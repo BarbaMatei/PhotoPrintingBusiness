@@ -1,0 +1,176 @@
+﻿@use 'styles/variables' as *;
+
+@keyframes kpiIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+.dash {
+  padding: $space-8;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  @media (max-width: 640px) { padding: $space-4; }
+}
+
+// KPI grid
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $space-5;
+  margin-bottom: $space-8;
+
+  @media (max-width: 900px)  { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 480px)  { grid-template-columns: 1fr; }
+}
+
+.dash-kpi {
+  position: relative;
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  padding: $space-5 $space-6 $space-5 calc(#{$space-6} + 4px);
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+  overflow: hidden;
+  animation: kpiIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+  transition: box-shadow $transition-normal, transform $transition-normal;
+
+  &:hover { box-shadow: $shadow-lg; transform: translateY(-2px); }
+
+  &__icon {
+    font-size: 1.75rem;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+  }
+
+  &__label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: $color-neutral-500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__value {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  &__stripe {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    border-radius: 0;
+
+    &--blue   { background: linear-gradient(180deg, $color-primary 0%, $color-primary-dark 100%); }
+    &--green  { background: linear-gradient(180deg, $color-success 0%, #16a34a 100%); }
+    &--amber  { background: linear-gradient(180deg, $color-accent 0%, $color-accent-dark 100%); }
+    &--purple { background: linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%); }
+  }
+}
+
+// Charts grid
+.dash-charts {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: auto auto;
+  gap: $space-5;
+
+  @media (max-width: 900px) { grid-template-columns: 1fr; }
+}
+
+.dash-chart {
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &--wide {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+  }
+
+  &__header {
+    padding: $space-5 $space-6 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semi;
+    color: $color-neutral-700;
+    letter-spacing: -0.01em;
+  }
+
+  &__canvas-wrap {
+    padding: $space-4 $space-5 $space-5;
+    flex: 1;
+    min-height: 200px;
+    position: relative;
+
+    canvas { width: 100% !important; }
+  }
+}
+
+// Alert
+.dash-alert {
+  padding: $space-4;
+  background: $color-error-light;
+  color: $color-error;
+  border-left: 3px solid $color-error;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  margin-bottom: $space-6;
+}
+
+// Skeleton
+.dash-skeleton {
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  padding: $space-5 $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  &__line {
+    height: 16px;
+    border-radius: $radius-sm;
+    background: linear-gradient(90deg, $color-neutral-100 25%, $color-neutral-50 50%, $color-neutral-100 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    width: 80%;
+
+    &--wide  { width: 55%; }
+    &--short { width: 35%; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-kpi { animation: none; }
+  .dash-skeleton__line { animation: none; }
+}

@@ -1,0 +1,234 @@
+using Microsoft.EntityFrameworkCore;
+using PhotoPrint.API.Data;
+using PhotoPrint.API.DTOs.Orders;
+using PhotoPrint.API.DTOs.Payments;
+using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Models;
+
+namespace PhotoPrint.API.Services;
+
+public class OrderService : IOrderService
+{
+    private readonly PhotoPrintDbContext _db;
+    private readonly IOrderNumberService _orderNumberService;
+    private readonly IShippingService _shipping;
+
+    public OrderService(
+        PhotoPrintDbContext db,
+        IOrderNumberService orderNumberService,
+        IShippingService shipping)
+    {
+        _db = db;
+        _orderNumberService = orderNumberService;
+        _shipping = shipping;
+    }
+
+    // ── CreateFromCartAsync ───────────────────────────────────────────────────
+
+    public async Task<Order> CreateFromCartAsync(
+        Guid? userId,
+        Guid? guestSessionId,
+        CreateOrderRequest request,
+        CancellationToken ct = default)
+    {
+        // 1. Load cart items with everything needed for price calculation
+        var cartItems = await _db.CartItems
+            .Where(ci => userId.HasValue
+                ? ci.UserId == userId
+                : ci.GuestSessionId == guestSessionId)
+            .Include(ci => ci.Product)
+                .ThenInclude(p => p.Sizes)
+                    .ThenInclude(s => s.PricingTiers)
+            .Include(ci => ci.Product)
+                .ThenInclude(p => p.Finishes)
+            .Include(ci => ci.Upload)
+            .Where(ci => ci.Upload.DeletedAt == null)
+            .OrderBy(ci => ci.AddedAt)
+            .ToListAsync(ct);
+
+        if (cartItems.Count == 0)
+            throw new BadRequestException("Coșul este gol.");
+
+        // 2. Build order items with price snapshots
+        var orderItems = cartItems.Select(ci =>
+        {
+            var unitPrice = ResolveUnitPrice(ci.Product, ci.Quantity);
+            var size = ci.Product.Sizes.FirstOrDefault(s => s.IsActive);
+            return new OrderItem
+            {
+                UploadId = ci.UploadId,
+                ProductId = ci.ProductId,
+                Quantity = ci.Quantity,
+                UnitPriceRon = unitPrice,
+                LineTotalRon = unitPrice * ci.Quantity,
+                ProductSnapshot = new ProductSnapshot
+                {
+                    ProductName = ci.Product.Name,
+                    Size = size?.Label ?? "",
+                    Finish = ci.Product.Finishes.FirstOrDefault()?.Name ?? "",
+                },
+            };
+        }).ToList();
+
+        var subtotal = orderItems.Sum(i => i.LineTotalRon);
+
+        // Server-side shipping resolution — never trust client-supplied cost.
+        // See bolt 034 (intent 014 payment-hardening).
+        var shipping = await _shipping.GetShippingCostAsync(request.DeliveryType.ToString(), ct);
+        var shippingCostRon = shipping.CostRon;
+        var total = subtotal + shippingCostRon;
+
+        // 3. Capture guest email before building the order
+        string? guestEmail = null;
+        if (guestSessionId.HasValue)
+        {
+            var gs = await _db.GuestSessions.FindAsync(new object[] { guestSessionId.Value }, ct);
+            guestEmail = gs?.Email;
+        }
+
+        // 4. Generate order number
+        var orderNumber = await _orderNumberService.GenerateAsync(ct);
+
+        // 5. Build and persist the order
+        var order = new Order
+        {
+            OrderNumber = orderNumber,
+            UserId = userId,
+            GuestSessionId = guestSessionId,
+            GuestEmail = guestEmail,
+            Status = OrderStatus.AwaitingPayment,
+            PaymentProcessor = request.PaymentProcessor,
+            ShippingAddress = request.ShippingAddress ?? new ShippingAddressSnapshot(),
+            DeliveryType = request.DeliveryType,
+            EasyboxLockerId = request.EasyboxLockerId,
+            ShippingCostRon = shippingCostRon,
+            SubtotalRon = subtotal,
+            TotalRon = total,
+            Items = orderItems,
+        };
+
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync(ct);
+
+        return order;
+    }
+
+    // ── Queries ───────────────────────────────────────────────────────────────
+
+    public async Task<Order?> GetByPaymentIntentIdAsync(
+        string paymentIntentId,
+        CancellationToken ct = default)
+        => await _db.Orders
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.PaymentIntentId == paymentIntentId, ct);
+
+    public async Task<Order?> GetByIdAsync(
+        Guid orderId,
+        CancellationToken ct = default)
+        => await _db.Orders
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+    // ── Customer order queries ────────────────────────────────────────────────
+
+    public async Task<(IReadOnlyList<OrderSummaryDto> Items, int Total)> GetOrdersAsync(
+        Guid userId, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = _db.Orders
+            .Where(o => o.UserId == userId)
+            .OrderByDescending(o => o.CreatedAt);
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(o => new OrderSummaryDto(
+                o.Id,
+                o.OrderNumber,
+                o.Status.ToString(),
+                o.TotalRon,
+                o.CreatedAt,
+                o.DeliveryType.ToString(),
+                o.Items.Sum(i => i.Quantity)))
+            .ToListAsync(ct);
+
+        return (items, total);
+    }
+
+    public async Task<OrderDetailDto> GetOrderDetailAsync(
+        Guid orderId, Guid userId, CancellationToken ct = default)
+    {
+        var order = await _db.Orders
+            .Include(o => o.Items)
+            .Include(o => o.EasyboxLocker)
+            .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+        if (order is null)
+            throw new NotFoundException($"Order {orderId} not found.");
+
+        if (order.UserId != userId)
+            throw new ForbiddenException("Access denied.");
+
+        var items = order.Items.Select(i => new OrderItemDto(
+            i.UploadId,
+            $"/api/uploads/{i.UploadId}/preview",
+            i.ProductSnapshot.ProductName,
+            i.ProductSnapshot.Size,
+            i.ProductSnapshot.Finish,
+            i.Quantity,
+            i.UnitPriceRon,
+            i.LineTotalRon)).ToList();
+
+        ShippingAddressDto? shippingAddress = null;
+        if (order.DeliveryType == DeliveryType.Courier && order.ShippingAddress is not null)
+        {
+            shippingAddress = new ShippingAddressDto(
+                order.ShippingAddress.RecipientName,
+                order.ShippingAddress.Street,
+                order.ShippingAddress.Number,
+                order.ShippingAddress.Block,
+                order.ShippingAddress.City,
+                order.ShippingAddress.County,
+                order.ShippingAddress.PostalCode,
+                order.ShippingAddress.Phone);
+        }
+
+        return new OrderDetailDto(
+            order.Id,
+            order.OrderNumber,
+            order.Status.ToString(),
+            order.SubtotalRon,
+            order.ShippingCostRon,
+            order.TotalRon,
+            order.CreatedAt,
+            order.PaidAt,
+            order.DeliveryType.ToString(),
+            order.PaymentProcessor.ToString(),
+            order.EasyboxLockerId,
+            order.EasyboxLocker?.Name,
+            order.EasyboxLocker?.Address,
+            shippingAddress,
+            items);
+    }
+
+    // ── Price helper (mirrors CartService.ResolveUnitPrice) ───────────────────
+
+    private static decimal ResolveUnitPrice(Product product, int quantity)
+    {
+        var tiers = product.Sizes
+            .Where(s => s.IsActive)
+            .SelectMany(s => s.PricingTiers)
+            .OrderByDescending(t => t.MinQuantity)
+            .ToList();
+
+        if (tiers.Count == 0)
+            return 0m;
+
+        var matched = tiers.FirstOrDefault(t =>
+            t.MinQuantity <= quantity &&
+            (t.MaxQuantity == null || quantity <= t.MaxQuantity));
+
+        return (matched ?? tiers[0]).UnitPrice;
+    }
+}

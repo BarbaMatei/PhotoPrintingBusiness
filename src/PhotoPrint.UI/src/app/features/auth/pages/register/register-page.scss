@@ -1,0 +1,5 @@
+@use 'styles/variables' as *;
+@use 'styles/auth-forms' as *;
+
+// Register-specific styles only — shared auth styles live in styles/_auth-forms.scss
+// Password checklist styles live in password-checklist.component.scss

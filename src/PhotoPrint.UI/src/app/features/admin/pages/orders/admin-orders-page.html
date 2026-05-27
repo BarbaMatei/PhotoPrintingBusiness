@@ -1,0 +1,87 @@
+﻿<div class="ord">
+
+  <!-- Filters -->
+  <div class="ord-toolbar">
+    <div class="ord-search">
+      <span class="ord-search__icon" aria-hidden="true">🔍</span>
+      <input
+        class="ord-search__input"
+        type="text"
+        placeholder="Caută după număr, email, client..."
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onSearchChange()"
+        aria-label="Căutare comenzi"
+      />
+    </div>
+    <select class="ord-select" [(ngModel)]="statusFilter" (ngModelChange)="onStatusChange()" aria-label="Filtru status">
+      @for (s of statusOptions; track s) {
+        <option [value]="s">{{ statusLabel(s) }}</option>
+      }
+    </select>
+  </div>
+
+  @if (loading) {
+    <div class="ord-table-wrap">
+      @for (n of [1,2,3,4,5]; track n) {
+        <div class="ord-row-skeleton">
+          <div class="ord-row-skeleton__cell ord-row-skeleton__cell--short"></div>
+          <div class="ord-row-skeleton__cell"></div>
+          <div class="ord-row-skeleton__cell"></div>
+          <div class="ord-row-skeleton__cell ord-row-skeleton__cell--short"></div>
+        </div>
+      }
+    </div>
+  } @else if (error) {
+    <div class="ord-alert">{{ error }}</div>
+  } @else {
+    <div class="ord-table-wrap">
+      <table class="ord-table" aria-label="Tabel comenzi">
+        <thead class="ord-table__head">
+          <tr>
+            <th>Număr</th>
+            <th>Status</th>
+            <th>Client</th>
+            <th>Email</th>
+            <th>Total</th>
+            <th>Data</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of orders; track order.id) {
+            <tr class="ord-table__row">
+              <td class="ord-table__num">{{ order.orderNumber }}</td>
+              <td>
+                <span class="ord-badge" [class]="'ord-badge--' + statusClass(order.status)">
+                  {{ statusLabel(order.status) }}
+                </span>
+              </td>
+              <td class="ord-table__name">{{ order.customerName }}</td>
+              <td class="ord-table__email">{{ order.customerEmail }}</td>
+              <td class="ord-table__total">{{ formatRon(order.totalRon) }}</td>
+              <td class="ord-table__date">{{ formatDate(order.createdAt) }}</td>
+              <td class="ord-table__action">
+                <a [routerLink]="['/admin/comenzi', order.id]" class="ord-detail-btn">
+                  Detalii <span aria-hidden="true">→</span>
+                </a>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="ord-empty">Nu există comenzi pentru filtrele selectate.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages > 1) {
+      <div class="ord-pagination">
+        <button class="ord-page-btn" [disabled]="page === 1" (click)="prevPage()">← Anterior</button>
+        <span class="ord-page-info">{{ page }} / {{ totalPages }} <span class="ord-page-total">({{ total }})</span></span>
+        <button class="ord-page-btn" [disabled]="page === totalPages" (click)="nextPage()">Următor →</button>
+      </div>
+    }
+  }
+
+</div>

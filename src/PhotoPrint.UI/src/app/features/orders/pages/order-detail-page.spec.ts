@@ -1,0 +1,155 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import { of, throwError } from 'rxjs';
+import { vi } from 'vitest';
+import { OrderDetailPage } from './order-detail-page';
+import { OrderService } from '../../../core/services/order.service';
+import { OrderDetailDto } from '../../../core/models/order.model';
+
+const MOCK_DETAIL: OrderDetailDto = {
+  id: 'order-1',
+  orderNumber: 'FT-001',
+  status: 'Paid',
+  totalRon: 120,
+  subtotalRon: 100,
+  shippingCostRon: 20,
+  createdAt: '2026-05-01T12:00:00Z',
+  paidAt: '2026-05-01T12:05:00Z',
+  deliveryType: 'Easybox',
+  itemCount: 1,
+  paymentProcessor: 'Stripe',
+  lockerId: 'locker-1',
+  lockerName: 'Easybox Mega Mall',
+  lockerAddress: 'Str. Exemplu 1, București',
+  shippingAddress: null,
+  items: [
+    {
+      uploadId: 'upload-1',
+      previewUrl: '/api/uploads/upload-1/preview',
+      productName: 'Fotografie 10×15',
+      size: '10x15',
+      finish: 'Lucioasă',
+      quantity: 2,
+      unitPriceRon: 50,
+      lineTotalRon: 100,
+    },
+  ],
+};
+
+function makeOrderService(overrides: Partial<OrderService> = {}): Partial<OrderService> {
+  return {
+    getOrderDetail: vi.fn().mockReturnValue(of(MOCK_DETAIL)),
+    ...overrides,
+  };
+}
+
+describe('OrderDetailPage', () => {
+  let fixture: ComponentFixture<OrderDetailPage>;
+  let component: OrderDetailPage;
+  let router: Router;
+
+  async function setup(serviceOverrides: Partial<OrderService> = {}, navigateSpy?: ReturnType<typeof vi.spyOn>) {
+    await TestBed.configureTestingModule({
+      imports: [OrderDetailPage],
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: makeOrderService(serviceOverrides) },
+      ],
+    }).compileComponents();
+
+    router = TestBed.inject(Router);
+    // If a spy was passed in, it was already installed; otherwise leave navigate unspied
+    if (navigateSpy === undefined && !serviceOverrides.getOrderDetail) {
+      // normal happy-path setup
+    }
+    fixture = TestBed.createComponent(OrderDetailPage);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('orderId', 'order-1');
+    fixture.detectChanges();
+  }
+
+  async function setupWithErrorAndNavigateSpy(status: number) {
+    await TestBed.configureTestingModule({
+      imports: [OrderDetailPage],
+      providers: [
+        provideRouter([]),
+        {
+          provide: OrderService,
+          useValue: makeOrderService({
+            getOrderDetail: vi.fn().mockReturnValue(throwError(() => ({ status }))),
+          }),
+        },
+      ],
+    }).compileComponents();
+
+    router = TestBed.inject(Router);
+    const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture = TestBed.createComponent(OrderDetailPage);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('orderId', 'order-1');
+    fixture.detectChanges();
+    return spy;
+  }
+
+  it('renders order number after loading', async () => {
+    await setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('FT-001');
+  });
+
+  it('renders line item product name', async () => {
+    await setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Fotografie 10×15');
+  });
+
+  it('renders subtotal, shipping and total amounts', async () => {
+    await setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('100.00 RON');
+    expect(el.textContent).toContain('20.00 RON');
+    expect(el.textContent).toContain('120.00 RON');
+  });
+
+  it('shows locker name for Easybox orders', async () => {
+    await setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Easybox Mega Mall');
+  });
+
+  it('shows shipping address for Courier orders', async () => {
+    const courierDetail: OrderDetailDto = {
+      ...MOCK_DETAIL,
+      deliveryType: 'Courier',
+      lockerId: null,
+      lockerName: null,
+      lockerAddress: null,
+      shippingAddress: {
+        recipientName: 'Ion Popescu',
+        street: 'Str. Florilor',
+        number: '10',
+        block: null,
+        city: 'Cluj-Napoca',
+        county: 'Cluj',
+        postalCode: '400001',
+        phone: '0712345678',
+      },
+    };
+    await setup({
+      getOrderDetail: vi.fn().mockReturnValue(of(courierDetail)),
+    });
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Ion Popescu');
+    expect(el.textContent).toContain('Cluj-Napoca');
+  });
+
+  it('navigates to /comenzile-mele on 403', async () => {
+    const navigateSpy = await setupWithErrorAndNavigateSpy(403);
+    expect(navigateSpy).toHaveBeenCalledWith(['/comenzile-mele']);
+  });
+
+  it('navigates to /comenzile-mele on 404', async () => {
+    const navigateSpy = await setupWithErrorAndNavigateSpy(404);
+    expect(navigateSpy).toHaveBeenCalledWith(['/comenzile-mele']);
+  });
+});

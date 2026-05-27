@@ -1,0 +1,37 @@
+@{
+    Layout = "_Layout";
+}
+<h2 style="margin:0 0 16px;font-size:22px;color:#2E7D32;">Comanda ta este în drum spre tine, @Model.FirstName!</h2>
+
+<p>Comanda <strong>#@Model.OrderNumber</strong> a fost preluată de curier și este pe drum.</p>
+
+@if (!string.IsNullOrEmpty(Model.AwbNumber))
+{
+  <div style="background-color:#e8f5e9;border-left:4px solid #2E7D32;padding:16px 20px;margin:24px 0;border-radius:4px;">
+    <p style="margin:0 0 6px;font-weight:bold;">AWB: @Model.AwbNumber</p>
+    @if (!string.IsNullOrEmpty(Model.TrackingUrl))
+    {
+      <a href="@Model.TrackingUrl" style="color:#2E7D32;font-size:14px;">Urmărește coletul &rarr;</a>
+    }
+  </div>
+}
+
+<div style="background-color:#f9fbe7;border-left:4px solid #8BC34A;padding:16px 20px;margin-bottom:24px;border-radius:4px;">
+  <p style="margin:0 0 6px;font-weight:bold;">Livrare:</p>
+  @if (Model.IsEasybox)
+  {
+    <p style="margin:0;color:#424242;">
+      Easybox — @Model.LockerName<br>
+      <span style="color:#616161;font-size:13px;">@Model.LockerAddress</span>
+    </p>
+  }
+  else
+  {
+    <p style="margin:0;color:#424242;">Curier la adresa de livrare</p>
+  }
+</div>
+
+<p style="color:#616161;font-size:13px;">
+  Ai întrebări? Scrie-ne la
+  <a href="mailto:contact@fototipar.ro" style="color:#2E7D32;">contact@fototipar.ro</a>.
+</p>

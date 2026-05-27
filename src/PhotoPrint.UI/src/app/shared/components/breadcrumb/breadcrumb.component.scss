@@ -1,0 +1,27 @@
+@use 'styles/variables' as *;
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  margin-bottom: $space-6;
+
+  &__back {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    text-decoration: none;
+  }
+
+  &__sep {
+    color: $color-neutral-300;
+    font-size: $font-size-sm;
+    user-select: none;
+  }
+
+  &__title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semi;
+    color: $color-neutral-700;
+  }
+}

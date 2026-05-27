@@ -1,0 +1,45 @@
+<dialog #dialog class="prompt-dialog" (cancel)="close()">
+  <button type="button" class="close-btn" (click)="close()" aria-label="Închide">✕</button>
+
+  @if (step === 'options') {
+    <div class="prompt-content">
+      <h2 class="prompt-title">Cum dorești să continui?</h2>
+      <p class="prompt-subtitle">Alege una dintre opțiunile de mai jos pentru a finaliza comanda.</p>
+
+      <div class="options">
+        <button type="button" class="option-btn option-btn--primary" (click)="goToLogin()">
+          <span class="option-icon">🔑</span>
+          <span>
+            <strong>Conectează-te</strong>
+            <small>Accesează contul tău existent</small>
+          </span>
+        </button>
+
+        <button type="button" class="option-btn" (click)="goToRegister()">
+          <span class="option-icon">✨</span>
+          <span>
+            <strong>Creează cont</strong>
+            <small>Înregistrează-te pentru a salva comenzile</small>
+          </span>
+        </button>
+
+        <button type="button" class="option-btn" (click)="showGuestForm()">
+          <span class="option-icon">🛒</span>
+          <span>
+            <strong>Continuă ca oaspete</strong>
+            <small>Fără cont — comenzile nu sunt salvate</small>
+          </span>
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (step === 'guest-form') {
+    <div class="prompt-content">
+      <app-guest-checkout-form
+        (sessionCreated)="onGuestSessionCreated()"
+        (cancelled)="step = 'options'"
+      />
+    </div>
+  }
+</dialog>

@@ -1,0 +1,21 @@
+@{
+    Layout = "_Layout";
+}
+<h2 style="margin:0 0 16px;font-size:22px;color:#2E7D32;">Comanda ta a ajuns, @Model.FirstName!</h2>
+
+<p>Comanda <strong>#@Model.OrderNumber</strong> a fost livrată. Sperăm că fotografiile îți aduc multă bucurie!</p>
+
+<p>Îți mulțumim că ai ales <strong>FotoTipar</strong>. Dacă ești mulțumit, ne bucurăm să te revedem.</p>
+
+<div style="text-align:center;margin:32px 0;">
+  <a href="@Model.OrdersUrl"
+     style="background-color:#2E7D32;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;display:inline-block;">
+    Comandă din nou
+  </a>
+</div>
+
+<p style="color:#616161;font-size:13px;">
+  Ai o problemă cu comanda? Contactează-ne la
+  <a href="mailto:contact@fototipar.ro" style="color:#2E7D32;">contact@fototipar.ro</a>
+  în termen de 14 zile.
+</p>

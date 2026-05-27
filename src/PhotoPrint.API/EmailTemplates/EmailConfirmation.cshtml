@@ -1,0 +1,19 @@
+@{
+    Layout = "_Layout";
+}
+<h2 style="margin:0 0 16px;font-size:22px;color:#2E7D32;">Confirmă adresa de email</h2>
+
+<p>Bună, <strong>@Model.UserName</strong>!</p>
+
+<p>Apasă butonul de mai jos pentru a confirma adresa de email și a-ți activa contul FotoTipar.</p>
+
+<div style="text-align:center;margin:32px 0;">
+  <a href="@Model.ConfirmUrl"
+     style="background-color:#2E7D32;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;display:inline-block;">
+    Confirmă adresa de email
+  </a>
+</div>
+
+<p style="color:#616161;font-size:13px;margin-top:24px;">
+  Linkul expiră în 24 de ore. Dacă nu ai creat un cont la FotoTipar, ignoră acest mesaj.
+</p>

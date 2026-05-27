@@ -1,0 +1,138 @@
+<header class="header">
+  <div class="header__container">
+
+    <!-- Logo -->
+    <a routerLink="/" class="header__logo" aria-label="FotoTipar – pagina principală">
+      <div class="header__logo-mark" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="url(#logoGrad)"/>
+          <path d="M14 8.5C11.515 8.5 9.5 10.515 9.5 13s2.015 4.5 4.5 4.5 4.5-2.015 4.5-4.5S16.485 8.5 14 8.5z" fill="white" opacity=".85"/>
+          <circle cx="14" cy="13" r="2.2" fill="url(#logoGrad2)"/>
+          <rect x="18.5" y="7" width="1.8" height="1.8" rx="0.9" fill="white" opacity=".9"/>
+          <rect x="7.5" y="18" width="13" height="1.5" rx="0.75" fill="white" opacity=".4"/>
+          <defs>
+            <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28">
+              <stop offset="0%" stop-color="#1a73e8"/>
+              <stop offset="100%" stop-color="#0d47a1"/>
+            </linearGradient>
+            <linearGradient id="logoGrad2" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+              <stop offset="0%" stop-color="#ff6d00"/>
+              <stop offset="100%" stop-color="#ff9100"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <span class="header__logo-name">
+        <span class="header__logo-foto">Foto</span><span class="header__logo-tipar">Tipar</span>
+      </span>
+    </a>
+
+    <!-- Desktop navigation -->
+    <nav class="header__nav" aria-label="Navigare principală">
+      <a
+        routerLink="/"
+        routerLinkActive="header__nav-link--active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="header__nav-link"
+      >Acasă</a>
+      <a
+        routerLink="/tipareste"
+        routerLinkActive="header__nav-link--active"
+        class="header__nav-link"
+      >Tipărește</a>
+      @if (isAdmin()) {
+        <a
+          routerLink="/admin"
+          routerLinkActive="header__nav-link--active"
+          class="header__nav-link header__nav-link--admin"
+        >Admin</a>
+      }
+    </nav>
+
+    <!-- Actions -->
+    <div class="header__actions">
+
+      <!-- Cart -->
+      <a
+        routerLink="/cos"
+        class="header__cart"
+        aria-label="Coș de cumpărături ({{ cartCount() }} articole)"
+      >
+        <svg class="header__cart-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+        @if (cartCount() > 0) {
+          <span class="header__cart-badge">{{ cartCount() }}</span>
+        }
+      </a>
+
+      <!-- Auth state -->
+      @if (isAuthenticated()) {
+        <div class="header__user">
+          <button
+            class="header__avatar-btn"
+            type="button"
+            aria-label="Meniu utilizator"
+            [attr.aria-expanded]="isUserMenuOpen()"
+            (click)="toggleUserMenu()"
+          >
+            <span class="header__avatar" aria-hidden="true">U</span>
+          </button>
+          @if (isUserMenuOpen()) {
+            <div class="header__dropdown" role="menu">
+              <a routerLink="/contul-meu" class="header__dropdown-item" role="menuitem" (click)="isUserMenuOpen.set(false)">Contul meu</a>
+              <a routerLink="/comenzile-mele" class="header__dropdown-item" role="menuitem" (click)="isUserMenuOpen.set(false)">Comenzile mele</a>
+              <hr class="header__dropdown-divider" />
+              <button
+                type="button"
+                class="header__dropdown-item header__dropdown-btn"
+                role="menuitem"
+                (click)="logout()"
+              >Deconectare</button>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="header__auth">
+          <a routerLink="/auth/login" class="header__auth-link">Autentificare</a>
+          <a routerLink="/auth/register" class="header__auth-cta btn btn--accent btn--sm">Înregistrare</a>
+        </div>
+      }
+
+      <!-- Mobile hamburger -->
+      <button
+        class="header__hamburger"
+        type="button"
+        aria-label="Deschide meniu"
+        [attr.aria-expanded]="isMobileMenuOpen()"
+        (click)="toggleMobileMenu()"
+      >
+        <span [class.open]="isMobileMenuOpen()"></span>
+        <span [class.open]="isMobileMenuOpen()"></span>
+        <span [class.open]="isMobileMenuOpen()"></span>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Mobile nav panel -->
+  @if (isMobileMenuOpen()) {
+    <div class="header__mobile-nav" role="dialog" aria-label="Meniu mobil">
+      <a routerLink="/" class="header__mobile-link" (click)="toggleMobileMenu()">Acasă</a>
+      <a routerLink="/tipareste" class="header__mobile-link" (click)="toggleMobileMenu()">Tipărește</a>
+      <a routerLink="/cos" class="header__mobile-link" (click)="toggleMobileMenu()">Coș</a>
+      @if (isAuthenticated()) {
+        <a routerLink="/contul-meu" class="header__mobile-link" (click)="toggleMobileMenu()">Contul meu</a>
+        <a routerLink="/comenzile-mele" class="header__mobile-link" (click)="toggleMobileMenu()">Comenzile mele</a>
+        @if (isAdmin()) {
+          <a routerLink="/admin" class="header__mobile-link" (click)="toggleMobileMenu()">Admin</a>
+        }
+        <button type="button" class="header__mobile-link header__mobile-logout" (click)="logout()">Deconectare</button>
+      } @else {
+        <a routerLink="/auth/login" class="header__mobile-link" (click)="toggleMobileMenu()">Autentificare</a>
+        <a routerLink="/auth/register" class="header__mobile-link header__mobile-link--cta" (click)="toggleMobileMenu()">Înregistrare</a>
+      }
+    </div>
+  }
+</header>

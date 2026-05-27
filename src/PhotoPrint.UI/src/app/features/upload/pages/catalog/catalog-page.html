@@ -1,0 +1,27 @@
+<section class="catalog">
+  <header class="catalog__header">
+    <h1>Tipărește fotografii</h1>
+    <p>Alege formatul și cantitatea — livrăm rapid în toată România.</p>
+  </header>
+
+  @if (loading) {
+    <div class="catalog__grid">
+      @for (skeleton of [1, 2, 3]; track skeleton) {
+        <div class="catalog__skeleton"></div>
+      }
+    </div>
+  } @else if (error) {
+    <div class="catalog__error">
+      <p>{{ error }}</p>
+      <button class="btn btn--primary" (click)="loadCatalog()">Încearcă din nou</button>
+    </div>
+  } @else if (products.length === 0) {
+    <p class="catalog__empty">Nu există produse disponibile momentan.</p>
+  } @else {
+    <div class="catalog__grid">
+      @for (product of products; track product.id) {
+        <app-product-card [product]="product" />
+      }
+    </div>
+  }
+</section>

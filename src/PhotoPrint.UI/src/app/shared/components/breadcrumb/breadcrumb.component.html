@@ -1,0 +1,7 @@
+<nav class="breadcrumb" aria-label="Navigare ierarhică">
+  <a [routerLink]="backLink()" class="breadcrumb__back btn btn--ghost btn--sm">
+    <span aria-hidden="true">←</span>&nbsp;{{ backLabel() }}
+  </a>
+  <span class="breadcrumb__sep" aria-hidden="true">/</span>
+  <span class="breadcrumb__title">{{ title() }}</span>
+</nav>

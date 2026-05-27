@@ -1,0 +1,70 @@
+<main class="auth-layout">
+  <div class="auth-card">
+    <h1 class="auth-card__title">Autentificare</h1>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="auth-form">
+
+      <!-- Email -->
+      <div class="form-field">
+        <label for="email">Adresă email</label>
+        <input id="email" type="email" formControlName="email" autocomplete="email" />
+        @if (form.get('email')?.invalid && form.get('email')?.touched) {
+          <span class="field-error">Introduceți o adresă de email validă.</span>
+        }
+      </div>
+
+      <!-- Password -->
+      <div class="form-field">
+        <div class="label-row">
+          <label for="password">Parolă</label>
+          <a routerLink="/auth/forgot-password" class="forgot-link">Am uitat parola</a>
+        </div>
+        <div class="input-with-toggle">
+          <input
+            id="password"
+            [type]="showPassword ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="current-password"
+          />
+          <button type="button" class="toggle-btn" (click)="showPassword = !showPassword" aria-label="Afișează/ascunde parola">
+            {{ showPassword ? '🙈' : '👁' }}
+          </button>
+        </div>
+        @if (form.get('password')?.invalid && form.get('password')?.touched) {
+          <span class="field-error">Parola este obligatorie.</span>
+        }
+      </div>
+
+      <!-- Remember me -->
+      <div class="form-field form-field--checkbox">
+        <label>
+          <input type="checkbox" formControlName="rememberMe" />
+          Ține-mă minte
+        </label>
+      </div>
+
+      <!-- Form-level error -->
+      @if (formError) {
+        <div class="form-error" role="alert">
+          {{ formError }}
+          @if (resendVisible) {
+            <button type="button" class="link-btn" (click)="resendConfirmation()">Retrimite email</button>
+          }
+        </div>
+      }
+
+      <button type="submit" class="btn btn--primary btn--full" [disabled]="form.invalid || loading">
+        @if (loading) {
+          <span class="spinner" aria-hidden="true"></span> Se procesează...
+        } @else {
+          Autentifică-te
+        }
+      </button>
+
+    </form>
+
+    <p class="auth-card__footer">
+      Nu ai cont? <a routerLink="/auth/register">Înregistrează-te</a>
+    </p>
+  </div>
+</main>

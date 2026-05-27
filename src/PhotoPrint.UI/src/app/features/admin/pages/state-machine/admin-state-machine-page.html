@@ -1,0 +1,91 @@
+﻿<div class="sm">
+
+  <!-- intro -->
+  <p class="sm-intro">
+    Diagrama tuturor statusurilor posibile ale unei comenzi și regulile de tranziție între ele.
+  </p>
+
+  <!-- State cards -->
+  <section class="sm-section" aria-label="Statusuri posibile">
+    <h2 class="sm-section-title">
+      <span class="sm-section-title__dot sm-section-title__dot--blue"></span>
+      Statusuri posibile
+    </h2>
+    <div class="sm-states-grid">
+      @for (state of states; track state.id; let i = $index) {
+        <div class="sm-state" [class]="'sm-state--' + state.colorClass.replace('state--','')"
+          [style.--i]="i">
+          <div class="sm-state__head">
+            <span class="sm-state__label">{{ state.label }}</span>
+            @if (state.isTerminal) {
+              <span class="sm-state__terminal">final</span>
+            }
+          </div>
+          <code class="sm-state__id">{{ state.id }}</code>
+          <p class="sm-state__desc">{{ state.description }}</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Transition table -->
+  <section class="sm-section" aria-label="Tranziții valide">
+    <h2 class="sm-section-title">
+      <span class="sm-section-title__dot sm-section-title__dot--amber"></span>
+      Tranziții valide
+    </h2>
+    <div class="sm-table-wrap">
+      <table class="sm-table" aria-label="Reguli de tranziție">
+        <thead>
+          <tr>
+            <th>De la</th>
+            <th></th>
+            <th>La</th>
+            <th>Declanșator</th>
+            <th>Actor</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of transitions; track t.from + t.to) {
+            <tr class="sm-table__row">
+              <td>
+                <span class="sm-inline" [class]="'sm-inline--' + stateClass(t.from).replace('state--','')">
+                  {{ stateLabel(t.from) }}
+                </span>
+              </td>
+              <td class="sm-table__arrow">→</td>
+              <td>
+                <span class="sm-inline" [class]="'sm-inline--' + stateClass(t.to).replace('state--','')">
+                  {{ stateLabel(t.to) }}
+                </span>
+              </td>
+              <td class="sm-table__trigger">{{ t.trigger }}</td>
+              <td>
+                <span class="sm-actor" [class]="t.actor === 'admin' ? 'sm-actor--admin' : 'sm-actor--system'">
+                  {{ t.actor === 'admin' ? '👤 Admin' : '⚙️ Sistem' }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Business rules -->
+  <section class="sm-section" aria-label="Reguli de business">
+    <h2 class="sm-section-title">
+      <span class="sm-section-title__dot sm-section-title__dot--green"></span>
+      Reguli de business
+    </h2>
+    <ul class="sm-rules" role="list">
+      @for (rule of rules; track rule) {
+        <li class="sm-rules__item">
+          <span class="sm-rules__check" aria-hidden="true">✓</span>
+          {{ rule }}
+        </li>
+      }
+    </ul>
+  </section>
+
+</div>

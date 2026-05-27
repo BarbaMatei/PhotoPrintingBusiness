@@ -1,0 +1,47 @@
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate class="guest-form">
+  <h3 class="guest-form__title">Date de contact</h3>
+
+  <div class="form-row">
+    <div class="form-field">
+      <label for="g-firstName">Prenume *</label>
+      <input id="g-firstName" type="text" formControlName="firstName" autocomplete="given-name" />
+      @if (form.get('firstName')?.invalid && form.get('firstName')?.touched) {
+        <span class="field-error">Prenumele este obligatoriu.</span>
+      }
+    </div>
+    <div class="form-field">
+      <label for="g-lastName">Nume *</label>
+      <input id="g-lastName" type="text" formControlName="lastName" autocomplete="family-name" />
+      @if (form.get('lastName')?.invalid && form.get('lastName')?.touched) {
+        <span class="field-error">Numele este obligatoriu.</span>
+      }
+    </div>
+  </div>
+
+  <div class="form-field">
+    <label for="g-email">Email *</label>
+    <input id="g-email" type="email" formControlName="email" autocomplete="email" />
+    @if (form.get('email')?.invalid && form.get('email')?.touched) {
+      <span class="field-error">Introduceți o adresă de email validă.</span>
+    }
+  </div>
+
+  <div class="form-field">
+    <label for="g-phone">Telefon *</label>
+    <input id="g-phone" type="tel" formControlName="phone" autocomplete="tel" placeholder="07xxxxxxxx" />
+    @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
+      <span class="field-error">Număr de telefon invalid (ex: 0712345678).</span>
+    }
+  </div>
+
+  <div class="form-actions">
+    <button type="button" class="btn btn--ghost" (click)="cancelled.emit()">Înapoi</button>
+    <button type="submit" class="btn btn--primary" [disabled]="form.invalid || loading">
+      @if (loading) {
+        <span class="spinner" aria-hidden="true"></span>
+      } @else {
+        Continuă
+      }
+    </button>
+  </div>
+</form>

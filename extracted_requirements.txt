@@ -1,0 +1,889 @@
+FotoTipar — Platformă Web
+Software Requirements Specification
+v1.1  ·  Mai 2026  ·  Română
+FRONTEND
+Angular 17+  (Standalone Components)
+TypeScript · SCSS · Angular Material
+BACKEND
+ASP.NET Core 8 Web API  (C#)
+PostgreSQL · EF Core · JWT · SignalR
+Scop &amp; Decizii Cheie
+Platformă e-commerce de tipărire foto 100% online, în limba română. Clienții uploadează fotografii, aleg format (10×15 / 13×18 / 15×21 cm) și finisaj (Lucios / Mat), plătesc online și primesc comenzile prin Sameday Easybox sau livrare la ușă.
+Auth: Email+Parolă + Google OAuth + Guest Checkout  ·  Plăți: Stripe + EuPlatesc  ·  Livrare: Easybox (auto API) + curier (manual fallback)  ·  Email: Confirmare / Expediat / Livrat / Bun venit  ·  DB: PostgreSQL
+1. Technology Stack
+FE Framework
+Angular 17+ — standalone components, Signals, lazy-loaded routes
+FE Language
+TypeScript 5.x
+FE Styling
+Angular Material + custom SCSS theme
+FE State
+Angular Signals + RxJS
+FE Maps
+Leaflet.js + OpenStreetMap (no billing)
+FE Charts
+ng2-charts (Chart.js wrapper)
+BE Framework
+ASP.NET Core 8 Web API (C#)
+BE ORM
+Entity Framework Core 8 — code-first migrations
+Database
+PostgreSQL 16
+Auth
+JWT RS256 (15-min) + HttpOnly refresh cookie (30-day rotating)
+Social Auth
+Google Identity Services — server-side token validation
+File Storage
+Local disk /uploads/ (IStorageService — S3-ready interface)
+Image Processing
+SixLabors.ImageSharp — dimension extraction, future resizing
+Email
+IEmailService: MailKit (dev SMTP) / SendGrid (prod) — Razor templates
+Payments
+Stripe (webhook-driven) + EuPlatesc (IPN-driven)
+Shipping
+IShippingService: Sameday API (Phase 2) / static seed + manual (Phase 1)
+Real-time
+ASP.NET Core SignalR — AdminOrderHub
+Validation
+FluentValidation (BE) + Angular Reactive Forms (FE)
+Rate Limiting
+ASP.NET Core Rate Limiting middleware
+Logging
+Serilog — console (dev) + rolling file (prod)
+API Docs
+Swashbuckle / Swagger UI (dev only)
+Containerisation
+Docker + docker-compose (local dev)
+2. Epics &amp; User Stories
+Cardurile sunt color-codate: VERDE = Frontend (Angular)   ROȘU = Backend (.NET API)
+Acceptance Criteria (AC) sunt formulate ca condiții testabile, gata de utilizat în prompts AI.
+EPIC-1  |  Autentificare &amp; Conturi
+Trei moduri de autentificare: Email+Parolă, Google OAuth și Guest Checkout. Reset parolă. Verificare email.
+[FRONTEND — Angular]  US-101 — Register — Email &amp; Password
+As a
+new visitor
+I want to
+create a personal account with email and password so I can track my orders later
+AC
+• Form fields: First Name, Last Name, Email, Password, Confirm Password, Phone (optional)
+• Real-time password validation: min 8 chars, 1 uppercase, 1 digit, 1 special character
+• GDPR consent checkbox (mandatory) with link to Privacy Policy — submit disabled until checked
+• On success: show email-verification-pending screen; do not auto-login until email confirmed
+• Duplicate email: inline field error &apos;Adresa de email este deja folosită&apos;
+• All labels and messages in Romanian
+[BACKEND — ASP.NET Core]  US-102 — Register — Backend
+As a
+system
+I want to
+persist new accounts securely and trigger email confirmation
+AC
+• POST /api/auth/register — FluentValidation on all fields
+• Password hashed with ASP.NET Identity (PBKDF2-SHA256, 10 000 iterations)
+• User record: Id (UUID), Email (unique index), PasswordHash, FirstName, LastName, Phone, Role=Customer, IsEmailConfirmed=false, CreatedAt
+• Generates email token (UUID), stores SHA-256 hash with 24h expiry in EmailConfirmationTokens table
+• Fires IEmailService.SendConfirmationEmailAsync (async, non-blocking); logs failure but does not fail request
+• Returns 201 {userId}; 409 on duplicate email; rate-limited 5 req/IP/hour
+[BACKEND — ASP.NET Core]  US-103 — Email Verification
+As a
+system
+I want to
+verify user owns the email before activating the account
+AC
+• GET /api/auth/confirm-email?userId=&amp;token= — marks IsEmailConfirmed=true; deletes token row
+• Expired or invalid token → 400 with message &apos;Link invalid sau expirat&apos;
+• POST /api/auth/resend-confirmation — rate-limited 3/hour/email; no-ops silently if already confirmed
+• FE confirmation-pending page shows countdown and resend button
+[FRONTEND — Angular]  US-104 — Login — Email &amp; Password
+As a
+registered user
+I want to
+sign in with email and password to access my account and order history
+AC
+• Form: Email, Password, &apos;Ține-mă minte&apos; toggle; show/hide password icon
+• On success: redirect to originally requested URL or homepage
+• On failure: &apos;Email sau parolă incorectă&apos; — no field-level leakage
+• &apos;Am uitat parola&apos; link → /reset-password; &apos;Nu ai cont? Înregistrează-te&apos; link
+• Spinner + disabled submit during in-flight request
+[BACKEND — ASP.NET Core]  US-105 — Login — JWT + Refresh Token
+As a
+system
+I want to
+authenticate users and issue short-lived JWT with rotating refresh tokens
+AC
+• POST /api/auth/login → {accessToken, expiresIn}; sets refreshToken in HttpOnly Secure SameSite=Strict cookie
+• Access token: JWT RS256, 15-min expiry; claims: sub (userId), email, role, firstName
+• Refresh token: opaque UUID, SHA-256 hashed in DB, 30-day expiry; rotated on every use (old token revoked immediately)
+• POST /api/auth/refresh — reads cookie, validates, issues new pair
+• POST /api/auth/logout — revokes refresh token in DB, clears cookie
+• 5 consecutive failures → account locked 15 min; 423 response + lockout email sent
+[FRONTEND — Angular]  US-106 — Google Social Login
+As a
+user
+I want to
+sign in with my Google account without creating a separate password
+AC
+• &apos;Continuă cu Google&apos; button on login and register pages using Google Identity Services SDK
+• On success callback: sends idToken to BE; receives platform JWT
+• If email exists with password account: accounts are linked; toast &apos;Contul tău Google a fost conectat&apos;
+• Error from Google: friendly message &apos;Autentificarea Google a eșuat. Încearcă din nou&apos;
+[BACKEND — ASP.NET Core]  US-107 — Google Social Login — Backend
+As a
+system
+I want to
+validate Google id_token server-side and issue platform JWT
+AC
+• POST /api/auth/google {idToken} — validates with Google tokeninfo; verifies aud=CLIENT_ID
+• Upserts user: creates if new (no password), or links GoogleId to existing account by email
+• Stores ExternalLogin(UserId, Provider=&apos;Google&apos;, ProviderKey=googleSub)
+• Returns same JWT + refresh cookie as password login
+• Never forwards Google token to client after this call
+[FRONTEND — Angular]  US-108 — Guest Checkout — Info Form
+As a
+visitor who does not want to create an account
+I want to
+place an order without registering by filling in my contact details
+AC
+• On checkout start: modal or page prompt — &apos;Continuă ca oaspete&apos; | &apos;Conectează-te&apos; | &apos;Creează cont&apos;
+• Guest form fields: First Name (required), Last Name (required), Email (required, valid format), Phone (required, Romanian format 07xxxxxxxx)
+• Guest session stored in localStorage as {guestToken, firstName, lastName, email, phone}; sent as X-Guest-Token header on all subsequent requests
+• &apos;La final îți vei putea crea un cont pentru a urmări comenzile&apos; — subtle nudge shown after order placed
+[BACKEND — ASP.NET Core]  US-109 — Guest Checkout — Backend
+As a
+system
+I want to
+allow anonymous order placement linked by a guest token, with option to later claim the order
+AC
+• POST /api/auth/guest — validates {firstName, lastName, email, phone}; creates GuestSession(Id=UUID, email, firstName, lastName, phone, CreatedAt, ExpiresAt=+7days)
+• Returns {guestToken: UUID} — client includes as X-Guest-Token header
+• All order/cart/upload endpoints accept EITHER Bearer JWT OR X-Guest-Token header
+• Guest orders are linked to GuestSessionId (not UserId); email stored for notifications
+• POST /api/auth/guest/claim — after guest registers/logs in, transfers guest orders to real account; invalidates guest token
+• GuestSessions with no orders cleaned up after 7 days (background job)
+[BACKEND — ASP.NET Core]  US-110 — Password Reset
+As a
+system
+I want to
+allow registered users to securely reset a forgotten password
+AC
+• POST /api/auth/forgot-password {email} — always 200 (no email enumeration); fires reset email if account exists
+• Reset token: UUID, hashed in DB, 1h expiry
+• POST /api/auth/reset-password {userId, token, newPassword} — validates token, updates hash, revokes ALL refresh tokens for user
+• FE: /forgot-password page and /reset-password?userId=&amp;token= page with same password validation rules as registration
+EPIC-2  |  Upload Fotografii &amp; Selecție Format
+Upload bulk (până la 30 poze), selecție globală format+finisaj pentru toate fotografiile, stepper cantitate per poză, coș persistent.
+[FRONTEND — Angular]  US-201 — Bulk Photo Upload
+As a
+customer (registered or guest)
+I want to
+upload multiple photos at once and see a thumbnail grid before choosing options
+AC
+• Drag-and-drop zone + &apos;Selectează fotografii&apos; button; accepts .jpg, .jpeg, .png, .heic
+• Max 30 files per session; max 50 MB per file; both validated client-side before upload
+• Upload starts immediately on file selection; per-file progress bar
+• Thumbnail grid: photo preview, filename (truncated), resolution (WxH px), quality badge
+• Quality badge per thumbnail — Green: optimal resolution; Yellow: minimum met; Red: below minimum (warning, not blocked)
+• Individual ✕ remove button; &apos;Șterge toate&apos; clear-all button
+• Total photo count shown: &apos;12 fotografii selectate&apos;
+[BACKEND — ASP.NET Core]  US-202 — Photo Upload — Backend
+As a
+system
+I want to
+receive, validate, virus-scan and store uploaded photos; return metadata
+AC
+• POST /api/uploads (multipart/form-data) — accepts Bearer or X-Guest-Token
+• Validates MIME by magic bytes (not extension); rejects non-image files with 415
+• Extracts width/height using ImageSharp; stores in Uploads table
+• File saved as /uploads/{sessionId}/{uuid}.{ext}; original filename never used in path
+• Returns UploadDto[]: {uploadId, widthPx, heightPx, fileSizeBytes, previewUrl}
+• Uploads not linked to an order within 24h are soft-deleted by background job
+• Max 30 uploads per session enforced server-side (429 if exceeded)
+[FRONTEND — Angular]  US-203 — Global Format &amp; Finish Selector
+As a
+customer
+I want to
+choose one format and finish that applies to all uploaded photos, and set quantity per photo
+AC
+• Above the thumbnail grid: prominent selector panel — Format (radio or segmented control: 10x15 / 13x18 / 15x21) and Finish (toggle: Lucios / Mat)
+• Changing format/finish immediately updates ALL quality badges on all thumbnails
+• Per-thumbnail quantity stepper (min 1, max 100); default 1
+• Order summary panel (sticky right or bottom): subtotal per line, grand subtotal (excl. shipping), total photo count
+• Price updates in real-time with debounce 300ms on quantity changes
+• &apos;Adaugă în coș&apos; CTA button — disabled if no photos uploaded
+• Format minimum resolution guide shown below selector: e.g. &apos;10x15 → min 1200×1800px&apos;
+[BACKEND — ASP.NET Core]  US-204 — Product Catalogue API
+As a
+system
+I want to
+expose print products (format+finish combinations) with prices and resolution requirements
+AC
+• GET /api/products — public, no auth; returns [{id, name, widthCm, heightCm, finish, priceRon, minWidthPx, minHeightPx, optimalWidthPx, optimalHeightPx, isActive, sortOrder}]
+• Only isActive=true products returned to public; admin sees all
+• POST /api/products/calculate [{productId, quantity}] — returns [{lineTotal}, grandTotal] in RON
+• Seeded: 6 products (3 formats × Lucios + Mat); prices editable from admin panel
+• Response cached 60 seconds (IMemoryCache) — invalidated on admin product update
+[FRONTEND — Angular]  US-205 — Cart Page
+As a
+customer
+I want to
+review my selections before proceeding to checkout, and make adjustments
+AC
+• Cart page /cos: list of items — thumbnail, format, finish, quantity stepper, unit price, line total, remove button
+• Global format/finish displayed as read-only summary banner at top: &apos;Format ales: 10×15 cm, Lucios&apos;
+• Subtotal, shipping placeholder (&apos;Calculat la pasul următor&apos;), grand total
+• Persistent: localStorage for guests; server-side cart for logged-in users, merged on login
+• Cart icon in nav shows item count badge; badge updates reactively
+• Empty cart state with CTA &apos;Adaugă fotografii&apos;
+• &apos;Continuă cumpărăturile&apos; + &apos;Finalizează comanda&apos; buttons
+[BACKEND — ASP.NET Core]  US-206 — Cart API
+As a
+system
+I want to
+store and retrieve cart state server-side for logged-in users
+AC
+• POST /api/cart — replace full cart: {productId, finish, items:[{uploadId, quantity}]}
+• GET /api/cart — returns cart with computed totals
+• DELETE /api/cart — clears cart
+• POST /api/cart/merge — merges guest/localStorage cart into user cart on login
+• Validates: uploadId belongs to session/user; productId is active; quantity 1–100
+• Cart scoped by userId OR guestSessionId
+EPIC-3  |  Checkout &amp; Plată
+Selecție livrare Easybox (hartă) sau acasă. Recenzie comandă. Plată duală Stripe + EuPlatesc. Confirmare comandă.
+[FRONTEND — Angular]  US-301 — Checkout — Delivery Method
+As a
+customer
+I want to
+choose between Easybox locker pickup or home delivery and provide the address
+AC
+• Step 1 of checkout: two cards — &apos;Easybox Sameday&apos; (cheaper) and &apos;Livrare la ușă&apos;
+• Easybox flow: city search input → list of nearest lockers (name, address, distance from searched city)
+• Locker list rendered with Leaflet.js + OpenStreetMap map showing pins; selected locker highlighted
+• Home delivery flow: form — Stradă, Număr, Bloc/Ap (optional), Oraș, Județ (dropdown), Cod poștal
+• Saved addresses shown for logged-in users (select or add new)
+• Guest users always fill the form; option to save is hidden
+• Shipping cost shown per option (from /api/shipping/cost)
+[BACKEND — ASP.NET Core]  US-302 — Shipping API
+As a
+system
+I want to
+provide locker list and shipping cost; generate AWB via Sameday API automatically where possible
+AC
+• GET /api/shipping/lockers?city= — Phase 1: returns seeded static locker list (~200 lockers); Phase 2: proxies Sameday Lockers API
+• GET /api/shipping/cost?type=Easybox|Courier — returns {costRon}; Easybox=20 RON, Courier=25 RON (config-driven)
+• POST /api/shipping/awb {orderId} — Phase 2 (Sameday API): generates AWB automatically, stores AwbNumber + TrackingUrl on Order
+• Phase 1 fallback: endpoint returns {manual: true} — operator generates AWB in Sameday portal manually; admin UI shows &apos;AWB manual required&apos; flag
+• Sameday API credentials stored in environment config; IShippingService abstraction allows switching
+[FRONTEND — Angular]  US-303 — Checkout — Order Review
+As a
+customer
+I want to
+see a complete summary of my order before paying
+AC
+• Step 2: read-only summary — photo count, format/finish, subtotal, delivery method, address/locker, shipping cost, GRAND TOTAL in RON
+• Estimated delivery: &apos;2–4 zile lucrătoare&apos;
+• &apos;Modifică coșul&apos; and &apos;Modifică adresa&apos; edit links
+• Acceptance of Terms checkbox (required); link opens /termeni-si-conditii in new tab
+• &apos;Plătește acum&apos; button enabled only when Terms accepted
+[FRONTEND — Angular]  US-304 — Payment — Dual Processor Selection
+As a
+customer
+I want to
+choose between card payment (Stripe) or Romanian card payment (EuPlatesc) and complete the payment
+AC
+• Payment step shows two tabs/options: &apos;Card internațional (Stripe)&apos; and &apos;Card românesc (EuPlatesc)&apos;
+• Stripe tab: embedded Stripe Elements (card number, expiry, CVC, name) — no redirect
+• EuPlatesc tab: &apos;Plătește cu EuPlatesc&apos; button → redirects to EuPlatesc hosted payment page
+• Stripe success: redirect to /comanda/{orderId}/confirmare
+• EuPlatesc success: EuPlatesc redirects back to /comanda/{orderId}/confirmare?processor=euplatesc
+• Failure: inline error in Romanian; retry available without losing cart
+[BACKEND — ASP.NET Core]  US-305 — Payment — Stripe Backend
+As a
+system
+I want to
+create Stripe PaymentIntents and confirm orders only after Stripe webhook verification
+AC
+• POST /api/payments/stripe/intent — creates PaymentIntent for cart total; returns {clientSecret}
+• Creates PendingOrder with Status=AwaitingPayment, PaymentProcessor=Stripe, PaymentIntentId
+• POST /api/webhooks/stripe — validates Stripe-Signature header with STRIPE_WEBHOOK_SECRET
+• payment_intent.succeeded → Order status=Paid; fires OrderConfirmedEmail; associates uploads to order
+• payment_intent.payment_failed → Order status=PaymentFailed
+• Idempotent: duplicate events ignored by PaymentIntentId uniqueness check
+[BACKEND — ASP.NET Core]  US-306 — Payment — EuPlatesc Backend
+As a
+system
+I want to
+initiate EuPlatesc payment sessions and confirm orders via EuPlatesc IPN callback
+AC
+• POST /api/payments/euplatesc/initiate — builds EuPlatesc payment request (amount, orderId, returnUrl, cancelUrl, ipnUrl); returns {redirectUrl}
+• EuPlatesc IPN endpoint: POST /api/webhooks/euplatesc — validates HMAC signature using EuPlatesc merchant key
+• On success IPN: Order status=Paid; fires OrderConfirmedEmail
+• On failure IPN: Order status=PaymentFailed
+• Stores EuPlatescTransactionId on order for reconciliation
+• IPN endpoint is public (no JWT); protected by HMAC validation only
+[FRONTEND — Angular]  US-307 — Order Confirmation Page
+As a
+customer
+I want to
+see a clear confirmation that my order was placed successfully
+AC
+• /comanda/{orderId}/confirmare — shows: order number, photo count, format, total paid, delivery address/locker
+• Visual status stepper: Comandă primită → În pregătire → Expediată → Livrată
+• Estimated delivery date shown
+• For guests: &apos;Vrei să-ți salvezi comanda? Creează un cont gratuit&apos; CTA with pre-filled email
+• For logged-in users: &apos;Vezi istoricul comenzilor&apos; link
+• Page rejects access if orderId not in Paid status (redirect to home)
+EPIC-4  |  Istoricul Comenzilor &amp; Tracking
+Listă comenzi cu statusuri, detaliu comandă, AWB tracking, acces guest prin email.
+[FRONTEND — Angular]  US-401 — Order History List
+As a
+logged-in customer
+I want to
+see all my past and current orders with status at a glance
+AC
+• /comenzile-mele — cards: order number, date, first photo thumbnail, item count, total RON, status badge
+• Status badge colors: Pending=gray, Paid=blue, Printing=orange, Shipped=purple, Delivered=green, Cancelled=red
+• Pagination 10 per page; sort by date desc
+• Empty state with &apos;Comandă acum&apos; CTA
+[FRONTEND — Angular]  US-402 — Order Detail Page
+As a
+customer
+I want to
+see full details of one order and track its delivery
+AC
+• /comanda/{orderId} — all items: thumbnail, format, finish, quantity, unit price, line total
+• Delivery: locker name + address or home address
+• Status stepper (same 4 steps as confirmation page) with current step highlighted
+• AWB number + &apos;Urmărește coletul&apos; button (opens Sameday tracking in new tab) — shown after shipping
+• &apos;Contactează-ne&apos; mailto link with order number pre-filled in subject
+• Guest access: /comanda/{orderId}?email={email} — shows order if email matches
+[BACKEND — ASP.NET Core]  US-403 — Orders API
+As a
+system
+I want to
+expose order data scoped to the requesting user or guest session
+AC
+• GET /api/orders — paginated, scoped to userId OR guestSessionId; ?status= filter
+• GET /api/orders/{id} — full detail; 403 if order belongs to different user/session
+• OrderDto: orderId, orderNumber (FT-YYYYNNNN), status, items[], shippingType, shippingAddress, deliveryLockerId, awbNumber, trackingUrl, paymentTotal, shippingCost, createdAt
+• Guest access via ?email= param: validates orderId+email match before returning data
+EPIC-5  |  Panou Admin
+Dashboard KPI + grafice, coadă comenzi real-time (SignalR), gestionare status, descărcare ZIP poze, anulare + rambursare, management produse.
+[FRONTEND — Angular]  US-501 — Admin — Dashboard Overview
+As a
+operator
+I want to
+see key business metrics at a glance when I open the admin panel
+AC
+• /admin — protected route; redirects to /admin/login if not Admin role
+• KPI cards row: Comenzi azi, Venituri azi (RON), Comenzi luna aceasta, Venituri luna aceasta
+• Orders by status: donut chart (Recharts or Chart.js via ng2-charts)
+• Revenue last 30 days: bar chart (daily); RON on Y-axis
+• Top 3 selling formats: horizontal bar chart
+• Auto-refresh every 5 min; manual refresh button
+[FRONTEND — Angular]  US-502 — Admin — Real-time Order Queue
+As a
+operator
+I want to
+see all incoming paid orders in real time so I know what to print next
+AC
+• /admin/comenzi — table: order number, customer name (or &apos;Oaspete&apos;), photos count, format/finish, created at, status badge, actions
+• Default sort: oldest Paid orders first (print FIFO queue)
+• Real-time: new orders appear via SignalR without page refresh; subtle slide-in animation + sound (optional)
+• Filter tabs: Toate / Plătite / În imprimare / Expediate; search by order number or email
+• Bulk action: select multiple Paid orders → &apos;Marchează ca În imprimare&apos;
+• Row click → opens order detail side panel
+[FRONTEND — Angular]  US-503 — Admin — Order Detail &amp; Workflow
+As a
+operator
+I want to
+see all photos I need to print for an order and move it through the workflow
+AC
+• Side panel or /admin/comenzi/{id}: full item list, customer info, delivery info, payment total
+• &apos;Descarcă toate pozele&apos; button → downloads ZIP of all original files for this order
+• Status workflow buttons (shown based on current status): [Marchează ca În imprimare] → [Marchează ca Expediată] → [Marchează ca Livrată]
+• &apos;Marchează ca Expediată&apos; opens AWB input field: text input for AWB number (manual) OR &apos;Generează AWB automat&apos; (Sameday API, Phase 2)
+• &apos;Anulează comanda&apos; button with reason field → triggers refund confirmation dialog
+• Internal notes textarea (saved to order, not visible to customer)
+[BACKEND — ASP.NET Core]  US-504 — Admin — API
+As a
+system
+I want to
+expose admin-only endpoints for full order management, file access, and analytics
+AC
+• All /api/admin/* endpoints require [Authorize(Roles=&apos;Admin&apos;)]; 403 otherwise
+• GET /api/admin/orders — paginated, all users, ?status=&amp;search=&amp;page=&amp;pageSize=
+• GET /api/admin/orders/{id} — full detail + internalNotes
+• PATCH /api/admin/orders/{id}/status {status, awbNumber?} — validates transitions: Paid→Printing→Shipped→Delivered; any→Cancelled
+• GET /api/admin/orders/{id}/download-zip — streams ZIP (System.IO.Compression) of all order photo files
+• POST /api/admin/orders/{id}/cancel — initiates Stripe refund OR EuPlatesc refund based on PaymentProcessor field; sets status=Cancelled
+• PATCH /api/admin/orders/{id}/notes {notes} — saves internal note
+• SignalR AdminOrderHub: broadcasts NewOrderReceived and OrderStatusChanged to admin clients on order events
+[BACKEND — ASP.NET Core]  US-505 — Admin — Stats API
+As a
+system
+I want to
+provide aggregated analytics efficiently
+AC
+• GET /api/admin/stats/summary — ordersToday, revenueToday, ordersThisMonth, revenueThisMonth (all RON)
+• GET /api/admin/stats/revenue?days=30 — [{date, totalRon}] array
+• GET /api/admin/stats/products — [{productName, orderCount, revenueRon}] sorted desc by orderCount
+• GET /api/admin/stats/orders-by-status — [{status, count}]
+• All stats queries filtered to Status != Cancelled for revenue figures
+• Queries use indexed columns (CreatedAt, Status); cached 5 min in IMemoryCache
+[FRONTEND — Angular]  US-506 — Admin — Product Management
+As a
+operator
+I want to
+manage print products and prices without a code deployment
+AC
+• /admin/produse — data table: all products with name, dimensions, finish, price, active toggle
+• Inline toggle for IsActive
+• Edit dialog: all fields editable (name, widthCm, heightCm, finish, priceRon, min/optimal resolutions, sortOrder)
+• &apos;Adaugă produs&apos; button for new entries
+• Price change reflects on storefront within 60 seconds (cache TTL)
+EPIC-6  |  Notificări Email
+4 emailuri tranzacționale: Bun venit, Comandă confirmată, Expediată, Livrată. Infrastructură IEmailService cu retry.
+[BACKEND — ASP.NET Core]  US-601 — Email — Welcome (Registered Users)
+As a
+system
+I want to
+send a welcome email when a new user confirms their email address
+AC
+• Triggered by: IsEmailConfirmed set to true
+• To: user email; Subject: &apos;Bun venit la FotoTipar!&apos;
+• Body: first name greeting, brief explanation of service, &apos;Comandă acum&apos; CTA button
+• Razor HTML template; plain text fallback auto-generated
+[BACKEND — ASP.NET Core]  US-602 — Email — Order Confirmed
+As a
+system
+I want to
+confirm to the customer (registered or guest) that payment was received and order is being processed
+AC
+• Triggered by: payment webhook success (Stripe or EuPlatesc)
+• Subject: &apos;Comanda #FT-XXXX a fost primită!&apos;
+• Body: customer first name (or &apos;Drag client&apos; for guest), order number, items table (format, finish, qty, unit price, line total), delivery address/locker name, shipping cost, TOTAL paid, estimated delivery &apos;2-4 zile lucrătoare&apos;
+• Guest email includes: &apos;Urmărește comanda&apos; link /comanda/{id}?email={email}
+[BACKEND — ASP.NET Core]  US-603 — Email — Order Shipped
+As a
+system
+I want to
+notify the customer with tracking details when the order is dispatched
+AC
+• Triggered by: order status → Shipped
+• Subject: &apos;Comanda #FT-XXXX a fost expediată!&apos;
+• Body: AWB number, &apos;Urmărește coletul pe Sameday&apos; button with tracking URL, locker address (if Easybox) or &apos;La ușa ta&apos; (if courier), delivery window
+[BACKEND — ASP.NET Core]  US-604 — Email — Order Delivered
+As a
+system
+I want to
+confirm delivery and invite the customer to review or reorder
+AC
+• Triggered by: order status → Delivered
+• Subject: &apos;Comanda ta a ajuns!&apos;
+• Body: confirmation message, &apos;Comandă din nou&apos; CTA, &apos;Contactează-ne dacă ai probleme&apos; section
+[BACKEND — ASP.NET Core]  US-605 — Email Infrastructure
+As a
+system
+I want to
+provide a single IEmailService abstraction switchable between SMTP and SendGrid
+AC
+• IEmailService: Task SendAsync(string to, string subject, string htmlBody)
+• SmtpEmailService (MailKit) for dev; SendGridEmailService for production — switched via appsettings EmailProvider
+• All emails BCC to operator address (config); all include List-Unsubscribe header
+• Failed sends logged with Serilog; retried up to 3× with exponential backoff via BackgroundService queue
+• Razor templates in /EmailTemplates/*.cshtml; shared layout with logo and footer
+EPIC-7  |  Cont Utilizator &amp; Legal
+Profil editabil, schimbare parolă, adrese salvate, pagini legale GDPR, consent cookie.
+[FRONTEND — Angular]  US-701 — User Profile Page
+As a
+logged-in customer
+I want to
+view and update my personal information
+AC
+• /contul-meu/profil: editable First Name, Last Name, Phone; Email shown read-only
+• Change password section: current password + new password (same rules as registration)
+• Social connections section: shows linked Google account; &apos;Conectează Google&apos; if not linked
+• &apos;Șterge contul&apos; link opens confirmation dialog (type &apos;ȘTERGE&apos; to confirm)
+[BACKEND — ASP.NET Core]  US-702 — Account API
+As a
+system
+I want to
+allow users to manage profile data and account lifecycle
+AC
+• GET /api/account — {firstName, lastName, email, phone, hasPassword, linkedProviders[]}
+• PATCH /api/account — updates name/phone; FluentValidation
+• POST /api/account/change-password — requires currentPassword; invalidates all refresh tokens on success
+• DELETE /api/account — sets DeletionRequestedAt; background job hard-deletes after 30 days if not cancelled
+[FRONTEND — Angular]  US-703 — Saved Addresses
+As a
+logged-in customer
+I want to
+manage my delivery addresses so I don&apos;t have to retype them every order
+AC
+• /contul-meu/adrese: list of saved addresses with Edit / Delete / Set as Default
+• Add address form: same fields as checkout home delivery form
+• Max 5 saved addresses; default address pre-selected in checkout
+[FRONTEND — Angular]  US-704 — Legal Pages &amp; Cookie Consent
+As a
+visitor
+I want to
+read legal documents and manage cookie preferences
+AC
+• Static pages: /politica-de-confidentialitate, /termeni-si-conditii, /politica-cookie
+• Cookie consent banner on first visit: &apos;Acceptă toate&apos; / &apos;Doar esențiale&apos;; stored in localStorage
+• MVP: only functional cookies (session, auth); no analytics/tracking by default
+• Footer on all pages links to all three legal pages and to company info (CUI, Nr. Reg. Com.)
+EPIC-8  |  Platformă &amp; Non-Funcționale
+Error handling global, logging Serilog, securitate, background jobs (cleanup uploads/guests/conturi).
+[BACKEND — ASP.NET Core]  US-801 — Global Error Handling &amp; Logging
+As a
+system
+I want to
+ensure all errors return consistent responses and are logged for debugging
+AC
+• ExceptionHandlerMiddleware: catches all unhandled exceptions; returns ProblemDetails (RFC 7807) with type, title, status, detail, correlationId
+• FluentValidation errors: 422 with [{field, message}] array
+• Serilog: structured JSON logging; console sink (dev) + file sink with daily rolling (prod)
+• GET /health — checks DB connectivity; returns {status, db, diskFreeGb}; public endpoint
+• CorrelationId middleware: reads X-Correlation-Id header or generates UUID; included in all responses and logs
+[BACKEND — ASP.NET Core]  US-802 — Security Baselines
+As a
+system
+I want to
+meet minimum security requirements for a production e-commerce platform
+AC
+• HTTPS enforced; HSTS header (max-age=31536000, includeSubDomains)
+• CORS: exact FE origin whitelist only; no wildcard in production
+• Rate limiting (ASP.NET Core Rate Limiting middleware): 100 req/min per IP public; 10/min auth endpoints
+• File upload: UUID-named files, no path traversal possible; served with Content-Disposition: attachment
+• All secrets in environment variables / .NET Secret Manager — never in appsettings committed to git
+• EF Core parameterised queries by default (no raw SQL with user input)
+• X-Content-Type-Options: nosniff; X-Frame-Options: DENY headers on all responses
+[BACKEND — ASP.NET Core]  US-803 — Background Jobs
+As a
+system
+I want to
+run scheduled cleanup and maintenance tasks without blocking the request pipeline
+AC
+• Hosted IHostedService implementations (no Hangfire at MVP — keep it simple)
+• UploadCleanupJob: runs every hour; soft-deletes Uploads with no associated order after 24h; deletes physical files
+• GuestSessionCleanupJob: runs daily; purges GuestSessions with no orders after 7 days
+• AccountDeletionJob: runs daily; hard-deletes accounts where DeletionRequestedAt &lt; 30 days ago
+• EmailRetryJob: processes failed email queue with exponential backoff
+[FRONTEND — Angular]  US-804 — Angular App Shell &amp; Routing
+As a
+developer
+I want to
+establish a clean Angular app structure with lazy-loaded feature modules and route guards
+AC
+• App shell: header (logo, nav links, cart badge, login/avatar), main router-outlet, footer
+• Lazy-loaded route groups: /auth/*, /comanda/*, /comenzile-mele/*, /contul-meu/*, /admin/*
+• AuthGuard: redirects unauthenticated users to /auth/login; stores returnUrl
+• AdminGuard: checks role=Admin claim in JWT; redirects to home if not admin
+• GuestOrAuthGuard: allows both Bearer and guest token for checkout routes
+• Angular HttpInterceptor: attaches Authorization header (JWT) OR X-Guest-Token to all API calls
+• Global error interceptor: handles 401 (trigger refresh flow), 403 (show error), 5xx (show error toast)
+• Environment files: environment.ts (dev API URL, Stripe/Google keys) vs environment.prod.ts
+Appendix A — Data Model (entități principale)
+Schemă generată prin EF Core code-first migrations. Toate Id-urile sunt UUID v4.
+Entitate
+Câmpuri principale
+Users
+Id(UUID), Email, PasswordHash?, FirstName, LastName, Phone, Role(Customer|Admin), IsEmailConfirmed, CreatedAt, DeletionRequestedAt?
+ExternalLogins
+Id, UserId→Users, Provider(&apos;Google&apos;), ProviderKey
+RefreshTokens
+Id, UserId→Users, TokenHash, ExpiresAt, RevokedAt?
+GuestSessions
+Id(UUID), Email, FirstName, LastName, Phone, CreatedAt, ExpiresAt
+Products
+Id, Name, WidthCm, HeightCm, Finish(Lucios|Mat), PriceRon, MinWidthPx, MinHeightPx, OptWidthPx, OptHeightPx, IsActive, SortOrder
+Uploads
+Id(UUID), UserId?→Users, GuestSessionId?→GuestSessions, FilePath, WidthPx, HeightPx, FileSizeBytes, UploadedAt, DeletedAt?
+CartItems
+Id, UserId?|GuestSessionId?, UploadId→Uploads, ProductId→Products, Quantity, AddedAt
+Orders
+Id(UUID), OrderNumber(FT-YYYYNNNN unique), UserId?→Users, GuestSessionId?→GuestSessions, Status(enum), PaymentProcessor(Stripe|EuPlatesc), PaymentIntentId?, EuPlatescTransactionId?, PaymentTotal, ShippingCost, ShippingType(Easybox|Courier), AwbNumber?, TrackingUrl?, InternalNotes?, CreatedAt, UpdatedAt
+OrderItems
+Id, OrderId→Orders, UploadId→Uploads, ProductId→Products, Quantity, UnitPriceRon, ProductSnapshot(JSONB)
+Addresses
+Id, UserId→Users, Street, City, County, PostalCode, IsDefault
+EasyboxLockers
+Id, SamedayId(string), Name, Address, City, Lat, Lng, IsActive
+EmailConfirmationTokens
+Id, UserId→Users, TokenHash, ExpiresAt, UsedAt?
+PasswordResetTokens
+Id, UserId→Users, TokenHash, ExpiresAt, UsedAt?
+Appendix B — Endpoint Summary
+Toate endpoint-urile sunt prefixate cu /api. Auth|Guest = acceptă Bearer JWT sau X-Guest-Token header.
+Verb
+Path
+Auth
+Descriere
+POST
+/api/auth/register
+Public
+Register with email+password
+GET
+/api/auth/confirm-email
+Public
+Confirm email address
+POST
+/api/auth/resend-confirmation
+Public
+Resend confirmation email
+POST
+/api/auth/login
+Public
+Login, receive JWT + refresh cookie
+POST
+/api/auth/refresh
+Public (cookie)
+Rotate refresh token
+POST
+/api/auth/logout
+Auth
+Revoke refresh token
+POST
+/api/auth/google
+Public
+Google OAuth login/register
+POST
+/api/auth/forgot-password
+Public
+Trigger reset email
+POST
+/api/auth/reset-password
+Public
+Set new password with token
+POST
+/api/auth/guest
+Public
+Create guest session
+POST
+/api/auth/guest/claim
+Auth
+Claim guest orders on login
+GET
+/api/account
+Auth
+Get own profile
+PATCH
+/api/account
+Auth
+Update profile
+POST
+/api/account/change-password
+Auth
+Change password
+DELETE
+/api/account
+Auth
+Request account deletion
+GET
+/api/account/addresses
+Auth
+List saved addresses
+POST
+/api/account/addresses
+Auth
+Add saved address
+PUT
+/api/account/addresses/{id}
+Auth
+Update address
+DELETE
+/api/account/addresses/{id}
+Auth
+Delete address
+POST
+/api/uploads
+Auth|Guest
+Upload photo file(s)
+GET
+/api/products
+Public
+List active products
+POST
+/api/products/calculate
+Public
+Calculate order total
+POST
+/api/cart
+Auth|Guest
+Set full cart
+GET
+/api/cart
+Auth|Guest
+Get cart with totals
+DELETE
+/api/cart
+Auth|Guest
+Clear cart
+POST
+/api/cart/merge
+Auth
+Merge guest cart on login
+GET
+/api/shipping/lockers
+Public
+List Easybox lockers
+GET
+/api/shipping/cost
+Public
+Get shipping cost by type
+POST
+/api/payments/stripe/intent
+Auth|Guest
+Create Stripe PaymentIntent
+POST
+/api/payments/euplatesc/initiate
+Auth|Guest
+Initiate EuPlatesc payment
+POST
+/api/webhooks/stripe
+Public+HMAC
+Stripe event receiver
+POST
+/api/webhooks/euplatesc
+Public+HMAC
+EuPlatesc IPN receiver
+GET
+/api/orders
+Auth|Guest
+Order history (paginated)
+GET
+/api/orders/{id}
+Auth|Guest
+Order detail
+GET
+/api/admin/orders
+Admin
+All orders with filters
+GET
+/api/admin/orders/{id}
+Admin
+Order detail + internal notes
+PATCH
+/api/admin/orders/{id}/status
+Admin
+Update order status + AWB
+PATCH
+/api/admin/orders/{id}/notes
+Admin
+Save internal note
+GET
+/api/admin/orders/{id}/download-zip
+Admin
+Download order photos ZIP
+POST
+/api/admin/orders/{id}/cancel
+Admin
+Cancel + refund order
+POST
+/api/admin/shipping/awb
+Admin
+Generate Sameday AWB (Phase 2)
+GET
+/api/admin/stats/summary
+Admin
+KPI summary
+GET
+/api/admin/stats/revenue
+Admin
+Revenue over time
+GET
+/api/admin/stats/products
+Admin
+Product analytics
+GET
+/api/admin/stats/orders-by-status
+Admin
+Orders by status count
+GET
+/api/admin/products
+Admin
+All products (incl. inactive)
+POST
+/api/admin/products
+Admin
+Create product
+PUT
+/api/admin/products/{id}
+Admin
+Update product
+DELETE
+/api/admin/products/{id}
+Admin
+Deactivate product
+GET
+/health
+Public
+Health check
+Appendix C — Structura Proiectului
+Backend — ASP.NET Core 8
+PhotoPrint.sln
+src/
+  PhotoPrint.API/
+    Controllers/       — AuthController, OrdersController, ProductsController, AdminController, WebhooksController
+    Services/          — IOrderService, IPaymentService, IEmailService, IStorageService, IShippingService
+    Models/            — EF Core entities (Users, Orders, OrderItems, Uploads, ...)
+    DTOs/              — Request + Response DTOs per endpoint group
+    Validators/        — FluentValidation validators
+    Hubs/              — AdminOrderHub (SignalR)
+    Middleware/        — ExceptionMiddleware, CorrelationIdMiddleware
+    BackgroundJobs/    — UploadCleanupJob, GuestSessionCleanupJob, AccountDeletionJob, EmailRetryJob
+    EmailTemplates/    — Razor .cshtml templates (Confirmed, Shipped, Delivered, Welcome)
+    Migrations/        — EF Core auto-generated migrations
+    appsettings.json   — non-secret config
+    appsettings.Development.json
+  PhotoPrint.Tests/   — xUnit unit + integration tests
+docker-compose.yml    — postgres + API
+Frontend — Angular 17+
+photo-print-fe/
+  src/app/
+    core/
+      auth/            — AuthService, JwtInterceptor, GuestInterceptor
+      guards/          — AuthGuard, AdminGuard, GuestOrAuthGuard
+      models/          — TypeScript interfaces (Order, Product, Cart, ...)
+    shared/
+      components/      — Header, Footer, StatusBadge, PhotoThumbnail, LoadingSpinner
+      pipes/           — CurrencyRon, StatusLabel
+    features/
+      auth/            — login, register, forgot-password, reset-password
+      upload/          — photo-upload, format-selector, cart
+      checkout/        — delivery-step, review-step, payment-step, confirmation
+      orders/          — order-list, order-detail
+      account/         — profile, addresses, change-password
+      admin/           — dashboard, order-queue, order-detail-panel, products
+      legal/           — privacy, terms, cookies
+  environments/
+    environment.ts          — apiUrl, stripeKey, googleClientId
+    environment.prod.ts
+Appendix D — State Machine Status Comandă
+Tranziții valide de status pentru o comandă:
+Status curent
+→ Status următor
+Declanșat de
+AwaitingPayment
+Paid
+Webhook Stripe / EuPlatesc IPN (plată reușită)
+AwaitingPayment
+PaymentFailed
+Webhook Stripe / EuPlatesc IPN (plată eșuată)
+Paid
+Printing
+Admin: &apos;Marchează ca În imprimare&apos;
+Printing
+Shipped
+Admin: &apos;Marchează ca Expediată&apos; + AWB introdus
+Shipped
+Delivered
+Admin: &apos;Marchează ca Livrată&apos;
+Paid → orice
+Cancelled
+Admin: &apos;Anulează&apos; + rambursare Stripe/EuPlatesc inițiată
+Printing → orice
+Cancelled
+Admin: &apos;Anulează&apos; + rambursare inițiată
+Orice altă tranziție returnează 400 Bad Request cu mesaj &apos;Tranziție de status invalidă&apos;.

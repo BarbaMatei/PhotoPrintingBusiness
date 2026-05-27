@@ -1,0 +1,34 @@
+@use 'styles/variables' as *;
+@use 'styles/auth-forms' as *;
+
+.verify-body {
+  margin-bottom: $space-6;
+  color: $color-neutral-700;
+  line-height: $line-height-relaxed;
+
+  strong { color: $color-neutral-900; }
+
+  &__note {
+    font-size: $font-size-sm;
+    color: $color-neutral-500;
+    margin-top: $space-3;
+  }
+}
+
+.banner {
+  padding: $space-6;
+  border-radius: $radius-md;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-4;
+  text-align: center;
+
+  &--success {
+    background: color-mix(in srgb, #1e8e3e 15%, white);
+    border: 1px solid $color-success;
+    color: $color-success;
+  }
+
+  p { margin: 0; font-weight: $font-weight-medium; }
+}

@@ -1,0 +1,30 @@
+@use 'styles/variables' as *;
+
+.google-btn-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.google-btn-placeholder {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-2 $space-6;
+  border: 1px solid $color-neutral-300;
+  border-radius: $radius-md;
+  font-size: $font-size-base;
+  color: $color-neutral-700;
+  background: $color-white;
+  opacity: 0.6;
+  cursor: not-allowed;
+  min-width: 240px;
+  justify-content: center;
+}
+
+.google-icon {
+  font-weight: $font-weight-bold;
+  color: #4285f4;
+  font-size: $font-size-lg;
+}

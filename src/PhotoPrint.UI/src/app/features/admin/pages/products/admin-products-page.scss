@@ -1,0 +1,919 @@
+﻿@use 'styles/variables' as *;
+
+// ── Keyframes ────────────────────────────────────────────────────────────────
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+@keyframes pulseGreen {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.35); }
+  50%       { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0); }
+}
+
+// ── Page shell ───────────────────────────────────────────────────────────────
+
+.ap {
+  padding: $space-10 $space-8;
+  max-width: 960px;
+  margin: 0 auto;
+  min-height: 100vh;
+
+  @media (max-width: 640px) { padding: $space-6 $space-4; }
+}
+
+// ── Page header ──────────────────────────────────────────────────────────────
+
+.ap-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: $space-4;
+  margin-bottom: $space-10;
+  padding-bottom: $space-8;
+  border-bottom: 1px solid $color-neutral-100;
+
+  &__left { display: flex; flex-direction: column; gap: $space-1; }
+
+  &__eyebrow {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: $color-primary;
+  }
+
+  &__title {
+    font-size: $font-size-3xl;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    letter-spacing: -0.02em;
+    line-height: $line-height-tight;
+    margin: 0;
+  }
+}
+
+// ── Add button ───────────────────────────────────────────────────────────────
+
+.ap-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-3 $space-5;
+  background: $color-primary;
+  color: $color-white;
+  border: none;
+  border-radius: $radius-lg;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semi;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: $shadow-glow-primary;
+  transition: transform $transition-fast, box-shadow $transition-fast, background $transition-fast;
+
+  &__icon {
+    font-size: 1.2rem;
+    font-weight: $font-weight-regular;
+    line-height: 1;
+  }
+
+  &:hover {
+    background: $color-primary-dark;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(26, 115, 232, 0.40);
+  }
+  &:active { transform: translateY(0); }
+}
+
+// ── Product grid ─────────────────────────────────────────────────────────────
+
+.ap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+}
+
+// ── Product card ─────────────────────────────────────────────────────────────
+
+.ap-card {
+  position: relative;
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  overflow: hidden;
+  animation: cardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0ms);
+  transition: box-shadow $transition-normal, transform $transition-normal;
+
+  &:hover {
+    box-shadow: $shadow-lg;
+    transform: translateY(-2px);
+  }
+
+  &--inactive {
+    opacity: 0.60;
+
+    .ap-card__stripe { background: $color-neutral-300; }
+  }
+
+  &__stripe {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, $color-primary 0%, $color-primary-dark 100%);
+  }
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: $space-4;
+    padding: $space-5 $space-6 $space-4 $space-8;
+  }
+
+  &__identity {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    letter-spacing: -0.015em;
+  }
+
+  &__body {
+    padding: 0 $space-6 $space-5 $space-8;
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+  }
+
+  &__footer {
+    display: flex;
+    gap: $space-3;
+    padding: $space-4 $space-6 $space-5 $space-8;
+    border-top: 1px solid $color-neutral-100;
+    background: $color-neutral-50;
+  }
+}
+
+// ── Type pill ────────────────────────────────────────────────────────────────
+
+.ap-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem $space-3;
+  background: $color-primary-50;
+  color: $color-primary-dark;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  letter-spacing: 0.04em;
+  width: fit-content;
+}
+
+// ── Status toggle ────────────────────────────────────────────────────────────
+
+.ap-toggle {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: $space-1;
+  border-radius: $radius-md;
+  flex-shrink: 0;
+  transition: opacity $transition-fast;
+
+  &:hover { opacity: 0.75; }
+
+  &__track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: $color-neutral-300;
+    border-radius: $radius-full;
+    transition: background $transition-normal;
+    flex-shrink: 0;
+  }
+
+  &__thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    background: $color-white;
+    border-radius: $radius-full;
+    box-shadow: $shadow-sm;
+    transition: transform $transition-normal;
+  }
+
+  &__label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    color: $color-neutral-500;
+    min-width: 42px;
+    transition: color $transition-fast;
+  }
+
+  &--on {
+    .ap-toggle__track {
+      background: $color-success;
+      animation: pulseGreen 2.5s ease-in-out infinite;
+    }
+    .ap-toggle__thumb { transform: translateX(16px); }
+    .ap-toggle__label { color: $color-success; }
+  }
+}
+
+// ── Sections ─────────────────────────────────────────────────────────────────
+
+.ap-section {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+
+  &__label {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin: 0;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: $color-neutral-500;
+  }
+}
+
+.ap-dot {
+  width: 6px; height: 6px;
+  border-radius: $radius-full;
+  flex-shrink: 0;
+
+  &--blue  { background: $color-primary; }
+  &--amber { background: $color-accent; }
+}
+
+// ── Chip rows ────────────────────────────────────────────────────────────────
+
+.ap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-2;
+  align-items: center;
+}
+
+// ── Size chips ───────────────────────────────────────────────────────────────
+
+.ap-size-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: $space-2 $space-3;
+  background: $color-primary-50;
+  border: 1.5px solid rgba(26, 115, 232, 0.15);
+  border-radius: $radius-md;
+  cursor: pointer;
+  transition: transform $transition-fast, background $transition-fast, box-shadow $transition-fast;
+
+  &:hover {
+    background: $color-primary-light;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.20);
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semi;
+    color: $color-primary-dark;
+    line-height: 1;
+  }
+
+  &__price {
+    font-size: $font-size-xs;
+    color: $color-primary;
+    opacity: 0.70;
+
+    &--none {
+      color: $color-warning;
+      opacity: 1;
+    }
+  }
+
+  &--inactive {
+    background: $color-neutral-100;
+    border-color: $color-neutral-300;
+    opacity: 0.50;
+
+    .ap-size-chip__label {
+      color: $color-neutral-500;
+      text-decoration: line-through;
+    }
+    .ap-size-chip__price { color: $color-neutral-500; }
+  }
+}
+
+// ── Finish chips ─────────────────────────────────────────────────────────────
+
+.ap-finish-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: $space-1 $space-3;
+  background: $color-accent-light;
+  border: 1px solid rgba(255, 109, 0, 0.18);
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  color: $color-accent-dark;
+}
+
+.ap-edit-finishes-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  padding: $space-1 $space-3;
+  background: none;
+  border: 1.5px dashed $color-neutral-300;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  color: $color-neutral-500;
+  cursor: pointer;
+  transition: border-color $transition-fast, color $transition-fast, background $transition-fast;
+
+  &:hover {
+    border-color: $color-primary;
+    color: $color-primary;
+    background: $color-primary-50;
+  }
+}
+
+// ── Card actions ─────────────────────────────────────────────────────────────
+
+.ap-action {
+  padding: $space-2 $space-4;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semi;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: transform $transition-fast, box-shadow $transition-fast, background $transition-fast;
+
+  &--edit {
+    background: $color-primary;
+    color: $color-white;
+    border-color: $color-primary;
+
+    &:hover {
+      background: $color-primary-dark;
+      transform: translateY(-1px);
+      box-shadow: $shadow-glow-primary;
+    }
+  }
+
+  &--delete {
+    background: none;
+    color: $color-error;
+    border-color: rgba(239, 68, 68, 0.25);
+
+    &:hover {
+      background: $color-error-light;
+      border-color: $color-error;
+      transform: translateY(-1px);
+    }
+  }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+.ap-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-4;
+  padding: $space-20 $space-8;
+  text-align: center;
+
+  &__icon { font-size: 3.5rem; }
+
+  &__title {
+    margin: 0;
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-700;
+  }
+
+  &__desc {
+    margin: 0;
+    color: $color-neutral-500;
+    font-size: $font-size-base;
+  }
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+.ap-skeleton {
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  &__line {
+    height: 14px;
+    border-radius: $radius-sm;
+    background: linear-gradient(90deg, $color-neutral-100 25%, $color-neutral-50 50%, $color-neutral-100 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    width: 80%;
+
+    &--wide  { width: 60%; }
+    &--short { width: 30%; }
+  }
+}
+
+// ── Modal backdrop ───────────────────────────────────────────────────────────
+
+.ap-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 25, 23, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: $z-modal;
+  padding: $space-4;
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+
+.ap-modal {
+  background: $color-white;
+  border-radius: $radius-xl;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: $shadow-xl;
+
+  &--narrow { max-width: 420px; }
+
+  &__header {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid $color-neutral-100;
+    position: sticky;
+    top: 0;
+    background: $color-white;
+    z-index: 1;
+    border-radius: $radius-xl $radius-xl 0 0;
+  }
+
+  &__header-accent {
+    width: 5px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, $color-primary 0%, $color-primary-dark 100%);
+    border-radius: $radius-xl 0 0 0;
+
+    &--amber { background: linear-gradient(180deg, $color-accent 0%, $color-accent-dark 100%); }
+    &--green { background: linear-gradient(180deg, $color-success 0%, $color-success 100%); }
+  }
+
+  &__header-content {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    padding: $space-5 $space-6;
+    flex: 1;
+  }
+
+  &__eyebrow {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: $color-neutral-500;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    letter-spacing: -0.01em;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: $space-5;
+    color: $color-neutral-500;
+    font-size: $font-size-base;
+    line-height: 1;
+    border-radius: 0 $radius-xl 0 0;
+    transition: color $transition-fast, background $transition-fast;
+
+    &:hover { color: $color-neutral-900; background: $color-neutral-100; }
+  }
+
+  &__hint {
+    margin: $space-4 $space-6 0;
+    padding: $space-3 $space-4;
+    background: $color-primary-50;
+    border-left: 3px solid $color-primary;
+    border-radius: 0 $radius-md $radius-md 0;
+    font-size: $font-size-sm;
+    color: $color-neutral-700;
+  }
+}
+
+// ── Form layout ──────────────────────────────────────────────────────────────
+
+.ap-form {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
+  &__row {
+    display: flex;
+    gap: $space-4;
+
+    &--2 > * { flex: 1; min-width: 0; }
+
+    @media (max-width: 500px) { flex-direction: column; }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-3;
+    padding-top: $space-4;
+    border-top: 1px solid $color-neutral-100;
+    margin-top: $space-2;
+  }
+
+  &__cancel {
+    padding: $space-2 $space-5;
+    background: none;
+    border: 1.5px solid $color-neutral-300;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-neutral-700;
+    cursor: pointer;
+    transition: border-color $transition-fast, background $transition-fast;
+
+    &:hover { border-color: $color-neutral-500; background: $color-neutral-50; }
+  }
+
+  &__submit {
+    padding: $space-2 $space-6;
+    background: $color-primary;
+    color: $color-white;
+    border: none;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semi;
+    cursor: pointer;
+    transition: transform $transition-fast, background $transition-fast, box-shadow $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-primary-dark;
+      transform: translateY(-1px);
+      box-shadow: $shadow-glow-primary;
+    }
+
+    &:disabled { opacity: 0.42; cursor: not-allowed; }
+  }
+}
+
+// ── Form fields ───────────────────────────────────────────────────────────────
+
+.ap-field {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.ap-label {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semi;
+  color: $color-neutral-700;
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+
+  &__req { color: $color-error; }
+}
+
+.ap-input {
+  padding: $space-2 $space-3;
+  border: 1.5px solid $color-neutral-300;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-family: $font-family-base;
+  color: $color-neutral-900;
+  background: $color-neutral-50;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color $transition-fast, box-shadow $transition-fast, background $transition-fast;
+
+  &::placeholder { color: $color-neutral-500; }
+
+  &:focus {
+    background: $color-white;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
+  }
+
+  &--short { width: 90px; flex-shrink: 0; }
+}
+
+// ── Sizes list in form ────────────────────────────────────────────────────────
+
+.ap-sizes-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.ap-size-row {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+
+  .ap-input:first-child { flex: 1; }
+}
+
+// ── Inline add button ─────────────────────────────────────────────────────────
+
+.ap-inline-btn {
+  background: none;
+  border: 1px solid $color-primary;
+  color: $color-primary;
+  border-radius: $radius-full;
+  padding: 0.1rem $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: $color-primary; color: $color-white; }
+}
+
+// ── Remove button ─────────────────────────────────────────────────────────────
+
+.ap-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: $color-neutral-500;
+  font-size: $font-size-sm;
+  padding: $space-1 $space-2;
+  border-radius: $radius-md;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color $transition-fast, background $transition-fast;
+
+  &:hover { color: $color-error; background: $color-error-light; }
+}
+
+// ── Ghost button ──────────────────────────────────────────────────────────────
+
+.ap-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  background: none;
+  border: 1.5px dashed $color-neutral-300;
+  border-radius: $radius-md;
+  padding: $space-2 $space-4;
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+  cursor: pointer;
+  width: fit-content;
+  transition: border-color $transition-fast, color $transition-fast, background $transition-fast;
+
+  &:hover {
+    border-color: $color-primary;
+    color: $color-primary;
+    background: $color-primary-50;
+  }
+}
+
+// ── Existing sizes in edit modal ──────────────────────────────────────────────
+
+.ap-existing-sizes {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  margin-bottom: $space-3;
+}
+
+.ap-existing-size {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  padding: $space-3 $space-4;
+  background: $color-neutral-50;
+  border: 1px solid $color-neutral-100;
+  border-radius: $radius-md;
+
+  &__name {
+    font-weight: $font-weight-semi;
+    font-size: $font-size-sm;
+    color: $color-neutral-900;
+    min-width: 60px;
+  }
+
+  &__dims {
+    font-size: $font-size-xs;
+    color: $color-neutral-500;
+    flex: 1;
+  }
+}
+
+.ap-status-pill {
+  padding: 0.2rem $space-3;
+  border-radius: $radius-full;
+  border: 1.5px solid;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all $transition-fast;
+
+  &--on {
+    background: $color-success-light;
+    color: $color-success;
+    border-color: rgba(34, 197, 94, 0.30);
+    &:hover { background: $color-success; color: $color-white; }
+  }
+
+  &--off {
+    background: $color-error-light;
+    color: $color-error;
+    border-color: rgba(239, 68, 68, 0.30);
+    &:hover { background: $color-error; color: $color-white; }
+  }
+}
+
+.ap-price-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: $font-size-base;
+  padding: $space-1 $space-2;
+  border-radius: $radius-md;
+  opacity: 0.60;
+  flex-shrink: 0;
+  transition: opacity $transition-fast, background $transition-fast;
+
+  &:hover { opacity: 1; background: $color-accent-light; }
+}
+
+// ── Add size inline form ──────────────────────────────────────────────────────
+
+.ap-add-size-form {
+  padding: $space-4;
+  background: $color-primary-50;
+  border: 1.5px dashed rgba(26, 115, 232, 0.30);
+  border-radius: $radius-lg;
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+.ap-add-size-actions {
+  display: flex;
+  gap: $space-2;
+  justify-content: flex-end;
+}
+
+.ap-save-size-btn {
+  padding: $space-2 $space-4;
+  background: $color-primary;
+  color: $color-white;
+  border: none;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semi;
+  cursor: pointer;
+  transition: background $transition-fast, transform $transition-fast;
+
+  &:hover:not(:disabled) { background: $color-primary-dark; transform: translateY(-1px); }
+  &:disabled { opacity: 0.40; cursor: not-allowed; }
+}
+
+// ── Pricing tier table ────────────────────────────────────────────────────────
+
+.ap-tier-table {
+  border: 1px solid $color-neutral-300;
+  border-radius: $radius-lg;
+  overflow: hidden;
+
+  &__head {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 40px;
+    gap: $space-2;
+    padding: $space-3 $space-4;
+    background: $color-neutral-50;
+    border-bottom: 1px solid $color-neutral-300;
+
+    span {
+      font-size: $font-size-xs;
+      font-weight: $font-weight-semi;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: $color-neutral-500;
+    }
+  }
+}
+
+.ap-tier-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 40px;
+  gap: $space-2;
+  align-items: center;
+  padding: $space-2 $space-4;
+  border-bottom: 1px solid $color-neutral-100;
+
+  &:last-child { border-bottom: none; }
+
+  .ap-input { min-width: 0; }
+}
+
+// ── Finishes list ─────────────────────────────────────────────────────────────
+
+.ap-finishes-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.ap-finish-row {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+
+  &__num {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    color: $color-neutral-500;
+    width: 16px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .ap-input { flex: 1; }
+}
+
+// ── Alert ─────────────────────────────────────────────────────────────────────
+
+.ap-alert {
+  padding: $space-3 $space-4;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  border-left: 3px solid;
+  margin: 0 $space-6;
+
+  &--error {
+    background: $color-error-light;
+    color: $color-error;
+    border-color: $color-error;
+  }
+}
+
+// ── Responsive ────────────────────────────────────────────────────────────────
+
+@media (max-width: 500px) {
+  .ap-card__head { flex-direction: column; gap: $space-3; }
+
+  .ap-tier-table__head,
+  .ap-tier-row { grid-template-columns: 1fr 1fr 1fr 32px; gap: $space-1; }
+}
+
+// ── Reduced motion ────────────────────────────────────────────────────────────
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-card { animation: none; opacity: 1; transform: none; }
+  .ap-toggle--on .ap-toggle__track { animation: none; }
+  .ap-skeleton__line { animation: none; }
+}

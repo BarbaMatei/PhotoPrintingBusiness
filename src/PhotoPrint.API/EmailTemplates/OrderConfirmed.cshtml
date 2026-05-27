@@ -1,0 +1,84 @@
+@{
+    Layout = "_Layout";
+}
+<h2 style="margin:0 0 16px;font-size:22px;color:#2E7D32;">Comanda confirmată, @Model.FirstName!</h2>
+
+<p>Comanda ta <strong>#@Model.OrderNumber</strong> a fost înregistrată cu succes și se află în procesare.</p>
+
+<!-- Items table -->
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="border-collapse:collapse;margin:24px 0;font-size:14px;">
+  <thead>
+    <tr style="background-color:#f5f5f5;">
+      <th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e0e0e0;">Produs</th>
+      <th style="padding:10px 12px;text-align:center;border-bottom:2px solid #e0e0e0;">Cant.</th>
+      <th style="padding:10px 12px;text-align:right;border-bottom:2px solid #e0e0e0;">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    @foreach (var item in Model.Items)
+    {
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #eeeeee;">
+          <strong>@item.ProductName</strong><br>
+          <span style="color:#757575;font-size:12px;">@item.Size &middot; @item.Finish</span>
+        </td>
+        <td style="padding:10px 12px;text-align:center;border-bottom:1px solid #eeeeee;">@item.Quantity</td>
+        <td style="padding:10px 12px;text-align:right;border-bottom:1px solid #eeeeee;">
+          @item.LineTotalRon.ToString("F2") lei
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>
+
+<!-- Totals -->
+<table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin-bottom:24px;">
+  <tr>
+    <td style="padding:4px 0;color:#616161;">Subtotal</td>
+    <td style="padding:4px 0;text-align:right;color:#616161;">@Model.SubtotalRon.ToString("F2") lei</td>
+  </tr>
+  <tr>
+    <td style="padding:4px 0;color:#616161;">Transport</td>
+    <td style="padding:4px 0;text-align:right;color:#616161;">@Model.ShippingCostRon.ToString("F2") lei</td>
+  </tr>
+  <tr style="font-weight:bold;font-size:16px;">
+    <td style="padding:8px 0 4px;border-top:2px solid #e0e0e0;">Total</td>
+    <td style="padding:8px 0 4px;text-align:right;border-top:2px solid #e0e0e0;color:#2E7D32;">
+      @Model.TotalRon.ToString("F2") lei
+    </td>
+  </tr>
+</table>
+
+<!-- Delivery info -->
+<div style="background-color:#f9fbe7;border-left:4px solid #8BC34A;padding:16px 20px;margin-bottom:24px;border-radius:4px;">
+  <p style="margin:0 0 6px;font-weight:bold;">Livrare:</p>
+  @if (Model.IsEasybox)
+  {
+    <p style="margin:0;color:#424242;">
+      Easybox — @Model.LockerName, @Model.LockerCity<br>
+      <span style="color:#616161;font-size:13px;">@Model.LockerAddress</span>
+    </p>
+  }
+  else if (Model.ShippingAddress != null)
+  {
+    <p style="margin:0;color:#424242;">
+      @Model.ShippingAddress.RecipientName<br>
+      @Model.ShippingAddress.Street @Model.ShippingAddress.Number
+      @(Model.ShippingAddress.Block != null ? $", bl. {Model.ShippingAddress.Block}" : "")<br>
+      @Model.ShippingAddress.City, @Model.ShippingAddress.County @Model.ShippingAddress.PostalCode
+    </p>
+  }
+</div>
+
+<div style="text-align:center;margin:28px 0;">
+  <a href="@Model.OrderUrl"
+     style="background-color:#2E7D32;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;display:inline-block;">
+    Urmărește comanda
+  </a>
+</div>
+
+<p style="color:#616161;font-size:13px;">
+  Ai întrebări? Scrie-ne la
+  <a href="mailto:contact@fototipar.ro" style="color:#2E7D32;">contact@fototipar.ro</a>.
+</p>

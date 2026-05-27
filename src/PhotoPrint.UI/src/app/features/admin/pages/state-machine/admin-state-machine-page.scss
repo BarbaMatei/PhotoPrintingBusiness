@@ -1,0 +1,257 @@
+﻿@use "styles/variables" as *;
+
+@keyframes stateIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sm {
+  padding: $space-6 $space-8;
+  max-width: 1100px;
+  margin: 0 auto;
+
+  @media (max-width: 640px) { padding: $space-4; }
+}
+
+.sm-intro {
+  color: $color-neutral-500;
+  font-size: $font-size-sm;
+  margin: 0 0 $space-8;
+  line-height: $line-height-relaxed;
+}
+
+// Section
+.sm-section {
+  margin-bottom: $space-10;
+}
+
+.sm-section-title {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: $color-neutral-500;
+  margin: 0 0 $space-5;
+  padding-bottom: $space-3;
+  border-bottom: 1px solid $color-neutral-100;
+
+  &__dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    &--blue  { background: $color-primary; }
+    &--amber { background: $color-accent; }
+    &--green { background: $color-success; }
+  }
+}
+
+// State cards
+.sm-states-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: $space-4;
+}
+
+.sm-state {
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  padding: $space-5 $space-5 $space-5 calc(#{$space-5} + 4px);
+  position: relative;
+  overflow: hidden;
+  animation: stateIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+  transition: box-shadow $transition-normal, transform $transition-normal;
+
+  &:hover { box-shadow: $shadow-lg; transform: translateY(-2px); }
+
+  // Left accent stripe (via border-left on a pseudo)
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    border-radius: 0;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    margin-bottom: $space-1;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semi;
+    color: $color-neutral-900;
+  }
+
+  &__terminal {
+    font-size: 10px;
+    font-weight: $font-weight-semi;
+    background: $color-neutral-100;
+    color: $color-neutral-500;
+    padding: 2px $space-2;
+    border-radius: $radius-full;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+
+  &__id {
+    display: block;
+    font-size: $font-size-xs;
+    font-family: $font-family-mono;
+    color: $color-neutral-500;
+    margin: 0 0 $space-2;
+  }
+
+  &__desc {
+    font-size: $font-size-xs;
+    color: $color-neutral-500;
+    line-height: $line-height-relaxed;
+    margin: 0;
+  }
+
+  // Color variants — stripe color via ::before bg
+  &--awaiting::before { background: $color-warning; }
+  &--paid::before     { background: $color-success; }
+  &--printing::before { background: $color-primary; }
+  &--shipped::before  { background: $color-accent; }
+  &--delivered::before { background: $color-success; }
+  &--failed::before   { background: $color-error; }
+  &--cancelled::before { background: $color-neutral-500; }
+}
+
+// Transition table
+.sm-table-wrap {
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  overflow: hidden;
+}
+
+.sm-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead {
+    background: $color-neutral-50;
+    border-bottom: 1.5px solid $color-neutral-100;
+
+    th {
+      padding: $space-3 $space-4;
+      font-size: $font-size-xs;
+      font-weight: $font-weight-semi;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: $color-neutral-500;
+      text-align: left;
+    }
+  }
+
+  &__row {
+    border-bottom: 1px solid $color-neutral-100;
+    transition: background $transition-fast;
+
+    &:last-child { border-bottom: none; }
+    &:hover { background: rgba($color-primary, 0.025); }
+
+    td {
+      padding: $space-3 $space-4;
+      font-size: $font-size-sm;
+      color: $color-neutral-700;
+      vertical-align: middle;
+    }
+  }
+
+  &__arrow {
+    color: $color-neutral-300;
+    font-size: $font-size-base;
+    text-align: center;
+    padding: $space-3 $space-2 !important;
+  }
+
+  &__trigger {
+    font-size: $font-size-xs !important;
+    color: $color-neutral-500 !important;
+  }
+}
+
+// Inline state chips in table
+.sm-inline {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem $space-3;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  white-space: nowrap;
+
+  &--awaiting  { background: $color-warning-light; color: #92400e; }
+  &--paid      { background: $color-success-light; color: $color-success; }
+  &--printing  { background: $color-primary-light; color: $color-primary-dark; }
+  &--shipped   { background: $color-accent-light;  color: $color-accent-dark; }
+  &--delivered { background: $color-success-light; color: $color-success; }
+  &--failed    { background: $color-error-light;   color: $color-error; }
+  &--cancelled { background: $color-neutral-100;   color: $color-neutral-500; }
+}
+
+// Actor badges
+.sm-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  padding: 0.2rem $space-3;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  white-space: nowrap;
+
+  &--admin  { background: $color-primary-50; color: $color-primary-dark; }
+  &--system { background: $color-neutral-100; color: $color-neutral-700; }
+}
+
+// Rules list
+.sm-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-md;
+  overflow: hidden;
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4 $space-5;
+    border-bottom: 1px solid $color-neutral-100;
+    font-size: $font-size-sm;
+    color: $color-neutral-700;
+    line-height: $line-height-relaxed;
+    transition: background $transition-fast;
+
+    &:last-child { border-bottom: none; }
+    &:hover { background: rgba($color-primary, 0.025); }
+  }
+
+  &__check {
+    font-size: $font-size-sm;
+    color: $color-success;
+    font-weight: $font-weight-bold;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-state { animation: none; }
+}

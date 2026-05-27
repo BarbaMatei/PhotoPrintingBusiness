@@ -1,0 +1,109 @@
+<main class="auth-layout">
+  <div class="auth-card">
+    <h1 class="auth-card__title">Creează cont</h1>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="auth-form">
+
+      <!-- First Name -->
+      <div class="form-field">
+        <label for="firstName">Prenume *</label>
+        <input id="firstName" type="text" formControlName="firstName" autocomplete="given-name" />
+        @if (form.get('firstName')?.invalid && form.get('firstName')?.touched) {
+          <span class="field-error">Prenumele este obligatoriu.</span>
+        }
+      </div>
+
+      <!-- Last Name -->
+      <div class="form-field">
+        <label for="lastName">Nume *</label>
+        <input id="lastName" type="text" formControlName="lastName" autocomplete="family-name" />
+        @if (form.get('lastName')?.invalid && form.get('lastName')?.touched) {
+          <span class="field-error">Numele este obligatoriu.</span>
+        }
+      </div>
+
+      <!-- Email -->
+      <div class="form-field">
+        <label for="email">Adresă email *</label>
+        <input id="email" type="email" formControlName="email" autocomplete="email" />
+        @if (form.get('email')?.errors?.['conflict']) {
+          <span class="field-error">Adresa de email este deja folosită.</span>
+        } @else if (form.get('email')?.errors?.['apiError']) {
+          <span class="field-error">{{ form.get('email')?.errors?.['apiError'] }}</span>
+        } @else if (form.get('email')?.invalid && form.get('email')?.touched) {
+          <span class="field-error">Introduceți o adresă de email validă.</span>
+        }
+      </div>
+
+      <!-- Password -->
+      <div class="form-field">
+        <label for="password">Parolă *</label>
+        <div class="input-with-toggle">
+          <input
+            id="password"
+            [type]="showPassword ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="new-password"
+          />
+          <button type="button" class="toggle-btn" (click)="showPassword = !showPassword" aria-label="Afișează/ascunde parola">
+            {{ showPassword ? '🙈' : '👁' }}
+          </button>
+        </div>
+
+        <!-- Strength indicator -->
+        <app-password-checklist [password]="form.get('password')?.value ?? ''" />
+      </div>
+
+      <!-- Confirm Password -->
+      <div class="form-field">
+        <label for="confirmPassword">Confirmă parola *</label>
+        <input
+          id="confirmPassword"
+          [type]="showPassword ? 'text' : 'password'"
+          formControlName="confirmPassword"
+          autocomplete="new-password"
+        />
+        @if (form.errors?.['passwordMismatch'] && form.get('confirmPassword')?.touched) {
+          <span class="field-error">Parolele nu se potrivesc.</span>
+        }
+      </div>
+
+      <!-- Phone (optional) -->
+      <div class="form-field">
+        <label for="phone">Telefon (opțional)</label>
+        <input id="phone" type="tel" formControlName="phone" autocomplete="tel" placeholder="07xxxxxxxx" />
+        @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
+          <span class="field-error">Număr de telefon invalid (ex: 0712345678).</span>
+        }
+      </div>
+
+      <!-- GDPR -->
+      <div class="form-field form-field--checkbox">
+        <label>
+          <input type="checkbox" formControlName="gdprConsent" />
+          Am citit și sunt de acord cu
+          <a routerLink="/politica-de-confidentialitate" target="_blank">Politica de confidențialitate</a>
+          și
+          <a routerLink="/termeni-si-conditii" target="_blank">Termenii și condițiile</a>. *
+        </label>
+      </div>
+
+      <button
+        type="submit"
+        class="btn btn--primary btn--full"
+        [disabled]="form.invalid || loading"
+      >
+        @if (loading) {
+          <span class="spinner" aria-hidden="true"></span> Se procesează...
+        } @else {
+          Creează cont
+        }
+      </button>
+
+    </form>
+
+    <p class="auth-card__footer">
+      Ai deja cont? <a routerLink="/auth/login">Autentifică-te</a>
+    </p>
+  </div>
+</main>

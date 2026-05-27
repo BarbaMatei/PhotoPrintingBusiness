@@ -1,0 +1,293 @@
+﻿<div class="ap">
+
+  <!-- ── Page header ── -->
+  <header class="ap-header">
+    <div class="ap-header__left">
+      <span class="ap-header__eyebrow">Catalog</span>
+      <h1 class="ap-header__title">Gestionare Produse</h1>
+    </div>
+    <button class="ap-add-btn" (click)="showCreateForm()">
+      <span class="ap-add-btn__icon" aria-hidden="true">+</span>
+      Adaugă produs
+    </button>
+  </header>
+
+  @if (loading) {
+    <div class="ap-grid">
+      @for (n of [1, 2, 3]; track n) {
+        <div class="ap-skeleton">
+          <div class="ap-skeleton__line ap-skeleton__line--wide"></div>
+          <div class="ap-skeleton__line"></div>
+          <div class="ap-skeleton__line ap-skeleton__line--short"></div>
+        </div>
+      }
+    </div>
+  }
+
+  @else if (products.length === 0) {
+    <div class="ap-empty">
+      <div class="ap-empty__icon">📦</div>
+      <h2 class="ap-empty__title">Niciun produs încă</h2>
+      <p class="ap-empty__desc">Adaugă primul produs pentru a-l afișa clienților.</p>
+      <button class="ap-add-btn" (click)="showCreateForm()">+ Adaugă produs</button>
+    </div>
+  }
+
+  @else {
+    <div class="ap-grid">
+      @for (product of products; track product.id; let i = $index) {
+        <article class="ap-card" [class.ap-card--inactive]="product.isActive === false"
+          [style.--delay]="(i * 70) + 'ms'">
+
+          <div class="ap-card__stripe"></div>
+
+          <div class="ap-card__head">
+            <div class="ap-card__identity">
+              <span class="ap-type-pill">{{ product.productType }}</span>
+              <h3 class="ap-card__name">{{ product.name }}</h3>
+            </div>
+            <button class="ap-toggle"
+              [class.ap-toggle--on]="product.isActive !== false"
+              (click)="toggleProductStatus(product)"
+              [title]="product.isActive !== false ? 'Dezactivează produsul' : 'Activează produsul'">
+              <span class="ap-toggle__track"><span class="ap-toggle__thumb"></span></span>
+              <span class="ap-toggle__label">{{ product.isActive !== false ? 'Activ' : 'Inactiv' }}</span>
+            </button>
+          </div>
+
+          <div class="ap-card__body">
+
+            <div class="ap-section">
+              <p class="ap-section__label">
+                <span class="ap-dot ap-dot--blue"></span>
+                Dimensiuni
+              </p>
+              <div class="ap-chips">
+                @for (size of product.sizes; track size.id) {
+                  <button class="ap-size-chip" [class.ap-size-chip--inactive]="size.isActive === false"
+                    (click)="openPricingEditor(product.id, size.id, size.pricingTiers)"
+                    title="Editează niveluri de prețuri">
+                    <span class="ap-size-chip__label">{{ size.label }}</span>
+                    @if (size.pricingTiers.length > 0) {
+                      <span class="ap-size-chip__price">de la {{ size.pricingTiers[0].unitPrice | number:'1.2-2' }} lei</span>
+                    } @else {
+                      <span class="ap-size-chip__price ap-size-chip__price--none">fără preț 💰</span>
+                    }
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="ap-section">
+              <p class="ap-section__label">
+                <span class="ap-dot ap-dot--amber"></span>
+                Finisaje
+              </p>
+              <div class="ap-chips ap-chips--finishes">
+                @for (finish of product.finishes; track finish) {
+                  <span class="ap-finish-chip">{{ finish }}</span>
+                }
+                <button class="ap-edit-finishes-btn" (click)="openFinishesEditor(product)">✏️ Editează</button>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="ap-card__footer">
+            <button class="ap-action ap-action--edit" (click)="showEditForm(product)">Editează produsul</button>
+            <button class="ap-action ap-action--delete" (click)="deleteProduct(product.id)">Șterge</button>
+          </div>
+
+        </article>
+      }
+    </div>
+  }
+
+
+  @if (formVisible) {
+    <div class="ap-backdrop" (click)="cancelForm()">
+      <div class="ap-modal" (click)="$event.stopPropagation()">
+        <div class="ap-modal__header">
+          <div class="ap-modal__header-accent"></div>
+          <div class="ap-modal__header-content">
+            <span class="ap-modal__eyebrow">{{ editingProductId ? 'Modificare' : 'Produs nou' }}</span>
+            <h2 class="ap-modal__title">{{ editingProductId ? 'Editează produs' : 'Adaugă produs' }}</h2>
+          </div>
+          <button class="ap-modal__close" (click)="cancelForm()" aria-label="Închide">✕</button>
+        </div>
+
+        @if (formError) {
+          <div class="ap-alert ap-alert--error">{{ formError }}</div>
+        }
+
+        <form [formGroup]="productForm" (ngSubmit)="submitProductForm()" class="ap-form">
+          <div class="ap-form__row ap-form__row--2">
+            <div class="ap-field">
+              <label class="ap-label">Nume <span class="ap-label__req">*</span></label>
+              <input class="ap-input" type="text" formControlName="name" placeholder="ex: Poze foto" />
+            </div>
+            <div class="ap-field">
+              <label class="ap-label">Tip produs</label>
+              <input class="ap-input" type="text" formControlName="productType" />
+            </div>
+          </div>
+          <div class="ap-form__row ap-form__row--2">
+            <div class="ap-field">
+              <label class="ap-label">URL imagine</label>
+              <input class="ap-input" type="url" formControlName="imageUrl" placeholder="https://..." />
+            </div>
+            <div class="ap-field">
+              <label class="ap-label">Ordine sortare</label>
+              <input class="ap-input" type="number" formControlName="sortOrder" />
+            </div>
+          </div>
+
+          @if (!editingProductId) {
+            <div class="ap-field">
+              <label class="ap-label">
+                Dimensiuni
+                <button type="button" class="ap-inline-btn" (click)="addSize()">+ adaugă</button>
+              </label>
+              <div formArrayName="sizes" class="ap-sizes-list">
+                @for (ctrl of sizesArray.controls; track $index) {
+                  <div [formGroupName]="$index" class="ap-size-row">
+                    <input class="ap-input" placeholder="Etichetă (ex: 10×15)" formControlName="label" />
+                    <input class="ap-input ap-input--short" type="number" placeholder="Lăț. mm" formControlName="widthMm" />
+                    <input class="ap-input ap-input--short" type="number" placeholder="Înăl. mm" formControlName="heightMm" />
+                    @if (sizesArray.length > 1) {
+                      <button type="button" class="ap-remove-btn" (click)="removeSize($index)" aria-label="Șterge">✕</button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @else if (editingProduct) {
+            <div class="ap-field">
+              <label class="ap-label">Dimensiuni existente</label>
+              <div class="ap-existing-sizes">
+                @for (size of editingProduct.sizes; track size.id) {
+                  <div class="ap-existing-size">
+                    <span class="ap-existing-size__name">{{ size.label }}</span>
+                    <span class="ap-existing-size__dims">{{ size.widthMm }}×{{ size.heightMm }} mm</span>
+                    <button type="button" class="ap-status-pill"
+                      [class.ap-status-pill--on]="size.isActive"
+                      [class.ap-status-pill--off]="!size.isActive"
+                      (click)="toggleSizeStatus(editingProduct!, size)">
+                      {{ size.isActive ? 'Activ' : 'Inactiv' }}
+                    </button>
+                    <button type="button" class="ap-price-btn"
+                      (click)="openPricingEditor(editingProduct!.id, size.id, size.pricingTiers)"
+                      title="Editează prețuri">💰</button>
+                  </div>
+                }
+              </div>
+              @if (!addSizeVisible) {
+                <button type="button" class="ap-ghost-btn" (click)="showAddSizeForm()">+ Adaugă dimensiune nouă</button>
+              } @else {
+                <div class="ap-add-size-form" [formGroup]="addSizeForm">
+                  <div class="ap-size-row">
+                    <input class="ap-input" placeholder="Etichetă (ex: 20×30)" formControlName="label" />
+                    <input class="ap-input ap-input--short" type="number" placeholder="Lăț." formControlName="widthMm" />
+                    <input class="ap-input ap-input--short" type="number" placeholder="Înăl." formControlName="heightMm" />
+                  </div>
+                  @if (addSizeError) { <div class="ap-alert ap-alert--error">{{ addSizeError }}</div> }
+                  <div class="ap-add-size-actions">
+                    <button type="button" class="ap-ghost-btn" (click)="cancelAddSize()">Anulează</button>
+                    <button type="button" class="ap-save-size-btn" [disabled]="addSizeForm.invalid" (click)="submitAddSize()">Salvează dimensiunea</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="ap-form__actions">
+            <button type="button" class="ap-form__cancel" (click)="cancelForm()">Anulează</button>
+            <button type="submit" class="ap-form__submit" [disabled]="productForm.invalid">
+              {{ editingProductId ? 'Salvează modificările' : 'Creează produsul' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+
+  @if (pricingEditorSizeId) {
+    <div class="ap-backdrop" (click)="closePricingEditor()">
+      <div class="ap-modal" (click)="$event.stopPropagation()">
+        <div class="ap-modal__header">
+          <div class="ap-modal__header-accent ap-modal__header-accent--amber"></div>
+          <div class="ap-modal__header-content">
+            <span class="ap-modal__eyebrow">Prețuri</span>
+            <h2 class="ap-modal__title">Niveluri de prețuri</h2>
+          </div>
+          <button class="ap-modal__close" (click)="closePricingEditor()" aria-label="Închide">✕</button>
+        </div>
+        @if (pricingError) { <div class="ap-alert ap-alert--error">{{ pricingError }}</div> }
+        <p class="ap-modal__hint">Cantitățile trebuie să fie continue. Ultimul nivel lasă Max gol (∞).</p>
+        <form [formGroup]="pricingForm" (ngSubmit)="savePricingTiers()" class="ap-form">
+          <div class="ap-tier-table">
+            <div class="ap-tier-table__head">
+              <span>Min cant.</span><span>Max cant.</span><span>Preț/buc (RON)</span><span></span>
+            </div>
+            <div formArrayName="tiers">
+              @for (ctrl of tiersArray.controls; track $index) {
+                <div [formGroupName]="$index" class="ap-tier-row">
+                  <input class="ap-input" type="number" formControlName="minQuantity" min="1" />
+                  <input class="ap-input" type="number" formControlName="maxQuantity" placeholder="∞" />
+                  <input class="ap-input" type="number" formControlName="unitPrice" step="0.01" min="0.01" />
+                  <div>@if (tiersArray.length > 1) {
+                    <button type="button" class="ap-remove-btn" (click)="removeTier($index)">✕</button>
+                  }</div>
+                </div>
+              }
+            </div>
+          </div>
+          <button type="button" class="ap-ghost-btn" (click)="addTier()">+ Adaugă nivel</button>
+          <div class="ap-form__actions">
+            <button type="button" class="ap-form__cancel" (click)="closePricingEditor()">Anulează</button>
+            <button type="submit" class="ap-form__submit">Salvează prețurile</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+
+  @if (finishesEditorProductId) {
+    <div class="ap-backdrop" (click)="closeFinishesEditor()">
+      <div class="ap-modal ap-modal--narrow" (click)="$event.stopPropagation()">
+        <div class="ap-modal__header">
+          <div class="ap-modal__header-accent ap-modal__header-accent--green"></div>
+          <div class="ap-modal__header-content">
+            <span class="ap-modal__eyebrow">Prezentare</span>
+            <h2 class="ap-modal__title">Finisaje produs</h2>
+          </div>
+          <button class="ap-modal__close" (click)="closeFinishesEditor()" aria-label="Închide">✕</button>
+        </div>
+        @if (finishesError) { <div class="ap-alert ap-alert--error">{{ finishesError }}</div> }
+        <form [formGroup]="finishesForm" (ngSubmit)="saveFinishes()" class="ap-form">
+          <div formArrayName="names" class="ap-finishes-list">
+            @for (ctrl of finishNamesArray.controls; track $index) {
+              <div class="ap-finish-row">
+                <span class="ap-finish-row__num">{{ $index + 1 }}</span>
+                <input class="ap-input" [formControlName]="$index" placeholder="ex: Lucioasă" />
+                @if (finishNamesArray.length > 1) {
+                  <button type="button" class="ap-remove-btn" (click)="removeFinish($index)">✕</button>
+                }
+              </div>
+            }
+          </div>
+          <button type="button" class="ap-ghost-btn" (click)="addFinish()">+ Adaugă finisaj</button>
+          <div class="ap-form__actions">
+            <button type="button" class="ap-form__cancel" (click)="closeFinishesEditor()">Anulează</button>
+            <button type="submit" class="ap-form__submit">Salvează finisajele</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+</div>

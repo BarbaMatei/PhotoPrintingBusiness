@@ -1,0 +1,300 @@
+@use 'styles/variables' as *;
+@use 'sass:color';
+
+.detail-page {
+  padding: $space-8 $space-6;
+  max-width: 1400px;
+  margin: 0 auto;
+  background: $color-bg-soft;
+  min-height: 100vh;
+}
+
+/* ── States ── */
+/* .loading removed — replaced by <app-spinner> */
+.error-banner {
+  padding: $space-8;
+  text-align: center;
+  border-radius: $radius-lg;
+  font-size: $font-size-sm;
+  color: $color-error;
+  background: $color-error-light;
+  border: 1px solid rgba($color-error, 0.2);
+}
+
+/* ── Layout ── */
+.detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: $space-5;
+  align-items: start;
+
+  @media (max-width: 1024px) { grid-template-columns: 1fr; }
+}
+
+/* ── Order header ── */
+.order-header {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+  margin-bottom: $space-6;
+  padding-bottom: $space-5;
+  border-bottom: 1px solid $color-neutral-300;
+
+  h1 {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    font-family: $font-family-mono;
+    color: $color-neutral-900;
+    margin: 0;
+    letter-spacing: 0.04em;
+  }
+}
+
+/* ── Info & Action cards ── */
+.info-card,
+.action-card {
+  background: $color-white;
+  border: 1px solid $color-neutral-300;
+  border-radius: $radius-xl;
+  padding: $space-6;
+  margin-bottom: $space-4;
+  box-shadow: $shadow-sm;
+
+  h2 {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: $color-neutral-500;
+    margin: 0 0 $space-5;
+    padding-bottom: $space-3;
+    border-bottom: 1px solid $color-neutral-100;
+  }
+}
+
+.info-card {
+  // colored top accent per section
+  &:nth-of-type(1) { border-top: 3px solid $color-primary; }
+  &:nth-of-type(2) { border-top: 3px solid $color-accent; }
+  &:nth-of-type(3) { border-top: 3px solid $color-success; }
+}
+
+/* ── Sidebar ── */
+.detail-sidebar {
+  position: sticky;
+  top: $space-4;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  .action-card { margin-bottom: 0; }
+}
+
+/* ── Info list ── */
+.info-list {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: $space-2 $space-4;
+
+  dt {
+    color: $color-neutral-500;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    align-self: start;
+    padding-top: 1px;
+  }
+
+  dd {
+    font-size: $font-size-sm;
+    color: $color-neutral-900;
+    margin: 0;
+  }
+}
+
+/* ── Items table ── */
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: $font-size-sm;
+
+  th {
+    background: $color-neutral-50;
+    padding: $space-2 $space-3;
+    text-align: left;
+    color: $color-neutral-500;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semi;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid $color-neutral-300;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: $space-3 $space-3;
+    border-bottom: 1px solid $color-neutral-100;
+    color: $color-neutral-700;
+    vertical-align: middle;
+  }
+
+  tfoot td {
+    padding: $space-2 $space-3;
+    font-size: $font-size-sm;
+    color: $color-neutral-500;
+    border-bottom: 1px solid $color-neutral-100;
+  }
+
+  .total-label { text-align: right; }
+
+  .total-row td {
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    border-top: 2px solid $color-neutral-300;
+    border-bottom: none;
+  }
+}
+
+/* ── Status badge ── */
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem $space-3;
+  border-radius: $radius-full;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  white-space: nowrap;
+
+  &.status--pending   { background: $color-warning-light;  color: color.mix(black, #f9ab00, 30%); }
+  &.status--paid      { background: $color-success-light;  color: $color-success; }
+  &.status--printing  { background: $color-primary-light;  color: $color-primary-dark; }
+  &.status--shipped   { background: #ede9fe; color: #5b21b6; }
+  &.status--delivered { background: $color-success-light;  color: $color-success; }
+  &.status--cancelled { background: $color-error-light;    color: $color-error; }
+}
+
+/* ── Form inputs ── */
+.input {
+  width: 100%;
+  padding: $space-2 $space-3;
+  border: 1px solid $color-neutral-300;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-family: $font-family-base;
+  color: $color-neutral-900;
+  background: $color-neutral-50;
+  margin-bottom: $space-3;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color $transition-fast, box-shadow $transition-fast, background $transition-fast;
+
+  &:focus {
+    background: $color-white;
+    border-color: $color-primary;
+    box-shadow: 0 0 0 3px rgba($color-primary, 0.12);
+  }
+}
+
+.textarea {
+  @extend .input;
+  resize: vertical;
+  font-family: $font-family-base;
+}
+
+/* ── Action buttons ── */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+}
+
+/* ── Cancel modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: $z-modal;
+  padding: $space-4;
+}
+
+.modal {
+  background: $color-white;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-xl;
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $space-5 $space-6;
+  border-bottom: 1px solid $color-neutral-100;
+
+  h2 {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    margin: 0;
+  }
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: $font-size-xl;
+  color: $color-neutral-500;
+  line-height: 1;
+  padding: $space-1;
+  border-radius: $radius-md;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: $color-neutral-100; color: $color-neutral-900; }
+}
+
+.modal-body {
+  padding: $space-6;
+}
+
+.modal-warning {
+  display: flex;
+  gap: $space-3;
+  background: $color-warning-light;
+  border: 1px solid rgba($color-warning, 0.3);
+  border-radius: $radius-md;
+  padding: $space-4;
+  font-size: $font-size-sm;
+  color: $color-neutral-700;
+  margin-bottom: $space-5;
+  line-height: 1.6;
+}
+
+.form-label {
+  display: block;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-neutral-700;
+  margin-bottom: $space-2;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: $space-3;
+  padding: $space-4 $space-6;
+  border-top: 1px solid $color-neutral-100;
+  background: $color-neutral-50;
+}
+
+/* ── Error inside sidebar ── */
+.error-banner {
+  font-size: $font-size-xs;
+  padding: $space-3;
+  border-radius: $radius-md;
+}
+

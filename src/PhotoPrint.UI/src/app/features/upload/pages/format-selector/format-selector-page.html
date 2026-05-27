@@ -1,0 +1,127 @@
+@if (loading) {
+  <div class="format-selector format-selector--loading">
+    <div class="skeleton skeleton--title"></div>
+    <div class="skeleton skeleton--body"></div>
+  </div>
+} @else if (error || !product) {
+  <div class="format-selector__error">
+    <p>{{ error ?? 'Produsul nu a fost găsit.' }}</p>
+    <a routerLink="/tipareste" class="btn btn--secondary">← Înapoi la catalog</a>
+  </div>
+} @else {
+  <div class="format-selector">
+    <a routerLink="/tipareste" class="format-selector__back">← Înapoi la catalog</a>
+    <h1 class="format-selector__title">{{ product.name }}</h1>
+
+    @if (cartSuccess) {
+      <div class="cart-success-banner" role="status">
+        ✅ Fotografii adăugate în coș!
+        <a routerLink="/cos" class="cart-success-banner__link">Vezi coșul →</a>
+        <span class="cart-success-banner__hint">sau continuă să adaugi fotografii cu alt format.</span>
+      </div>
+    }
+
+    <div class="format-selector__layout">
+      <!-- Left: upload zone + thumbnails + format form -->
+      <div class="format-selector__main">
+
+        <!-- Upload zone -->
+        <section class="format-selector__section">
+          <h2 class="format-selector__section-title">Fotografiile tale</h2>
+          <app-photo-upload
+            [currentUploadCount]="doneUploadCount"
+            (filesAccepted)="onFilesAccepted($event)"
+            (filesRejected)="onFilesRejected($event)"
+          />
+
+          @for (err of uploadErrors; track $index) {
+            <div class="upload-error">
+              @switch (err.reason) {
+                @case ('type') { <span>«{{ err.fileName }}» — tip de fișier neacceptat.</span> }
+                @case ('size') { <span>«{{ err.fileName }}» — fișierul depășește 50 MB.</span> }
+                @case ('limit') { <span>«{{ err.fileName }}» — limita de 100 fotografii a fost atinsă.</span> }
+              }
+              <button class="upload-error__close" (click)="dismissUploadError($index)">✕</button>
+            </div>
+          }
+
+          @if (uploads().length > 0) {
+            <!-- Scrollable photo strip -->
+            <div class="photo-strip">
+              @for (upload of uploads(); track upload.clientId) {
+                <div class="photo-strip__item">
+                  <app-photo-thumbnail
+                    [state]="upload"
+                    [selectedSize]="selectedSize()"
+                    (removed)="onRemoveUpload($event)"
+                    (preview)="lightboxSrc.set($event)"
+                  />
+                  @if (upload.status === 'done') {
+                    <app-quantity-stepper
+                      [value]="upload.quantity"
+                      (valueChange)="onQuantityChange(upload.clientId, $event)"
+                    />
+                  }
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <!-- Format and finish selection -->
+        <section class="format-selector__section">
+          <h2 class="format-selector__section-title">Format și finisaj</h2>
+          <form [formGroup]="form" class="format-selector__form">
+
+            <fieldset class="format-selector__fieldset">
+              <legend>Dimensiune</legend>
+              <div class="format-selector__sizes">
+                @for (size of product.sizes; track size.id) {
+                  <label class="size-option" [class.size-option--selected]="form.get('sizeId')!.value === size.id">
+                    <input type="radio" formControlName="sizeId" [value]="size.id" />
+                    <span class="size-option__label">{{ size.label }}</span>
+                    <span class="size-option__dims">{{ size.widthMm }}×{{ size.heightMm }} mm</span>
+                  </label>
+                }
+              </div>
+            </fieldset>
+
+            @if (product.finishes.length > 0) {
+              <fieldset class="format-selector__fieldset">
+                <legend>Finisaj</legend>
+                <div class="format-selector__finishes">
+                  @for (finish of product.finishes; track finish) {
+                    <label class="finish-option" [class.finish-option--selected]="form.get('finish')!.value === finish">
+                      <input type="radio" formControlName="finish" [value]="finish" />
+                      <span>{{ finish }}</span>
+                    </label>
+                  }
+                </div>
+              </fieldset>
+            }
+
+          </form>
+        </section>
+
+      </div>
+
+      <!-- Right: order summary panel -->
+      <aside class="format-selector__sidebar">
+        <app-order-summary
+          [uploads]="uploads()"
+          [selectedSize]="selectedSize()"
+          [unitPrice]="priceResult()?.unitPrice ?? 0"
+          [tierLabel]="priceResult()?.tierLabel ?? null"
+          [canAddToCart]="canAddToCart()"
+          [disabledReason]="disabledReason()"
+          (addToCart)="onAddToCart()"
+        />
+      </aside>
+    </div>
+  </div>
+
+  <app-photo-lightbox
+    [src]="lightboxSrc()"
+    (close)="lightboxSrc.set(null)"
+  />
+}

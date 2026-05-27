@@ -1,0 +1,139 @@
+@use 'styles/variables' as *;
+
+// Shared auth layout & form styles
+// Used by: login, register, forgot-password, reset-password, verify-email
+
+.auth-layout {
+  min-height: calc(100vh - #{$header-height} - #{$footer-height});
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $space-8 $space-4;
+  background: $color-neutral-50;
+}
+
+.auth-card {
+  background: $color-white;
+  border-radius: $radius-lg;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  padding: $space-12 $space-10;
+  width: 100%;
+  max-width: 480px;
+
+  &__title {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-neutral-900;
+    margin: 0 0 $space-8;
+    text-align: center;
+  }
+
+  &__footer {
+    margin-top: $space-6;
+    text-align: center;
+    font-size: $font-size-sm;
+    color: $color-neutral-500;
+
+    a {
+      color: $color-primary;
+      text-decoration: none;
+      font-weight: $font-weight-medium;
+
+      &:hover { text-decoration: underline; }
+    }
+  }
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+
+  label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-neutral-700;
+  }
+
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='tel'] {
+    width: 100%;
+    padding: $space-3 $space-4;
+    border: 1px solid $color-neutral-300;
+    border-radius: $radius-md;
+    font-size: $font-size-base;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+
+    &:focus { border-color: $color-primary; }
+
+    &.ng-invalid.ng-touched { border-color: $color-error; }
+  }
+
+  &--checkbox {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: $space-2;
+
+    label {
+      display: flex;
+      align-items: flex-start;
+      gap: $space-2;
+      font-size: $font-size-sm;
+      font-weight: $font-weight-regular;
+      cursor: pointer;
+      line-height: $line-height-normal;
+    }
+
+    input[type='checkbox'] { margin-top: 2px; flex-shrink: 0; }
+
+    a { color: $color-primary; text-decoration: none; &:hover { text-decoration: underline; } }
+  }
+}
+
+.input-with-toggle {
+  position: relative;
+  display: flex;
+
+  input { flex: 1; padding-right: $space-10; }
+}
+
+.toggle-btn {
+  position: absolute;
+  right: $space-3;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: $font-size-base;
+  line-height: 1;
+}
+
+.field-error {
+  font-size: $font-size-xs;
+  color: $color-error;
+}
+
+// Button-level inline spinner used inside submit buttons across all auth forms
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: $color-white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -1,0 +1,47 @@
+<main class="auth-layout">
+  <div class="auth-card">
+
+    @if (confirmed) {
+      <div class="banner banner--success">
+        <p>✅ Email confirmat! Vă puteți autentifica.</p>
+        <a routerLink="/auth/login" class="btn btn--primary">Mergi la autentificare</a>
+      </div>
+    } @else {
+      <h1 class="auth-card__title">Verificați emailul</h1>
+
+      <div class="verify-body">
+        <p>
+          Am trimis un link de confirmare la adresa
+          @if (email) {
+            <strong>{{ email }}</strong>
+          } @else {
+            dvs. de email
+          }.
+          Vă rugăm să accesați linkul din email pentru a vă activa contul.
+        </p>
+
+        <p class="verify-body__note">Nu ați primit emailul? Verificați folderul Spam sau retrimiteti emailul.</p>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn--primary btn--full"
+        [disabled]="!email || loading || countdown > 0"
+        (click)="resend()"
+      >
+        @if (loading) {
+          <span class="spinner" aria-hidden="true"></span> Se trimite...
+        } @else if (countdown > 0) {
+          Retrimite email ({{ countdown }}s)
+        } @else {
+          Retrimite email
+        }
+      </button>
+
+      <p class="auth-card__footer">
+        <a routerLink="/auth/login">Înapoi la autentificare</a>
+      </p>
+    }
+
+  </div>
+</main>

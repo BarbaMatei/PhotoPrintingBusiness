@@ -1,0 +1,214 @@
+<div class="detail-page">
+  <app-breadcrumb
+    [title]="order ? 'Comandă ' + order.orderNumber : 'Comandă...'"
+    backLink="/admin/comenzi"
+    backLabel="Înapoi la comenzi" />
+
+  @if (loading) {
+    <app-spinner [showLabel]="true" />
+  } @else if (error) {
+    <div class="error-banner">{{ error }}</div>
+  } @else if (order) {
+    <div class="detail-layout">
+
+      <!-- Left column: order info -->
+      <div class="detail-main">
+        <header class="order-header">
+          <h1>{{ order.orderNumber }}</h1>
+          <span class="status-badge" [class]="statusClass(order.status)">
+            {{ statusLabel(order.status) }}
+          </span>
+        </header>
+
+        <!-- Customer -->
+        <section class="info-card">
+          <h2>Client</h2>
+          <dl class="info-list">
+            <dt>Nume</dt><dd>{{ order.customerName }}</dd>
+            <dt>Email</dt><dd>{{ order.customerEmail }}</dd>
+            <dt>Data comenzii</dt><dd>{{ formatDate(order.createdAt) }}</dd>
+            <dt>Data plății</dt><dd>{{ formatDate(order.paidAt) }}</dd>
+            <dt>Procesator plată</dt><dd>{{ order.paymentProcessor }}</dd>
+          </dl>
+        </section>
+
+        <!-- Shipping -->
+        <section class="info-card">
+          <h2>Livrare</h2>
+          <dl class="info-list">
+            <dt>Tip</dt><dd>{{ order.deliveryType }}</dd>
+            @if (order.lockerName) {
+              <dt>Easybox</dt><dd>{{ order.lockerName }} — {{ order.lockerAddress }}</dd>
+            }
+            @if (order.shippingAddress) {
+              <dt>Adresă</dt>
+              <dd>
+                {{ order.shippingAddress.recipientName }},
+                {{ order.shippingAddress.street }} {{ order.shippingAddress.number }}
+                @if (order.shippingAddress.block) { Bl. {{ order.shippingAddress.block }} }
+                , {{ order.shippingAddress.city }}, {{ order.shippingAddress.county }},
+                {{ order.shippingAddress.postalCode }},
+                Tel: {{ order.shippingAddress.phone }}
+              </dd>
+            }
+            @if (order.awbNumber) {
+              <dt>AWB</dt>
+              <dd>
+                {{ order.awbNumber }}
+                @if (order.trackingUrl) {
+                  — <a [href]="order.trackingUrl" target="_blank" rel="noopener">urmărire</a>
+                }
+              </dd>
+            }
+          </dl>
+        </section>
+
+        <!-- Items -->
+        <section class="info-card">
+          <h2>Produse</h2>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Produs</th>
+                <th>Dimensiune</th>
+                <th>Finisaj</th>
+                <th>Cant.</th>
+                <th>Preț unitar</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of order.items; track item.uploadId) {
+                <tr>
+                  <td>{{ item.productName }}</td>
+                  <td>{{ item.size }}</td>
+                  <td>{{ item.finish }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>{{ formatRon(item.unitPriceRon) }}</td>
+                  <td>{{ formatRon(item.lineTotalRon) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="5" class="total-label">Subtotal</td>
+                <td>{{ formatRon(order.subtotalRon) }}</td>
+              </tr>
+              <tr>
+                <td colspan="5" class="total-label">Transport</td>
+                <td>{{ formatRon(order.shippingCostRon) }}</td>
+              </tr>
+              <tr class="total-row">
+                <td colspan="5" class="total-label">Total</td>
+                <td>{{ formatRon(order.totalRon) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </section>
+      </div>
+
+      <!-- Right column: actions -->
+      <aside class="detail-sidebar">
+
+        <!-- Status transition -->
+        @if (nextStatuses.length > 0) {
+          <section class="action-card">
+            <h2>Schimbă status</h2>
+            <select class="input" [(ngModel)]="selectedStatus">
+              <option value="">Selectează...</option>
+              @for (s of nextStatuses; track s) {
+                <option [value]="s">{{ statusLabel(s) }}</option>
+              }
+            </select>
+            @if (showAwbFields) {
+              <input class="input" type="text" placeholder="Număr AWB" [(ngModel)]="awbNumber" />
+              <input class="input" type="text" placeholder="URL tracking" [(ngModel)]="trackingUrl" />
+            }
+            <button
+              class="btn btn--primary btn--full"
+              [disabled]="!selectedStatus || actionLoading"
+              (click)="applyStatusChange()"
+            >
+              {{ actionLoading ? 'Se aplică...' : 'Aplică' }}
+            </button>
+          </section>
+        }
+
+        <!-- Actions -->
+        <section class="action-card">
+          <h2>Acțiuni</h2>
+          <div class="action-buttons">
+            <button class="btn btn--ghost btn--sm btn--full" (click)="downloadZip()">
+              ⬇ Descarcă fotografiile (ZIP)
+            </button>
+
+            @if (order.status !== 'Cancelled' && order.status !== 'Delivered') {
+              <button class="btn btn--danger btn--sm btn--full" (click)="openCancelModal()">
+                Anulează comanda
+              </button>
+            }
+          </div>
+        </section>
+
+        @if (actionError) {
+          <div class="error-banner">{{ actionError }}</div>
+        }
+
+        <!-- Notes -->
+        <section class="action-card">
+          <h2>Note interne</h2>
+          <textarea
+            class="textarea"
+            rows="4"
+            placeholder="Note vizibile doar pentru admin..."
+            [(ngModel)]="notesText"
+          ></textarea>
+          <button
+            class="btn btn--primary btn--full"
+            [disabled]="notesSaving"
+            (click)="saveNotes()"
+          >
+            {{ notesSaving ? 'Se salvează...' : 'Salvează notele' }}
+          </button>
+        </section>
+
+      </aside>
+    </div>
+  }
+</div>
+
+<!-- Cancel order modal -->
+@if (showCancelModal) {
+  <div class="modal-backdrop" (click)="closeCancelModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Anulare comandă</h2>
+        <button class="modal-close" (click)="closeCancelModal()" aria-label="Închi">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-warning">
+          ⚠️ Această acțiune este ireversibilă. Rambursarea către client va fi inițiată automat
+          și i se va trimite un email de confirmare a anulării.
+        </p>
+        <label class="form-label" for="cancelReason">Motivul anulării</label>
+        <textarea
+          id="cancelReason"
+          class="textarea"
+          rows="4"
+          placeholder="Ex: Stoc insuficient, problemă tehnică, cerere client..."
+          [(ngModel)]="cancelReason"
+        ></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn--ghost btn--sm" (click)="closeCancelModal()">Renunță</button>
+        <button
+          class="btn btn--danger btn--sm"
+          [disabled]="cancelLoading"
+          (click)="doCancel()"
+        >
+          {{ cancelLoading ? 'Se anulează...' : 'Da, anulează comanda' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,42 @@
+<div class="as">
+
+  <header class="as-header">
+    <div class="as-header__brand">
+      <span class="as-header__eyebrow">FotoTipar</span>
+      <h1 class="as-header__title">Administrare</h1>
+    </div>
+
+    <nav class="as-nav" aria-label="Navigare admin">
+      <a class="as-nav__tab"
+         routerLink="/admin"
+         routerLinkActive="as-nav__tab--active"
+         [routerLinkActiveOptions]="{exact: true}">
+        <span class="as-nav__icon">📊</span>
+        <span class="as-nav__label">Panou</span>
+      </a>
+      <a class="as-nav__tab"
+         routerLink="/admin/comenzi"
+         routerLinkActive="as-nav__tab--active">
+        <span class="as-nav__icon">📦</span>
+        <span class="as-nav__label">Comenzi</span>
+      </a>
+      <a class="as-nav__tab"
+         routerLink="/admin/stari-comenzi"
+         routerLinkActive="as-nav__tab--active">
+        <span class="as-nav__icon">🔄</span>
+        <span class="as-nav__label">Stări comenzi</span>
+      </a>
+      <a class="as-nav__tab"
+         routerLink="/admin/produse"
+         routerLinkActive="as-nav__tab--active">
+        <span class="as-nav__icon">🏷️</span>
+        <span class="as-nav__label">Produse</span>
+      </a>
+    </nav>
+  </header>
+
+  <main class="as-main">
+    <router-outlet />
+  </main>
+
+</div>

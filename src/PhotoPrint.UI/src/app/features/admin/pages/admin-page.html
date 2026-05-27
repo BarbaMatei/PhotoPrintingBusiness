@@ -1,0 +1,82 @@
+﻿<div class="dash">
+
+  <!-- KPI row -->
+  @if (loading) {
+    <div class="dash-kpi-grid">
+      @for (n of [1,2,3,4]; track n) {
+        <div class="dash-skeleton">
+          <div class="dash-skeleton__line dash-skeleton__line--wide"></div>
+          <div class="dash-skeleton__line dash-skeleton__line--short"></div>
+        </div>
+      }
+    </div>
+  } @else if (error) {
+    <div class="dash-alert">{{ error }}</div>
+  } @else if (stats) {
+    <div class="dash-kpi-grid" role="list">
+      <div class="dash-kpi" style="--i:0" role="listitem">
+        <div class="dash-kpi__icon">📬</div>
+        <div class="dash-kpi__body">
+          <span class="dash-kpi__label">Comenzi azi</span>
+          <span class="dash-kpi__value">{{ stats.todayOrders }}</span>
+        </div>
+        <div class="dash-kpi__stripe dash-kpi__stripe--blue"></div>
+      </div>
+      <div class="dash-kpi" style="--i:1" role="listitem">
+        <div class="dash-kpi__icon">💳</div>
+        <div class="dash-kpi__body">
+          <span class="dash-kpi__label">Venituri azi</span>
+          <span class="dash-kpi__value">{{ formatRon(stats.todayRevenue) }}</span>
+        </div>
+        <div class="dash-kpi__stripe dash-kpi__stripe--green"></div>
+      </div>
+      <div class="dash-kpi" style="--i:2" role="listitem">
+        <div class="dash-kpi__icon">📅</div>
+        <div class="dash-kpi__body">
+          <span class="dash-kpi__label">Comenzi luna aceasta</span>
+          <span class="dash-kpi__value">{{ stats.monthOrders }}</span>
+        </div>
+        <div class="dash-kpi__stripe dash-kpi__stripe--amber"></div>
+      </div>
+      <div class="dash-kpi" style="--i:3" role="listitem">
+        <div class="dash-kpi__icon">📈</div>
+        <div class="dash-kpi__body">
+          <span class="dash-kpi__label">Venituri luna aceasta</span>
+          <span class="dash-kpi__value">{{ formatRon(stats.monthRevenue) }}</span>
+        </div>
+        <div class="dash-kpi__stripe dash-kpi__stripe--purple"></div>
+      </div>
+    </div>
+  }
+
+  <!-- Charts -->
+  <div class="dash-charts">
+    <div class="dash-chart dash-chart--wide">
+      <div class="dash-chart__header">
+        <h2 class="dash-chart__title">Venituri — ultimele 30 zile</h2>
+      </div>
+      <div class="dash-chart__canvas-wrap">
+        <canvas #revenueChart></canvas>
+      </div>
+    </div>
+
+    <div class="dash-chart">
+      <div class="dash-chart__header">
+        <h2 class="dash-chart__title">Comenzi pe status</h2>
+      </div>
+      <div class="dash-chart__canvas-wrap">
+        <canvas #statusChart></canvas>
+      </div>
+    </div>
+
+    <div class="dash-chart">
+      <div class="dash-chart__header">
+        <h2 class="dash-chart__title">Top produse</h2>
+      </div>
+      <div class="dash-chart__canvas-wrap">
+        <canvas #productChart></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>

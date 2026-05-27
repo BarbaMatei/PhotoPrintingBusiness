@@ -1,0 +1,440 @@
+﻿@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: $z-header;
+  background: rgba(253, 252, 251, 0.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid rgba($color-neutral-300, 0.6);
+  box-shadow: $shadow-sm;
+  height: $header-height;
+
+  // Thin gradient accent bar at very top
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, $color-primary 0%, $color-accent 100%);
+  }
+}
+
+.header__container {
+  @include flex-between;
+  @include container;
+  height: 100%;
+}
+
+// â”€â”€ Logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__logo {
+  display: flex;
+  align-items: center;
+  gap: $space-2 + 0.125rem;
+  text-decoration: none;
+  flex-shrink: 0;
+
+  &:hover { text-decoration: none; }
+  &:hover .header__logo-mark { transform: scale(1.05) rotate(-2deg); }
+}
+
+.header__logo-mark {
+  display: flex;
+  transition: transform $transition-normal;
+  flex-shrink: 0;
+}
+
+.header__logo-name {
+  font-size: 1.2rem;
+  font-weight: $font-weight-bold;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.header__logo-foto {
+  color: $color-primary;
+  font-weight: 800;
+}
+
+.header__logo-tipar {
+  color: $color-neutral-900;
+  font-weight: 600;
+}
+
+// â”€â”€ Desktop nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__nav {
+  display: none;
+  align-items: center;
+  gap: $space-1;
+
+  @include lg {
+    display: flex;
+  }
+}
+
+.header__nav-link {
+  position: relative;
+  text-decoration: none;
+  color: $color-neutral-700;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  padding: $space-2 $space-3;
+  border-radius: $radius-md;
+  transition: color $transition-fast, background-color $transition-fast;
+
+  &:hover {
+    color: $color-primary;
+    background: $color-primary-light;
+  }
+
+  &--active {
+    color: $color-primary;
+    font-weight: $font-weight-semi;
+    background: $color-primary-light;
+  }
+
+  &--admin {
+    color: $color-accent;
+    &:hover { background: $color-accent-light; color: $color-accent-dark; }
+    &.header__nav-link--active { background: $color-accent-light; }
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+// â”€â”€ Actions area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+}
+
+// â”€â”€ Cart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__cart {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  text-decoration: none;
+  color: $color-neutral-700;
+  border-radius: $radius-md;
+  transition: background-color $transition-fast, color $transition-fast;
+
+  &:hover {
+    background-color: $color-primary-light;
+    color: $color-primary;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.header__cart-svg {
+  flex-shrink: 0;
+}
+
+.header__cart-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 17px;
+  height: 17px;
+  background: linear-gradient(135deg, $color-accent, #ff9100);
+  color: $color-white;
+  border-radius: $radius-full;
+  font-size: 0.65rem;
+  font-weight: $font-weight-bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 1.5px solid rgba(253,252,251,0.9);
+  animation: badge-pop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badge-pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+// â”€â”€ Auth links â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__auth {
+  display: none;
+  align-items: center;
+  gap: $space-2;
+
+  @include md {
+    display: flex;
+  }
+}
+
+.header__auth-link {
+  text-decoration: none;
+  color: $color-neutral-700;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  padding: $space-1 + 0.125rem $space-3;
+  border-radius: $radius-md;
+  transition: background-color $transition-fast, color $transition-fast;
+
+  &:hover {
+    background: $color-neutral-100;
+    color: $color-neutral-900;
+  }
+
+  &:focus-visible { @include focus-ring; }
+}
+
+.header__auth-cta {
+  // Uses global .btn .btn--accent .btn--sm
+  display: none;
+
+  @include md { display: inline-flex; }
+}
+
+// â”€â”€ User avatar + dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__user {
+  position: relative;
+  display: none;
+
+  @include md { display: block; }
+}
+
+.header__avatar-btn {
+  background: $color-primary-light;
+  border: 2px solid $color-primary;
+  border-radius: $radius-full;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: box-shadow $transition-fast, transform $transition-fast;
+
+  &:hover {
+    box-shadow: $shadow-glow-primary;
+    transform: scale(1.06);
+  }
+
+  &:focus-visible { @include focus-ring; }
+}
+
+.header__avatar {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+  color: $color-primary;
+  user-select: none;
+}
+
+.header__dropdown {
+  position: absolute;
+  top: calc(100% + $space-2);
+  right: 0;
+  min-width: 192px;
+  background: $color-white;
+  border: 1px solid $color-neutral-300;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-xl;
+  padding: $space-2 0;
+  z-index: $z-dropdown;
+  animation: dropdown-in 0.15s ease;
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header__dropdown-item {
+  display: block;
+  width: 100%;
+  padding: $space-2 $space-4;
+  text-decoration: none;
+  color: $color-neutral-700;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  transition: background-color $transition-fast;
+  white-space: nowrap;
+
+  &:hover {
+    background: $color-neutral-100;
+    color: $color-neutral-900;
+    text-decoration: none;
+  }
+}
+
+.header__dropdown-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: $font-family-base;
+  width: 100%;
+  color: $color-error;
+
+  &:hover {
+    background: $color-error-light;
+    color: $color-error;
+  }
+}
+
+.header__dropdown-divider {
+  border: none;
+  border-top: 1px solid $color-neutral-300;
+  margin: $space-2 0;
+}
+
+// â”€â”€ Mobile hamburger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 38px;
+  height: 38px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: $space-2;
+  border-radius: $radius-md;
+  transition: background-color $transition-fast;
+
+  span {
+    display: block;
+    height: 2px;
+    background: $color-neutral-700;
+    border-radius: $radius-full;
+    transition: transform $transition-normal, opacity $transition-normal;
+
+    &.open:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    &.open:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    &.open:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  }
+
+  &:hover { background: $color-neutral-100; }
+  &:focus-visible { @include focus-ring; }
+
+  @include lg { display: none; }
+}
+
+// ── Mobile nav panel ───────────────────────────
+.header__mobile-nav {
+  position: fixed;
+  top: $header-height;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba($color-white, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: $z-header - 1;
+  padding: $space-6 $space-4 $space-8;
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  border-top: 1px solid $color-neutral-300;
+  overflow-y: auto;
+  animation: mobile-nav-in 0.2s ease;
+
+  @include lg { display: none; }
+}
+
+@keyframes mobile-nav-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header__mobile-link {
+  display: block;
+  padding: $space-3 $space-4;
+  text-decoration: none;
+  color: $color-neutral-900;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-lg;
+  transition: background-color $transition-fast;
+
+  &:hover { background: $color-neutral-100; }
+
+  &--cta {
+    color: $color-accent;
+    font-weight: $font-weight-bold;
+  }
+}
+
+.header__mobile-logout {
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: $font-family-base;
+  width: 100%;
+  color: $color-error;
+
+  &:hover { background: $color-error-light; }
+}
+
+// â”€â”€ Mobile nav panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+.header__mobile-nav {
+  position: fixed;
+  top: $header-height;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba($color-white, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: $z-header - 1;
+  padding: $space-6 $space-4 $space-8;
+  display: flex;
+  flex-direction: column;
+  gap: $space-1;
+  border-top: 1px solid $color-neutral-300;
+  overflow-y: auto;
+  animation: mobile-nav-in 0.2s ease;
+
+  @include lg { display: none; }
+}
+
+@keyframes mobile-nav-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header__mobile-link {
+  display: block;
+  padding: $space-3 $space-4;
+  text-decoration: none;
+  color: $color-neutral-900;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-lg;
+  transition: background-color $transition-fast;
+
+  &:hover { background: $color-neutral-100; }
+
+  &--cta {
+    color: $color-accent;
+    font-weight: $font-weight-bold;
+  }
+}
+
+.header__mobile-logout {
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: $font-family-base;
+  width: 100%;
+  color: $color-error;
+
+  &:hover { background: $color-error-light; }
+}

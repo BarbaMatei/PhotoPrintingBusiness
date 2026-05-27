@@ -1,0 +1,37 @@
+@use 'styles/variables' as *;
+@use 'styles/auth-forms' as *;
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.forgot-link {
+  font-size: $font-size-sm;
+  color: $color-primary;
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+.form-error {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  padding: $space-3 $space-4;
+  background: color-mix(in srgb, #d93025 10%, white);
+  border: 1px solid $color-error;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  color: $color-error;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: $color-primary;
+  cursor: pointer;
+  padding: 0;
+  font-size: $font-size-sm;
+  text-decoration: underline;
+}

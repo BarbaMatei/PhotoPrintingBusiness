@@ -1,0 +1,77 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+.footer {
+  background-color: $color-neutral-900;
+  color: $color-neutral-300;
+  padding: $space-8 0 $space-6;
+  margin-top: auto;
+}
+
+.footer__container {
+  @include container;
+  display: flex;
+  flex-direction: column;
+  gap: $space-6;
+
+  @include md {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-8;
+  }
+}
+
+.footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.footer__logo {
+  text-decoration: none;
+  color: $color-white;
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+
+  &:hover {
+    color: $color-primary-light;
+  }
+}
+
+.footer__tagline {
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+  margin: 0;
+}
+
+.footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-4;
+}
+
+.footer__link {
+  text-decoration: none;
+  color: $color-neutral-300;
+  font-size: $font-size-sm;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: $color-white;
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+}
+
+.footer__copy {
+  font-size: $font-size-xs;
+  color: $color-neutral-500;
+  margin: 0;
+
+  @include md {
+    text-align: right;
+  }
+}

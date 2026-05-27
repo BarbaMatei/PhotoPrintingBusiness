@@ -1,0 +1,252 @@
+@use 'variables' as *;
+
+// ─────────────────────────────────────────────
+// Responsive breakpoint mixins (mobile-first)
+// ─────────────────────────────────────────────
+
+@mixin sm {
+  @media (min-width: #{$breakpoint-sm}) { @content; }
+}
+
+@mixin md {
+  @media (min-width: #{$breakpoint-md}) { @content; }
+}
+
+@mixin lg {
+  @media (min-width: #{$breakpoint-lg}) { @content; }
+}
+
+@mixin xl {
+  @media (min-width: #{$breakpoint-xl}) { @content; }
+}
+
+@mixin xxl {
+  @media (min-width: #{$breakpoint-2xl}) { @content; }
+}
+
+// ─────────────────────────────────────────────
+// Layout helpers
+// ─────────────────────────────────────────────
+
+@mixin container {
+  width: 100%;
+  max-width: $container-max;
+  margin-inline: auto;
+  padding-inline: $space-4;
+
+  @include md {
+    padding-inline: $space-6;
+  }
+
+  @include lg {
+    padding-inline: $space-8;
+  }
+}
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// ─────────────────────────────────────────────
+// Typography helpers
+// ─────────────────────────────────────────────
+
+@mixin text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// ─────────────────────────────────────────────
+// Focus ring
+// ─────────────────────────────────────────────
+
+@mixin focus-ring {
+  outline: 2px solid $color-primary;
+  outline-offset: 2px;
+}
+
+// ─────────────────────────────────────────────
+// Button base
+// ─────────────────────────────────────────────
+
+@mixin btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  padding: $space-2 $space-4;
+  border: none;
+  border-radius: $radius-md;
+  font-family: $font-family-base;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  line-height: $line-height-normal;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color $transition-fast, color $transition-fast, box-shadow $transition-fast;
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+@mixin btn-primary {
+  @include btn-base;
+  background-color: $color-primary;
+  color: $color-white;
+
+  &:hover {
+    background-color: $color-primary-dark;
+    box-shadow: $shadow-md;
+  }
+}
+
+@mixin btn-secondary {
+  @include btn-base;
+  background-color: transparent;
+  color: $color-primary;
+  border: 1.5px solid $color-primary;
+
+  &:hover {
+    background-color: $color-primary-light;
+  }
+}
+
+@mixin btn-ghost {
+  @include btn-base;
+  background-color: transparent;
+  color: $color-neutral-700;
+  border: 1.5px solid $color-neutral-300;
+
+  &:hover {
+    background-color: $color-neutral-100;
+    border-color: $color-neutral-700;
+  }
+}
+
+@mixin btn-accent {
+  @include btn-base;
+  background: linear-gradient(135deg, $color-accent 0%, #ff9100 100%);
+  color: $color-white;
+  box-shadow: $shadow-glow-accent;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(255, 109, 0, 0.45);
+  }
+
+  &:active { transform: translateY(0); }
+}
+
+// ─────────────────────────────────────────────
+// Card
+// ─────────────────────────────────────────────
+
+@mixin card {
+  background: $color-white;
+  border: 1px solid $color-neutral-300;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-sm;
+  overflow: hidden;
+  transition: transform $transition-normal, box-shadow $transition-normal, border-color $transition-normal;
+}
+
+@mixin card-hover {
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: $shadow-lg;
+    border-color: $color-primary;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Skeleton loading shimmer
+// ─────────────────────────────────────────────
+
+@mixin skeleton {
+  background: linear-gradient(
+    90deg,
+    $color-neutral-100 25%,
+    darken($color-neutral-100, 4%) 50%,
+    $color-neutral-100 75%
+  );
+  background-size: 200% 100%;
+  border-radius: $radius-md;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// ─────────────────────────────────────────────
+// Display heading (Playfair)
+// ─────────────────────────────────────────────
+
+@mixin heading-display {
+  font-family: $font-family-display;
+  font-weight: 700;
+  line-height: $line-height-tight;
+  letter-spacing: -0.01em;
+}
+
+// ─────────────────────────────────────────────
+// Brand gradient text
+// ─────────────────────────────────────────────
+
+@mixin text-gradient {
+  background: linear-gradient(135deg, $color-primary 0%, $color-accent 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// ─────────────────────────────────────────────
+// Section title
+// ─────────────────────────────────────────────
+
+@mixin section-title {
+  font-size: $font-size-2xl;
+  font-weight: $font-weight-bold;
+  color: $color-neutral-900;
+  text-align: center;
+  margin-bottom: $space-2;
+  letter-spacing: -0.02em;
+}
+
+@mixin section-subtitle {
+  font-size: $font-size-base;
+  color: $color-neutral-500;
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto $space-10;
+  line-height: $line-height-relaxed;
+}
