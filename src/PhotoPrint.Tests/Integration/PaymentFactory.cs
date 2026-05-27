@@ -17,9 +17,21 @@ namespace PhotoPrint.Tests.Integration;
 /// <summary>Returns a predictable fake client secret — no HTTP calls to Stripe.</summary>
 public class FakeStripePaymentGateway : IStripePaymentGateway
 {
+    /// <summary>Number of times a PaymentIntent was actually created — lets tests
+    /// assert that an idempotent replay did NOT hit the gateway a second time.</summary>
+    public int CreateCallCount { get; private set; }
+
+    /// <summary>The most recent idempotency key forwarded to the gateway.</summary>
+    public string? LastIdempotencyKey { get; private set; }
+
     public Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
-        long amountBani, string currency, string orderIdMetadata, CancellationToken ct = default)
-        => Task.FromResult(("pi_test_secret_fake", "pi_test_fake_id"));
+        long amountBani, string currency, string orderIdMetadata,
+        string? idempotencyKey = null, CancellationToken ct = default)
+    {
+        CreateCallCount++;
+        LastIdempotencyKey = idempotencyKey;
+        return Task.FromResult(("pi_test_secret_fake", "pi_test_fake_id"));
+    }
 }
 
 /// <summary>Configurable Stripe signature verifier for integration tests.</summary>
@@ -54,6 +66,10 @@ public class PaymentFactory : ShippingFactory
 {
     public FakeStripeSignatureVerifier StripeVerifier { get; } = new();
 
+    /// <summary>Shared fake gateway so tests can inspect call count / forwarded key
+    /// across multiple requests (bolt 035 idempotency).</summary>
+    public FakeStripePaymentGateway StripeGateway { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -74,7 +90,7 @@ public class PaymentFactory : ShippingFactory
         {
             // Replace real Stripe client so it doesn't try to use an empty API key
             services.AddSingleton<IStripeClient>(new StripeClient("sk_test_fake"));
-            services.AddScoped<IStripePaymentGateway>(_ => new FakeStripePaymentGateway());
+            services.AddScoped<IStripePaymentGateway>(_ => StripeGateway);
             services.AddScoped<IStripeSignatureVerifier>(_ => StripeVerifier);
         });
     }

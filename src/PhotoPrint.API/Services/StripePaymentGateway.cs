@@ -15,6 +15,7 @@ public class StripePaymentGateway : IStripePaymentGateway
         long amountBani,
         string currency,
         string orderIdMetadata,
+        string? idempotencyKey = null,
         CancellationToken ct = default)
     {
         var options = new PaymentIntentCreateOptions
@@ -27,7 +28,12 @@ public class StripePaymentGateway : IStripePaymentGateway
             },
         };
 
-        var pi = await _service.CreateAsync(options, cancellationToken: ct);
+        // Gateway-side dedupe: same key → Stripe returns the same PaymentIntent.
+        var requestOptions = idempotencyKey is null
+            ? null
+            : new RequestOptions { IdempotencyKey = idempotencyKey };
+
+        var pi = await _service.CreateAsync(options, requestOptions, ct);
         return (pi.ClientSecret, pi.Id);
     }
 }

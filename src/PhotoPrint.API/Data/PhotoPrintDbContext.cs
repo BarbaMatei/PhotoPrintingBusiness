@@ -290,6 +290,22 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(o => o.OrderNumber).HasMaxLength(20);
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
+
+            // ── Idempotency (bolt 035) ──────────────────────────────────────
+            entity.Property(o => o.IdempotencyKey).HasMaxLength(80);
+            entity.Property(o => o.StripeClientSecret).HasMaxLength(255);
+            entity.Property(o => o.EuPlatescRedirectUrl).HasMaxLength(1000);
+
+            // At most one order may carry any given non-null IdempotencyKey.
+            // NULLs are distinct in both Postgres and SQLite unique indexes, so
+            // multiple key-less orders coexist freely. The explicit HasFilter on
+            // Postgres documents intent and keeps the index small; SQLite gets a
+            // plain unique index (multiple NULLs still allowed).
+            var idempotencyIndex = entity.HasIndex(o => o.IdempotencyKey)
+                  .IsUnique()
+                  .HasDatabaseName("ix_orders_idempotency_key");
+            if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+                idempotencyIndex.HasFilter("\"IdempotencyKey\" IS NOT NULL");
             if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
             {
                 entity.Property(o => o.ShippingCostRon).HasColumnType("decimal(10,2)");

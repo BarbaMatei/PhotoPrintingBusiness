@@ -24,6 +24,21 @@ public class Order
     public string? AwbNumber { get; set; }
     public string? TrackingUrl { get; set; }
 
+    // ── Idempotency (bolt 035) ───────────────────────────────────────────────
+    /// <summary>Client-supplied Idempotency-Key bound to this order. Set once at
+    /// creation, never modified — except nulled when a stale (&gt;24h) row's key is
+    /// reused by a new request (see ddd-02 technical design + migration comment).</summary>
+    public string? IdempotencyKey { get; set; }
+
+    /// <summary>Cached Stripe ClientSecret so an idempotent replay returns the exact
+    /// same secret without a second Stripe round-trip.</summary>
+    public string? StripeClientSecret { get; set; }
+
+    /// <summary>Cached EuPlatesc redirect URL. Persisted on first initiate because
+    /// the URL embeds a timestamp + nonce and is therefore NOT reproducible on a
+    /// later call; replay returns this stored value verbatim.</summary>
+    public string? EuPlatescRedirectUrl { get; set; }
+
     /// <summary>Captured at order creation for guest orders (no User nav property).</summary>
     public string? GuestEmail { get; set; }
 

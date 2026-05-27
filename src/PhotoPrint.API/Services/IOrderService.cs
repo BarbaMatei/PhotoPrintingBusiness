@@ -9,12 +9,25 @@ public interface IOrderService
     /// <summary>
     /// Creates an Order (+ OrderItems) from the current cart of the given user/guest.
     /// Throws <see cref="Exceptions.BadRequestException"/> when the cart is empty.
+    ///
+    /// When <paramref name="idempotencyKey"/> is supplied and already maps to an
+    /// order created within the 24h window, that order is returned with
+    /// <c>WasIdempotentReplay = true</c> (no new row, no new payment intent).
+    /// If the key maps to an order with a divergent logical request, throws
+    /// <see cref="Exceptions.IdempotencyConflictException"/> (HTTP 409, see ADR-004).
     /// </summary>
-    Task<Order> CreateFromCartAsync(
+    Task<OrderCreationResult> CreateFromCartAsync(
         Guid? userId,
         Guid? guestSessionId,
         CreateOrderRequest request,
+        string? idempotencyKey = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the order bound to the given Idempotency-Key, but only when it was
+    /// created within the 24h idempotency window. Stale matches return null.
+    /// </summary>
+    Task<Order?> GetByIdempotencyKeyAsync(string key, CancellationToken ct = default);
 
     Task<Order?> GetByPaymentIntentIdAsync(string paymentIntentId, CancellationToken ct = default);
 

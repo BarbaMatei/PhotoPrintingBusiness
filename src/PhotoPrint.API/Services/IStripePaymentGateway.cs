@@ -7,12 +7,15 @@ namespace PhotoPrint.API.Services;
 public interface IStripePaymentGateway
 {
     /// <summary>
-    /// Creates a Stripe PaymentIntent.
+    /// Creates a Stripe PaymentIntent. When <paramref name="idempotencyKey"/> is
+    /// non-null it is forwarded as Stripe's <c>RequestOptions.IdempotencyKey</c>,
+    /// so duplicate charges are blocked at the gateway as well as in our DB.
     /// </summary>
     /// <returns>(ClientSecret, PaymentIntentId)</returns>
     Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
         long amountBani,
         string currency,
         string orderIdMetadata,
+        string? idempotencyKey = null,
         CancellationToken ct = default);
 }
