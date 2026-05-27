@@ -21,8 +21,15 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((err: unknown) => {
       if (err instanceof HttpErrorResponse) {
         if (err.status === 401) {
-          auth.logout();
-          router.navigateByUrl('/auth/login');
+          // A guest token can expire or be invalidated server-side. Treat that as a
+          // stale guest session — drop it (so the next attempt re-inits a fresh one)
+          // rather than logging out and bouncing to the login page.
+          if (!auth.isAuthenticated() && auth.getGuestToken()) {
+            auth.clearGuestToken();
+          } else {
+            auth.logout();
+            router.navigateByUrl('/auth/login');
+          }
         } else if (err.status === 403) {
           toast.show('Acces interzis. Nu ai permisiunile necesare.', 'error');
         } else if (err.status >= 500) {

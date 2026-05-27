@@ -44,6 +44,16 @@ public class ExceptionHandlerMiddleware : IMiddleware
         {
             await next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client disconnected/cancelled mid-request (e.g. navigated away or
+            // reloaded). That's not a server error — the caller is gone, so there's
+            // nothing to return; log quietly instead of as an unhandled 500.
+            _logger.LogDebug(
+                "Request {Path} was cancelled by the client. | CorrelationId: {CorrelationId}",
+                context.Request.Path,
+                context.Items["CorrelationId"]?.ToString());
+        }
         catch (Exception ex)
         {
             await HandleExceptionAsync(context, ex);
