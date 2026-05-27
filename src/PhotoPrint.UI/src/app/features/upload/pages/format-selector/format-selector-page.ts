@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable, of, map, tap } from 'rxjs';
 import { ProductService } from '../../../../core/services/product.service';
 import { UploadService, BatchUploadItemResult } from '../../../../core/services/upload.service';
 import { CartService } from '../../../../core/services/cart.service';
@@ -116,25 +117,10 @@ export class FormatSelectorPage implements OnInit {
 
     this.storageKey = `photoprint-uploads-${id}`;
 
-    // Ensure the user has a valid auth token before they try to upload.
-    // If not logged in and no guest token exists, create an anonymous pre-session
-    // so the upload endpoint (DualAuthPolicy) will accept the request.
-    if (!this.authService.isAuthenticated() && !this.authService.getGuestToken()) {
-      this.guestAuthService.initAnonymousSession().subscribe({
-        next: res => {
-          this.guestAuthService.storeSession({
-            guestToken: res.guestToken,
-            firstName: '',
-            lastName: '',
-            email: '',
-            phone: '',
-          });
-        },
-        error: () => {
-          // Non-fatal: user will see a 401 on upload and can try again.
-        },
-      });
-    }
+    // Pre-create an anonymous guest session for not-logged-in users so the first
+    // upload is accepted. ensureGuestSession() also runs per upload, so an expired
+    // or cleared token self-heals on the next attempt.
+    this.ensureGuestSession().subscribe({ error: () => { /* non-fatal */ } });
 
     this.productService.getProduct(id).subscribe({
       next: product => {
@@ -179,6 +165,41 @@ export class FormatSelectorPage implements OnInit {
     this.uploads.update(prev => [...prev, ...newStates]);
     this.cdr.markForCheck();
 
+    this.ensureGuestSession().subscribe({
+      next: () => this.performUpload(files, newStates),
+      error: () =>
+        newStates.forEach(s =>
+          this.updateUpload(s.clientId, {
+            status: 'error',
+            error: 'Eroare la încărcarea fișierului.',
+          }),
+        ),
+    });
+  }
+
+  /** Logged-in users and guests with a token proceed immediately; a guest with no
+   *  token gets a fresh anonymous session created first. Combined with the
+   *  errorInterceptor clearing stale guest tokens on 401, an expired session
+   *  self-heals: the failed attempt clears the token, the retry re-inits here. */
+  private ensureGuestSession(): Observable<void> {
+    if (this.authService.isAuthenticated() || this.authService.getGuestToken()) {
+      return of(void 0);
+    }
+    return this.guestAuthService.initAnonymousSession().pipe(
+      tap(res =>
+        this.guestAuthService.storeSession({
+          guestToken: res.guestToken,
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+        }),
+      ),
+      map(() => void 0),
+    );
+  }
+
+  private performUpload(files: File[], newStates: UploadState[]): void {
     if (files.length === 1) {
       // Single file: use individual upload for accurate per-file progress.
       const { clientId } = newStates[0];

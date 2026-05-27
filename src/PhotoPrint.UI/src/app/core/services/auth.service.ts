@@ -89,6 +89,12 @@ export class AuthService {
     }
   }
 
+  /** Removes the stored guest session — e.g. after it expires or the server
+   *  rejects it (401), so the app can create a fresh one. */
+  clearGuestToken(): void {
+    localStorage.removeItem('guestSession');
+  }
+
   /** Persists the URL the user tried to access before being redirected to login. */
   setReturnUrl(url: string): void {
     this.returnUrl = url;
