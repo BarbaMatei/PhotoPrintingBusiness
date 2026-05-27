@@ -23,12 +23,17 @@ public class OrderService : IOrderService
         _shipping = shipping;
     }
 
+    // ── Idempotency (bolt 035) ────────────────────────────────────────────────
+
+    private static readonly TimeSpan IdempotencyWindow = TimeSpan.FromHours(24);
+
     // ── CreateFromCartAsync ───────────────────────────────────────────────────
 
-    public async Task<Order> CreateFromCartAsync(
+    public async Task<OrderCreationResult> CreateFromCartAsync(
         Guid? userId,
         Guid? guestSessionId,
         CreateOrderRequest request,
+        string? idempotencyKey = null,
         CancellationToken ct = default)
     {
         // 1. Load cart items with everything needed for price calculation
@@ -78,6 +83,32 @@ public class OrderService : IOrderService
         var shippingCostRon = shipping.CostRon;
         var total = subtotal + shippingCostRon;
 
+        // 2b. Idempotency resolution (bolt 035). Only when a key is supplied.
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var existing = await GetByIdempotencyKeyAsync(idempotencyKey, ct);
+            if (existing is not null)
+            {
+                var divergent = DivergentFields(existing, request, total);
+                if (divergent.Count > 0)
+                    throw new IdempotencyConflictException(divergent);
+
+                // Same logical request within the window → replay the original order.
+                return new OrderCreationResult(existing, WasIdempotentReplay: true);
+            }
+
+            // A row may still hold this key but be older than the window (stale).
+            // Free the key first, in its own save, so the new INSERT below does not
+            // transiently violate the unique index (Postgres checks per-statement).
+            var stale = await _db.Orders
+                .FirstOrDefaultAsync(o => o.IdempotencyKey == idempotencyKey, ct);
+            if (stale is not null)
+            {
+                stale.IdempotencyKey = null;
+                await _db.SaveChangesAsync(ct);
+            }
+        }
+
         // 3. Capture guest email before building the order
         string? guestEmail = null;
         if (guestSessionId.HasValue)
@@ -104,13 +135,39 @@ public class OrderService : IOrderService
             ShippingCostRon = shippingCostRon,
             SubtotalRon = subtotal,
             TotalRon = total,
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
             Items = orderItems,
         };
 
         _db.Orders.Add(order);
         await _db.SaveChangesAsync(ct);
 
-        return order;
+        return new OrderCreationResult(order, WasIdempotentReplay: false);
+    }
+
+    // ── Idempotency helpers (bolt 035) ─────────────────────────────────────────
+
+    public async Task<Order?> GetByIdempotencyKeyAsync(string key, CancellationToken ct = default)
+    {
+        var cutoff = DateTimeOffset.UtcNow - IdempotencyWindow;
+        return await _db.Orders
+            .FirstOrDefaultAsync(o => o.IdempotencyKey == key && o.CreatedAt > cutoff, ct);
+    }
+
+    /// <summary>
+    /// Returns the names of the fields that diverge between an existing order and a
+    /// candidate request. Empty list = same logical request (replay-eligible).
+    /// `ShippingAddress` is intentionally excluded (see ADR-005).
+    /// </summary>
+    private static IReadOnlyList<string> DivergentFields(
+        Order existing, CreateOrderRequest request, decimal candidateTotal)
+    {
+        var fields = new List<string>();
+        if (existing.PaymentProcessor != request.PaymentProcessor) fields.Add("paymentProcessor");
+        if (existing.DeliveryType != request.DeliveryType) fields.Add("deliveryType");
+        if (existing.EasyboxLockerId != request.EasyboxLockerId) fields.Add("easyboxLockerId");
+        if (existing.TotalRon != candidateTotal) fields.Add("totalRon");
+        return fields;
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────

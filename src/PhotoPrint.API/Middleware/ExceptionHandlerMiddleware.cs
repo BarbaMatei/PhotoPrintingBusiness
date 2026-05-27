@@ -10,6 +10,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
     {
         [typeof(NotFoundException)]             = (StatusCodes.Status404NotFound, "Not Found"),
         [typeof(ConflictException)]             = (StatusCodes.Status409Conflict, "Conflict"),
+        [typeof(IdempotencyConflictException)]  = (StatusCodes.Status409Conflict, "Idempotency conflict"),
         [typeof(ForbiddenException)]            = (StatusCodes.Status403Forbidden, "Forbidden"),
         [typeof(UnauthorizedException)]         = (StatusCodes.Status401Unauthorized, "Unauthorized"),
         [typeof(BadGatewayException)]           = (StatusCodes.Status502BadGateway, "Bad Gateway"),
@@ -117,7 +118,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         }
         else
         {
-            response = new ProblemDetails
+            var problem = new ProblemDetails
             {
                 Type = "https://tools.ietf.org/html/rfc7807",
                 Title = title,
@@ -125,6 +126,12 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 Detail = detail,
                 Extensions = { ["correlationId"] = correlationId },
             };
+
+            // Surface idempotency divergent field NAMES (never values — no PII).
+            if (exception is IdempotencyConflictException idempotencyConflict)
+                problem.Extensions["divergentFields"] = idempotencyConflict.DivergentFields;
+
+            response = problem;
         }
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, _jsonOptions));
