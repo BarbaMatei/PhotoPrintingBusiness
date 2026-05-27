@@ -1,0 +1,51 @@
+#!/bin/sh
+# ─────────────────────────────────────────────────────────────────────────────
+#  Pre-commit secret guard (bolt 041 — intent 018 secrets-management).
+#
+#  Install once per clone (no Husky/npm or Python pre-commit dependency):
+#      git config core.hooksPath hooks
+#
+#  Blocks committing staged ADDITIONS that look like real secrets. Known-good
+#  fixtures (the RSA test key) are allowlisted by path. CI runs gitleaks as a
+#  second, authoritative net (.github/workflows/secret-scan.yml).
+# ─────────────────────────────────────────────────────────────────────────────
+set -eu
+
+# Extended regex of secret-shaped strings.
+PATTERNS='-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_[0-9A-Za-z]{16,}|pk_live_[0-9A-Za-z]{16,}|whsec_[0-9A-Za-z]{16,}|ghp_[0-9A-Za-z]{20,}'
+
+# Paths permitted to contain the PEM marker for legitimate reasons. Keep this in
+# sync with the [allowlist] paths in .gitleaks.toml:
+#   - TestKeys.cs        : real RSA test fixture
+#   - docs/, memory-bank/: analysis docs / specs / ADRs quote the marker
+#   - README.md          : documents the PEM setup format
+#   - hooks/             : this guard contains the detection pattern itself
+#   - .gitleaks.toml     : the allowlist config references the marker
+violations=0
+for file in $(git diff --cached --name-only --diff-filter=ACM); do
+  case "$file" in
+    src/PhotoPrint.Tests/Helpers/TestKeys.cs) continue ;;
+    docs/*)         continue ;;
+    memory-bank/*)  continue ;;
+    README.md)      continue ;;
+    hooks/*)        continue ;;
+    .gitleaks.toml) continue ;;
+  esac
+  # Inspect only newly added lines (leading '+', excluding the '+++' header).
+  added=$(git diff --cached --no-color -U0 -- "$file" | grep '^+' | grep -v '^+++' || true)
+  # `-e` is required: the pattern starts with '-----', which grep would otherwise
+  # mis-parse as command-line flags.
+  if printf '%s\n' "$added" | grep -Eq -e "$PATTERNS"; then
+    echo "[blocked] potential secret in staged file: $file" >&2
+    violations=1
+  fi
+done
+
+if [ "$violations" -ne 0 ]; then
+  echo "" >&2
+  echo "Commit blocked by hooks/pre-commit (secret guard)." >&2
+  echo "Move the secret to appsettings.{Environment}.Local.json or user-secrets." >&2
+  echo "False positive? See README -> Secret scanning for the allowlist." >&2
+  exit 1
+fi
+exit 0

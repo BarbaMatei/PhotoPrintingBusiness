@@ -2,11 +2,13 @@
 id: 005-history-rewrite-decision
 unit: 001-secrets-rotation-and-guardrails
 intent: 018-secrets-management
-status: draft
+status: implemented
 priority: must
 created: 2026-05-25T10:25:00Z
 assigned_bolt: 041-secrets-management
-implemented: false
+implemented: true
+implemented_at: 2026-05-25T15:10:00Z
+decision: accept-and-rotate (ADR-006)
 ---
 
 # Story: 005-history-rewrite-decision

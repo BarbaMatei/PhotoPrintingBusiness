@@ -3,7 +3,7 @@ id: 041-secrets-management
 unit: 001-secrets-rotation-and-guardrails
 intent: 018-secrets-management
 type: simple-construction-bolt
-status: planned
+status: complete
 stories:
   - 001-rotate-jwt-keypair
   - 002-remove-key-from-repo
@@ -11,10 +11,19 @@ stories:
   - 004-precommit-and-ci-scan
   - 005-history-rewrite-decision
 created: 2026-05-25T10:25:00Z
-started: null
-completed: null
+started: 2026-05-25T14:30:00Z
+completed: 2026-05-25T15:10:00Z
 current_stage: null
-stages_completed: []
+stages_completed:
+  - name: plan
+    completed: 2026-05-25T14:30:00Z
+    artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-05-25T14:50:00Z
+    artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-05-25T15:10:00Z
+    artifact: test-walkthrough.md
 
 requires_bolts: [040-containers-and-pipelines]
 enables_bolts: []
