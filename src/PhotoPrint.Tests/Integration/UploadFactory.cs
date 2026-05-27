@@ -223,6 +223,9 @@ internal class FakeStorageService : IStorageService
         return Task.FromResult<Stream>(new MemoryStream(bytes));
     }
 
+    public Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
+        => Task.FromResult(_store.ContainsKey(storagePath));
+
     /// <summary>Directly stores bytes for a given path (used when seeding upload rows).</summary>
     public void Store(string path, byte[] bytes) => _store[path] = bytes;
 }

@@ -11,6 +11,9 @@ public class Upload
     /// <summary>UUID-based path on disk — never derived from OriginalFileName.</summary>
     public string FilePath { get; set; } = "";
 
+    /// <summary>Cached thumbnail storage path; null until the first preview generates it (bolt 042).</summary>
+    public string? ThumbnailPath { get; set; }
+
     /// <summary>Original client filename stored for audit only — never used in storage path.</summary>
     public string OriginalFileName { get; set; } = "";
 

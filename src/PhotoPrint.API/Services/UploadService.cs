@@ -80,6 +80,13 @@ public class UploadService : IUploadService
             throw new UnprocessableEntityException("The uploaded file could not be read as an image.");
         }
 
+        if (imageInfo.WidthPx > ImageProcessor.MaxDecodeDimension ||
+            imageInfo.HeightPx > ImageProcessor.MaxDecodeDimension)
+        {
+            await _storage.DeleteAsync(storagePath, ct);
+            throw new UnprocessableEntityException("Image dimensions exceed limits.");
+        }
+
         var actualLength = fileStream.Length;
 
         var upload = new Upload
@@ -118,7 +125,6 @@ public class UploadService : IUploadService
         CancellationToken ct = default)
     {
         var upload = await _db.Uploads
-            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
 
         if (upload is null)
@@ -130,8 +136,19 @@ public class UploadService : IUploadService
         if (!isOwner)
             throw new ForbiddenException("You do not have access to this upload.");
 
-        var thumbnail = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
-        return (thumbnail, "image/jpeg");
+        // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
+        // deletion). Generate once, store via IStorageService, and record the path.
+        if (upload.ThumbnailPath is null || !await _storage.ExistsAsync(upload.ThumbnailPath, ct))
+        {
+            await using var generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
+            var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
+            upload.ThumbnailPath = await _storage.SaveAsync(generated, ownerId, "jpg", ct);
+            await _db.SaveChangesAsync(ct);
+        }
+
+        // Cache hit: stream the stored thumbnail — no ImageSharp work on this path.
+        var stream = await _storage.GetStreamAsync(upload.ThumbnailPath!, ct);
+        return (stream, "image/jpeg");
     }
 
     private static UploadDto MapToDto(Upload u) => new(

@@ -36,6 +36,9 @@ public class UploadServiceTests
                 It.IsAny<Stream>(), It.IsAny<Guid>(), It.IsAny<string>(),
                 It.IsAny<CancellationToken>(), It.IsAny<Guid?>()))
             .ReturnsAsync("owner/abc.jpg");
+        _storageMock
+            .Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new MemoryStream(JpegMagic));
 
         _imageProcessorMock = new Mock<IImageProcessor>();
         _imageProcessorMock
@@ -260,6 +263,66 @@ public class UploadServiceTests
 
         contentType.Should().Be("image/jpeg");
         stream.Length.Should().BeGreaterThan(0);
+    }
+
+    // ── GetPreviewAsync — thumbnail caching (bolt 042) ────────────────────────
+
+    [Fact]
+    public async Task GetPreviewAsync_SecondCall_StreamsCacheWithoutRegenerating()
+    {
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        // First call stores the thumbnail at "owner/abc.jpg"; thereafter it exists.
+        _storageMock
+            .Setup(s => s.ExistsAsync("owner/abc.jpg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var (first, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+        first.Dispose();
+        var (second, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+        second.Dispose();
+
+        // Cache hit on the second call — no thumbnail regeneration.
+        _imageProcessorMock.Verify(
+            p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CachedFileMissing_RegeneratesThumbnail()
+    {
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        upload.ThumbnailPath = "owner/missing-thumb.jpg";   // recorded, but file is gone
+        await _db.SaveChangesAsync();
+
+        _storageMock
+            .Setup(s => s.ExistsAsync("owner/missing-thumb.jpg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var (stream, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+        stream.Dispose();
+
+        _imageProcessorMock.Verify(
+            p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadAsync_ImageDimensionsExceedLimit_ThrowsUnprocessableEntityException()
+    {
+        _imageProcessorMock
+            .Setup(p => p.GetInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageInfo(30_000, 30_000)); // pixel bomb
+
+        var act = () => _sut.UploadAsync(
+            JpegStream(), "huge.jpg", declaredLength: 100L,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        await act.Should().ThrowAsync<UnprocessableEntityException>()
+            .WithMessage("*dimensions exceed*");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
