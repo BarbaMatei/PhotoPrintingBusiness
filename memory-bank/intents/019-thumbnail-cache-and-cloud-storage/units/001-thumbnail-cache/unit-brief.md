@@ -2,7 +2,7 @@
 unit: 001-thumbnail-cache
 intent: 019-thumbnail-cache-and-cloud-storage
 phase: inception
-status: draft
+status: complete
 created: 2026-05-25T10:30:00Z
 updated: 2026-05-25T10:30:00Z
 ---

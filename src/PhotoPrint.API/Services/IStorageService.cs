@@ -13,4 +13,7 @@ public interface IStorageService
 
     /// <summary>Opens a read stream for a stored file.</summary>
     Task<Stream> GetStreamAsync(string storagePath, CancellationToken ct = default);
+
+    /// <summary>Returns true if a file exists at the given storage path.</summary>
+    Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default);
 }

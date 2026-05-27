@@ -52,4 +52,10 @@ public class LocalStorageService : IStorageService
         Stream stream = File.OpenRead(fullPath);
         return Task.FromResult(stream);
     }
+
+    public Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
+    {
+        var fullPath = Path.Combine(_basePath, storagePath);
+        return Task.FromResult(File.Exists(fullPath));
+    }
 }

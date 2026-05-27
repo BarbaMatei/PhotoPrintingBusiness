@@ -3,10 +3,11 @@
 ## Overview
 - **Total stories**: 114 (59 prior + 51 from arch-analysis + 4 from intent 023)
 - **Generated**: 103
-- **Implemented**: 23 (bolts 033 + 034 + 035 + 040 + 049 + 041)
+- **Implemented**: 26 (bolts 033 + 034 + 035 + 040 + 042 + 049 + 041)
 - **Intents complete**: 013, 014, 017, 018, 023
 - **Planned (not yet story-filed)**: 11
-- **Last updated**: 2026-05-27T10:20:00Z
+- **Last updated**: 2026-05-27T11:45:00Z
+- **Note**: intent 019 unit 001 (thumbnail-cache, bolt 042) done; unit 002 (cloud-storage, bolt 043) still open.
 
 ---
 
@@ -827,19 +828,19 @@
 
 #### Unit: 001-thumbnail-cache (3 stories) — Bolt: 042
 
-### 001-thumbnail-path-schema.md ⬜ NOT STARTED
+### 001-thumbnail-path-schema.md ✅ IMPLEMENTED
 **Title**: EF migration adds `Uploads.ThumbnailPath`
 **Priority**: Must
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/001-thumbnail-cache/stories/001-thumbnail-path-schema.md`
 **Bolt**: 042
 
-### 002-persist-thumbnail-on-first-request.md ⬜ NOT STARTED
+### 002-persist-thumbnail-on-first-request.md ✅ IMPLEMENTED
 **Title**: First preview persists thumbnail; later requests stream cached file
 **Priority**: Must
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/001-thumbnail-cache/stories/002-persist-thumbnail-on-first-request.md`
 **Bolt**: 042
 
-### 003-imagesharp-max-pixels.md ⬜ NOT STARTED
+### 003-imagesharp-max-pixels.md ✅ IMPLEMENTED
 **Title**: Configure ImageSharp `MaxImageWidth/Height` (decomp-bomb defence)
 **Priority**: Must
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/001-thumbnail-cache/stories/003-imagesharp-max-pixels.md`

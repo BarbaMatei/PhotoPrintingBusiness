@@ -2,11 +2,11 @@
 id: 003-imagesharp-max-pixels
 unit: 001-thumbnail-cache
 intent: 019-thumbnail-cache-and-cloud-storage
-status: draft
+status: complete
 priority: must
 created: 2026-05-25T10:30:00Z
 assigned_bolt: 042-thumbnail-cache
-implemented: false
+implemented: true
 ---
 
 # Story: 003-imagesharp-max-pixels

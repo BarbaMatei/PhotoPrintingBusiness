@@ -122,6 +122,9 @@ public class UploadsController : ControllerBase
         var (stream, contentType) = await _uploadService.GetPreviewAsync(
             id, userId, guestSessionId, cancellationToken);
 
+        // Thumbnails are UUID-keyed and immutable — allow long-lived shared caching.
+        Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+
         var etag = $"\"{id}-{stream.Length}\"";
         Response.Headers.ETag = etag;
 

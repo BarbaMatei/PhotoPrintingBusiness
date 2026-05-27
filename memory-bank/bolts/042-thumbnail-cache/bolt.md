@@ -3,16 +3,25 @@ id: 042-thumbnail-cache
 unit: 001-thumbnail-cache
 intent: 019-thumbnail-cache-and-cloud-storage
 type: simple-construction-bolt
-status: planned
+status: complete
 stories:
   - 001-thumbnail-path-schema
   - 002-persist-thumbnail-on-first-request
   - 003-imagesharp-max-pixels
 created: 2026-05-25T10:30:00Z
-started: null
-completed: null
+started: 2026-05-27T11:00:00Z
+completed: 2026-05-27T11:45:00Z
 current_stage: null
-stages_completed: []
+stages_completed:
+  - name: plan
+    completed: 2026-05-27T11:10:00Z
+    artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-05-27T11:30:00Z
+    artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-05-27T11:45:00Z
+    artifact: test-walkthrough.md
 
 requires_bolts: [012-photo-upload-backend, 040-containers-and-pipelines]
 enables_bolts: [043-cloud-storage-provider]
