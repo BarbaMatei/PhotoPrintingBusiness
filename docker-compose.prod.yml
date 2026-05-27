@@ -1,0 +1,57 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  Production stack: Caddy (auto-TLS edge) -> API.  See docs/DEPLOYMENT.md.
+#  Postgres points at a MANAGED instance by default (ConnectionStrings__Default
+#  in .env). Uncomment the `db` service for an all-in-one single-VM deploy.
+#  Run on the host:  docker compose -f docker-compose.prod.yml up -d
+# ──────────────────────────────────────────────────────────────────────────────
+name: fototipar
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data          # persisted ACME certs — survives restarts
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env, e.g. fototipar.ro}
+
+  api:
+    image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/fototipar/api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      DatabaseProvider: Postgres
+    expose:
+      - "8080"            # internal only — NOT published to the host
+    volumes:
+      - apidata:/app/Storage
+
+  # ── All-in-one VM without a managed DB? Uncomment, and point
+  #    ConnectionStrings__Default at Host=db.  ────────────────────────────────
+  # db:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-fototipar}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+  #     POSTGRES_DB: ${POSTGRES_DB:-fototipar}
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+  apidata:
+  # pgdata:

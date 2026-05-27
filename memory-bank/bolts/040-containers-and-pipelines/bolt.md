@@ -3,7 +3,7 @@ id: 040-containers-and-pipelines
 unit: 001-containers-and-pipelines
 intent: 017-deployment-cicd
 type: simple-construction-bolt
-status: in-progress
+status: complete
 stories:
   - 001-api-dockerfile
   - 002-docker-compose-dev
@@ -13,12 +13,15 @@ stories:
   - 006-env-vars-matrix
 created: 2026-05-25T10:20:00Z
 started: 2026-05-27T09:00:00Z
-completed: null
-current_stage: implement
+completed: 2026-05-27T10:20:00Z
+current_stage: null
 stages_completed:
   - name: plan
     completed: 2026-05-27T09:20:00Z
     artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-05-27T10:10:00Z
+    artifact: implementation-walkthrough.md
 
 requires_bolts: []
 enables_bolts: [041-secrets-management, 042-thumbnail-cache, 043-cloud-storage-provider, 044-tracing-and-metrics, 045-error-tracking, 046-distributed-state-redis]
