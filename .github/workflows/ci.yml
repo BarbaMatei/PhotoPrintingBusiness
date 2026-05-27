@@ -54,7 +54,7 @@ jobs:
           path: TestResults/**/*.trx
 
   web:
-    name: UI — lint, test & build
+    name: UI — test & build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,7 +67,7 @@ jobs:
           cache: npm
           cache-dependency-path: src/PhotoPrint.UI/package-lock.json
       - run: npm ci
-      - run: npm run lint --if-present
-      - name: Unit tests (headless)
-        run: npm test -- --watch=false --browsers=ChromeHeadless --if-present
+      # Angular 21 unit tests run on Vitest (@angular/build:unit-test); --watch=false runs once.
+      # No lint step: this project has no `lint` script / ESLint config yet.
+      - run: npm test -- --watch=false
       - run: npm run build -- --configuration=production
