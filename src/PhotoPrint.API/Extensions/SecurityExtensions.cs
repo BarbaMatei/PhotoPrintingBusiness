@@ -109,13 +109,14 @@ public static class SecurityExtensions
 
     public static WebApplication UseSecurityBaselines(this WebApplication app)
     {
-        // HSTS is production-only — dev certificates would get permanently cached by browsers
+        // HSTS + HTTPS redirection are production-only. In Development the app serves HTTP
+        // only, so UseHttpsRedirection can't determine an HTTPS port (logs a warning); and a
+        // dev HSTS header would get permanently cached by browsers.
         if (!app.Environment.IsDevelopment())
         {
             app.UseHsts();
+            app.UseHttpsRedirection();
         }
-
-        app.UseHttpsRedirection();
         app.UseMiddleware<SecurityHeadersMiddleware>();
         app.UseCors(CorsPolicyName);
         app.UseRateLimiter();
