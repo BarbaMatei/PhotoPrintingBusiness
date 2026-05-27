@@ -108,7 +108,7 @@ public class OrderServiceTests : IDisposable
     {
         var (userId, productId, uploadId) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
 
-        var order = await _service.CreateFromCartAsync(userId, null, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
 
         Assert.NotNull(order);
         Assert.Single(order.Items);
@@ -125,7 +125,7 @@ public class OrderServiceTests : IDisposable
     {
         var (userId, _, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
 
-        var order = await _service.CreateFromCartAsync(userId, null, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
 
         Assert.Equal(6.00m, order.SubtotalRon);
         Assert.Equal(26.00m, order.TotalRon);
@@ -138,7 +138,7 @@ public class OrderServiceTests : IDisposable
     {
         var (userId, _, _) = await SeedCartAsync();
 
-        var order = await _service.CreateFromCartAsync(userId, null, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
 
         Assert.Equal("FT-20260001", order.OrderNumber);
     }
@@ -148,7 +148,7 @@ public class OrderServiceTests : IDisposable
     {
         var (userId, _, _) = await SeedCartAsync();
 
-        var order = await _service.CreateFromCartAsync(userId, null, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
 
         Assert.Equal(OrderStatus.AwaitingPayment, order.Status);
     }
@@ -158,7 +158,7 @@ public class OrderServiceTests : IDisposable
     {
         var (userId, _, _) = await SeedCartAsync();
 
-        var order = await _service.CreateFromCartAsync(userId, null, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
 
         var snapshot = order.Items.First().ProductSnapshot;
         Assert.Equal("Foto 10x15", snapshot.ProductName);
@@ -192,7 +192,7 @@ public class OrderServiceTests : IDisposable
         _db.CartItems.Add(cartItem);
         await _db.SaveChangesAsync();
 
-        var order = await _service.CreateFromCartAsync(null, guestId, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(null, guestId, MakeRequest())).Order;
 
         Assert.Null(order.UserId);
         Assert.Equal(guestId, order.GuestSessionId);
@@ -222,9 +222,117 @@ public class OrderServiceTests : IDisposable
         _db.CartItems.Add(cartItem);
         await _db.SaveChangesAsync();
 
-        var order = await _service.CreateFromCartAsync(null, guestSession.Id, MakeRequest(), default);
+        var order = (await _service.CreateFromCartAsync(null, guestSession.Id, MakeRequest())).Order;
 
         Assert.Equal("guest@test.com", order.GuestEmail);
+    }
+
+    // ── Idempotency (bolt 035) ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateFromCart_SameKey_SameRequest_ReplaysOriginalOrder()
+    {
+        var (userId, _, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
+        const string key = "idem-key-001";
+
+        // Reuse the SAME request instance — MakeRequest() randomizes EasyboxLockerId
+        // per call, which would otherwise register as a divergent field.
+        var request = MakeRequest();
+        var first = await _service.CreateFromCartAsync(userId, null, request, key);
+        var second = await _service.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.False(first.WasIdempotentReplay);
+        Assert.True(second.WasIdempotentReplay);
+        Assert.Equal(first.Order.Id, second.Order.Id);
+
+        // Exactly one order row persisted.
+        Assert.Equal(1, await _db.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateFromCart_SameKey_DivergentProcessor_ThrowsConflictNamingField()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "idem-key-002";
+
+        // Same base request; vary ONLY the processor so the divergence is unambiguous.
+        var request = MakeRequest(PaymentProcessor.Stripe);
+        await _service.CreateFromCartAsync(userId, null, request, key);
+
+        var divergent = request with { PaymentProcessor = PaymentProcessor.EuPlatesc };
+        var ex = await Assert.ThrowsAsync<IdempotencyConflictException>(
+            () => _service.CreateFromCartAsync(userId, null, divergent, key));
+
+        Assert.Contains("paymentProcessor", ex.DivergentFields);
+        Assert.DoesNotContain("easyboxLockerId", ex.DivergentFields);
+        // Still only one order — the conflicting second request created nothing.
+        Assert.Equal(1, await _db.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateFromCart_NoKey_DoesNotReplay_CreatesDistinctOrders()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+
+        var first = await _service.CreateFromCartAsync(userId, null, MakeRequest());
+        var second = await _service.CreateFromCartAsync(userId, null, MakeRequest());
+
+        Assert.False(first.WasIdempotentReplay);
+        Assert.False(second.WasIdempotentReplay);
+        Assert.NotEqual(first.Order.Id, second.Order.Id);
+        Assert.Equal(2, await _db.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task GetByIdempotencyKey_StaleOrder_ReturnsNull()
+    {
+        var staleOrder = new Order
+        {
+            OrderNumber = "FT-STALE-1",
+            IdempotencyKey = "idem-key-stale",
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-25), // outside the 24h window
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "S", Number = "1", City = "C", County = "J",
+                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
+            },
+        };
+        _db.Orders.Add(staleOrder);
+        await _db.SaveChangesAsync();
+
+        var found = await _service.GetByIdempotencyKeyAsync("idem-key-stale");
+
+        Assert.Null(found);
+    }
+
+    [Fact]
+    public async Task CreateFromCart_StaleKey_CreatesNewOrderAndFreesOldKey()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "idem-key-reuse";
+
+        var staleOrder = new Order
+        {
+            OrderNumber = "FT-STALE-2",
+            IdempotencyKey = key,
+            CreatedAt = DateTimeOffset.UtcNow.AddHours(-25),
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "S", Number = "1", City = "C", County = "J",
+                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
+            },
+        };
+        _db.Orders.Add(staleOrder);
+        await _db.SaveChangesAsync();
+
+        var result = await _service.CreateFromCartAsync(userId, null, MakeRequest(), key);
+
+        Assert.False(result.WasIdempotentReplay);          // not a replay — stale key
+        Assert.NotEqual(staleOrder.Id, result.Order.Id);    // a brand-new order
+        Assert.Equal(key, result.Order.IdempotencyKey);     // new order owns the key
+
+        var freed = await _db.Orders.FindAsync(staleOrder.Id);
+        Assert.Null(freed!.IdempotencyKey);                 // old row's key was nulled
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────

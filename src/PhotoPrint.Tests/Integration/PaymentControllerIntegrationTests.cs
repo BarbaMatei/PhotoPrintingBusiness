@@ -36,6 +36,120 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
     }
 
+    // ── bolt 035 — payment idempotency ────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateStripeIntent_SameIdempotencyKey_ReplaysOneOrderAndOneStripeCall()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+        var callsBefore = _factory.StripeGateway.CreateCallCount;
+
+        var first = await SendStripeIntent(client, ValidRequest, key);
+        var second = await SendStripeIntent(client, ValidRequest, key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var dto1 = await first.Content.ReadFromJsonAsync<StripeIntentResponse>();
+        var dto2 = await second.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // Same order + same secret on replay.
+        Assert.Equal(dto1!.OrderId, dto2!.OrderId);
+        Assert.Equal(dto1.ClientSecret, dto2.ClientSecret);
+
+        // Stripe was hit exactly once across the two requests.
+        Assert.Equal(callsBefore + 1, _factory.StripeGateway.CreateCallCount);
+        // The idempotency key was forwarded to the gateway.
+        Assert.Equal(key, _factory.StripeGateway.LastIdempotencyKey);
+
+        // Exactly one order persisted for this key.
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        var count = db.Orders.Count(o => o.IdempotencyKey == key);
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task CreateStripeIntent_SameKey_DivergentProcessor_Returns409()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+
+        var first = await SendStripeIntent(client, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        // Same key, different processor → conflict.
+        var divergent = ValidRequest with { PaymentProcessor = PaymentProcessor.EuPlatesc };
+        var second = await SendStripeIntent(client, divergent, key);
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
+    [Fact]
+    public async Task InitiateEuPlatesc_SameIdempotencyKey_ReturnsSameUrlAndOneOrder()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 1.50m, quantity: 4);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+
+        var first = await SendEuPlatescInitiate(client, EuPlatescRequest, key);
+        var second = await SendEuPlatescInitiate(client, EuPlatescRequest, key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var dto1 = await first.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
+        var dto2 = await second.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
+
+        Assert.Equal(dto1!.OrderId, dto2!.OrderId);
+        // Same redirect URL verbatim (persisted, not rebuilt with a fresh nonce).
+        Assert.Equal(dto1.RedirectUrl, dto2.RedirectUrl);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        Assert.Equal(1, db.Orders.Count(o => o.IdempotencyKey == key));
+    }
+
+    private static Task<HttpResponseMessage> SendStripeIntent(
+        HttpClient client, CreateOrderRequest body, string idempotencyKey)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/payments/stripe/intent")
+        {
+            Content = JsonContent.Create(body),
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return client.SendAsync(request);
+    }
+
+    private static Task<HttpResponseMessage> SendEuPlatescInitiate(
+        HttpClient client, CreateOrderRequest body, string idempotencyKey)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/payments/euplatesc/initiate")
+        {
+            Content = JsonContent.Create(body),
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return client.SendAsync(request);
+    }
+
     // ── POST /api/payments/stripe/intent ──────────────────────────────────────
 
     [Fact]
