@@ -13,6 +13,12 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Local developer overrides (untracked; holds the dev JWT signing key) ──────
+// appsettings.{Environment}.Local.json is gitignored. Loaded last so it wins.
+builder.Configuration.AddJsonFile(
+    $"appsettings.{builder.Environment.EnvironmentName}.Local.json",
+    optional: true, reloadOnChange: true);
+
 // ── Logging ──────────────────────────────────────────────────────────────────
 builder.AddSerilogLogging();
 
