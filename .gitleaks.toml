@@ -1,0 +1,18 @@
+title = "PhotoPrint gitleaks config (bolt 041)"
+
+# Start from gitleaks' built-in rule set, then add project allowlists.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Legitimate occurrences of secret-shaped strings (test fixtures + docs)"
+# Paths are regexes matched against the file path.
+# Keep this set in sync with the allowlist in hooks/pre-commit.
+paths = [
+  '''src/PhotoPrint\.Tests/Helpers/TestKeys\.cs''',  # intentional RSA test fixture
+  '''docs/.*''',                                       # analysis docs quote the PEM marker
+  '''memory-bank/.*''',                                # specs/ADRs reference the marker
+  '''README\.md''',                                    # documents the PEM setup format
+  '''hooks/.*''',                                      # the guard contains the detection pattern
+  '''\.gitleaks\.toml''',                              # this file
+]

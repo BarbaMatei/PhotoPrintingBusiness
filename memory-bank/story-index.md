@@ -3,10 +3,11 @@
 ## Overview
 - **Total stories**: 114 (59 prior + 51 from arch-analysis + 4 from intent 023)
 - **Generated**: 103
-- **Implemented**: 9 (bolts 033 + 049 + 034)
-- **Intents complete**: 013, 023 (full); 014 partial (unit 001 done, unit 002 pending)
+- **Implemented**: 14 (bolts 033 + 034 + 049 + 041)
+- **Intents complete**: 013, 018, 023 (full); 014 partial (unit 001 done on its own branch)
 - **Planned (not yet story-filed)**: 11
-- **Last updated**: 2026-05-25T13:00:00Z
+- **Last updated**: 2026-05-25T15:10:00Z
+- **Note**: bolt 035 (intent 014 unit 002) lives on branch `feat/bolt-035-payment-idempotency`, not yet merged here.
 
 ---
 
@@ -791,31 +792,31 @@
 
 #### Unit: 001-secrets-rotation-and-guardrails (5 stories) — Bolt: 041
 
-### 001-rotate-jwt-keypair.md ⬜ NOT STARTED
+### 001-rotate-jwt-keypair.md ✅ IMPLEMENTED
 **Title**: Generate + rotate keys across environments
 **Priority**: Must
 **Path**: `intents/018-secrets-management/units/001-secrets-rotation-and-guardrails/stories/001-rotate-jwt-keypair.md`
 **Bolt**: 041
 
-### 002-remove-key-from-repo.md ⬜ NOT STARTED
+### 002-remove-key-from-repo.md ✅ IMPLEMENTED
 **Title**: Empty `appsettings.Development.json` key value + user-secrets workflow
 **Priority**: Must
 **Path**: `intents/018-secrets-management/units/001-secrets-rotation-and-guardrails/stories/002-remove-key-from-repo.md`
 **Bolt**: 041
 
-### 003-gitignore-and-secrets-dir.md ⬜ NOT STARTED
+### 003-gitignore-and-secrets-dir.md ✅ IMPLEMENTED
 **Title**: `.gitignore` discipline + `secrets/.gitkeep`
 **Priority**: Must
 **Path**: `intents/018-secrets-management/units/001-secrets-rotation-and-guardrails/stories/003-gitignore-and-secrets-dir.md`
 **Bolt**: 041
 
-### 004-precommit-and-ci-scan.md ⬜ NOT STARTED
+### 004-precommit-and-ci-scan.md ✅ IMPLEMENTED
 **Title**: Pre-commit hook + Gitleaks CI job
 **Priority**: Must
 **Path**: `intents/018-secrets-management/units/001-secrets-rotation-and-guardrails/stories/004-precommit-and-ci-scan.md`
 **Bolt**: 041
 
-### 005-history-rewrite-decision.md ⬜ NOT STARTED
+### 005-history-rewrite-decision.md ✅ IMPLEMENTED
 **Title**: Decide and record history-rewrite vs. accept-leak in `decision-index.md`
 **Priority**: Must
 **Path**: `intents/018-secrets-management/units/001-secrets-rotation-and-guardrails/stories/005-history-rewrite-decision.md`

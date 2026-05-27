@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-05-25T13:36:00Z
-total_decisions: 5
+last_updated: 2026-05-25T14:45:00Z
+total_decisions: 6
 ---
 
 # Decision Index
@@ -17,6 +17,14 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-006: Accept the Historical Key Leak and Mitigate by Rotation (No History Rewrite)
+- **Status**: accepted
+- **Date**: 2026-05-25
+- **Bolt**: 041-secrets-management (secrets-rotation-and-guardrails)
+- **Path**: `bolts/041-secrets-management/adr-006-secret-history-accept-and-rotate.md`
+- **Summary**: A real dev RSA JWT key was committed in the initial commit and remains in git history. Rather than rewrite history (force-push, full re-clone), accept its presence and neutralize it by rotating the key out of all environments. Pre-commit hook + CI gitleaks scan prevent recurrence.
+- **Read when**: Handling leaked credentials, deciding whether to rewrite git history, JWT key rotation, secret-scanning setup, or onboarding secrets for a new environment.
 
 ### ADR-005: Idempotency Equality (LogicalRequest) Excludes Shipping Address
 - **Status**: accepted
