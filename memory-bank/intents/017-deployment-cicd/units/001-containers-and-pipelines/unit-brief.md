@@ -2,7 +2,7 @@
 unit: 001-containers-and-pipelines
 intent: 017-deployment-cicd
 phase: inception
-status: draft
+status: complete
 created: 2026-05-25T10:20:00Z
 updated: 2026-05-25T10:20:00Z
 ---

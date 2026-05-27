@@ -1,0 +1,29 @@
+# Keep the build context small and free of host artefacts / secrets.
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+**/.vs/
+.git/
+.github/
+TestResults/
+**/*.user
+**/appsettings.*.Local.json
+
+# Secrets & local env — never copy into an image layer.
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/.gitkeep
+*.pem
+*.pfx
+*.key
+
+# Docs / planning — not needed at runtime.
+memory-bank/
+docs/
+*.md
+hooks/
+scripts/

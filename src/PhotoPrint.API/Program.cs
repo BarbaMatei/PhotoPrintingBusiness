@@ -101,10 +101,22 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderNumberService, PhotoPrint.API.Services.OrderNumberService>();
 
 // ── Payments ──────────────────────────────────────────────────────────────────
-builder.Services.Configure<PhotoPrint.API.Configuration.StripeSettings>(
-    builder.Configuration.GetSection(PhotoPrint.API.Configuration.StripeSettings.SectionName));
-builder.Services.Configure<PhotoPrint.API.Configuration.EuPlatescSettings>(
-    builder.Configuration.GetSection(PhotoPrint.API.Configuration.EuPlatescSettings.SectionName));
+// Payment secrets fail fast in Production (story 006 env-matrix). Validation is
+// Production-gated so the Testing host and local dev — which don't configure live
+// payment keys — start normally.
+var paymentsRequired = builder.Environment.IsProduction();
+builder.Services
+    .AddOptions<PhotoPrint.API.Configuration.StripeSettings>()
+    .Bind(builder.Configuration.GetSection(PhotoPrint.API.Configuration.StripeSettings.SectionName))
+    .Validate(s => !paymentsRequired || !string.IsNullOrWhiteSpace(s.SecretKey),
+        "Stripe:SecretKey is required in Production.")
+    .ValidateOnStart();
+builder.Services
+    .AddOptions<PhotoPrint.API.Configuration.EuPlatescSettings>()
+    .Bind(builder.Configuration.GetSection(PhotoPrint.API.Configuration.EuPlatescSettings.SectionName))
+    .Validate(s => !paymentsRequired || (!string.IsNullOrWhiteSpace(s.MerchantId) && !string.IsNullOrWhiteSpace(s.SecretKey)),
+        "EuPlatesc:MerchantId and EuPlatesc:SecretKey are required in Production.")
+    .ValidateOnStart();
 builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 {
     var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.StripeSettings>>().Value;
@@ -166,6 +178,20 @@ if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
         }
     }
 }
+else
+{
+    // ── Postgres (production): apply EF migrations at boot ────────────────────
+    // Guarded by IsNpgsql() so the Testing host (InMemory) and any non-relational
+    // provider are a no-op; only a real PostgreSQL connection triggers migration.
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+    if (db.Database.IsNpgsql())
+    {
+        var migrateLog = scope.ServiceProvider.GetRequiredService<ILogger<PhotoPrintDbContext>>();
+        migrateLog.LogInformation("Applying pending EF migrations to PostgreSQL (if any)...");
+        db.Database.Migrate();
+    }
+}
 
 // ── Seed-only mode: dotnet run --seed  /  dotnet run --seed-dev ──────────────
 if (args.Contains("--seed") || args.Contains("--seed-dev"))
@@ -211,6 +237,11 @@ app.UseSecurityBaselines();      // 4th: HSTS, HTTPS, security headers, CORS, ra
 
 app.UseResponseCaching();        // 5th: serve cached responses for catalog endpoints
 
+// ── Static SPA assets (D1: combined image serves the built Angular app) ───────
+// No-op when wwwroot is absent (API-only local dev / tests).
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -218,6 +249,12 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<AdminOrderHub>("/hubs/admin-orders");
 app.MapHealthEndpoint();
+
+// SPA fallback — only when the UI was built into wwwroot (production combined
+// image). Absent in API-only dev/test, preserving 404s for unknown routes.
+var spaIndex = Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "index.html");
+if (File.Exists(spaIndex))
+    app.MapFallbackToFile("index.html");
 
 app.Run();
 

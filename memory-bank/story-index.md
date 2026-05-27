@@ -3,10 +3,10 @@
 ## Overview
 - **Total stories**: 114 (59 prior + 51 from arch-analysis + 4 from intent 023)
 - **Generated**: 103
-- **Implemented**: 17 (bolts 033 + 034 + 035 + 049 + 041)
-- **Intents complete**: 013, 014, 018, 023
+- **Implemented**: 23 (bolts 033 + 034 + 035 + 040 + 049 + 041)
+- **Intents complete**: 013, 014, 017, 018, 023
 - **Planned (not yet story-filed)**: 11
-- **Last updated**: 2026-05-27T00:00:00Z
+- **Last updated**: 2026-05-27T10:20:00Z
 
 ---
 
@@ -749,37 +749,37 @@
 
 #### Unit: 001-containers-and-pipelines (6 stories) — Bolt: 040
 
-### 001-api-dockerfile.md ⬜ NOT STARTED
+### 001-api-dockerfile.md ✅ IMPLEMENTED
 **Title**: Multi-stage Dockerfile with non-root user and HEALTHCHECK
 **Priority**: Must
 **Path**: `intents/017-deployment-cicd/units/001-containers-and-pipelines/stories/001-api-dockerfile.md`
 **Bolt**: 040
 
-### 002-docker-compose-dev.md ⬜ NOT STARTED
+### 002-docker-compose-dev.md ✅ IMPLEMENTED
 **Title**: Compose for API + Postgres + MailHog
 **Priority**: Must
 **Path**: `intents/017-deployment-cicd/units/001-containers-and-pipelines/stories/002-docker-compose-dev.md`
 **Bolt**: 040
 
-### 003-docker-compose-prod-caddy.md ⬜ NOT STARTED
+### 003-docker-compose-prod-caddy.md ✅ IMPLEMENTED
 **Title**: Production compose + Caddy reverse proxy with Let's Encrypt
 **Priority**: Must
 **Path**: `intents/017-deployment-cicd/units/001-containers-and-pipelines/stories/003-docker-compose-prod-caddy.md`
 **Bolt**: 040
 
-### 004-github-actions-ci.md ⬜ NOT STARTED
+### 004-github-actions-ci.md ✅ IMPLEMENTED
 **Title**: CI workflow — restore, build, test, artefacts
 **Priority**: Must
 **Path**: `intents/017-deployment-cicd/units/001-containers-and-pipelines/stories/004-github-actions-ci.md`
 **Bolt**: 040
 
-### 005-github-actions-deploy.md ⬜ NOT STARTED
+### 005-github-actions-deploy.md ✅ IMPLEMENTED
 **Title**: CD workflow — tag image, push GHCR, deploy
 **Priority**: Must
 **Path**: `intents/017-deployment-cicd/units/001-containers-and-pipelines/stories/005-github-actions-deploy.md`
 **Bolt**: 040
 
-### 006-env-vars-matrix.md ⬜ NOT STARTED
+### 006-env-vars-matrix.md ✅ IMPLEMENTED
 **Title**: `.env.example` + README env-matrix + ValidateOnStart wiring
 **Priority**: Must
 **Path**: `intents/017-deployment-cicd/units/001-containers-and-pipelines/stories/006-env-vars-matrix.md`
