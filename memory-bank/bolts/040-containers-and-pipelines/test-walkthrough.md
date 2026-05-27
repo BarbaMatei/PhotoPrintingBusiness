@@ -41,3 +41,4 @@ change is safe** and the **config is well-formed**, and defers the rest to a doc
 ### Notes
 
 - Six stories (001–006) are delivered as repo config + one code change; their live acceptance is the `docs/DEPLOYMENT.md` §8 checklist, to be run when infrastructure exists.
+- **CI `web` job corrected (post-review fix):** this UI is Angular 21 on the **Vitest** runner (`@angular/build:unit-test`), not Karma. The initial job used Karma-era flags (`--browsers=ChromeHeadless`) and a `lint` step that don't apply here, which failed the job. Fixed to `npm test -- --watch=false` + `npm run build -- --configuration=production`; dropped the lint step (no ESLint/`lint` script configured). **UI verified locally:** prod `ng build` succeeds (output `dist/PhotoPrint.UI/browser` — matches the Dockerfile COPY) and `ng test --watch=false` passes **46 files / 395 tests**.
