@@ -27,10 +27,13 @@ var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
 {
     var connStr = builder.Configuration.GetConnectionString("Default");
+    // Default to split queries so multi-collection Includes don't trigger a cartesian
+    // explosion (and silence the MultipleCollectionInclude warning). No effect on the
+    // InMemory provider used in tests.
     if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
-        options.UseSqlite(connStr);
+        options.UseSqlite(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
     else
-        options.UseNpgsql(connStr);
+        options.UseNpgsql(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -239,9 +242,13 @@ app.UseSecurityBaselines();      // 4th: HSTS, HTTPS, security headers, CORS, ra
 app.UseResponseCaching();        // 5th: serve cached responses for catalog endpoints
 
 // ── Static SPA assets (D1: combined image serves the built Angular app) ───────
-// No-op when wwwroot is absent (API-only local dev / tests).
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Registered only when wwwroot exists (the production image bundles the SPA there);
+// skipped in API-only local dev / tests so StaticFileMiddleware doesn't warn.
+if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot")))
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 
 app.UseRouting();
 app.UseAuthentication();
