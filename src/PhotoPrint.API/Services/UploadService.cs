@@ -153,6 +153,12 @@ public class UploadService : IUploadService
         // to that tier under the deterministic thumbnail key, and record it.
         if (upload.ThumbnailPath is null || !await store.ExistsAsync(upload.ThumbnailPath, ct))
         {
+            // FilePath is nullable since bolt 052 (the original-purge nulls it). If the
+            // original is gone, we cannot regenerate a missing thumbnail — surface as 404
+            // ("your photos are no longer available"); unit 003 catches this for UI.
+            if (upload.FilePath is null)
+                throw new NotFoundException($"Upload {uploadId} is no longer available.");
+
             await using var src = await store.GetStreamAsync(upload.FilePath, ct);
             await using var generated = await _imageProcessor.GenerateThumbnailAsync(src, ct);
             var thumbKey = StorageKeys.Thumbnail(upload.Id);
