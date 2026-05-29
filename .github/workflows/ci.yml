@@ -26,6 +26,21 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+      # MinIO — S3-compatible service container for bolt-043 storage tests (ADR-008).
+      # Local-tier tests don't need it; cloud-tier integration tests opt in via the
+      # STORAGE_TEST_ENDPOINT env var below. The MinIO root credentials are CI-only.
+      minio:
+        image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - "9000:9000"
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -47,6 +62,13 @@ jobs:
           # Integration tests swap to an InMemory DB; this is here for any test
           # that opts into the real provider in future.
           ConnectionStrings__Default: Host=localhost;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
+          # Bolt 043: enables cloud-tier integration tests against the MinIO service.
+          # Local runs without Docker leave these unset and the [SkippableFact] tests
+          # skip themselves — see bolt-043 ddd-02-technical-design.md §Test Plan.
+          STORAGE_TEST_ENDPOINT: http://localhost:9000
+          STORAGE_TEST_ACCESS_KEY: minioadmin
+          STORAGE_TEST_SECRET_KEY: minioadmin
+          STORAGE_TEST_BUCKET: photoprint-ci
       - uses: actions/upload-artifact@v4
         if: always()
         with:
