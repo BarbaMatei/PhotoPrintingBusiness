@@ -6,15 +6,16 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.API.Extensions;
 
 /// <summary>
-/// Wires the intent-024 promote-on-paid lifecycle (bolt 051):
+/// Wires the intent-024 lifecycle:
 /// <list type="bullet">
-///   <item><see cref="IPromotionQueue"/> — in-memory channel singleton (ADR-010).</item>
-///   <item><see cref="IOrderPhotoPromoter"/> — scoped (uses <see cref="Data.PhotoPrintDbContext"/>).</item>
-///   <item><see cref="OrderPhotoPromotionWorker"/> — single hosted consumer.</item>
-///   <item><see cref="PromotionRecoveryScanner"/> — startup self-heal (ADR-010).</item>
+///   <item><b>Bolt 051 (promote-on-paid):</b> <see cref="IPromotionQueue"/> singleton,
+///         <see cref="IOrderPhotoPromoter"/> scoped, <see cref="PromotionRecoveryScanner"/>
+///         + <see cref="OrderPhotoPromotionWorker"/> hosted (ADR-010).</item>
+///   <item><b>Bolt 052 (retention):</b> <see cref="IOriginalPurger"/> scoped,
+///         <see cref="OriginalPurgeRecoveryScanner"/> + <see cref="ArchiveRetentionJob"/>
+///         hosted. Retention anchor is <c>Order.PaidAt</c> (ADR-012).</item>
 /// </list>
-/// Settings validation fails fast at startup (<c>.ValidateOnStart()</c>) via
-/// <see cref="OrderPhotoArchiveSettingsValidator"/>.
+/// All settings fail fast at startup via <c>.ValidateOnStart()</c>.
 /// </summary>
 public static class PhotoArchiveExtensions
 {
@@ -22,6 +23,7 @@ public static class PhotoArchiveExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // ── Bolt 051: promote-on-paid ─────────────────────────────────────────────
         services.Configure<OrderPhotoArchiveSettings>(
             configuration.GetSection(OrderPhotoArchiveSettings.SectionName));
         services.AddSingleton<
@@ -40,6 +42,21 @@ public static class PhotoArchiveExtensions
         // is primed by the time the worker begins reading.
         services.AddHostedService<PromotionRecoveryScanner>();
         services.AddHostedService<OrderPhotoPromotionWorker>();
+
+        // ── Bolt 052: retention (ADR-012 anchor = Order.PaidAt) ───────────────────
+        services.Configure<ArchiveSettings>(
+            configuration.GetSection(ArchiveSettings.SectionName));
+        services.AddSingleton<IValidateOptions<ArchiveSettings>, ArchiveSettingsValidator>();
+        services.AddOptions<ArchiveSettings>().ValidateOnStart();
+
+        // Purger holds a DbContext → scoped. Called synchronously from AdminOrderService
+        // (request-scoped) and inline from the recovery scanner (its own scope).
+        services.AddScoped<IOriginalPurger, OriginalPurger>();
+
+        // Recovery scanner registered before the retention job so a crash-stuck purge
+        // gets fixed on boot rather than waiting up to JobIntervalHours for the sweep.
+        services.AddHostedService<OriginalPurgeRecoveryScanner>();
+        services.AddHostedService<ArchiveRetentionJob>();
 
         return services;
     }

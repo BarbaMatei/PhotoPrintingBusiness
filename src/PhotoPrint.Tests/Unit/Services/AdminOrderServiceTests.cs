@@ -2,7 +2,9 @@ using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
@@ -19,6 +21,7 @@ public class AdminOrderServiceTests
     private readonly Mock<IEuPlatescService> _euPlatesc = new();
     private readonly Mock<IStripeClient> _stripeClient = new();
     private readonly Mock<IStorageService> _storage = new();
+    private readonly Mock<IOriginalPurger> _purger = new();
     private readonly Mock<IHubContext<AdminOrderHub>> _hub = new();
     private readonly Mock<IHubClients> _hubClients = new();
     private readonly Mock<IClientProxy> _clientProxy = new();
@@ -38,12 +41,19 @@ public class AdminOrderServiceTests
             .Setup(c => c.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
+        // Default: cloud tier off so existing tests don't accidentally fire the purger.
+        // Tests that need to verify purge wiring set the option explicitly.
+        _purger.Setup(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(PurgeOutcome.Empty);
+
         _sut = new AdminOrderService(
             _db,
             _emailSvc.Object,
             _euPlatesc.Object,
             _stripeClient.Object,
             _storage.Object,
+            _purger.Object,
+            Options.Create(new ArchiveSettings()),
             _hub.Object,
             NullLogger<AdminOrderService>.Instance);
     }
@@ -251,6 +261,81 @@ public class AdminOrderServiceTests
         var act = () => _sut.UpdateStatusAsync(order.Id, "Printing", null, null);
 
         await act.Should().ThrowAsync<InvalidOrderTransitionException>();
+    }
+
+    // ── Bolt 052: original-purge hook on production-complete transition ──────
+
+    /// <summary>
+    /// Builds an SUT with a custom ArchiveSettings — default test setup uses defaults
+    /// (PurgeOriginalAtStatus = Shipped). This override lets a single test pretend
+    /// PurgeOriginalAtStatus = Delivered without disturbing the shared _sut.
+    /// </summary>
+    private AdminOrderService BuildSutWithArchive(ArchiveSettings archive)
+        => new(_db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            _storage.Object, _purger.Object, Options.Create(archive),
+            _hub.Object, NullLogger<AdminOrderService>.Instance);
+
+    [Fact]
+    public async Task UpdateStatusAsync_PrintingToShipped_TriggersOriginalPurge()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+
+        await _sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_PaidToPrinting_DoesNotTriggerPurge()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Paid);
+
+        await _sut.UpdateStatusAsync(order.Id, "Printing", null, null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ShippedToDelivered_DoesNotTriggerPurge_WithDefaultConfig()
+    {
+        // Default PurgeOriginalAtStatus = Shipped → the purge already fired on Shipped.
+        // The Shipped → Delivered transition must NOT re-fire it.
+        var order = await SeedOrderAsync(OrderStatus.Shipped);
+
+        await _sut.UpdateStatusAsync(order.Id, "Delivered", null, null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ConfigSetToDelivered_OnlyDeliveredTriggersPurge()
+    {
+        var sut = BuildSutWithArchive(new ArchiveSettings
+        {
+            PurgeOriginalAtStatus = "Delivered",
+        });
+
+        // Printing → Shipped MUST NOT trigger (Shipped is no longer the production-complete status).
+        var order1 = await SeedOrderAsync(OrderStatus.Printing);
+        await sut.UpdateStatusAsync(order1.Id, "Shipped", "AWB", null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        // Shipped → Delivered SHOULD trigger.
+        var order2 = await SeedOrderAsync(OrderStatus.Shipped);
+        await sut.UpdateStatusAsync(order2.Id, "Delivered", null, null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(order2.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     // ── CancelOrderAsync ──────────────────────────────────────────────────────
