@@ -2,11 +2,11 @@
 id: 004-backfill-paid-orders
 unit: 001-order-photo-promotion
 intent: 024-order-photo-archive
-status: draft
+status: complete
 priority: should
 created: 2026-05-27T13:05:00Z
 assigned_bolt: 051-order-photo-promotion
-implemented: false
+implemented: true
 supersedes: 019-thumbnail-cache-and-cloud-storage/002-cloud-storage-provider/003-local-to-cloud-migration-tool
 ---
 
