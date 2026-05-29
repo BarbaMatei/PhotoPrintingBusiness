@@ -66,12 +66,18 @@ public class UploadFactory : WebApplicationFactory<Program>
             services.AddDbContext<PhotoPrintDbContext>(options =>
                 options.UseInMemoryDatabase(dbName));
 
-            // Replace storage with singleton in-memory fake
-            var storageDescriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(IStorageService));
-            if (storageDescriptor is not null)
-                services.Remove(storageDescriptor);
+            // Replace EVERY IStorageService registration (bolt 043: there are now keyed
+            // "local"/"cloud" registrations plus a default that resolves to keyed "local").
+            // We swap the lot for the in-memory fake so the router still works and tests
+            // exercise the Local-tier code path.
+            var storageDescriptors = services
+                .Where(d => d.ServiceType == typeof(IStorageService))
+                .ToList();
+            foreach (var d in storageDescriptors)
+                services.Remove(d);
+
             services.AddSingleton<IStorageService>(_fakeStorage);
+            services.AddKeyedSingleton<IStorageService>("local", _fakeStorage);
 
             // Replace image processor with a fake that returns fixed dimensions
             var imageProcessorDescriptor = services.SingleOrDefault(
@@ -191,43 +197,49 @@ file static class JwtHelper
 // ── Fake implementations ──────────────────────────────────────────────────────
 
 /// <summary>
-/// In-memory storage service. Registered as Singleton so that file state
-/// persists across scoped HTTP requests within the same factory instance.
+/// In-memory storage service. Registered as Singleton (both default and keyed "local")
+/// so file state persists across scoped HTTP requests within the same factory instance.
+/// Implements the bolt-043 contract (caller-supplied key + presigned-URL capability).
 /// </summary>
 internal class FakeStorageService : IStorageService
 {
     private readonly Dictionary<string, byte[]> _store = new(StringComparer.Ordinal);
 
-    public Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null)
-    {
-        var id = fileId ?? Guid.NewGuid();
-        var path = $"{ownerId:N}/{id:N}.{extension}";
-        stream.Position = 0;
-        using var ms = new MemoryStream();
-        stream.CopyTo(ms);
-        _store[path] = ms.ToArray();
-        return Task.FromResult(path);
-    }
+    public bool SupportsPresignedUrls => false;
 
-    public Task DeleteAsync(string storagePath, CancellationToken ct = default)
+    public Task SaveAsync(Stream content, string key, CancellationToken ct = default)
     {
-        _store.Remove(storagePath);
+        if (content.CanSeek)
+            content.Position = 0;
+        using var ms = new MemoryStream();
+        content.CopyTo(ms);
+        _store[key] = ms.ToArray();
         return Task.CompletedTask;
     }
 
-    public Task<Stream> GetStreamAsync(string storagePath, CancellationToken ct = default)
+    public Task DeleteAsync(string key, CancellationToken ct = default)
     {
-        if (!_store.TryGetValue(storagePath, out var bytes))
-            throw new FileNotFoundException("Stored upload not found.", storagePath);
+        _store.Remove(key);
+        return Task.CompletedTask;
+    }
+
+    public Task<Stream> GetStreamAsync(string key, CancellationToken ct = default)
+    {
+        if (!_store.TryGetValue(key, out var bytes))
+            throw new FileNotFoundException("Stored upload not found.", key);
 
         return Task.FromResult<Stream>(new MemoryStream(bytes));
     }
 
-    public Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
-        => Task.FromResult(_store.ContainsKey(storagePath));
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(_store.ContainsKey(key));
 
-    /// <summary>Directly stores bytes for a given path (used when seeding upload rows).</summary>
-    public void Store(string path, byte[] bytes) => _store[path] = bytes;
+    public Task<string> GetPresignedUrlAsync(string key, TimeSpan ttl, CancellationToken ct = default)
+        => throw new NotSupportedException(
+            "FakeStorageService models the Local tier; it does not produce presigned URLs.");
+
+    /// <summary>Directly stores bytes for a given key (used when seeding upload rows).</summary>
+    public void Store(string key, byte[] bytes) => _store[key] = bytes;
 }
 
 /// <summary>Always returns ImageInfo(800, 600) and a minimal JPEG thumbnail.</summary>
@@ -235,10 +247,10 @@ internal class FakeImageProcessor : IImageProcessor
 {
     private static readonly byte[] ThumbnailBytes = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x01];
 
-    public Task<ImageInfo?> GetInfoAsync(string storagePath, CancellationToken ct = default)
+    public Task<ImageInfo?> GetInfoAsync(Stream source, CancellationToken ct = default)
         => Task.FromResult<ImageInfo?>(new ImageInfo(800, 600));
 
-    public Task<MemoryStream> GenerateThumbnailAsync(string storagePath, CancellationToken ct = default)
+    public Task<MemoryStream> GenerateThumbnailAsync(Stream source, CancellationToken ct = default)
         => Task.FromResult(new MemoryStream(ThumbnailBytes));
 }
 
