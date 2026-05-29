@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-05-28T08:15:00Z
-total_decisions: 9
+last_updated: 2026-05-29T10:20:00Z
+total_decisions: 11
 ---
 
 # Decision Index
@@ -17,6 +17,22 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-011: Per-Upload Atomicity with Confirmed-Write-Then-Delete
+- **Status**: accepted
+- **Date**: 2026-05-29
+- **Bolt**: 051-order-photo-promotion (order-photo-promotion)
+- **Path**: `bolts/051-order-photo-promotion/adr-011-per-upload-atomicity-confirmed-write-then-delete.md`
+- **Summary**: Promotion atomicity is per-upload, not per-order, and side effects within an upload are applied strictly in the order: cloud writes → DB row update → local file deletes ("Confirmed-Write-Then-Delete"). `Upload.StorageLocation` is the single source of truth; partial promotion states are normal and recoverable. Wraps `OrderPhotoPromoter` and binds units 002 (purge) and 003 (viewing) to the same invariant.
+- **Read when**: Working on `OrderPhotoPromoter` or anything in intent 024; modifying upload-to-cloud transitions; designing the unit-002 purge or unit-003 viewing paths; debugging "where do these bytes live?" issues; reasoning about crash recovery for promotion; tempted to wrap the order loop in a DB transaction.
+
+### ADR-010: In-Process `Channel<T>` + Startup Recovery Scan Instead of a Durable Work-Queue Table
+- **Status**: accepted
+- **Date**: 2026-05-29
+- **Bolt**: 051-order-photo-promotion (order-photo-promotion)
+- **Path**: `bolts/051-order-photo-promotion/adr-010-in-process-promotion-queue.md`
+- **Summary**: Promotion queueing uses an in-memory `Channel<PromotionJob>` consumed by a single `BackgroundService`, with crash-safety provided by a startup `PromotionRecoveryScanner` that re-derives pending work from `Upload.StorageLocation`. No durable `PromotionJobs` table. Trade-off: simpler code + single source of truth, in exchange for blocking multi-VM scale-out until the queue is replaced (likely alongside bolt 046's Redis introduction).
+- **Read when**: Working on the promotion worker, recovery scanner, backfill CLI, or anything in intent 024; planning multi-VM scale-out; tempted to add a `PromotionJobs` table; debugging "why is order X not getting promoted?"; introducing a new producer of promotion work.
 
 ### ADR-009: Cloudflare R2 as the Recommended Concrete Cloud Target
 - **Status**: accepted

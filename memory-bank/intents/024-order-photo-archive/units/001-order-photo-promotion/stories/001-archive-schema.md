@@ -2,11 +2,11 @@
 id: 001-archive-schema
 unit: 001-order-photo-promotion
 intent: 024-order-photo-archive
-status: draft
+status: complete
 priority: must
 created: 2026-05-27T13:05:00Z
 assigned_bolt: 051-order-photo-promotion
-implemented: false
+implemented: true
 ---
 
 # Story: 001-archive-schema

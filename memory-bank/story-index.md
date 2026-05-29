@@ -1013,25 +1013,25 @@
 
 #### Unit: 001-order-photo-promotion (4 stories) — Bolt: 051
 
-### 001-archive-schema.md ⬜ NOT STARTED
+### 001-archive-schema.md ✅ COMPLETE
 **Title**: `Upload.LargePreviewPath` + `OriginalPurgedAt` migration
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/001-archive-schema.md`
 **Bolt**: 051
 
-### 002-large-preview-generation.md ⬜ NOT STARTED
+### 002-large-preview-generation.md ✅ COMPLETE
 **Title**: Generate ~2000 px large web preview
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/002-large-preview-generation.md`
 **Bolt**: 051
 
-### 003-promote-on-paid.md ⬜ NOT STARTED
+### 003-promote-on-paid.md ✅ COMPLETE
 **Title**: Async promote-on-Paid worker (+ delete local after confirmed write)
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/003-promote-on-paid.md`
 **Bolt**: 051
 
-### 004-backfill-paid-orders.md ⬜ NOT STARTED
+### 004-backfill-paid-orders.md ✅ COMPLETE
 **Title**: One-off backfill of pre-existing paid orders (supersedes 019-003)
 **Priority**: Should
 **Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/004-backfill-paid-orders.md`
