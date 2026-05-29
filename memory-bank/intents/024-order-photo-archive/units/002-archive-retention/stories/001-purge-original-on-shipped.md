@@ -2,11 +2,11 @@
 id: 001-purge-original-on-shipped
 unit: 002-archive-retention
 intent: 024-order-photo-archive
-status: draft
+status: complete
 priority: must
 created: 2026-05-27T13:05:00Z
 assigned_bolt: 052-archive-retention
-implemented: false
+implemented: true
 ---
 
 # Story: 001-purge-original-on-shipped

@@ -3,15 +3,31 @@ id: 052-archive-retention
 unit: 002-archive-retention
 intent: 024-order-photo-archive
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories:
   - 001-purge-original-on-shipped
   - 002-retention-cleanup-job
 created: 2026-05-27T13:10:00Z
-started: null
-completed: null
-current_stage: null
-stages_completed: []
+started: 2026-05-29T12:00:00Z
+completed: 2026-05-29T13:30:00Z
+current_stage: test
+stages_completed:
+  - name: model
+    completed: 2026-05-29T12:10:00Z
+    artifact: ddd-01-domain-model.md
+  - name: design
+    completed: 2026-05-29T12:25:00Z
+    artifact: ddd-02-technical-design.md
+  - name: adr
+    completed: 2026-05-29T12:35:00Z
+    artifacts:
+      - adr-012-retention-anchor-paid-at.md
+  - name: implement
+    completed: 2026-05-29T13:10:00Z
+    artifact: source-code
+  - name: test
+    completed: 2026-05-29T13:30:00Z
+    artifact: ddd-03-test-report.md
 
 requires_bolts: [051-order-photo-promotion]
 enables_bolts: []
