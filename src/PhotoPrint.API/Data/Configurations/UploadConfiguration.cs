@@ -20,6 +20,13 @@ public class UploadConfiguration : IEntityTypeConfiguration<Upload>
         builder.Property(u => u.ThumbnailPath)
             .HasMaxLength(512);
 
+        // Nullable large-preview path (bolt 051) — populated post-promotion; same length budget.
+        builder.Property(u => u.LargePreviewPath)
+            .HasMaxLength(512);
+
+        // Nullable purge timestamp (bolt 051; written by unit-002 purge job).
+        builder.Property(u => u.OriginalPurgedAt);
+
         // Two-tier storage location (bolt 043). Stored as int; defaults to 0 (Local).
         builder.Property(u => u.StorageLocation)
             .IsRequired()

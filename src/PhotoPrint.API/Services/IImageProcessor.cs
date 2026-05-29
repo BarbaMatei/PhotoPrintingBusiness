@@ -21,4 +21,14 @@ public interface IImageProcessor
     /// rewound to position 0.
     /// </summary>
     Task<MemoryStream> GenerateThumbnailAsync(Stream source, CancellationToken ct = default);
+
+    /// <summary>
+    /// Generates a JPEG large web preview (max 2000 px on the longest dimension, quality 85)
+    /// from the supplied source stream. Aspect ratio preserved; never upscales — an image
+    /// already smaller than 2000 px on its long edge is re-encoded at native dimensions.
+    /// Subject to the same decompression-bomb guard as the thumbnail path. Used by the
+    /// intent-024 promoter (bolt 051) to generate the customer-facing full-view preview.
+    /// Returns the preview as a <see cref="MemoryStream"/> rewound to position 0.
+    /// </summary>
+    Task<MemoryStream> GenerateLargePreviewAsync(Stream source, CancellationToken ct = default);
 }

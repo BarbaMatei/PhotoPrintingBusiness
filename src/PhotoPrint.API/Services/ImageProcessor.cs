@@ -10,6 +10,12 @@ public class ImageProcessor : IImageProcessor
     private const int ThumbnailMaxDimension = 300;
     private const int ThumbnailJpegQuality = 85;
 
+    // ── Bolt 051 (intent 024) — large web preview tier ───────────────────────────
+    // The customer-facing "full view" representation in the order history. Sized
+    // to look crisp on a desktop monitor without serving the multi-MB original.
+    private const int LargePreviewMaxDimension = 2000;
+    private const int LargePreviewJpegQuality = 85;
+
     /// <summary>Reject images whose width or height exceeds this — decompression-bomb defence (bolt 042).</summary>
     public const int MaxDecodeDimension = 25_000;
 
@@ -62,6 +68,42 @@ public class ImageProcessor : IImageProcessor
 
         var ms = new MemoryStream();
         var encoder = new JpegEncoder { Quality = ThumbnailJpegQuality };
+        await image.SaveAsync(ms, encoder, ct);
+        ms.Position = 0;
+        return ms;
+    }
+
+    public async Task<MemoryStream> GenerateLargePreviewAsync(Stream source, CancellationToken ct = default)
+    {
+        // Same decompression-bomb defence as the thumbnail path — promotion happens on
+        // user-supplied bytes that have already passed the upload-time check, but defence in
+        // depth is cheap. Identify first; never decode an image we'd reject anyway.
+        if (source.CanSeek)
+            source.Position = 0;
+        var info = await Image.IdentifyAsync(source, ct);
+        if (info is not null && (info.Width > MaxDecodeDimension || info.Height > MaxDecodeDimension))
+            throw new UnprocessableEntityException("Image dimensions exceed limits.");
+
+        if (source.CanSeek)
+            source.Position = 0;
+        using var image = await Image.LoadAsync(source, ct);
+
+        // Story 002: "never upscale — images already < 2000 px pass through at native size."
+        // ImageSharp 3.x's ResizeMode.Max DOES upscale a smaller source to fit the bound,
+        // so we gate the resize on at-least-one-dimension exceeding the target. A 1500×1000
+        // input is re-encoded at native 1500×1000; a 4032×3024 phone photo comes out at
+        // 2000×1500.
+        if (image.Width > LargePreviewMaxDimension || image.Height > LargePreviewMaxDimension)
+        {
+            image.Mutate(ctx => ctx.Resize(new ResizeOptions
+            {
+                Size = new Size(LargePreviewMaxDimension, LargePreviewMaxDimension),
+                Mode = ResizeMode.Max,
+            }));
+        }
+
+        var ms = new MemoryStream();
+        var encoder = new JpegEncoder { Quality = LargePreviewJpegQuality };
         await image.SaveAsync(ms, encoder, ct);
         ms.Position = 0;
         return ms;
