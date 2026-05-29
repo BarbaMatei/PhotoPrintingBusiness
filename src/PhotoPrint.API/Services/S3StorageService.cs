@@ -17,6 +17,7 @@ public class S3StorageService : IStorageService
 {
     private readonly IAmazonS3 _s3;
     private readonly string _bucket;
+    private readonly Protocol _presignProtocol;
     private readonly ResiliencePipeline _pipeline;
     private readonly ILogger<S3StorageService> _logger;
 
@@ -26,10 +27,21 @@ public class S3StorageService : IStorageService
         ILogger<S3StorageService> logger)
     {
         _s3 = s3;
-        _bucket = settings.Value.Bucket
+        var s = settings.Value;
+        _bucket = s.Bucket
             ?? throw new InvalidOperationException(
                 "Storage:Bucket is required when Storage:Provider=S3.");
         _logger = logger;
+
+        // The SDK defaults presigned URLs to HTTPS regardless of the endpoint scheme.
+        // R2 and AWS S3 both want HTTPS, but a local MinIO endpoint (CI / dev) is plain
+        // HTTP — and a mismatched scheme produces an unfetchable URL. Honour the
+        // EndpointUrl's scheme when one is configured; default HTTPS otherwise.
+        _presignProtocol =
+            !string.IsNullOrEmpty(s.EndpointUrl)
+            && s.EndpointUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                ? Protocol.HTTP
+                : Protocol.HTTPS;
 
         _pipeline = new ResiliencePipelineBuilder()
             .AddRetry(new RetryStrategyOptions
@@ -113,6 +125,7 @@ public class S3StorageService : IStorageService
             Key = key,
             Verb = HttpVerb.GET,
             Expires = DateTime.UtcNow.Add(ttl),
+            Protocol = _presignProtocol,
         });
         return Task.FromResult(url);
     }
