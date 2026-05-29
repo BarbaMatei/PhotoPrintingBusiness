@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-05-29T10:20:00Z
-total_decisions: 11
+last_updated: 2026-05-29T12:30:00Z
+total_decisions: 12
 ---
 
 # Decision Index
@@ -17,6 +17,14 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-012: Retention Anchor = `Order.PaidAt`
+- **Status**: accepted
+- **Date**: 2026-05-29
+- **Bolt**: 052-archive-retention (archive-retention)
+- **Path**: `bolts/052-archive-retention/adr-012-retention-anchor-paid-at.md`
+- **Summary**: The intent-024 retention job (large preview + thumbnail cleanup after the configurable window, default 12 months) measures the window from `Order.PaidAt` — not from a new `CompletedAt` column, not from `UpdatedAt`, not from delivery time. Chosen because `PaidAt` is always set on any order whose photos reached the cloud (including `Paid → Cancelled`), is never re-set, and is index-friendly. Trade-off: a slow fulfilment shortens customer-visible archive lifetime. Net schema change: zero.
+- **Read when**: Working on `ArchiveRetentionJob` or anything time-anchored in intent 024; tempted to add an `Order.CompletedAt` / `DeliveredAt` column; debugging "why aren't these old photos getting cleaned up?"; designing the customer-facing copy ("12 months from when you paid us"); planning courier-IPN-driven delivery confirmation (would supersede this ADR).
 
 ### ADR-011: Per-Upload Atomicity with Confirmed-Write-Then-Delete
 - **Status**: accepted

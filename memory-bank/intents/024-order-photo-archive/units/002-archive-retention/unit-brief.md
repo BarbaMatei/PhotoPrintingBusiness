@@ -1,12 +1,12 @@
 ---
 unit: 002-archive-retention
 intent: 024-order-photo-archive
-phase: inception
-status: draft
+phase: construction
+status: complete
 unit_type: backend
 default_bolt_type: ddd-construction-bolt
 created: 2026-05-27T13:05:00Z
-updated: 2026-05-27T13:05:00Z
+updated: 2026-05-29T13:30:00Z
 ---
 
 # Unit Brief: Archive Retention

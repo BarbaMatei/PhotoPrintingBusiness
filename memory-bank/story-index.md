@@ -1039,13 +1039,13 @@
 
 #### Unit: 002-archive-retention (2 stories) — Bolt: 052
 
-### 001-purge-original-on-shipped.md ⬜ NOT STARTED
+### 001-purge-original-on-shipped.md ✅ COMPLETE
 **Title**: Delete cloud original when order ships (configurable status)
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/002-archive-retention/stories/001-purge-original-on-shipped.md`
 **Bolt**: 052
 
-### 002-retention-cleanup-job.md ⬜ NOT STARTED
+### 002-retention-cleanup-job.md ✅ COMPLETE
 **Title**: 12-month configurable archive cleanup (large + thumbnail)
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/002-archive-retention/stories/002-retention-cleanup-job.md`
