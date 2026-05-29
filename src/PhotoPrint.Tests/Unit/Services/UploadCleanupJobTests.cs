@@ -77,7 +77,7 @@ public class UploadCleanupJobTests
 
         var updated = await db.Uploads.FindAsync(old.Id);
         updated!.DeletedAt.Should().NotBeNull();
-        storageMock.Verify(s => s.DeleteAsync(old.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+        storageMock.Verify(s => s.DeleteAsync(old.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -360,7 +360,7 @@ public class UploadCleanupJobTests
         var after = await db.Uploads.FindAsync(upload.Id);
         after!.DeletedAt.Should().NotBeNull();
         storageMock.Verify(
-            s => s.DeleteAsync(upload.FilePath, It.IsAny<CancellationToken>()),
+            s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }

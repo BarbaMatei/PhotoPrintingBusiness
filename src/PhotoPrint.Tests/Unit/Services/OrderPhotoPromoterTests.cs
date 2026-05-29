@@ -207,7 +207,7 @@ public class OrderPhotoPromoterTests
         var order = SeedOrder(db, OrderStatus.Paid, upload);
         var bundle = CreateSut(db);
 
-        SetupLocalSource(bundle.Local, upload.FilePath, [0xFF, 0xD8, 0xFF, 0xE0]);
+        SetupLocalSource(bundle.Local, upload.FilePath!, [0xFF, 0xD8, 0xFF, 0xE0]);
         bundle.Local.Setup(s => s.ExistsAsync(upload.ThumbnailPath!, It.IsAny<CancellationToken>()))
                     .ReturnsAsync(true);
         SetupLocalSource(bundle.Local, upload.ThumbnailPath!, [0xFF, 0xD8]);
@@ -229,14 +229,14 @@ public class OrderPhotoPromoterTests
 
         // Three cloud writes in the right order (no Sequence assertion — only existence + keys).
         bundle.Cloud.Verify(s => s.SaveAsync(
-            It.IsAny<Stream>(), upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<Stream>(), upload.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
         bundle.Cloud.Verify(s => s.SaveAsync(
             It.IsAny<Stream>(), StorageKeys.Thumbnail(upload.Id), It.IsAny<CancellationToken>()), Times.Once);
         bundle.Cloud.Verify(s => s.SaveAsync(
             It.IsAny<Stream>(), StorageKeys.Preview(upload.Id), It.IsAny<CancellationToken>()), Times.Once);
 
         // Local litter cleanup attempted.
-        bundle.Local.Verify(s => s.DeleteAsync(upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+        bundle.Local.Verify(s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class OrderPhotoPromoterTests
         var order = SeedOrder(db, OrderStatus.Paid, upload);
         var bundle = CreateSut(db);
 
-        SetupLocalSource(bundle.Local, upload.FilePath, [0xFF, 0xD8, 0xFF, 0xE0]);
+        SetupLocalSource(bundle.Local, upload.FilePath!, [0xFF, 0xD8, 0xFF, 0xE0]);
         bundle.Local.Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
         bundle.Cloud.Setup(s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -272,7 +272,7 @@ public class OrderPhotoPromoterTests
         var order = SeedOrder(db, OrderStatus.Paid, upload);
         var bundle = CreateSut(db);
 
-        bundle.Local.Setup(s => s.GetStreamAsync(upload.FilePath, It.IsAny<CancellationToken>()))
+        bundle.Local.Setup(s => s.GetStreamAsync(upload.FilePath!, It.IsAny<CancellationToken>()))
                     .ThrowsAsync(new FileNotFoundException("not on disk"));
 
         var outcome = await bundle.Sut.PromoteOrderAsync(order.Id);
@@ -296,8 +296,8 @@ public class OrderPhotoPromoterTests
         var order = SeedOrder(db, OrderStatus.Paid, upload);
         var bundle = CreateSut(db);
 
-        SetupLocalSource(bundle.Local, upload.FilePath, [0xFF, 0xD8, 0xFF, 0xE0]);
-        bundle.Cloud.Setup(s => s.SaveAsync(It.IsAny<Stream>(), upload.FilePath, It.IsAny<CancellationToken>()))
+        SetupLocalSource(bundle.Local, upload.FilePath!, [0xFF, 0xD8, 0xFF, 0xE0]);
+        bundle.Cloud.Setup(s => s.SaveAsync(It.IsAny<Stream>(), upload.FilePath!, It.IsAny<CancellationToken>()))
                     .ThrowsAsync(new IOException("simulated cloud failure"));
 
         var outcome = await bundle.Sut.PromoteOrderAsync(order.Id);
@@ -322,8 +322,8 @@ public class OrderPhotoPromoterTests
         var order = SeedOrder(db, OrderStatus.Paid, ok, bad);
         var bundle = CreateSut(db);
 
-        SetupLocalSource(bundle.Local, ok.FilePath, [0xFF, 0xD8]);
-        bundle.Local.Setup(s => s.GetStreamAsync(bad.FilePath, It.IsAny<CancellationToken>()))
+        SetupLocalSource(bundle.Local, ok.FilePath!, [0xFF, 0xD8]);
+        bundle.Local.Setup(s => s.GetStreamAsync(bad.FilePath!, It.IsAny<CancellationToken>()))
                     .ThrowsAsync(new FileNotFoundException("simulate missing"));
         bundle.Local.Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);

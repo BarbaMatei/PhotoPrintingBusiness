@@ -8,8 +8,13 @@ public class Upload
     public Guid? UserId { get; set; }
     public Guid? GuestSessionId { get; set; }
 
-    /// <summary>UUID-based path on disk — never derived from OriginalFileName.</summary>
-    public string FilePath { get; set; } = "";
+    /// <summary>
+    /// UUID-based storage key — never derived from OriginalFileName. Non-null while the
+    /// upload's original blob exists on disk (Local) or in the cloud bucket (Cloud).
+    /// Nulled by the intent-024 / bolt-052 original-purge once the order reaches the
+    /// configured production-complete status; see <see cref="OriginalPurgedAt"/>.
+    /// </summary>
+    public string? FilePath { get; set; } = "";
 
     /// <summary>Cached thumbnail storage path; null until the first preview generates it (bolt 042).</summary>
     public string? ThumbnailPath { get; set; }

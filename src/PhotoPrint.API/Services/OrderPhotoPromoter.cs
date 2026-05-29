@@ -122,11 +122,17 @@ public class OrderPhotoPromoter : IOrderPhotoPromoter
             return new PromotionOutcome(0, 1, 0, 0);
         }
 
+        // The promoter only runs on Local uploads (filtered in PromoteOrderAsync). Local
+        // uploads can't have been purged (purge only fires on Cloud), so FilePath is
+        // guaranteed non-null here. The null-forgiving operator surfaces that invariant
+        // to the compiler.
+        var localKey = upload.FilePath!;
+
         // Step 1: read source bytes from local. Failure = missing local file → mark Failed.
         byte[] sourceBytes;
         try
         {
-            await using var srcStream = await _router.Local.GetStreamAsync(upload.FilePath, ct);
+            await using var srcStream = await _router.Local.GetStreamAsync(localKey, ct);
             using var buf = new MemoryStream();
             await srcStream.CopyToAsync(buf, ct);
             sourceBytes = buf.ToArray();
@@ -135,19 +141,19 @@ public class OrderPhotoPromoter : IOrderPhotoPromoter
         {
             _logger.LogWarning(
                 "promotion.upload.failed upload_id={UploadId} reason=local-original-missing path={Path}",
-                upload.Id, upload.FilePath);
+                upload.Id, localKey);
             return new PromotionOutcome(0, 0, 1, 0);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "promotion.upload.failed upload_id={UploadId} reason=local-read-error path={Path}",
-                upload.Id, upload.FilePath);
+                upload.Id, localKey);
             return new PromotionOutcome(0, 0, 1, 0);
         }
 
         // Capture old keys for the post-update local cleanup — the row about to change.
-        var oldFilePath = upload.FilePath;
+        var oldFilePath = localKey;
         var oldThumbPath = upload.ThumbnailPath;
 
         // Step 2: write the three cloud objects. Any exception escaping here aborts the

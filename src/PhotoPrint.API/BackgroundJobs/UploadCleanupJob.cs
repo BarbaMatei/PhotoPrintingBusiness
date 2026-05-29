@@ -85,14 +85,19 @@ public class UploadCleanupJob : BackgroundService
 
         foreach (var upload in candidates)
         {
-            try
+            // Bolt 052: FilePath may have been nulled by the original-purge already. If
+            // so, the cloud blob is gone; only the row needs the soft-delete bookkeeping.
+            if (upload.FilePath is { } filePath)
             {
-                await storage.DeleteAsync(upload.FilePath, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to delete upload file {StoragePath}", upload.FilePath);
-                fileErrors++;
+                try
+                {
+                    await storage.DeleteAsync(filePath, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete upload file {StoragePath}", filePath);
+                    fileErrors++;
+                }
             }
 
             // Bolt 042 adds a second persistent file per upload (the cached thumbnail).
