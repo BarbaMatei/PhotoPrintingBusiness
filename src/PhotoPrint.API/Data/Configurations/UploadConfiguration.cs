@@ -20,6 +20,11 @@ public class UploadConfiguration : IEntityTypeConfiguration<Upload>
         builder.Property(u => u.ThumbnailPath)
             .HasMaxLength(512);
 
+        // Two-tier storage location (bolt 043). Stored as int; defaults to 0 (Local).
+        builder.Property(u => u.StorageLocation)
+            .IsRequired()
+            .HasDefaultValue(StorageLocation.Local);
+
         builder.Property(u => u.OriginalFileName)
             .IsRequired()
             .HasMaxLength(260);

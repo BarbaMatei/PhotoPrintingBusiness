@@ -14,6 +14,14 @@ public class Upload
     /// <summary>Cached thumbnail storage path; null until the first preview generates it (bolt 042).</summary>
     public string? ThumbnailPath { get; set; }
 
+    /// <summary>
+    /// Which storage tier currently holds this upload's bytes (bolt 043 — two-tier model).
+    /// New uploads start <see cref="Models.StorageLocation.Local"/>; the intent-024 promoter
+    /// flips this to <see cref="Models.StorageLocation.Cloud"/> after a paid order's photos
+    /// are written to cloud and the cloud writes are confirmed.
+    /// </summary>
+    public StorageLocation StorageLocation { get; set; } = StorageLocation.Local;
+
     /// <summary>Original client filename stored for audit only — never used in storage path.</summary>
     public string OriginalFileName { get; set; } = "";
 

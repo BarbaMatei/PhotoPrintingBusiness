@@ -3,6 +3,11 @@ using PhotoPrint.API.Configuration;
 
 namespace PhotoPrint.API.Services;
 
+/// <summary>
+/// Local-disk <see cref="IStorageService"/> adapter. Always registered; used for
+/// pre-payment (and dev) bytes. Does NOT support presigned URLs — the router + the
+/// per-upload <c>StorageLocation</c> keep <see cref="GetPresignedUrlAsync"/> off this path.
+/// </summary>
 public class LocalStorageService : IStorageService
 {
     private readonly string _basePath;
@@ -12,62 +17,44 @@ public class LocalStorageService : IStorageService
     {
         _basePath = settings.Value.BasePath;
         _logger = logger;
+        Directory.CreateDirectory(_basePath);
     }
 
-    public async Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null, string? prefix = null)
+    public bool SupportsPresignedUrls => false;
+
+    public async Task SaveAsync(Stream content, string key, CancellationToken ct = default)
     {
-        var id = fileId ?? Guid.NewGuid();
-        var fileName = $"{id:N}.{extension}";
+        StorageKeys.Validate(key);
 
-        // Storage keys always use '/' so they're OS-independent (NEW-4, review 042-v2): a key
-        // written on a Windows dev box reads correctly on the Linux server, and it maps cleanly
-        // to a cloud object key in bolt-043. Only the on-disk path uses OS separators.
-        var key = prefix is null
-            ? $"{ownerId}/{fileName}"
-            : $"{prefix}/{ownerId}/{fileName}";
+        var fullPath = ResolveFullPath(key);
+        var dir = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
 
-        var fullPath = ToFullPath(key);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-
-        // Write to a unique temp file then atomically move into place. Two concurrent writers of
-        // the same deterministic key (e.g. two first-previews of one upload) would otherwise
-        // collide on File.Create's exclusive FileShare.None handle → IOException → 500 (M2,
-        // review 042-v4). The same key only ever holds the same logical artifact, so last-writer
-        // overwrite is safe.
-        var tempPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            await using (var fs = File.Create(tempPath))
-            {
-                stream.Position = 0;
-                await stream.CopyToAsync(fs, ct);
-            }
-            File.Move(tempPath, fullPath, overwrite: true);
-        }
-        catch
-        {
-            if (File.Exists(tempPath)) File.Delete(tempPath);
-            throw;
-        }
+        await using var fs = File.Create(fullPath);
+        if (content.CanSeek)
+            content.Position = 0;
+        await content.CopyToAsync(fs, ct);
 
         _logger.LogDebug("Saved upload to {Key}", key);
-        return key;
     }
 
-    public Task DeleteAsync(string storagePath, CancellationToken ct = default)
+    public Task DeleteAsync(string key, CancellationToken ct = default)
     {
-        var fullPath = ToFullPath(storagePath);
+        StorageKeys.Validate(key);
+        var fullPath = ResolveFullPath(key);
         if (File.Exists(fullPath))
         {
             File.Delete(fullPath);
-            _logger.LogDebug("Deleted upload {StoragePath}", storagePath);
+            _logger.LogDebug("Deleted upload {Key}", key);
         }
         return Task.CompletedTask;
     }
 
-    public Task<Stream> GetStreamAsync(string storagePath, CancellationToken ct = default)
+    public Task<Stream> GetStreamAsync(string key, CancellationToken ct = default)
     {
-        var fullPath = ToFullPath(storagePath);
+        StorageKeys.Validate(key);
+        var fullPath = ResolveFullPath(key);
         if (!File.Exists(fullPath))
             throw new FileNotFoundException("Stored upload not found.", fullPath);
 
@@ -75,10 +62,27 @@ public class LocalStorageService : IStorageService
         return Task.FromResult(stream);
     }
 
-    public Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
-        => Task.FromResult(File.Exists(ToFullPath(storagePath)));
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+    {
+        StorageKeys.Validate(key);
+        return Task.FromResult(File.Exists(ResolveFullPath(key)));
+    }
 
-    /// <summary>Maps an OS-independent '/'-separated storage key to an on-disk path.</summary>
-    private string ToFullPath(string storageKey)
-        => Path.Combine(_basePath, storageKey.Replace('/', Path.DirectorySeparatorChar));
+    public Task<string> GetPresignedUrlAsync(string key, TimeSpan ttl, CancellationToken ct = default)
+        => throw new NotSupportedException(
+            "LocalStorageService cannot produce presigned URLs. " +
+            "Callers must check IStorageService.SupportsPresignedUrls or route via IStorageRouter " +
+            "and branch on Upload.StorageLocation.");
+
+    private string ResolveFullPath(string key)
+    {
+        // StorageKeys.Validate has already rejected absolute paths and '..' — but we
+        // still re-anchor to _basePath here so any future caller using a key that
+        // bypassed validation can't escape the storage root.
+        var combined = Path.GetFullPath(Path.Combine(_basePath, key));
+        var root = Path.GetFullPath(_basePath);
+        if (!combined.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Resolved path escapes storage root.");
+        return combined;
+    }
 }
