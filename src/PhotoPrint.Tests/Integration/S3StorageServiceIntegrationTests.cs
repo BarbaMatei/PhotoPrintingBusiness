@@ -120,7 +120,10 @@ public sealed class S3StorageServiceIntegrationTests : IClassFixture<MinioFixtur
 
         url.Should().StartWith(_fx.Endpoint);
         url.Should().Contain(key);
-        url.Should().Contain("X-Amz-Signature");
+        // AWSSDK + S3-compatible servers negotiate SigV2 (Signature=) or SigV4
+        // (X-Amz-Signature=) depending on the client config; MinIO accepts both.
+        // The test's intent is "the URL is signed", not "which signature flavour".
+        url.Should().MatchRegex(@"[?&](X-Amz-)?Signature=");
     }
 
     [SkippableFact]
