@@ -3,6 +3,11 @@ using PhotoPrint.API.Configuration;
 
 namespace PhotoPrint.API.Services;
 
+/// <summary>
+/// Local-disk <see cref="IStorageService"/> adapter. Always registered; used for
+/// pre-payment (and dev) bytes. Does NOT support presigned URLs — the router + the
+/// per-upload <c>StorageLocation</c> keep <see cref="GetPresignedUrlAsync"/> off this path.
+/// </summary>
 public class LocalStorageService : IStorageService
 {
     private readonly string _basePath;
@@ -12,40 +17,44 @@ public class LocalStorageService : IStorageService
     {
         _basePath = settings.Value.BasePath;
         _logger = logger;
+        Directory.CreateDirectory(_basePath);
     }
 
-    public async Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null)
-    {
-        var ownerDir = Path.Combine(_basePath, ownerId.ToString());
-        Directory.CreateDirectory(ownerDir);
+    public bool SupportsPresignedUrls => false;
 
-        var id = fileId ?? Guid.NewGuid();
-        var fileName = $"{id:N}.{extension}";
-        var fullPath = Path.Combine(ownerDir, fileName);
+    public async Task SaveAsync(Stream content, string key, CancellationToken ct = default)
+    {
+        StorageKeys.Validate(key);
+
+        var fullPath = ResolveFullPath(key);
+        var dir = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
 
         await using var fs = File.Create(fullPath);
-        stream.Position = 0;
-        await stream.CopyToAsync(fs, ct);
+        if (content.CanSeek)
+            content.Position = 0;
+        await content.CopyToAsync(fs, ct);
 
-        var relativePath = Path.Combine(ownerId.ToString(), fileName);
-        _logger.LogDebug("Saved upload to {RelativePath}", relativePath);
-        return relativePath;
+        _logger.LogDebug("Saved upload to {Key}", key);
     }
 
-    public Task DeleteAsync(string storagePath, CancellationToken ct = default)
+    public Task DeleteAsync(string key, CancellationToken ct = default)
     {
-        var fullPath = Path.Combine(_basePath, storagePath);
+        StorageKeys.Validate(key);
+        var fullPath = ResolveFullPath(key);
         if (File.Exists(fullPath))
         {
             File.Delete(fullPath);
-            _logger.LogDebug("Deleted upload {StoragePath}", storagePath);
+            _logger.LogDebug("Deleted upload {Key}", key);
         }
         return Task.CompletedTask;
     }
 
-    public Task<Stream> GetStreamAsync(string storagePath, CancellationToken ct = default)
+    public Task<Stream> GetStreamAsync(string key, CancellationToken ct = default)
     {
-        var fullPath = Path.Combine(_basePath, storagePath);
+        StorageKeys.Validate(key);
+        var fullPath = ResolveFullPath(key);
         if (!File.Exists(fullPath))
             throw new FileNotFoundException("Stored upload not found.", fullPath);
 
@@ -53,9 +62,27 @@ public class LocalStorageService : IStorageService
         return Task.FromResult(stream);
     }
 
-    public Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default)
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
     {
-        var fullPath = Path.Combine(_basePath, storagePath);
-        return Task.FromResult(File.Exists(fullPath));
+        StorageKeys.Validate(key);
+        return Task.FromResult(File.Exists(ResolveFullPath(key)));
+    }
+
+    public Task<string> GetPresignedUrlAsync(string key, TimeSpan ttl, CancellationToken ct = default)
+        => throw new NotSupportedException(
+            "LocalStorageService cannot produce presigned URLs. " +
+            "Callers must check IStorageService.SupportsPresignedUrls or route via IStorageRouter " +
+            "and branch on Upload.StorageLocation.");
+
+    private string ResolveFullPath(string key)
+    {
+        // StorageKeys.Validate has already rejected absolute paths and '..' — but we
+        // still re-anchor to _basePath here so any future caller using a key that
+        // bypassed validation can't escape the storage root.
+        var combined = Path.GetFullPath(Path.Combine(_basePath, key));
+        var root = Path.GetFullPath(_basePath);
+        if (!combined.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Resolved path escapes storage root.");
+        return combined;
     }
 }

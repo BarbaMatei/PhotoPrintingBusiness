@@ -13,42 +13,46 @@ public class ImageProcessor : IImageProcessor
     /// <summary>Reject images whose width or height exceeds this — decompression-bomb defence (bolt 042).</summary>
     public const int MaxDecodeDimension = 25_000;
 
-    private readonly IStorageService _storage;
     private readonly ILogger<ImageProcessor> _logger;
 
-    public ImageProcessor(IStorageService storage, ILogger<ImageProcessor> logger)
+    // Bolt 043 (ADR-008): no IStorageService dependency. The caller routes via
+    // IStorageRouter and hands the processor an open source stream.
+    public ImageProcessor(ILogger<ImageProcessor> logger)
     {
-        _storage = storage;
         _logger = logger;
     }
 
-    public async Task<ImageInfo?> GetInfoAsync(string storagePath, CancellationToken ct = default)
+    public async Task<ImageInfo?> GetInfoAsync(Stream source, CancellationToken ct = default)
     {
         try
         {
-            await using var stream = await _storage.GetStreamAsync(storagePath, ct);
-            var info = await Image.IdentifyAsync(stream, ct);
+            if (source.CanSeek)
+                source.Position = 0;
+            var info = await Image.IdentifyAsync(source, ct);
             if (info is null) return null;
             return new ImageInfo(info.Width, info.Height);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to identify image at {StoragePath}", storagePath);
+            _logger.LogWarning(ex, "Failed to identify image stream.");
             return null;
         }
     }
 
-    public async Task<MemoryStream> GenerateThumbnailAsync(string storagePath, CancellationToken ct = default)
+    public async Task<MemoryStream> GenerateThumbnailAsync(Stream source, CancellationToken ct = default)
     {
-        await using var stream = await _storage.GetStreamAsync(storagePath, ct);
-
-        // Reject pixel bombs before the full decode allocates pixel buffers (bolt 042).
-        var info = await Image.IdentifyAsync(stream, ct);
+        // Defence in depth: even though UploadService validates dimensions before save, a
+        // promoted/legacy upload's source could conceivably exceed the cap. Identify the
+        // header first; reject before the full decode allocates pixel buffers (bolt 042).
+        if (source.CanSeek)
+            source.Position = 0;
+        var info = await Image.IdentifyAsync(source, ct);
         if (info is not null && (info.Width > MaxDecodeDimension || info.Height > MaxDecodeDimension))
             throw new UnprocessableEntityException("Image dimensions exceed limits.");
-        stream.Position = 0;
 
-        using var image = await Image.LoadAsync(stream, ct);
+        if (source.CanSeek)
+            source.Position = 0;
+        using var image = await Image.LoadAsync(source, ct);
 
         image.Mutate(ctx => ctx.Resize(new ResizeOptions
         {

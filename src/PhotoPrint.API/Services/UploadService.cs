@@ -11,20 +11,23 @@ public class UploadService : IUploadService
     private const long MaxFileSizeBytes = 52_428_800L; // 50 MB
     private const int MaxUploadsPerSession = 100;
 
-    private readonly IStorageService _storage;
+    private readonly IStorageRouter _router;
     private readonly IMimeValidator _mimeValidator;
     private readonly IImageProcessor _imageProcessor;
     private readonly PhotoPrintDbContext _db;
     private readonly ILogger<UploadService> _logger;
 
+    // Bolt 043 (ADR-008): the router replaces the single IStorageService injection so a
+    // promoted (Cloud) upload's bytes are read/written against the cloud adapter — every
+    // path here routes by upload.StorageLocation.
     public UploadService(
-        IStorageService storage,
+        IStorageRouter router,
         IMimeValidator mimeValidator,
         IImageProcessor imageProcessor,
         PhotoPrintDbContext db,
         ILogger<UploadService> logger)
     {
-        _storage = storage;
+        _router = router;
         _mimeValidator = mimeValidator;
         _imageProcessor = imageProcessor;
         _db = db;
@@ -61,7 +64,7 @@ public class UploadService : IUploadService
                     $"Guest sessions are limited to {MaxUploadsPerSession} active uploads.");
         }
 
-        // Determine file extension from MIME type — never trust client filename extension
+        // Determine file extension from MIME type — never trust client filename extension.
         var extension = mimeType switch
         {
             "image/jpeg" => "jpg",
@@ -70,22 +73,27 @@ public class UploadService : IUploadService
             _            => "bin",
         };
 
-        var uploadId = Guid.NewGuid();
-        var storagePath = await _storage.SaveAsync(fileStream, ownerId, extension, ct, fileId: uploadId);
-
-        var imageInfo = await _imageProcessor.GetInfoAsync(storagePath, ct);
+        // Validate the image up-front, BEFORE writing it (ADR-007: caller owns key + I/O).
+        // No need to save-then-delete on validation failure now.
+        if (fileStream.CanSeek)
+            fileStream.Position = 0;
+        var imageInfo = await _imageProcessor.GetInfoAsync(fileStream, ct);
         if (imageInfo is null)
-        {
-            await _storage.DeleteAsync(storagePath, ct);
             throw new UnprocessableEntityException("The uploaded file could not be read as an image.");
-        }
-
         if (imageInfo.WidthPx > ImageProcessor.MaxDecodeDimension ||
             imageInfo.HeightPx > ImageProcessor.MaxDecodeDimension)
-        {
-            await _storage.DeleteAsync(storagePath, ct);
             throw new UnprocessableEntityException("Image dimensions exceed limits.");
-        }
+
+        var uploadId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow;
+        var key = StorageKeys.Original(uploadId, createdAt, extension);
+
+        // New uploads always start on the Local tier — pre-payment bytes never go to cloud.
+        // The intent-024 promoter flips StorageLocation to Cloud (and re-writes the bytes
+        // there) when the order is paid.
+        if (fileStream.CanSeek)
+            fileStream.Position = 0;
+        await _router.Local.SaveAsync(fileStream, key, ct);
 
         var actualLength = fileStream.Length;
 
@@ -94,7 +102,8 @@ public class UploadService : IUploadService
             Id              = uploadId,
             UserId          = userId,
             GuestSessionId  = guestSessionId,
-            FilePath        = storagePath,
+            FilePath        = key,
+            StorageLocation = StorageLocation.Local,
             // Strip any directory component OS-independently. Path.GetFileName only treats
             // '\' as a separator on Windows, so on the Linux server a crafted name like
             // "C:\evil\x.jpg" would pass through unsanitised — strip both '/' and '\'.
@@ -105,7 +114,7 @@ public class UploadService : IUploadService
             WidthPx         = imageInfo.WidthPx,
             HeightPx        = imageInfo.HeightPx,
             FileSizeBytes   = actualLength,
-            UploadedAt      = DateTimeOffset.UtcNow,
+            UploadedAt      = createdAt,
         };
 
         _db.Uploads.Add(upload);
@@ -118,7 +127,7 @@ public class UploadService : IUploadService
         return MapToDto(upload);
     }
 
-    public async Task<(Stream stream, string contentType)> GetPreviewAsync(
+    public async Task<PreviewLocation> GetPreviewAsync(
         Guid uploadId,
         Guid? userId,
         Guid? guestSessionId,
@@ -136,19 +145,23 @@ public class UploadService : IUploadService
         if (!isOwner)
             throw new ForbiddenException("You do not have access to this upload.");
 
+        // Route to the adapter that owns this upload's bytes.
+        var store = _router.For(upload.StorageLocation);
+
         // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
-        // deletion). Generate once, store via IStorageService, and record the path.
-        if (upload.ThumbnailPath is null || !await _storage.ExistsAsync(upload.ThumbnailPath, ct))
+        // deletion). Generate from the original (in the upload's current tier), store back
+        // to that tier under the deterministic thumbnail key, and record it.
+        if (upload.ThumbnailPath is null || !await store.ExistsAsync(upload.ThumbnailPath, ct))
         {
-            await using var generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
-            var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
-            upload.ThumbnailPath = await _storage.SaveAsync(generated, ownerId, "jpg", ct);
+            await using var src = await store.GetStreamAsync(upload.FilePath, ct);
+            await using var generated = await _imageProcessor.GenerateThumbnailAsync(src, ct);
+            var thumbKey = StorageKeys.Thumbnail(upload.Id);
+            await store.SaveAsync(generated, thumbKey, ct);
+            upload.ThumbnailPath = thumbKey;
             await _db.SaveChangesAsync(ct);
         }
 
-        // Cache hit: stream the stored thumbnail — no ImageSharp work on this path.
-        var stream = await _storage.GetStreamAsync(upload.ThumbnailPath!, ct);
-        return (stream, "image/jpeg");
+        return new PreviewLocation(upload.Id, upload.StorageLocation, upload.ThumbnailPath!);
     }
 
     private static UploadDto MapToDto(Upload u) => new(

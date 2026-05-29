@@ -79,11 +79,9 @@ builder.Services.AddScoped<PhotoPrint.API.Services.PricingService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IProductService, PhotoPrint.API.Services.ProductService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPrint.API.Services.AdminProductService>();
 
-// ── Photo Upload ──────────────────────────────────────────────────────────────
-builder.Services.Configure<PhotoPrint.API.Configuration.StorageSettings>(
-    builder.Configuration.GetSection(PhotoPrint.API.Configuration.StorageSettings.SectionName));
+// ── Photo Upload + Storage (bolt 043: two-tier router + S3 adapter) ───────────
+builder.Services.AddPhotoStorage(builder.Configuration);
 builder.Services.AddSingleton<PhotoPrint.API.Services.IMimeValidator, PhotoPrint.API.Services.MimeValidator>();
-builder.Services.AddScoped<PhotoPrint.API.Services.IStorageService, PhotoPrint.API.Services.LocalStorageService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IImageProcessor, PhotoPrint.API.Services.ImageProcessor>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IUploadService, PhotoPrint.API.Services.UploadService>();
 
