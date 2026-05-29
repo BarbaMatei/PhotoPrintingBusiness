@@ -2,6 +2,8 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Admin;
 using PhotoPrint.API.DTOs.Orders;
@@ -19,6 +21,8 @@ public class AdminOrderService : IAdminOrderService
     private readonly IEuPlatescService _euPlatescService;
     private readonly IStripeClient _stripeClient;
     private readonly IStorageService _storage;
+    private readonly IOriginalPurger _originalPurger;
+    private readonly ArchiveSettings _archiveSettings;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly ILogger<AdminOrderService> _logger;
 
@@ -28,6 +32,8 @@ public class AdminOrderService : IAdminOrderService
         IEuPlatescService euPlatescService,
         IStripeClient stripeClient,
         IStorageService storage,
+        IOriginalPurger originalPurger,
+        IOptions<ArchiveSettings> archiveSettings,
         IHubContext<AdminOrderHub> hub,
         ILogger<AdminOrderService> logger)
     {
@@ -36,6 +42,8 @@ public class AdminOrderService : IAdminOrderService
         _euPlatescService = euPlatescService;
         _stripeClient = stripeClient;
         _storage = storage;
+        _originalPurger = originalPurger;
+        _archiveSettings = archiveSettings.Value;
         _hub = hub;
         _logger = logger;
     }
@@ -114,6 +122,13 @@ public class AdminOrderService : IAdminOrderService
 
         await _hub.Clients.All.SendAsync(
             "OrderStatusChanged", orderId, order.Status.ToString(), ct);
+
+        // Bolt 052: when the order enters the configured production-complete status
+        // (default Shipped), purge each upload's cloud original. Synchronous — adds
+        // ~50–100 ms per upload to this admin PATCH but keeps the lifecycle ordering
+        // simple. Self-refuses if the cloud tier is off or archive is disabled.
+        if (_archiveSettings.IsProductionCompleteStatus(newStatus))
+            await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
 
         return BuildDetailDto(order);
     }
