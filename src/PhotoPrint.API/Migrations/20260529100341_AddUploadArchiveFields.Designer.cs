@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PhotoPrint.API.Data;
 
@@ -10,9 +11,11 @@ using PhotoPrint.API.Data;
 namespace PhotoPrint.API.Migrations
 {
     [DbContext(typeof(PhotoPrintDbContext))]
-    partial class PhotoPrintDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260529100341_AddUploadArchiveFields")]
+    partial class AddUploadArchiveFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -346,7 +349,7 @@ namespace PhotoPrint.API.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("StripeClientSecret")
-                        .HasMaxLength(512)
+                        .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("SubtotalRon")

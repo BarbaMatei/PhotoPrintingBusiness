@@ -242,16 +242,21 @@ internal class FakeStorageService : IStorageService
     public void Store(string key, byte[] bytes) => _store[key] = bytes;
 }
 
-/// <summary>Always returns ImageInfo(800, 600) and a minimal JPEG thumbnail.</summary>
+/// <summary>Always returns ImageInfo(800, 600) and a minimal JPEG thumbnail / preview.</summary>
 internal class FakeImageProcessor : IImageProcessor
 {
     private static readonly byte[] ThumbnailBytes = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x01];
+    // Distinguishable header so tests can tell a preview byte-stream from a thumbnail.
+    private static readonly byte[] LargePreviewBytes = [0xFF, 0xD8, 0xFF, 0xE1, 0x00, 0x02];
 
     public Task<ImageInfo?> GetInfoAsync(Stream source, CancellationToken ct = default)
         => Task.FromResult<ImageInfo?>(new ImageInfo(800, 600));
 
     public Task<MemoryStream> GenerateThumbnailAsync(Stream source, CancellationToken ct = default)
         => Task.FromResult(new MemoryStream(ThumbnailBytes));
+
+    public Task<MemoryStream> GenerateLargePreviewAsync(Stream source, CancellationToken ct = default)
+        => Task.FromResult(new MemoryStream(LargePreviewBytes));
 }
 
 internal class UploadNoOpEmailService : IEmailService
