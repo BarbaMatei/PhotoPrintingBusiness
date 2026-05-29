@@ -94,6 +94,9 @@ builder.Services
 
 builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.UploadCleanupJob>();
 
+// ── Order Photo Archive (bolt 051: promote-on-paid + recovery scanner) ────────
+builder.Services.AddPhotoArchive(builder.Configuration);
+
 // ── Cart ──────────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.Services.CartService>();
 
@@ -203,6 +206,15 @@ if (args.Contains("--seed") || args.Contains("--seed-dev"))
     if (args.Contains("--seed-dev"))
         await PhotoPrint.API.Data.Seed.DevDataSeed.ApplyAsync(db);
     return;
+}
+
+// ── Backfill archive mode (bolt 051 story 004): one-off ops verb ──────────────
+//    dotnet run --project src/PhotoPrint.API -- backfill-archive [--dry-run]
+if (args.Contains(PhotoPrint.API.Cli.BackfillCommand.Verb))
+{
+    var exitCode = await PhotoPrint.API.Cli.BackfillCommand.RunAsync(
+        app.Services, args, CancellationToken.None);
+    Environment.Exit(exitCode);
 }
 
 // ── Promote admin mode: dotnet run -- --promote-admin <email> ─────────────────

@@ -21,6 +21,7 @@ public class WebhooksController : ControllerBase
     private readonly IEuPlatescService _euPlatescService;
     private readonly PhotoPrintDbContext _db;
     private readonly IOrderEmailService _orderEmailService;
+    private readonly IOrderPhotoPromoter _photoPromoter;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly StripeSettings _stripeSettings;
     private readonly EuPlatescSettings _euPlatescSettings;
@@ -32,6 +33,7 @@ public class WebhooksController : ControllerBase
         IEuPlatescService euPlatescService,
         PhotoPrintDbContext db,
         IOrderEmailService orderEmailService,
+        IOrderPhotoPromoter photoPromoter,
         IHubContext<AdminOrderHub> hub,
         IOptions<StripeSettings> stripeSettings,
         IOptions<EuPlatescSettings> euPlatescSettings,
@@ -42,6 +44,7 @@ public class WebhooksController : ControllerBase
         _euPlatescService = euPlatescService;
         _db = db;
         _orderEmailService = orderEmailService;
+        _photoPromoter = photoPromoter;
         _hub = hub;
         _stripeSettings = stripeSettings.Value;
         _euPlatescSettings = euPlatescSettings.Value;
@@ -177,6 +180,9 @@ public class WebhooksController : ControllerBase
             await _db.SaveChangesAsync(cancellationToken);
             await BroadcastNewOrderAsync(order, cancellationToken);
             await FireOrderConfirmedEmailAsync(order, cancellationToken);
+            // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
+            // the worker picks up and uploads asynchronously (ADR-010).
+            await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
         }
         else if (action != "0" && order.Status == OrderStatus.AwaitingPayment)
         {
@@ -216,6 +222,9 @@ public class WebhooksController : ControllerBase
             await _db.SaveChangesAsync(ct);
             await BroadcastNewOrderAsync(order, ct);
             await FireOrderConfirmedEmailAsync(order, ct);
+            // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
+            // the worker picks up and uploads asynchronously (ADR-010).
+            await _photoPromoter.EnqueueAsync(order.Id, ct);
         }
     }
 
