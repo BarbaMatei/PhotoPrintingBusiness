@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-05-25T14:45:00Z
-total_decisions: 6
+last_updated: 2026-05-28T08:15:00Z
+total_decisions: 9
 ---
 
 # Decision Index
@@ -17,6 +17,30 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-009: Cloudflare R2 as the Recommended Concrete Cloud Target
+- **Status**: accepted
+- **Date**: 2026-05-28
+- **Bolt**: 043-cloud-storage-provider (cloud-storage-provider)
+- **Path**: `bolts/043-cloud-storage-provider/adr-009-cloudflare-r2-recommended-cloud-target.md`
+- **Summary**: `S3StorageService` is vendor-neutral; this records the production recommendation of Cloudflare R2 over AWS S3, based on $0 egress (decisive for image serving), Cloudflare-edge proximity to the Romanian audience, and lower storage cost. AWS S3 and MinIO remain fully supported via the same code path; only config changes.
+- **Read when**: Choosing or configuring a cloud storage backend, writing/updating `docs/DEPLOYMENT.md` storage section, debugging R2-specific quirks (`Region="auto"`, `ForcePathStyle=true`), reasoning about CDN cache rules and egress cost, or evaluating storage cost.
+
+### ADR-008: Two-Tier Storage with Per-Upload StorageLocation and IStorageRouter
+- **Status**: accepted
+- **Date**: 2026-05-28
+- **Bolt**: 043-cloud-storage-provider (cloud-storage-provider)
+- **Path**: `bolts/043-cloud-storage-provider/adr-008-two-tier-storage-with-storage-location.md`
+- **Summary**: Storage runs as two tiers — local (always available) and cloud (when configured) — with per-upload routing via `Upload.StorageLocation` and `IStorageRouter`. `Storage:Provider` is repurposed to "cloud tier on/off." The preview endpoint branches per upload. Driven by the intent-024 promote-on-payment lifecycle and GDPR data minimization; trades multi-replica scaling for the pre-payment phase.
+- **Read when**: Working on upload/preview/promotion code paths, adding new storage callers, debugging where an upload's bytes live, planning multi-replica scale-out (pre-payment serving), or reading anything in intent 024.
+
+### ADR-007: Storage Adapter Persists Bytes at Caller-Supplied Keys (Naming is an Application Concern)
+- **Status**: accepted
+- **Date**: 2026-05-28
+- **Bolt**: 043-cloud-storage-provider (cloud-storage-provider)
+- **Path**: `bolts/043-cloud-storage-provider/adr-007-storage-adapter-caller-supplied-keys.md`
+- **Summary**: `IStorageService.SaveAsync` accepts an explicit, caller-supplied `string key` rather than inventing one. Storage key/naming policy lives in an application-layer `StorageKeys` helper, not in the adapter. Adapters perform byte persistence only.
+- **Read when**: Modifying `IStorageService` or any of its implementations (`LocalStorageService`, `S3StorageService`, `FakeStorageService`); adding new asset kinds (e.g. `previews/`); writing tests that mock storage; implementing the intent-024 promoter/backfill; debugging storage key drift.
 
 ### ADR-006: Accept the Historical Key Leak and Mitigate by Rotation (No History Rewrite)
 - **Status**: accepted

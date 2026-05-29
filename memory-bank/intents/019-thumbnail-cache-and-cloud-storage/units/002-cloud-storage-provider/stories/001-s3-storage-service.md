@@ -2,11 +2,12 @@
 id: 001-s3-storage-service
 unit: 002-cloud-storage-provider
 intent: 019-thumbnail-cache-and-cloud-storage
-status: draft
+status: complete
 priority: must
 created: 2026-05-25T10:30:00Z
+completed: 2026-05-29T08:30:00Z
 assigned_bolt: 043-cloud-storage-provider
-implemented: false
+implemented: true
 ---
 
 # Story: 001-s3-storage-service
