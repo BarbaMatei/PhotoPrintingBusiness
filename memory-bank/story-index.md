@@ -1053,13 +1053,13 @@
 
 #### Unit: 003-order-history-photos (2 stories) — Bolt: 053
 
-### 001-order-photos-endpoint.md ⬜ NOT STARTED
+### 001-order-photos-endpoint.md ✅ COMPLETE
 **Title**: `GET /api/orders/{id}/photos` → presigned large + thumbnail URLs
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/003-order-history-photos/stories/001-order-photos-endpoint.md`
 **Bolt**: 053
 
-### 002-order-detail-photo-grid.md ⬜ NOT STARTED
+### 002-order-detail-photo-grid.md ✅ COMPLETE
 **Title**: Order-detail thumbnail grid + large-preview lightbox
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/003-order-history-photos/stories/002-order-detail-photo-grid.md`
