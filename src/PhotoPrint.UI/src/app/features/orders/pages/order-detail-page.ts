@@ -8,12 +8,13 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { catchError, EMPTY } from 'rxjs';
+import { catchError, EMPTY, of } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
 import { OrderStatusPipe } from '../../../core/pipes/order-status.pipe';
 import { statusClass, isAtLeast } from '../../../core/models/order-status.constants';
-import { OrderDetailDto } from '../../../core/models/order.model';
+import { OrderDetailDto, OrderPhotoDto } from '../../../core/models/order.model';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { PhotoLightboxComponent } from '../../../shared/components/photo-lightbox/photo-lightbox.component';
 
 interface StepDef {
   status: string;
@@ -25,7 +26,7 @@ interface StepDef {
   selector: 'app-order-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, RouterLink, OrderStatusPipe, SpinnerComponent],
+  imports: [DecimalPipe, RouterLink, OrderStatusPipe, SpinnerComponent, PhotoLightboxComponent],
   template: `
     <div class="order-detail-page">
       @if (loading()) {
@@ -92,6 +93,36 @@ interface StepDef {
             </div>
           </section>
 
+          <!-- Photo archive (bolt 053) -->
+          <section class="order-photos">
+            <h2>Fotografiile tale</h2>
+
+            @if (photosLoading()) {
+              <app-spinner label="Se încarcă fotografiile..." [showLabel]="true" />
+            } @else if (photos().length === 0) {
+              <p class="photos-empty">
+                Fotografiile pentru această comandă nu mai sunt disponibile.
+              </p>
+            } @else {
+              <div class="photo-grid">
+                @for (photo of photos(); track photo.uploadId) {
+                  <button
+                    type="button"
+                    class="photo-tile"
+                    (click)="openLightbox(photo)"
+                    [attr.aria-label]="'Vezi ' + photo.fileName"
+                  >
+                    <img
+                      [src]="photo.thumbnailUrl"
+                      [alt]="photo.fileName"
+                      loading="lazy"
+                    />
+                  </button>
+                }
+              </div>
+            }
+          </section>
+
           <!-- Delivery info -->
           <section class="delivery-info">
             <h2>Livrare</h2>
@@ -110,6 +141,13 @@ interface StepDef {
           </section>
         </div>
       }
+
+      <!-- Lightbox overlay — mounted only when a photo is selected. The large URL
+           is requested by the browser at this point (lazy-load per story 002). -->
+      <app-photo-lightbox
+        [src]="lightboxSrc()"
+        (close)="lightboxSrc.set(null)"
+      />
     </div>
   `,
   styles: [`
@@ -238,6 +276,52 @@ interface StepDef {
       h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; }
       p { margin: 0.25rem 0; font-size: 0.95rem; }
     }
+
+    /* Photo archive section (bolt 053) */
+    .order-photos {
+      margin-bottom: 1.5rem;
+      h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+    }
+
+    .photos-empty {
+      color: #6c757d;
+      font-style: italic;
+      margin: 0;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .photo-tile {
+      all: unset;
+      cursor: pointer;
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 1 / 1;
+      background: #f0f0f0;
+      border: 1px solid #dee2e6;
+      transition: transform 0.15s, box-shadow 0.15s;
+
+      &:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      &:focus-visible {
+        outline: 2px solid #1a73e8;
+        outline-offset: 2px;
+      }
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+    }
   `],
 })
 export class OrderDetailPage implements OnInit {
@@ -248,6 +332,11 @@ export class OrderDetailPage implements OnInit {
 
   readonly loading = signal(true);
   readonly order = signal<OrderDetailDto | null>(null);
+
+  // Bolt 053: photo archive + lightbox
+  readonly photosLoading = signal(true);
+  readonly photos = signal<OrderPhotoDto[]>([]);
+  readonly lightboxSrc = signal<string | null>(null);
 
   readonly badgeClass = statusClass;
   readonly stepDone = isAtLeast;
@@ -260,8 +349,10 @@ export class OrderDetailPage implements OnInit {
   ];
 
   ngOnInit(): void {
+    const id = this.orderId();
+
     this.orderService
-      .getOrderDetail(this.orderId())
+      .getOrderDetail(id)
       .pipe(
         catchError(() => {
           this.router.navigate(['/comenzile-mele']);
@@ -272,5 +363,19 @@ export class OrderDetailPage implements OnInit {
         this.order.set(order);
         this.loading.set(false);
       });
+
+    // Bolt 053: fetch photos in parallel. A failure here doesn't navigate away —
+    // the empty-state copy ("no longer available") covers it gracefully.
+    this.orderService
+      .getOrderPhotos(id)
+      .pipe(catchError(() => of({ photos: [] })))
+      .subscribe(result => {
+        this.photos.set(result.photos);
+        this.photosLoading.set(false);
+      });
+  }
+
+  openLightbox(photo: OrderPhotoDto): void {
+    this.lightboxSrc.set(photo.largeUrl);
   }
 }

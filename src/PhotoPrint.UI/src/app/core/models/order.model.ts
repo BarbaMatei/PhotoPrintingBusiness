@@ -41,3 +41,18 @@ export interface OrderDetailDto extends OrderSummaryDto {
   shippingAddress: ShippingAddressDto | null;
   items: OrderItemDto[];
 }
+
+/**
+ * One photo from an order's archive (bolt 053). Returned by GET /api/orders/{id}/photos.
+ * URLs are presigned cloud URLs with a short TTL (1h by default).
+ */
+export interface OrderPhotoDto {
+  uploadId: string;
+  fileName: string;
+  thumbnailUrl: string;
+  largeUrl: string;
+}
+
+export interface OrderPhotosDto {
+  photos: OrderPhotoDto[];
+}
