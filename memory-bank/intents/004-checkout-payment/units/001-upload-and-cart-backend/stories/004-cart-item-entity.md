@@ -2,11 +2,11 @@
 id: 004-cart-item-entity
 unit: 001-upload-and-cart-backend
 intent: 004-checkout-payment
-status: draft
+status: complete
 priority: must
 created: 2026-05-21T12:00:00Z
 assigned_bolt: 013-cart-api
-implemented: false
+implemented: true
 ---
 
 # Story: 004-cart-item-entity

@@ -2,7 +2,7 @@
 id: 003-gitignore-and-secrets-dir
 unit: 001-secrets-rotation-and-guardrails
 intent: 018-secrets-management
-status: implemented
+status: complete
 priority: must
 created: 2026-05-25T10:25:00Z
 assigned_bolt: 041-secrets-management

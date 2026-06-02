@@ -2,11 +2,11 @@
 id: 001-https-hsts-enforcement
 unit: 002-security-baselines
 intent: 001-foundation-infrastructure
-status: draft
+status: complete
 priority: must
 created: 2026-05-05T15:26:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 001-https-hsts-enforcement

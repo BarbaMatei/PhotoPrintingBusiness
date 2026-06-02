@@ -2,7 +2,7 @@
 id: 003-cleanup-regression-test
 unit: 001-upload-cleanup-job-fix
 intent: 013-upload-cleanup-fix
-status: implemented
+status: complete
 priority: must
 created: 2026-05-25T10:00:00Z
 assigned_bolt: 033-upload-cleanup-fix

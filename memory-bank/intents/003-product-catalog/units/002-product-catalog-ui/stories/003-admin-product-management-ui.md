@@ -2,11 +2,11 @@
 id: 003-admin-product-management-ui
 unit: 002-product-catalog-ui
 intent: 003-product-catalog
-status: draft
+status: complete
 priority: must
 created: 2026-05-20T20:35:00Z
 assigned_bolt: 011-product-catalog-ui
-implemented: false
+implemented: true
 ---
 
 # Story: 003-admin-product-management-ui

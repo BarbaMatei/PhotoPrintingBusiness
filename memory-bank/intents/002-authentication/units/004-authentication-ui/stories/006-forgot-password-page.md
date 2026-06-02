@@ -2,11 +2,11 @@
 id: 006-forgot-password-page
 unit: 004-authentication-ui
 intent: 002-authentication
-status: draft
+status: complete
 priority: must
 created: 2026-05-20T12:58:00Z
 assigned_bolt: 008-authentication-ui
-implemented: false
+implemented: true
 ---
 
 # Story: 006-forgot-password-page

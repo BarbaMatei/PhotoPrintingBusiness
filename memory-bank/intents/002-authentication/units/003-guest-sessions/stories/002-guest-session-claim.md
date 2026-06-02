@@ -2,11 +2,11 @@
 id: 002-guest-session-claim
 unit: 003-guest-sessions
 intent: 002-authentication
-status: draft
+status: complete
 priority: must
 created: 2026-05-20T12:57:00Z
 assigned_bolt: 007-guest-sessions
-implemented: false
+implemented: true
 ---
 
 # Story: 002-guest-session-claim

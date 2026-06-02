@@ -2,7 +2,7 @@
 id: 001-remove-client-shipping-cost
 unit: 001-shipping-cost-server-side
 intent: 014-payment-hardening
-status: implemented
+status: complete
 priority: must
 created: 2026-05-25T10:05:00Z
 assigned_bolt: 034-shipping-cost-server-side

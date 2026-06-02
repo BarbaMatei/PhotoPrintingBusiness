@@ -2,11 +2,11 @@
 id: 003-order-entity-schema
 unit: 003-shipping-and-order-core
 intent: 004-checkout-payment
-status: draft
+status: complete
 priority: must
 created: 2026-05-21T12:00:00Z
 assigned_bolt: 015-shipping-and-order-core
-implemented: false
+implemented: true
 ---
 
 # Story: 003-order-entity-schema

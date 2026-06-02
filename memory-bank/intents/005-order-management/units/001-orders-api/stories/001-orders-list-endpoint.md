@@ -2,11 +2,11 @@
 id: 001-orders-list-endpoint
 unit: 001-orders-api
 intent: 005-order-management
-status: draft
+status: complete
 priority: must
 created: 2026-05-22T07:10:00Z
 assigned_bolt: 018-orders-api
-implemented: false
+implemented: true
 ---
 
 # Story: 001-orders-list-endpoint

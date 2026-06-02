@@ -2,11 +2,11 @@
 id: 005-euplatesc-ipn-handler
 unit: 004-payment-backends
 intent: 004-checkout-payment
-status: draft
+status: complete
 priority: must
 created: 2026-05-21T12:00:00Z
 assigned_bolt: 016-payment-backends
-implemented: false
+implemented: true
 ---
 
 # Story: 005-euplatesc-ipn-handler

@@ -2,11 +2,11 @@
 id: 001-order-history-page
 unit: 002-orders-ui
 intent: 005-order-management
-status: draft
+status: complete
 priority: must
 created: 2026-05-22T07:10:00Z
 assigned_bolt: 019-orders-ui
-implemented: false
+implemented: true
 ---
 
 # Story: 001-order-history-page
