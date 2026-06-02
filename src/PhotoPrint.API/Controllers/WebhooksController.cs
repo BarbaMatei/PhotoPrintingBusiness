@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
@@ -80,11 +82,15 @@ public class WebhooksController : ControllerBase
         catch (StripeException ex)
         {
             _logger.LogWarning("Stripe webhook signature invalid: {Message}", ex.Message);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.SignatureInvalid);
             return BadRequest("Invalid Stripe signature.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Stripe webhook event parse error");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
             return BadRequest("Could not parse Stripe event.");
         }
 
@@ -141,6 +147,8 @@ public class WebhooksController : ControllerBase
         if (!EuPlatescService.ValidateIpnSignature(fields, secretKey))
         {
             _logger.LogWarning("EuPlatesc IPN signature validation failed");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.SignatureInvalid);
             return Content("<epayment>error</epayment>", "text/plain");
         }
 
@@ -149,6 +157,8 @@ public class WebhooksController : ControllerBase
             !Guid.TryParse(invoiceIdStr, out var orderId))
         {
             _logger.LogWarning("EuPlatesc IPN: missing or invalid invoice_id");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Failed);
             return Content("<epayment>error</epayment>", "text/plain");
         }
 
@@ -156,6 +166,8 @@ public class WebhooksController : ControllerBase
         if (order == null)
         {
             _logger.LogWarning("EuPlatesc IPN: order {OrderId} not found", orderId);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.OrderNotFound);
             return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
         }
 
@@ -168,6 +180,8 @@ public class WebhooksController : ControllerBase
                 _logger.LogWarning(
                     "EuPlatesc IPN amount mismatch: expected {Expected}, received {Received} for order {OrderId}",
                     expected, amountStr, orderId);
+                RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                    MetricNames.WebhookResultValues.AmountMismatch);
                 return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
             }
         }
@@ -182,6 +196,8 @@ public class WebhooksController : ControllerBase
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
             await _db.SaveChangesAsync(cancellationToken);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Ok);
             await BroadcastNewOrderAsync(order, cancellationToken);
             await FireOrderConfirmedEmailAsync(order, cancellationToken);
             // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
@@ -191,10 +207,18 @@ public class WebhooksController : ControllerBase
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
         }
+        else if (action == "0" && order.Status == OrderStatus.Paid)
+        {
+            // Duplicate IPN for an already-paid order — Stripe-equivalent duplicate path.
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Duplicate);
+        }
         else if (action != "0" && order.Status == OrderStatus.AwaitingPayment)
         {
             OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
             await _db.SaveChangesAsync(cancellationToken);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Failed);
         }
 
         return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
@@ -207,6 +231,8 @@ public class WebhooksController : ControllerBase
         if (string.IsNullOrEmpty(paymentIntentId))
         {
             _logger.LogWarning("Stripe webhook: payment_intent.succeeded but no PaymentIntent ID found");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
             return;
         }
 
@@ -215,18 +241,26 @@ public class WebhooksController : ControllerBase
         {
             _logger.LogWarning(
                 "Stripe webhook: PaymentIntent {Id} not linked to any order", paymentIntentId);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.OrderNotFound);
             return;
         }
 
         // Idempotency: silently ignore if already paid
         if (order.Status == OrderStatus.Paid)
+        {
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Duplicate);
             return;
+        }
 
         if (order.Status == OrderStatus.AwaitingPayment)
         {
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(ct);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Ok);
             await BroadcastNewOrderAsync(order, ct);
             await FireOrderConfirmedEmailAsync(order, ct);
             // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
@@ -251,7 +285,25 @@ public class WebhooksController : ControllerBase
         {
             OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
             await _db.SaveChangesAsync(ct);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
         }
+    }
+
+    /// <summary>
+    /// Observability (bolt 044): payment_webhook_total{processor,result}. The SLO
+    /// in <c>memory-bank/operations/slos.md</c> §3 sets a 99.9% target on result=ok;
+    /// every webhook receipt should produce exactly one increment with a result
+    /// from <see cref="MetricNames.WebhookResultValues"/>.
+    /// </summary>
+    private static void RecordPaymentWebhook(string processor, string result)
+    {
+        FotoMetrics.PaymentWebhook.Add(1,
+            new TagList
+            {
+                { MetricNames.Labels.Processor, processor },
+                { MetricNames.Labels.Result,    result },
+            });
     }
 
     private async Task BroadcastNewOrderAsync(Order order, CancellationToken ct)

@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services.Sameday;
 
@@ -38,6 +40,33 @@ public sealed class AwbCreator : IAwbCreator
 
     public async Task<AwbCreationOutcome> CreateForOrderAsync(
         Guid orderId, int attempt, CancellationToken ct = default)
+    {
+        var outcome = await CreateForOrderInternalAsync(orderId, attempt, ct);
+        RecordOutcome(outcome);
+        return outcome;
+    }
+
+    /// <summary>
+    /// Observability (bolt 044): awb_creation_total{result}. Mapped from
+    /// the discriminated <see cref="AwbCreationOutcome"/> union — one
+    /// increment per CreateForOrderAsync invocation.
+    /// </summary>
+    private static void RecordOutcome(AwbCreationOutcome outcome)
+    {
+        var result = outcome switch
+        {
+            AwbCreationOutcome.Created    => MetricNames.AwbResultValues.Ok,
+            AwbCreationOutcome.Skipped    => MetricNames.AwbResultValues.Skipped,
+            AwbCreationOutcome.RetryLater => MetricNames.AwbResultValues.RetryLater,
+            AwbCreationOutcome.GiveUp     => MetricNames.AwbResultValues.GiveUp,
+            _                             => "unknown",
+        };
+        FotoMetrics.AwbCreation.Add(1,
+            new TagList { { MetricNames.Labels.Result, result } });
+    }
+
+    private async Task<AwbCreationOutcome> CreateForOrderInternalAsync(
+        Guid orderId, int attempt, CancellationToken ct)
     {
         var order = await _db.Orders
             .Include(o => o.Items)

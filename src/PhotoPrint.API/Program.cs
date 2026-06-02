@@ -60,6 +60,19 @@ if (sentryEnabled)
     builder.Services.AddScoped<PhotoPrint.API.Middleware.SentryScopeEnricherMiddleware>();
 }
 
+// ── Observability (OTel traces + Prometheus metrics, intent 020 bolt 044) ────
+// Same two-stage flag posture: Observability:Enabled=false → nothing wired,
+// boot byte-identical to baseline. When on, exposes /metrics gated by an IP
+// allow-list (ADR-018) and pushes traces via OTLP (or stdout if no endpoint).
+builder.Services.AddObservability(builder.Configuration);
+
+var observabilityEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.ObservabilitySettings.SectionName)
+    .GetValue<bool>("Enabled");
+var metricsPath = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.ObservabilitySettings.SectionName)
+    .GetValue<string>("Metrics:PrometheusEndpoint") ?? "/metrics";
+
 // ── Database ─────────────────────────────────────────────────────────────────
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
@@ -385,6 +398,18 @@ app.UseAuthorization();
 // the middleware is a no-op when the SDK isn't initialized.
 if (sentryEnabled)
     app.UseSentryScopeEnricher();
+
+// ── /metrics endpoint (bolt 044) — gated by IP allow-list per ADR-018 ──────
+// Registered conditionally so the endpoint is absent (not just 403) when
+// Observability:Enabled=false. The allow-list middleware runs before the
+// Prometheus exporter; non-allowed IPs see 403 + empty body.
+if (observabilityEnabled)
+{
+    app.UseWhen(
+        ctx => ctx.Request.Path.StartsWithSegments(metricsPath, StringComparison.OrdinalIgnoreCase),
+        branch => branch.UseMiddleware<PhotoPrint.API.Middleware.MetricsEndpointIpAllowListMiddleware>());
+    app.UseOpenTelemetryPrometheusScrapingEndpoint(metricsPath);
+}
 
 // Synthetic-throw endpoint — exists only in the "Testing" environment for
 // SentryIntegrationTests. Never reachable in Development or Production.

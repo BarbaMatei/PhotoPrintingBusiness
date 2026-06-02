@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-02T17:20:00Z
-total_decisions: 16
+last_updated: 2026-06-03T02:00:00Z
+total_decisions: 18
 ---
 
 # Decision Index
@@ -17,6 +17,22 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-018: `/metrics` Uses IP Allow-List, Not JWT
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 044-tracing-and-metrics (tracing-and-metrics)
+- **Path**: `bolts/044-tracing-and-metrics/adr-018-metrics-endpoint-ip-allow-list-not-jwt.md`
+- **Summary**: `GET /metrics` deliberately deviates from the project's JWT-everywhere posture (intent 002). The endpoint is gated by `MetricsEndpointIpAllowListMiddleware` reading `Observability:Metrics:AllowedScrapeIps` (default `["127.0.0.1", "::1"]` for local dev; production override required). JWT is the wrong primitive for server-to-server scrape: tokens have to be issued, rotated, and revoked manually, and the failure mode (expired token → dashboards go dark) is silent. IP allow-list is the industry-standard pattern for Prometheus scrape and composes with network-layer controls (NetworkPolicy, security groups) for defence in depth.
+- **Read when**: adding any server-to-server endpoint without a user identity (push-gateways, internal admin APIs); reviewing PRs that touch `/metrics` or its middleware; tempted to add `[Authorize]` to `/metrics` "for consistency"; designing a NetworkPolicy / security group that bounds traffic to the API; debugging "why does the scraper get 403"; reasoning about defence-in-depth for the observability stack.
+
+### ADR-017: Deterministic Trace-ID Sampling, Not Random
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 044-tracing-and-metrics (tracing-and-metrics)
+- **Path**: `bolts/044-tracing-and-metrics/adr-017-deterministic-trace-id-sampling.md`
+- **Summary**: `RouteAwareSampler` derives its sampling decision from a deterministic hash of the trace_id (lower 63 bits normalised against `long.MaxValue`), not from `Random.NextDouble()`. The same trace_id + same rate always yields the same decision. Required so a single request's spans (HTTP server → EF queries → outbound Stripe/Sameday) are either all sampled or all dropped — never partial. Also gives cross-service trace consistency under W3C trace-context propagation, since downstream services using the same OTel-spec-recommended algorithm make the same decision. Random sampling produces frankenstein traces and is silently wrong.
+- **Read when**: implementing or modifying any sampler in `Observability/Sampling/`; reviewing PRs that touch the sampling path; debugging "why does this trace_id exist but its EF spans don't"; reasoning about cross-service trace completeness; tempted to use `Random.NextDouble` "for simplicity"; designing similar deterministic-by-id decisions in other domains (feature flag rollouts, A/B test bucketing).
 
 ### ADR-016: Compare-and-Swap via `ExecuteUpdateAsync` for Multi-Replica-Safe `Order.Status` Transitions
 - **Status**: accepted
