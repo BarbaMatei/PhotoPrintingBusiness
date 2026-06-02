@@ -3,15 +3,18 @@ id: 053-order-history-photos
 unit: 003-order-history-photos
 intent: 024-order-photo-archive
 type: simple-construction-bolt
-status: planned
+status: in-progress
 stories:
   - 001-order-photos-endpoint
   - 002-order-detail-photo-grid
 created: 2026-05-27T13:10:00Z
-started: null
+started: 2026-05-29T14:00:00Z
 completed: null
-current_stage: null
-stages_completed: []
+current_stage: implement
+stages_completed:
+  - name: plan
+    completed: 2026-05-29T14:10:00Z
+    artifact: implementation-plan.md
 
 requires_bolts: [051-order-photo-promotion]
 enables_bolts: []

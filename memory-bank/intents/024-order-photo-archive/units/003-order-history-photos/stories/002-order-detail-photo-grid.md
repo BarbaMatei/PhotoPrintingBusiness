@@ -2,11 +2,11 @@
 id: 002-order-detail-photo-grid
 unit: 003-order-history-photos
 intent: 024-order-photo-archive
-status: draft
+status: complete
 priority: must
 created: 2026-05-27T13:05:00Z
 assigned_bolt: 053-order-history-photos
-implemented: false
+implemented: true
 ---
 
 # Story: 002-order-detail-photo-grid
