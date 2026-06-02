@@ -62,4 +62,23 @@ public class OrdersController : ControllerBase
         var dto = await _orderService.GetOrderDetailAsync(id, userId.Value, ct);
         return Ok(dto);
     }
+
+    // ── GET /api/orders/{id}/photos (bolt 053) ────────────────────────────────
+
+    [HttpGet("{id:guid}/photos")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOrderPhotos(
+        Guid id,
+        CancellationToken ct = default)
+    {
+        var userId = User.GetUserIdOrNull();
+        if (userId is null)
+            return Unauthorized();
+
+        var dto = await _orderService.GetOrderPhotosAsync(id, userId.Value, ct);
+        return Ok(dto);
+    }
 }
