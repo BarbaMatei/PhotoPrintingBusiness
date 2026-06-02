@@ -144,6 +144,13 @@ var samedayEnabled = builder.Configuration
     .GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName)
     .GetValue<bool>("Enabled");
 
+// Default: no Sameday lifecycle automation. The webhook handlers depend on
+// IAwbCreationNotifier; the Null impl ensures the integration is invisible
+// when Sameday is off or only credentials are wired.
+builder.Services.AddSingleton<
+    PhotoPrint.API.Services.Sameday.IAwbCreationNotifier,
+    PhotoPrint.API.Services.Sameday.NullAwbCreationNotifier>();
+
 if (samedayEnabled)
 {
     builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.ISamedayTokenProvider, PhotoPrint.API.Services.Sameday.SamedayTokenProvider>();
@@ -163,6 +170,34 @@ if (samedayEnabled)
         .AddHttpMessageHandler<PhotoPrint.API.Services.Sameday.SamedayResilienceHandler>();
 
     builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.SamedayShippingService>();
+
+    // ── Bolt 037: AWB + tracking lifecycle jobs ───────────────────────────
+    // Orthogonal flag — credentials may be wired (Sameday:Enabled=true) without
+    // yet flipping the lifecycle on. See ADR-015/016.
+    var samedayJobsEnabled = builder.Configuration
+        .GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName + ":Jobs")
+        .GetValue<bool>("Enabled");
+
+    if (samedayJobsEnabled)
+    {
+        builder.Services.AddSingleton<
+            PhotoPrint.API.Services.Sameday.IAwbJobQueue,
+            PhotoPrint.API.Services.Sameday.AwbJobQueue>();
+        builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.AwbGiveUpRegistry>();
+        builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.TrackingStopRegistry>();
+        builder.Services.AddScoped<
+            PhotoPrint.API.Services.Sameday.IAwbCreator,
+            PhotoPrint.API.Services.Sameday.AwbCreator>();
+
+        // Override the default Null notifier with the real enqueuer.
+        builder.Services.AddSingleton<
+            PhotoPrint.API.Services.Sameday.IAwbCreationNotifier,
+            PhotoPrint.API.Services.Sameday.AwbCreationNotifier>();
+
+        builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.AwbDispatcher>();
+        builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.AwbRetryJob>();
+        builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.ShipmentTrackingJob>();
+    }
 }
 else
 {

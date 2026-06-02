@@ -1,29 +1,37 @@
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using Polly;
 
 namespace PhotoPrint.API.Services.Sameday;
 
 /// <summary>
-/// Wraps <see cref="HttpMessageHandler.SendAsync"/> in the Sameday retry
-/// resilience pipeline. The pipeline is built once per handler instance —
-/// <see cref="IHttpClientFactory"/> rebuilds the handler chain every
-/// <c>HandlerLifetime</c> (default 2 min), which is acceptable since retry
-/// state is per-call. 401 is explicitly outside this pipeline (ADR-014).
+/// Wraps <see cref="HttpMessageHandler.SendAsync"/> in the Sameday resilience
+/// pipeline (rate limit + retry). The pipeline is built once per handler
+/// instance — <see cref="IHttpClientFactory"/> rebuilds the handler chain
+/// every <c>HandlerLifetime</c> (default 2 min), which is acceptable since
+/// retry / rate-limit state is per-call. 401 is explicitly outside this
+/// pipeline (ADR-014).
+///
+/// <para>The rate-limit ceiling is taken from
+/// <c>Sameday:Jobs:MaxConcurrentSamedayCalls</c> when the bolt-037 jobs
+/// are enabled. When the jobs are off, the handler is still installed but
+/// the configured limit (default 5 req/s) still applies — it's safe to
+/// over-throttle a low-volume bolt-036-only flow.</para>
 /// </summary>
 public sealed class SamedayResilienceHandler : DelegatingHandler
 {
     private readonly ResiliencePipeline<HttpResponseMessage> _pipeline;
 
-    public SamedayResilienceHandler()
+    public SamedayResilienceHandler(IOptions<SamedaySettings> settings)
     {
-        _pipeline = SamedayPolicies.BuildRetryPipeline();
+        var limit = settings.Value.Jobs.MaxConcurrentSamedayCalls;
+        _pipeline = SamedayPolicies.BuildPipeline(limit > 0 ? limit : 5);
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        // ResiliencePipeline retries the lambda on transient failures only;
-        // 401 short-circuits to the SamedayAuthHandler one frame outside.
         return await _pipeline.ExecuteAsync(
             async ct => await base.SendAsync(request, ct),
             cancellationToken);

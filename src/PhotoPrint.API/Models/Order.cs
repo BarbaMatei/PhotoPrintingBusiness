@@ -62,6 +62,23 @@ public class Order
     public DateTimeOffset? UpdatedAt { get; set; }
     public DateTimeOffset? PaidAt { get; set; }
 
+    /// <summary>UTC timestamp set when the order is marked <c>Shipped</c> —
+    /// either by an admin action (<see cref="AdminOrderService"/>) or by a
+    /// future automation path. Anchors the bolt-037 tracking job's 30-day
+    /// polling window (<c>Sameday:Jobs:TrackingMaxAgeDays</c>); orders
+    /// older than the window are excluded from polling after a one-shot
+    /// warning. Manual <c>Delivered</c> transitions that skip <c>Shipped</c>
+    /// (legacy data) may have this null.</summary>
+    public DateTimeOffset? ShippedAt { get; set; }
+
+    /// <summary>UTC timestamp set by the bolt-037 tracking job when it observes
+    /// a Sameday <c>delivered</c> state and successfully CAS-transitions
+    /// <see cref="Status"/> from <c>Shipped</c> to <c>Delivered</c>. Invariant:
+    /// <c>DeliveredAt is not null ⇔ Status == Delivered</c> for orders that
+    /// reached delivery via the tracking job. Manual admin transitions to
+    /// <c>Delivered</c> may leave this null; consumers must tolerate that.</summary>
+    public DateTimeOffset? DeliveredAt { get; set; }
+
     // Navigation
     public User? User { get; set; }
     public EasyboxLocker? EasyboxLocker { get; set; }

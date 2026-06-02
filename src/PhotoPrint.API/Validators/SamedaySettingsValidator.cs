@@ -38,6 +38,24 @@ public sealed class SamedaySettingsValidator : IValidateOptions<SamedaySettings>
         if (options.RequestTimeoutSeconds is < 1 or > 60)
             failures.Add("Sameday:RequestTimeoutSeconds must be between 1 and 60.");
 
+        if (options.Jobs.Enabled)
+        {
+            if (options.Jobs.AwbRetryIntervalMinutes < 1)
+                failures.Add("Sameday:Jobs:AwbRetryIntervalMinutes must be >= 1.");
+            if (options.Jobs.AwbGiveUpHours < 1)
+                failures.Add("Sameday:Jobs:AwbGiveUpHours must be >= 1.");
+            if (options.Jobs.TrackingIntervalMinutes < 1)
+                failures.Add("Sameday:Jobs:TrackingIntervalMinutes must be >= 1.");
+            if (options.Jobs.TrackingMaxAgeDays < 1)
+                failures.Add("Sameday:Jobs:TrackingMaxAgeDays must be >= 1.");
+            if (options.Jobs.MaxConcurrentSamedayCalls is < 1 or > 50)
+                failures.Add("Sameday:Jobs:MaxConcurrentSamedayCalls must be between 1 and 50.");
+            if (options.Jobs.DispatchBackoffSeconds is null || options.Jobs.DispatchBackoffSeconds.Length == 0)
+                failures.Add("Sameday:Jobs:DispatchBackoffSeconds must contain at least one value.");
+            else if (options.Jobs.DispatchBackoffSeconds.Any(s => s < 1))
+                failures.Add("Sameday:Jobs:DispatchBackoffSeconds entries must each be >= 1.");
+        }
+
         return failures.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);
