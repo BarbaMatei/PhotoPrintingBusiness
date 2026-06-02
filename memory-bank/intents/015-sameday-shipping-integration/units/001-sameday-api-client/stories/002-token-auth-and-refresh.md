@@ -2,11 +2,11 @@
 id: 002-token-auth-and-refresh
 unit: 001-sameday-api-client
 intent: 015-sameday-shipping-integration
-status: draft
+status: complete
 priority: must
-created: 2026-05-25T10:10:00Z
+created: 2026-05-25T10:10:00.000Z
 assigned_bolt: 036-sameday-api-client
-implemented: false
+implemented: true
 ---
 
 # Story: 002-token-auth-and-refresh

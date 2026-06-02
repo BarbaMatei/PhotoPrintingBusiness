@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-05-29T12:30:00Z
-total_decisions: 12
+last_updated: 2026-06-02T10:20:00Z
+total_decisions: 14
 ---
 
 # Decision Index
@@ -17,6 +17,22 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-014: 401 Retry-Once Lives in `SamedayAuthHandler`, Not in Polly
+- **Status**: accepted
+- **Date**: 2026-06-02
+- **Bolt**: 036-sameday-api-client (sameday-api-client)
+- **Path**: `bolts/036-sameday-api-client/adr-014-401-retry-in-auth-handler-not-polly.md`
+- **Summary**: The Sameday HTTP pipeline keeps "session expiry" (401 → invalidate token → re-auth → retry once → `SamedayAuthException` on a second 401) in a dedicated `DelegatingHandler` *outside* Polly. Polly retains exclusive ownership of transient-failure retries (5xx / 408 / 429 / network) on its own budget. 401 is never in Polly's retryable status set. Trade-off: two retry layers to reason about, but each is independently testable, retry budgets don't collide, and Polly's exponential backoff doesn't waste a second on session refresh.
+- **Read when**: working on the Sameday HTTP pipeline or `SamedayAuthHandler`; debugging "why was this request retried N times"; tempted to fold 401 into Polly's retry list; adding a new outbound endpoint to `SamedayClient`; designing retry semantics for *another* upstream that has token-expiry behaviour.
+
+### ADR-013: In-Process Singleton Token Cache for the Sameday API
+- **Status**: accepted
+- **Date**: 2026-06-02
+- **Bolt**: 036-sameday-api-client (sameday-api-client)
+- **Path**: `bolts/036-sameday-api-client/adr-013-in-process-sameday-token-cache.md`
+- **Summary**: The Sameday bearer token is cached in-process on a singleton `SamedayTokenProvider`, gated by `SemaphoreSlim(1,1)` against thundering-herd, with a 60 s pre-expiry safety window. No Redis, no Postgres-backed token row. Mirrors ADR-010's "in-process now, durable later" stance for the photo-promotion queue. Cross-instance sharing is deferred to intent 021 (when Redis lands for other reasons). Each replica re-authenticates independently; cost is well within Sameday's rate budget.
+- **Read when**: working on `SamedayTokenProvider` or the Sameday auth flow; reviewing token caching during an outage post-mortem; planning horizontal scale-out *before* intent 021 lands Redis; tempted to persist the token in Postgres; rotating Sameday credentials and asking "do I need to restart all replicas?"
 
 ### ADR-012: Retention Anchor = `Order.PaidAt`
 - **Status**: accepted
