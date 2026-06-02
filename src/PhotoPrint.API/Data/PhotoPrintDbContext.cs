@@ -291,6 +291,10 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
 
+            // ── Sameday integration (bolt 036) ─────────────────────────────
+            entity.Property(o => o.AwbLabelUrl).HasMaxLength(500).IsRequired(false);
+            entity.Property(o => o.LastTrackingSyncAt).IsRequired(false);
+
             // ── Idempotency (bolt 035) ──────────────────────────────────────
             entity.Property(o => o.IdempotencyKey).HasMaxLength(80);
             entity.Property(o => o.StripeClientSecret).HasMaxLength(255);

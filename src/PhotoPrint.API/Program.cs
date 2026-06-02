@@ -101,7 +101,51 @@ builder.Services.AddPhotoArchive(builder.Configuration);
 builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.Services.CartService>();
 
 // ── Shipping ──────────────────────────────────────────────────────────────────
-builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.StaticShippingService>();
+// Sameday integration (intent 015, bolt 036). The flag is read once at boot:
+//   - Sameday:Enabled = false → StaticShippingService (today's behaviour, default).
+//   - Sameday:Enabled = true  → SamedayShippingService + typed HttpClient + auth
+//                                handler. Flipping back to false produces a
+//                                byte-identical fallback (intent goal).
+builder.Services.AddSingleton<TimeProvider>(_ => TimeProvider.System);
+
+builder.Services.Configure<PhotoPrint.API.Configuration.SamedaySettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.SamedaySettings>,
+    PhotoPrint.API.Validators.SamedaySettingsValidator>();
+builder.Services
+    .AddOptions<PhotoPrint.API.Configuration.SamedaySettings>()
+    .ValidateOnStart();
+
+var samedayEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName)
+    .GetValue<bool>("Enabled");
+
+if (samedayEnabled)
+{
+    builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.ISamedayTokenProvider, PhotoPrint.API.Services.Sameday.SamedayTokenProvider>();
+    builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.ISamedayAuthenticator>(sp =>
+        sp.GetRequiredService<PhotoPrint.API.Services.Sameday.ISamedayClient>());
+    builder.Services.AddTransient<PhotoPrint.API.Services.Sameday.SamedayAuthHandler>();
+    builder.Services.AddTransient<PhotoPrint.API.Services.Sameday.SamedayResilienceHandler>();
+
+    builder.Services
+        .AddHttpClient<PhotoPrint.API.Services.Sameday.ISamedayClient, PhotoPrint.API.Services.Sameday.SamedayClient>((sp, http) =>
+        {
+            var s = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.SamedaySettings>>().Value;
+            http.BaseAddress = new Uri(s.BaseUrl);
+            http.Timeout     = TimeSpan.FromSeconds(s.RequestTimeoutSeconds);
+        })
+        .AddHttpMessageHandler<PhotoPrint.API.Services.Sameday.SamedayAuthHandler>()
+        .AddHttpMessageHandler<PhotoPrint.API.Services.Sameday.SamedayResilienceHandler>();
+
+    builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.SamedayShippingService>();
+}
+else
+{
+    builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.StaticShippingService>();
+}
+
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderNumberService, PhotoPrint.API.Services.OrderNumberService>();
 
 // ── Payments ──────────────────────────────────────────────────────────────────

@@ -24,6 +24,17 @@ public class Order
     public string? AwbNumber { get; set; }
     public string? TrackingUrl { get; set; }
 
+    /// <summary>URL to the Sameday-hosted PDF shipping label, populated alongside
+    /// <see cref="AwbNumber"/> when the AWB workflow (bolt 037) successfully creates
+    /// the AWB. Nullable: existing orders + orders whose AWB creation has not yet
+    /// succeeded have no label URL.</summary>
+    public string? AwbLabelUrl { get; set; }
+
+    /// <summary>UTC timestamp of the most recent successful tracking poll against
+    /// Sameday for <see cref="AwbNumber"/>. Updated by the tracking job (bolt 037)
+    /// on every successful poll; nullable until the first successful poll.</summary>
+    public DateTimeOffset? LastTrackingSyncAt { get; set; }
+
     // ── Idempotency (bolt 035) ───────────────────────────────────────────────
     /// <summary>Client-supplied Idempotency-Key bound to this order. Set once at
     /// creation, never modified — except nulled when a stale (&gt;24h) row's key is
