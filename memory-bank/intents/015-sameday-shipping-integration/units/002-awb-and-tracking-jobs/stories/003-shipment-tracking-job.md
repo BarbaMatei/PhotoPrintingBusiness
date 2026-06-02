@@ -2,11 +2,11 @@
 id: 003-shipment-tracking-job
 unit: 002-awb-and-tracking-jobs
 intent: 015-sameday-shipping-integration
-status: draft
+status: complete
 priority: should
-created: 2026-05-25T10:10:00Z
+created: 2026-05-25T10:10:00.000Z
 assigned_bolt: 037-awb-and-tracking-jobs
-implemented: false
+implemented: true
 ---
 
 # Story: 003-shipment-tracking-job
