@@ -20,4 +20,26 @@ public sealed class SamedaySettings
     public string Password              { get; set; } = string.Empty;
     public string PickupPointId         { get; set; } = string.Empty;
     public int    RequestTimeoutSeconds { get; set; } = 10;
+
+    /// <summary>Lifecycle jobs (bolt 037). Orthogonal to <see cref="Enabled"/>: a
+    /// deployment can wire credentials and validate them through the typed client
+    /// without yet flipping the AWB / tracking workflows on.</summary>
+    public SamedayJobsSettings Jobs { get; set; } = new();
+}
+
+/// <summary>
+/// Settings for the AWB creation + tracking background jobs (bolt 037).
+/// Gated separately from <see cref="SamedaySettings.Enabled"/> so a deployment
+/// can run "credentials wired but no lifecycle automation yet" as a deliberate
+/// rollout step.
+/// </summary>
+public sealed class SamedayJobsSettings
+{
+    public bool   Enabled                       { get; set; } = false;
+    public int    AwbRetryIntervalMinutes       { get; set; } = 60;
+    public int    AwbGiveUpHours                { get; set; } = 24;
+    public int    TrackingIntervalMinutes       { get; set; } = 15;
+    public int    TrackingMaxAgeDays            { get; set; } = 30;
+    public int    MaxConcurrentSamedayCalls     { get; set; } = 5;
+    public int[]  DispatchBackoffSeconds        { get; set; } = [30, 120, 300, 900, 3600];
 }

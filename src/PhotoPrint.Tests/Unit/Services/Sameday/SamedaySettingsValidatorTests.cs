@@ -108,6 +108,94 @@ public class SamedaySettingsValidatorTests
         result.Failures.Should().HaveCount(3);
     }
 
+    // ── Bolt-037 Jobs validation ─────────────────────────────────────────────
+
+    [Fact]
+    public void Jobs_disabled_skips_every_Jobs_rule_even_when_settings_are_garbage()
+    {
+        var s = ValidEnabled();
+        s.Jobs = new SamedayJobsSettings
+        {
+            Enabled = false,
+            AwbRetryIntervalMinutes = 0,
+            AwbGiveUpHours = 0,
+            TrackingIntervalMinutes = 0,
+            TrackingMaxAgeDays = 0,
+            MaxConcurrentSamedayCalls = 0,
+            DispatchBackoffSeconds = [],
+        };
+
+        var result = _sut.Validate(name: null, s);
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Jobs_enabled_with_zero_retry_interval_fails()
+    {
+        var s = ValidEnabled();
+        s.Jobs.Enabled = true;
+        s.Jobs.AwbRetryIntervalMinutes = 0;
+
+        var result = _sut.Validate(name: null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("AwbRetryIntervalMinutes"));
+    }
+
+    [Fact]
+    public void Jobs_enabled_with_max_concurrent_above_50_fails()
+    {
+        var s = ValidEnabled();
+        s.Jobs.Enabled = true;
+        s.Jobs.MaxConcurrentSamedayCalls = 51;
+
+        var result = _sut.Validate(name: null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("MaxConcurrentSamedayCalls"));
+    }
+
+    [Fact]
+    public void Jobs_enabled_with_empty_backoff_array_fails()
+    {
+        var s = ValidEnabled();
+        s.Jobs.Enabled = true;
+        s.Jobs.DispatchBackoffSeconds = [];
+
+        var result = _sut.Validate(name: null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("DispatchBackoffSeconds"));
+    }
+
+    [Fact]
+    public void Jobs_enabled_with_negative_backoff_entry_fails()
+    {
+        var s = ValidEnabled();
+        s.Jobs.Enabled = true;
+        s.Jobs.DispatchBackoffSeconds = [30, -1, 300];
+
+        var result = _sut.Validate(name: null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("DispatchBackoffSeconds"));
+    }
+
+    [Fact]
+    public void Jobs_enabled_with_full_valid_settings_is_valid()
+    {
+        var s = ValidEnabled();
+        s.Jobs = new SamedayJobsSettings
+        {
+            Enabled = true,
+            AwbRetryIntervalMinutes = 60,
+            AwbGiveUpHours = 24,
+            TrackingIntervalMinutes = 15,
+            TrackingMaxAgeDays = 30,
+            MaxConcurrentSamedayCalls = 5,
+            DispatchBackoffSeconds = [30, 120, 300, 900, 3600],
+        };
+
+        var result = _sut.Validate(name: null, s);
+        result.Succeeded.Should().BeTrue();
+    }
+
     [Fact]
     public void Disabled_with_blanks_skips_all_rules()
     {

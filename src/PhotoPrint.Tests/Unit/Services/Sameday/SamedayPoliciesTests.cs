@@ -1,5 +1,7 @@
 using System.Net;
 using FluentAssertions;
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
@@ -21,7 +23,15 @@ public class SamedayPoliciesTests
         params Func<HttpRequestMessage, HttpResponseMessage>[] responses)
     {
         var script = new ScriptedHttpMessageHandler(responses);
-        var resilience = new SamedayResilienceHandler { InnerHandler = script };
+        // Bolt 036 contract: tests exercise retry semantics without the bolt-037
+        // rate-limit interfering. SamedayResilienceHandler reads
+        // MaxConcurrentSamedayCalls; the special sentinel int.MaxValue disables
+        // the limiter via SamedayPolicies.BuildRetryPipeline.
+        var settings = Options.Create(new SamedaySettings
+        {
+            Jobs = new SamedayJobsSettings { MaxConcurrentSamedayCalls = int.MaxValue },
+        });
+        var resilience = new SamedayResilienceHandler(settings) { InnerHandler = script };
         var client = new HttpClient(resilience)
         {
             BaseAddress = new Uri("https://sameday-test/"),

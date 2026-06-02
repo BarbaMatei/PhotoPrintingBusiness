@@ -111,6 +111,12 @@ public class AdminOrderService : IAdminOrderService
         {
             order.AwbNumber = awbNumber;
             order.TrackingUrl = trackingUrl;
+            order.ShippedAt = DateTimeOffset.UtcNow;
+        }
+        else if (newStatus == OrderStatus.Delivered && order.DeliveredAt is null)
+        {
+            // Admin-initiated Delivered (legacy or manual override path).
+            order.DeliveredAt = DateTimeOffset.UtcNow;
         }
 
         await _db.SaveChangesAsync(ct);

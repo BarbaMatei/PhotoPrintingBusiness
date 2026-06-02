@@ -90,14 +90,183 @@ public sealed class SamedayClient : ISamedayClient
         return new SamedayToken(payload.Token, payload.ExpireAtUtc.Value);
     }
 
-    public Task<AwbCreationResult> CreateAwbAsync(AwbCreationRequest request, CancellationToken ct = default)
-        => throw new NotImplementedException("Implemented in bolt 037-awb-and-tracking-jobs.");
+    public async Task<AwbCreationResult> CreateAwbAsync(AwbCreationRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
 
-    public Task<Stream> GetLabelPdfAsync(string awbNumber, CancellationToken ct = default)
-        => throw new NotImplementedException("Implemented in bolt 037-awb-and-tracking-jobs.");
+        var body = new SamedayWireDtos.AwbCreateRequest
+        {
+            PickupPoint    = request.PickupPointId,
+            AwbPayment     = 1,
+            PackageWeight  = request.ParcelWeightKg,
+            CashOnDelivery = request.CodAmountRon,
+            Observation    = request.Observations,
+            ClientInternalReference = request.PickupPointId, // vendor uses this as our idempotency key (ADR-015)
+            AwbRecipient   = new SamedayWireDtos.AwbRecipient
+            {
+                Name        = request.RecipientName,
+                PhoneNumber = request.RecipientPhone,
+                Address     = request.RecipientAddress,
+                City        = request.RecipientCity,
+                County      = request.RecipientCounty,
+                PostalCode  = request.RecipientPostalCode,
+            },
+            Parcels = Enumerable.Range(0, request.ParcelCount)
+                .Select(_ => new SamedayWireDtos.AwbParcel { Weight = request.ParcelWeightKg })
+                .ToList(),
+        };
 
-    public Task<TrackingSnapshot> GetTrackingAsync(string awbNumber, CancellationToken ct = default)
-        => throw new NotImplementedException("Implemented in bolt 037-awb-and-tracking-jobs.");
+        var endpoint = "/api/awb";
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = JsonContent.Create(body),
+        };
+
+        HttpResponseMessage response;
+        try { response = await _http.SendAsync(httpRequest, ct); }
+        catch (HttpRequestException ex) { throw new SamedayUnreachableException(endpoint, inner: ex); }
+
+        using var _ = response;
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            throw new SamedayAuthException(endpoint);
+
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+            throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var rawBody = await SafeReadAsync(response, ct);
+            throw new SamedayValidationException(endpoint, (int)response.StatusCode, rawBody);
+        }
+
+        SamedayWireDtos.AwbCreateResponse? payload;
+        try { payload = await response.Content.ReadFromJsonAsync<SamedayWireDtos.AwbCreateResponse>(JsonOptions, ct); }
+        catch (JsonException ex) { throw new SamedayProtocolException(endpoint, "response body was not valid JSON", ex); }
+
+        if (payload is null
+            || string.IsNullOrWhiteSpace(payload.AwbNumber)
+            || string.IsNullOrWhiteSpace(payload.PdfLink))
+        {
+            throw new SamedayProtocolException(
+                endpoint, "response was missing 'awbNumber' or 'pdfLink'");
+        }
+
+        return new AwbCreationResult(payload.AwbNumber, payload.PdfLink, payload.AwbCost);
+    }
+
+    public async Task<Stream> GetLabelPdfAsync(string awbNumber, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(awbNumber))
+            throw new ArgumentException("awbNumber is required.", nameof(awbNumber));
+
+        var endpoint = $"/api/awb/{Uri.EscapeDataString(awbNumber)}/label";
+
+        HttpResponseMessage response;
+        try { response = await _http.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead, ct); }
+        catch (HttpRequestException ex) { throw new SamedayUnreachableException(endpoint, inner: ex); }
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            response.Dispose();
+            throw new SamedayAuthException(endpoint);
+        }
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+        {
+            var status = (int)response.StatusCode;
+            response.Dispose();
+            throw new SamedayUnreachableException(endpoint, httpStatus: status);
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            var status = (int)response.StatusCode;
+            var rawBody = await SafeReadAsync(response, ct);
+            response.Dispose();
+            throw new SamedayValidationException(endpoint, status, rawBody);
+        }
+
+        // Caller owns the stream + the response disposal.
+        return await response.Content.ReadAsStreamAsync(ct);
+    }
+
+    public async Task<TrackingSnapshot> GetTrackingAsync(string awbNumber, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(awbNumber))
+            throw new ArgumentException("awbNumber is required.", nameof(awbNumber));
+
+        var endpoint = $"/api/awb/{Uri.EscapeDataString(awbNumber)}/tracking";
+
+        HttpResponseMessage response;
+        try { response = await _http.GetAsync(endpoint, ct); }
+        catch (HttpRequestException ex) { throw new SamedayUnreachableException(endpoint, inner: ex); }
+
+        using var _ = response;
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            throw new SamedayAuthException(endpoint);
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+            throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
+        if (!response.IsSuccessStatusCode)
+        {
+            var rawBody = await SafeReadAsync(response, ct);
+            throw new SamedayValidationException(endpoint, (int)response.StatusCode, rawBody);
+        }
+
+        SamedayWireDtos.TrackingResponse? payload;
+        try { payload = await response.Content.ReadFromJsonAsync<SamedayWireDtos.TrackingResponse>(JsonOptions, ct); }
+        catch (JsonException ex) { throw new SamedayProtocolException(endpoint, "response body was not valid JSON", ex); }
+
+        if (payload is null || string.IsNullOrWhiteSpace(payload.Status))
+            throw new SamedayProtocolException(endpoint, "response was missing 'status'");
+
+        var state = MapTrackingState(payload.Status);
+
+        var observedAt = payload.ObservedAt
+            ?? payload.DeliveredAt
+            ?? DateTimeOffset.UtcNow;
+
+        var history = (payload.History ?? Array.Empty<SamedayWireDtos.TrackingHistoryEntry>())
+            .Select(h => new TrackingEvent(
+                State: MapTrackingState(h.Status ?? string.Empty),
+                Description: h.Description ?? string.Empty,
+                OccurredAt: h.OccurredAt ?? observedAt))
+            .ToList();
+
+        return new TrackingSnapshot(awbNumber, state, observedAt, history);
+    }
+
+    /// <summary>
+    /// Vendor status code → normalised <see cref="TrackingState"/>. The
+    /// anti-corruption boundary for Sameday's wire vocabulary; every
+    /// downstream consumer thinks in <see cref="TrackingState"/>, not the
+    /// vendor codes.
+    /// </summary>
+    private static TrackingState MapTrackingState(string vendorCode)
+    {
+        return vendorCode.Trim().ToLowerInvariant() switch
+        {
+            "awb-issued"     or "pickup-pending"
+                => TrackingState.Pending,
+
+            "picked-up"      or "in-transit"
+            or "arrived-at-sortation" or "out-for-pickup"
+                => TrackingState.InTransit,
+
+            "out-for-delivery" or "at-locker"
+                => TrackingState.OutForDelivery,
+
+            "delivered" or "delivered-to-locker-with-pickup"
+                => TrackingState.Delivered,
+
+            "failed-delivery" or "returned-to-sender" or "lost"
+                => TrackingState.Failed,
+
+            "cancelled"
+                => TrackingState.Cancelled,
+
+            _ => TrackingState.Unknown,
+        };
+    }
 
     private static async Task<string?> SafeReadAsync(HttpResponseMessage response, CancellationToken ct)
     {

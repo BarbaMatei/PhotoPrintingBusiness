@@ -163,30 +163,59 @@ public class SamedayClientTests
         await act.Should().ThrowAsync<SamedayUnreachableException>();
     }
 
-    // ── Bolt-037 stubs ────────────────────────────────────────────────────────
+    // ── Bolt-037: CreateAwbAsync / GetLabelPdfAsync / GetTrackingAsync ───────
+    // The bolt-036 NotImplementedException stubs are replaced; full coverage
+    // of the AWB + tracking surfaces lives in SamedayClientAwbTests and
+    // SamedayClientTrackingTests. The three tests below are smoke checks
+    // that the methods are wired and exercise the happy path.
 
     [Fact]
-    public async Task CreateAwbAsync_throws_NotImplemented_in_bolt_036()
+    public async Task CreateAwbAsync_returns_AwbCreationResult_on_200()
     {
-        var sut = Build(new ScriptedHttpMessageHandler());
-        var act = () => sut.CreateAwbAsync(new AwbCreationRequest(
+        var script = new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(
+                HttpStatusCode.OK,
+                "{\"awbNumber\":\"RO12345678\",\"awbCost\":18.50,\"pdfLink\":\"https://sameday.cdn/labels/abc.pdf\"}"));
+
+        var sut = Build(script);
+        var result = await sut.CreateAwbAsync(new AwbCreationRequest(
             "1", "name", "phone", "addr", "city", "county", "00000", 0.1m, 1, 0m, null));
-        await act.Should().ThrowAsync<NotImplementedException>();
+
+        result.AwbNumber.Should().Be("RO12345678");
+        result.LabelUrl.Should().Be("https://sameday.cdn/labels/abc.pdf");
+        result.CalculatedPrice.Should().Be(18.50m);
     }
 
     [Fact]
-    public async Task GetLabelPdfAsync_throws_NotImplemented_in_bolt_036()
+    public async Task GetLabelPdfAsync_returns_response_body_stream_on_200()
     {
-        var sut = Build(new ScriptedHttpMessageHandler());
-        var act = () => sut.GetLabelPdfAsync("RO123");
-        await act.Should().ThrowAsync<NotImplementedException>();
+        var pdfBytes = new byte[] { 0x25, 0x50, 0x44, 0x46 }; // "%PDF"
+        var script = new ScriptedHttpMessageHandler(
+            _ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(pdfBytes),
+            });
+
+        var sut = Build(script);
+        await using var stream = await sut.GetLabelPdfAsync("RO123");
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+        ms.ToArray().Should().Equal(pdfBytes);
     }
 
     [Fact]
-    public async Task GetTrackingAsync_throws_NotImplemented_in_bolt_036()
+    public async Task GetTrackingAsync_returns_normalised_state_for_delivered_vendor_code()
     {
-        var sut = Build(new ScriptedHttpMessageHandler());
-        var act = () => sut.GetTrackingAsync("RO123");
-        await act.Should().ThrowAsync<NotImplementedException>();
+        var script = new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(
+                HttpStatusCode.OK,
+                "{\"awbNumber\":\"RO123\",\"status\":\"delivered\",\"observedAt\":\"2026-06-02T10:00:00Z\",\"history\":[]}"));
+
+        var sut = Build(script);
+        var snapshot = await sut.GetTrackingAsync("RO123");
+
+        snapshot.AwbNumber.Should().Be("RO123");
+        snapshot.State.Should().Be(TrackingState.Delivered);
+        snapshot.ObservedAt.Should().Be(new DateTimeOffset(2026, 6, 2, 10, 0, 0, TimeSpan.Zero));
     }
 }
