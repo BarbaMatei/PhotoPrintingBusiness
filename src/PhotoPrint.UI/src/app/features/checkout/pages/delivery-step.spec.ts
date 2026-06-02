@@ -38,6 +38,8 @@ describe('DeliveryStep', () => {
   function flushShippingCosts() {
     http.expectOne(`${BASE}/cost?type=Easybox`).flush({ costRon: 20 });
     http.expectOne(`${BASE}/cost?type=Courier`).flush({ costRon: 25 });
+    // The component primes the map with all active lockers on init.
+    http.expectOne(`${BASE}/lockers?city=`).flush([]);
   }
 
   it('renders two delivery option cards', () => {
@@ -134,6 +136,47 @@ describe('DeliveryStep', () => {
     await new Promise(r => setTimeout(r, 350)); // after 300ms debounce
     const req = http.expectOne(`${BASE}/lockers?city=Clu`);
     req.flush([]);
+  });
+
+  it('loads all lockers on init so the map shows pins before the user types a city', () => {
+    const fixture = TestBed.createComponent(DeliveryStep);
+    fixture.detectChanges();
+
+    // The two cost calls and the initial lockers call all fire during ngOnInit.
+    http.expectOne(`${BASE}/cost?type=Easybox`).flush({ costRon: 20 });
+    http.expectOne(`${BASE}/cost?type=Courier`).flush({ costRon: 25 });
+    http.expectOne(`${BASE}/lockers?city=`).flush([
+      { id: 'l1', samedayId: 'SD1', name: 'Box Cluj',    address: 'Str 1',  city: 'Cluj-Napoca', lat: 46.7, lng: 23.6 },
+      { id: 'l2', samedayId: 'SD2', name: 'Box București', address: 'Str 2', city: 'București',   lat: 44.4, lng: 26.0 },
+    ]);
+
+    expect(fixture.componentInstance.lockers().length).toBe(2);
+  });
+
+  it('clearing the city search restores the full locker list', async () => {
+    const fixture = createFixture();
+    flushShippingCosts();
+    fixture.detectChanges();
+
+    fixture.componentInstance.selectMethod('Easybox');
+    fixture.detectChanges();
+
+    // Filter narrows to one match.
+    fixture.componentInstance.citySearch.setValue('Clu');
+    await new Promise(r => setTimeout(r, 350));
+    http.expectOne(`${BASE}/lockers?city=Clu`).flush([
+      { id: 'l1', samedayId: 'SD1', name: 'Box Cluj', address: 'Str 1', city: 'Cluj-Napoca', lat: 46.7, lng: 23.6 },
+    ]);
+    expect(fixture.componentInstance.lockers().length).toBe(1);
+
+    // Clearing the search re-fetches the unfiltered list.
+    fixture.componentInstance.citySearch.setValue('');
+    await new Promise(r => setTimeout(r, 350));
+    http.expectOne(`${BASE}/lockers?city=`).flush([
+      { id: 'l1', samedayId: 'SD1', name: 'Box Cluj',    address: 'Str 1',  city: 'Cluj-Napoca', lat: 46.7, lng: 23.6 },
+      { id: 'l2', samedayId: 'SD2', name: 'Box București', address: 'Str 2', city: 'București',   lat: 44.4, lng: 26.0 },
+    ]);
+    expect(fixture.componentInstance.lockers().length).toBe(2);
   });
 
   it('selectLocker updates CheckoutStateService', () => {

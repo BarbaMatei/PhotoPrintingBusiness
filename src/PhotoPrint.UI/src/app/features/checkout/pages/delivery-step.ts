@@ -311,11 +311,17 @@ export class DeliveryStep implements OnInit {
     this.shippingService.getShippingCost('Easybox').subscribe(r => this.easyboxCostRon.set(r.costRon));
     this.shippingService.getShippingCost('Courier').subscribe(r => this.courierCostRon.set(r.costRon));
 
+    // Prime the locker map with every active locker so the user sees pins
+    // immediately on arriving at the Easybox step. The city-search switchMap
+    // below replaces this list when they start filtering.
+    this.shippingService.getLockers('').subscribe(r => this.lockers.set(r));
+
     // Restore address form if previously saved
     const saved = this.checkoutState.snapshot.shippingAddress;
     if (saved) this.addressForm.patchValue(saved);
 
-    // City search with debounce
+    // City search with debounce. An empty / sub-2-char query falls back to
+    // the full list (re-fetched so a stale filter never persists).
     this.citySearch.valueChanges
       .pipe(
         debounceTime(300),
@@ -323,7 +329,7 @@ export class DeliveryStep implements OnInit {
         switchMap(city =>
           city && city.trim().length >= 2
             ? this.shippingService.getLockers(city.trim())
-            : [[]],
+            : this.shippingService.getLockers(''),
         ),
       )
       .subscribe(results => this.lockers.set(results));
