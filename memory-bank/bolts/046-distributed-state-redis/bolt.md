@@ -4,6 +4,7 @@ unit: 001-redis-backplane
 intent: 021-distributed-state-redis
 type: ddd-construction-bolt
 status: planned
+priority: could
 stories:
   - 001-signalr-redis-backplane
   - 002-two-level-cache
@@ -28,6 +29,26 @@ complexity:
 ---
 
 # Bolt: 046-distributed-state-redis
+
+> ## ⏸ Deprioritized (decision 2026-06-03)
+>
+> This bolt is scaling infrastructure. It only pays off when the API runs
+> on more than one server. As of 2026-06-03 the application is **not yet
+> deployed** and current/foreseeable traffic fits comfortably on a single
+> server (well under 1 req/s sustained per the SLOs in bolt 045).
+>
+> **Do not start this bolt** until at least one of these is true:
+>
+> 1. The app is in production AND a real scaling pressure exists
+>    (sustained latency from a single-server bottleneck, a marketing
+>    push expected to multiply traffic, etc.).
+> 2. A zero-downtime-deploy requirement is on the roadmap (you can't do
+>    zero-downtime deploys with one server).
+> 3. A multi-region availability requirement appears.
+>
+> Until then, ADRs 010 / 013 / 015 explicitly accept the single-server
+> trade-offs they describe — those decisions remain correct and don't
+> need revisiting.
 
 ## Overview
 

@@ -3,7 +3,7 @@ id: 001-signalr-redis-backplane
 unit: 001-redis-backplane
 intent: 021-distributed-state-redis
 status: draft
-priority: must
+priority: could
 created: 2026-05-25T10:40:00Z
 assigned_bolt: 046-distributed-state-redis
 implemented: false
