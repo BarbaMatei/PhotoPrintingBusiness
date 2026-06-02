@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-02T10:20:00Z
-total_decisions: 14
+last_updated: 2026-06-02T17:20:00Z
+total_decisions: 16
 ---
 
 # Decision Index
@@ -17,6 +17,22 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-016: Compare-and-Swap via `ExecuteUpdateAsync` for Multi-Replica-Safe `Order.Status` Transitions
+- **Status**: accepted
+- **Date**: 2026-06-02
+- **Bolt**: 037-awb-and-tracking-jobs (awb-and-tracking-jobs)
+- **Path**: `bolts/037-awb-and-tracking-jobs/adr-016-cas-execute-update-for-multi-replica-status-transitions.md`
+- **Summary**: Background workers that transition `Order.Status` use EF 8's `ExecuteUpdateAsync` with a `WHERE` clause that pins the expected source state — a database-native compare-and-swap. The affected-row count is the success signal: `affected == 0` is a legitimate, expected outcome (race lost; another replica or admin already moved the row) logged at Info level. No new column (no `RowVersion`), no transactions wrapping the outbound HTTP call, no Redis. Generalises beyond bolt 037: any future job that mutates a status column should adopt the same shape.
+- **Read when**: writing any `BackgroundService` that mutates `Order.Status`; reviewing PRs that add `ExecuteUpdateAsync` calls on `Orders`; designing concurrency for an aggregate with an enum-style status column; debugging "did the wrong replica win this race?"; reasoning about whether to introduce a `RowVersion` column (don't, unless the *value* semantics — not just the transition — need protecting).
+
+### ADR-015: Accept Duplicate `CreateAwb` Calls on Multi-Replica (Rely on Vendor Idempotency + DB Re-Check)
+- **Status**: accepted
+- **Date**: 2026-06-02
+- **Bolt**: 037-awb-and-tracking-jobs (awb-and-tracking-jobs)
+- **Path**: `bolts/037-awb-and-tracking-jobs/adr-015-accept-duplicate-awb-create-on-multi-replica.md`
+- **Summary**: `AwbRetryJob` running on multiple replicas will enqueue (and dispatch) the same order ID more than once. Rather than introduce leader election / Redis locks before bolt 046, we accept duplicate `POST /api/awb` calls. Correctness rests on two load-bearing properties: (a) Sameday's `awbPayment` external reference makes the second call idempotent on the vendor side, and (b) `IAwbCreator.CreateForOrderAsync` re-checks `Status == Paid AND AwbNumber IS NULL` before persisting. A future PR that breaks either property silently breaks correctness — this ADR makes the dependency loud.
+- **Read when**: working on `AwbRetryJob`, `AwbDispatcher`, or `IAwbCreator`; modifying the `AwbNumber` write path; refactoring or removing the `Status == Paid AND AwbNumber IS NULL` re-check (don't — it's the load-bearing half); reasoning about scale-out before bolt 046's Redis introduction; vendor behaviour drift post-mortem; debugging "why are there two `sameday.awb.created` logs for the same order id?"; designing similar acceptance-of-duplication trade-offs for other vendor integrations.
 
 ### ADR-014: 401 Retry-Once Lives in `SamedayAuthHandler`, Not in Polly
 - **Status**: accepted

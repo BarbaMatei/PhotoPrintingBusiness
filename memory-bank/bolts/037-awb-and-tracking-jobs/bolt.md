@@ -3,22 +3,36 @@ id: 037-awb-and-tracking-jobs
 unit: 002-awb-and-tracking-jobs
 intent: 015-sameday-shipping-integration
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories:
   - 001-awb-creation-on-paid
   - 002-awb-retry-job
   - 003-shipment-tracking-job
-created: 2026-05-25T10:10:00Z
-started: null
-completed: null
+created: 2026-05-25T10:10:00.000Z
+started: 2026-06-02T16:00:00.000Z
+completed: "2026-06-02T19:28:01Z"
 current_stage: null
-stages_completed: []
-
-requires_bolts: [036-sameday-api-client]
+stages_completed:
+  - name: domain-model
+    completed: 2026-06-02T16:30:00.000Z
+    artifact: ddd-01-domain-model.md
+  - name: technical-design
+    completed: 2026-06-02T17:00:00.000Z
+    artifact: ddd-02-technical-design.md
+  - name: adr-analysis
+    completed: 2026-06-02T17:20:00.000Z
+    artifact: adr-015-accept-duplicate-awb-create-on-multi-replica.md, adr-016-cas-execute-update-for-multi-replica-status-transitions.md
+  - name: implement
+    completed: 2026-06-02T19:00:00.000Z
+    artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-06-02T20:00:00.000Z
+    artifact: ddd-03-test-report.md
+requires_bolts:
+  - 036-sameday-api-client
 enables_bolts: []
 requires_units: []
 blocks: false
-
 complexity:
   avg_complexity: 3
   avg_uncertainty: 3
