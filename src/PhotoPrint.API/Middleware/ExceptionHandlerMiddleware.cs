@@ -86,6 +86,16 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 context.Request.Path,
                 correlationId);
 
+            // Sentry integration (intent 020 bolt 045): unhandled exceptions are
+            // captured explicitly because Serilog replaces other logging providers
+            // (intent 001) which would otherwise short-circuit Sentry's automatic
+            // capture via MEL. We resolve IHub from per-request DI (rather than
+            // the static SentrySdk) so each WebApplicationFactory in tests uses
+            // its own hub — the static hub is process-global and shared across
+            // factories.
+            var hub = context.RequestServices.GetService<Sentry.IHub>();
+            hub?.CaptureException(exception);
+
             var detail = _environment.IsDevelopment()
                 ? exception.Message
                 : "A apărut o eroare neașteptată. Încearcă din nou.";
