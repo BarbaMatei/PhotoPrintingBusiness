@@ -17,7 +17,22 @@ public class LocalStorageService : IStorageService
     {
         _basePath = settings.Value.BasePath;
         _logger = logger;
-        Directory.CreateDirectory(_basePath);
+        // Eager directory creation surfaces misconfig at boot. Tolerate failures here —
+        // tests that resolve this service transitively (via IStorageRouter from a hosted
+        // service) but never actually write would otherwise crash on factories that don't
+        // override BasePath. SaveAsync re-creates the directory tree per-file, so a real
+        // production misconfig still surfaces — just on first upload rather than at boot.
+        try
+        {
+            Directory.CreateDirectory(_basePath);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            _logger.LogWarning(ex,
+                "LocalStorageService: could not pre-create BasePath {BasePath} at boot. " +
+                "SaveAsync will retry per-file. Verify the deployment user has write access " +
+                "if uploads should land here.", _basePath);
+        }
     }
 
     public bool SupportsPresignedUrls => false;
