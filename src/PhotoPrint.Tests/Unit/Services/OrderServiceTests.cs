@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.DTOs.Shipping;
@@ -14,6 +16,7 @@ public class OrderServiceTests : IDisposable
     private readonly PhotoPrintDbContext _db;
     private readonly Mock<IOrderNumberService> _orderNumberServiceMock;
     private readonly Mock<IShippingService> _shippingMock;
+    private readonly Mock<IStorageRouter> _storageRouterMock;
     private readonly OrderService _service;
 
     public OrderServiceTests()
@@ -33,7 +36,18 @@ public class OrderServiceTests : IDisposable
             .Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
 
-        _service = new OrderService(_db, _orderNumberServiceMock.Object, _shippingMock.Object);
+        // Bolt 053: OrderService now depends on storage for the photos endpoint. Default
+        // to cloud-tier-off so existing tests don't accidentally exercise the new path;
+        // bolt-053 photos tests construct their own SUT with cloud enabled.
+        _storageRouterMock = new Mock<IStorageRouter>();
+        _storageRouterMock.SetupGet(r => r.CloudEnabled).Returns(false);
+
+        _service = new OrderService(
+            _db,
+            _orderNumberServiceMock.Object,
+            _shippingMock.Object,
+            _storageRouterMock.Object,
+            Options.Create(new StorageSettings()));
     }
 
     public void Dispose() => _db.Dispose();
@@ -431,5 +445,195 @@ public class OrderServiceTests : IDisposable
     {
         var result = await _service.GetByIdAsync(Guid.NewGuid());
         Assert.Null(result);
+    }
+
+    // ── Bolt 053: GetOrderPhotosAsync ────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a separate OrderService SUT with the cloud tier ENABLED — the default
+    /// _service field in this fixture has cloud off (so legacy tests don't touch the new
+    /// path). The mocked Cloud adapter returns a deterministic URL per (key, ttl).
+    /// </summary>
+    private (OrderService Sut, Mock<IStorageService> CloudMock) CreateSutWithCloud(int presignTtlMinutes = 60)
+    {
+        var cloud = new Mock<IStorageService>(MockBehavior.Strict);
+        cloud.Setup(s => s.GetPresignedUrlAsync(
+                It.IsAny<string>(),
+                It.IsAny<TimeSpan>(),
+                It.IsAny<CancellationToken>()))
+             .ReturnsAsync((string key, TimeSpan ttl, CancellationToken _) =>
+                 $"https://cdn.test/{key}?sig=test&ttl={(int)ttl.TotalMinutes}");
+
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+
+        var settings = Options.Create(new StorageSettings
+        {
+            PresignTtlMinutes = presignTtlMinutes,
+        });
+
+        var sut = new OrderService(
+            _db, _orderNumberServiceMock.Object, _shippingMock.Object, router.Object, settings);
+        return (sut, cloud);
+    }
+
+    private async Task<(Order Order, Upload Upload)> SeedPaidOrderWithPromotedUploadAsync(
+        StorageLocation loc = StorageLocation.Cloud,
+        string? largePreviewPath = "previews/abc.jpg",
+        string? thumbnailPath = "thumbs/abc.jpg",
+        string fileName = "photo.jpg",
+        Guid? userId = null)
+    {
+        var owner = userId ?? Guid.NewGuid();
+        var upload = new Upload
+        {
+            UserId = owner,
+            OriginalFileName = fileName,
+            FilePath = "uploads/2026/01/abc.jpg",
+            LargePreviewPath = largePreviewPath,
+            ThumbnailPath = thumbnailPath,
+            StorageLocation = loc,
+            ContentType = "image/jpeg",
+            WidthPx = 4000, HeightPx = 3000, FileSizeBytes = 5_000_000,
+        };
+        var order = new Order
+        {
+            OrderNumber = "FT-" + Random.Shared.Next(100_000, 999_999),
+            UserId = owner,
+            Status = OrderStatus.Paid,
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                RecipientName = "x", Phone = "x",
+                Street = "x", Number = "1",
+                City = "x", County = "x", PostalCode = "0",
+            },
+            DeliveryType = DeliveryType.Easybox,
+            PaidAt = DateTimeOffset.UtcNow.AddDays(-3),
+            Items = new List<OrderItem>
+            {
+                new()
+                {
+                    UploadId = upload.Id, Upload = upload,
+                    ProductId = Guid.NewGuid(),
+                    Quantity = 1, UnitPriceRon = 1, LineTotalRon = 1,
+                    ProductSnapshot = new ProductSnapshot
+                    {
+                        ProductName = "x", Size = "x", Finish = "x",
+                    },
+                },
+            },
+        };
+        _db.Uploads.Add(upload);
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+        return (order, upload);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_OrderNotFound_ThrowsNotFoundException()
+    {
+        var (sut, _) = CreateSutWithCloud();
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            sut.GetOrderPhotosAsync(Guid.NewGuid(), Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_NonOwner_ThrowsForbiddenException()
+    {
+        var (sut, _) = CreateSutWithCloud();
+        var (order, _) = await SeedPaidOrderWithPromotedUploadAsync();
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            sut.GetOrderPhotosAsync(order.Id, Guid.NewGuid())); // different user
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_CloudTierOff_ReturnsEmptyPhotos()
+    {
+        // Use the fixture's _service (cloud off) — should NOT throw, just return empty.
+        var (order, _) = await SeedPaidOrderWithPromotedUploadAsync();
+
+        var result = await _service.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Empty(result.Photos);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_HappyPath_ReturnsPresignedUrlsForEachPhoto()
+    {
+        var (sut, cloud) = CreateSutWithCloud();
+        var (order, upload) = await SeedPaidOrderWithPromotedUploadAsync(fileName: "vacation.jpg");
+
+        var result = await sut.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Single(result.Photos);
+        var photo = result.Photos[0];
+        Assert.Equal(upload.Id, photo.UploadId);
+        Assert.Equal("vacation.jpg", photo.FileName);
+        Assert.Equal($"https://cdn.test/thumbs/abc.jpg?sig=test&ttl=60", photo.ThumbnailUrl);
+        Assert.Equal($"https://cdn.test/previews/abc.jpg?sig=test&ttl=60", photo.LargeUrl);
+
+        cloud.Verify(c => c.GetPresignedUrlAsync(
+            "thumbs/abc.jpg", It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(c => c.GetPresignedUrlAsync(
+            "previews/abc.jpg", It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_LocalUpload_ExcludedFromResults()
+    {
+        var (sut, cloud) = CreateSutWithCloud();
+        var (order, _) = await SeedPaidOrderWithPromotedUploadAsync(loc: StorageLocation.Local);
+
+        var result = await sut.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Empty(result.Photos);
+        cloud.VerifyNoOtherCalls(); // no presigning attempted for Local
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_LargePreviewPathNull_ExcludedFromResults()
+    {
+        // Mid-retention half-expired row: thumb still cached, preview gone.
+        var (sut, _) = CreateSutWithCloud();
+        var (order, _) = await SeedPaidOrderWithPromotedUploadAsync(largePreviewPath: null);
+
+        var result = await sut.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Empty(result.Photos);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_ThumbnailPathNull_ExcludedFromResults()
+    {
+        // Mirror of the above — preview kept, thumb gone. Either-null filters the row out.
+        var (sut, _) = CreateSutWithCloud();
+        var (order, _) = await SeedPaidOrderWithPromotedUploadAsync(thumbnailPath: null);
+
+        var result = await sut.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Empty(result.Photos);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotosAsync_PresignTtl_MatchesConfiguredMinutes()
+    {
+        var (sut, cloud) = CreateSutWithCloud(presignTtlMinutes: 90);
+        var (order, _) = await SeedPaidOrderWithPromotedUploadAsync();
+
+        var result = await sut.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Single(result.Photos);
+        // The deterministic mock URL embeds the requested TTL — proves the value flowed
+        // from StorageSettings.PresignTtlMinutes through to the SDK call.
+        Assert.Contains("ttl=90", result.Photos[0].ThumbnailUrl);
+        Assert.Contains("ttl=90", result.Photos[0].LargeUrl);
+
+        cloud.Verify(c => c.GetPresignedUrlAsync(
+            It.IsAny<string>(),
+            It.Is<TimeSpan>(t => t == TimeSpan.FromMinutes(90)),
+            It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 }
