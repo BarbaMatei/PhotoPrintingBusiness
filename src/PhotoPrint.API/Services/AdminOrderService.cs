@@ -10,6 +10,7 @@ using PhotoPrint.API.DTOs.Orders;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
@@ -122,6 +123,15 @@ public class AdminOrderService : IAdminOrderService
             if (!string.IsNullOrWhiteSpace(awbNumber)) order.AwbNumber = awbNumber;
             if (!string.IsNullOrWhiteSpace(trackingUrl)) order.TrackingUrl = trackingUrl;
             order.ShippedAt = DateTimeOffset.UtcNow;
+
+            // Observability (bolt 044): order_processing_duration_seconds histogram.
+            // PaidAt should always be set for an order reaching Shipped, but guard
+            // anyway — the admin's manual force-Shipped path is a rare edge case.
+            if (order.PaidAt is not null)
+            {
+                var seconds = (order.ShippedAt.Value - order.PaidAt.Value).TotalSeconds;
+                FotoMetrics.OrderProcessingDuration.Record(seconds);
+            }
         }
         else if (newStatus == OrderStatus.Delivered && order.DeliveredAt is null)
         {

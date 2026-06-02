@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
@@ -6,6 +7,7 @@ using PhotoPrint.API.DTOs.Orders;
 using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services;
 
@@ -171,6 +173,23 @@ public class OrderService : IOrderService
             try
             {
                 await _db.SaveChangesAsync(ct);
+
+                // Observability (bolt 044): orders_created_total{processor,status}.
+                // Status is "created" — the order is in AwaitingPayment; the Paid
+                // transition is observed via payment_webhook_total at the webhook handlers.
+                var processorLabel = order.PaymentProcessor switch
+                {
+                    PaymentProcessor.Stripe    => MetricNames.ProcessorValues.Stripe,
+                    PaymentProcessor.EuPlatesc => MetricNames.ProcessorValues.EuPlatesc,
+                    _                          => "unknown",
+                };
+                FotoMetrics.OrdersCreated.Add(1,
+                    new TagList
+                    {
+                        { MetricNames.Labels.Processor, processorLabel },
+                        { MetricNames.Labels.Status,    MetricNames.OrderStatusValues.Created },
+                    });
+
                 return new OrderCreationResult(order, WasIdempotentReplay: false);
             }
             catch (DbUpdateException ex) when (hasKey && IsIdempotencyKeyViolation(ex))

@@ -3,6 +3,7 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Uploads;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services;
 
@@ -131,6 +132,9 @@ public class UploadService : IUploadService
 
         _db.Uploads.Add(upload);
         await _db.SaveChangesAsync(ct);
+
+        // Observability (bolt 044): upload_size_bytes histogram.
+        FotoMetrics.UploadSize.Record(actualLength);
 
         _logger.LogInformation(
             "Upload {UploadId} saved for owner {OwnerId} ({MimeType}, {W}x{H}, {Size:N0} bytes)",
