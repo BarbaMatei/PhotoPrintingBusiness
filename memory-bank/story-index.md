@@ -985,29 +985,31 @@
 
 ### 021-distributed-state-redis
 
+> ⏸ **Deprioritized 2026-06-03** — scaling infrastructure; only pays off with multiple API instances. App not yet deployed, single-server fits current/foreseeable traffic. Revisit only on real scaling pressure / zero-downtime-deploy / multi-region need. ADRs 010 / 013 / 015 explicitly accept the single-server trade-offs.
+
 #### Unit: 001-redis-backplane (4 stories) — Bolt: 046
 
 ### 001-signalr-redis-backplane.md ⬜ NOT STARTED
 **Title**: SignalR `.AddStackExchangeRedis(...)` + multi-replica fan-out test
-**Priority**: Must
+**Priority**: Could (was Must — deprioritized)
 **Path**: `intents/021-distributed-state-redis/units/001-redis-backplane/stories/001-signalr-redis-backplane.md`
 **Bolt**: 046
 
 ### 002-two-level-cache.md ⬜ NOT STARTED
 **Title**: `ITwoLevelCache` with L1 memory + L2 Redis + pub/sub invalidation
-**Priority**: Must
+**Priority**: Could (was Must — deprioritized)
 **Path**: `intents/021-distributed-state-redis/units/001-redis-backplane/stories/002-two-level-cache.md`
 **Bolt**: 046
 
 ### 003-distributed-rate-limiter.md ⬜ NOT STARTED
 **Title**: Redis-backed rate-limit partition with fallback
-**Priority**: Must
+**Priority**: Could (was Must — deprioritized)
 **Path**: `intents/021-distributed-state-redis/units/001-redis-backplane/stories/003-distributed-rate-limiter.md`
 **Bolt**: 046
 
 ### 004-redis-health-and-compose.md ⬜ NOT STARTED
 **Title**: `/health` Redis probe + Compose service entries
-**Priority**: Must
+**Priority**: Could (was Must — deprioritized)
 **Path**: `intents/021-distributed-state-redis/units/001-redis-backplane/stories/004-redis-health-and-compose.md`
 **Bolt**: 046
 
