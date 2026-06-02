@@ -22,6 +22,44 @@ builder.Configuration.AddJsonFile(
 // ── Logging ──────────────────────────────────────────────────────────────────
 builder.AddSerilogLogging();
 
+// ── Error tracking (Sentry, intent 020 bolt 045) ─────────────────────────────
+// Master flag mirrors the Sameday two-stage rollout: Enabled=false → SDK never
+// constructed, boot is byte-identical to baseline. The DSN never lives in
+// appsettings.json (ADR-006) — provide via user-secrets/env vars.
+builder.Services.Configure<PhotoPrint.API.Configuration.SentrySettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.SentrySettings>,
+    PhotoPrint.API.Validators.SentrySettingsValidator>();
+builder.Services
+    .AddOptions<PhotoPrint.API.Configuration.SentrySettings>()
+    .ValidateOnStart();
+
+var sentryEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName)
+    .GetValue<bool>("Enabled");
+
+if (sentryEnabled)
+{
+    var sentryConfig = builder.Configuration
+        .GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName)
+        .Get<PhotoPrint.API.Configuration.SentrySettings>()!;
+
+    builder.WebHost.UseSentry(o =>
+    {
+        o.Dsn              = sentryConfig.Dsn;
+        o.Environment      = sentryConfig.Environment ?? builder.Environment.EnvironmentName;
+        o.Release          = sentryConfig.Release ?? Environment.GetEnvironmentVariable("GIT_COMMIT_SHA");
+        o.SampleRate       = (float)sentryConfig.SampleRate;
+        o.TracesSampleRate = sentryConfig.TracesSampleRate;
+        o.SendDefaultPii   = false;
+        o.Debug            = sentryConfig.Debug;
+        o.SetBeforeSend((evt, _) => PhotoPrint.API.Configuration.SentryDataScrubbers.Scrub(evt));
+    });
+
+    builder.Services.AddScoped<PhotoPrint.API.Middleware.SentryScopeEnricherMiddleware>();
+}
+
 // ── Database ─────────────────────────────────────────────────────────────────
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
@@ -293,6 +331,20 @@ if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot"
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Sentry scope enrichment: stamps every event captured during the request with
+// correlation_id + user_id. Registered after auth so the user claim is populated;
+// the middleware is a no-op when the SDK isn't initialized.
+if (sentryEnabled)
+    app.UseSentryScopeEnricher();
+
+// Synthetic-throw endpoint — exists only in the "Testing" environment for
+// SentryIntegrationTests. Never reachable in Development or Production.
+if (app.Environment.IsEnvironment("Testing"))
+{
+    app.MapGet("/__test/throw",
+        () => { throw new InvalidOperationException("synthetic-test-exception"); });
+}
 
 app.MapControllers();
 app.MapHub<AdminOrderHub>("/hubs/admin-orders");

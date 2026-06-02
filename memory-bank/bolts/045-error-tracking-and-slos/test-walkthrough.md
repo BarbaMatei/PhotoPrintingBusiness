@@ -1,0 +1,49 @@
+---
+stage: test
+bolt: 045-error-tracking-and-slos
+created: 2026-06-03T00:45:00Z
+---
+
+## Test Report: error-tracking-and-slos
+
+### Summary
+
+- **Sentry-scoped tests**: 32/32 passed (1.7s)
+- **Full suite**: 766/766 passed, 7 skipped (S3 cloud tests — require AWS credentials, expected skip), 0 failed (5s)
+- **New test count delta**: +19 tests vs. pre-bolt baseline
+
+### Test Files
+
+- [x] `src/PhotoPrint.Tests/Unit/Configuration/SentrySettingsValidatorTests.cs` (8 tests) — pins the `IValidateOptions<SentrySettings>` contract: disabled is a no-op even with garbage values, enabled enforces DSN + sample-rate constraints with aggregated failure messages.
+- [x] `src/PhotoPrint.Tests/Unit/Configuration/SentryDataScrubbersTests.cs` (15 tests, including theory expansions) — the PII contract: request body is always replaced with `<scrubbed:request-body>`, sensitive headers (Authorization, Cookie, Set-Cookie, X-Guest-Token) are scrubbed, sensitive-key substring matching is case-insensitive, non-sensitive headers are preserved, no-request events don't NRE.
+- [x] `src/PhotoPrint.Tests/Unit/Middleware/SentryScopeEnricherMiddlewareTests.cs` (3 tests) — smoke tests: absent IHub no-ops, missing correlation id no-ops, unauthenticated user no-ops. The positive scope-tag-stamping path is exercised in the integration test.
+- [x] `src/PhotoPrint.Tests/Integration/SentryIntegrationFactory.cs` (test support) — boots the API with `Sentry:Enabled=true` (via env vars set in static ctor — required because Program.cs reads the flag before WAF's `ConfigureAppConfiguration` callback fires), then replaces the DI `IHub` registration with a Moq fake.
+- [x] `src/PhotoPrint.Tests/Integration/SentryIntegrationTests.cs` (1 test) — end-to-end: a real HTTP request to `/__test/throw` (the Testing-only synthetic-500 endpoint) flows through the full middleware pipeline, the mock `IHub` captures the exception via `ExceptionHandlerMiddleware`, and `correlation_id` lands on the scope from `SentryScopeEnricherMiddleware`.
+
+### Acceptance Criteria Validation
+
+**Story 001 — Sentry ASP.NET integration**
+
+- ✅ **`Sentry.AspNetCore` package added** — version `4.13.0` in `PhotoPrint.API.csproj`.
+- ✅ **`builder.WebHost.UseSentry(o => …)` wired; DSN from `Sentry:Dsn`** — see `Program.cs` lines ~25–55; conditional on `Sentry:Enabled`.
+- ✅ **Every Sentry event has tags `correlation_id`, `user_id` (when authenticated), `environment`, `release`** — `correlation_id` + `user_id` stamped per-request by `SentryScopeEnricherMiddleware`; `environment` + `release` stamped once at SDK init from `SentryOptions`. The integration test verifies `correlation_id` reaches the captured scope.
+- ✅ **PII scrubbing: email, phone, full request body redacted; only structured metadata sent** — `SentryDataScrubbers.Scrub` is wired via `SetBeforeSend`. 15 unit tests pin the contract.
+- ✅ **Sample rate configurable; default 100% errors / 10% transactions** — `Sentry:SampleRate` defaults to `1.0`, `Sentry:TracesSampleRate` defaults to `0.1`. Both validated to be in [0.0, 1.0] when `Enabled=true`.
+- ✅ **Integration test: synthetic 500 endpoint produces a Sentry event in the in-memory transport** — `SentryIntegrationTests.Synthetic_500_captures_exception_through_sentry_hub` passes. (Implementation deviation: a Moq `IHub` is used instead of a custom `ITransport`. Achieves the same observable behaviour while sidestepping the process-global static-SDK contamination across the full test suite. See [implementation-walkthrough.md](implementation-walkthrough.md) "Deviations from Plan".)
+
+**Story 002 — SLO documentation + Grafana dashboard**
+
+- ✅ **`memory-bank/operations/slos.md` documents 5 SLOs** — availability 99.5%, p95 checkout latency 1.5s, payment-webhook 99.9%, AWB 98%, ANAF 99%. Each with rationale, source metric expression, breach action, owner.
+- ✅ **`ops/dashboards/fototipar-overview.json` is a Grafana dashboard JSON with the required panels** — schema 38 (Grafana 10.x), 8 panels: availability, RPS, latency p50/p95/p99, error rate, orders/day, payment-webhook success, AWB success, ANAF success. Datasource templated via `${DS_PROMETHEUS}`.
+- ✅ **README link added under Operations section** — [README.md](../../../README.md) now has an Operations section linking SLOs, dashboard, and DEPLOYMENT.md §13.
+
+### Issues Found
+
+None during testing. One iteration was required during Stage 2 to fix the integration test's cross-suite contamination — captured in detail in [implementation-walkthrough.md](implementation-walkthrough.md). The fix (resolving `IHub` from per-request DI instead of the static `SentrySdk`) is now the production code path, which is also slightly safer outside tests.
+
+### Notes
+
+- **Bolt-044 forward dependency is explicit and accepted.** The dashboard panels reference metrics (`http_request_total`, `payment_webhook_total`, `awb_creation_total`, `anaf_submission_total`) that bolt 044 will create. The `NOTE` block at the top of `slos.md` makes this explicit. The SLOs themselves stand as commitments; the panels show "No Data" until 044 ships.
+- **Two-stage rollout posture pinned.** With `Sentry:Enabled=false` (the shipped default), the SDK is never constructed, no middleware is registered, boot is byte-identical to the pre-bolt baseline. Reverse-proof: the suite was run with `Sentry__Enabled` unset and the full 766 passed, including a non-Sentry-related Exception test that exercises `ExceptionHandlerMiddleware`'s unhandled-exception branch (`hub` resolves to null, the no-op path runs).
+- **Scope of Sentry capture is correct.** Only the unhandled-exception branch (`_logger.LogError`) reaches Sentry. Domain exceptions (NotFound, Conflict, UnprocessableEntity, etc.) hit `_logger.LogWarning` and are NOT captured. Verified by inspection — there's no integration test for the negative case because it would just assert "nothing happened", which is the default behaviour.
+- **PII scrubbing is enforced.** Every event leaving the SDK passes through `SentryDataScrubbers.Scrub`. The list of sensitive keys lives in one static class; adding a new key is a 1-line change + a 1-line test addition.

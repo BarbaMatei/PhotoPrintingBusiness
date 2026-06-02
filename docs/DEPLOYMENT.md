@@ -807,3 +807,128 @@ Two non-implemented items worth tracking:
    future intent will route these to whatever admin notification
    surface exists at that point (email, in-app banner, SignalR
    broadcast).
+
+---
+
+## 13. Error tracking with Sentry (intent 020 / bolt 045)
+
+### 13.1 What the integration does
+
+When an unhandled exception escapes any controller or middleware, the API:
+
+1. Routes it through `ExceptionHandlerMiddleware` (existing behaviour: log + ProblemDetails 500).
+2. **Captures it to Sentry** with full context — stack trace, correlation id, user id (when authenticated), environment, release SHA, scrubbed request metadata.
+3. Sentry pages / Slacks / emails per your project's alert rules (configured in the Sentry UI, not here).
+
+Domain exceptions (`NotFoundException`, `ConflictException`, `UnprocessableEntityException`, etc.) are **NOT** captured — they're expected business outcomes, not server errors. Only unhandled exceptions (the `else` branch in `ExceptionHandlerMiddleware`) reach Sentry.
+
+### 13.2 Master flag — `Sentry:Enabled`
+
+The integration follows the same two-stage rollout posture as the Sameday integration (§12.2):
+
+- `Sentry:Enabled` (master). Default: `false`. When false, the SDK is never constructed, no middleware is registered, no events leave the host. Boot is byte-identical to baseline.
+- `Sentry:Dsn` provisioned via secret store (see 13.4). With the master flag off, an empty DSN is irrelevant.
+
+When `Sentry:Enabled=true`, the SDK runs; when `Sentry:Dsn` is also valid, events flow.
+
+### 13.3 Provisioning prerequisites
+
+1. **Create a Sentry project** (sentry.io or self-hosted).
+   - Platform: **.NET / ASP.NET Core**.
+   - Take note of the project DSN (looks like `https://abc123@o0.ingest.sentry.io/0`).
+2. **Configure alert rules in Sentry** (the events arrive; Sentry decides who gets notified).
+   - Minimum recommended: alert on every new issue + alert on issue regression.
+   - For payment-webhook errors (see §13.8): tag-based filter `correlation_id` exists + path matches `/api/webhooks/*` → page immediately.
+3. **Set release tagging via the deploy workflow.** The `GIT_COMMIT_SHA` env var is read at boot and tagged on every event. This is already set by the deploy workflow shipped in bolt 040 — no extra work, just verify `echo $GIT_COMMIT_SHA` in the container prints the deployed commit.
+
+### 13.4 Secret management
+
+The DSN is a secret (it identifies your Sentry project and is rate-limit-tied). Set it the same way as the JWT private key (§5):
+
+| Environment | Mechanism |
+|---|---|
+| Local dev | `dotnet user-secrets set "Sentry:Enabled" "true" --project src/PhotoPrint.API` then `dotnet user-secrets set "Sentry:Dsn" "https://abc@o0.ingest.sentry.io/0" --project src/PhotoPrint.API` |
+| Staging / Production | Env vars `Sentry__Enabled=true` and `Sentry__Dsn=https://...` in your `.env` / orchestrator secret store |
+
+Full env-var reference for Sentry:
+
+| Env var | Type | Default | Purpose |
+|---|---|---|---|
+| `Sentry__Enabled` | bool | `false` | Master flag — flip to true to wire the SDK |
+| `Sentry__Dsn` | string | `""` | Project DSN from Sentry UI |
+| `Sentry__Release` | string | `$GIT_COMMIT_SHA` | Override the release tag (rare; default is the deploy SHA) |
+| `Sentry__Environment` | string | ASP.NET env name | Override the environment tag |
+| `Sentry__SampleRate` | double | `1.0` | Fraction of error events to send (1.0 = all) |
+| `Sentry__TracesSampleRate` | double | `0.1` | Fraction of transactions to send for performance tracing |
+| `Sentry__Debug` | bool | `false` | Enable SDK internal logs (noisy; only for diagnosing wiring) |
+
+### 13.5 Recommended rollout sequence
+
+Same two-stage posture as the Sameday rollout (§12.5):
+
+1. **Pre-flight (config only).** Provision the DSN in staging secrets. Leave `Sentry__Enabled=false`. Deploy. Verify the API still boots with no Sentry-related log lines — proves the disabled path is byte-identical.
+
+2. **Stage 1 — Sentry on, low blast radius.** Flip `Sentry__Enabled=true` in **staging only**. Trigger a known synthetic error (hit a debug endpoint or briefly add a `throw` in a low-stakes controller). Verify the event lands in your Sentry project with the right tags (`correlation_id`, `release`, `environment=staging`). Watch the dashboard for a week.
+
+3. **Stage 2 — Production.** Flip `Sentry__Enabled=true` in production. Monitor the Sentry project for the first hour — any flood of new issues represents a pre-existing pile of un-logged errors finally surfacing. That's a feature, not a bug.
+
+### 13.6 PII scrubbing
+
+The integration is **PII-careful by default**:
+
+- **Full request body** — always replaced with `<scrubbed:request-body>`. The ProblemDetails response in our error path already contains the useful sanitized info; the raw body is never needed.
+- **Sensitive headers** — `Authorization`, `Cookie`, `Set-Cookie`, `X-Guest-Token` are replaced with `<scrubbed>`.
+- **Sensitive extras** — any extra/header key containing `email`, `phone`, `password`, `confirmPassword`, `currentPassword`, `newPassword` (case-insensitive substring) is scrubbed.
+- **Stack traces** — kept (no PII).
+- **Tags** (correlation_id, user_id, release, environment) — kept.
+- **Query string** — kept (verify no PII is in your query strings; extend the scrubber if not).
+
+The scrubber list lives in [`Configuration/SentryDataScrubbers.cs`](../src/PhotoPrint.API/Configuration/SentryDataScrubbers.cs). Adding a new sensitive key is a 1-line change.
+
+### 13.7 Operations playbook
+
+**Pause Sentry without a deploy** — flip `Sentry__Enabled=false` and restart the container. The SDK never constructs. Events stop immediately.
+
+**Sentry quota approaching** — drop `Sentry__SampleRate` (e.g., `0.5` keeps half) or `Sentry__TracesSampleRate` (default already low at `0.1`). Errors at sample rate 0.5 is usually fine; you'll still notice spikes via the dashboard.
+
+**Sentry's own outage** — Sentry SDK queues with a bounded in-memory buffer and drops oldest on overflow. The API never blocks on Sentry; an outage on Sentry's side is invisible to customers.
+
+**Replay a missed event** — Sentry doesn't replay. The event was either captured (in Sentry, find it via the correlation_id from your Serilog logs) or it wasn't (the SDK queue overflowed during a flood). The Serilog logs always have the full picture; Sentry is the alerting layer on top.
+
+**Rotate the DSN** — provision the new DSN, set the env var, rolling-restart the API. Old in-flight events go to the old DSN; new events go to the new one. No coordination needed.
+
+### 13.8 What Sentry alerts on (suggested)
+
+Configure in the Sentry UI, not in code. Suggested baseline:
+
+| Signal | Severity | Notification |
+|---|---|---|
+| Any new issue (first occurrence of an exception type/location) | **Page** | Slack + email |
+| Issue regression (resolved issue happens again) | **Page** | Slack |
+| Issue volume > 10× baseline in 5 min | **Page** | Slack + email — likely an incident |
+| Issue tagged `correlation_id` (any) on `/api/webhooks/*` path | **Page** | Slack — payment webhooks are SLA-critical, see [`slos.md`](../memory-bank/operations/slos.md) §3 |
+| Any 5xx not captured by Sentry (gap in coverage) | — | Cross-check Serilog `Error`-level logs against Sentry events monthly |
+
+### 13.9 Cost envelope
+
+Free tier: 5k errors + 10k transactions / month. With the defaults shipped (errors at 100%, transactions at 10%) plus the SLO targets in [`slos.md`](../memory-bank/operations/slos.md):
+
+- Availability target ≥ 99.5% → ≤ 1/200 requests is a 5xx → ≤ 0.5% of a few hundred req/day daily = a handful of error events per day, well under the free tier.
+- Transactions at 10% × ~500 req/day = ~50/day = ~1500/month, under the free tier.
+
+If volumes grow 10×, transactions become the constraint; drop `Sentry__TracesSampleRate` to `0.01` or upgrade.
+
+### 13.10 Service Level Objectives
+
+This bolt also ships a written SLO record + a starter Grafana dashboard:
+
+- **[`memory-bank/operations/slos.md`](../memory-bank/operations/slos.md)** — 5 SLOs: availability, checkout latency, payment-webhook success, AWB auto-creation success, ANAF submission success.
+- **[`ops/dashboards/fototipar-overview.json`](../ops/dashboards/fototipar-overview.json)** — Grafana dashboard JSON, 8 panels mapping to the SLOs.
+
+**Caveat**: the dashboard panels reference metrics that ship with bolt 044 (OTel + Prometheus business counters). Until bolt 044 lands, the panels show "No Data". The SLOs themselves still hold as commitments — they just aren't continuously measured yet. The SLO doc has the long-form explanation.
+
+### 13.11 Not implemented (future considerations)
+
+1. **Frontend Sentry SDK (Angular)** — UI errors today surface only through the existing toast service. A separate intent would wire `@sentry/angular`.
+2. **Burn-rate alerts on SLOs** — Sentry alerts on individual events; SLO burn-rate alerts (e.g. "we're consuming error budget too fast") need a Prometheus + AlertManager stack that bolt 044 starts.
+3. **PagerDuty / OpsGenie integration** — Sentry's built-in Slack + email is enough until on-call rotations exist.
