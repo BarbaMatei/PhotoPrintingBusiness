@@ -2,11 +2,11 @@
 id: 002-lazy-loaded-routes
 unit: 004-angular-app-shell
 intent: 001-foundation-infrastructure
-status: draft
+status: complete
 priority: must
 created: 2026-05-05T15:27:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 002-lazy-loaded-routes

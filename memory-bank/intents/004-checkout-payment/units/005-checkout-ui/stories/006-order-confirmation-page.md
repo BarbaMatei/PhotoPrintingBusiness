@@ -2,11 +2,11 @@
 id: 006-order-confirmation-page
 unit: 005-checkout-ui
 intent: 004-checkout-payment
-status: draft
+status: complete
 priority: must
 created: 2026-05-21T12:00:00Z
 assigned_bolt: 017-checkout-ui
-implemented: false
+implemented: true
 ---
 
 # Story: 006-order-confirmation-page

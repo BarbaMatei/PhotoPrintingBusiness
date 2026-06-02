@@ -2,11 +2,11 @@
 id: 004-product-detail-endpoint
 unit: 001-product-catalog-core
 intent: 003-product-catalog
-status: draft
+status: complete
 priority: must
 created: 2026-05-20T20:35:00Z
 assigned_bolt: 009-product-catalog-core
-implemented: false
+implemented: true
 ---
 
 # Story: 004-product-detail-endpoint

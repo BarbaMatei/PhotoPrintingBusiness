@@ -2,11 +2,11 @@
 id: 001-photo-lightbox-component
 unit: 001-photo-lightbox-ui
 intent: 010-photo-lightbox
-status: draft
+status: complete
 priority: must
 created: 2026-05-24T15:00:00Z
 assigned_bolt: 026-photo-lightbox
-implemented: false
+implemented: true
 ---
 
 # Story: 001-photo-lightbox-component
