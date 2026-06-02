@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { OrderDetailDto, OrderSummaryDto } from '../models/order.model';
+import { OrderDetailDto, OrderPhotosDto, OrderSummaryDto } from '../models/order.model';
 
 export interface OrdersPage {
   items: OrderSummaryDto[];
@@ -24,5 +24,10 @@ export class OrderService {
 
   getOrderDetail(id: string): Observable<OrderDetailDto> {
     return this.http.get<OrderDetailDto>(`${this.base}/${id}`);
+  }
+
+  /** Bolt 053: order's photo archive — presigned cloud URLs, 1h TTL. */
+  getOrderPhotos(id: string): Observable<OrderPhotosDto> {
+    return this.http.get<OrderPhotosDto>(`${this.base}/${id}/photos`);
   }
 }

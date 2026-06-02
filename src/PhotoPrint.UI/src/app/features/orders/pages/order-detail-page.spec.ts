@@ -39,6 +39,8 @@ const MOCK_DETAIL: OrderDetailDto = {
 function makeOrderService(overrides: Partial<OrderService> = {}): Partial<OrderService> {
   return {
     getOrderDetail: vi.fn().mockReturnValue(of(MOCK_DETAIL)),
+    // Bolt 053: photos endpoint — default empty so legacy tests don't need to know about it.
+    getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
     ...overrides,
   };
 }
@@ -151,5 +153,119 @@ describe('OrderDetailPage', () => {
   it('navigates to /comenzile-mele on 404', async () => {
     const navigateSpy = await setupWithErrorAndNavigateSpy(404);
     expect(navigateSpy).toHaveBeenCalledWith(['/comenzile-mele']);
+  });
+
+  // ── Bolt 053: photo archive grid + lightbox ─────────────────────────────
+
+  it('shows the "no longer available" copy when the photos endpoint returns empty', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
+    });
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Fotografiile pentru această comandă nu mai sunt disponibile');
+  });
+
+  it('renders a thumbnail tile per photo returned by the endpoint', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'sunset.jpg', thumbnailUrl: 'https://cdn.test/t1', largeUrl: 'https://cdn.test/l1' },
+          { uploadId: 'u2', fileName: 'beach.jpg',  thumbnailUrl: 'https://cdn.test/t2', largeUrl: 'https://cdn.test/l2' },
+        ],
+      })),
+    });
+    const tiles = (fixture.nativeElement as HTMLElement).querySelectorAll('.photo-tile');
+    expect(tiles.length).toBe(2);
+    const imgs = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLImageElement>('.photo-tile img'));
+    expect(imgs[0].getAttribute('src')).toBe('https://cdn.test/t1');
+    expect(imgs[1].getAttribute('src')).toBe('https://cdn.test/t2');
+  });
+
+  it('uses native lazy-loading on thumbnail images', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' },
+        ],
+      })),
+    });
+    const img = (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.photo-tile img')!;
+    expect(img.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('does not render the lightbox until a thumbnail is clicked', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' },
+        ],
+      })),
+    });
+    // The lightbox renders nothing while [src] is null — its template only emits when src truthy.
+    expect((fixture.nativeElement as HTMLElement).querySelector('.lightbox__backdrop')).toBeNull();
+  });
+
+  it('opens the lightbox with the largeUrl when a thumbnail is clicked', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'https://cdn.test/large-1' },
+        ],
+      })),
+    });
+
+    const tile = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.photo-tile')!;
+    tile.click();
+    fixture.detectChanges();
+
+    const img = (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.lightbox__img')!;
+    expect(img).not.toBeNull();
+    expect(img.getAttribute('src')).toBe('https://cdn.test/large-1');
+  });
+
+  it('closes the lightbox when its close event fires', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' },
+        ],
+      })),
+    });
+
+    // Open then close — the backdrop click handler emits (close).
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.photo-tile')!.click();
+    fixture.detectChanges();
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.lightbox__backdrop')!.click();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.lightbox__backdrop')).toBeNull();
+  });
+
+  it('silently empties the photos list when the photos call fails (no navigation)', async () => {
+    // A photos-endpoint failure must NOT redirect the page — the customer still sees their
+    // order detail, with the "no longer available" copy in the photos section.
+    await TestBed.configureTestingModule({
+      imports: [OrderDetailPage],
+      providers: [
+        provideRouter([]),
+        {
+          provide: OrderService,
+          useValue: makeOrderService({
+            getOrderPhotos: vi.fn().mockReturnValue(throwError(() => ({ status: 500 }))),
+          }),
+        },
+      ],
+    }).compileComponents();
+
+    router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture = TestBed.createComponent(OrderDetailPage);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('orderId', 'order-1');
+    fixture.detectChanges();
+
+    expect(navigateSpy).not.toHaveBeenCalled();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Fotografiile pentru această comandă nu mai sunt disponibile');
   });
 });
