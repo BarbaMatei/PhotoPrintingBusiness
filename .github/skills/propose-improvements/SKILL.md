@@ -1,7 +1,7 @@
 ---
 name: propose-improvements
 description: >
-  Synthesises the outputs of all previous analysis skills into exactly 10 ranked
+  Synthesises the outputs of all previous analysis skills into exactly 20 ranked
   improvement proposals. Each proposal includes complexity, business impact,
   implementation steps, schema/API changes, effort estimate, and risks.
   Run this skill last, after detect-gaps.
@@ -14,7 +14,7 @@ allowed-tools:
 
 ## How to generate proposals
 
-You have completed the architecture scan, workflow inference, and gap analysis. Now synthesise everything into exactly 10 proposals.
+You have completed the architecture scan, workflow inference, and gap analysis. Now synthesise everything into exactly 20 proposals.
 
 ### Scoring formula
 
@@ -47,7 +47,7 @@ Assign exactly one category to each proposal:
 
 ## Proposal template
 
-For each of the 10 proposals, use this exact structure:
+For each of the 20 proposals, use this exact structure:
 
 ---
 
@@ -82,7 +82,7 @@ For each of the 10 proposals, use this exact structure:
 
 ---
 
-## After all 10 proposals
+## After all 20 proposals
 
 Append a **Roadmap** section with three horizons:
 
