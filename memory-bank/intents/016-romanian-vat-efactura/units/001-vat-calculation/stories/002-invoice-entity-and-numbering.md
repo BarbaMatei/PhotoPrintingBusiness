@@ -2,11 +2,11 @@
 id: 002-invoice-entity-and-numbering
 unit: 001-vat-calculation
 intent: 016-romanian-vat-efactura
-status: draft
+status: complete
 priority: must
-created: 2026-05-25T10:15:00Z
+created: 2026-05-25T10:15:00.000Z
 assigned_bolt: 038-vat-calculation
-implemented: false
+implemented: true
 ---
 
 # Story: 002-invoice-entity-and-numbering
