@@ -285,6 +285,81 @@ else
         PhotoPrint.API.Services.Invoicing.PostgresInvoiceNumberingService>();
 }
 
+// ── Invoicing (intent 016 / bolt 039 — e-Factura/ANAF) ────────────────────────
+// Seller fiscal identity (always validated — embedded in every invoice).
+builder.Services.Configure<PhotoPrint.API.Configuration.SellerSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.SellerSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.SellerSettings>,
+    PhotoPrint.API.Validators.SellerSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.SellerSettings>().ValidateOnStart();
+
+// ANAF SPV (gated by master flag per intent goal — disabled-by-default).
+builder.Services.Configure<PhotoPrint.API.Configuration.AnafSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.AnafSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.AnafSettings>,
+    PhotoPrint.API.Validators.AnafSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.AnafSettings>().ValidateOnStart();
+
+// Dual-write rollout flag (ADR-022).
+builder.Services.Configure<PhotoPrint.API.Configuration.InvoicingSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.InvoicingSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.InvoicingSettings>,
+    PhotoPrint.API.Validators.InvoicingSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.InvoicingSettings>().ValidateOnStart();
+
+// QuestPDF Community License (ADR-021). Declared explicitly per QuestPDF
+// 2024.10+ requirement; the Community License is valid for businesses with
+// revenue < $1M USD/year. Operations checklist: re-evaluate the license
+// tier annually (see DEPLOYMENT.md).
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
+// Application-layer + domain services for bolt 039 — always wired even when
+// Anaf:Enabled = false (so the Invoice row is still created at Paid and the
+// admin endpoints still work; only the ANAF upload pipeline is conditional).
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceCreationService,
+                            PhotoPrint.API.Services.Invoicing.InvoiceCreationService>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceXmlBuilder,
+                            PhotoPrint.API.Services.Invoicing.InvoiceXmlBuilder>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoicePdfRenderer,
+                            PhotoPrint.API.Services.Invoicing.InvoicePdfRenderer>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceLifecycle,
+                            PhotoPrint.API.Services.Invoicing.InvoiceLifecycle>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.InvoicePdfReadyNotifier>();
+
+// ANAF SPV client + worker — gated by Anaf:Enabled (two-stage rollout).
+var anafEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.AnafSettings.SectionName)
+    .GetValue<bool>("Enabled");
+
+if (anafEnabled)
+{
+    var anafBase = builder.Configuration
+        .GetSection(PhotoPrint.API.Configuration.AnafSettings.SectionName)
+        .GetValue<string>("BaseUrl");
+
+    builder.Services.AddSingleton<PhotoPrint.API.Services.Invoicing.Anaf.IAnafTokenProvider,
+                                   PhotoPrint.API.Services.Invoicing.Anaf.AnafTokenProvider>();
+    builder.Services.AddTransient<PhotoPrint.API.Services.Invoicing.Anaf.AnafAuthHandler>();
+    builder.Services.AddTransient<PhotoPrint.API.Services.Invoicing.Anaf.AnafResilienceHandler>();
+
+    builder.Services
+        .AddHttpClient<PhotoPrint.API.Services.Invoicing.Anaf.IAnafSpvClient,
+                       PhotoPrint.API.Services.Invoicing.Anaf.AnafSpvClient>((sp, http) =>
+        {
+            var s = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.AnafSettings>>().Value;
+            var baseUrl = s.BaseUrl.EndsWith('/') ? s.BaseUrl : s.BaseUrl + "/";
+            http.BaseAddress = new Uri(baseUrl);
+            http.Timeout     = TimeSpan.FromSeconds(30);
+        })
+        .AddHttpMessageHandler<PhotoPrint.API.Services.Invoicing.Anaf.AnafAuthHandler>()
+        .AddHttpMessageHandler<PhotoPrint.API.Services.Invoicing.Anaf.AnafResilienceHandler>();
+
+    builder.Services.AddHostedService<PhotoPrint.API.Services.Invoicing.Anaf.InvoiceUploadJob>();
+}
+
 // ── Admin ────────────────────────────────────────────────────────────────────────────
 
 builder.Services.AddHttpClient();

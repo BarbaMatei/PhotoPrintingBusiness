@@ -2,11 +2,11 @@
 id: 003-invoice-pdf-renderer-and-endpoint
 unit: 002-efactura-generation-and-anaf
 intent: 016-romanian-vat-efactura
-status: draft
+status: complete
 priority: must
-created: 2026-05-25T10:15:00Z
+created: 2026-05-25T10:15:00.000Z
 assigned_bolt: 039-efactura-anaf
-implemented: false
+implemented: true
 ---
 
 # Story: 003-invoice-pdf-renderer-and-endpoint
