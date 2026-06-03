@@ -11,6 +11,7 @@ using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
 using PhotoPrint.Tests.Helpers;
 using Stripe;
@@ -29,6 +30,7 @@ public class WebhooksControllerMetricsTests
     private readonly Mock<IOrderEmailService> _emailSvc = new();
     private readonly Mock<IOrderPhotoPromoter> _promoter = new();
     private readonly Mock<IAwbCreationNotifier> _awbNotifier = new();
+    private readonly Mock<IInvoiceCreationService> _invoiceCreator = new();
     private readonly Mock<IHubContext<AdminOrderHub>> _hub = new();
     private readonly Mock<IHubClients> _hubClients = new();
     private readonly Mock<IClientProxy> _clientProxy = new();
@@ -53,6 +55,8 @@ public class WebhooksControllerMetricsTests
                  .Returns(ValueTask.CompletedTask);
         _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
+        _invoiceCreator.Setup(i => i.CreateForOrderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((PhotoPrint.API.Models.Invoice?)null);
 
         _sut = new WebhooksController(
             _orderService.Object,
@@ -62,6 +66,7 @@ public class WebhooksControllerMetricsTests
             _emailSvc.Object,
             _promoter.Object,
             _awbNotifier.Object,
+            _invoiceCreator.Object,
             _hub.Object,
             Options.Create(new StripeSettings { WebhookSecret = "whsec_test" }),
             Options.Create(new EuPlatescSettings { SecretKey = SecretKeyHex, MerchantId = "M1" }),

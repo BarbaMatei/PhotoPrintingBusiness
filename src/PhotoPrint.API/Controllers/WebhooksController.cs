@@ -10,6 +10,7 @@ using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
@@ -26,6 +27,7 @@ public class WebhooksController : ControllerBase
     private readonly IOrderEmailService _orderEmailService;
     private readonly IOrderPhotoPromoter _photoPromoter;
     private readonly IAwbCreationNotifier _awbNotifier;
+    private readonly IInvoiceCreationService _invoiceCreator;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly StripeSettings _stripeSettings;
     private readonly EuPlatescSettings _euPlatescSettings;
@@ -39,6 +41,7 @@ public class WebhooksController : ControllerBase
         IOrderEmailService orderEmailService,
         IOrderPhotoPromoter photoPromoter,
         IAwbCreationNotifier awbNotifier,
+        IInvoiceCreationService invoiceCreator,
         IHubContext<AdminOrderHub> hub,
         IOptions<StripeSettings> stripeSettings,
         IOptions<EuPlatescSettings> euPlatescSettings,
@@ -51,6 +54,7 @@ public class WebhooksController : ControllerBase
         _orderEmailService = orderEmailService;
         _photoPromoter = photoPromoter;
         _awbNotifier = awbNotifier;
+        _invoiceCreator = invoiceCreator;
         _hub = hub;
         _stripeSettings = stripeSettings.Value;
         _euPlatescSettings = euPlatescSettings.Value;
@@ -195,6 +199,10 @@ public class WebhooksController : ControllerBase
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
+            // Invoice INSERT joins the same transaction (ADR-020 — gap-free
+            // posture requires Order Paid mutation + Invoice INSERT to commit
+            // or roll back together).
+            await _invoiceCreator.CreateForOrderAsync(order.Id, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
             RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
                 MetricNames.WebhookResultValues.Ok);
@@ -272,6 +280,9 @@ public class WebhooksController : ControllerBase
         {
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
+            // Same Invoice INSERT pattern as the EuPlatesc path — joins the
+            // existing transaction so the gap-free numbering posture holds.
+            await _invoiceCreator.CreateForOrderAsync(order.Id, ct);
             await _db.SaveChangesAsync(ct);
             RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
                 MetricNames.WebhookResultValues.Ok);
