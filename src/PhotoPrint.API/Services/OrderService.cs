@@ -18,19 +18,22 @@ public class OrderService : IOrderService
     private readonly IShippingService _shipping;
     private readonly IStorageRouter _storageRouter;
     private readonly StorageSettings _storageSettings;
+    private readonly VatSettings _vatSettings;
 
     public OrderService(
         PhotoPrintDbContext db,
         IOrderNumberService orderNumberService,
         IShippingService shipping,
         IStorageRouter storageRouter,
-        IOptions<StorageSettings> storageSettings)
+        IOptions<StorageSettings> storageSettings,
+        IOptions<VatSettings> vatSettings)
     {
         _db = db;
         _orderNumberService = orderNumberService;
         _shipping = shipping;
         _storageRouter = storageRouter;
         _storageSettings = storageSettings.Value;
+        _vatSettings = vatSettings.Value;
     }
 
     // ── Idempotency ────────────────────────────────────────────────
@@ -132,7 +135,16 @@ public class OrderService : IOrderService
             guestEmail = gs?.Email;
         }
 
-        // 4. Build and persist the order
+        // 4. VAT breakdown (bolt 038). Romanian convention: prices are
+        // VAT-inclusive; VAT is extracted from the gross total, not added
+        // on top. Shipping is folded into the gross at the same rate as
+        // goods (the simpler/common B2C convention — see ADR-019 rounding,
+        // and a code-level comment in VatCalculator on the shipping
+        // assumption). Rate is snapshotted onto the order; later config
+        // changes do NOT mutate existing rows.
+        var vat = VatCalculator.ExtractBreakdown(total, _vatSettings.Rate);
+
+        // 5. Build and persist the order
         var order = new Order
         {
             OrderNumber = await _orderNumberService.GenerateAsync(ct),
@@ -147,6 +159,9 @@ public class OrderService : IOrderService
             ShippingCostRon = shippingCostRon,
             SubtotalRon = subtotal,
             TotalRon = total,
+            NetTotalRon = vat.NetTotalRon,
+            VatRon = vat.VatRon,
+            VatRate = vat.VatRate,
             IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
             Items = orderItems,
         };
@@ -457,6 +472,9 @@ public class OrderService : IOrderService
             order.OrderNumber,
             order.Status.ToString(),
             order.SubtotalRon,
+            order.NetTotalRon,
+            order.VatRon,
+            order.VatRate,
             order.ShippingCostRon,
             order.TotalRon,
             order.CreatedAt,

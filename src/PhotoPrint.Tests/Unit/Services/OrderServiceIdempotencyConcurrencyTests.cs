@@ -57,7 +57,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         return new OrderService(db, numberMock.Object, shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
     }
 
     // The REAL OrderNumberService (SQLite COUNT+1 branch) — the mock's always-unique
@@ -68,7 +69,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         return new OrderService(db, new OrderNumberService(db), shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
     }
 
     // Build the concurrent "winner" by running the REAL
@@ -86,7 +88,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         var svc = new OrderService(winnerDb, numberMock.Object, shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
 
         var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);
         return result.Order;

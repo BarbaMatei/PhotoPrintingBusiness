@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-03T02:00:00Z
-total_decisions: 18
+last_updated: 2026-06-03T05:00:00Z
+total_decisions: 20
 ---
 
 # Decision Index
@@ -17,6 +17,22 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-020: Postgres `SEQUENCE` for Invoice Numbering — Accept Gap-on-Rollback
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 038-vat-calculation (vat-calculation)
+- **Path**: `bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md`
+- **Summary**: Invoice numbering uses Postgres `SEQUENCE` per `(series, year)` partition with `CREATE SEQUENCE IF NOT EXISTS` + `nextval()`. Atomic, concurrent, idiomatic — but gaps on transaction rollback by Postgres design. The counter-table alternative (`FOR UPDATE` + increment + INSERT in one transaction) was considered and rejected: it eliminates gaps at the cost of row-level lock contention on the Paid path. Rollback is extraordinarily rare in our flow (single SaveChanges, no external I/O inside the transaction); mitigation is a quarterly audit query that surfaces any gap for the accountant. Composite unique index `(Series, year, Number)` is the last-line-of-defence against the database-restore-error case. SQLite dev path uses `MAX + 1` in a transaction (single-writer DB makes this safe).
+- **Read when**: working on `IInvoiceNumberingService` or `Invoice` insertion; reviewing PRs that touch the Paid transition's transactional scope; designing the bolt-039 worker that creates invoices; tempted to "harden" the numbering by switching to a counter table (don't, without re-engaging with this ADR's trade-off); debugging "why is there a gap between `FT-2026-00042` and `FT-2026-00044`?"; auditing invoices for a fiscal period; planning Redis-backed alternatives at scale.
+
+### ADR-019: `MidpointRounding.AwayFromZero` for Legal / Regulatory Decimal Math
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 038-vat-calculation (vat-calculation)
+- **Path**: `bolts/038-vat-calculation/adr-019-decimal-rounding-away-from-zero-for-regulatory-math.md`
+- **Summary**: All decimal rounding in legal / regulatory code paths uses `MidpointRounding.AwayFromZero`. The default `decimal.Round(x, 2)` overload (no mode argument) is FORBIDDEN in any path that produces a value written to an invoice, submitted to ANAF, or reported to a customer as a tax amount. The default uses banker's rounding (`ToEven`) which disagrees with Romanian accountancy convention + ANAF tooling; small per-row, accumulates across many invoices, audit-time finding. `VatCalculator.ExtractBreakdown` is the canonical reference; future tax-adjacent classes follow it. Unit test pins the contract against the .NET default.
+- **Read when**: writing any code that rounds a `decimal` to a fixed number of decimal places in a financial / regulatory context; reviewing PRs that touch VAT, totals, discounts, refunds, or any value written to an invoice or report; debugging "why does my invoice's `VatRon` disagree with ANAF's recomputation?"; tempted to "simplify" a `decimal.Round(x, 2, MidpointRounding.AwayFromZero)` call by dropping the mode argument (don't — it's load-bearing); designing similar rounding rules for other regulatory domains.
 
 ### ADR-018: `/metrics` Uses IP Allow-List, Not JWT
 - **Status**: accepted

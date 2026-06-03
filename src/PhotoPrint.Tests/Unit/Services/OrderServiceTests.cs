@@ -49,7 +49,8 @@ public class OrderServiceTests : IDisposable
             _orderNumberServiceMock.Object,
             _shippingMock.Object,
             _storageRouterMock.Object,
-            Options.Create(new StorageSettings()));
+            Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
     }
 
     public void Dispose() => _db.Dispose();
@@ -108,6 +109,40 @@ public class OrderServiceTests : IDisposable
         Assert.Equal(26.00m, order.TotalRon);
         // Server-resolved shipping cost from IShippingService mock (20.00 RON).
         Assert.Equal(20.00m, order.ShippingCostRon);
+    }
+
+    // ── VAT breakdown (bolt 038) ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateFromCartAsync_ValidCart_PopulatesVatBreakdown()
+    {
+        // Cart subtotal 6 + shipping 20 = gross 26.00. At 19% (default):
+        //   VatRon = round(26.00 * 0.19 / 1.19, 2) = round(4.1512..., 2) = 4.15
+        //   NetTotalRon = 26.00 - 4.15 = 21.85
+        var (userId, _, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
+
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
+
+        Assert.Equal(21.85m, order.NetTotalRon);
+        Assert.Equal(4.15m,  order.VatRon);
+        Assert.Equal(0.19m,  order.VatRate);
+        // Reconciles to the gross within rounding tolerance.
+        Assert.True(Math.Abs((order.NetTotalRon + order.VatRon) - order.TotalRon) <= 0.01m);
+    }
+
+    [Fact]
+    public async Task CreateFromCartAsync_FreeOrder_HasZeroVat()
+    {
+        // Future intent 022 (coupons) will produce zero-gross orders. Guard
+        // against div-by-zero / negative-VAT regressions today.
+        var (userId, _, _) = await SeedCartAsync(unitPrice: 0m, quantity: 1);
+        _shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ShippingCostDto(0m));
+
+        var order = (await _service.CreateFromCartAsync(userId, null, MakeRequest())).Order;
+
+        Assert.Equal(0m, order.NetTotalRon);
+        Assert.Equal(0m, order.VatRon);
     }
 
     [Fact]
@@ -476,7 +511,8 @@ public class OrderServiceTests : IDisposable
         });
 
         var sut = new OrderService(
-            _db, _orderNumberServiceMock.Object, _shippingMock.Object, router.Object, settings);
+            _db, _orderNumberServiceMock.Object, _shippingMock.Object, router.Object,
+            settings, Options.Create(new VatSettings()));
         return (sut, cloud);
     }
 

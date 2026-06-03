@@ -21,6 +21,23 @@ public class Order
     public decimal SubtotalRon { get; set; }
     public decimal TotalRon { get; set; }
 
+    // ── VAT breakdown (bolt 038) ─────────────────────────────────────────────
+    /// <summary>Net (VAT-exclusive) total in RON. Snapshot at order creation;
+    /// not re-derived from a live config rate. Invariant:
+    /// <c>NetTotalRon + VatRon ≈ TotalRon</c> within ±0.01.</summary>
+    public decimal NetTotalRon { get; set; }
+
+    /// <summary>VAT amount extracted from <see cref="TotalRon"/> at
+    /// <see cref="VatRate"/>. Romanian convention — VAT is included in
+    /// customer-facing prices and extracted, not added on top.</summary>
+    public decimal VatRon { get; set; }
+
+    /// <summary>The VAT rate applied to this order, snapshotted at creation
+    /// (default 0.19 = 19%). Changing <c>Vat:Rate</c> in config later does
+    /// NOT mutate existing orders — the legal trail records the rate at
+    /// time of sale.</summary>
+    public decimal VatRate { get; set; }
+
     public string? AwbNumber { get; set; }
     public string? TrackingUrl { get; set; }
 

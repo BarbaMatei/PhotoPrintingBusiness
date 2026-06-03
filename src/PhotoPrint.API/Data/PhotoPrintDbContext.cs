@@ -44,6 +44,7 @@ public class PhotoPrintDbContext : DbContext
     public DbSet<EasyboxLocker> EasyboxLockers { get; set; } = null!;
     public DbSet<Order> Orders { get; set; } = null!;
     public DbSet<OrderItem> OrderItems { get; set; } = null!;
+    public DbSet<Invoice> Invoices { get; set; } = null!;
     public DbSet<SavedAddress> SavedAddresses { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -351,6 +352,10 @@ public class PhotoPrintDbContext : DbContext
                 entity.Property(o => o.ShippingCostRon).HasColumnType("decimal(10,2)");
                 entity.Property(o => o.SubtotalRon).HasColumnType("decimal(10,2)");
                 entity.Property(o => o.TotalRon).HasColumnType("decimal(10,2)");
+                // VAT breakdown (bolt 038)
+                entity.Property(o => o.NetTotalRon).HasColumnType("decimal(18,2)");
+                entity.Property(o => o.VatRon).HasColumnType("decimal(18,2)");
+                entity.Property(o => o.VatRate).HasColumnType("decimal(5,4)");
             }
 
             entity.Property(o => o.ShippingAddress)
@@ -406,6 +411,40 @@ public class PhotoPrintDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(oi => oi.ProductId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Invoice (bolt 038) ─────────────────────────────────────────────────────
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasKey(i => i.Id);
+            entity.Property(i => i.InvoiceNumber).HasMaxLength(50);
+            entity.Property(i => i.Series).HasMaxLength(10);
+            entity.Property(i => i.AnafStatus).HasConversion<string>().HasMaxLength(30);
+            entity.Property(i => i.AnafUploadId).HasMaxLength(100);
+            entity.Property(i => i.PdfStoragePath).HasMaxLength(500);
+            entity.Property(i => i.XmlPayload).HasColumnType("text");
+            entity.Property(i => i.LastError).HasColumnType("text");
+
+            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+            {
+                entity.Property(i => i.NetTotalRon).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.VatRon).HasColumnType("decimal(18,2)");
+                entity.Property(i => i.TotalRon).HasColumnType("decimal(18,2)");
+            }
+
+            entity.HasIndex(i => i.InvoiceNumber)
+                  .IsUnique()
+                  .HasDatabaseName("ix_invoices_invoice_number");
+            entity.HasIndex(i => i.OrderId)
+                  .HasDatabaseName("ix_invoices_order_id");
+            entity.HasIndex(i => i.AnafStatus)
+                  .HasDatabaseName("ix_invoices_anaf_status");
+
+            entity.HasOne(i => i.Order)
+                  .WithMany()
+                  .HasForeignKey(i => i.OrderId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired();
         });
 
         // ── SavedAddress ───────────────────────────────────────────────────────────

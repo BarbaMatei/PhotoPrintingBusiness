@@ -223,6 +223,30 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IStripeSignatureVerifier, Pho
 builder.Services.AddScoped<PhotoPrint.API.Services.IEuPlatescService, PhotoPrint.API.Services.EuPlatescService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderService, PhotoPrint.API.Services.OrderService>();
 
+// ── Invoicing (intent 016 / bolt 038) ─────────────────────────────────────────
+// VAT calculation + invoice numbering. No master flag — VAT is unconditional
+// for legal compliance. Numbering service is provider-aware (Postgres SEQUENCE
+// per ADR-020; SQLite MAX+1 in single-writer mode).
+builder.Services.Configure<PhotoPrint.API.Configuration.VatSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.VatSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.VatSettings>,
+    PhotoPrint.API.Validators.VatSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.VatSettings>().ValidateOnStart();
+
+if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddScoped<
+        PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
+        PhotoPrint.API.Services.Invoicing.SqliteInvoiceNumberingService>();
+}
+else
+{
+    builder.Services.AddScoped<
+        PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
+        PhotoPrint.API.Services.Invoicing.PostgresInvoiceNumberingService>();
+}
+
 // ── Admin ────────────────────────────────────────────────────────────────────────────
 
 builder.Services.AddHttpClient();
