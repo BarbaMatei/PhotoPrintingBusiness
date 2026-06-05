@@ -1,18 +1,21 @@
 # Global Story Index
 
 ## Overview
-- **Total story listings**: 155 (+ 6 intents documented inline without per-story listings)
-- **Story files on disk**: 142
+- **Total story listings**: 180 (+ 6 intents documented inline without per-story listings)
+- **Story files on disk**: 167
 - **Implemented**: 80 listings (across 44 shipped bolts) + 8 COMPLETE (intent 024) + 46 GENERATED-but-actually-shipped (early intents 001–003, 005)
 - **Intents complete (shipped)**: 001–010, 012–020, 023, 024 (016 VAT/e-Factura + 020 observability shipped via bolts 038/039/044/045; 011 is a non-standard design-review intent)
 - **Intents parked**: 021 (Redis multi-replica — deprioritized until deployed + real scaling pressure; bolt 046)
-- **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 (see below)
-- **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03)
+- **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 + roadmap Phase 3–4 intents 032–033 (see below)
+- **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03), 070–075 (roadmap Phase 3–4). Bolt 050 remains unallocated by design (no directory exists).
 - **Last updated**: 2026-06-05
-- **Last index change**: 2026-06-05 (added architect-review-2026-06-03 intents 025–031 → 16 units, 44 stories, bolts 054–069 — all status PLANNED / ✅ GENERATED)
+- **Last index change**: 2026-06-05 (added roadmap Phase 3–4 intents 032–033 → 6 units, 25 stories, bolts 070–075 — all status PLANNED / ✅ GENERATED. Source: ai-workflow-review-2026-06-05 §6. 032 builds on bolts 066+062; 033 is infrastructure-readiness only, NOT deployment.)
+- **Roadmap Phase 3–4 intents planned**: 032 (regression + comprehensive e2e — Phase 3 stabilize; builds on bolts 066 + 062), 033 (environment triad — Phase 4 infrastructure readiness only, NOT deployment).
+- **Roadmap Phase 3–4 bolts planned**: 070–075 (6 bolts → 25 stories).
 - **Architect-review (2026-06-03) intents planned**: 025 (security/dependency hygiene), 026 (observability/manifest), 027 (architectural layering), 028 (test architecture), 029 (decomposition/hardening), 030 (UI scaling/e2e), 031 (refund/return). P20 coupon → existing 022 (not re-added).
 - **Architect-review bolts planned**: 054–069 (16 bolts → 44 stories)
-- **Last index change (prior)**: 2026-06-02 (drift repair — see notes below)
+- **Last index change (prior)**: 2026-06-05 (added architect-review-2026-06-03 intents 025–031 → 16 units, 44 stories, bolts 054–069 — all status PLANNED / ✅ GENERATED)
+- **Last index change (prior 2)**: 2026-06-02 (drift repair — see notes below)
 - **Note**: intent 024 (order-photo archive) shipped 2026-05-30 → 2026-06-01 (bolts 051, 052, 053). Intent 015 (Sameday shipping integration) shipped 2026-06-02 (bolts 036, 037). Story 019-003 superseded → backfill done via intent 024 bolt 051. Bolt 050 is unallocated (no directory exists).
 - **Drift-repair note (2026-06-02)**: prior to this edit, the index undercounted ~51 stories. Flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED`: all stories under intents 004, 010, 012, 015, 023. Added sections for intents 005–009 + 011 which were missing from the index entirely.
 
@@ -1474,3 +1477,181 @@
 **Priority**: Must
 **Path**: `intents/031-refund-return-flow/units/002-refund-return-flow-ui/stories/001-admin-refund-action.md`
 **Bolt**: 069
+
+---
+
+## Roadmap Phase 3–4 — Stabilization & Environment Triad Intents (032–033)
+
+> Source: `docs/analysis/ai-workflow-review-2026-06-05.md` §6 (owner's roadmap). All PLANNED / ✅ GENERATED (inception artifacts created; not yet implemented). New bolts: 070–075 (bolt 050 remains unallocated by design). Intent 032 = Phase 3 (stabilize); intent 033 = Phase 4 (environment triad — infrastructure readiness only, NOT deployment).
+
+### 032-regression-and-e2e-stabilization
+
+> Phase 3. Builds on bolt 066 (Playwright foundation) + bolt 062 (Builders) — extends, does not re-plan. Coupon (047/048) and refund (068/069) e2e journeys authored but gated (`test.fixme`) until those features ship.
+
+#### Unit: 001-e2e-data-strategy (4 stories) — Bolt: 070
+
+### 001-e2e-data-contract.md ✅ GENERATED
+**Title**: Documented deterministic e2e data contract
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/001-e2e-data-contract.md`
+**Bolt**: 070
+
+### 002-builder-backed-fixtures.md ✅ GENERATED
+**Title**: Builder-backed Playwright fixtures (guest/user/admin)
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/002-builder-backed-fixtures.md`
+**Bolt**: 070
+
+### 003-payment-testmode-fixtures.md ✅ GENERATED
+**Title**: Stripe + EuPlatesc test-mode fixtures
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/003-payment-testmode-fixtures.md`
+**Bolt**: 070
+
+### 004-real-postgres-e2e-boot.md ✅ GENERATED
+**Title**: Real-Postgres docker-compose e2e boot
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/004-real-postgres-e2e-boot.md`
+**Bolt**: 070
+
+#### Unit: 002-e2e-journey-coverage (8 stories) — Bolt: 071
+
+### 001-guest-and-registered-checkout.md ✅ GENERATED
+**Title**: Guest + registered checkout journeys (+ decline branch)
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/001-guest-and-registered-checkout.md`
+**Bolt**: 071
+
+### 002-authentication-journeys.md ✅ GENERATED
+**Title**: Email / Google (mocked) / guest-claim auth journeys
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/002-authentication-journeys.md`
+**Bolt**: 071
+
+### 003-uploads-cart-and-merge.md ✅ GENERATED
+**Title**: Uploads, cart edits, guest→user cart merge
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/003-uploads-cart-and-merge.md`
+**Bolt**: 071
+
+### 004-payments-journeys.md ✅ GENERATED
+**Title**: Stripe + EuPlatesc test-mode payment journeys
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/004-payments-journeys.md`
+**Bolt**: 071
+
+### 005-orders-and-account-journeys.md ✅ GENERATED
+**Title**: Order history/detail (+ ownership) + account management
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/005-orders-and-account-journeys.md`
+**Bolt**: 071
+
+### 006-admin-journeys.md ✅ GENERATED
+**Title**: Admin order/product/invoice journeys
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/006-admin-journeys.md`
+**Bolt**: 071
+
+### 007-gated-coupon-refund-journeys.md ✅ GENERATED
+**Title**: Gated coupon + refund journeys (requires 047/048 + 068/069)
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/007-gated-coupon-refund-journeys.md`
+**Bolt**: 071
+
+### 008-e2e-ci-tiers-and-stability.md ✅ GENERATED
+**Title**: CI fast/full tiers, retries, artifacts, flake controls
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/008-e2e-ci-tiers-and-stability.md`
+**Bolt**: 071
+
+#### Unit: 003-regression-methodology (3 stories) — Bolt: 072
+
+### 001-regression-checklist.md ✅ GENERATED
+**Title**: Regression checklist mapped to shipped intents
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/003-regression-methodology/stories/001-regression-checklist.md`
+**Bolt**: 072
+
+### 002-execute-regression-baseline.md ✅ GENERATED
+**Title**: Execute + record one dated regression baseline
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/003-regression-methodology/stories/002-execute-regression-baseline.md`
+**Bolt**: 072
+
+### 003-triage-findings-to-backlog.md ✅ GENERATED
+**Title**: Triage findings into backlog / KNOWN_FAILURES
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/003-regression-methodology/stories/003-triage-findings-to-backlog.md`
+**Bolt**: 072
+
+---
+
+### 033-environment-triad
+
+> Phase 4 — **infrastructure readiness only, NOT deployment** (deployment is roadmap Phase 6). Adds a third deployable-dev tier alongside the existing local + prod compose/appsettings assets; builds from them, leaving prod behaviour unchanged. No external bolt dependencies.
+
+#### Unit: 001-config-tiers-and-compose (4 stories) — Bolt: 073
+
+### 001-define-dev-env-tier.md ✅ GENERATED
+**Title**: Define the dev-env ASPNETCORE_ENVIRONMENT + layered appsettings
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/001-define-dev-env-tier.md`
+**Bolt**: 073
+
+### 002-dev-env-compose-file.md ✅ GENERATED
+**Title**: docker-compose.dev-env.yml (standalone; prod untouched)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/002-dev-env-compose-file.md`
+**Bolt**: 073
+
+### 003-three-tier-config-map.md ✅ GENERATED
+**Title**: Per-setting config map across local / dev-env / prod
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/003-three-tier-config-map.md`
+**Bolt**: 073
+
+### 004-boot-validation-parity.md ✅ GENERATED
+**Title**: ValidateOnStart parity for the dev-env tier (loud-fail, no fallback)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/004-boot-validation-parity.md`
+**Bolt**: 073
+
+#### Unit: 002-secrets-and-seeding (4 stories) — Bolt: 074
+
+### 001-secrets-tier-matrix.md ✅ GENERATED
+**Title**: Secrets × tier matrix (test vs live, storage location)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/001-secrets-tier-matrix.md`
+**Bolt**: 074
+
+### 002-dev-env-secrets-template.md ✅ GENERATED
+**Title**: .env.dev-env.example template (test-mode placeholders)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/002-dev-env-secrets-template.md`
+**Bolt**: 074
+
+### 003-seeding-policy-and-selector.md ✅ GENERATED
+**Title**: Per-environment seeding policy + selector (reuse existing seeders)
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/003-seeding-policy-and-selector.md`
+**Bolt**: 074
+
+### 004-prod-demo-data-guard.md ✅ GENERATED
+**Title**: Guard — DevDataSeed cannot run in Production
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/004-prod-demo-data-guard.md`
+**Bolt**: 074
+
+#### Unit: 003-promotion-readiness (2 stories) — Bolt: 075
+
+### 001-promotion-path-runbook.md ✅ GENERATED
+**Title**: dev→prod promotion runbook (readiness documentation)
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/003-promotion-readiness/stories/001-promotion-path-runbook.md`
+**Bolt**: 075
+
+### 002-deployment-deferral-note.md ✅ GENERATED
+**Title**: Explicit Phase-6 deployment-deferral note
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/003-promotion-readiness/stories/002-deployment-deferral-note.md`
+**Bolt**: 075
