@@ -3,7 +3,7 @@ id: 022-admin-ui
 unit: 002-admin-ui
 intent: 007-admin-panel
 type: simple-construction-bolt
-status: completed
+status: complete
 stories:
   - 001-admin-dashboard-page
   - 002-admin-order-queue-page

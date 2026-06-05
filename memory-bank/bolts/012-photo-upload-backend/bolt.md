@@ -3,7 +3,7 @@ id: 012-photo-upload-backend
 unit: 001-upload-and-cart-backend
 intent: 004-checkout-payment
 type: ddd-construction-bolt
-status: completed
+status: complete
 started: 2026-05-21T12:30:00Z
 completed: 2026-05-21T18:00:00Z
 current_stage: done

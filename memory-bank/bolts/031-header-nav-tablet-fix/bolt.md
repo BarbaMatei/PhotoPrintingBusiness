@@ -3,7 +3,7 @@ id: 031-header-nav-tablet-fix
 unit: 004-responsive-ux-fixes
 intent: 012-ui-polish
 type: simple-construction-bolt
-status: completed
+status: complete
 priority: P3
 stories:
   - 001-show-hamburger-at-md-breakpoint

@@ -3,7 +3,7 @@ id: 020-transactional-emails
 unit: 001-transactional-emails
 intent: 006-email-notifications
 type: ddd-construction-bolt
-status: completed
+status: complete
 stories:
   - 001-welcome-email
   - 002-order-confirmed-email
