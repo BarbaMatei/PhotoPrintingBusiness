@@ -3,7 +3,7 @@ id: 017-checkout-ui
 unit: 005-checkout-ui
 intent: 004-checkout-payment
 type: simple
-status: completed
+status: complete
 started: 2026-05-22T00:00:00Z
 completed: 2026-05-22T07:07:00Z
 current_stage: done

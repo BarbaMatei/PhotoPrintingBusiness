@@ -3,7 +3,7 @@ id: 027-auth-scss-shared-extraction
 unit: 001-auth-scss-refactor
 intent: 012-ui-polish
 type: simple-construction-bolt
-status: completed
+status: complete
 priority: P2
 stories:
   - 001-extract-auth-shared-styles

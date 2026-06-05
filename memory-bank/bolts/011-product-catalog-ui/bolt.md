@@ -3,7 +3,7 @@ id: 011-product-catalog-ui
 unit: 002-product-catalog-ui
 intent: 003-product-catalog
 type: simple-construction-bolt
-status: done
+status: complete
 started: 2026-05-21T11:10:00Z
 completed: 2026-05-21T13:00:00Z
 current_stage: test

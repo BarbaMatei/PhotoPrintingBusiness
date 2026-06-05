@@ -3,7 +3,7 @@ id: 018-orders-api
 unit: 001-orders-api
 intent: 005-order-management
 type: ddd-construction-bolt
-status: completed
+status: complete
 stories:
   - 001-orders-list-endpoint
   - 002-order-detail-endpoint

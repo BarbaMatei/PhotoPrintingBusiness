@@ -3,7 +3,7 @@ id: 029-global-button-styles
 unit: 003-global-ui-primitives
 intent: 012-ui-polish
 type: simple-construction-bolt
-status: completed
+status: complete
 priority: P2
 stories:
   - 001-create-buttons-partial

@@ -4,11 +4,15 @@
 - **Total story listings**: 155 (+ 6 intents documented inline without per-story listings)
 - **Story files on disk**: 142
 - **Implemented**: 80 listings (across 44 shipped bolts) + 8 COMPLETE (intent 024) + 46 GENERATED-but-actually-shipped (early intents 001–003, 005)
-- **Intents complete**: 001, 002, 003, 004, 005, 006, 007, 008, 009, 010, 012, 013, 014, 015, 017, 018, 019, 023, 024
-- **Intents planned**: 016 (VAT/e-Factura), 020 (observability), 021 (Redis), 022 (coupons)
-- **Bolts planned**: 038, 039, 044, 045, 046, 047, 048 (7 bolts → 20 stories)
-- **Last updated**: 2026-06-02
-- **Last index change**: 2026-06-02 (drift repair — see notes below)
+- **Intents complete (shipped)**: 001–010, 012–020, 023, 024 (016 VAT/e-Factura + 020 observability shipped via bolts 038/039/044/045; 011 is a non-standard design-review intent)
+- **Intents parked**: 021 (Redis multi-replica — deprioritized until deployed + real scaling pressure; bolt 046)
+- **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 (see below)
+- **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03)
+- **Last updated**: 2026-06-05
+- **Last index change**: 2026-06-05 (added architect-review-2026-06-03 intents 025–031 → 16 units, 44 stories, bolts 054–069 — all status PLANNED / ✅ GENERATED)
+- **Architect-review (2026-06-03) intents planned**: 025 (security/dependency hygiene), 026 (observability/manifest), 027 (architectural layering), 028 (test architecture), 029 (decomposition/hardening), 030 (UI scaling/e2e), 031 (refund/return). P20 coupon → existing 022 (not re-added).
+- **Architect-review bolts planned**: 054–069 (16 bolts → 44 stories)
+- **Last index change (prior)**: 2026-06-02 (drift repair — see notes below)
 - **Note**: intent 024 (order-photo archive) shipped 2026-05-30 → 2026-06-01 (bolts 051, 052, 053). Intent 015 (Sameday shipping integration) shipped 2026-06-02 (bolts 036, 037). Story 019-003 superseded → backfill done via intent 024 bolt 051. Bolt 050 is unallocated (no directory exists).
 - **Drift-repair note (2026-06-02)**: prior to this edit, the index undercounted ~51 stories. Flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED`: all stories under intents 004, 010, 012, 015, 023. Added sections for intents 005–009 + 011 which were missing from the index entirely.
 
@@ -1142,3 +1146,331 @@
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/003-order-history-photos/stories/002-order-detail-photo-grid.md`
 **Bolt**: 053
+
+---
+
+## Architect Review 2026-06-03 — Improvement Intents (025–031)
+
+> Source: `docs/analysis/architect-review-2026-06-03.md`. All PLANNED / ✅ GENERATED (inception artifacts created; not yet implemented). P20 (coupon) → existing intent 022.
+
+### 025-security-dependency-hygiene
+
+#### Unit: 001-dependency-and-boot-hardening (4 stories) — Bolt: 054
+
+### 001-patch-otel-cve.md ✅ GENERATED
+**Title**: Patch OpenTelemetry CVE (GHSA-4625-4j76-fww9) — P01
+**Priority**: Must
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/001-patch-otel-cve.md`
+**Bolt**: 054
+
+### 002-central-package-management.md ✅ GENERATED
+**Title**: Stripe.net unify + Central Package Management — P02
+**Priority**: Must
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/002-central-package-management.md`
+**Bolt**: 054
+
+### 003-renovate-config.md ✅ GENERATED
+**Title**: Renovate grouped upgrade PRs — P03
+**Priority**: Should
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/003-renovate-config.md`
+**Bolt**: 054
+
+### 004-forwarded-headers-metrics.md ✅ GENERATED
+**Title**: ForwardedHeadersMiddleware for /metrics allow-list — P05
+**Priority**: Must
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/004-forwarded-headers-metrics.md`
+**Bolt**: 054
+
+---
+
+### 026-observability-boot-manifest
+
+#### Unit: 001-boot-composition-and-flags (2 stories) — Bolt: 055
+
+### 001-program-subsystem-extensions.md ✅ GENERATED
+**Title**: Program.cs subsystem extension methods — P07
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/001-boot-composition-and-flags/stories/001-program-subsystem-extensions.md`
+**Bolt**: 055
+
+### 002-typed-feature-gate.md ✅ GENERATED
+**Title**: Typed IFeatureGate registry — P10
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/001-boot-composition-and-flags/stories/002-typed-feature-gate.md`
+**Bolt**: 055
+
+#### Unit: 002-system-manifest-and-liveness (3 stories) — Bolt: 056
+
+### 001-system-info-endpoint.md ✅ GENERATED
+**Title**: /api/admin/system-info manifest — P04
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/002-system-manifest-and-liveness/stories/001-system-info-endpoint.md`
+**Bolt**: 056
+
+### 002-background-job-liveness-check.md ✅ GENERATED
+**Title**: Heartbeat + background-job liveness health check — P17
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/002-system-manifest-and-liveness/stories/002-background-job-liveness-check.md`
+**Bolt**: 056
+
+### 003-anaf-invoice-metrics-and-slo.md ✅ GENERATED
+**Title**: invoice_upload metrics + ANAF SLO — P17
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/002-system-manifest-and-liveness/stories/003-anaf-invoice-metrics-and-slo.md`
+**Bolt**: 056
+
+#### Unit: 003-architecture-and-standards-docs (3 stories) — Bolt: 057
+
+### 001-multi-replica-readiness-doc.md ✅ GENERATED
+**Title**: Multi-replica-readiness consolidation doc — P12
+**Priority**: Could
+**Path**: `intents/026-observability-boot-manifest/units/003-architecture-and-standards-docs/stories/001-multi-replica-readiness-doc.md`
+**Bolt**: 057
+
+### 002-refresh-tech-stack-and-known-failures.md ✅ GENERATED
+**Title**: Refresh tech-stack.md + KNOWN_FAILURES.md — P19
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/003-architecture-and-standards-docs/stories/002-refresh-tech-stack-and-known-failures.md`
+**Bolt**: 057
+
+### 003-architecture-audit-checklist.md ✅ GENERATED
+**Title**: Quarterly architecture audit checklist — P19
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/003-architecture-and-standards-docs/stories/003-architecture-audit-checklist.md`
+**Bolt**: 057
+
+#### Unit: 004-observability-boot-manifest-ui (1 story) — Bolt: 058
+
+### 001-admin-system-info-tab.md ✅ GENERATED
+**Title**: Admin System tab rendering the manifest — P04 (UI)
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/004-observability-boot-manifest-ui/stories/001-admin-system-info-tab.md`
+**Bolt**: 058
+
+---
+
+### 027-architectural-layering
+
+#### Unit: 001-layering-foundation (5 stories) — Bolt: 059
+
+### 001-no-split-adr.md ✅ GENERATED
+**Title**: No four-project clean-arch split ADR — P22
+**Priority**: Could
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/001-no-split-adr.md`
+**Bolt**: 059
+
+### 002-domain-layer-extraction.md ✅ GENERATED
+**Title**: Domain/ layer extraction — P21 (folds P16)
+**Priority**: Could
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/002-domain-layer-extraction.md`
+**Bolt**: 059
+
+### 003-infrastructure-layer.md ✅ GENERATED
+**Title**: Infrastructure/ layer — P21
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/003-infrastructure-layer.md`
+**Bolt**: 059
+
+### 004-web-layer.md ✅ GENERATED
+**Title**: Web/ presentation layer — P21
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/004-web-layer.md`
+**Bolt**: 059
+
+### 005-application-feature-promotion.md ✅ GENERATED
+**Title**: Application/<Feature>/ promotion — P21 (folds P06)
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/005-application-feature-promotion.md`
+**Bolt**: 059
+
+#### Unit: 002-conventions-and-policy (2 stories) — Bolt: 060
+
+### 001-abstractions-subfolders.md ✅ GENERATED
+**Title**: Abstractions/ subfolder per feature — P23
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/002-conventions-and-policy/stories/001-abstractions-subfolders.md`
+**Bolt**: 060
+
+### 002-no-repository-policy-and-analyzer.md ✅ GENERATED
+**Title**: No-repository policy + IQueryable analyzer — P24
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/002-conventions-and-policy/stories/002-no-repository-policy-and-analyzer.md`
+**Bolt**: 060
+
+#### Unit: 003-handler-pattern (4 stories) — Bolt: 061
+
+### 001-command-handler-abstractions.md ✅ GENERATED
+**Title**: ICommandHandler/IEventDispatcher abstractions — P25
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/001-command-handler-abstractions.md`
+**Bolt**: 061
+
+### 002-create-order-handler.md ✅ GENERATED
+**Title**: CreateOrderHandler (extract CreateFromCartAsync) — P25
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/002-create-order-handler.md`
+**Bolt**: 061
+
+### 003-order-paid-event-dispatcher.md ✅ GENERATED
+**Title**: OrderPaidEventDispatcher — P25 (folds P11)
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/003-order-paid-event-dispatcher.md`
+**Bolt**: 061
+
+### 004-retry-and-promote-handlers.md ✅ GENERATED
+**Title**: Retry-invoice + promote-photos handlers — P25
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/004-retry-and-promote-handlers.md`
+**Bolt**: 061
+
+---
+
+### 028-test-architecture
+
+#### Unit: 001-test-infrastructure (4 stories) — Bolt: 062
+
+### 001-timeprovider-adoption.md ✅ GENERATED
+**Title**: Adopt TimeProvider across older services — P28
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/001-timeprovider-adoption.md`
+**Bolt**: 062
+
+### 002-shared-test-application-factory.md ✅ GENERATED
+**Title**: Shared PhotoPrintTestApplicationFactory base — P27
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/002-shared-test-application-factory.md`
+**Bolt**: 062
+
+### 003-test-builders.md ✅ GENERATED
+**Title**: Fluent test data Builders — P27
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/003-test-builders.md`
+**Bolt**: 062
+
+### 004-reclassify-misnamed-unit-tests.md ✅ GENERATED
+**Title**: Reclassify DbContext "unit" tests to Integration — P27
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/004-reclassify-misnamed-unit-tests.md`
+**Bolt**: 062
+
+---
+
+### 029-decomposition-and-hardening
+
+#### Unit: 001-access-hardening (2 stories) — Bolt: 063
+
+### 001-global-rate-limit.md ✅ GENERATED
+**Title**: Global per-IP rate limit — P08
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/001-access-hardening/stories/001-global-rate-limit.md`
+**Bolt**: 063
+
+### 002-admin-policy-constant.md ✅ GENERATED
+**Title**: Policies.Admin constant — P08
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/001-access-hardening/stories/002-admin-policy-constant.md`
+**Bolt**: 063
+
+#### Unit: 002-service-decomposition (2 stories) — Bolt: 064
+
+### 001-decompose-auth-service.md ✅ GENERATED
+**Title**: Split AuthService into 3 services — P13
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/002-service-decomposition/stories/001-decompose-auth-service.md`
+**Bolt**: 064
+
+### 002-thin-webhooks-and-order-photo-query.md ✅ GENERATED
+**Title**: OrderPhotoQueryService + thin WebhooksController — P14
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/002-service-decomposition/stories/002-thin-webhooks-and-order-photo-query.md`
+**Bolt**: 064
+
+#### Unit: 003-persistence-config (1 story) — Bolt: 065
+
+### 001-per-entity-configurations.md ✅ GENERATED
+**Title**: Per-entity IEntityTypeConfiguration<T> — P15
+**Priority**: Could
+**Path**: `intents/029-decomposition-and-hardening/units/003-persistence-config/stories/001-per-entity-configurations.md`
+**Bolt**: 065
+
+---
+
+### 030-ui-scaling-and-e2e
+
+#### Unit: 001-ci-quality-gates (2 stories) — Bolt: 066
+
+### 001-bundle-size-budget.md ✅ GENERATED
+**Title**: CI bundle-size budget — P18
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/001-ci-quality-gates/stories/001-bundle-size-budget.md`
+**Bolt**: 066
+
+### 002-playwright-e2e-smoke-tests.md ✅ GENERATED
+**Title**: 3 Playwright e2e smoke tests — P18
+**Priority**: Must
+**Path**: `intents/030-ui-scaling-and-e2e/units/001-ci-quality-gates/stories/002-playwright-e2e-smoke-tests.md`
+**Bolt**: 066
+
+#### Unit: 002-ui-scaling-and-e2e-ui (4 stories) — Bolt: 067
+
+### 001-base-api-service.md ✅ GENERATED
+**Title**: Shared BaseApiService — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/001-base-api-service.md`
+**Bolt**: 067
+
+### 002-home-page-breakup.md ✅ GENERATED
+**Title**: Break up home-page.ts (951 LOC) — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/002-home-page-breakup.md`
+**Bolt**: 067
+
+### 003-account-pages-breakup.md ✅ GENERATED
+**Title**: Break up saved-addresses + profile pages — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/003-account-pages-breakup.md`
+**Bolt**: 067
+
+### 004-delivery-step-locker-selector.md ✅ GENERATED
+**Title**: Extract locker-selector from delivery-step — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/004-delivery-step-locker-selector.md`
+**Bolt**: 067
+
+---
+
+### 031-refund-return-flow
+
+#### Unit: 001-refund-domain-and-api (4 stories) — Bolt: 068
+
+### 001-refund-schema-and-status.md ✅ GENERATED
+**Title**: Refund schema + OrderStatus.Refunded — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/001-refund-schema-and-status.md`
+**Bolt**: 068
+
+### 002-refund-service-stripe-euplatesc.md ✅ GENERATED
+**Title**: Refund service (full/partial, Stripe + EuPlatesc) — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/002-refund-service-stripe-euplatesc.md`
+**Bolt**: 068
+
+### 003-anaf-credit-note.md ✅ GENERATED
+**Title**: ANAF credit-note (UBL type 381) — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/003-anaf-credit-note.md`
+**Bolt**: 068
+
+### 004-admin-refund-endpoint.md ✅ GENERATED
+**Title**: Admin refund endpoint — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/004-admin-refund-endpoint.md`
+**Bolt**: 068
+
+#### Unit: 002-refund-return-flow-ui (1 story) — Bolt: 069
+
+### 001-admin-refund-action.md ✅ GENERATED
+**Title**: Admin refund action + modal — P09 (UI)
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/002-refund-return-flow-ui/stories/001-admin-refund-action.md`
+**Bolt**: 069
