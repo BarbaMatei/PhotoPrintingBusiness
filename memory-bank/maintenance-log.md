@@ -34,3 +34,37 @@ Normalized 21 bolts from non-standard done-states to the template-standard `comp
 - **Remaining `planned` bolts (19):** 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03 backlog).
 
 ---
+
+## 2026-06-05T13:00:00Z - Inception (roadmap Phase 3–4 intents 032–033)
+
+**Triggered by**: Inception Agent run for the owner's roadmap Phase 3 (stabilize) + Phase 4 (environment triad). Source: `docs/analysis/ai-workflow-review-2026-06-05.md` §6. Self-validated at all four checkpoints (no human available mid-run; owner reviews afterward).
+
+### Intents created
+
+| Intent | Type | Units | Stories | Bolts |
+|--------|------|-------|---------|-------|
+| 032-regression-and-e2e-stabilization | brown-field / stabilization | 3 | 15 | 070, 071, 072 |
+| 033-environment-triad | brown-field / infrastructure readiness (NOT deployment) | 3 | 10 | 073, 074, 075 |
+
+### Dependency edges declared (build-on, not duplicate)
+
+- **070-e2e-data-strategy** `requires_bolts: [066-ci-quality-gates, 062-test-infrastructure]` — extends the Playwright foundation + reuses the Builders.
+- **071-e2e-journey-coverage** `requires_bolts: [070, 066]`; gated coupon/refund specs reference bolts 047/048 + 068/069 (authored, not implemented).
+- **072-regression-methodology** `requires_bolts: [071]`; soft dependency on 057 (KNOWN_FAILURES.md).
+- **073/074/075** form an internal chain (073 → 074 → 075); no external bolt dependencies (builds from shipped infra assets).
+
+### Story-index changes
+
+| Artifact | Change | Reason |
+|----------|--------|--------|
+| story-index.md | Appended intent 032 (15 stories) + 033 (10 stories) sections, all ✅ GENERATED | New inception artifacts |
+| story-index.md (Overview) | Total listings 155 → 180; files-on-disk 142 → 167; added Phase 3–4 intent/bolt planned bullets; recorded bolts 070–075; reaffirmed bolt 050 unallocated | Keep header truthful |
+
+### Notes
+
+- **Intent 033 is infrastructure readiness only — NOT deployment.** Deployment is roadmap Phase 6. No deploy/provision/cutover work was planned; bolt 075 carries an explicit Phase-6 deferral note.
+- **Bolt 050 remains unallocated by design** — new bolts started at 070 per the run constraint.
+- **Self-validation concern flagged for owner**: unit 002 of intent 032 carries 8 stories (over the 5–6 soft cap) — kept as one bolt (071) because they are thin, parallel, domain-sliced specs over one shared fixture layer; owner may prefer a 2-bolt split.
+- **Remaining `planned` bolts now (25):** 046 (parked), 047, 048 (coupons), 054–069 (architect-review), 070–075 (roadmap Phase 3–4).
+
+---
