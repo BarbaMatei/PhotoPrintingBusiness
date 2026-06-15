@@ -33,8 +33,8 @@ See [conductor-system.md](conductor-system.md) for the pipeline and the planner-
 | System | Role | Status | Note |
 |---|---|---|---|
 | **AI-DLC / specsmd** | Builder — specs + code from intent | **built / installed** | — |
-| **bug-hunter** | Inspector — finds defects in standing code | **specced, ready to build** | [guide](../bug-hunter-build-guide-v3.6.md) |
-| **knowledge-builder** | Librarian / oracle — distils intent → contracts | **specced, ready to build** | [guide](../knowledge-builder-build-guide-v3.5.md) |
+| **bug-hunter** | Inspector — finds defects in standing code | **specced, ready to build** | [guide](../bug-hunter-build-guide.md) |
+| **knowledge-builder** | Librarian / oracle — distils intent → contracts | **specced, ready to build** | [guide](../knowledge-builder-build-guide.md) |
 | **code-review** | Reviewer — pre-merge, diff-scoped gate | **planned (deferred)** | [concept](code-review-system.md) |
 | **analyst** | Architectural review — scans the system, detects gaps, proposes ranked improvements (feeds the Conductor) | **partial** — `architect-analyst` agent exists | [concept](analyst-system.md) |
 | **conductor** | Planning conductor — aggregates all signals → proposes ranked next-work queue | **planned (deferred)** | [concept](conductor-system.md) |

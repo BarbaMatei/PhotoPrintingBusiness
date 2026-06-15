@@ -26,7 +26,7 @@ implemented: false
 ## Technical Notes
 
 - ⚠️ This is an **extension brief**: paste **Optional A** from
-  `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the **skill-creator** skill (`Skill`
+  `docs/agent-systems/bug-hunter-build-guide.md` into the **skill-creator** skill (`Skill`
   tool → `skill-creator:skill-creator`) to re-open `report-rendering`. Re-run
   Prompt 4's tests after. STOP and report if skill-creator is unavailable.
 - Build on owner adoption (GitHub code scanning accepts SARIF uploads — natural

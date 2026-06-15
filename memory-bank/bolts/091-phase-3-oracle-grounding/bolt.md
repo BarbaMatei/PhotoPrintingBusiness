@@ -41,8 +41,8 @@ surface contract contradictions (24b), Verifier/scoring weight contract corrobor
 ## ⛔ GATED — cross-system prerequisite (requirements D6 — now a schedule)
 
 `intent-lookup` consumes the **knowledge builder's `ledger-query` interface**, now
-fully specified in `docs/agent-systems/integration-contract-v1.5.md` (§2 envelope, §3 flow identity)
-and built per `docs/agent-systems/knowledge-builder-build-guide-v3.5.md`. Sequencing is normative in
+fully specified in `docs/agent-systems/integration-contract.md` (§2 envelope, §3 flow identity)
+and built per `docs/agent-systems/knowledge-builder-build-guide.md`. Sequencing is normative in
 the contract's §7: this bolt runs **after the knowledge builder's Phases 1–2** (which
 themselves require bolts 085–088 of this intent first). If the owner instead descopes
 the oracle for now, story 017's non-oracle parts (specialist dispatch, cost control,
@@ -53,7 +53,7 @@ silently.**
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's test prompts**, fix,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's test prompts**, fix,
 then next — in order. 24b/24c/24d **re-open existing skills** (hunters, bug-verifier,
 orchestrator) — re-run each re-opened skill's original tests after. **This bolt must
 never run in parallel with anything** (it touches skills from bolts 086–090). If

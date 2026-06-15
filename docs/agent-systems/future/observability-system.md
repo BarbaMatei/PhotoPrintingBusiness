@@ -32,7 +32,7 @@ connection to whatever runtime telemetry the deployment exposes.
 
 ## Relationship to what exists
 
-- Feeds the **fix loop** ([contract §4](../integration-contract-v1.5.md)) the same mailbox the
+- Feeds the **fix loop** ([contract §4](../integration-contract.md)) the same mailbox the
   Inspector's confirmed bugs use — an incident is just a bug discovered at runtime.
 - Distinct from the Inspector: the Inspector reasons about code *at rest*; Observability observes
   behaviour *in flight*. (Same disjointness discipline as the rest of the org.)

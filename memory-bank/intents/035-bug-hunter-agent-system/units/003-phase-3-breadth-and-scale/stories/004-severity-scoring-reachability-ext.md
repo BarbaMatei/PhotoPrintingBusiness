@@ -27,7 +27,7 @@ implemented: false
 ## Technical Notes
 
 - ⚠️ This is an **extension brief**: paste **Prompt 14b** from
-  `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the **skill-creator** skill (`Skill`
+  `docs/agent-systems/bug-hunter-build-guide.md` into the **skill-creator** skill (`Skill`
   tool → `skill-creator:skill-creator`) to re-open `severity-scoring`. Run its test
   AND re-run Prompt 8's tests. STOP and report if skill-creator is unavailable.
 - Small change by design — the Phase 2 formula was built to extend.

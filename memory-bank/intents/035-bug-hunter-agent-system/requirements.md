@@ -9,7 +9,7 @@ updated: 2026-06-10T10:40:14Z
 # Requirements: Bug-Hunting Agent System (Tooling Intent)
 
 > **Tooling-only intent.** Builds the multi-agent bug-hunting system described in
-> `docs/agent-systems/bug-hunter-build-guide-v3.6.md` — **42 numbered briefs** across 5 additive phases
+> `docs/agent-systems/bug-hunter-build-guide.md` — **42 numbered briefs** across 5 additive phases
 > plus an optional integration tier. Components are Claude Code skills (agents are
 > built as skills defining their procedure, per the guide's shared conventions).
 > **The system is read-only on application source** — this intent ships no production
@@ -23,7 +23,7 @@ updated: 2026-06-10T10:40:14Z
 > only then move on. If skill-creator is unavailable in the construction context,
 > STOP and report — do not hand-roll skills.
 >
-> Source feed (the spec of record): `docs/agent-systems/bug-hunter-build-guide-v3.6.md`. Stories do
+> Source feed (the spec of record): `docs/agent-systems/bug-hunter-build-guide.md`. Stories do
 > NOT duplicate the briefs — each story points at its Prompt N and adds memory-bank
 > tracking + acceptance criteria.
 
@@ -83,7 +83,7 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
   *reads* its `ledger-query` interface; building that system is a separate intent.
   Its absence blocks only the oracle stories (see bolt 091 `blocks` flag).
 - ❌ **Auto-applied patches.** `fix-proposal` proposes diffs; it never applies them.
-- ❌ **Modifying the guide.** `docs/agent-systems/bug-hunter-build-guide-v3.6.md` is the spec of
+- ❌ **Modifying the guide.** `docs/agent-systems/bug-hunter-build-guide.md` is the spec of
   record; construction follows it verbatim (deviations are owner decisions).
 - ❌ **No deployment implications.** This is tooling; roadmap Phase 6 (deployment)
   is untouched.
@@ -227,7 +227,7 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
 | D3 | System outputs root: `bug-hunting/` — `bug-hunting/bug-ledger.json` + `bug-ledger.md`, `bug-hunting/reports/bug-report-run-NN-<ts>.md`, `bug-hunting/eval/` (corpus + fixtures), `bug-hunting/fix-requests/` (the AI-DLC store) | One audited write-root outside app source and outside `memory-bank/` (AI-DLC's tree); single seam — only `ledger-io`/`report-rendering`/`fix-request-emit` know paths, so relocating later is cheap |
 | D4 | Sandbox recipe = the repo's existing `docker-compose` assets (API + Postgres), adapted once by the owner as the fixed asset the Verifier reads | Guide: "you provide the recipe once"; the repo already ships compose files (bolt 040) |
 | D5 | `concurrency-auditor-agent` is in scope at Should priority | Guide-optional, but this stack is async/await + BackgroundServices + EF transactions — exactly its territory |
-| D6 | Oracle stories (Prompts 24–24d) carry a cross-system gate | `intent-lookup` reads the knowledge builder's `ledger-query` interface — now specified in `docs/agent-systems/integration-contract-v1.5.md` (§2/§3) and built per `docs/agent-systems/knowledge-builder-build-guide-v3.5.md`; bolt 091 runs after the knowledge builder's Phases 1–2 (contract §7), unless the owner descopes the oracle |
+| D6 | Oracle stories (Prompts 24–24d) carry a cross-system gate | `intent-lookup` reads the knowledge builder's `ledger-query` interface — now specified in `docs/agent-systems/integration-contract.md` (§2/§3) and built per `docs/agent-systems/knowledge-builder-build-guide.md`; bolt 091 runs after the knowledge builder's Phases 1–2 (contract §7), unless the owner descopes the oracle |
 | D7 | Story files do not duplicate brief content | The guide is the spec of record; stories carry tracking + acceptance criteria + the skill-creator mandate, and point at Prompt N |
 
 ## Traceability

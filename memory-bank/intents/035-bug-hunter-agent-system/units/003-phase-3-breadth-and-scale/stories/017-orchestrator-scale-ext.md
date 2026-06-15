@@ -29,7 +29,7 @@ implemented: false
 ## Technical Notes
 
 - ⚠️ This is an **extension brief**: paste **Prompt 24d** from
-  `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the **skill-creator** skill (`Skill`
+  `docs/agent-systems/bug-hunter-build-guide.md` into the **skill-creator** skill (`Skill`
   tool → `skill-creator:skill-creator`) to re-open `orchestrator`. Re-run prior
   orchestrator tests after. STOP and report if skill-creator is unavailable.
 - Concurrent hunters write via `ledger-io` staging files — the single-writer merge

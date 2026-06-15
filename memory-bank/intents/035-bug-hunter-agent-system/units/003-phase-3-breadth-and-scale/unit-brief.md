@@ -54,7 +54,7 @@ planned — never rebuilds.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, then move on — in order. Briefs 14b/24b/24c/24d **re-open existing skills**
 (seam extensions; prior tests must still pass). If skill-creator is unavailable,
 **STOP and report**.
@@ -107,7 +107,7 @@ fix, then move on — in order. Briefs 14b/24b/24c/24d **re-open existing skills
   `dotnet list package --vulnerable` via `tool-ingest` — query at run time.
 - **Oracle (⛔ cross-system gate)**: `intent-lookup` queries the knowledge builder's
   `ledger-query` interface per the normative envelope in
-  `docs/agent-systems/integration-contract-v1.5.md` §2 (flow identity per §3); only `intent_contracts`
+  `docs/agent-systems/integration-contract.md` §2 (flow identity per §3); only `intent_contracts`
   are authority; superseded / not-yet-`done` contracts returned tagged; `contested`
   contracts never raise confidence. Bolt 091 runs after the knowledge builder's
   Phases 1–2 (contract §7), unless the owner descopes the oracle.

@@ -44,7 +44,7 @@ directories, both depending only on 088. No extension briefs here.
 
 **Each skill MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, then next — in order 20 → 21 → 22 → 23. If skill-creator is unavailable,
 **STOP and report**.
 

@@ -66,7 +66,7 @@ To make it a *system* in this architecture rather than a one-off report generato
 ## Connections
 
 Feeds the [Conductor](conductor-system.md). Reads the oracle
-([knowledge-builder](../knowledge-builder-build-guide-v3.5.md)). Disjoint from the
-[Inspector](../bug-hunter-build-guide-v3.6.md), the [Reviewer](code-review-system.md), and
+([knowledge-builder](../knowledge-builder-build-guide.md)). Disjoint from the
+[Inspector](../bug-hunter-build-guide.md), the [Reviewer](code-review-system.md), and
 [Observability](observability-system.md). Existing implementation:
 `.github/agents/architect-analyst.agent.md`.

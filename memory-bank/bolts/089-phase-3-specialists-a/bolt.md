@@ -44,7 +44,7 @@ shared files are touched.
 
 **Each skill MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, then next — in order 16 → 17 → 18 → 19. If skill-creator is unavailable,
 **STOP and report**.
 

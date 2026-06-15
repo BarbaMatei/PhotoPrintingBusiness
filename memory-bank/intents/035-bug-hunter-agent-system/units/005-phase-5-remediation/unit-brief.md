@@ -40,7 +40,7 @@ through an idempotent fix-request store keyed by `correlation_id`.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's test prompts**,
 fix, then move on — in order. Prompt 31 also **re-opens** `bug-lifecycle`, and Prompt 31b
 **re-opens** the `orchestrator` at its Open seam (planned extensions). If skill-creator is
 unavailable, **STOP and report**.

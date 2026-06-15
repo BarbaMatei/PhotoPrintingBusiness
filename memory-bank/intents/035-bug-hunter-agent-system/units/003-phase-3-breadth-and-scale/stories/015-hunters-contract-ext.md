@@ -26,7 +26,7 @@ implemented: false
 ## Technical Notes
 
 - ⚠️ This is an **extension brief across multiple skills**: paste **Prompt 24b** from
-  `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the **skill-creator** skill (`Skill`
+  `docs/agent-systems/bug-hunter-build-guide.md` into the **skill-creator** skill (`Skill`
   tool → `skill-creator:skill-creator`), re-opening each hunter in turn. Re-run each
   hunter's original tests after. STOP and report if skill-creator is unavailable.
 - Apply to exactly the hunters that exist at build time (incl.

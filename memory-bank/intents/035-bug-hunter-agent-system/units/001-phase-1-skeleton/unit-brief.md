@@ -44,7 +44,7 @@ false-positive rate until Phase 2."**
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste the component's brief (Prompt N) from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, and only then take the next component — in master-build-order. If skill-creator
 is unavailable, **STOP the bolt and report**. Hand-rolled skills violate FR-1.
 

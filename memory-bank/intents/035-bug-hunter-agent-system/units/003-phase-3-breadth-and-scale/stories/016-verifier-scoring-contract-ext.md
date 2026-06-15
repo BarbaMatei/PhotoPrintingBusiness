@@ -27,7 +27,7 @@ implemented: false
 ## Technical Notes
 
 - ⚠️ This is an **extension brief**: paste **Prompt 24c** from
-  `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the **skill-creator** skill (`Skill`
+  `docs/agent-systems/bug-hunter-build-guide.md` into the **skill-creator** skill (`Skill`
   tool → `skill-creator:skill-creator`) to re-open `bug-verifier` (and confirm the
   scoring path needs no change). Re-run prior tests after. STOP and report if
   skill-creator is unavailable.

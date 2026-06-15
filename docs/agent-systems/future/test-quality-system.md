@@ -87,8 +87,8 @@ the duplication is harmless defense-in-depth, deduped at the bug ledger.
 
 ## Connections
 
-Builds on: AI-DLC TDD, [bug-hunter](../bug-hunter-build-guide-v3.6.md) (`regression-harvest`, the
+Builds on: AI-DLC TDD, [bug-hunter](../bug-hunter-build-guide.md) (`regression-harvest`, the
 Verifier's flake-guard), and the `pr-test-analyzer` plugin. Grounds its scan in the oracle
-([knowledge-builder](../knowledge-builder-build-guide-v3.5.md)) + `app-mapping`. Routes bug findings
-through the fix loop ([contract §4](../integration-contract-v1.5.md)); test writes follow the active
+([knowledge-builder](../knowledge-builder-build-guide.md)) + `app-mapping`. Routes bug findings
+through the fix loop ([contract §4](../integration-contract.md)); test writes follow the active
 profile (§5.5). Feeds the [Conductor](conductor-system.md). Maps to the roadmap's e2e/regression phase.

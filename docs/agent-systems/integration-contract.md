@@ -1,4 +1,4 @@
-# Integration Contract — AI-DLC × Bug-Hunter × Knowledge-Builder (v1.5)
+# Integration Contract — AI-DLC × Bug-Hunter × Knowledge-Builder
 
 *The normative interface between the three systems. Both build guides reference this file; neither
 restates it. **If a brief and this contract disagree, this contract wins.** Changes here are
@@ -53,8 +53,8 @@ versioned (v1, v1.1, v2, …) and require checking every consumer listed in §8.
 > stamp + the §5 threshold); §4 names the `fix-reported` writer and both mailbox **checking
 > mechanisms**; §5 gets a default staleness threshold.
 
-> Referenced by: `docs/agent-systems/knowledge-builder-build-guide-v3.5.md` (Appendix A) and
-> `docs/agent-systems/bug-hunter-build-guide-v3.6.md` (mirror edits 2026-06-11; G hardening
+> Referenced by: `docs/agent-systems/knowledge-builder-build-guide.md` (Appendix A) and
+> `docs/agent-systems/bug-hunter-build-guide.md` (mirror edits 2026-06-11; G hardening
 > 2026-06-11; H mechanisms 2026-06-12; I co-residence/loop fixes 2026-06-12; J index-seam closure
 > 2026-06-15; operating profiles 2026-06-15).
 

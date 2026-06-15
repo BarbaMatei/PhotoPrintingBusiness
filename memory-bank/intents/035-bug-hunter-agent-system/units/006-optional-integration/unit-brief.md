@@ -37,7 +37,7 @@ yet — build on adoption, not by default.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste the brief from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run its test prompts**, fix, then move
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run its test prompts**, fix, then move
 on. Brief A **re-opens** `report-rendering` (seam extension). If skill-creator is
 unavailable, **STOP and report**.
 
