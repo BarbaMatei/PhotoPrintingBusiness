@@ -38,7 +38,7 @@ pipeline slots. Ends with the system's **first end-to-end run on this repo**.
 
 **Each skill MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt 6 then Prompt 7 from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run each brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run each brief's three test prompts**,
 fix before proceeding. If skill-creator is unavailable, **STOP and report**.
 
 ## Stories Included (build in this order)

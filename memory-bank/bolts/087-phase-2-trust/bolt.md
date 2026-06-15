@@ -42,7 +42,7 @@ trustworthy: confirmed by execution where possible, scored by real risk.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, then next — in order. Prompt 11b **re-opens** `orchestrator` (seam extension —
 re-run Prompt 7's tests after). If skill-creator is unavailable, **STOP and report**.
 

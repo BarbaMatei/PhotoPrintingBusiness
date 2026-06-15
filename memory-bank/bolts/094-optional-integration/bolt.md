@@ -46,7 +46,7 @@ Partial builds are fine — the three stories are independent of each other.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste the brief from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run its test prompts**, fix, then next.
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run its test prompts**, fix, then next.
 Brief A **re-opens** `report-rendering` (re-run Prompt 4's tests after). If
 skill-creator is unavailable, **STOP and report**.
 

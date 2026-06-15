@@ -79,7 +79,7 @@ its reasoning shown — never an autonomous commitment of work.
 
 ## Connections
 
-Consumes: [bug-hunter](../bug-hunter-build-guide-v3.6.md), [knowledge-builder](../knowledge-builder-build-guide-v3.5.md),
-the fix loop ([contract §4](../integration-contract-v1.5.md)), and (later) the
+Consumes: [bug-hunter](../bug-hunter-build-guide.md), [knowledge-builder](../knowledge-builder-build-guide.md),
+the fix loop ([contract §4](../integration-contract.md)), and (later) the
 [Reviewer](code-review-system.md) and [Test-Quality](test-quality-system.md) outputs.
 Sits above the owner's execution planners. The human checkpoint is on its proposed plan.

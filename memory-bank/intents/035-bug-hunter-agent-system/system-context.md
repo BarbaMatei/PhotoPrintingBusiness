@@ -38,8 +38,8 @@ updated: 2026-06-10T10:40:14Z
   tests, P5).
 - **Knowledge ledger / knowledge builder** (`ledger-query` interface): the intent
   oracle `intent-lookup` reads from Phase 3. **Sibling system — now specified**:
-  interface in `docs/agent-systems/integration-contract-v1.5.md` (§2 envelope, §3 flow identity),
-  build per `docs/agent-systems/knowledge-builder-build-guide-v3.5.md`; sequencing gates bolt 091
+  interface in `docs/agent-systems/integration-contract.md` (§2 envelope, §3 flow identity),
+  build per `docs/agent-systems/knowledge-builder-build-guide.md`; sequencing gates bolt 091
   (contract §7, requirements D6).
 - **Sandbox** (Docker Desktop on this host): throwaway container built per run from
   the owner-provided recipe (adapted from the repo's compose assets); commit-matched,
@@ -108,7 +108,7 @@ C4Context
 
 ## Boundary Notes
 
-- **The guide is the spec of record** (`docs/agent-systems/bug-hunter-build-guide-v3.6.md`); this
+- **The guide is the spec of record** (`docs/agent-systems/bug-hunter-build-guide.md`); this
   context summarizes it and never overrides it.
 - The six slots are permanent from Phase 1; phases fill or extend slots at named
   seams — restructuring the pipeline is out of bounds.

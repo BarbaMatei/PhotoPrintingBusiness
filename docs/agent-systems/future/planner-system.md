@@ -77,6 +77,6 @@ Both agents predate the systems framing, so the work is *integration*, not rebui
 ## Connections
 
 Below the [Conductor](conductor-system.md) and AI-DLC inception; feeds the Builder. Honours the
-operating profile and single-history rules ([contract §1/§5.5](../integration-contract-v1.5.md)).
+operating profile and single-history rules ([contract §1/§5.5](../integration-contract.md)).
 Existing implementation: `.claude/agents/bolt-parallel-planner.md`,
 `.claude/agents/bolt-wave-orchestrator.md`; reference [agent-commands.md](../../planning/agent-commands.md).

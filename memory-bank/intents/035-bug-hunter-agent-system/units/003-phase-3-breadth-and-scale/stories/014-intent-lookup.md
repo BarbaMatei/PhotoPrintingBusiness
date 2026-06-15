@@ -27,14 +27,14 @@ implemented: false
 
 ## Technical Notes
 
-- ⚠️ Build by pasting **Prompt 24** from `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the
+- ⚠️ Build by pasting **Prompt 24** from `docs/agent-systems/bug-hunter-build-guide.md` into the
   **skill-creator** skill (`Skill` tool → `skill-creator:skill-creator`); run the
   brief's three test prompts and fix before proceeding. STOP and report if
   skill-creator is unavailable.
 - ⛔ **Cross-system gate (requirements D6)**: the knowledge builder's `ledger-query`
-  interface is specified in `docs/agent-systems/integration-contract-v1.5.md` (§2 envelope — this
+  interface is specified in `docs/agent-systems/integration-contract.md` (§2 envelope — this
   skill's five expected fields are its required subset; §3 flow identity) and built
-  per `docs/agent-systems/knowledge-builder-build-guide-v3.5.md`. Bolt 091 runs after the knowledge
+  per `docs/agent-systems/knowledge-builder-build-guide.md`. Bolt 091 runs after the knowledge
   builder's Phases 1–2 (contract §7). Do NOT stub the interface silently — absence is
   a bolt-gating fact, not an implementation detail.
 - Per the v3.1 brief: record the oracle's `as_of_commit` (from the query envelope)

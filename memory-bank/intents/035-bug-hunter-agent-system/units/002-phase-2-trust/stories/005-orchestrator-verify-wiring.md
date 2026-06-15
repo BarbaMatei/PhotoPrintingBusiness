@@ -28,7 +28,7 @@ implemented: false
 ## Technical Notes
 
 - ⚠️ This is an **extension brief**: paste **Prompt 11b** from
-  `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the **skill-creator** skill (`Skill` tool →
+  `docs/agent-systems/bug-hunter-build-guide.md` into the **skill-creator** skill (`Skill` tool →
   `skill-creator:skill-creator`) to re-open `orchestrator` and top up the named
   seams. Run the brief's tests AND re-run Prompt 7's tests. STOP and report if
   skill-creator is unavailable.

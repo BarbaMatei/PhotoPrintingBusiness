@@ -40,7 +40,7 @@ orchestrator's Verify/Triage slots — all without rewriting Phase 1.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, then move on — in order. Prompt 11b **re-opens** the existing `orchestrator`
 skill (extension at its seam — no restructuring; Phase 1 tests must still pass).
 If skill-creator is unavailable, **STOP and report**.

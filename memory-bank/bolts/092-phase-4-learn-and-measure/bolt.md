@@ -42,7 +42,7 @@ dismissal reasons, the bug lifecycle, the eval corpus + metrics, the Curator
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's test prompts**, fix,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's test prompts**, fix,
 then next — in order. Prompt 29b **re-opens** `orchestrator` (one-line slot fill;
 re-run prior orchestrator tests). If skill-creator is unavailable, **STOP and report**.
 

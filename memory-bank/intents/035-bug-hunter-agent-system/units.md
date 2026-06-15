@@ -15,7 +15,7 @@ updated: 2026-06-10T10:40:14Z
 > skills, not application code.
 >
 > ⚠️ **Cross-cutting (FR-1, FR-2), binding for every unit:** every component is built
-> by pasting its brief (Prompt N from `docs/agent-systems/bug-hunter-build-guide-v3.6.md`) into the
+> by pasting its brief (Prompt N from `docs/agent-systems/bug-hunter-build-guide.md`) into the
 > **skill-creator skill** (`Skill` tool → `skill-creator:skill-creator`), then running
 > the brief's three test prompts before moving on — in master-build-order. The system
 > is **read-only on application source**.

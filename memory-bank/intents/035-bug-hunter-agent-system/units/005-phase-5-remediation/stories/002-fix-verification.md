@@ -29,7 +29,7 @@ implemented: false
 
 ## Technical Notes
 
-- ⚠️ Build by pasting **Prompt 31** from `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the
+- ⚠️ Build by pasting **Prompt 31** from `docs/agent-systems/bug-hunter-build-guide.md` into the
   **skill-creator** skill (`Skill` tool → `skill-creator:skill-creator`) — it creates
   `fix-verification` AND re-opens `bug-lifecycle` at its planned seam. Run the
   brief's tests + re-run Prompt 26's. STOP and report if skill-creator is unavailable.

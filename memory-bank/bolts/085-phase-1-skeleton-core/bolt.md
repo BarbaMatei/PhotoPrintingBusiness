@@ -42,7 +42,7 @@ read-only on source by design).
 
 **Each skill MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste the story's brief (Prompt N) from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md`, build, **run the brief's three test prompts**,
+`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
 fix, and only then move to the next story — strictly in order 001 → 005. If
 skill-creator is unavailable, **STOP this bolt and report** (intent FR-1).
 
@@ -86,5 +86,5 @@ skill-creator is unavailable, **STOP this bolt and report** (intent FR-1).
 
 ## Notes
 
-**Time-box: 5h.** Spec of record: `docs/agent-systems/bug-hunter-build-guide-v3.6.md` Part II Phase 1.
+**Time-box: 5h.** Spec of record: `docs/agent-systems/bug-hunter-build-guide.md` Part II Phase 1.
 Unit brief: `memory-bank/intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/unit-brief.md`.

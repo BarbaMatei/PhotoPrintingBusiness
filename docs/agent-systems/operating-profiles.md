@@ -2,7 +2,7 @@
 
 > **This is an operator-facing guide, not a rulebook.** The **normative** definition of profiles —
 > the invariant, the two policy axes, the validity test, the named profiles — lives in the
-> **integration contract, §5.5** ([integration-contract-v1.5.md](integration-contract-v1.5.md)). If
+> **integration contract, §5.5** ([integration-contract.md](integration-contract.md)). If
 > anything here and §5.5 disagree, **§5.5 wins.** This doc just helps you *choose, switch, and wire* a
 > profile, and is the home for the actual deployment artifacts (hook script, CI template) once they're
 > built.

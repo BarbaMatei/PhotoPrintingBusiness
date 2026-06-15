@@ -26,7 +26,7 @@ implemented: false
 
 ## Technical Notes
 
-- ⚠️ Build by pasting **Prompt 6** from `docs/agent-systems/bug-hunter-build-guide-v3.6.md` into the
+- ⚠️ Build by pasting **Prompt 6** from `docs/agent-systems/bug-hunter-build-guide.md` into the
   **skill-creator** skill (`Skill` tool → `skill-creator:skill-creator`); run the
   brief's three test prompts and fix before proceeding. STOP and report if
   skill-creator is unavailable.

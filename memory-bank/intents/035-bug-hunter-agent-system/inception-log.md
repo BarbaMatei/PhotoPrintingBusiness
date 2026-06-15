@@ -10,11 +10,11 @@ status: complete
 ## Overview
 
 **Intent**: Tooling-only intent building the multi-agent bug-hunting system from
-`docs/agent-systems/bug-hunter-build-guide-v3.6.md` — 42 briefs across 5 additive phases + an optional
+`docs/agent-systems/bug-hunter-build-guide.md` — 42 briefs across 5 additive phases + an optional
 integration tier, all as Claude Code skills, all **read-only on application source**.
 **Type**: Infrastructure/Tooling (no production code)
 **Created**: 2026-06-10
-**Source feed (spec of record)**: `docs/agent-systems/bug-hunter-build-guide-v3.6.md`
+**Source feed (spec of record)**: `docs/agent-systems/bug-hunter-build-guide.md`
 **Construction mandate**: every component built with the **skill-creator** skill
 (`Skill` tool → `skill-creator:skill-creator`) per the guide's build loop — paste
 brief → build → run its three test prompts → fix → next, in master-build-order.
@@ -53,6 +53,13 @@ brief → build → run its three test prompts → fix → next, in master-build
 
 ## Decision Log
 
+> **Note (2026-06-15):** rows below reference the four cross-system review files
+> (`docs/agent-systems/reviews/cross-system-review-v*`) and intermediate spec versions (v3.1–v3.6,
+> v1.1–v1.5). Once the specs reached final form, those review files and versioned copies were removed;
+> the specs are now versionless (`bug-hunter-build-guide.md`, `integration-contract.md`,
+> `knowledge-builder-build-guide.md`). All of it remains recoverable in **git history** — the rows are
+> kept verbatim as the historical record.
+
 | Date | Decision | Rationale | Approved |
 |------|----------|-----------|----------|
 | 2026-06-10 | **Correction**: the first inception run this day misread the subject — it specced porting the specsmd inception agent itself to Claude skills (intent `035-specsmd-inception-claude-skills`, bolts 085–087). Owner corrected: the subject is the **bug-hunter build guide**. Wrong artifacts deleted, replaced by this intent (same numbers reused) | Owner correction in-session | Yes (owner) |
@@ -63,7 +70,7 @@ brief → build → run its three test prompts → fix → next, in master-build
 | 2026-06-10 | `concurrency-auditor-agent` in scope at Should (D5) | Guide-optional, but the stack is async/await + BackgroundServices + EF transactions | Inception decision — flagged for owner review |
 | 2026-06-10 | Bolt 091 (oracle) marked `blocks: true` (D6) | `intent-lookup` needs the knowledge builder's `ledger-query` interface, which doesn't exist in this repo; owner must confirm availability or descope — no silent stubbing | Inception decision — flagged for owner review |
 | 2026-06-10 | Priorities: P1–P3 Must, P4–P5 Should, Optional Could; 094 parked on adoption | The guide's "build only as far as your bottleneck demands" | Inception decision |
-| 2026-06-11 | Adopted `docs/agent-systems/integration-contract-v1.5.md` as the normative cross-system interface; spec of record bumped to `docs/agent-systems/bug-hunter-build-guide-v3.6.md` (8 mirror edits applied); bolt 091's external gate is now a schedule (after knowledge-builder Phases 1–2, contract §7); loop mailboxes pinned (`fix_status` on fix-requests, `correlation_id` in bug-bolt frontmatter) | Knowledge-builder guide v3 + integration contract published; both systems now build against one interface | Yes (owner) |
+| 2026-06-11 | Adopted `docs/agent-systems/integration-contract.md` as the normative cross-system interface; spec of record bumped to `docs/agent-systems/bug-hunter-build-guide.md` (8 mirror edits applied); bolt 091's external gate is now a schedule (after knowledge-builder Phases 1–2, contract §7); loop mailboxes pinned (`fix_status` on fix-requests, `correlation_id` in bug-bolt frontmatter) | Knowledge-builder guide v3 + integration contract published; both systems now build against one interface | Yes (owner) |
 | 2026-06-11 | Cross-system review G1–G16 applied (`docs/agent-systems/reviews/cross-system-review-v1-2026-06-11.md`): spec of record bumped to guide **v3.2** + contract **v1.1** (KB guide → v3.1). Story-level deltas: injection convention (data-never-instructions) + secret redaction everywhere; reporting floor fixed to the confidence axis with body callouts; signature matches are candidate duplicates (never auto-collapsed); `fix_status: fix-reported` written on signal pickup + run-open mailbox scan; eval runs isolated to `bug-hunting/eval-runs/`; record-model-per-run replaces eval pinning; triage queue capped/age-escalating + intake takes the writer lock; ledger gains `schema_version` + Windows-safe publish; harvested-test pre-approval checklist | Review accepted by owner; minor-version bumps chosen over major (additive, no structural change) | Yes (owner) |
 | 2026-06-12 | Cross-system review v2 H1–H35 applied (`docs/agent-systems/reviews/cross-system-review-v2-2026-06-12.md`): spec of record bumped to guide **v3.3** + contract **v1.2** (KB guide → v3.2). **NEW Prompt 31b** (run-open fix-request mailbox scan — H1) added as story 005-orchestrator-remediation-ext in unit 005 / bolt 093 (now 5 stories; intent total 43). Owner decisions recorded in contract v1.2: **publish = git commit by the publishing orchestrator** (A); **`main` is the designated single-history integration home**. Other story-level deltas: run lock owned by orchestrator Open/Close + write audit; `closed-unverified` terminal state; `correlation_id` allocation rule; `Reopened` in the enum + full-record embedding + content hash in ledger-io; regression-candidate compare in bug-lifecycle; injection/secret/PII guards at candidate emission; budget semantics; model-change eval trigger | Review accepted by owner 2026-06-12; mechanisms-over-policy pattern (the review's central finding) addressed by naming a builder for every rule | Yes (owner) |
 | 2026-06-12 | Cross-system review v3 I1–I13 applied (`docs/agent-systems/reviews/cross-system-review-v3-2026-06-12.md`): spec of record bumped to guide **v3.4** + contract **v1.3** (KB guide → v3.3). Runtime co-residence closed: **cross-system mutex** (each Open checks the sibling's `.run-lock`), write audits **scoped to the run's own store**, publish-commits **path-scoped + serialized** (I1/I7); Prompt 31b's scan predicate now includes **`fix-failed`** so re-fixes are re-checked (I2 — a state-machine bug in the H-round text); **owner decision (I3, option B): `closed-unverified` fixes produce NO oracle entry of any kind** — blind spot accepted and recorded in contract §4; hunting-host posture (clean checkout, egress allowlist, pinned scanner toolchain — I4/I5); code-index atomic pointer-swap refresh (I6); envelope `oracle_coverage` + run-open incomplete-backfill warning (I8); injection-resistance is now a graded eval metric and the report surfaces `injection_suspected` (I9); fix-failed only when the fixing commit is at HEAD (I11); pre-merge runs are read-only advisory (I12). No new stories or briefs — structure unchanged | Review accepted by owner 2026-06-12 with decision B (stricter than the reviewer's queue-only proposal); review cadence judged at diminishing returns — next signal source is Phase 1 construction | Yes (owner) |

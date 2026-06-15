@@ -9,7 +9,7 @@
 - **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 + roadmap Phase 3–4 intents 032–033 + research intent 034 (EU expansion study) + tooling intent 035 (bug-hunter agent system) (see below)
 - **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03), 070–075 (roadmap Phase 3–4), 076–084 (intent 034 EU-expansion research), 085–094 (intent 035 bug-hunter agent system; 091 ⛔ knowledge-ledger gate, 094 ⏸ adoption-gated). Bolt 050 remains unallocated by design (no directory exists).
 - **Last updated**: 2026-06-10
-- **Last index change**: 2026-06-10 (added tooling intent 035 bug-hunter-agent-system → 6 units, 42 stories, bolts 085–094 — all status PLANNED / ✅ GENERATED. Builds the bug-hunting agent system from `docs/agent-systems/bug-hunter-build-guide-v3.6.md`: 5 additive phases + optional tier, 6-slot pipeline (Map→Hunt→Verify→Triage→Report→Learn), read-only on app source. ⚠️ Construction mandate: every component built with the **skill-creator** skill per the guide's build loop. Order: 085→086→087→088→(089 ∥ 090)→091 ⛔(knowledge-ledger gate)→092→093; 094 ⏸ adoption-gated. Note: an earlier same-day inception misread the subject (specsmd-skills port, bolts 085–087) — deleted and replaced by this intent.)
+- **Last index change**: 2026-06-10 (added tooling intent 035 bug-hunter-agent-system → 6 units, 42 stories, bolts 085–094 — all status PLANNED / ✅ GENERATED. Builds the bug-hunting agent system from `docs/agent-systems/bug-hunter-build-guide.md`: 5 additive phases + optional tier, 6-slot pipeline (Map→Hunt→Verify→Triage→Report→Learn), read-only on app source. ⚠️ Construction mandate: every component built with the **skill-creator** skill per the guide's build loop. Order: 085→086→087→088→(089 ∥ 090)→091 ⛔(knowledge-ledger gate)→092→093; 094 ⏸ adoption-gated. Note: an earlier same-day inception misread the subject (specsmd-skills port, bolts 085–087) — deleted and replaced by this intent.)
 - **Last index change (prior)**: 2026-06-05 (added research-only intent 034 EU-expansion-architecture-study → 3 units, 10 stories, bolts 076–084 — all status PLANNED / ✅ GENERATED. Spike-bolts; zero production code. Source: eu-expansion-research-brief-2026-06-05. Owner Checkpoint-1 decisions: compare both tiers · one brand EU-wide · ship from Romania · local currencies.)
 - **Last index change (prior 2)**: 2026-06-05 (added roadmap Phase 3–4 intents 032–033 → 6 units, 25 stories, bolts 070–075 — all status PLANNED / ✅ GENERATED. Source: ai-workflow-review-2026-06-05 §6. 032 builds on bolts 066+062; 033 is infrastructure-readiness only, NOT deployment.)
 - **Roadmap Phase 3–4 intents planned**: 032 (regression + comprehensive e2e — Phase 3 stabilize; builds on bolts 066 + 062), 033 (environment triad — Phase 4 infrastructure readiness only, NOT deployment).
@@ -1738,7 +1738,7 @@
 ### 035-bug-hunter-agent-system
 
 > **Tooling-only intent.** Builds the bug-hunting agent system from
-> `docs/agent-systems/bug-hunter-build-guide-v3.6.md` (spec of record): 43 briefs across 5 additive
+> `docs/agent-systems/bug-hunter-build-guide.md` (spec of record): 43 briefs across 5 additive
 > phases + an optional tier (31b added in v3.3, review H1) — a permanent 6-slot pipeline
 > (Map→Hunt→Verify→Triage→
 > Report→Learn), agents-as-skills, **read-only on application source**, outputs under
