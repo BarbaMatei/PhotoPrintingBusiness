@@ -1,21 +1,23 @@
 # Global Story Index
 
 ## Overview
-- **Total story listings**: 180 (+ 6 intents documented inline without per-story listings)
-- **Story files on disk**: 167
+- **Total story listings**: 233 (+ 6 intents documented inline without per-story listings)
+- **Story files on disk**: 220
 - **Implemented**: 80 listings (across 44 shipped bolts) + 8 COMPLETE (intent 024) + 46 GENERATED-but-actually-shipped (early intents 001–003, 005)
 - **Intents complete (shipped)**: 001–010, 012–020, 023, 024 (016 VAT/e-Factura + 020 observability shipped via bolts 038/039/044/045; 011 is a non-standard design-review intent)
 - **Intents parked**: 021 (Redis multi-replica — deprioritized until deployed + real scaling pressure; bolt 046)
-- **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 + roadmap Phase 3–4 intents 032–033 (see below)
-- **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03), 070–075 (roadmap Phase 3–4). Bolt 050 remains unallocated by design (no directory exists).
-- **Last updated**: 2026-06-05
-- **Last index change**: 2026-06-05 (added roadmap Phase 3–4 intents 032–033 → 6 units, 25 stories, bolts 070–075 — all status PLANNED / ✅ GENERATED. Source: ai-workflow-review-2026-06-05 §6. 032 builds on bolts 066+062; 033 is infrastructure-readiness only, NOT deployment.)
+- **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 + roadmap Phase 3–4 intents 032–033 + research intent 034 (EU expansion study) + tooling intent 035 (bug-hunter agent system) (see below)
+- **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03), 070–075 (roadmap Phase 3–4), 076–084 (intent 034 EU-expansion research), 085–094 (intent 035 bug-hunter agent system; 091 ⛔ knowledge-ledger gate, 094 ⏸ adoption-gated). Bolt 050 remains unallocated by design (no directory exists).
+- **Last updated**: 2026-06-10
+- **Last index change**: 2026-06-10 (added tooling intent 035 bug-hunter-agent-system → 6 units, 42 stories, bolts 085–094 — all status PLANNED / ✅ GENERATED. Builds the bug-hunting agent system from `docs/agent-systems/bug-hunter-build-guide-v3.6.md`: 5 additive phases + optional tier, 6-slot pipeline (Map→Hunt→Verify→Triage→Report→Learn), read-only on app source. ⚠️ Construction mandate: every component built with the **skill-creator** skill per the guide's build loop. Order: 085→086→087→088→(089 ∥ 090)→091 ⛔(knowledge-ledger gate)→092→093; 094 ⏸ adoption-gated. Note: an earlier same-day inception misread the subject (specsmd-skills port, bolts 085–087) — deleted and replaced by this intent.)
+- **Last index change (prior)**: 2026-06-05 (added research-only intent 034 EU-expansion-architecture-study → 3 units, 10 stories, bolts 076–084 — all status PLANNED / ✅ GENERATED. Spike-bolts; zero production code. Source: eu-expansion-research-brief-2026-06-05. Owner Checkpoint-1 decisions: compare both tiers · one brand EU-wide · ship from Romania · local currencies.)
+- **Last index change (prior 2)**: 2026-06-05 (added roadmap Phase 3–4 intents 032–033 → 6 units, 25 stories, bolts 070–075 — all status PLANNED / ✅ GENERATED. Source: ai-workflow-review-2026-06-05 §6. 032 builds on bolts 066+062; 033 is infrastructure-readiness only, NOT deployment.)
 - **Roadmap Phase 3–4 intents planned**: 032 (regression + comprehensive e2e — Phase 3 stabilize; builds on bolts 066 + 062), 033 (environment triad — Phase 4 infrastructure readiness only, NOT deployment).
 - **Roadmap Phase 3–4 bolts planned**: 070–075 (6 bolts → 25 stories).
 - **Architect-review (2026-06-03) intents planned**: 025 (security/dependency hygiene), 026 (observability/manifest), 027 (architectural layering), 028 (test architecture), 029 (decomposition/hardening), 030 (UI scaling/e2e), 031 (refund/return). P20 coupon → existing 022 (not re-added).
 - **Architect-review bolts planned**: 054–069 (16 bolts → 44 stories)
-- **Last index change (prior)**: 2026-06-05 (added architect-review-2026-06-03 intents 025–031 → 16 units, 44 stories, bolts 054–069 — all status PLANNED / ✅ GENERATED)
-- **Last index change (prior 2)**: 2026-06-02 (drift repair — see notes below)
+- **Last index change (prior 3)**: 2026-06-05 (added architect-review-2026-06-03 intents 025–031 → 16 units, 44 stories, bolts 054–069 — all status PLANNED / ✅ GENERATED)
+- **Last index change (prior 4)**: 2026-06-02 (drift repair — see notes below)
 - **Note**: intent 024 (order-photo archive) shipped 2026-05-30 → 2026-06-01 (bolts 051, 052, 053). Intent 015 (Sameday shipping integration) shipped 2026-06-02 (bolts 036, 037). Story 019-003 superseded → backfill done via intent 024 bolt 051. Bolt 050 is unallocated (no directory exists).
 - **Drift-repair note (2026-06-02)**: prior to this edit, the index undercounted ~51 stories. Flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED`: all stories under intents 004, 010, 012, 015, 023. Added sections for intents 005–009 + 011 which were missing from the index entirely.
 
@@ -1655,3 +1657,362 @@
 **Priority**: Should
 **Path**: `intents/033-environment-triad/units/003-promotion-readiness/stories/002-deployment-deferral-note.md`
 **Bolt**: 075
+
+---
+
+### 034-eu-expansion-architecture-study
+
+> **Research-only intent (roadmap Phase 5 prep).** Spike-bolts; zero production code, no
+> translations, no deployment. Source feed: `docs/planning/eu-expansion-research-brief-2026-06-05.md`.
+> Owner decisions (Checkpoint 1, 2026-06-05): compare both market tiers · one brand EU-wide ·
+> ship from Romania · local currencies.
+
+#### Unit: 001-research-tracks (7 stories) — Bolts: 076–082
+
+### 001-t1-fulfillment-logistics.md ✅ GENERATED
+**Title**: T1 — Fulfillment & logistics (RO-ship validation, per-corridor cost/time)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/001-t1-fulfillment-logistics.md`
+**Bolt**: 076
+
+### 002-t2-site-url-architecture.md ✅ GENERATED
+**Title**: T2 — Site & URL architecture (one brand; tied to intent 033 triad)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/002-t2-site-url-architecture.md`
+**Bolt**: 077
+
+### 003-t3-frontend-i18n.md ✅ GENERATED
+**Title**: T3 — Frontend i18n (Angular 21: built-in vs runtime)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/003-t3-frontend-i18n.md`
+**Bolt**: 078
+
+### 004-t4-backend-localization.md ✅ GENERATED
+**Title**: T4 — Backend localization (.NET; deferred-culture trap)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/004-t4-backend-localization.md`
+**Bolt**: 079
+
+### 005-t5-tax-invoicing-compliance.md ✅ GENERATED
+**Title**: T5 — Tax, invoicing & compliance (OSS VAT, multi-currency, both tiers)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/005-t5-tax-invoicing-compliance.md`
+**Bolt**: 080
+
+### 006-t6-payments-checkout.md ✅ GENERATED
+**Title**: T6 — Payments & checkout (Stripe local methods, multi-currency)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/006-t6-payments-checkout.md`
+**Bolt**: 081
+
+### 007-t7-codebase-seam-audit.md ✅ GENERATED
+**Title**: T7 — Codebase seam audit (repo-bound; counts + top-10)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/007-t7-codebase-seam-audit.md`
+**Bolt**: 082
+
+#### Unit: 002-synthesis-and-decision (2 stories) — Bolt: 083
+
+### 001-synthesis-options-paper.md ✅ GENERATED
+**Title**: Synthesize findings → options paper (D2)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/002-synthesis-and-decision/stories/001-synthesis-options-paper.md`
+**Bolt**: 083
+
+### 002-owner-decision-adr.md ✅ GENERATED
+**Title**: ⛔ Owner decision → ADR (D3)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/002-synthesis-and-decision/stories/002-owner-decision-adr.md`
+**Bolt**: 083
+
+#### Unit: 003-implementation-briefs (1 story) — Bolt: 084
+
+### 001-author-implementation-briefs.md ✅ GENERATED
+**Title**: Author implementation brief(s) from the ADR (D4)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/003-implementation-briefs/stories/001-author-implementation-briefs.md`
+**Bolt**: 084
+
+---
+
+### 035-bug-hunter-agent-system
+
+> **Tooling-only intent.** Builds the bug-hunting agent system from
+> `docs/agent-systems/bug-hunter-build-guide-v3.6.md` (spec of record): 43 briefs across 5 additive
+> phases + an optional tier (31b added in v3.3, review H1) — a permanent 6-slot pipeline
+> (Map→Hunt→Verify→Triage→
+> Report→Learn), agents-as-skills, **read-only on application source**, outputs under
+> `bug-hunting/`. ⚠️ **Construction mandate: every component MUST be built with the
+> skill-creator skill** (`Skill` tool → `skill-creator:skill-creator`) — paste the
+> story's Prompt N, build, run its test prompts, fix, then next, in master order.
+> Order: 085→086→087→088→(089 ∥ 090)→091 ⛔(needs knowledge-ledger `ledger-query`)→092→093; 094 ⏸ on adoption.
+
+#### Unit: 001-phase-1-skeleton (7 stories) — Bolts: 085, 086
+
+### 001-ledger-io.md ✅ GENERATED
+**Title**: `ledger-io` — concurrency-safe shared ledger R/W, correlation_id (Prompt 1)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/001-ledger-io.md`
+**Bolt**: 085
+
+### 002-bug-documentation.md ✅ GENERATED
+**Title**: `bug-documentation` — canonical 3-audience bug record, contract-sourced expected_behavior (Prompt 2)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/002-bug-documentation.md`
+**Bolt**: 085
+
+### 003-deduplication.md ✅ GENERATED
+**Title**: `deduplication` — new/duplicate/dismissed/suppressed verdicts (Prompt 3)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/003-deduplication.md`
+**Bolt**: 085
+
+### 004-report-rendering.md ✅ GENERATED
+**Title**: `report-rendering` — per-run Markdown report with reporting floor (Prompt 4)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/004-report-rendering.md`
+**Bolt**: 085
+
+### 005-triage-intake.md ✅ GENERATED
+**Title**: `triage-intake` — human decisions front door, reason-required dismissals (Prompt 5)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/005-triage-intake.md`
+**Bolt**: 085
+
+### 006-general-hunter.md ✅ GENERATED
+**Title**: `general-hunter` — combined top-down + file-sweep hunting agent (Prompt 6)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/006-general-hunter.md`
+**Bolt**: 086
+
+### 007-orchestrator-skeleton.md ✅ GENERATED
+**Title**: `orchestrator` — 6-slot coordinator; Phase-1 output labeled unverified (Prompt 7)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/007-orchestrator-skeleton.md`
+**Bolt**: 086
+
+#### Unit: 002-phase-2-trust (5 stories) — Bolt: 087
+
+### 001-severity-scoring.md ✅ GENERATED
+**Title**: `severity-scoring` — severity × confidence → 0–100 risk (Prompt 8)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/001-severity-scoring.md`
+**Bolt**: 087
+
+### 002-tool-ingest.md ✅ GENERATED
+**Title**: `tool-ingest` — deterministic tool findings → normalized candidates (Prompt 9)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/002-tool-ingest.md`
+**Bolt**: 087
+
+### 003-bug-verifier.md ✅ GENERATED
+**Title**: `bug-verifier` — hardened Verify gate: disprove-first, sandbox+commit check, flaky double-run (Prompt 10)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/003-bug-verifier.md`
+**Bolt**: 087
+
+### 004-git-revision-tracking.md ✅ GENERATED
+**Title**: `git-revision-tracking` — commit pinning + fixed/moved reconciliation (Prompt 11)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/004-git-revision-tracking.md`
+**Bolt**: 087
+
+### 005-orchestrator-verify-wiring.md ✅ GENERATED
+**Title**: orchestrator extension — Verify→Verifier, Triage→scoring, SHA open/close (Prompt 11b)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/005-orchestrator-verify-wiring.md`
+**Bolt**: 087
+
+#### Unit: 003-phase-3-breadth-and-scale (17 stories) — Bolts: 088, 089 ∥ 090, 091 ⛔
+
+### 001-app-mapping.md ✅ GENERATED
+**Title**: `app-mapping` — entry points, flows, risk classes; diff on refresh (Prompt 12)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/001-app-mapping.md`
+**Bolt**: 088
+
+### 002-code-index.md ✅ GENERATED
+**Title**: `code-index` — symbol/reference index + slice retrieval, incremental (Prompt 13)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/002-code-index.md`
+**Bolt**: 088
+
+### 003-reachability.md ✅ GENERATED
+**Title**: `reachability` — entry-point tracing; framework-aware unknown weight (Prompt 14)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/003-reachability.md`
+**Bolt**: 088
+
+### 004-severity-scoring-reachability-ext.md ✅ GENERATED
+**Title**: severity-scoring extension — risk = severity × confidence × reachability (Prompt 14b)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/004-severity-scoring-reachability-ext.md`
+**Bolt**: 088
+
+### 005-flow-tracing.md ✅ GENERATED
+**Title**: `flow-tracing` — walk one flow, inspect every handoff (Prompt 15)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/005-flow-tracing.md`
+**Bolt**: 088
+
+### 006-taint-analysis.md ✅ GENERATED
+**Title**: `taint-analysis` — source→sink tracking with sanitizer awareness (Prompt 16)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/006-taint-analysis.md`
+**Bolt**: 089
+
+### 007-flow-tracer-agent.md ✅ GENERATED
+**Title**: `flow-tracer-agent` — top-down hunt over priority flows (Prompt 17)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/007-flow-tracer-agent.md`
+**Bolt**: 089
+
+### 008-file-sweeper-agent.md ✅ GENERATED
+**Title**: `file-sweeper-agent` — bottom-up sweep, deterministic tools first (Prompt 18)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/008-file-sweeper-agent.md`
+**Bolt**: 089
+
+### 009-security-auditor-agent.md ✅ GENERATED
+**Title**: `security-auditor-agent` — taint + authn/authz + secrets + vuln classes (Prompt 19)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/009-security-auditor-agent.md`
+**Bolt**: 089
+
+### 010-dependency-audit-agent.md ✅ GENERATED
+**Title**: `dependency-audit-agent` — manifests/lockfiles vs live advisories, CVEs (Prompt 20)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/010-dependency-audit-agent.md`
+**Bolt**: 090
+
+### 011-config-auditor-agent.md ✅ GENERATED
+**Title**: `config-auditor-agent` — config/infra bug class (compose, CI, env, IaC) (Prompt 21)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/011-config-auditor-agent.md`
+**Bolt**: 090
+
+### 012-concurrency-auditor-agent.md ✅ GENERATED
+**Title**: `concurrency-auditor-agent` — races/deadlocks/TOCTOU (conditional; async-heavy stack) (Prompt 22)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/012-concurrency-auditor-agent.md`
+**Bolt**: 090
+
+### 013-root-cause-clustering.md ✅ GENERATED
+**Title**: `root-cause-clustering` — N symptoms → 1 multi-location bug, conservative (Prompt 23)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/013-root-cause-clustering.md`
+**Bolt**: 090
+
+### 014-intent-lookup.md ✅ GENERATED
+**Title**: `intent-lookup` — oracle read of knowledge-ledger contracts (Prompt 24) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/014-intent-lookup.md`
+**Bolt**: 091
+
+### 015-hunters-contract-ext.md ✅ GENERATED
+**Title**: hunters extension — surface contract-contradiction candidates (Prompt 24b) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/015-hunters-contract-ext.md`
+**Bolt**: 091
+
+### 016-verifier-scoring-contract-ext.md ✅ GENERATED
+**Title**: verifier+scoring extension — contract-corroborated confidence, intent-unconfirmed tag (Prompt 24c) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/016-verifier-scoring-contract-ext.md`
+**Bolt**: 091
+
+### 017-orchestrator-scale-ext.md ✅ GENERATED
+**Title**: orchestrator extension — specialists dispatch, budget, incremental, cheap-first, oracle (Prompt 24d) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/017-orchestrator-scale-ext.md`
+**Bolt**: 091
+
+#### Unit: 004-phase-4-learn-and-measure (6 stories) — Bolt: 092
+
+### 001-suppression-learning.md ✅ GENERATED
+**Title**: `suppression-learning` — dismissal reasons → validated, proposed-only patterns (Prompt 25)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/001-suppression-learning.md`
+**Bolt**: 092
+
+### 002-bug-lifecycle.md ✅ GENERATED
+**Title**: `bug-lifecycle` — status machine, evidence-based self-close, regression flags (Prompt 26)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/002-bug-lifecycle.md`
+**Bolt**: 092
+
+### 003-eval-corpus.md ✅ GENERATED
+**Title**: `eval-corpus` — labeled real + seeded synthetic ground truth, hit matcher (Prompt 27)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/003-eval-corpus.md`
+**Bolt**: 092
+
+### 004-eval-metrics.md ✅ GENERATED
+**Title**: `eval-metrics` — recall vs seeded corpus, precision via dismissals, trends (Prompt 28)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/004-eval-metrics.md`
+**Bolt**: 092
+
+### 005-curator-agent.md ✅ GENERATED
+**Title**: `curator-agent` — Learn/Reconcile/Measure/Summarize, fills the Learn slot (Prompt 29)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/005-curator-agent.md`
+**Bolt**: 092
+
+### 006-orchestrator-learn-ext.md ✅ GENERATED
+**Title**: orchestrator extension — Learn slot → Curator at run close (Prompt 29b)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/006-orchestrator-learn-ext.md`
+**Bolt**: 092
+
+#### Unit: 005-phase-5-remediation (5 stories) — Bolt: 093
+
+### 001-regression-harvest.md ✅ GENERATED
+**Title**: `regression-harvest` — keep the proving test as a tripwire (owner-approved write) (Prompt 30)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/001-regression-harvest.md`
+**Bolt**: 093
+
+### 002-fix-verification.md ✅ GENERATED
+**Title**: `fix-verification` — the closure GATE; verified-fixed by correlation_id (extends bug-lifecycle) (Prompt 31)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/002-fix-verification.md`
+**Bolt**: 093
+
+### 003-fix-proposal.md ✅ GENERATED
+**Title**: `fix-proposal` — suite-validated draft diffs, never applied (Prompt 32)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/003-fix-proposal.md`
+**Bolt**: 093
+
+### 004-fix-request-emit.md ✅ GENERATED
+**Title**: `fix-request-emit` — idempotent AI-DLC hand-off store, correlation_id-keyed (Prompt 33)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/004-fix-request-emit.md`
+**Bolt**: 093
+
+### 005-orchestrator-remediation-ext.md ✅ GENERATED
+**Title**: orchestrator extension — run-open fix-request mailbox scan (Prompt 31b, NEW in guide v3.3 / review H1)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/005-orchestrator-remediation-ext.md`
+**Bolt**: 093
+
+#### Unit: 006-optional-integration (3 stories) — Bolt: 094 ⏸ adoption-gated
+
+### 001-report-rendering-sarif-ext.md ✅ GENERATED
+**Title**: report-rendering extension — SARIF twin with count parity (Optional A)
+**Priority**: Could
+**Path**: `intents/035-bug-hunter-agent-system/units/006-optional-integration/stories/001-report-rendering-sarif-ext.md`
+**Bolt**: 094
+
+### 002-issue-sync.md ✅ GENERATED
+**Title**: `issue-sync` — idempotent tracker tickets following the bug lifecycle (Optional B)
+**Priority**: Could
+**Path**: `intents/035-bug-hunter-agent-system/units/006-optional-integration/stories/002-issue-sync.md`
+**Bolt**: 094
+
+### 003-ci-gate.md ✅ GENERATED
+**Title**: `ci-gate` — baseline-aware pass/fail policy, fails only NEW Critical/High (Optional C)
+**Priority**: Could
+**Path**: `intents/035-bug-hunter-agent-system/units/006-optional-integration/stories/003-ci-gate.md`
+**Bolt**: 094
