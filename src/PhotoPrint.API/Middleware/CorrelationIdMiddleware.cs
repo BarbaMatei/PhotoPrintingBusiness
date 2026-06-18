@@ -1,3 +1,4 @@
+using PhotoPrint.API.Extensions;
 using Serilog;
 using Serilog.Context;
 
@@ -17,7 +18,7 @@ public class CorrelationIdMiddleware : IMiddleware
     {
         var correlationId = ResolveCorrelationId(context);
 
-        context.Items["CorrelationId"] = correlationId;
+        context.Items[HttpContextExtensions.CorrelationIdItemKey] = correlationId;
 
         using (LogContext.PushProperty("CorrelationId", correlationId))
         {

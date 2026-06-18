@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Extensions;
 
 namespace PhotoPrint.API.Middleware;
 
@@ -52,7 +53,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var correlationId = context.Items["CorrelationId"]?.ToString() ?? Guid.NewGuid().ToString();
+        var correlationId = context.GetCorrelationId() ?? Guid.NewGuid().ToString();
 
         if (_exceptionMappings.TryGetValue(exception.GetType(), out var mapping))
         {

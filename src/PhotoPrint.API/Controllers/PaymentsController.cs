@@ -67,8 +67,12 @@ public class PaymentsController : ControllerBase
         }
 
         var amountBani = (long)(order.TotalRon * 100);
+        // BUG-4: key Stripe by the order id, not the client Idempotency-Key. The client
+        // key can be freed and reused for a *different* order at the 24h boundary; the
+        // order id is stable and unique per order, so a retry for THIS order still
+        // dedupes at Stripe while distinct orders never collide on a recycled key.
         var (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
-            amountBani, "ron", order.Id.ToString(), idempotencyKey, cancellationToken);
+            amountBani, "ron", order.Id.ToString(), order.Id.ToString(), cancellationToken);
 
         order.PaymentIntentId = paymentIntentId;
         order.StripeClientSecret = clientSecret;
@@ -113,14 +117,17 @@ public class PaymentsController : ControllerBase
         return Ok(new EuPlatescInitiateResponse(redirectUrl, order.Id));
     }
 
+    // OPS-1 (review 035-v1): this warning is transitional. Once the FE always sends an
+    // Idempotency-Key, escalate a missing key from a warning to a 400 (breaking change).
+    // Tracked as a follow-up bolt — see memory-bank/bolts/035-payment-idempotency
+    // (ddd-02) and the bolt walkthrough. TODO(bolt-035-followup): enforce required key.
     private void WarnIfMissingIdempotencyKey(string? key, string endpoint)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
-            var correlationId = HttpContext.Items["CorrelationId"]?.ToString();
             _logger.LogWarning(
                 "payments.idempotency.missing-key endpoint={Endpoint} correlation_id={CorrelationId}",
-                endpoint, correlationId);
+                endpoint, HttpContext.GetCorrelationId());
         }
     }
 }

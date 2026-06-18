@@ -66,8 +66,8 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
 
         // Stripe was hit exactly once across the two requests.
         Assert.Equal(callsBefore + 1, _factory.StripeGateway.CreateCallCount);
-        // The idempotency key was forwarded to the gateway.
-        Assert.Equal(key, _factory.StripeGateway.LastIdempotencyKey);
+        // BUG-4: Stripe is keyed by the order id (stable per order), not the client key.
+        Assert.Equal(dto1.OrderId.ToString(), _factory.StripeGateway.LastIdempotencyKey);
 
         // Exactly one order persisted for this key.
         using var scope = _factory.Services.CreateScope();
