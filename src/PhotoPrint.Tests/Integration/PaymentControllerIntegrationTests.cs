@@ -77,6 +77,43 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     }
 
     [Fact]
+    public async Task CreateStripeIntent_SecondTenantReusesAnothersKey_DoesNotReceiveTheirOrder()
+    {
+        // Tenant A creates an intent under a key.
+        var (userA, tokenA) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userA, unitPrice: 2.00m, quantity: 5);
+        var clientA = _factory.CreateClient();
+        clientA.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenA);
+
+        var key = Guid.NewGuid().ToString();
+        var respA = await SendStripeIntent(clientA, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, respA.StatusCode);
+        var dtoA = await respA.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // Tenant B presents the SAME key (IDOR attempt via header).
+        var (userB, tokenB) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userB, unitPrice: 2.00m, quantity: 5);
+        var clientB = _factory.CreateClient();
+        clientB.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenB);
+
+        var respB = await SendStripeIntent(clientB, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, respB.StatusCode);
+        var dtoB = await respB.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // SEC-1: B must NOT be handed A's order — that order (and its live secret) is A's.
+        Assert.NotEqual(dtoA!.OrderId, dtoB!.OrderId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        var orderA = await db.Orders.FindAsync(dtoA.OrderId);
+        var orderB = await db.Orders.FindAsync(dtoB.OrderId);
+        Assert.Equal(userA, orderA!.UserId);
+        Assert.Equal(userB, orderB!.UserId); // B received only B's own order
+    }
+
+    [Fact]
     public async Task CreateStripeIntent_SameKey_DivergentProcessor_Returns409()
     {
         var (userId, token) = await _factory.SeedUserWithJwtAsync();

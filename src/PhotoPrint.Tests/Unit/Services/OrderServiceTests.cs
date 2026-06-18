@@ -270,6 +270,47 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateFromCart_SameKey_SameTotalDifferentItems_ThrowsConflictNamingItems()
+    {
+        // BUG-3: with uniform per-unit pricing, a different photo at the same qty has
+        // an identical total. Total parity alone must NOT authorize a replay, or the
+        // reused key silently ships the wrong order's images.
+        var (userId, productId, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
+        const string key = "idem-items-001";
+
+        // Reuse the SAME request instance so ONLY the items differ between calls.
+        var request = MakeRequest();
+        var first = await _service.CreateFromCartAsync(userId, null, request, key);
+        Assert.False(first.WasIdempotentReplay);
+
+        // Swap the cart to a different photo at the same price/quantity → same total.
+        var oldItem = await _db.CartItems.FirstAsync(ci => ci.UserId == userId);
+        _db.CartItems.Remove(oldItem);
+        var upload2 = new Upload
+        {
+            UserId = userId,
+            OriginalFileName = "other.jpg",
+            FilePath = "/uploads/other.jpg",
+            ContentType = "image/jpeg",
+            WidthPx = 1800,
+            HeightPx = 1200,
+        };
+        _db.Uploads.Add(upload2);
+        _db.CartItems.Add(new CartItem
+        {
+            UserId = userId, UploadId = upload2.Id, ProductId = productId, Quantity = 3,
+        });
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<IdempotencyConflictException>(
+            () => _service.CreateFromCartAsync(userId, null, request, key));
+
+        Assert.Contains("items", ex.DivergentFields);
+        Assert.DoesNotContain("totalRon", ex.DivergentFields); // totals are identical
+        Assert.Equal(1, await _db.Orders.CountAsync());          // no second order created
+    }
+
+    [Fact]
     public async Task CreateFromCart_NoKey_DoesNotReplay_CreatesDistinctOrders()
     {
         var (userId, _, _) = await SeedCartAsync();
@@ -300,9 +341,84 @@ public class OrderServiceTests : IDisposable
         _db.Orders.Add(staleOrder);
         await _db.SaveChangesAsync();
 
-        var found = await _service.GetByIdempotencyKeyAsync("idem-key-stale");
+        var found = await _service.GetByIdempotencyKeyAsync("idem-key-stale", null, null);
 
         Assert.Null(found);
+    }
+
+    // ── SEC-1: idempotency lookup scoped to the caller (tenant isolation) ────────
+
+    [Fact]
+    public async Task GetByIdempotencyKey_KeyOwnedByAnotherUser_ReturnsNull()
+    {
+        var ownerId = Guid.NewGuid();
+        var attackerId = Guid.NewGuid();
+        const string key = "victim-key";
+
+        var ownersOrder = new Order
+        {
+            OrderNumber = "FT-OWNER-1",
+            UserId = ownerId,
+            IdempotencyKey = key,
+            StripeClientSecret = "pi_secret_victim", // must never leak to another caller
+            CreatedAt = DateTimeOffset.UtcNow,
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "S", Number = "1", City = "C", County = "J",
+                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
+            },
+        };
+        _db.Orders.Add(ownersOrder);
+        await _db.SaveChangesAsync();
+
+        // Same key, different caller → must not resolve the owner's order.
+        var leakedToUser = await _service.GetByIdempotencyKeyAsync(key, attackerId, null);
+        var leakedToGuest = await _service.GetByIdempotencyKeyAsync(key, null, Guid.NewGuid());
+
+        Assert.Null(leakedToUser);
+        Assert.Null(leakedToGuest);
+
+        // The owner still resolves their own order.
+        var ownerView = await _service.GetByIdempotencyKeyAsync(key, ownerId, null);
+        Assert.NotNull(ownerView);
+        Assert.Equal(ownersOrder.Id, ownerView!.Id);
+    }
+
+    [Fact]
+    public async Task CreateFromCart_OtherTenantsKey_DoesNotReplayOrLeakOrder()
+    {
+        // Tenant A owns an order under `key`.
+        var (attackerId, _, _) = await SeedCartAsync();
+        var ownerId = Guid.NewGuid();
+        const string key = "shared-key";
+
+        var ownersOrder = new Order
+        {
+            OrderNumber = "FT-OWNER-2",
+            UserId = ownerId,
+            IdempotencyKey = key,
+            StripeClientSecret = "pi_secret_owner",
+            CreatedAt = DateTimeOffset.UtcNow,
+            PaymentProcessor = PaymentProcessor.Stripe,
+            DeliveryType = DeliveryType.Easybox,
+            TotalRon = 26.00m,
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "S", Number = "1", City = "C", County = "J",
+                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
+            },
+        };
+        _db.Orders.Add(ownersOrder);
+        await _db.SaveChangesAsync();
+
+        // Tenant A (the caller seeded above) presents the owner's key.
+        var result = await _service.CreateFromCartAsync(attackerId, null, MakeRequest(), key);
+
+        // Must NOT be a replay of the owner's order, and must not surface its secret.
+        Assert.False(result.WasIdempotentReplay);
+        Assert.NotEqual(ownersOrder.Id, result.Order.Id);
+        Assert.Equal(attackerId, result.Order.UserId);
+        Assert.Null(result.Order.StripeClientSecret);
     }
 
     [Fact]
@@ -314,6 +430,7 @@ public class OrderServiceTests : IDisposable
         var staleOrder = new Order
         {
             OrderNumber = "FT-STALE-2",
+            UserId = userId,                 // the caller's OWN stale row (SEC-1: only own keys are freed)
             IdempotencyKey = key,
             CreatedAt = DateTimeOffset.UtcNow.AddHours(-25),
             ShippingAddress = new ShippingAddressSnapshot

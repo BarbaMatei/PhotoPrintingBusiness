@@ -86,25 +86,26 @@ public class OrderService : IOrderService
         // 2b. Idempotency resolution (bolt 035). Only when a key is supplied.
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            var existing = await GetByIdempotencyKeyAsync(idempotencyKey, ct);
-            if (existing is not null)
+            // Single round-trip for THIS caller's row holding the key — fresh or stale
+            // (QUAL-1: replaces the old two-query fresh-then-stale pattern). Scoped to
+            // the caller so another tenant's key can never be resolved here (SEC-1).
+            var holder = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
+            if (holder is not null)
             {
-                var divergent = DivergentFields(existing, request, total);
-                if (divergent.Count > 0)
-                    throw new IdempotencyConflictException(divergent);
+                if (holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow)
+                {
+                    // Fresh match for this caller → replay or (on divergence) 409.
+                    var divergent = DivergentFields(holder, request, total, orderItems);
+                    if (divergent.Count > 0)
+                        throw new IdempotencyConflictException(divergent);
 
-                // Same logical request within the window → replay the original order.
-                return new OrderCreationResult(existing, WasIdempotentReplay: true);
-            }
+                    return new OrderCreationResult(holder, WasIdempotentReplay: true);
+                }
 
-            // A row may still hold this key but be older than the window (stale).
-            // Free the key first, in its own save, so the new INSERT below does not
-            // transiently violate the unique index (Postgres checks per-statement).
-            var stale = await _db.Orders
-                .FirstOrDefaultAsync(o => o.IdempotencyKey == idempotencyKey, ct);
-            if (stale is not null)
-            {
-                stale.IdempotencyKey = null;
+                // Stale (>24h) row this caller owns still holds the key. Free it first,
+                // in its own save, so the INSERT below does not violate the unique index
+                // (both SQLite and Postgres enforce it per-statement — DOC-1).
+                holder.IdempotencyKey = null;
                 await _db.SaveChangesAsync(ct);
             }
         }
@@ -140,35 +141,130 @@ public class OrderService : IOrderService
         };
 
         _db.Orders.Add(order);
-        await _db.SaveChangesAsync(ct);
 
-        return new OrderCreationResult(order, WasIdempotentReplay: false);
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            await _db.SaveChangesAsync(ct);
+            return new OrderCreationResult(order, WasIdempotentReplay: false);
+        }
+
+        // BUG-1: a concurrent request carrying the same key may have won the INSERT
+        // race between our resolution above and this save. The unique index then
+        // rejects ours with a DbUpdateException — previously unhandled → 500 on the
+        // canonical double-submit. Catch it, detach our failed insert, and resolve
+        // the winner instead of surfacing a 500.
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return new OrderCreationResult(order, WasIdempotentReplay: false);
+        }
+        catch (DbUpdateException)
+        {
+            // Snapshot the candidate items BEFORE detaching: order.Items and orderItems
+            // are the same reference, and EF fix-up empties the collection as each item
+            // is detached — which would otherwise make the divergence check see no items.
+            var candidateItems = order.Items.ToList();
+            DetachFailedInsert(order);
+
+            var winner = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
+            if (winner is not null && winner.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow)
+            {
+                // Same caller won the race → replay it (or 409 if the request diverged).
+                var divergent = DivergentFields(winner, request, total, candidateItems);
+                if (divergent.Count > 0)
+                    throw new IdempotencyConflictException(divergent);
+
+                return new OrderCreationResult(winner, WasIdempotentReplay: true);
+            }
+
+            // We don't own a row for this key, yet the INSERT collided. If the key is
+            // held by a *different* caller (global unique index), replaying it would
+            // disclose another tenant's order (SEC-1) — return a clean 409 instead.
+            // If nothing holds the key, the failure was unrelated → rethrow, never mask.
+            var collidesWithOtherCaller = await _db.Orders
+                .AnyAsync(o => o.IdempotencyKey == idempotencyKey, ct);
+            if (collidesWithOtherCaller)
+                throw new ConflictException(
+                    "The Idempotency-Key is already associated with another request.");
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Detaches an order whose INSERT was rejected by the unique index, together with
+    /// its items, so the shared request-scoped <see cref="PhotoPrintDbContext"/> does
+    /// not later persist the orphaned graph on the next SaveChanges (e.g. the
+    /// controller saving the gateway secret after an idempotent replay).
+    /// </summary>
+    private void DetachFailedInsert(Order order)
+    {
+        // Snapshot the collection: detaching an item triggers EF fix-up that removes it
+        // from order.Items, which would otherwise mutate the collection mid-enumeration.
+        foreach (var item in order.Items.ToList())
+            _db.Entry(item).State = EntityState.Detached;
+        _db.Entry(order).State = EntityState.Detached;
     }
 
     // ── Idempotency helpers (bolt 035) ─────────────────────────────────────────
 
-    public async Task<Order?> GetByIdempotencyKeyAsync(string key, CancellationToken ct = default)
+    public async Task<Order?> GetByIdempotencyKeyAsync(
+        string key, Guid? userId, Guid? guestSessionId, CancellationToken ct = default)
     {
-        var cutoff = DateTimeOffset.UtcNow - IdempotencyWindow;
-        return await _db.Orders
-            .FirstOrDefaultAsync(o => o.IdempotencyKey == key && o.CreatedAt > cutoff, ct);
+        var holder = await FindKeyHolderAsync(key, userId, guestSessionId, ct);
+        if (holder is null)
+            return null;
+
+        // Stale (>24h) matches are treated as absent (the window has expired).
+        return holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow ? holder : null;
     }
+
+    /// <summary>
+    /// The single order (if any) currently holding <paramref name="key"/> for the
+    /// supplied caller — fresh OR stale; callers branch on the 24h window in memory.
+    /// Scoped to <paramref name="userId"/> / <paramref name="guestSessionId"/> so a
+    /// caller can only ever see their own order (SEC-1). Items are included for the
+    /// divergence comparison (BUG-3).
+    /// </summary>
+    private Task<Order?> FindKeyHolderAsync(
+        string key, Guid? userId, Guid? guestSessionId, CancellationToken ct)
+        => _db.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o =>
+                o.IdempotencyKey == key &&
+                (userId.HasValue ? o.UserId == userId : o.GuestSessionId == guestSessionId), ct);
 
     /// <summary>
     /// Returns the names of the fields that diverge between an existing order and a
     /// candidate request. Empty list = same logical request (replay-eligible).
-    /// `ShippingAddress` is intentionally excluded (see ADR-005).
+    /// `ShippingAddress` is intentionally excluded (see ADR-005); the cart items ARE
+    /// compared (BUG-3) — without that, two carts with identical totals but different
+    /// photos would silently replay the wrong order's images.
     /// </summary>
     private static IReadOnlyList<string> DivergentFields(
-        Order existing, CreateOrderRequest request, decimal candidateTotal)
+        Order existing, CreateOrderRequest request, decimal candidateTotal,
+        IReadOnlyList<OrderItem> candidateItems)
     {
         var fields = new List<string>();
         if (existing.PaymentProcessor != request.PaymentProcessor) fields.Add("paymentProcessor");
         if (existing.DeliveryType != request.DeliveryType) fields.Add("deliveryType");
         if (existing.EasyboxLockerId != request.EasyboxLockerId) fields.Add("easyboxLockerId");
         if (existing.TotalRon != candidateTotal) fields.Add("totalRon");
+        if (ItemsSignature(existing.Items) != ItemsSignature(candidateItems)) fields.Add("items");
         return fields;
     }
+
+    /// <summary>
+    /// Order-independent signature of a set of order items (product + upload + quantity).
+    /// Two requests with the same total but different photos/quantities produce
+    /// different signatures, so a reused key correctly 409s instead of replaying the
+    /// wrong order (BUG-3).
+    /// </summary>
+    private static string ItemsSignature(IEnumerable<OrderItem> items)
+        => string.Join("|", items
+            .OrderBy(i => i.ProductId)
+            .ThenBy(i => i.UploadId)
+            .Select(i => $"{i.ProductId:N}:{i.UploadId:N}:{i.Quantity}"));
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
