@@ -153,12 +153,19 @@ public class OrderService : IOrderService
         // rejects ours with a DbUpdateException — previously unhandled → 500 on the
         // canonical double-submit. Catch it, detach our failed insert, and resolve
         // the winner instead of surfacing a 500.
+        //
+        // The `when` filter (BUG-1, review 035-v5) confirms the failure IS the
+        // idempotency unique index before treating it as a key collision. An unrelated
+        // DbUpdateException (FK, NOT NULL, an OrderNumber unique collision) no longer
+        // matches the catch, so it propagates honestly instead of being masked behind a
+        // misleading 409 — and we no longer probe `AnyAsync(key)` to *infer* the cause
+        // (which also raced a holder freed between the throw and the probe).
         try
         {
             await _db.SaveChangesAsync(ct);
             return new OrderCreationResult(order, WasIdempotentReplay: false);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsIdempotencyKeyViolation(ex))
         {
             // Snapshot the candidate items BEFORE detaching: order.Items and orderItems
             // are the same reference, and EF fix-up empties the collection as each item
@@ -177,19 +184,33 @@ public class OrderService : IOrderService
                 return new OrderCreationResult(winner, WasIdempotentReplay: true);
             }
 
-            // We don't own a row for this key, yet the INSERT collided. If the key is
-            // held by a *different* caller (global unique index), replaying it would
-            // disclose another tenant's order (SEC-1) — return a clean 409 instead.
-            // If nothing holds the key, the failure was unrelated → rethrow, never mask.
-            var collidesWithOtherCaller = await _db.Orders
-                .AnyAsync(o => o.IdempotencyKey == idempotencyKey, ct);
-            if (collidesWithOtherCaller)
-                throw new ConflictException(
-                    "The Idempotency-Key is already associated with another request.");
-
-            throw;
+            // The constraint error already proves the key is taken, but this caller owns
+            // no (fresh) row for it → it is held by a *different* caller (global unique
+            // index). Replaying would disclose another tenant's order (SEC-1) → clean 409.
+            throw new ConflictException(
+                "The Idempotency-Key is already associated with another request.");
         }
     }
+
+    /// <summary>
+    /// True iff <paramref name="ex"/> is the database rejecting an INSERT/UPDATE because
+    /// of the <c>ix_orders_idempotency_key</c> unique index — as opposed to any other
+    /// constraint. Inspecting the provider error (Postgres <c>23505</c> + the constraint
+    /// name, SQLite constraint code + the column name) lets the catch handle ONLY a real
+    /// key collision and rethrow everything else, instead of inferring the cause from a
+    /// follow-up query (BUG-1, review 035-v5).
+    /// </summary>
+    private static bool IsIdempotencyKeyViolation(DbUpdateException ex)
+        => ex.InnerException switch
+        {
+            Microsoft.Data.Sqlite.SqliteException sqlite =>
+                sqlite.SqliteErrorCode == 19 /* SQLITE_CONSTRAINT */ &&
+                sqlite.Message.Contains("IdempotencyKey", StringComparison.OrdinalIgnoreCase),
+            Npgsql.PostgresException pg =>
+                pg.SqlState == "23505" /* unique_violation */ &&
+                pg.ConstraintName == "ix_orders_idempotency_key",
+            _ => false,
+        };
 
     /// <summary>
     /// Detaches an order whose INSERT was rejected by the unique index, together with

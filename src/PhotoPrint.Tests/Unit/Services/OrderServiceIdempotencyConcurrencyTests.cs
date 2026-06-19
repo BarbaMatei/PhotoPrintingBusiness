@@ -131,6 +131,38 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateFromCart_UnrelatedUniqueViolation_IsNotMaskedAsIdempotency409()
+    {
+        // BUG-1 (review 035-v5): the catch must confirm the failure is the idempotency
+        // index, not infer it. Here the caller's INSERT collides on ix_orders_order_number
+        // (an UNRELATED unique index) while the caller's key also happens to be held by
+        // another tenant. The old code caught any DbUpdateException, saw AnyAsync(key)==true,
+        // and returned a misleading 409 that MASKED the order-number collision. The scoped
+        // catch only engages for the idempotency index, so the unrelated failure now
+        // propagates as a DbUpdateException (an honest 500) instead.
+        var (callerId, _, _) = await SeedCartAsync();
+        const string key = "shared-key-unrelated-collision";
+
+        // Another tenant holds BOTH the caller's key AND the order number the caller's
+        // (counter-based) number service will generate first ("FT-00000001"). The caller's
+        // INSERT therefore violates ix_orders_order_number; SQLite reports that constraint,
+        // which is NOT the idempotency index → the scoped catch does not swallow it.
+        var ownerId = await SeedUserAsync();
+        using (var seed = NewContext())
+        {
+            seed.Orders.Add(MinimalOrder("FT-00000001", ownerId, key));
+            await seed.SaveChangesAsync();
+        }
+
+        using var db = NewContext();
+        var svc = NewService(db); // counter starts at 0 → first GenerateAsync → "FT-00000001"
+
+        // Must surface the real (order-number) failure, never a masked idempotency 409.
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () => svc.CreateFromCartAsync(callerId, null, MakeRequest(), key));
+    }
+
+    [Fact]
     public async Task CreateFromCart_ConcurrentSameOwnerSameKey_LoserReplaysWinner_OneOrder()
     {
         var (userId, productId, uploadId) = await SeedCartAsync();
