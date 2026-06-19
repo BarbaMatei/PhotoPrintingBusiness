@@ -27,6 +27,10 @@ public sealed class IdempotencyKeyFilter : IActionFilter
 
         if (key is null)
         {
+            // OPS-1 (review 035-v1): transitional. Once the FE always sends an
+            // Idempotency-Key, escalate a missing key from this warning to a 400
+            // (breaking change). Tracked in memory-bank/bolts/035-payment-idempotency
+            // (ddd-02) + the bolt walkthrough. TODO(bolt-035-followup): enforce required key.
             _logger.LogWarning(
                 "payments.idempotency.missing-key endpoint={Endpoint} correlation_id={CorrelationId}",
                 EndpointLabel(context), context.HttpContext.GetCorrelationId());
