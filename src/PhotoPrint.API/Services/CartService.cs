@@ -77,7 +77,7 @@ public class CartService : ICartService
         }
 
         // Replace strategy: delete only items for this product+size+finish, keep other groups intact.
-        var useTransaction = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
+        var useTransaction = _db.Database.ProviderName != DbProviders.InMemory;
         IDbContextTransaction? tx = useTransaction
             ? await _db.Database.BeginTransactionAsync(ct)
             : null;
@@ -143,7 +143,7 @@ public class CartService : ICartService
         Guid guestSessionId,
         CancellationToken ct = default)
     {
-        var useTransaction = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
+        var useTransaction = _db.Database.ProviderName != DbProviders.InMemory;
         IDbContextTransaction? tx = useTransaction
             ? await _db.Database.BeginTransactionAsync(ct)
             : null;

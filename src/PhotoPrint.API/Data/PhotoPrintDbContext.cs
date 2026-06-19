@@ -37,7 +37,7 @@ public class PhotoPrintDbContext : DbContext
 
         // SQLite doesn't support DateTimeOffset natively — store as Unix ms (long)
         // so that range comparisons (<=, >=) translate correctly in LINQ queries.
-        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        if (Database.ProviderName == DbProviders.Sqlite)
         {
             var dtConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, long>(
                 v => v.ToUnixTimeMilliseconds(),
@@ -185,7 +185,7 @@ public class PhotoPrintDbContext : DbContext
         modelBuilder.Entity<PricingTier>(entity =>
         {
             entity.HasKey(pt => pt.Id);
-            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+            if (Database.ProviderName != DbProviders.Sqlite)
                 entity.Property(pt => pt.UnitPrice).HasColumnType("decimal(10,2)");
             entity.HasIndex(pt => pt.ProductSizeId)
                   .HasDatabaseName("ix_pricing_tiers_product_size_id");
@@ -236,7 +236,7 @@ public class PhotoPrintDbContext : DbContext
 
         // Check constraint: exactly one of UserId / GuestSessionId must be set.
         // Skipped for InMemory provider (used in tests) — relational-only API.
-        if (Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+        if (Database.ProviderName != DbProviders.InMemory)
         {
             modelBuilder.Entity<Upload>()
                 .ToTable(t => t.HasCheckConstraint(
@@ -308,9 +308,9 @@ public class PhotoPrintDbContext : DbContext
             var idempotencyIndex = entity.HasIndex(o => o.IdempotencyKey)
                   .IsUnique()
                   .HasDatabaseName("ix_orders_idempotency_key");
-            if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (Database.ProviderName == DbProviders.Postgres)
                 idempotencyIndex.HasFilter("\"IdempotencyKey\" IS NOT NULL");
-            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+            if (Database.ProviderName != DbProviders.Sqlite)
             {
                 entity.Property(o => o.ShippingCostRon).HasColumnType("decimal(10,2)");
                 entity.Property(o => o.SubtotalRon).HasColumnType("decimal(10,2)");
@@ -319,7 +319,7 @@ public class PhotoPrintDbContext : DbContext
 
             entity.Property(o => o.ShippingAddress)
                   .HasConversion(shippingConverter);
-            if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (Database.ProviderName == DbProviders.Postgres)
                 entity.Property(o => o.ShippingAddress).HasColumnType("jsonb");
 
             entity.HasOne(o => o.User)
@@ -345,7 +345,7 @@ public class PhotoPrintDbContext : DbContext
             entity.HasKey(oi => oi.Id);
             entity.HasIndex(oi => oi.OrderId)
                   .HasDatabaseName("ix_order_items_order_id");
-            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+            if (Database.ProviderName != DbProviders.Sqlite)
             {
                 entity.Property(oi => oi.UnitPriceRon).HasColumnType("decimal(10,2)");
                 entity.Property(oi => oi.LineTotalRon).HasColumnType("decimal(10,2)");
@@ -353,7 +353,7 @@ public class PhotoPrintDbContext : DbContext
 
             entity.Property(oi => oi.ProductSnapshot)
                   .HasConversion(productSnapshotConverter);
-            if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (Database.ProviderName == DbProviders.Postgres)
                 entity.Property(oi => oi.ProductSnapshot).HasColumnType("jsonb");
 
             entity.HasOne(oi => oi.Order)

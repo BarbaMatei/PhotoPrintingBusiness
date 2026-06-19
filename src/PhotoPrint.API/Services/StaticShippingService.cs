@@ -25,7 +25,7 @@ public class StaticShippingService : IShippingService
         if (!string.IsNullOrWhiteSpace(city))
         {
             // ILike is PostgreSQL-specific; fall back to ToLower().Contains for InMemory / SQLite.
-            if (_db.Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (_db.Database.ProviderName == DbProviders.Postgres)
                 query = query.Where(l => EF.Functions.ILike(l.City, $"%{city}%"));
             else
                 query = query.Where(l => l.City.ToLower().Contains(city.ToLower()));

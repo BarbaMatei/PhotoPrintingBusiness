@@ -20,8 +20,7 @@ public class OrderNumberService : IOrderNumberService
         // (local/dev — appsettings.Development.json sets DatabaseProvider=Sqlite) both use
         // a simple count-based number. The unique index on OrderNumber is the backstop;
         // these providers don't carry production write-concurrency. (BUG-6, review 035-v3.)
-        if (_db.Database.ProviderName is "Microsoft.EntityFrameworkCore.InMemory"
-            or "Microsoft.EntityFrameworkCore.Sqlite")
+        if (_db.Database.ProviderName is DbProviders.InMemory or DbProviders.Sqlite)
         {
             var count = await _db.Orders.CountAsync(ct);
             return FormatOrderNumber(year, count + 1);
