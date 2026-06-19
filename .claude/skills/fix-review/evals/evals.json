@@ -1,0 +1,39 @@
+{
+  "skill_name": "fix-review",
+  "evals": [
+    {
+      "id": 0,
+      "name": "fix-all-findings",
+      "prompt": "Address the open findings in the code review for the discount module (the review is under reviews/discount-module/).",
+      "expected_output": "All 4 findings driven to a terminal status; blockers FIX-1/FIX-2 fixed in code WITH new regression tests; DOC-1 comment + CLEAN-1 duplicate constant addressed; resolution-v1.md updated per finding (status+commit+note) with top-level status=resolved; review-v1.md untouched; nothing marked 'verified'; one commit per finding referencing its ID.",
+      "files": [],
+      "expectations": [
+        "review-v1.md is byte-identical to the base commit (immutable, not edited)",
+        "resolution-v1.md contains no finding with status 'verified'",
+        "FIX-1 and FIX-2 are marked status: fixed in resolution-v1.md with a commit SHA",
+        "applyDiscount clamps: applyDiscount(100,150)===0 and applyDiscount(100,-10)===100",
+        "getUserCart is scoped: getUserCart('bob') returns Bob's items, not Alice's",
+        "At least 2 new regression tests were added and the full test suite passes (node --test, >2 tests)",
+        "DOC-1 and CLEAN-1 are at a terminal status (fixed) in resolution-v1.md",
+        "resolution-v1.md top-level status is 'resolved' with fixed_commit set",
+        "At least one git commit message references a finding ID (FIX-1/FIX-2/DOC-1/CLEAN-1)"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "blockers-only",
+      "prompt": "Fix just the two blocker findings (FIX-1 and FIX-2) from the discount-module review. Leave the rest for later.",
+      "expected_output": "Only FIX-1 and FIX-2 fixed (code + regression tests), recorded in resolution-v1.md; DOC-1 and CLEAN-1 left at status: open; review-v1.md untouched; nothing marked 'verified'; commits reference the finding IDs.",
+      "files": [],
+      "expectations": [
+        "review-v1.md is byte-identical to the base commit (immutable, not edited)",
+        "resolution-v1.md contains no finding with status 'verified'",
+        "FIX-1 and FIX-2 are marked status: fixed with a commit SHA",
+        "applyDiscount clamps and getUserCart is scoped (both blocker bugs fixed in code)",
+        "Regression tests added for the blockers and the suite passes (node --test)",
+        "DOC-1 and CLEAN-1 remain status: open (scope respected, not over-reaching)",
+        "At least one commit message references FIX-1 or FIX-2"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  { "query": "the security review flagged a couple of issues in the payment service, can you go through and fix them", "should_trigger": true },
+  { "query": "address the open findings in review 035-v1", "should_trigger": true },
+  { "query": "apply the code review feedback on the auth module and mark what you fixed", "should_trigger": true },
+  { "query": "we got the review back — resolve the blockers and leave the nits for later", "should_trigger": true },
+  { "query": "go close out the findings from yesterday's review of the cart service", "should_trigger": true },
+  { "query": "work through the resolution file for the discount module and knock out the bugs the reviewer found", "should_trigger": true },
+  { "query": "review this PR for bugs and security issues", "should_trigger": false },
+  { "query": "can you do a security review of the changes on this branch", "should_trigger": false },
+  { "query": "this function returns the wrong value for negative input, fix it", "should_trigger": false },
+  { "query": "simplify the changed code in checkout.js, it's too repetitive", "should_trigger": false },
+  { "query": "verify that my fix actually works by running the app", "should_trigger": false },
+  { "query": "summarize the findings in the review doc for me", "should_trigger": false }
+]
