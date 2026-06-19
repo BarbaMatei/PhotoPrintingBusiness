@@ -98,6 +98,13 @@ public class ExceptionHandlerMiddleware : IMiddleware
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
 
+        // OBS-1 (review 035-v5): the documented 409 contract is "names the divergent
+        // fields". Compute it once and surface it in BOTH the Development diagnostic shape
+        // and the production ProblemDetails — previously only the prod branch carried it,
+        // so a FE built against the dev API never saw the contract field. Field NAMES only,
+        // never values (no PII).
+        var divergentFields = (exception as IdempotencyConflictException)?.DivergentFields;
+
         object response;
 
         if (exception != null && IsDevContext(context))
@@ -109,6 +116,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 status = statusCode,
                 detail,
                 correlationId,
+                divergentFields,
                 exception = new
                 {
                     type = exception.GetType().FullName,
@@ -128,9 +136,8 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 Extensions = { ["correlationId"] = correlationId },
             };
 
-            // Surface idempotency divergent field NAMES (never values — no PII).
-            if (exception is IdempotencyConflictException idempotencyConflict)
-                problem.Extensions["divergentFields"] = idempotencyConflict.DivergentFields;
+            if (divergentFields is not null)
+                problem.Extensions["divergentFields"] = divergentFields;
 
             response = problem;
         }

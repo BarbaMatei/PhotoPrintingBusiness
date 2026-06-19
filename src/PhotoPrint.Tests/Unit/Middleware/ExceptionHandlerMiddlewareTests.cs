@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using FluentAssertions;
@@ -133,6 +134,51 @@ public class ExceptionHandlerMiddlewareTests
         // Assert
         nextCalled.Should().BeTrue();
         context.Response.StatusCode.Should().Be(200);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyConflict_IncludesDivergentFields_InProduction()
+    {
+        // Arrange
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext(isDev: false);
+        RequestDelegate next = _ =>
+            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+
+        // Act
+        await sut.InvokeAsync(context, next);
+
+        // Assert
+        context.Response.StatusCode.Should().Be(409);
+        var body = await ReadResponseBodyAsync(context);
+        var fields = body.RootElement.GetProperty("divergentFields")
+            .EnumerateArray().Select(e => e.GetString()).ToArray();
+        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyConflict_IncludesDivergentFields_InDevelopment()
+    {
+        // OBS-1 (review 035-v5): the documented 409 contract field must be present even in
+        // Development, where the response uses the richer diagnostic shape. A FE developer
+        // building against the dev API otherwise never sees `divergentFields`.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+        var sut = CreateSut();
+        var context = CreateContext(isDev: true);
+        RequestDelegate next = _ =>
+            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+
+        // Act
+        await sut.InvokeAsync(context, next);
+
+        // Assert
+        context.Response.StatusCode.Should().Be(409);
+        var body = await ReadResponseBodyAsync(context);
+        body.RootElement.TryGetProperty("divergentFields", out var divergent)
+            .Should().BeTrue("the 409 contract field must be present in Development too (OBS-1)");
+        var fields = divergent.EnumerateArray().Select(e => e.GetString()).ToArray();
+        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
     }
 
     [Fact]

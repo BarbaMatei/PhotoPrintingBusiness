@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.DTOs.Payments;
@@ -133,6 +135,12 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         var second = await SendStripeIntent(client, divergent, key);
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+
+        // OBS-1: the 409 body must NAME the divergent field, not just carry the status.
+        using var body = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        var divergentFields = body.RootElement.GetProperty("divergentFields")
+            .EnumerateArray().Select(e => e.GetString()).ToArray();
+        Assert.Contains("paymentProcessor", divergentFields);
     }
 
     [Fact]
