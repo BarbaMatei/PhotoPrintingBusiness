@@ -138,6 +138,7 @@ public class PaymentFactory : ShippingFactory
             GuestSessionId = guestSessionId,
             UploadId = upload.Id,
             ProductId = product.Id,
+            SizeId = size.Id,        // required under real FK enforcement (SQLite); InMemory ignores it
             Quantity = quantity,
         };
 
