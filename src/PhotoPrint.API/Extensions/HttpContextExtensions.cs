@@ -11,7 +11,17 @@ public static class HttpContextExtensions
     /// correlation id is stored. Prefer <see cref="GetCorrelationId"/> over this key.</summary>
     public const string CorrelationIdItemKey = "CorrelationId";
 
+    /// <summary>The <see cref="HttpContext.Items"/> key under which the normalized
+    /// Idempotency-Key is stashed by <c>IdempotencyKeyFilter</c>. Prefer
+    /// <see cref="GetIdempotencyKey"/> over this key.</summary>
+    public const string IdempotencyKeyItemKey = "IdempotencyKey";
+
     /// <summary>The correlation id stamped on this request, or <c>null</c> if none was set.</summary>
     public static string? GetCorrelationId(this HttpContext context)
         => context.Items[CorrelationIdItemKey]?.ToString();
+
+    /// <summary>The normalized Idempotency-Key for this request (whitespace-only → null),
+    /// stashed by <c>IdempotencyKeyFilter</c>; <c>null</c> when no usable key was sent.</summary>
+    public static string? GetIdempotencyKey(this HttpContext context)
+        => context.Items[IdempotencyKeyItemKey] as string;
 }

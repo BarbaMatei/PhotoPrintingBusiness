@@ -14,6 +14,7 @@ namespace PhotoPrint.API.Controllers;
 [Route("api/payments")]
 [Authorize(Policy = GuestSessionExtensions.DualAuthPolicy)]
 [ServiceFilter(typeof(DetectLegacyShippingCostFilter))]
+[ServiceFilter(typeof(IdempotencyKeyFilter))]
 public class PaymentsController : ControllerBase
 {
     private readonly IOrderService _orderService;
@@ -21,8 +22,6 @@ public class PaymentsController : ControllerBase
     private readonly IEuPlatescService _euPlatescService;
     private readonly PhotoPrintDbContext _db;
     private readonly ILogger<PaymentsController> _logger;
-
-    private const string IdempotencyHeader = "Idempotency-Key";
 
     public PaymentsController(
         IOrderService orderService,
@@ -44,42 +43,26 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(typeof(StripeIntentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> CreateStripeIntentAsync(
+    public Task<IActionResult> CreateStripeIntentAsync(
         [FromBody] CreateOrderRequest request,
-        [FromHeader(Name = IdempotencyHeader)] string? idempotencyKey,
         CancellationToken cancellationToken)
-    {
-        WarnIfMissingIdempotencyKey(idempotencyKey, "stripe.intent");
-
-        var userId = User.GetUserIdOrNull();
-        var guestSessionId = User.GetGuestSessionIdOrNull();
-
-        var result = await _orderService.CreateFromCartAsync(
-            userId, guestSessionId, request, idempotencyKey, cancellationToken);
-        var order = result.Order;
-
-        // Idempotent replay: return the exact same secret without touching Stripe.
-        if (result.WasIdempotentReplay && order.StripeClientSecret is not null)
-        {
-            _logger.LogInformation(
-                "payments.idempotency.replay processor=Stripe order_id={OrderId}", order.Id);
-            return Ok(new StripeIntentResponse(order.StripeClientSecret, order.Id));
-        }
-
-        var amountBani = (long)(order.TotalRon * 100);
-        // BUG-4: key Stripe by the order id, not the client Idempotency-Key. The client
-        // key can be freed and reused for a *different* order at the 24h boundary; the
-        // order id is stable and unique per order, so a retry for THIS order still
-        // dedupes at Stripe while distinct orders never collide on a recycled key.
-        var (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
-            amountBani, "ron", order.Id.ToString(), order.Id.ToString(), cancellationToken);
-
-        order.PaymentIntentId = paymentIntentId;
-        order.StripeClientSecret = clientSecret;
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return Ok(new StripeIntentResponse(clientSecret, order.Id));
-    }
+        => CreateIntentAsync(
+            request,
+            processor: "Stripe",
+            cachedValue: o => o.StripeClientSecret,
+            computeAndApplyAsync: async o =>
+            {
+                var amountBani = (long)(o.TotalRon * 100);
+                // BUG-4: key Stripe by the order id (stable per order), not the client
+                // Idempotency-Key, so a recycled client key can't collide at Stripe.
+                var (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
+                    amountBani, "ron", o.Id.ToString(), o.Id.ToString(), cancellationToken);
+                o.PaymentIntentId = paymentIntentId;
+                o.StripeClientSecret = clientSecret;
+                return clientSecret;
+            },
+            buildResponse: (o, secret) => new StripeIntentResponse(secret, o.Id),
+            cancellationToken);
 
     // ── POST /api/payments/euplatesc/initiate ─────────────────────────────────
 
@@ -87,47 +70,59 @@ public class PaymentsController : ControllerBase
     [ProducesResponseType(typeof(EuPlatescInitiateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> InitiateEuPlatescAsync(
+    public Task<IActionResult> InitiateEuPlatescAsync(
         [FromBody] CreateOrderRequest request,
-        [FromHeader(Name = IdempotencyHeader)] string? idempotencyKey,
         CancellationToken cancellationToken)
-    {
-        WarnIfMissingIdempotencyKey(idempotencyKey, "euplatesc.initiate");
+        => CreateIntentAsync(
+            request,
+            processor: "EuPlatesc",
+            cachedValue: o => o.EuPlatescRedirectUrl,
+            computeAndApplyAsync: o =>
+            {
+                // The redirect URL embeds a timestamp + nonce, so it is persisted and
+                // replayed verbatim rather than rebuilt on a later call.
+                var redirectUrl = _euPlatescService.BuildInitiateUrl(o);
+                o.EuPlatescRedirectUrl = redirectUrl;
+                return Task.FromResult(redirectUrl);
+            },
+            buildResponse: (o, url) => new EuPlatescInitiateResponse(url, o.Id),
+            cancellationToken);
 
+    /// <summary>
+    /// QUAL-4: the replay/compute/persist shape shared by both processors. Resolve the
+    /// (idempotent) order; if this is a replay and the processor's value is already
+    /// cached, return it without touching the gateway; otherwise compute it
+    /// (<paramref name="computeAndApplyAsync"/> calls the gateway and writes the order's
+    /// fields), persist, and return. The Idempotency-Key is read from
+    /// <see cref="HttpContext"/> where <see cref="IdempotencyKeyFilter"/> stashed it (QUAL-3).
+    /// </summary>
+    private async Task<IActionResult> CreateIntentAsync<TResponse>(
+        CreateOrderRequest request,
+        string processor,
+        Func<Order, string?> cachedValue,
+        Func<Order, Task<string>> computeAndApplyAsync,
+        Func<Order, string, TResponse> buildResponse,
+        CancellationToken ct)
+    {
         var userId = User.GetUserIdOrNull();
         var guestSessionId = User.GetGuestSessionIdOrNull();
+        var idempotencyKey = HttpContext.GetIdempotencyKey();
 
         var result = await _orderService.CreateFromCartAsync(
-            userId, guestSessionId, request, idempotencyKey, cancellationToken);
+            userId, guestSessionId, request, idempotencyKey, ct);
         var order = result.Order;
 
-        // Idempotent replay: return the stored redirect URL verbatim (the URL is
-        // not reproducible — it embeds a timestamp + nonce).
-        if (result.WasIdempotentReplay && order.EuPlatescRedirectUrl is not null)
+        // Idempotent replay with the value already cached → return it, no gateway call.
+        var cached = cachedValue(order);
+        if (result.WasIdempotentReplay && cached is not null)
         {
             _logger.LogInformation(
-                "payments.idempotency.replay processor=EuPlatesc order_id={OrderId}", order.Id);
-            return Ok(new EuPlatescInitiateResponse(order.EuPlatescRedirectUrl, order.Id));
+                "payments.idempotency.replay processor={Processor} order_id={OrderId}", processor, order.Id);
+            return Ok(buildResponse(order, cached));
         }
 
-        var redirectUrl = _euPlatescService.BuildInitiateUrl(order);
-        order.EuPlatescRedirectUrl = redirectUrl;
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return Ok(new EuPlatescInitiateResponse(redirectUrl, order.Id));
-    }
-
-    // OPS-1 (review 035-v1): this warning is transitional. Once the FE always sends an
-    // Idempotency-Key, escalate a missing key from a warning to a 400 (breaking change).
-    // Tracked as a follow-up bolt — see memory-bank/bolts/035-payment-idempotency
-    // (ddd-02) and the bolt walkthrough. TODO(bolt-035-followup): enforce required key.
-    private void WarnIfMissingIdempotencyKey(string? key, string endpoint)
-    {
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            _logger.LogWarning(
-                "payments.idempotency.missing-key endpoint={Endpoint} correlation_id={CorrelationId}",
-                endpoint, HttpContext.GetCorrelationId());
-        }
+        var value = await computeAndApplyAsync(order);
+        await _db.SaveChangesAsync(ct);
+        return Ok(buildResponse(order, value));
     }
 }

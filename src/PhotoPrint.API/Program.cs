@@ -37,6 +37,7 @@ builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
 builder.Services.AddScoped<CorrelationIdMiddleware>();
 builder.Services.AddScoped<ExceptionHandlerMiddleware>();
 builder.Services.AddSingleton<PhotoPrint.API.Filters.DetectLegacyShippingCostFilter>();
+builder.Services.AddScoped<PhotoPrint.API.Filters.IdempotencyKeyFilter>();
 
 // ── Controllers + Validation ─────────────────────────────────────────────────
 builder.Services.AddControllers(options =>
