@@ -69,11 +69,7 @@ public class PaymentIdempotencyRelationalTests : IClassFixture<SqlitePaymentFact
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/payments/stripe/intent")
-        {
-            Content = JsonContent.Create(CourierStripeRequest),
-        };
-        request.Headers.Add("Idempotency-Key", idempotencyKey);
-        return client.SendAsync(request);
+        // QUAL-4 (review 035-v5): request building centralized in PaymentRequestHelpers.
+        return client.PostStripeIntentAsync(CourierStripeRequest, idempotencyKey);
     }
 }

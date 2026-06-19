@@ -239,27 +239,14 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         Assert.Equal(1, vdb.Orders.Count(o => o.IdempotencyKey == key)); // still exactly one order
     }
 
+    // QUAL-4 (review 035-v5): request building centralized in PaymentRequestHelpers.
     private static Task<HttpResponseMessage> SendStripeIntent(
         HttpClient client, CreateOrderRequest body, string idempotencyKey)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/payments/stripe/intent")
-        {
-            Content = JsonContent.Create(body),
-        };
-        request.Headers.Add("Idempotency-Key", idempotencyKey);
-        return client.SendAsync(request);
-    }
+        => client.PostStripeIntentAsync(body, idempotencyKey);
 
     private static Task<HttpResponseMessage> SendEuPlatescInitiate(
         HttpClient client, CreateOrderRequest body, string idempotencyKey)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/payments/euplatesc/initiate")
-        {
-            Content = JsonContent.Create(body),
-        };
-        request.Headers.Add("Idempotency-Key", idempotencyKey);
-        return client.SendAsync(request);
-    }
+        => client.PostEuPlatescInitiateAsync(body, idempotencyKey);
 
     // ── POST /api/payments/stripe/intent ──────────────────────────────────────
 
