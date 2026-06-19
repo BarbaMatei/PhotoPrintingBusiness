@@ -121,7 +121,9 @@ Identical contract additions. Response body is `{ redirectUrl, orderId }` instea
 | Race (two simultaneous fresh calls, same key) | present | (both pass lookup) | — | one 200, one 409 | second caller receives ProblemDetails | 1 row inserted; second insert rejected by unique index; the rejection is caught and translated to 409 |
 | Stale (>24h) | present | exists, > 24h old | — | 200 | new order (the stale row keeps its key for audit) | 1 row inserted with the same key value but **only the new one is "active"** because `CreatedAt + 24h > UtcNow` filter excludes the old |
 
-**The stale case requires careful index handling**: the filtered unique index covers ALL non-null keys, not "active" keys. Therefore, when we insert a new row with a previously-used (stale) key, the unique index will reject it. **Design choice**: at insert time, if the resolver returns `NewOrder` because the existing row is stale, we **null out the stale row's `IdempotencyKey`** in the same transaction before inserting the new row. Documented in the Data Model section.
+**The stale case requires careful index handling**: the filtered unique index covers ALL non-null keys, not "active" keys. Therefore, when we insert a new row with a previously-used (stale) key, the unique index will reject it. **Design choice**: at insert time, if the resolver returns `NewOrder` because the existing row is stale, we **null out the stale row's `IdempotencyKey`** before inserting the new row. Documented in the Data Model section.
+
+> **Implementation note (DOC-1, review 035-v5):** the as-built code frees the stale key in **its own `SaveChangesAsync`**, then inserts the new order in a **separate save** — deliberately two saves, *not* one wrapping transaction. A single transaction would still violate the unique index per-statement (both Postgres and SQLite enforce it mid-transaction), so the free must commit before the insert. The free+insert is therefore non-atomic; this is benign because the spec already accepts losing the stale row's key for audit (below), and the new insert is still arbitrated by the unique index. The wording "same transaction" in this section and the Data Model section below is the original sketch, not the shipped behaviour.
 
 ---
 
@@ -167,7 +169,9 @@ The `HasFilter` string is passed verbatim; Postgres respects it, SQLite (3.8+) a
 
 ### Stale-row handling on reuse
 
-When `IdempotencyResolver` returns `NewOrder` because an existing row's key is stale (> 24h old), `OrderService.CreateFromCartAsync(... , idempotencyKey, ct)` issues — inside the same transaction as the insert — an `UPDATE "Orders" SET "IdempotencyKey" = NULL WHERE "IdempotencyKey" = @key AND "CreatedAt" < @cutoff;`. This frees the key for the new row and preserves the old order's audit trail (the historical key value is no longer queryable but its presence/absence isn't audit-relevant once the order ships).
+When `IdempotencyResolver` returns `NewOrder` because an existing row's key is stale (> 24h old), `OrderService.CreateFromCartAsync(... , idempotencyKey, ct)` frees the key by nulling it on the stale row, then inserts the new row. This frees the key for the new row and preserves the old order's audit trail (the historical key value is no longer queryable but its presence/absence isn't audit-relevant once the order ships).
+
+> **As-built (DOC-1, review 035-v5):** this is **two saves**, not one transaction. The stale row's key is nulled and committed in its own `SaveChangesAsync` *first*, because the unique index is enforced per-statement (a single transaction would still collide). Only an owner-scoped stale row is freed (SEC-1). The free+insert pair is intentionally non-atomic — see the behaviour-matrix note above.
 
 Trade-off: the stale row's idempotency key is lost. If audit ever requires it, a future migration can introduce `Orders.HistoricalIdempotencyKey` text column. Out of scope here.
 
@@ -307,7 +311,8 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 
 ### Stripe SDK
 
-- `Stripe.RequestOptions.IdempotencyKey` set on every `PaymentIntentService.CreateAsync(...)` invocation when our key is non-null.
+- `Stripe.RequestOptions.IdempotencyKey` set on every `PaymentIntentService.CreateAsync(...)` invocation.
+- **The gateway is keyed by `order.Id` (server-generated), NOT the client `Idempotency-Key` header (DOC-2 / BUG-4, review 035).** The client key arbitrates *our* order row (the filtered unique index); Stripe is keyed by the stable order id so a recycled or replayed client key can never collide a different order at Stripe, and a re-call for the same order (e.g. the recovery-replay path, OBS-3) returns the same PaymentIntent rather than double-charging. The sketch below that forwarded the client `key` to Stripe is superseded by this choice.
 - Stripe enforces gateway-side dedupe for 24 h (matches our window — convenient alignment).
 - On Stripe-side conflict (`StripeError.Code == "idempotency_error"`), translate to our `IdempotencyConflictException`.
 
