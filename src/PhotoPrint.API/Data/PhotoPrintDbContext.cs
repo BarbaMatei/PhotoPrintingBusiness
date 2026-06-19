@@ -293,7 +293,11 @@ public class PhotoPrintDbContext : DbContext
 
             // ── Idempotency (bolt 035) ──────────────────────────────────────
             entity.Property(o => o.IdempotencyKey).HasMaxLength(80);
-            entity.Property(o => o.StripeClientSecret).HasMaxLength(255);
+            // DB-2 (review 035-v5): 512, not Stripe's exact 255-char ID ceiling. Today's
+            // client secrets are ~60–90 chars, but a zero-headroom column throws "value
+            // too long" on prod Postgres AFTER the Stripe charge exists if Stripe ever
+            // lengthens IDs (SQLite/InMemory don't enforce it, so tests wouldn't catch it).
+            entity.Property(o => o.StripeClientSecret).HasMaxLength(512);
             entity.Property(o => o.EuPlatescRedirectUrl).HasMaxLength(1000);
 
             // At most one order may carry any given non-null IdempotencyKey.

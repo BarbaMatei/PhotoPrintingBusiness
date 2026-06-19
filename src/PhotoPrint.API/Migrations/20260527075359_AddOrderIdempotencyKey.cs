@@ -36,8 +36,12 @@ namespace PhotoPrint.API.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "StripeClientSecret",
                 table: "Orders",
-                type: isNpgsql ? "character varying(255)" : "TEXT",
-                maxLength: 255,
+                // DB-2 (review 035-v5): 512, not Stripe's exact 255 ceiling — headroom so a
+                // longer client secret can't throw "value too long" on prod Postgres after
+                // the charge already exists. Safe to widen this not-yet-deployed migration
+                // in place (no Postgres DB has applied it; SQLite is unaffected by maxLength).
+                type: isNpgsql ? "character varying(512)" : "TEXT",
+                maxLength: 512,
                 nullable: true);
 
             migrationBuilder.CreateIndex(

@@ -346,7 +346,7 @@ namespace PhotoPrint.API.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("StripeClientSecret")
-                        .HasMaxLength(255)
+                        .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("SubtotalRon")
