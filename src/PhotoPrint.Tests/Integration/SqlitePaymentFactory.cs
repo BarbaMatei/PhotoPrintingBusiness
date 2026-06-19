@@ -3,10 +3,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using PhotoPrint.API.Data;
-using PhotoPrint.API.Services;
 
 namespace PhotoPrint.Tests.Integration;
 
@@ -37,12 +35,7 @@ public sealed class SqlitePaymentFactory : PaymentFactory
                 services.Remove(descriptor);
 
             services.AddDbContext<PhotoPrintDbContext>(options => options.UseSqlite(_connection));
-
-            // OrderNumberService only handles InMemory + Postgres (its else-branch emits
-            // Postgres `DO $$ … nextval` SQL that fails on SQLite). Order numbering is
-            // orthogonal to this test, so use a provider-agnostic sequential fake.
-            services.RemoveAll<IOrderNumberService>();
-            services.AddSingleton<IOrderNumberService, SequentialOrderNumberService>();
+            // NB: the REAL OrderNumberService runs here — it has a SQLite branch (BUG-6).
         });
     }
 
@@ -65,13 +58,5 @@ public sealed class SqlitePaymentFactory : PaymentFactory
         base.Dispose(disposing);
         if (disposing)
             _connection.Dispose();
-    }
-
-    /// <summary>Provider-agnostic order numbers for the SQLite-backed test host.</summary>
-    private sealed class SequentialOrderNumberService : IOrderNumberService
-    {
-        private int _n;
-        public Task<string> GenerateAsync(CancellationToken ct = default)
-            => Task.FromResult($"FT-TEST-{Interlocked.Increment(ref _n):D6}");
     }
 }
