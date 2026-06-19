@@ -15,8 +15,17 @@ namespace PhotoPrint.API.Migrations
             // is unbounded (ignores maxLength) and the index needs an explicit NULL
             // filter to match the runtime model (PhotoPrintDbContext); on SQLite, plain
             // TEXT + a plain unique index (NULLs are distinct) is exactly what we had.
-            // NOTE: the model snapshot is still SQLite-flavored — fully eliminating
-            // scaffold-time drift needs per-provider migration assemblies (deferred).
+            //
+            // DB-1 (review 035-v5) — breadcrumb for the NEXT author. The model snapshot
+            // (PhotoPrintDbContextModelSnapshot.cs) is SQLite-flavored: it records these
+            // columns as TEXT and the idempotency index as UNFILTERED. The runtime Npgsql
+            // model is character varying(N) + a filtered index. EF diffs the next migration
+            // against that snapshot, so `dotnet ef migrations add` under the Npgsql provider
+            // will scaffold a PHANTOM diff for these columns — AlterColumn (TEXT→varchar) +
+            // Drop/CreateIndex (to add `"IdempotencyKey" IS NOT NULL`). For an already-correct
+            // deployed schema that diff is spurious: review it and discard the idempotency-
+            // column operations. Fully eliminating the drift needs per-provider migration
+            // assemblies — a deferred follow-up, not done here (see resolution-v5 DB-1).
             var isNpgsql = migrationBuilder.ActiveProvider == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
             migrationBuilder.AddColumn<string>(
