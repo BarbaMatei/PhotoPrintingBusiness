@@ -64,6 +64,14 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 context.Request.Path,
                 correlationId);
 
+            // OBS-2 (review 035-v5): emit the structured event ddd-01:61 reserves so a
+            // conflict is distinctly observable (a signal of client bugs / key-reuse abuse)
+            // rather than buried in the generic warning above. Field NAMES only — no values.
+            if (exception is IdempotencyConflictException conflict)
+                _logger.LogWarning(
+                    "payments.idempotency.conflict correlation_id={CorrelationId} divergent_fields={DivergentFields}",
+                    correlationId, string.Join(",", conflict.DivergentFields));
+
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,
                 exception.Message, correlationId, exception);
         }

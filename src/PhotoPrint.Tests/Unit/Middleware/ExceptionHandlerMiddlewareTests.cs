@@ -182,6 +182,30 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_IdempotencyConflict_EmitsReservedConflictLogEvent()
+    {
+        // OBS-2 (review 035-v5): ddd-01 reserves `payments.idempotency.conflict` as a
+        // distinct structured event; the middleware must emit it (not only the generic
+        // "Handled exception" warning) so a conflict is independently observable.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new IdempotencyConflictException(new[] { "paymentProcessor" });
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("payments.idempotency.conflict")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_KnownException_IncludesCorrelationIdFromContext()
     {
         // Arrange
