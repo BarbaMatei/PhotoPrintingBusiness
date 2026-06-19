@@ -23,7 +23,7 @@ findings:
   QUAL-1: { status: verified, commit: 0bc6ecd, note: "extracted IsFresh(order) + ReplayOrConflict(holder,request,total,items); both the pre-INSERT lookup and post-collision recovery now call them (IsFresh also used in GetByIdempotencyKeyAsync). Behavior-preserving; named ReplayOrConflict vs the review's sketched ResolveFreshHolder." }
   QUAL-2: { status: verified, commit: 24ed333, note: "added DbProviders constants (Postgres/Sqlite/InMemory); replaced magic strings in DbContext + OrderNumberService + (beyond the named files) CartService + StaticShippingService. Migration kept literal — see decisions." }
   QUAL-3: { status: deferred, commit: null, note: "pre-existing altitude pattern; review says 'not introduced here'. POST-V6 RE-ASSESSED: confirmed CODEBASE-WIDE — WebhooksController also injects PhotoPrintDbContext and uses it 6x; PaymentsController's single SaveChangesAsync is the same convention. Fixing only PaymentsController (e.g. exposing SaveChangesAsync on IOrderService to drop its _db) would be inconsistent cosmetic churn; the real fix is a repo-wide controller/service boundary decision, out of scope for a bolt-035 fix-review. Stays deferred." }
-  QUAL-4: { status: fixed, commit: fbb4c7c, note: "(POST-V6, user-requested) consolidated the duplicated Idempotency-Key POST builders into PaymentRequestHelpers HttpClient extensions; per-class helpers delegate, call sites unchanged. 19 payment integration tests green. Left the unit MakeRequest + SQLite-vs-WAF factory setup (different test layers). Awaiting v7 re-review to verify." }
+  QUAL-4: { status: verified, commit: fbb4c7c, note: "(POST-V6, user-requested) consolidated the duplicated Idempotency-Key POST builders into PaymentRequestHelpers HttpClient extensions; per-class helpers delegate, call sites unchanged. Left the unit MakeRequest + SQLite-vs-WAF factory setup (different test layers). v7: VERIFIED — isolated lens confirmed line-by-line behavior-preservation (method/url/body/header identical, auth+body preserved in the relational test); 19 payment integration tests green." }
   QUAL-5: { status: verified, commit: 738993e, note: "suppressed EF1002 with #pragma + justifying comment (seqName is a server-side int only, DDL identifier can't be parameterized). Warning no longer in the build output. Postgres branch still has no automated coverage — unchanged, no Postgres in the test matrix." }
 ---
 
@@ -52,7 +52,7 @@ is driven to a terminal state below. When all are terminal, the top-level `statu
 | QUAL-1 | ⚪ Clean | verified | 0bc6ecd | Extracted `IsFresh()` + `ReplayOrConflict()`; both resolution blocks (pre-INSERT + post-collision) and `GetByIdempotencyKeyAsync` reuse them. Behavior-preserving (full idempotency + payment suites green). Named `ReplayOrConflict` rather than the review's sketch `ResolveFreshHolder`. |
 | QUAL-2 | ⚪ Clean | verified | 24ed333 | `DbProviders` constants class; magic strings replaced in `PhotoPrintDbContext`, `OrderNumberService`, and (beyond the 3 named files, for completeness) `CartService` + `StaticShippingService`. The migration keeps its literal `ActiveProvider` string — see decisions. |
 | QUAL-3 | ⚪ Clean | **deferred** | — | **Post-v6 re-assessed:** confirmed codebase-wide — `WebhooksController` also injects `PhotoPrintDbContext` (6 uses); PaymentsController's single `SaveChangesAsync` is the same convention. Fixing only PaymentsController would be inconsistent cosmetic churn; the real fix is a repo-wide controller/service-boundary decision, out of scope for a bolt-035 fix-review. Stays deferred. |
-| QUAL-4 | ⚪ Clean | fixed | fbb4c7c | **Post-v6 (user-requested):** extracted the duplicated payment POST builders into `PaymentRequestHelpers` `HttpClient` extensions; per-class helpers delegate, call sites unchanged; 19 payment integration tests green. Unit `MakeRequest` + SQLite/WAF factory setup left (different test layers). Awaiting v7 to verify. |
+| QUAL-4 | ⚪ Clean | **verified** (v7) | fbb4c7c | **Post-v6 (user-requested):** extracted the duplicated payment POST builders into `PaymentRequestHelpers` `HttpClient` extensions; per-class helpers delegate, call sites unchanged; 19 payment integration tests green. Unit `MakeRequest` + SQLite/WAF factory setup left (different test layers). **v7: verified** — isolated lens confirmed line-by-line behavior-preservation. |
 | QUAL-5 | ⚪ Clean | verified | 738993e | `#pragma warning disable/restore EF1002` around the year-sequence `ExecuteSqlRawAsync`, with a comment: the interpolated value is a server-side `int` (no injection) and a DDL identifier (can't be parameterized). EF1002 no longer appears in the build. (The Postgres branch's lack of coverage is unchanged — no Postgres in the test matrix.) |
 
 ## Decisions for the re-reviewer
@@ -137,3 +137,12 @@ blinded to `reviews/`, judged the code independently.
   is a repo-wide boundary decision.
 
 So after this round: **12 verified · 1 fixed-awaiting-v7 (QUAL-4) · 2 deferred (DB-1, QUAL-3).**
+
+### v7 re-review outcome (against `fbb4c7c`)
+
+QUAL-4 re-reviewed in [review-v7.md](review-v7.md) by one isolated lens (blinded to `reviews/`):
+**QUAL-4 → `verified`** — line-by-line confirmation the helper extraction is behavior-preserving
+(method/url/body/header identical; the relational test's Bearer auth + `CourierStripeRequest`
+body preserved); 19 payment integration tests green. DB-1 + QUAL-3 deferrals re-affirmed.
+
+**Final: 13 verified · 2 accepted-deferred (DB-1, QUAL-3) · 0 open. Loop complete.**

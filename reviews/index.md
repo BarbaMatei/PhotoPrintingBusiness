@@ -11,7 +11,7 @@ Findings column is H / M / L / Cleanup. Status tracks the resolution loop: `open
 
 | Date | Target | Branch | Verdict | Findings | Status | Latest review | Resolution |
 |------|--------|--------|---------|----------|--------|---------------|------------|
-| 2026-06-19 | Bolt 035 — payment idempotency | `feat/bolt-035-payment-idempotency` | Approved (v6 re-review, 0 blockers) | 0 / 3 / 6 / 6 | v6: 12 verified + DOC-3 fixed. Post-v6: QUAL-4 deferral fixed @fbb4c7c (awaiting v7); DB-1 + QUAL-3 stay deferred (migration-deploy infra / codebase-wide pattern). 474/474 green. | [v6](035-payment-idempotency/review-v6.md) | [v5](035-payment-idempotency/resolution-v5.md) |
+| 2026-06-19 | Bolt 035 — payment idempotency | `feat/bolt-035-payment-idempotency` | Approved (v7 re-review, 0 blockers) | 0 / 3 / 6 / 6 | **Loop complete** — 13 verified, 2 accepted-deferred (DB-1: migration-deploy infra; QUAL-3: codebase-wide pattern), 0 open. v7 verified QUAL-4 @fbb4c7c. 474/474 green. | [v7](035-payment-idempotency/review-v7.md) | [v5](035-payment-idempotency/resolution-v5.md) |
 
 ## Backlog / improvements to the system
 
