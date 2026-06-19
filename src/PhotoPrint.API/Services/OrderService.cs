@@ -249,11 +249,23 @@ public class OrderService : IOrderService
     /// </summary>
     private Task<Order?> FindKeyHolderAsync(
         string key, Guid? userId, Guid? guestSessionId, CancellationToken ct)
-        => _db.Orders
+    {
+        // SEC-1 (review 035-v5): defense-in-depth. With both identities null the scope
+        // predicate below collapses to `o.GuestSessionId == null`, which matches every
+        // authenticated user's order — a borrowed key could then resolve an arbitrary
+        // user's order/secret. The payment endpoints' dual-auth guarantees exactly one
+        // identity is non-null today, so this is unreachable; reject it loudly rather than
+        // let a future token-shape change silently turn the predicate into an IDOR.
+        if (userId is null && guestSessionId is null)
+            throw new InvalidOperationException(
+                "Idempotency lookup requires an authenticated user or guest session identity.");
+
+        return _db.Orders
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o =>
                 o.IdempotencyKey == key &&
                 (userId.HasValue ? o.UserId == userId : o.GuestSessionId == guestSessionId), ct);
+    }
 
     /// <summary>
     /// Returns the names of the fields that diverge between an existing order and a

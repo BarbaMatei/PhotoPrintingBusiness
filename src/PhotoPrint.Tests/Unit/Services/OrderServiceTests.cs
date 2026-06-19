@@ -327,9 +327,11 @@ public class OrderServiceTests : IDisposable
     [Fact]
     public async Task GetByIdempotencyKey_StaleOrder_ReturnsNull()
     {
+        var ownerId = Guid.NewGuid();
         var staleOrder = new Order
         {
             OrderNumber = "FT-STALE-1",
+            UserId = ownerId,
             IdempotencyKey = "idem-key-stale",
             CreatedAt = DateTimeOffset.UtcNow.AddHours(-25), // outside the 24h window
             ShippingAddress = new ShippingAddressSnapshot
@@ -341,9 +343,37 @@ public class OrderServiceTests : IDisposable
         _db.Orders.Add(staleOrder);
         await _db.SaveChangesAsync();
 
-        var found = await _service.GetByIdempotencyKeyAsync("idem-key-stale", null, null);
+        var found = await _service.GetByIdempotencyKeyAsync("idem-key-stale", ownerId, null);
 
         Assert.Null(found);
+    }
+
+    [Fact]
+    public async Task GetByIdempotencyKey_BothIdentitiesNull_Throws_DoesNotResolveArbitraryOrder()
+    {
+        // SEC-1 (review 035-v5): an idempotency lookup with neither a user nor a guest
+        // identity must be rejected, not silently collapse to "any guestless order". Here
+        // a real user owns the key; before the guard, a both-null lookup matched it
+        // (o.GuestSessionId == null) and disclosed the owner's order.
+        var ownerId = Guid.NewGuid();
+        const string key = "idem-key-both-null";
+        _db.Orders.Add(new Order
+        {
+            OrderNumber = "FT-OWNER-NULL",
+            UserId = ownerId,
+            IdempotencyKey = key,
+            StripeClientSecret = "pi_secret_owner",
+            CreatedAt = DateTimeOffset.UtcNow,
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "S", Number = "1", City = "C", County = "J",
+                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
+            },
+        });
+        await _db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.GetByIdempotencyKeyAsync(key, null, null));
     }
 
     // ── SEC-1: idempotency lookup scoped to the caller (tenant isolation) ────────
