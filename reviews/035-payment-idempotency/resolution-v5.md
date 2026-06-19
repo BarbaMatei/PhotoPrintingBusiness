@@ -3,14 +3,14 @@ type: review-resolution
 target: bolt-035-payment-idempotency
 review_version: 5
 status: resolved            # open | in-progress | resolved
-fixed_commit: 738993e       # branch tip (11e72c1, e957ac1, 659056a, 6aad926, c7c2b97, 8278bbe, 8d5b240, 1c36ff5, 03fa13d, 0bc6ecd, 24ed333, 738993e)
+fixed_commit: fbb4c7c       # branch tip; fixes: 11e72c1 e957ac1 659056a 6aad926 c7c2b97 8278bbe 8d5b240 1c36ff5 03fa13d 0bc6ecd 24ed333 738993e (+v6: 3faaae6 DOC-3; +post-v6: fbb4c7c QUAL-4)
 opened: 2026-06-19
 closed: 2026-06-19
 # Per-finding state. status ∈ open | in-progress | verified | verified | wont-fix | deferred | disputed | false-positive
 # `verified` is set ONLY by the re-review (review-v6.md) — a fixer cannot self-verify.
 # v5 finding IDs are v5-scoped (clean-room) and do NOT map to the v1–v4 comment IDs.
 findings:
-  DB-1:   { status: deferred, commit: 659056a, note: "real fix (per-provider migration assemblies) stays deferred (= BUG-5 v1 residual); added the explicit breadcrumb the review asked for so the next author expects + discards the phantom AlterColumn/Drop+CreateIndex diff under Npgsql. Scaffold-time only; no runtime/ValidateOnStart impact." }
+  DB-1:   { status: deferred, commit: 659056a, note: "real fix stays deferred (= BUG-5 v1 residual); breadcrumb added. POST-V6 RE-ASSESSED (user asked if it can be fixed now): app uses EnsureCreated() at startup (Program.cs:143,166), never Migrate() — migrations are Postgres-only artifacts for a not-yet-built migration-based deployment. A clean snapshot fix means either committing a phantom migration or hand-rewriting the whole generated snapshot Npgsql-canonical, and it belongs to the migration/deploy setup (roadmap's 3-env phase). Premature now. Breadcrumb stands." }
   DB-2:   { status: verified, commit: 11e72c1, note: "widened StripeClientSecret to varchar(512) in model + (not-yet-deployed) migration + snapshot; added provider-independent model-metadata regression guard (fails at 255, passes at 512)." }
   OBS-1:  { status: verified, commit: e957ac1, note: "compute divergentFields once, emit in BOTH dev diagnostic + prod ProblemDetails branches; unit tests for dev & prod, HTTP-layer body assertion on the divergent-processor 409. Dev test fails pre-fix, passes post-fix." }
   BUG-1:  { status: verified, commit: 6aad926, note: "added `when (IsIdempotencyKeyViolation(ex))` filter (Postgres 23505+constraint name / SQLite code 19 + 'IdempotencyKey' in message); dropped the AnyAsync inference — unrelated DbUpdateExceptions now propagate. Regression test: OrderNumber collision + key held by another tenant propagates DbUpdateException (pre-fix masked it as ConflictException 409); proven non-vacuous via stash-revert." }
@@ -22,8 +22,8 @@ findings:
   DOC-2:  { status: verified, commit: 03fa13d, note: "ddd-02 Stripe SDK section now documents the gateway is keyed by order.Id (BUG-4), not the client header key; explains why (recycled/replayed key can't collide a different PaymentIntent; recovery-replay returns the same intent)." }
   QUAL-1: { status: verified, commit: 0bc6ecd, note: "extracted IsFresh(order) + ReplayOrConflict(holder,request,total,items); both the pre-INSERT lookup and post-collision recovery now call them (IsFresh also used in GetByIdempotencyKeyAsync). Behavior-preserving; named ReplayOrConflict vs the review's sketched ResolveFreshHolder." }
   QUAL-2: { status: verified, commit: 24ed333, note: "added DbProviders constants (Postgres/Sqlite/InMemory); replaced magic strings in DbContext + OrderNumberService + (beyond the named files) CartService + StaticShippingService. Migration kept literal — see decisions." }
-  QUAL-3: { status: deferred, commit: null, note: "pre-existing altitude pattern (the controller persisted the gateway field before this bolt); review itself says 'not introduced here'. Moving persistence into OrderService would reshape the CreateIntentAsync replay/compute split — out of this bolt's scope. Batch into a future altitude tidy." }
-  QUAL-4: { status: deferred, commit: null, note: "test-only cleanup. Consolidating SendStripeIntent/SendEuPlatescInitiate/MakeRequest/SQLite-factory setup spans fixtures with different base factories (PaymentFactory vs SqlitePaymentFactory) and signatures; low value, real churn. Batch into a dedicated test-helper pass." }
+  QUAL-3: { status: deferred, commit: null, note: "pre-existing altitude pattern; review says 'not introduced here'. POST-V6 RE-ASSESSED: confirmed CODEBASE-WIDE — WebhooksController also injects PhotoPrintDbContext and uses it 6x; PaymentsController's single SaveChangesAsync is the same convention. Fixing only PaymentsController (e.g. exposing SaveChangesAsync on IOrderService to drop its _db) would be inconsistent cosmetic churn; the real fix is a repo-wide controller/service boundary decision, out of scope for a bolt-035 fix-review. Stays deferred." }
+  QUAL-4: { status: fixed, commit: fbb4c7c, note: "(POST-V6, user-requested) consolidated the duplicated Idempotency-Key POST builders into PaymentRequestHelpers HttpClient extensions; per-class helpers delegate, call sites unchanged. 19 payment integration tests green. Left the unit MakeRequest + SQLite-vs-WAF factory setup (different test layers). Awaiting v7 re-review to verify." }
   QUAL-5: { status: verified, commit: 738993e, note: "suppressed EF1002 with #pragma + justifying comment (seqName is a server-side int only, DDL identifier can't be parameterized). Warning no longer in the build output. Postgres branch still has no automated coverage — unchanged, no Postgres in the test matrix." }
 ---
 
@@ -51,8 +51,8 @@ is driven to a terminal state below. When all are terminal, the top-level `statu
 | DOC-2 | ⚪ Clean | verified | 03fa13d | ddd-02 Stripe SDK section now states the gateway is keyed by `order.Id` (BUG-4), not the client header key, with the rationale. |
 | QUAL-1 | ⚪ Clean | verified | 0bc6ecd | Extracted `IsFresh()` + `ReplayOrConflict()`; both resolution blocks (pre-INSERT + post-collision) and `GetByIdempotencyKeyAsync` reuse them. Behavior-preserving (full idempotency + payment suites green). Named `ReplayOrConflict` rather than the review's sketch `ResolveFreshHolder`. |
 | QUAL-2 | ⚪ Clean | verified | 24ed333 | `DbProviders` constants class; magic strings replaced in `PhotoPrintDbContext`, `OrderNumberService`, and (beyond the 3 named files, for completeness) `CartService` + `StaticShippingService`. The migration keeps its literal `ActiveProvider` string — see decisions. |
-| QUAL-3 | ⚪ Clean | **deferred** | — | Pre-existing altitude pattern (the controller already persisted the gateway field before bolt 035 — the review confirms "not introduced here"). Relocating persistence into `OrderService` would reshape the `CreateIntentAsync` replay/compute split; out of scope for a fix-review pass. Batch into a future altitude tidy. |
-| QUAL-4 | ⚪ Clean | **deferred** | — | Test-only duplication. A shared base spanning `PaymentFactory` and `SqlitePaymentFactory` (different base fixtures + helper signatures) is more churn than the ⚪ value warrants right now. Batch into a dedicated test-helper consolidation pass. |
+| QUAL-3 | ⚪ Clean | **deferred** | — | **Post-v6 re-assessed:** confirmed codebase-wide — `WebhooksController` also injects `PhotoPrintDbContext` (6 uses); PaymentsController's single `SaveChangesAsync` is the same convention. Fixing only PaymentsController would be inconsistent cosmetic churn; the real fix is a repo-wide controller/service-boundary decision, out of scope for a bolt-035 fix-review. Stays deferred. |
+| QUAL-4 | ⚪ Clean | fixed | fbb4c7c | **Post-v6 (user-requested):** extracted the duplicated payment POST builders into `PaymentRequestHelpers` `HttpClient` extensions; per-class helpers delegate, call sites unchanged; 19 payment integration tests green. Unit `MakeRequest` + SQLite/WAF factory setup left (different test layers). Awaiting v7 to verify. |
 | QUAL-5 | ⚪ Clean | verified | 738993e | `#pragma warning disable/restore EF1002` around the year-sequence `ExecuteSqlRawAsync`, with a comment: the interpolated value is a server-side `int` (no injection) and a DDL identifier (can't be parameterized). EF1002 no longer appears in the build. (The Postgres branch's lack of coverage is unchanged — no Postgres in the test matrix.) |
 
 ## Decisions for the re-reviewer
@@ -123,3 +123,17 @@ blinded to `reviews/`, judged the code independently.
   now passes `order.Id.ToString()`). Recorded in review-v6; the shipped code was always correct.
 - **0 reopened. No regressions** (blinded hunter found no introduced defect; tenant isolation
   intact). **Bolt-035 loop complete** — every finding terminal.
+
+### Post-v6 — revisited the 3 deferrals (user asked "can these be fixed now?")
+
+- **QUAL-4 → now `fixed`** (`fbb4c7c`). The duplicated payment POST builders were genuinely
+  consolidatable without risk — done. Needs a v7 re-review to flip to `verified`.
+- **DB-1 → stays deferred.** The app uses `EnsureCreated()` (not `Migrate()`); migrations are
+  Postgres-only artifacts for a migration-based deployment that doesn't exist yet. A clean
+  snapshot fix means a phantom migration or a full hand-rewrite of the generated snapshot, and
+  it belongs to the migration/deploy setup (roadmap's 3-env phase). Premature now.
+- **QUAL-3 → stays deferred.** Confirmed codebase-wide (`WebhooksController` uses
+  `PhotoPrintDbContext` 6×). Fixing one controller is inconsistent cosmetic churn; the real fix
+  is a repo-wide boundary decision.
+
+So after this round: **12 verified · 1 fixed-awaiting-v7 (QUAL-4) · 2 deferred (DB-1, QUAL-3).**
