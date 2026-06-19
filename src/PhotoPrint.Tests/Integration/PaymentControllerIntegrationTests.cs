@@ -144,6 +144,27 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     }
 
     [Fact]
+    public async Task CreateStripeIntent_OverLengthIdempotencyKey_Returns400()
+    {
+        // SEC-2: a key longer than the documented 80-char ceiling must be rejected at the
+        // filter with a 400, not accepted (dev/SQLite) or 500'd (prod Postgres truncation).
+        // The cart is seeded so a passing request would otherwise be a 200 — the 400 is
+        // attributable to the length check, not an empty cart.
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var overLength = new string('k', 81); // ceiling is 80
+
+        var response = await SendStripeIntent(client, ValidRequest, overLength);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task InitiateEuPlatesc_SameIdempotencyKey_ReturnsSameUrlAndOneOrder()
     {
         var (userId, token) = await _factory.SeedUserWithJwtAsync();

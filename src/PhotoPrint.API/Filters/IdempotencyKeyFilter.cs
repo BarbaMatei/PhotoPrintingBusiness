@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Filters;
+using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Extensions;
 
 namespace PhotoPrint.API.Filters;
@@ -15,6 +16,11 @@ namespace PhotoPrint.API.Filters;
 public sealed class IdempotencyKeyFilter : IActionFilter
 {
     public const string HeaderName = "Idempotency-Key";
+
+    /// <summary>Domain-spec ceiling for the key length (ddd-01: 1..80) and the width of
+    /// the <c>Orders.IdempotencyKey</c> column.</summary>
+    public const int MaxKeyLength = 80;
+
     private readonly ILogger<IdempotencyKeyFilter> _logger;
 
     public IdempotencyKeyFilter(ILogger<IdempotencyKeyFilter> logger) => _logger = logger;
@@ -23,6 +29,15 @@ public sealed class IdempotencyKeyFilter : IActionFilter
     {
         var raw = context.HttpContext.Request.Headers[HeaderName].ToString();
         var key = string.IsNullOrWhiteSpace(raw) ? null : raw;
+
+        // SEC-2 (review 035-v5): enforce the documented 1..80 length here. Without this an
+        // over-length key passes dev/test (SQLite ignores varchar(80)) and then fails the
+        // prod Postgres INSERT with a truncation DbUpdateException → a 500 for what is a
+        // client input error. Reject it up front with a 400 instead.
+        if (key is not null && key.Length > MaxKeyLength)
+            throw new BadRequestException(
+                $"Idempotency-Key must be at most {MaxKeyLength} characters.");
+
         context.HttpContext.Items[HttpContextExtensions.IdempotencyKeyItemKey] = key;
 
         if (key is null)
