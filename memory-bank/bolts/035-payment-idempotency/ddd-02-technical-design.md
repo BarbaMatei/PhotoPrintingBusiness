@@ -262,7 +262,10 @@ public async Task<IActionResult> CreateStripeIntent(
     var order = await _orderService.CreateFromCartAsync(userId, guestSessionId, req, key, ct);
     var (clientSecret, paymentIntentId) =
         await _stripeGateway.CreatePaymentIntentAsync(
-            (long)(order.TotalRon * 100), "ron", order.Id.ToString(), key, ct);
+            // DOC-2 (review 035): Stripe is keyed by order.Id, NOT the client `key` —
+            // see the Integration Points › Stripe SDK note below. This early sketch
+            // originally forwarded `key`; the shipped code passes order.Id here.
+            (long)(order.TotalRon * 100), "ron", order.Id.ToString(), order.Id.ToString(), ct);
 
     order.StripeClientSecret = clientSecret;   // NEW persisted field — see Data Model addendum below
     order.PaymentIntentId    = paymentIntentId;
