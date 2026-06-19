@@ -92,15 +92,9 @@ public class OrderService : IOrderService
             var holder = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
             if (holder is not null)
             {
-                if (holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow)
-                {
-                    // Fresh match for this caller → replay or (on divergence) 409.
-                    var divergent = DivergentFields(holder, request, total, orderItems);
-                    if (divergent.Count > 0)
-                        throw new IdempotencyConflictException(divergent);
-
-                    return new OrderCreationResult(holder, WasIdempotentReplay: true);
-                }
+                // Fresh match for this caller → replay or (on divergence) 409 (QUAL-1).
+                if (IsFresh(holder))
+                    return ReplayOrConflict(holder, request, total, orderItems);
 
                 // Stale (>24h) row this caller owns still holds the key. Free it first,
                 // in its own save, so the INSERT below does not violate the unique index
@@ -173,16 +167,10 @@ public class OrderService : IOrderService
             var candidateItems = order.Items.ToList();
             DetachFailedInsert(order);
 
+            // Same caller won the race → replay it (or 409 if the request diverged) (QUAL-1).
             var winner = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
-            if (winner is not null && winner.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow)
-            {
-                // Same caller won the race → replay it (or 409 if the request diverged).
-                var divergent = DivergentFields(winner, request, total, candidateItems);
-                if (divergent.Count > 0)
-                    throw new IdempotencyConflictException(divergent);
-
-                return new OrderCreationResult(winner, WasIdempotentReplay: true);
-            }
+            if (winner is not null && IsFresh(winner))
+                return ReplayOrConflict(winner, request, total, candidateItems);
 
             // The constraint error already proves the key is taken, but this caller owns
             // no (fresh) row for it → it is held by a *different* caller (global unique
@@ -237,7 +225,29 @@ public class OrderService : IOrderService
             return null;
 
         // Stale (>24h) matches are treated as absent (the window has expired).
-        return holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow ? holder : null;
+        return IsFresh(holder) ? holder : null;
+    }
+
+    /// <summary>True while <paramref name="holder"/> is inside the 24h idempotency window.</summary>
+    private static bool IsFresh(Order holder)
+        => holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow;
+
+    /// <summary>
+    /// Shared resolution for a fresh holder of the caller's key (QUAL-1, review 035-v5):
+    /// replay it, or throw <see cref="IdempotencyConflictException"/> if the candidate
+    /// request diverges. Used by both the pre-INSERT lookup and the post-collision
+    /// recovery, which were near-duplicate blocks. (Named for what it does; the review
+    /// sketched it as <c>ResolveFreshHolder</c>.)
+    /// </summary>
+    private OrderCreationResult ReplayOrConflict(
+        Order freshHolder, CreateOrderRequest request, decimal total,
+        IReadOnlyList<OrderItem> candidateItems)
+    {
+        var divergent = DivergentFields(freshHolder, request, total, candidateItems);
+        if (divergent.Count > 0)
+            throw new IdempotencyConflictException(divergent);
+
+        return new OrderCreationResult(freshHolder, WasIdempotentReplay: true);
     }
 
     /// <summary>
