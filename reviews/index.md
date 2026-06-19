@@ -11,7 +11,7 @@ Findings column is H / M / L / Cleanup. Status tracks the resolution loop: `open
 
 | Date | Target | Branch | Verdict | Findings | Status | Latest review | Resolution |
 |------|--------|--------|---------|----------|--------|---------------|------------|
-| 2026-06-18 | Bolt 035 — payment idempotency | `feat/bolt-035-payment-idempotency` | Approved (v4 re-review, 0 blockers) | 2 / 7 / 6 / 3 | resolved — all findings terminal (v4 verified BUG-6 + DOC-4; 0 blockers) | [v4](035-payment-idempotency/review-v4.md) | [v1](035-payment-idempotency/resolution-v1.md) |
+| 2026-06-19 | Bolt 035 — payment idempotency | `feat/bolt-035-payment-idempotency` | Approved (v5 clean-room, 0 blockers) | 0 / 3 / 6 / 6 | resolved @738993e — 12 fixed (incl. DB-2 + OBS-1), 3 deferred (DB-1, QUAL-3, QUAL-4); 474/474 green; awaiting v6 re-review to verify | [v5](035-payment-idempotency/review-v5.md) | [v5](035-payment-idempotency/resolution-v5.md) |
 
 ## Backlog / improvements to the system
 
