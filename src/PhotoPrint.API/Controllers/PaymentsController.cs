@@ -121,6 +121,18 @@ public class PaymentsController : ControllerBase
             return Ok(buildResponse(order, cached));
         }
 
+        // OBS-3 (review 035-v5): recovery replay. An earlier attempt created this order but
+        // died before persisting the gateway value, so the service resolves the same order
+        // (WasIdempotentReplay) yet there is nothing cached. Re-invoking the gateway below is
+        // safe — Stripe is keyed by the stable order id (same PaymentIntent, no double
+        // charge) and EuPlatesc just rebuilds the caller's own redirect URL — but it is a
+        // distinct completion path, so log it as such rather than letting it look like a
+        // fresh request in logs/metrics.
+        if (result.WasIdempotentReplay)
+            _logger.LogInformation(
+                "payments.idempotency.replay-recovery processor={Processor} order_id={OrderId}",
+                processor, order.Id);
+
         var value = await computeAndApplyAsync(order);
         await _db.SaveChangesAsync(ct);
         return Ok(buildResponse(order, value));

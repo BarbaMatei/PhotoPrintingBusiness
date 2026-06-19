@@ -194,6 +194,51 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         Assert.Equal(1, db.Orders.Count(o => o.IdempotencyKey == key));
     }
 
+    [Fact]
+    public async Task CreateStripeIntent_ReplayWithNullCachedSecret_RecoversByRecallingGateway()
+    {
+        // OBS-3 (review 035-v5): an earlier attempt created the order but died before
+        // persisting the secret. A replay then resolves the same order with a null cached
+        // secret and recovers by re-calling the gateway — safe because Stripe is keyed by
+        // the stable order id — returning a usable secret without creating a second order.
+        // This exercises the previously-unobserved recovery-replay completion path.
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+
+        var first = await SendStripeIntent(client, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var dto1 = await first.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // Simulate the crash-before-persist state: the order exists (fresh, non-divergent)
+        // but its secret was never saved.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+            var order = await db.Orders.FindAsync(dto1!.OrderId);
+            order!.StripeClientSecret = null;
+            await db.SaveChangesAsync();
+        }
+
+        var callsBefore = _factory.StripeGateway.CreateCallCount;
+        var second = await SendStripeIntent(client, ValidRequest, key);
+
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var dto2 = await second.Content.ReadFromJsonAsync<StripeIntentResponse>();
+        Assert.Equal(dto1!.OrderId, dto2!.OrderId);            // same order — a replay, not a new one
+        Assert.False(string.IsNullOrEmpty(dto2.ClientSecret)); // recovered a usable secret
+        Assert.Equal(callsBefore + 1, _factory.StripeGateway.CreateCallCount); // gateway re-called
+
+        using var verify = _factory.Services.CreateScope();
+        var vdb = verify.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        Assert.Equal(1, vdb.Orders.Count(o => o.IdempotencyKey == key)); // still exactly one order
+    }
+
     private static Task<HttpResponseMessage> SendStripeIntent(
         HttpClient client, CreateOrderRequest body, string idempotencyKey)
     {
