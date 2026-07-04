@@ -89,22 +89,12 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var userId = await SeedUserAsync(); // SQLite enforces the CartItem/Upload → User FKs
         using var db = NewContext();
 
-        var product = new Product { Name = "Foto 10x15", IsActive = true };
-        var size = new ProductSize { ProductId = product.Id, Label = "10x15", WidthMm = 100, HeightMm = 150, IsActive = true };
-        var tier = new PricingTier { ProductSizeId = size.Id, MinQuantity = 1, MaxQuantity = null, UnitPrice = unitPrice };
-        var finish = new ProductFinish { ProductId = product.Id, Name = "Lucios" };
-        var upload = new Upload { UserId = userId, OriginalFileName = "p.jpg", FilePath = "/p.jpg", ContentType = "image/jpeg", WidthPx = 1800, HeightPx = 1200 };
-        var cartItem = new CartItem { UserId = userId, UploadId = upload.Id, ProductId = product.Id, SizeId = size.Id, Quantity = quantity };
-
-        db.Products.Add(product);
-        db.ProductSizes.Add(size);
-        db.PricingTiers.Add(tier);
-        db.ProductFinishes.Add(finish);
-        db.Uploads.Add(upload);
-        db.CartItems.Add(cartItem);
+        // QUAL-3 (review 035-v8): shared canonical cart graph — see TestCartSeed.
+        var graph = TestCartSeed.Build(userId: userId, unitPrice: unitPrice, quantity: quantity);
+        graph.AddTo(db);
         await db.SaveChangesAsync();
 
-        return (userId, product.Id, upload.Id);
+        return (userId, graph.Product.Id, graph.Upload.Id);
     }
 
     // Courier delivery avoids the Order → EasyboxLocker FK (SQLite enforces it), so the

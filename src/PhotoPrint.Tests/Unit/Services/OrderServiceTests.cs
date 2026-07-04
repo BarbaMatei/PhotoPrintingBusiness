@@ -46,51 +46,12 @@ public class OrderServiceTests : IDisposable
     {
         var userId = Guid.NewGuid();
 
-        var product = new Product { Name = "Foto 10x15", IsActive = true };
-        var size = new ProductSize
-        {
-            ProductId = product.Id,
-            Label = "10x15",
-            WidthMm = 100,
-            HeightMm = 150,
-            IsActive = true,
-        };
-        var tier = new PricingTier
-        {
-            ProductSizeId = size.Id,
-            MinQuantity = 1,
-            MaxQuantity = null,
-            UnitPrice = unitPrice,
-        };
-        var finish = new ProductFinish { ProductId = product.Id, Name = "Lucios" };
-
-        var upload = new Upload
-        {
-            UserId = userId,
-            OriginalFileName = "photo.jpg",
-            FilePath = "/uploads/photo.jpg",
-            ContentType = "image/jpeg",
-            WidthPx = 1800,
-            HeightPx = 1200,
-        };
-
-        var cartItem = new CartItem
-        {
-            UserId = userId,
-            UploadId = upload.Id,
-            ProductId = product.Id,
-            Quantity = quantity,
-        };
-
-        _db.Products.Add(product);
-        _db.ProductSizes.Add(size);
-        _db.PricingTiers.Add(tier);
-        _db.ProductFinishes.Add(finish);
-        _db.Uploads.Add(upload);
-        _db.CartItems.Add(cartItem);
+        // QUAL-3 (review 035-v8): shared canonical cart graph — see TestCartSeed.
+        var graph = TestCartSeed.Build(userId: userId, unitPrice: unitPrice, quantity: quantity);
+        graph.AddTo(_db);
         await _db.SaveChangesAsync();
 
-        return (userId, product.Id, upload.Id);
+        return (userId, graph.Product.Id, graph.Upload.Id);
     }
 
     private static CreateOrderRequest MakeRequest(
