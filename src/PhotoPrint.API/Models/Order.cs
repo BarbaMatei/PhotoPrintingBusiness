@@ -27,7 +27,9 @@ public class Order
     // ── Idempotency (bolt 035) ───────────────────────────────────────────────
     /// <summary>Client-supplied Idempotency-Key bound to this order. Set once at
     /// creation, never modified — except nulled when a stale (&gt;24h) row's key is
-    /// reused by a new request (see ddd-02 technical design + migration comment).</summary>
+    /// reused by a new request from its <b>original owner</b> (REQ-1: reclamation is
+    /// owner-scoped, so a stale key stays reserved on the global unique index against
+    /// other callers — see ddd-01/ddd-02 + migration comment).</summary>
     public string? IdempotencyKey { get; set; }
 
     /// <summary>Cached Stripe ClientSecret so an idempotent replay returns the exact

@@ -48,6 +48,8 @@ The `Order` aggregate is otherwise unchanged. The new property is **additive** �
 
 The 24-hour window is a domain rule, not a storage detail — it caps how long a retry is honoured. Stale keys remain on the row (audit value), but they no longer participate in lookup.
 
+> **As-built caveat (REQ-1, review 035-v8):** the "may be reused after 24 h" reuse is **owner-scoped**, not global. Reclamation (nulling the stale row's key so the index frees it) only runs when the **original owner** resubmits — because both the lookup and the free are scoped to the caller (SEC-1). A *different* caller presenting the same stale key finds nothing in their scoped lookup, then collides on the **global** single-column unique index (which still holds the stale key) → 409. So across callers the key is effectively reserved for as long as the stale row exists, not freed at 24 h. This is a consequence of the global single-column index + owner-scoped reclamation; making the window truly per-caller needs the composite `(owner, key)` index tracked under the deferred SEC-1. In practice keys are unpredictable GUIDs so cross-caller reuse is a non-scenario; documented so the contract matches the code.
+
 ---
 
 ## Domain Events
