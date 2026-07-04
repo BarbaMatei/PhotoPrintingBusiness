@@ -27,6 +27,11 @@ public class OrderService : IOrderService
 
     private static readonly TimeSpan IdempotencyWindow = TimeSpan.FromHours(24);
 
+    // BUG-4 (review 035-v8): the non-Postgres OrderNumber generator is a racy COUNT, so a
+    // concurrent insert can pick a duplicate number. That is transient — regenerate and retry
+    // a bounded number of times before letting a genuine, persistent clash surface.
+    private const int MaxOrderNumberRetries = 3;
+
     // ── CreateFromCartAsync ───────────────────────────────────────────────────
 
     public async Task<OrderCreationResult> CreateFromCartAsync(
@@ -117,13 +122,10 @@ public class OrderService : IOrderService
             guestEmail = gs?.Email;
         }
 
-        // 4. Generate order number
-        var orderNumber = await _orderNumberService.GenerateAsync(ct);
-
-        // 5. Build and persist the order
+        // 4. Build and persist the order
         var order = new Order
         {
-            OrderNumber = orderNumber,
+            OrderNumber = await _orderNumberService.GenerateAsync(ct),
             UserId = userId,
             GuestSessionId = guestSessionId,
             GuestEmail = guestEmail,
@@ -141,48 +143,55 @@ public class OrderService : IOrderService
 
         _db.Orders.Add(order);
 
-        if (string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            await _db.SaveChangesAsync(ct);
-            return new OrderCreationResult(order, WasIdempotentReplay: false);
-        }
+        var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
 
-        // BUG-1: a concurrent request carrying the same key may have won the INSERT
-        // race between our resolution above and this save. The unique index then
-        // rejects ours with a DbUpdateException — previously unhandled → 500 on the
-        // canonical double-submit. Catch it, detach our failed insert, and resolve
-        // the winner instead of surfacing a 500.
+        // 5. Persist. Two unique indexes can reject the INSERT, each with its own recovery;
+        // any OTHER DbUpdateException (FK, NOT NULL) matches neither `when` filter and
+        // propagates honestly — we never infer the cause from a follow-up AnyAsync probe.
         //
-        // The `when` filter (BUG-1, review 035-v5) confirms the failure IS the
-        // idempotency unique index before treating it as a key collision. An unrelated
-        // DbUpdateException (FK, NOT NULL, an OrderNumber unique collision) no longer
-        // matches the catch, so it propagates honestly instead of being masked behind a
-        // misleading 409 — and we no longer probe `AnyAsync(key)` to *infer* the cause
-        // (which also raced a holder freed between the throw and the probe).
-        try
+        //  • ix_orders_idempotency_key (BUG-1): a concurrent request with the SAME key won
+        //    the race between our resolution above and this save → resolve the winner
+        //    (replay / 409) instead of a 500. Terminal — no retry.
+        //  • ix_orders_order_number (BUG-4, review 035-v8): the non-Postgres OrderNumber is a
+        //    racy COUNT (OrderNumberService's SQLite branch), so two concurrent inserts can
+        //    pick the SAME number. That is transient and unrelated to idempotency —
+        //    regenerate the number and retry the (still-tracked) order rather than 500.
+        //    Bounded, so a genuine persistent number clash still surfaces. Postgres uses a
+        //    per-year sequence, so this branch is effectively SQLite/dev-only.
+        for (var attempt = 0; ; attempt++)
         {
-            await _db.SaveChangesAsync(ct);
-            return new OrderCreationResult(order, WasIdempotentReplay: false);
-        }
-        catch (DbUpdateException ex) when (IsIdempotencyKeyViolation(ex))
-        {
-            // Snapshot the candidate items BEFORE detaching: order.Items and orderItems
-            // are the same reference, and EF fix-up empties the collection as each item
-            // is detached — which would otherwise make the divergence check see no items.
-            var candidateItems = order.Items.ToList();
-            DetachFailedInsert(order);
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return new OrderCreationResult(order, WasIdempotentReplay: false);
+            }
+            catch (DbUpdateException ex) when (hasKey && IsIdempotencyKeyViolation(ex))
+            {
+                // Snapshot the candidate items BEFORE detaching: order.Items and orderItems
+                // are the same reference, and EF fix-up empties the collection as each item
+                // is detached — which would otherwise make the divergence check see no items.
+                var candidateItems = order.Items.ToList();
+                DetachFailedInsert(order);
 
-            // Same caller won the race → replay it (or 409 if the request diverged) (QUAL-1).
-            var winner = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
-            if (winner is not null && IsFresh(winner))
-                return ReplayOrConflict(winner, request, total, candidateItems);
+                // Same caller won the race → replay it (or 409 if the request diverged) (QUAL-1).
+                var winner = await FindKeyHolderAsync(idempotencyKey!, userId, guestSessionId, ct);
+                if (winner is not null && IsFresh(winner))
+                    return ReplayOrConflict(winner, request, total, candidateItems);
 
-            // The constraint error already proves the key is taken, but this caller owns
-            // no (fresh) row for it → it is held by a *different* caller (global unique
-            // index). Replaying would disclose another tenant's order (SEC-1) → clean 409.
-            // Thrown as a DISTINCT type (subtype of ConflictException) so the middleware
-            // can emit the reserved cross-tenant abuse signal for triage (OBS-1, v8).
-            throw new IdempotencyKeyTakenException();
+                // The constraint error already proves the key is taken, but this caller owns
+                // no (fresh) row for it → it is held by a *different* caller (global unique
+                // index). Replaying would disclose another tenant's order (SEC-1) → clean 409.
+                // Thrown as a DISTINCT type (subtype of ConflictException) so the middleware
+                // can emit the reserved cross-tenant abuse signal for triage (OBS-1, v8).
+                throw new IdempotencyKeyTakenException();
+            }
+            catch (DbUpdateException ex) when (attempt < MaxOrderNumberRetries && IsOrderNumberViolation(ex))
+            {
+                // Transient number-generation race (BUG-4): regenerate and retry the SAME
+                // order — it is still tracked as Added after the failed save, so assigning a
+                // fresh number and looping re-attempts the INSERT (no detach/rebuild needed).
+                order.OrderNumber = await _orderNumberService.GenerateAsync(ct);
+            }
         }
     }
 
@@ -211,6 +220,26 @@ public class OrderService : IOrderService
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.IdempotencyKeyIndexName,
+            _ => false,
+        };
+
+    /// <summary>
+    /// True iff <paramref name="ex"/> is the database rejecting the INSERT because of the
+    /// OrderNumber unique index (<see cref="PhotoPrintDbContext.OrderNumberIndexName"/>).
+    /// Only the non-Postgres COUNT-based generator can produce a duplicate number under
+    /// concurrency (BUG-4, review 035-v8), and that is transient — the caller regenerates
+    /// and retries. Same provider-error inspection (and same compile-break coupling) as
+    /// <see cref="IsIdempotencyKeyViolation"/>.
+    /// </summary>
+    private static bool IsOrderNumberViolation(DbUpdateException ex)
+        => ex.InnerException switch
+        {
+            Microsoft.Data.Sqlite.SqliteException sqlite =>
+                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
+                sqlite.Message.Contains(nameof(Order.OrderNumber), StringComparison.OrdinalIgnoreCase),
+            Npgsql.PostgresException pg =>
+                pg.SqlState == "23505" /* unique_violation */ &&
+                pg.ConstraintName == PhotoPrintDbContext.OrderNumberIndexName,
             _ => false,
         };
 

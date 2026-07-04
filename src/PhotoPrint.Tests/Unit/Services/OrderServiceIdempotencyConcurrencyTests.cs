@@ -57,6 +57,16 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         return new OrderService(db, numberMock.Object, shippingMock.Object);
     }
 
+    // BUG-4: the REAL OrderNumberService (SQLite COUNT+1 branch) — the mock's always-unique
+    // Interlocked.Increment masked the concurrent order-number collision this exercises.
+    private static OrderService NewServiceWithRealNumberService(PhotoPrintDbContext db)
+    {
+        var shippingMock = new Mock<IShippingService>();
+        shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ShippingCostDto(20.00m));
+        return new OrderService(db, new OrderNumberService(db), shippingMock.Object);
+    }
+
     private async Task<Guid> SeedUserAsync()
     {
         var id = Guid.NewGuid();
@@ -133,35 +143,29 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateFromCart_UnrelatedUniqueViolation_IsNotMaskedAsIdempotency409()
+    public async Task CreateFromCart_UnrelatedDbFailure_PropagatesHonestly_NotMaskedAs409()
     {
-        // BUG-1 (review 035-v5): the catch must confirm the failure is the idempotency
-        // index, not infer it. Here the caller's INSERT collides on ix_orders_order_number
-        // (an UNRELATED unique index) while the caller's key also happens to be held by
-        // another tenant. The old code caught any DbUpdateException, saw AnyAsync(key)==true,
-        // and returned a misleading 409 that MASKED the order-number collision. The scoped
-        // catch only engages for the idempotency index, so the unrelated failure now
-        // propagates as a DbUpdateException (an honest 500) instead.
+        // BUG-1 (review 035-v5) + BUG-4 (v8): the recovery catches ONLY the two known unique
+        // indexes — idempotency (resolve the winner) and order-number (regenerate + retry).
+        // Any OTHER DbUpdateException must propagate honestly, never be masked as an
+        // idempotency 409 (the old AnyAsync inference did exactly that). Here the INSERT fails
+        // on an UNRELATED foreign key — Easybox delivery pointing at a non-existent locker —
+        // which matches neither `when` filter, so it surfaces as a DbUpdateException.
+        //
+        // (Before BUG-4 this test used an order-number collision as its "unrelated" failure;
+        // that is now a handled/retryable transient, so the unrelated case is an FK violation.)
         var (callerId, _, _) = await SeedCartAsync();
-        const string key = "shared-key-unrelated-collision";
-
-        // Another tenant holds BOTH the caller's key AND the order number the caller's
-        // (counter-based) number service will generate first ("FT-00000001"). The caller's
-        // INSERT therefore violates ix_orders_order_number; SQLite reports that constraint,
-        // which is NOT the idempotency index → the scoped catch does not swallow it.
-        var ownerId = await SeedUserAsync();
-        using (var seed = NewContext())
-        {
-            seed.Orders.Add(MinimalOrder("FT-00000001", ownerId, key));
-            await seed.SaveChangesAsync();
-        }
+        const string key = "free-key-unrelated-fk"; // key is free — not the failure cause
 
         using var db = NewContext();
-        var svc = NewService(db); // counter starts at 0 → first GenerateAsync → "FT-00000001"
+        var svc = NewService(db);
 
-        // Must surface the real (order-number) failure, never a masked idempotency 409.
+        var easyboxWithBogusLocker = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(), ShippingAddress: null);
+
         await Assert.ThrowsAsync<DbUpdateException>(
-            () => svc.CreateFromCartAsync(callerId, null, MakeRequest(), key));
+            () => svc.CreateFromCartAsync(callerId, null, easyboxWithBogusLocker, key));
     }
 
     [Fact]
@@ -300,6 +304,61 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         Assert.Equal(2067, sqlite.SqliteExtendedErrorCode); // SQLITE_CONSTRAINT_UNIQUE
         Assert.Contains(nameof(Order.IdempotencyKey), sqlite.Message,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateFromCart_ConcurrentSameKey_OrderNumberCollidesFirst_RecoversToReplay_NotServerError()
+    {
+        // BUG-4 (review 035-v8): on SQLite the OrderNumber is a racy COUNT+1, so a same-key
+        // concurrent double-submit can collide on ix_orders_order_number FIRST (it is created
+        // before the idempotency index, so SQLite reports it first). That collision is NOT an
+        // idempotency violation, so pre-fix it propagated as a 500 instead of replaying the
+        // winner. The fix regenerates the number and retries; the genuine same-key collision
+        // then surfaces and resolves to a clean replay. Uses the REAL OrderNumberService (the
+        // mock's always-unique Interlocked.Increment masked this).
+        var (userId, productId, uploadId) = await SeedCartAsync();
+        const string key = "race-key-ordernum";
+        var winnerId = Guid.NewGuid();
+
+        // The caller (Orders count == 0) will generate this number; force the winner to take
+        // it too, so the caller's INSERT hits the order-number index before the idempotency one.
+        var collidingNumber = OrderNumberService.FormatOrderNumber(DateTime.UtcNow.Year, 1);
+
+        var interceptor = new WinnerInjectingInterceptor(async () =>
+        {
+            using var winnerDb = NewContext();
+            var winner = MinimalOrder(collidingNumber, userId, key);
+            winner.Id = winnerId;
+            winner.PaymentProcessor = PaymentProcessor.Stripe;
+            winner.DeliveryType = DeliveryType.Courier;
+            winner.SubtotalRon = 6.00m;
+            winner.ShippingCostRon = 20.00m;
+            winner.TotalRon = 26.00m; // 3 × 2.00 + 20.00 shipping — matches the caller's request
+            winner.Items.Add(new OrderItem
+            {
+                ProductId = productId,
+                UploadId = uploadId,
+                Quantity = 3,
+                UnitPriceRon = 2.00m,
+                LineTotalRon = 6.00m,
+                ProductSnapshot = new ProductSnapshot { ProductName = "Foto 10x15", Size = "10x15", Finish = "Lucios" },
+            });
+            winnerDb.Orders.Add(winner);
+            await winnerDb.SaveChangesAsync();
+        });
+
+        using var db = NewContext(interceptor);
+        var svc = NewServiceWithRealNumberService(db);
+
+        var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);
+
+        // The order-number collision was retried, the idempotency collision then resolved the
+        // winner, and the loser replayed it — instead of 500ing. Exactly one order persisted.
+        Assert.True(result.WasIdempotentReplay);
+        Assert.Equal(winnerId, result.Order.Id);
+
+        using var verify = NewContext();
+        Assert.Equal(1, await verify.Orders.CountAsync());
     }
 
     private static Order MinimalOrder(string number, Guid userId, string key) => new()

@@ -16,6 +16,13 @@ public class PhotoPrintDbContext : DbContext
     /// </summary>
     public const string IdempotencyKeyIndexName = "ix_orders_idempotency_key";
 
+    /// <summary>
+    /// Name of the unique index on <c>OrderNumber</c>. Shared with
+    /// <c>OrderService.IsOrderNumberViolation</c> so the order-number collision retry
+    /// (BUG-4, v8) keys off the same literal the index is named with (rename → compile break).
+    /// </summary>
+    public const string OrderNumberIndexName = "ix_orders_order_number";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {
