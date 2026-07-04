@@ -28,7 +28,13 @@ public sealed class IdempotencyKeyFilter : IActionFilter
     public void OnActionExecuting(ActionExecutingContext context)
     {
         var raw = context.HttpContext.Request.Headers[HeaderName].ToString();
-        var key = string.IsNullOrWhiteSpace(raw) ? null : raw;
+
+        // SEC-2 (review 035-v8): trim before storing. The value becomes the EXACT unique-index
+        // key, so an untrimmed key means "abc", " abc" and "abc " are three distinct keys — a
+        // client or buggy proxy/retry layer that resends the same logical key once padded would
+        // then defeat dedupe and create a second order + second PaymentIntent (double charge).
+        // Whitespace-only still normalizes to null (IsNullOrWhiteSpace catches it first).
+        var key = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
 
         // SEC-2 (review 035-v5): enforce the documented 1..80 length here. Without this an
         // over-length key passes dev/test (SQLite ignores varchar(80)) and then fails the
