@@ -102,7 +102,7 @@ The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) 
 | **Replay** | The successful path of a repeat call: the existing order is returned unchanged, no new database row, no new Stripe `PaymentIntent`. |
 | **Conflict** | A repeat call with the same key but a divergent logical request. Yields 409 ProblemDetails. The client must either change the key or change the request. |
 | **Idempotency Window** | The 24-hour interval starting at `Order.CreatedAt` during which the key dedupes. After the window, the key is *stale* — it remains on the row for audit but no longer matches in lookup. |
-| **Missing Key (transitional)** | A request without the `Idempotency-Key` header. The endpoint accepts it (preserving current behaviour during the FE migration window) but logs `WARN payments.idempotency.missing-key`. After the FE adopts the header globally, missing-key should escalate to 400 — that decision is out of scope for this bolt. |
+| **Missing Key (transitional)** | A request without the `Idempotency-Key` header. The endpoint accepts it (preserving current behaviour during the FE migration window) and logs `INFO payments.idempotency.missing-key` (OBS-3, review 035-v8: Information, not Warning — it is the expected transitional state on ~100% of requests, so a Warning is constant alert noise). After the FE adopts the header globally, missing-key should escalate to 400 (and the log back to Warning) — that decision is out of scope for this bolt. |
 | **Replay Token** | The Stripe `ClientSecret` returned to a replay caller. Identical bytes to the original response. Equivalent for EuPlatesc is the redirect URL. |
 
 ---

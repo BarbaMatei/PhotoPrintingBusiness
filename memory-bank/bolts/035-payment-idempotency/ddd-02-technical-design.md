@@ -254,7 +254,7 @@ public async Task<IActionResult> CreateStripeIntent(
     CancellationToken ct)
 {
     if (string.IsNullOrEmpty(key))
-        _logger.LogWarning("payments.idempotency.missing-key endpoint=stripe/intent");
+        _logger.LogInformation("payments.idempotency.missing-key endpoint=stripe/intent"); // OBS-3 (v8): Information, not Warning
 
     if (!string.IsNullOrEmpty(key))
     {
@@ -348,7 +348,7 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 ## Test Plan Preview (full plan in Stage 5)
 
 - **Unit**: `IsSameLogicalRequest` true/false matrix; resolver decision-table (4 rows) on in-memory fixtures; `IdempotencyConflictException` payload shape.
-- **Integration — Stripe**: replay returns same body; conflict returns 409 with `divergentFields`; missing-key logs Warning + still succeeds; Stripe `RequestOptions.IdempotencyKey` verified via test-double assertion that the key bytes reach the SDK.
+- **Integration — Stripe**: replay returns same body; conflict returns 409 with `divergentFields`; missing-key logs Information (OBS-3, v8) + still succeeds; Stripe `RequestOptions.IdempotencyKey` verified via test-double assertion that the key bytes reach the SDK.
 - **Integration — EuPlatesc**: replay returns same `redirectUrl`; conflict returns 409.
 - **Concurrency**: two parallel calls with the same key, no body divergence — exactly one new order, one 200, one 409 (DB-arbitrated). Captured via xUnit `await Task.WhenAll(...)` against the in-memory DB; the unique index is what makes this work.
 
