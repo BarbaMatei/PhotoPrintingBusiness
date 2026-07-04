@@ -324,94 +324,25 @@ public class OrderServiceTests : IDisposable
         Assert.Equal(2, await _db.Orders.CountAsync());
     }
 
-    [Fact]
-    public async Task GetByIdempotencyKey_StaleOrder_ReturnsNull()
-    {
-        var ownerId = Guid.NewGuid();
-        var staleOrder = new Order
-        {
-            OrderNumber = "FT-STALE-1",
-            UserId = ownerId,
-            IdempotencyKey = "idem-key-stale",
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-25), // outside the 24h window
-            ShippingAddress = new ShippingAddressSnapshot
-            {
-                Street = "S", Number = "1", City = "C", County = "J",
-                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
-            },
-        };
-        _db.Orders.Add(staleOrder);
-        await _db.SaveChangesAsync();
-
-        var found = await _service.GetByIdempotencyKeyAsync("idem-key-stale", ownerId, null);
-
-        Assert.Null(found);
-    }
+    // ── SEC-1: idempotency resolution scoped to the caller (tenant isolation) ────
+    // QUAL-1 (review 035-v8): GetByIdempotencyKeyAsync was removed as dead production code,
+    // so these behaviors are now asserted through the only real entry point,
+    // CreateFromCartAsync. The stale-window and cross-tenant cases are covered by
+    // CreateFromCart_StaleKey_* and CreateFromCart_OtherTenantsKey_* below (previously
+    // duplicated by GetByIdempotencyKey_* tests); the both-null guard is retargeted here.
 
     [Fact]
-    public async Task GetByIdempotencyKey_BothIdentitiesNull_Throws_DoesNotResolveArbitraryOrder()
+    public async Task CreateFromCart_BothIdentitiesNull_Throws_DoesNotResolveArbitraryOrder()
     {
-        // SEC-1 (review 035-v5): an idempotency lookup with neither a user nor a guest
-        // identity must be rejected, not silently collapse to "any guestless order". Here
-        // a real user owns the key; before the guard, a both-null lookup matched it
-        // (o.GuestSessionId == null) and disclosed the owner's order.
-        var ownerId = Guid.NewGuid();
-        const string key = "idem-key-both-null";
-        _db.Orders.Add(new Order
-        {
-            OrderNumber = "FT-OWNER-NULL",
-            UserId = ownerId,
-            IdempotencyKey = key,
-            StripeClientSecret = "pi_secret_owner",
-            CreatedAt = DateTimeOffset.UtcNow,
-            ShippingAddress = new ShippingAddressSnapshot
-            {
-                Street = "S", Number = "1", City = "C", County = "J",
-                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
-            },
-        });
-        await _db.SaveChangesAsync();
+        // SEC-1 (review 035-v5): an idempotency resolution with neither a user nor a guest
+        // identity must be rejected by FindKeyHolderAsync's guard rather than silently
+        // collapsing to "any guestless order" (which would disclose an arbitrary user's
+        // order/secret). The cart's items are guest-null, so a both-null call reaches the
+        // idempotency block and the guard fires.
+        await SeedCartAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _service.GetByIdempotencyKeyAsync(key, null, null));
-    }
-
-    // ── SEC-1: idempotency lookup scoped to the caller (tenant isolation) ────────
-
-    [Fact]
-    public async Task GetByIdempotencyKey_KeyOwnedByAnotherUser_ReturnsNull()
-    {
-        var ownerId = Guid.NewGuid();
-        var attackerId = Guid.NewGuid();
-        const string key = "victim-key";
-
-        var ownersOrder = new Order
-        {
-            OrderNumber = "FT-OWNER-1",
-            UserId = ownerId,
-            IdempotencyKey = key,
-            StripeClientSecret = "pi_secret_victim", // must never leak to another caller
-            CreatedAt = DateTimeOffset.UtcNow,
-            ShippingAddress = new ShippingAddressSnapshot
-            {
-                Street = "S", Number = "1", City = "C", County = "J",
-                PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
-            },
-        };
-        _db.Orders.Add(ownersOrder);
-        await _db.SaveChangesAsync();
-
-        // Same key, different caller → must not resolve the owner's order.
-        var leakedToUser = await _service.GetByIdempotencyKeyAsync(key, attackerId, null);
-        var leakedToGuest = await _service.GetByIdempotencyKeyAsync(key, null, Guid.NewGuid());
-
-        Assert.Null(leakedToUser);
-        Assert.Null(leakedToGuest);
-
-        // The owner still resolves their own order.
-        var ownerView = await _service.GetByIdempotencyKeyAsync(key, ownerId, null);
-        Assert.NotNull(ownerView);
-        Assert.Equal(ownersOrder.Id, ownerView!.Id);
+            () => _service.CreateFromCartAsync(null, null, MakeRequest(), "idem-key-both-null"));
     }
 
     [Fact]

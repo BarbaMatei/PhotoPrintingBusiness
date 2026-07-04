@@ -260,17 +260,6 @@ public class OrderService : IOrderService
 
     // ── Idempotency helpers (bolt 035) ─────────────────────────────────────────
 
-    public async Task<Order?> GetByIdempotencyKeyAsync(
-        string key, Guid? userId, Guid? guestSessionId, CancellationToken ct = default)
-    {
-        var holder = await FindKeyHolderAsync(key, userId, guestSessionId, ct);
-        if (holder is null)
-            return null;
-
-        // Stale (>24h) matches are treated as absent (the window has expired).
-        return IsFresh(holder) ? holder : null;
-    }
-
     /// <summary>True while <paramref name="holder"/> is inside the 24h idempotency window.</summary>
     private static bool IsFresh(Order holder)
         => holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow;

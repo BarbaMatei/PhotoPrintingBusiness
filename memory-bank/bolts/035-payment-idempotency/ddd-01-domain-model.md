@@ -87,7 +87,7 @@ The 24-hour window is a domain rule, not a storage detail — it caps how long a
 
 | Repository | Entity | Methods (additive — existing methods unchanged) |
 |------------|--------|------------------------------------------------|
-| `IOrderService` (existing) | `Order` | `GetByIdempotencyKeyAsync(IdempotencyKey key, CancellationToken ct) -> Task<Order?>` — returns the matching `Order` only when `CreatedAt + 24h > UtcNow`; returns `null` otherwise. `IsSameLogicalRequest(Order existing, LogicalRequest current) -> bool` — pure comparison; no I/O |
+| `IOrderService` (existing) | `Order` | ~~`GetByIdempotencyKeyAsync(...)`~~ **removed as dead code (QUAL-1, review 035-v8)** — idempotency resolution lives entirely inside `CreateFromCartAsync` via the private `FindKeyHolderAsync`; the standalone public lookup had no production caller. `IsSameLogicalRequest(Order existing, LogicalRequest current) -> bool` — pure comparison; no I/O (as-built: `DivergentFields`) |
 
 The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) so `Replay` can return it directly. EuPlatesc has no equivalent secret — the redirect URL is reconstructed deterministically from the persisted `Order` (HMAC-MD5 of stable fields).
 

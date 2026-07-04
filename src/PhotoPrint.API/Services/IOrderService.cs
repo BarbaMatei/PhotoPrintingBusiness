@@ -29,16 +29,6 @@ public interface IOrderService
         string? idempotencyKey = null,
         CancellationToken ct = default);
 
-    /// <summary>
-    /// Returns the order bound to the given Idempotency-Key <b>for the supplied
-    /// caller</b>, but only when it was created within the 24h idempotency window.
-    /// Stale matches return null. The lookup is scoped to <paramref name="userId"/>
-    /// / <paramref name="guestSessionId"/> so a caller can never resolve another
-    /// tenant's order via a guessed/borrowed key (SEC-1, review 035-v1).
-    /// </summary>
-    Task<Order?> GetByIdempotencyKeyAsync(
-        string key, Guid? userId, Guid? guestSessionId, CancellationToken ct = default);
-
     Task<Order?> GetByPaymentIntentIdAsync(string paymentIntentId, CancellationToken ct = default);
 
     Task<Order?> GetByIdAsync(Guid orderId, CancellationToken ct = default);
