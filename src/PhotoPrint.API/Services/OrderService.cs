@@ -451,23 +451,16 @@ public class OrderService : IOrderService
             items);
     }
 
-    // ── Price helper (mirrors CartService.ResolveUnitPrice) ───────────────────
+    // ── Price helper ──────────────────────────────────────────────────────────
 
+    // QUAL-2 (review 035-v8): the tier bracket-matching is shared with CartService via
+    // PricingTierResolver. This call site keeps its own semantics — the tiers of the item's
+    // ACTIVE sizes, matched against that item's own quantity — which is deliberately NOT the
+    // same basis CartService uses (a size's tiers vs. the per-group total copies). The old
+    // "mirrors CartService" comment claimed they were identical; they are not, so only the
+    // bracket rule is shared, not the input selection.
     private static decimal ResolveUnitPrice(Product product, int quantity)
-    {
-        var tiers = product.Sizes
-            .Where(s => s.IsActive)
-            .SelectMany(s => s.PricingTiers)
-            .OrderByDescending(t => t.MinQuantity)
-            .ToList();
-
-        if (tiers.Count == 0)
-            return 0m;
-
-        var matched = tiers.FirstOrDefault(t =>
-            t.MinQuantity <= quantity &&
-            (t.MaxQuantity == null || quantity <= t.MaxQuantity));
-
-        return (matched ?? tiers[0]).UnitPrice;
-    }
+        => PricingTierResolver.Resolve(
+            product.Sizes.Where(s => s.IsActive).SelectMany(s => s.PricingTiers),
+            quantity);
 }

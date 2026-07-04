@@ -276,21 +276,10 @@ public class CartService : ICartService
     /// <summary>
     /// Resolves unit price from the specific size's PricingTiers using the total copy count.
     /// Falls back to the highest-minQuantity tier if no tier brackets the quantity.
-    /// Returns 0 if no tiers are defined.
+    /// Returns 0 if no tiers are defined. The bracket rule is shared with OrderService via
+    /// <see cref="PricingTierResolver"/> (QUAL-2, review 035-v8); the tier source (this size's
+    /// tiers) and quantity (per-group total copies) are this call site's own semantics.
     /// </summary>
     private static decimal ResolveUnitPrice(ProductSize size, int totalQuantity)
-    {
-        var tiers = size.PricingTiers
-            .OrderByDescending(t => t.MinQuantity)
-            .ToList();
-
-        if (tiers.Count == 0)
-            return 0m;
-
-        var matched = tiers.FirstOrDefault(t =>
-            t.MinQuantity <= totalQuantity &&
-            (t.MaxQuantity == null || totalQuantity <= t.MaxQuantity));
-
-        return (matched ?? tiers[0]).UnitPrice;
-    }
+        => PricingTierResolver.Resolve(size.PricingTiers, totalQuantity);
 }
