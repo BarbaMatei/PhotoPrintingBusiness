@@ -122,8 +122,10 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var svc = NewService(db);
 
         // Before the fix this surfaced as an unhandled DbUpdateException (500). It must
-        // now be a clean 409 (and must not disclose the other tenant's order).
-        await Assert.ThrowsAsync<ConflictException>(
+        // now be a clean 409 (and must not disclose the other tenant's order). OBS-1
+        // (review 035-v8): the cross-tenant path throws the distinct IdempotencyKeyTaken
+        // subtype (still a ConflictException → 409) so the abuse signal is observable.
+        await Assert.ThrowsAsync<IdempotencyKeyTakenException>(
             () => svc.CreateFromCartAsync(callerId, null, MakeRequest(), key));
 
         using var verify = NewContext();
@@ -207,6 +209,34 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
 
         using var verify = NewContext();
         Assert.Equal(1, await verify.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task SqliteIdempotencyCollision_SurfacesUniqueExtendedCode_AndColumnName()
+    {
+        // BUG-1 (review 035-v8): IsIdempotencyKeyViolation classifies the SQLite arm off the
+        // EXTENDED result code SQLITE_CONSTRAINT_UNIQUE (2067) plus the column name in the
+        // message (tied to nameof(Order.IdempotencyKey)). Pin both premises here so a
+        // Microsoft.Data.Sqlite upgrade that re-words the message or changes the code fails
+        // in THIS test — loudly — instead of silently degrading the canonical double-submit
+        // from a clean 409 to an unhandled 500 (the fragility 5 lenses converged on).
+        var ownerId = await SeedUserAsync();
+        const string key = "dupe-key-classify";
+
+        using (var seed = NewContext())
+        {
+            seed.Orders.Add(MinimalOrder("FT-DUP-A", ownerId, key));
+            await seed.SaveChangesAsync();
+        }
+
+        using var db = NewContext();
+        db.Orders.Add(MinimalOrder("FT-DUP-B", ownerId, key)); // same key → idempotency index
+
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        var sqlite = Assert.IsType<SqliteException>(ex.InnerException);
+        Assert.Equal(2067, sqlite.SqliteExtendedErrorCode); // SQLITE_CONSTRAINT_UNIQUE
+        Assert.Contains(nameof(Order.IdempotencyKey), sqlite.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private static Order MinimalOrder(string number, Guid userId, string key) => new()

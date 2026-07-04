@@ -8,6 +8,14 @@ namespace PhotoPrint.API.Data;
 
 public class PhotoPrintDbContext : DbContext
 {
+    /// <summary>
+    /// Name of the unique index enforcing at-most-one order per non-null Idempotency-Key.
+    /// Shared with <c>OrderService.IsIdempotencyKeyViolation</c> (the Postgres
+    /// <c>ConstraintName</c> match) so a rename here is a compile break there, not a silent
+    /// detection regression that degrades the canonical double-submit to a 500 (BUG-1, v8).
+    /// </summary>
+    public const string IdempotencyKeyIndexName = "ix_orders_idempotency_key";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {
@@ -307,7 +315,7 @@ public class PhotoPrintDbContext : DbContext
             // index (multiple NULLs still permitted).
             var idempotencyIndex = entity.HasIndex(o => o.IdempotencyKey)
                   .IsUnique()
-                  .HasDatabaseName("ix_orders_idempotency_key");
+                  .HasDatabaseName(IdempotencyKeyIndexName);
             if (Database.ProviderName == DbProviders.Postgres)
                 idempotencyIndex.HasFilter("\"IdempotencyKey\" IS NOT NULL");
             if (Database.ProviderName != DbProviders.Sqlite)

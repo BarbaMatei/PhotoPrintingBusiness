@@ -183,21 +183,29 @@ public class OrderService : IOrderService
 
     /// <summary>
     /// True iff <paramref name="ex"/> is the database rejecting an INSERT/UPDATE because
-    /// of the <c>ix_orders_idempotency_key</c> unique index — as opposed to any other
-    /// constraint. Inspecting the provider error (Postgres <c>23505</c> + the constraint
-    /// name, SQLite constraint code + the column name) lets the catch handle ONLY a real
-    /// key collision and rethrow everything else, instead of inferring the cause from a
-    /// follow-up query (BUG-1, review 035-v5).
+    /// of the idempotency unique index (<see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/>)
+    /// — as opposed to any other constraint. Inspecting the provider error lets the catch
+    /// handle ONLY a real key collision and rethrow everything else, instead of inferring the
+    /// cause from a follow-up query (BUG-1, review 035-v5).
+    ///
+    /// BUG-1 (review 035-v8) hardened both arms against silent regressions:
+    /// <list type="bullet">
+    /// <item>Postgres matches <see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/> (the
+    /// same constant the index is named with) so a rename is a compile break, not a fall-through.</item>
+    /// <item>SQLite has no structured constraint name, so it keys off the <b>extended</b> result
+    /// code <c>SQLITE_CONSTRAINT_UNIQUE</c> (2067 — narrower than the generic <c>SQLITE_CONSTRAINT</c>
+    /// 19) plus the column name via <c>nameof</c>, so a column rename also breaks at compile time.</item>
+    /// </list>
     /// </summary>
     private static bool IsIdempotencyKeyViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
             Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteErrorCode == 19 /* SQLITE_CONSTRAINT */ &&
-                sqlite.Message.Contains("IdempotencyKey", StringComparison.OrdinalIgnoreCase),
+                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
+                sqlite.Message.Contains(nameof(Order.IdempotencyKey), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
-                pg.ConstraintName == "ix_orders_idempotency_key",
+                pg.ConstraintName == PhotoPrintDbContext.IdempotencyKeyIndexName,
             _ => false,
         };
 
