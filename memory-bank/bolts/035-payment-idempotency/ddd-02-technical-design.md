@@ -123,7 +123,16 @@ Identical contract additions. Response body is `{ redirectUrl, orderId }` instea
 
 **The stale case requires careful index handling**: the filtered unique index covers ALL non-null keys, not "active" keys. Therefore, when we insert a new row with a previously-used (stale) key, the unique index will reject it. **Design choice**: at insert time, if the resolver returns `NewOrder` because the existing row is stale, we **null out the stale row's `IdempotencyKey`** before inserting the new row. Documented in the Data Model section.
 
-> **Implementation note (DOC-1, review 035-v5):** the as-built code frees the stale key in **its own `SaveChangesAsync`**, then inserts the new order in a **separate save** — deliberately two saves, *not* one wrapping transaction. A single transaction would still violate the unique index per-statement (both Postgres and SQLite enforce it mid-transaction), so the free must commit before the insert. The free+insert is therefore non-atomic; this is benign because the spec already accepts losing the stale row's key for audit (below), and the new insert is still arbitrated by the unique index. The wording "same transaction" in this section and the Data Model section below is the original sketch, not the shipped behaviour.
+> **Implementation note (BUG-3, review 035-v8 — supersedes the v5 DOC-1 two-save note):** the
+> free and the insert now flush in **one `SaveChangesAsync`** — i.e. one transaction, and the
+> free+insert pair is **atomic**. The earlier assumption that a single transaction "would still
+> collide per-statement" was wrong for the EF path: EF Core's command batching is unique-index
+> aware and emits the free (`UPDATE … SET IdempotencyKey = NULL`) *before* the new-order INSERT,
+> so they don't conflict on `ix_orders_idempotency_key` within the batch (verified on SQLite in
+> `OrderServiceIdempotencyConcurrencyTests`). Making it atomic closes the v5 gap: if the INSERT
+> fails for any reason, the free rolls back with it, so the stale row can never lose its key with
+> no replacement order created (which would have permanently stopped that key deduping). Only an
+> owner-scoped stale row is freed (SEC-1).
 
 ---
 
@@ -171,7 +180,13 @@ The `HasFilter` string is passed verbatim; Postgres respects it, SQLite (3.8+) a
 
 When `IdempotencyResolver` returns `NewOrder` because an existing row's key is stale (> 24h old), `OrderService.CreateFromCartAsync(... , idempotencyKey, ct)` frees the key by nulling it on the stale row, then inserts the new row. This frees the key for the new row and preserves the old order's audit trail (the historical key value is no longer queryable but its presence/absence isn't audit-relevant once the order ships).
 
-> **As-built (DOC-1, review 035-v5):** this is **two saves**, not one transaction. The stale row's key is nulled and committed in its own `SaveChangesAsync` *first*, because the unique index is enforced per-statement (a single transaction would still collide). Only an owner-scoped stale row is freed (SEC-1). The free+insert pair is intentionally non-atomic — see the behaviour-matrix note above.
+> **As-built (BUG-3, review 035-v8 — supersedes the v5 DOC-1 note):** this is now **one save** —
+> the stale row's key is nulled on the in-memory entity and flushed together with the new-order
+> INSERT in a single `SaveChangesAsync`, so free+insert is **atomic** (one transaction). EF's
+> unique-index-aware batching emits the free before the insert, so there is no within-transaction
+> collision; and a failing insert rolls the free back with it, so the stale row never loses its
+> key with no replacement. Only an owner-scoped stale row is freed (SEC-1). See the implementation
+> note above.
 
 Trade-off: the stale row's idempotency key is lost. If audit ever requires it, a future migration can introduce `Orders.HistoricalIdempotencyKey` text column. Out of scope here.
 

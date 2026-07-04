@@ -96,11 +96,16 @@ public class OrderService : IOrderService
                 if (IsFresh(holder))
                     return ReplayOrConflict(holder, request, total, orderItems);
 
-                // Stale (>24h) row this caller owns still holds the key. Free it first,
-                // in its own save, so the INSERT below does not violate the unique index
-                // (both SQLite and Postgres enforce it per-statement — DOC-1).
+                // Stale (>24h) row this caller owns still holds the key. Null it on the
+                // in-memory entity WITHOUT an intermediate save (BUG-3, review 035-v8), so
+                // the free (UPDATE) and the new-order INSERT below flush in ONE
+                // SaveChanges → one transaction. EF Core's unique-index-aware command
+                // ordering emits the UPDATE before the INSERT, so they do not collide on
+                // ix_orders_idempotency_key within the batch; and because they share a
+                // transaction, a failing INSERT rolls the free back with it — the stale
+                // row can never lose its key linkage with no replacement order created
+                // (the orphaning the two-save version risked on a crash/mid-failure).
                 holder.IdempotencyKey = null;
-                await _db.SaveChangesAsync(ct);
             }
         }
 

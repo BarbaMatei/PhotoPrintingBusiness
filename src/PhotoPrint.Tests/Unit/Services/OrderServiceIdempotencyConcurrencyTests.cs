@@ -212,6 +212,69 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateFromCart_StaleKeyReuse_FreesOldAndInsertsNew_NoWithinBatchCollision()
+    {
+        // BUG-3 (review 035-v8): the stale-key free and the new-order INSERT now flush in a
+        // SINGLE SaveChanges → one transaction on a real relational provider. This proves
+        // EF's unique-index-aware ordering emits the UPDATE (free) before the INSERT, so
+        // they do NOT collide on ix_orders_idempotency_key inside the one batch.
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "stale-reuse-key";
+
+        using (var seed = NewContext())
+        {
+            var stale = MinimalOrder("FT-STALE", userId, key);
+            stale.CreatedAt = DateTimeOffset.UtcNow.AddHours(-25); // outside the 24h window
+            seed.Orders.Add(stale);
+            await seed.SaveChangesAsync();
+        }
+
+        using var db = NewContext();
+        var svc = NewService(db);
+        var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);
+
+        Assert.False(result.WasIdempotentReplay);      // stale → brand-new order, not a replay
+        Assert.Equal(key, result.Order.IdempotencyKey); // new order owns the key
+
+        using var verify = NewContext();
+        Assert.Equal(1, await verify.Orders.CountAsync(o => o.IdempotencyKey == key)); // only the new one
+        var staleRow = await verify.Orders.FirstAsync(o => o.OrderNumber == "FT-STALE");
+        Assert.Null(staleRow.IdempotencyKey);           // old row freed
+    }
+
+    [Fact]
+    public async Task CreateFromCart_StaleKeyReuse_InsertFails_FreeRollsBack_KeyPreserved()
+    {
+        // BUG-3 (review 035-v8): if the new-order INSERT fails, the stale-key free must roll
+        // back WITH it (they share one transaction now) — otherwise the stale row loses its
+        // key with no replacement, so a later retry finds no holder and the key stops
+        // deduping. Before the fix the free committed in its own save, so the key was gone;
+        // this assertion (key preserved after the failed insert) goes red pre-fix.
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "stale-reuse-fail-key";
+
+        using (var seed = NewContext())
+        {
+            var stale = MinimalOrder("FT-STALE-FAIL", userId, key);
+            stale.CreatedAt = DateTimeOffset.UtcNow.AddHours(-25);
+            seed.Orders.Add(stale);
+            await seed.SaveChangesAsync();
+        }
+
+        // Abort the save the moment a new Order INSERT is part of it.
+        using var db = NewContext(new ThrowOnOrderInsertInterceptor());
+        var svc = NewService(db);
+
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => svc.CreateFromCartAsync(userId, null, MakeRequest(), key));
+
+        using var verify = NewContext();
+        var staleRow = await verify.Orders.FirstAsync(o => o.OrderNumber == "FT-STALE-FAIL");
+        Assert.Equal(key, staleRow.IdempotencyKey);     // free rolled back with the failed insert
+        Assert.Equal(1, await verify.Orders.CountAsync(o => o.IdempotencyKey == key)); // no orphan/new row
+    }
+
+    [Fact]
     public async Task SqliteIdempotencyCollision_SurfacesUniqueExtendedCode_AndColumnName()
     {
         // BUG-1 (review 035-v8): IsIdempotencyKeyViolation classifies the SQLite arm off the
@@ -251,6 +314,20 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
             PostalCode = "010101", RecipientName = "R", Phone = "0700000000",
         },
     };
+
+    /// <summary>Aborts any SaveChanges that includes a new Order INSERT — used to simulate
+    /// the new-order INSERT failing mid-flight (BUG-3), so the test can assert the stale-key
+    /// free rolled back with it rather than committing on its own.</summary>
+    private sealed class ThrowOnOrderInsertInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken ct = default)
+        {
+            if (eventData.Context!.ChangeTracker.Entries<Order>().Any(e => e.State == EntityState.Added))
+                throw new InvalidOperationException("boom: simulated INSERT failure (BUG-3 test)");
+            return base.SavingChangesAsync(eventData, result, ct);
+        }
+    }
 
     /// <summary>Runs a one-shot injection the first time an Order INSERT is about to be
     /// saved on the intercepted context — simulating a concurrent winner committing
