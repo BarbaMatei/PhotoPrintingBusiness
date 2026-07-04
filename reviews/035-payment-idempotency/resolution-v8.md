@@ -27,7 +27,7 @@ findings:
   QUAL-5: { status: verified, commit: 694788a, note: "One switch over (replay, cached) in CreateIntentAsync. v9 VERIFIED — all three branches preserved; (true,true) returns before the gateway call (genuinely skipped)." }
   QUAL-6: { status: verified, commit: cfa23af, note: "Middleware uses injected _environment; service-locator hop deleted. v9 VERIFIED — instance method, IsDevContext removed, dev/prod shape unchanged (both carry divergentFields)." }
   OBS-2:  { status: verified, commit: b37d322, note: "Typed IdempotencyConflictProblemDetails on the 409 ProducesResponseType; DivergentFields nullable; runtime body unchanged. v9 VERIFIED — DTO matches runtime (field present for same-caller conflict, absent for cross-tenant type)." }
-  OBS-3:  { status: fixed, commit: 065a516, note: "Missing-key logs at Information (was Warning). Code v9-VERIFIED, but v9 REOPENED the incomplete doc alignment — 4 stale Warning refs (ddd-01:118, ddd-02:117, ddd-02:324, IdempotencyKeyFilter class summary). Completed in 065a516 (grep-confirmed no stale current-behavior refs remain). Not self-verified — the doc completion awaits a trivial v10 confirmation; code portion is already verified." }
+  OBS-3:  { status: verified, commit: 065a516, note: "Missing-key logs at Information (was Warning). Code v9-verified; v9 reopened the incomplete doc alignment (4 stale Warning refs: ddd-01:118, ddd-02:117, ddd-02:324, filter class summary), completed in 065a516. v10 VERIFIED by an independent lens — no reference states current behavior as Warning (remaining tokens are historical/future-escalation); residual WARN in frozen stage artifacts judged non-defects." }
 ---
 
 # Resolution — Bolt 035: Payment Idempotency (review v8)
@@ -35,8 +35,8 @@ findings:
 Fixer's response to [review-v8.md](review-v8.md), the fresh clean-room discovery audit at
 `50fc692`, and its verification re-review [review-v9.md](review-v9.md) at `01b5264`. The review
 files are immutable; this file records the fix work + the re-review outcome. v8 was
-**approve-with-followups, 0 blockers**. Final state: **13 verified · 1 fixed (OBS-3, re-fixed
-after a v9 doc-drift reopen) · 4 accepted-deferred · 0 open.**
+**approve-with-followups, 0 blockers**. Final state (after v9 + v10): **14 verified · 4
+accepted-deferred · 0 open — resolution loop complete.**
 
 **Scope decided with the owner (2026-07-04):** *full sweep* — fix every tractable finding now
 with the regression test the review asked for; **keep the DB/migration/schema findings deferred**
@@ -62,7 +62,7 @@ the standing v5→v7 decision.
 | QUAL-5| ⚪ C | **verified** | 694788a | Replay-branch switch. v9-verified. |
 | QUAL-6| ⚪ C | **verified** | cfa23af | Middleware `_environment`, no service-locator. v9-verified. |
 | OBS-2 | ⚪ C | **verified** | b37d322 | Typed 409 body. v9-verified. |
-| OBS-3 | ⚪ C | **fixed** | 065a516 | Missing-key at Information. Code v9-verified; v9 reopened incomplete doc alignment → completed in 065a516; awaiting a trivial v10 doc-check. |
+| OBS-3 | ⚪ C | **verified** | 065a516 | Missing-key at Information. Code v9-verified; v9 reopened incomplete doc alignment → completed in 065a516; **v10-verified** by an independent lens. |
 
 ## Decisions for the re-reviewer
 
@@ -94,10 +94,19 @@ Verification re-review [review-v9.md](review-v9.md) — 4 isolated anchored lens
   Fixed in **`065a516`** (grep-confirmed no stale current-behavior refs remain).
 - **0 reopened among the 13. No regressions** (tenant isolation intact; no hidden behavior change).
 
-**So after v9: 13 verified · 1 fixed-awaiting-trivial-confirm (OBS-3 doc completion) · 4
-accepted-deferred · 0 open.** The resolution loop is effectively complete; OBS-3's code is verified and
-its doc drift is closed. **Closing the *feature* (vs. these fixes) still requires a saturated discovery
-pass** (K independent blinded audits agreeing) — tracked separately per the two-loops model.
+## v10 re-review outcome (against `065a516`)
+
+Narrow verification re-review [review-v10.md](review-v10.md) — one isolated lens confirming the
+OBS-3 doc-drift completion. **OBS-3 → `verified`:** the code logs at Information and no reference
+states current behavior as Warning (remaining tokens are historical "was Warning" / the future OPS-1
+escalation); residual WARN in three frozen stage artifacts (implementation-walkthrough, ddd-03
+test-report, upstream intent AC) judged non-defects — they record point-in-time state, not current
+behavior.
+
+**Final: 14 verified · 4 accepted-deferred · 0 open — bolt-035 resolution loop complete.** Every v8
+fix is confirmed by an independent re-review; the 4 deferrals ride to the migration/deploy phase.
+**Closing the *feature* (vs. these fixes) still requires a saturated discovery pass** (K independent
+blinded audits agreeing) — tracked separately per the two-loops model.
 
 ## Verification (fixer's own checks — the re-review owns `verified`)
 
