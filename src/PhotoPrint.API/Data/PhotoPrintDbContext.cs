@@ -320,6 +320,19 @@ public class PhotoPrintDbContext : DbContext
             // key-less orders coexist freely (DOC-2). The explicit HasFilter on Postgres
             // documents intent and keeps the index small; SQLite gets a plain unique
             // index (multiple NULLs still permitted).
+            //
+            // SEC-1 + REQ-1 (review 035-v8, ACCEPTED RESIDUAL — deferred): this uniqueness is
+            // GLOBAL single-column, while the lookup/reclamation are owner-scoped. Consequences:
+            //   • a cross-tenant 409-vs-200 is a weak existence oracle + a key-squatting DoS
+            //     vector (SEC-1); and
+            //   • a stale key is only reclaimable by its original owner, so cross-caller the
+            //     24h window doesn't actually free it (REQ-1).
+            // Both dissolve with a per-tenant COMPOSITE unique index — (UserId, IdempotencyKey)
+            // / (GuestSessionId, IdempotencyKey) — plus updating IsIdempotencyKeyViolation to
+            // that index name. That is a schema/migration change, so it is deferred to the
+            // migration/deploy phase (with DB-1/DB-2), not this bolt. Real-world exploitability
+            // is LOW: keys are client-chosen GUIDs (unpredictable) and the 200 probe self-limits
+            // (it creates a real charge on the attacker's own account). Accepted for now.
             var idempotencyIndex = entity.HasIndex(o => o.IdempotencyKey)
                   .IsUnique()
                   .HasDatabaseName(IdempotencyKeyIndexName);

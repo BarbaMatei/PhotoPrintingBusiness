@@ -26,6 +26,16 @@ namespace PhotoPrint.API.Migrations
             // deployed schema that diff is spurious: review it and discard the idempotency-
             // column operations. Fully eliminating the drift needs per-provider migration
             // assemblies — a deferred follow-up, not done here (see resolution-v5 DB-1).
+            //
+            // DB-1 + DB-2 (review 035-v8) — re-affirmed deferred. Two related gaps, same home:
+            //   • DB-2: the SQLite-flavored snapshot phantom diff described above.
+            //   • DB-1: NO test exercises the Postgres arm at all — every fixture uses
+            //     EnsureCreated() (schema from the model), never Migrate(), so this migration's
+            //     DDL, the filtered index, and the Npgsql `IsIdempotencyKeyViolation` branch run
+            //     in tests NOWHERE. A Testcontainers-Postgres regression that applies this
+            //     migration and drives the concurrent double-submit is the durable fix.
+            // Both belong to the migration/deploy (3-env) phase of the roadmap, not a bolt-035
+            // fix pass — the app has no migration-based deployment yet. Deferral upheld v5→v8.
             var isNpgsql = migrationBuilder.ActiveProvider == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
             migrationBuilder.AddColumn<string>(

@@ -84,6 +84,20 @@ public class PaymentsController : ControllerBase
             {
                 // The redirect URL embeds a timestamp + nonce, so it is persisted and
                 // replayed verbatim rather than rebuilt on a later call.
+                //
+                // BUG-2 (review 035-v8, gateway asymmetry — durable fix DEFERRED): Stripe has
+                // gateway-side idempotency (RequestOptions.IdempotencyKey keyed by order.Id), so
+                // a re-call can't create a second intent. EuPlatesc has NO gateway idempotency
+                // key — its only protection is persist-URL-once + replay. In the recovery-replay
+                // path (WasIdempotentReplay with a null cached URL, e.g. crash-before-persist),
+                // two truly concurrent retries could each rebuild a DIFFERENT signed URL
+                // (fresh timestamp+nonce), last-writer-wins on the row. No double CHARGE — the
+                // stable invoice_id (== order.Id) makes EuPlatesc map both to one order — but the
+                // "replay returns the stored value verbatim" invariant is momentarily violated.
+                // Durable fix: re-read the persisted URL under a short row lock (Postgres
+                // SELECT … FOR UPDATE). That needs the not-yet-built Postgres arm, so it is
+                // deferred to the migration/deploy phase (with DB-1); documented here per the
+                // review's stated minimum.
                 var redirectUrl = _euPlatescService.BuildInitiateUrl(o);
                 o.EuPlatescRedirectUrl = redirectUrl;
                 return Task.FromResult(redirectUrl);
