@@ -206,6 +206,34 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_IdempotencyKeyTaken_Returns409_AndEmitsReservedCrossTenantLogEvent()
+    {
+        // OBS-1 (review 035-v8): a cross-tenant key collision must map to 409 (it is a
+        // ConflictException subtype) AND be logged as its own reserved event, distinct
+        // from both the generic "Handled exception" warning and the same-caller
+        // `payments.idempotency.conflict`. Before the fix the type was unmapped (→ 500)
+        // and there was no cross-tenant marker at all.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new IdempotencyKeyTakenException();
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(409);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("payments.idempotency.cross-tenant-conflict")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_KnownException_IncludesCorrelationIdFromContext()
     {
         // Arrange

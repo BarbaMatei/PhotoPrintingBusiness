@@ -12,6 +12,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(NotFoundException)]             = (StatusCodes.Status404NotFound, "Not Found"),
         [typeof(ConflictException)]             = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(IdempotencyConflictException)]  = (StatusCodes.Status409Conflict, "Idempotency conflict"),
+        [typeof(IdempotencyKeyTakenException)]  = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(ForbiddenException)]            = (StatusCodes.Status403Forbidden, "Forbidden"),
         [typeof(UnauthorizedException)]         = (StatusCodes.Status401Unauthorized, "Unauthorized"),
         [typeof(BadGatewayException)]           = (StatusCodes.Status502BadGateway, "Bad Gateway"),
@@ -71,6 +72,16 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 _logger.LogWarning(
                     "payments.idempotency.conflict correlation_id={CorrelationId} divergent_fields={DivergentFields}",
                     correlationId, string.Join(",", conflict.DivergentFields));
+
+            // OBS-1 (review 035-v8): a cross-tenant key collision (a borrowed/guessed key
+            // or a key-squatting probe) also 409s, but via a plain ConflictException that
+            // was indistinguishable from any other 409 in the logs — exactly the signal an
+            // operator needs to grep during a duplicate-charge incident. Emit it as a
+            // distinct reserved event (no key value — just the class + correlation id).
+            if (exception is IdempotencyKeyTakenException)
+                _logger.LogWarning(
+                    "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
+                    correlationId);
 
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,
                 exception.Message, correlationId, exception);

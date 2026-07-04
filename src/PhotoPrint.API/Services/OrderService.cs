@@ -175,8 +175,9 @@ public class OrderService : IOrderService
             // The constraint error already proves the key is taken, but this caller owns
             // no (fresh) row for it → it is held by a *different* caller (global unique
             // index). Replaying would disclose another tenant's order (SEC-1) → clean 409.
-            throw new ConflictException(
-                "The Idempotency-Key is already associated with another request.");
+            // Thrown as a DISTINCT type (subtype of ConflictException) so the middleware
+            // can emit the reserved cross-tenant abuse signal for triage (OBS-1, v8).
+            throw new IdempotencyKeyTakenException();
         }
     }
 
