@@ -20,21 +20,14 @@ public class ExceptionHandlerMiddlewareTests
     private ExceptionHandlerMiddleware CreateSut()
         => new(_loggerMock.Object, _envMock.Object);
 
-    private static DefaultHttpContext CreateContext(bool isDev = false)
+    // QUAL-6 (review 035-v8): the middleware now uses its injected IHostEnvironment
+    // (_envMock) for the dev/prod shape decision, not context.RequestServices — so the
+    // context no longer needs a service-locator env stub. Each test sets _envMock directly.
+    private static DefaultHttpContext CreateContext()
     {
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.Items["CorrelationId"] = "test-correlation-id";
-
-        var envMock = new Mock<IHostEnvironment>();
-        envMock.Setup(e => e.EnvironmentName)
-               .Returns(isDev ? Environments.Development : Environments.Production);
-
-        var servicesMock = new Mock<IServiceProvider>();
-        servicesMock.Setup(s => s.GetService(typeof(IHostEnvironment)))
-                    .Returns(envMock.Object);
-        context.RequestServices = servicesMock.Object;
-
         return context;
     }
 
@@ -80,7 +73,7 @@ public class ExceptionHandlerMiddlewareTests
         // Arrange
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
         var sut = CreateSut();
-        var context = CreateContext(isDev: false);
+        var context = CreateContext();
         RequestDelegate next = _ => throw new InvalidOperationException("Secret internal detail");
 
         // Act
@@ -101,7 +94,7 @@ public class ExceptionHandlerMiddlewareTests
         // Arrange
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Development);
         var sut = CreateSut();
-        var context = CreateContext(isDev: true);
+        var context = CreateContext();
         RequestDelegate next = _ => throw new InvalidOperationException("Secret internal detail");
 
         // Act
@@ -142,7 +135,7 @@ public class ExceptionHandlerMiddlewareTests
         // Arrange
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
         var sut = CreateSut();
-        var context = CreateContext(isDev: false);
+        var context = CreateContext();
         RequestDelegate next = _ =>
             throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
 
@@ -165,7 +158,7 @@ public class ExceptionHandlerMiddlewareTests
         // building against the dev API otherwise never sees `divergentFields`.
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Development);
         var sut = CreateSut();
-        var context = CreateContext(isDev: true);
+        var context = CreateContext();
         RequestDelegate next = _ =>
             throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
 

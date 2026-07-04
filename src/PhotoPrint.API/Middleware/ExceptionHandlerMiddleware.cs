@@ -106,7 +106,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         }
     }
 
-    private static async Task WriteProblemDetailsAsync(
+    private async Task WriteProblemDetailsAsync(
         HttpContext context,
         int statusCode,
         string title,
@@ -126,7 +126,11 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
         object response;
 
-        if (exception != null && IsDevContext(context))
+        // QUAL-6 (review 035-v8): use the injected _environment (this is now an instance
+        // method) instead of re-resolving IHostEnvironment via context.RequestServices — the
+        // middleware already holds it, and the service-locator hop was a second, redundant
+        // way to answer the same question.
+        if (exception != null && _environment.IsDevelopment())
         {
             response = new
             {
@@ -162,11 +166,5 @@ public class ExceptionHandlerMiddleware : IMiddleware
         }
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, _jsonOptions));
-    }
-
-    private static bool IsDevContext(HttpContext context)
-    {
-        var env = context.RequestServices.GetService<IHostEnvironment>();
-        return env?.IsDevelopment() ?? false;
     }
 }
