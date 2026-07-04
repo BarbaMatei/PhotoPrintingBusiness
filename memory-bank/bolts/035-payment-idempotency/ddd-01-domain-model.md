@@ -115,7 +115,7 @@ The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) 
 | 001 | Down-migration drops index and column | Implicit from additive-only modelling; reversibility is a stage-2 / migration concern |
 | 002 | Two consecutive calls with same key + identical body → same OrderId + ClientSecret, one DB row, one Stripe PaymentIntent | `Replay(existingOrder)` outcome + Stripe SDK `RequestOptions.IdempotencyKey` (stage-2 wiring) |
 | 002 | Same key + divergent body → 409 "Idempotency conflict" naming divergent fields | `Conflict(divergentFields)` outcome → 409 ProblemDetails (NOT 422, per ADR-002) |
-| 002 | Missing key behaves as today + Warning log | `MissingIdempotencyKeyObserved` event (logged) + resolver short-circuit (treat as `NewOrder`) |
+| 002 | Missing key behaves as today + Information log (OBS-3, v8 — was Warning) | `MissingIdempotencyKeyObserved` event (logged) + resolver short-circuit (treat as `NewOrder`) |
 | 002 | Stripe SDK `RequestOptions.IdempotencyKey` set | Stage-2 wiring; modelled here as "Replay Token" parity requirement |
 | 003 | Same key on EuPlatesc → same redirect URL + OrderId | `Replay(existingOrder)` outcome; EuPlatesc redirect URL is deterministic from the persisted order |
 | 003 | First-call failure before persist → retry allowed | Resolver returns `NewOrder` because no row was ever written; no special state to clean up |

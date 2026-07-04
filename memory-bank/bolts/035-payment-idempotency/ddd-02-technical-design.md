@@ -114,7 +114,7 @@ Identical contract additions. Response body is `{ redirectUrl, orderId }` instea
 
 | Scenario | Header `Idempotency-Key` | Existing order in 24h window | Logical match | HTTP status | Body | Side effects |
 |---|---|---|---|---|---|---|
-| Fresh call | absent | — | — | 200 | new order | 1 row inserted; 1 Stripe intent; **WARN log** `missing-idempotency-key` |
+| Fresh call | absent | — | — | 200 | new order | 1 row inserted; 1 Stripe intent; **INFO log** `missing-idempotency-key` (OBS-3, v8 — was WARN) |
 | Fresh call | present | none | — | 200 | new order | 1 row inserted; 1 Stripe intent; key persisted on order; **Stripe `RequestOptions.IdempotencyKey` set** |
 | Replay | present | exists | yes | 200 | replay (same order, same `clientSecret`) | **zero new rows; zero new Stripe calls**; INFO log `replay` |
 | Conflict | present | exists | no | 409 | ProblemDetails with `divergentFields` | zero state mutation; INFO log `conflict` |
@@ -321,7 +321,7 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 | Replay throughput | No degradation vs. fresh call | Replay path skips order creation + Stripe call entirely — strictly cheaper than a fresh call. |
 | Migration safety | Apply cleanly to running prod with no downtime | `IdempotencyKey` and `StripeClientSecret` both nullable; index creation does NOT lock the table on Postgres (`CREATE INDEX CONCURRENTLY` not needed at MVP scale, but documented as a future option). |
 | Observability | Replay/conflict/missing-key counts | Logged as structured events with reserved names. Intent 020 will lift them to Prometheus counters without re-coding. |
-| Backwards compat | FE-without-key still works for one release | Endpoint accepts missing header; logs Warning. Migration in two phases: deploy server, then FE adopts; finally a follow-up bolt makes the header required. |
+| Backwards compat | FE-without-key still works for one release | Endpoint accepts missing header; logs Information (OBS-3, v8 — was Warning; escalates back to Warning + 400 when the header becomes required). Migration in two phases: deploy server, then FE adopts; finally a follow-up bolt makes the header required. |
 
 ---
 

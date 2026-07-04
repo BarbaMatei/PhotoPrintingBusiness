@@ -9,9 +9,9 @@ namespace PhotoPrint.API.Filters;
 /// reads the <c>Idempotency-Key</c> header once, normalizes whitespace-only to null,
 /// stashes it in <see cref="HttpContext.Items"/> for the action (read via
 /// <see cref="HttpContextExtensions.GetIdempotencyKey"/>), and logs the transitional
-/// missing-key warning with the correlation id — instead of each endpoint repeating
-/// the extraction + warning. See OPS-1: the warning escalates to a 400 once the FE
-/// always sends a key.
+/// missing-key event (at Information — OBS-3, review 035-v8) with the correlation id,
+/// instead of each endpoint repeating the extraction + logging. See OPS-1: the missing-key
+/// log escalates to a 400 (and back to Warning) once the FE always sends a key.
 /// </summary>
 public sealed class IdempotencyKeyFilter : IActionFilter
 {
