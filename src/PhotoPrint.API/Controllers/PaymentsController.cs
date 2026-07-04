@@ -42,7 +42,9 @@ public class PaymentsController : ControllerBase
     [HttpPost("stripe/intent")]
     [ProducesResponseType(typeof(StripeIntentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    // OBS-2 (review 035-v8): the 409 body carries the divergentFields extension — type it so
+    // generated clients see the field that tells the FE which inputs to fix.
+    [ProducesResponseType(typeof(IdempotencyConflictProblemDetails), StatusCodes.Status409Conflict)]
     public Task<IActionResult> CreateStripeIntentAsync(
         [FromBody] CreateOrderRequest request,
         CancellationToken cancellationToken)
@@ -69,7 +71,8 @@ public class PaymentsController : ControllerBase
     [HttpPost("euplatesc/initiate")]
     [ProducesResponseType(typeof(EuPlatescInitiateResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    // OBS-2 (review 035-v8): typed 409 body — see the Stripe endpoint above.
+    [ProducesResponseType(typeof(IdempotencyConflictProblemDetails), StatusCodes.Status409Conflict)]
     public Task<IActionResult> InitiateEuPlatescAsync(
         [FromBody] CreateOrderRequest request,
         CancellationToken cancellationToken)
