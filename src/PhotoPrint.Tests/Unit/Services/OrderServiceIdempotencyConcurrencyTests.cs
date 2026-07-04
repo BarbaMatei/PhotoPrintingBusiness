@@ -67,6 +67,26 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         return new OrderService(db, new OrderNumberService(db), shippingMock.Object);
     }
 
+    // QUAL-4 (review 035-v8): build the concurrent "winner" by running the REAL
+    // CreateFromCartAsync on a second context, so its totals + items come from the service
+    // (same cart + same 20.00 shipping mock the caller uses) instead of hand-copied magic
+    // numbers that silently drift from the pricing math and flip replay↔409 for the wrong
+    // reason. Only the OrderNumber is pinned — it is the control knob for WHICH index the
+    // caller collides on (distinct → idempotency only; equal → order-number first, BUG-4).
+    private async Task<Order> InjectWinnerViaRealFlowAsync(Guid userId, string key, string orderNumber)
+    {
+        using var winnerDb = NewContext();
+        var numberMock = new Mock<IOrderNumberService>();
+        numberMock.Setup(s => s.GenerateAsync(It.IsAny<CancellationToken>())).ReturnsAsync(orderNumber);
+        var shippingMock = new Mock<IShippingService>();
+        shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ShippingCostDto(20.00m));
+        var svc = new OrderService(winnerDb, numberMock.Object, shippingMock.Object);
+
+        var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);
+        return result.Order;
+    }
+
     private async Task<Guid> SeedUserAsync()
     {
         var id = Guid.NewGuid();
@@ -161,35 +181,17 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     [Fact]
     public async Task CreateFromCart_ConcurrentSameOwnerSameKey_LoserReplaysWinner_OneOrder()
     {
-        var (userId, productId, uploadId) = await SeedCartAsync();
+        var (userId, _, _) = await SeedCartAsync();
         const string key = "race-key";
-        var winnerId = Guid.NewGuid();
 
-        // Deterministically inject the canonical double-submit race: just before the
-        // caller's INSERT executes, a concurrent request with the SAME key + owner +
-        // logical request commits first, so the caller loses the unique-index race.
-        var interceptor = new WinnerInjectingInterceptor(async () =>
-        {
-            using var winnerDb = NewContext();
-            var winner = MinimalOrder("FT-WINNER", userId, key);
-            winner.Id = winnerId;
-            winner.PaymentProcessor = PaymentProcessor.Stripe;
-            winner.DeliveryType = DeliveryType.Courier;
-            winner.SubtotalRon = 6.00m;
-            winner.ShippingCostRon = 20.00m;
-            winner.TotalRon = 26.00m; // 3 × 2.00 + 20.00 shipping — matches the caller's request
-            winner.Items.Add(new OrderItem
-            {
-                ProductId = productId,
-                UploadId = uploadId,
-                Quantity = 3,
-                UnitPriceRon = 2.00m,
-                LineTotalRon = 6.00m,
-                ProductSnapshot = new ProductSnapshot { ProductName = "Foto 10x15", Size = "10x15", Finish = "Lucios" },
-            });
-            winnerDb.Orders.Add(winner);
-            await winnerDb.SaveChangesAsync();
-        });
+        // Deterministically inject the canonical double-submit race: just before the caller's
+        // INSERT executes, a concurrent request with the SAME key + owner + logical request
+        // commits first, so the caller loses the unique-index race. The winner is built via
+        // the REAL flow (QUAL-4) — its totals/items match the caller's by construction — with
+        // a DISTINCT order number so the caller collides only on the idempotency index.
+        Order? winner = null;
+        var interceptor = new WinnerInjectingInterceptor(
+            async () => winner = await InjectWinnerViaRealFlowAsync(userId, key, "FT-WINNER"));
 
         using var db = NewContext(interceptor);
         var svc = NewService(db);
@@ -199,7 +201,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         // The loser caught the unique violation, re-resolved the winner, and replayed it
         // — instead of 500ing. Exactly one order persisted.
         Assert.True(result.WasIdempotentReplay);
-        Assert.Equal(winnerId, result.Order.Id);
+        Assert.Equal(winner!.Id, result.Order.Id);
 
         using var verify = NewContext();
         Assert.Equal(1, await verify.Orders.CountAsync());
@@ -306,36 +308,17 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         // winner. The fix regenerates the number and retries; the genuine same-key collision
         // then surfaces and resolves to a clean replay. Uses the REAL OrderNumberService (the
         // mock's always-unique Interlocked.Increment masked this).
-        var (userId, productId, uploadId) = await SeedCartAsync();
+        var (userId, _, _) = await SeedCartAsync();
         const string key = "race-key-ordernum";
-        var winnerId = Guid.NewGuid();
 
-        // The caller (Orders count == 0) will generate this number; force the winner to take
-        // it too, so the caller's INSERT hits the order-number index before the idempotency one.
+        // The caller (Orders count == 0) will generate this number via the real service; the
+        // winner is pinned to the SAME number, so the caller's INSERT hits the order-number
+        // index before the idempotency one. Winner totals/items come from the real flow (QUAL-4).
         var collidingNumber = OrderNumberService.FormatOrderNumber(DateTime.UtcNow.Year, 1);
 
-        var interceptor = new WinnerInjectingInterceptor(async () =>
-        {
-            using var winnerDb = NewContext();
-            var winner = MinimalOrder(collidingNumber, userId, key);
-            winner.Id = winnerId;
-            winner.PaymentProcessor = PaymentProcessor.Stripe;
-            winner.DeliveryType = DeliveryType.Courier;
-            winner.SubtotalRon = 6.00m;
-            winner.ShippingCostRon = 20.00m;
-            winner.TotalRon = 26.00m; // 3 × 2.00 + 20.00 shipping — matches the caller's request
-            winner.Items.Add(new OrderItem
-            {
-                ProductId = productId,
-                UploadId = uploadId,
-                Quantity = 3,
-                UnitPriceRon = 2.00m,
-                LineTotalRon = 6.00m,
-                ProductSnapshot = new ProductSnapshot { ProductName = "Foto 10x15", Size = "10x15", Finish = "Lucios" },
-            });
-            winnerDb.Orders.Add(winner);
-            await winnerDb.SaveChangesAsync();
-        });
+        Order? winner = null;
+        var interceptor = new WinnerInjectingInterceptor(
+            async () => winner = await InjectWinnerViaRealFlowAsync(userId, key, collidingNumber));
 
         using var db = NewContext(interceptor);
         var svc = NewServiceWithRealNumberService(db);
@@ -345,7 +328,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         // The order-number collision was retried, the idempotency collision then resolved the
         // winner, and the loser replayed it — instead of 500ing. Exactly one order persisted.
         Assert.True(result.WasIdempotentReplay);
-        Assert.Equal(winnerId, result.Order.Id);
+        Assert.Equal(winner!.Id, result.Order.Id);
 
         using var verify = NewContext();
         Assert.Equal(1, await verify.Orders.CountAsync());
