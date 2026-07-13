@@ -14,10 +14,13 @@ public class ImageProcessor : IImageProcessor
     /// <summary>
     /// Reject images whose total pixel area exceeds this — decompression-bomb defence
     /// (bolt 042, BUG-1). A per-axis cap misses the total-pixel bomb: a 25000×25000 image
-    /// passes any 25000-per-axis check yet decodes to ~625 MP ≈ 2.5 GB. An area cap sized
-    /// for a print workload (tens of MP) bounds the decode allocation instead.
+    /// passes any 25000-per-axis check yet decodes to ~625 MP ≈ 2.5 GB. An area cap bounds
+    /// the decode allocation instead. Sized (NEW-1, review 042-v2) to accept legitimate
+    /// large-format prints (A1 @ 300 DPI ≈ 70 MP) and high-res camera originals: 100 MP
+    /// decodes to ~400 MB RGBA, comfortably under the 512 MB allocator backstop
+    /// (Program.cs), while a 625 MP+ bomb is still rejected here at Identify.
     /// </summary>
-    public const long MaxDecodePixels = 50_000_000; // 50 MP
+    public const long MaxDecodePixels = 100_000_000; // 100 MP
 
     /// <summary>Shared message so both decode sites report the rejection identically (QUAL-3).</summary>
     public const string DimensionsExceededMessage = "Image dimensions exceed limits.";

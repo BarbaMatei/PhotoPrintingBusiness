@@ -22,7 +22,7 @@ implemented: true
 - [x] `Configuration.Default.MemoryAllocator` allocation cap **and** a decode-dimension guard.
   - **AC amended (REQ-1 + BUG-1, review 042-v1):**
     - The `MemoryAllocator` allocation cap (`AllocationLimitMegabytes = 512`) is now set in `Program.cs` — it had been silently dropped, which is what left a within-dimension bomb able to allocate GBs (REQ-1).
-    - `MaxImageWidth/MaxImageHeight` **do not exist** in ImageSharp 3.1.11, so the guard is a per-call check. It was originally a per-axis cap (`> 25000`), which a 25000×25000 (≈625 MP) or multi-frame bomb bypassed. It is now a **total pixel-area cap** (`ImageProcessor.ExceedsDecodeLimits`, 50 MP) plus `DecoderOptions.MaxFrames = 1` (BUG-1).
+    - `MaxImageWidth/MaxImageHeight` **do not exist** in ImageSharp 3.1.11, so the guard is a per-call check. It was originally a per-axis cap (`> 25000`), which a 25000×25000 (≈625 MP) or multi-frame bomb bypassed. It is now a **total pixel-area cap** (`ImageProcessor.ExceedsDecodeLimits`) plus `DecoderOptions.MaxFrames = 1` (BUG-1). The cap is **100 MP** (NEW-1, review 042-v2) — sized to accept large-format prints (A1 @ 300 DPI ≈ 70 MP) and high-res camera originals while a 100 MP decode (~400 MB RGBA) stays under the 512 MB allocator backstop.
 - [x] Decoding an image exceeding the cap throws `DecompressionBombException` (subclass of `UnprocessableEntityException`) → 422 `"Image dimensions exceed limits."`, and emits the reserved `uploads.decompression_bomb.rejected` event (OBS-3).
 - [x] Test: `ImageProcessorTests` exercises the REAL processor — an oversized image (54 MP) is rejected before decode; a small valid image yields a ≤300 px JPEG; an unreadable file → 422 (TEST-2).
 
@@ -36,8 +36,8 @@ SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
     SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
         new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
 
-// ImageProcessor — per-call area cap + single-frame decode (BUG-1)
-public const long MaxDecodePixels = 50_000_000; // 50 MP
+// ImageProcessor — per-call area cap + single-frame decode (BUG-1; cap raised to 100 MP by NEW-1)
+public const long MaxDecodePixels = 100_000_000; // 100 MP
 public static bool ExceedsDecodeLimits(int w, int h) => (long)w * h > MaxDecodePixels;
 // ... var info = await Image.IdentifyAsync(new DecoderOptions { MaxFrames = 1 }, stream, ct);
 //     if (info is not null && ExceedsDecodeLimits(info.Width, info.Height))

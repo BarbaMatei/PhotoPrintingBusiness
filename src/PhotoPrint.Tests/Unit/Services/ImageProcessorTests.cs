@@ -39,8 +39,8 @@ public class ImageProcessorTests
     [Fact]
     public void ExceedsDecodeLimits_AtCapAllowed_OverCapAndOverflowRejected()
     {
-        ImageProcessor.ExceedsDecodeLimits(10_000, 5_000).Should().BeFalse();   // 50 MP exactly
-        ImageProcessor.ExceedsDecodeLimits(10_000, 5_001).Should().BeTrue();    // one row over
+        ImageProcessor.ExceedsDecodeLimits(10_000, 10_000).Should().BeFalse();  // 100 MP exactly
+        ImageProcessor.ExceedsDecodeLimits(10_000, 10_001).Should().BeTrue();   // one row over
         // A per-axis check would pass 25000×25000 (≈625 MP); the area cap rejects it.
         ImageProcessor.ExceedsDecodeLimits(25_000, 25_000).Should().BeTrue();
         // long multiply: this product overflows a 32-bit int (would wrap negative).
@@ -52,16 +52,16 @@ public class ImageProcessorTests
     [Fact]
     public async Task GenerateThumbnailAsync_OversizedImage_ThrowsDecompressionBomb()
     {
-        // A genuine image whose pixel area (54 MP) exceeds the 50 MP decode cap. L8 keeps the
-        // test allocation ~54 MB; the guard rejects it at Identify, before the full decode.
-        using var big = new Image<L8>(9_000, 6_000);
+        // A genuine image whose pixel area (110 MP) exceeds the 100 MP decode cap. L8 keeps the
+        // test allocation ~110 MB; the guard rejects it at Identify, before the full decode.
+        using var big = new Image<L8>(11_000, 10_000);
         StoreBytes("big.png", EncodePng(big));
 
         var act = () => _sut.GenerateThumbnailAsync("big.png");
 
         var ex = (await act.Should().ThrowAsync<DecompressionBombException>()).Which;
-        ex.WidthPx.Should().Be(9_000);
-        ex.HeightPx.Should().Be(6_000);
+        ex.WidthPx.Should().Be(11_000);
+        ex.HeightPx.Should().Be(10_000);
     }
 
     [Fact]
