@@ -25,10 +25,12 @@ public class UploadsController : ControllerBase
         $"private, max-age={(int)TimeSpan.FromDays(30).TotalSeconds}";
 
     private readonly IUploadService _uploadService;
+    private readonly ILogger<UploadsController> _logger;
 
-    public UploadsController(IUploadService uploadService)
+    public UploadsController(IUploadService uploadService, ILogger<UploadsController> logger)
     {
         _uploadService = uploadService;
+        _logger = logger;
     }
 
     // POST /api/uploads
@@ -110,6 +112,13 @@ public class UploadsController : ControllerBase
                       RequestEntityTooLargeException or
                       BadRequestException)
             {
+                // OBS-1 (review 042-v1): the batch endpoint turns each rejection into a
+                // per-item result and returns 200, so without this the exception never
+                // reaches ExceptionHandlerMiddleware and bulk abuse (the most likely bomb
+                // vector) is invisible to ops. Log it — Warning, no file bytes / no PII.
+                _logger.LogWarning(
+                    "uploads.batch.item_rejected file={FileName} reason={Reason} correlation_id={CorrelationId}",
+                    file.FileName, ex.GetType().Name, HttpContext.GetCorrelationId());
                 results.Add(new BatchUploadItemResult(file.FileName, null, ex.Message));
             }
         }
