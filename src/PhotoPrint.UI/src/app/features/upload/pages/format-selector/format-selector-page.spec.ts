@@ -229,16 +229,23 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
     expect(guestAuth.initAnonymousSession).toHaveBeenCalledTimes(1);
   });
 
-  it('re-inits and retries the upload exactly once after a 401 (FE-2)', async () => {
-    const auth = { isAuthenticated: () => false, getGuestToken: () => 'stale', clearGuestToken: vi.fn() };
+  it('re-inits a fresh session and retries the upload exactly once after a 401 (FE-2)', async () => {
+    // Model the real flow: the first attempt goes out with a stale token, 401s, and the
+    // errorInterceptor clears the token; on retry ensureGuestSession sees no token and
+    // re-inits. Simulate the interceptor's clear by nulling the token on the 401 so the
+    // re-init path is genuinely exercised (not just the retry wiring).
+    let token: string | null = 'stale';
+    const auth = { isAuthenticated: () => false, getGuestToken: () => token, clearGuestToken: vi.fn(() => { token = null; }) };
     const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
     let attempts = 0;
     const upload = {
       upload: vi.fn(() => {
         attempts++;
-        return attempts === 1
-          ? throwError(() => new HttpErrorResponse({ status: 401 }))
-          : of({ type: 'done' as const, dto: { ...DTO } });
+        if (attempts === 1) {
+          token = null; // interceptor clears the stale token on the 401
+          return throwError(() => new HttpErrorResponse({ status: 401 }));
+        }
+        return of({ type: 'done' as const, dto: { ...DTO } });
       }),
     };
     const c = await setupWithMocks({ auth, guestAuth, upload });
@@ -246,6 +253,7 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
     c.onFilesAccepted([new File(['x'], 'p.jpg')]);
 
     expect(upload.upload).toHaveBeenCalledTimes(2);
+    expect(guestAuth.initAnonymousSession).toHaveBeenCalledTimes(1); // re-init actually happened
     expect(c.uploads()[0].status).toBe('done');
   });
 
