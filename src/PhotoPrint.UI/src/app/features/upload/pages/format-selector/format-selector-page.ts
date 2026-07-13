@@ -8,8 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Observable, of, map, tap } from 'rxjs';
+import { Observable, of, map, tap, shareReplay, finalize } from 'rxjs';
 import { ProductService } from '../../../../core/services/product.service';
 import { UploadService, BatchUploadItemResult } from '../../../../core/services/upload.service';
 import { CartService } from '../../../../core/services/cart.service';
@@ -177,15 +178,25 @@ export class FormatSelectorPage implements OnInit {
     });
   }
 
+  /** In-flight anonymous-session init, shared so concurrent callers don't each mint a
+   *  session (FE-1). Reset once it settles so a later expiry can re-init. */
+  private guestInit$: Observable<void> | null = null;
+
   /** Logged-in users and guests with a token proceed immediately; a guest with no
    *  token gets a fresh anonymous session created first. Combined with the
-   *  errorInterceptor clearing stale guest tokens on 401, an expired session
-   *  self-heals: the failed attempt clears the token, the retry re-inits here. */
+   *  errorInterceptor clearing stale guest tokens on 401 and the upload/preview retry
+   *  below, an expired session self-heals: the failed attempt clears the token, the
+   *  retry re-inits here. */
   private ensureGuestSession(): Observable<void> {
     if (this.authService.isAuthenticated() || this.authService.getGuestToken()) {
       return of(void 0);
     }
-    return this.guestAuthService.initAnonymousSession().pipe(
+    // Dedup concurrent inits: ngOnInit pre-creates a session, and an eager user dropping
+    // files before it resolves would otherwise fire a second init (getGuestToken() is a
+    // synchronous localStorage read that stays null until the first init lands) — minting a
+    // duplicate session and orphaning uploads. Share one in-flight request; finalize resets
+    // the field so a later expiry re-inits (FE-1).
+    this.guestInit$ ??= this.guestAuthService.initAnonymousSession().pipe(
       tap(res =>
         this.guestAuthService.storeSession({
           guestToken: res.guestToken,
@@ -196,10 +207,34 @@ export class FormatSelectorPage implements OnInit {
         }),
       ),
       map(() => void 0),
+      finalize(() => { this.guestInit$ = null; }),
+      shareReplay(1),
     );
+    return this.guestInit$;
   }
 
-  private performUpload(files: File[], newStates: UploadState[]): void {
+  private performUpload(files: File[], newStates: UploadState[], isRetry = false): void {
+    const clientIds = newStates.map(s => s.clientId);
+    const failAll = () =>
+      clientIds.forEach(id =>
+        this.updateUpload(id, { status: 'error', error: 'Eroare la încărcarea fișierului.' }));
+
+    // FE-2: a stale-but-present guest token isn't caught by ensureGuestSession (it only
+    // checks presence, not expiry — the token is an opaque id, so expiry can't be read
+    // client-side), so the upload goes out stale and 401s; the interceptor then clears the
+    // token. Re-init a fresh session and retry the upload exactly once so the self-heal is
+    // seamless instead of surfacing a generic error the user must resolve by re-dropping.
+    const onUploadError = (err: unknown) => {
+      if (!isRetry && err instanceof HttpErrorResponse && err.status === 401) {
+        this.ensureGuestSession().subscribe({
+          next: () => this.performUpload(files, newStates, true),
+          error: () => failAll(),
+        });
+        return;
+      }
+      failAll();
+    };
+
     if (files.length === 1) {
       // Single file: use individual upload for accurate per-file progress.
       const { clientId } = newStates[0];
@@ -211,13 +246,10 @@ export class FormatSelectorPage implements OnInit {
             this.updateUpload(clientId, { status: 'done', progress: 100, dto: event.dto });
           }
         },
-        error: () => {
-          this.updateUpload(clientId, { status: 'error', error: 'Eroare la încărcarea fișierului.' });
-        },
+        error: onUploadError,
       });
     } else {
       // Multiple files: send all in one request.
-      const clientIds = newStates.map(s => s.clientId);
       this.uploadService.uploadBatch(files).subscribe({
         next: event => {
           if (event.type === 'progress') {
@@ -233,11 +265,7 @@ export class FormatSelectorPage implements OnInit {
             });
           }
         },
-        error: () => {
-          clientIds.forEach(id =>
-            this.updateUpload(id, { status: 'error', error: 'Eroare la încărcarea fișierului.' }),
-          );
-        },
+        error: onUploadError,
       });
     }
   }
@@ -343,20 +371,36 @@ export class FormatSelectorPage implements OnInit {
       this.uploads.set(restored);
       this.cdr.markForCheck();
 
-      // Fetch preview blobs in parallel; remove any upload whose preview fails.
-      saved.forEach(s => {
-        this.uploadService.getPreviewBlob(s.dto.id).subscribe({
-          next: url => this.updateUpload(s.clientId, { previewUrl: url }),
-          error: () => {
-            // Auth may have changed or upload expired — drop the stale entry.
-            this.uploads.update(prev => prev.filter(u => u.clientId !== s.clientId));
-            this.saveToSession();
-            this.cdr.markForCheck();
-          },
-        });
-      });
+      // Fetch preview blobs in parallel; a 401 self-heals, a 404 drops the stale entry.
+      saved.forEach(s => this.fetchPreviewWithRetry(s.dto.id, s.clientId, false));
     } catch {
       sessionStorage.removeItem(this.storageKey);
     }
+  }
+
+  /** Fetches a restored upload's preview. On a 401 (expired guest token on refresh) the
+   *  interceptor clears the token; re-init a fresh session and retry ONCE before giving up,
+   *  so a refresh with an expired session doesn't wipe the whole restored grid. Only a
+   *  genuine 404 (or a failed retry) drops the entry (FE-4). */
+  private fetchPreviewWithRetry(uploadId: string, clientId: string, isRetry: boolean): void {
+    this.uploadService.getPreviewBlob(uploadId).subscribe({
+      next: url => this.updateUpload(clientId, { previewUrl: url }),
+      error: (err: unknown) => {
+        if (!isRetry && err instanceof HttpErrorResponse && err.status === 401) {
+          this.ensureGuestSession().subscribe({
+            next: () => this.fetchPreviewWithRetry(uploadId, clientId, true),
+            error: () => this.dropRestoredEntry(clientId),
+          });
+          return;
+        }
+        this.dropRestoredEntry(clientId);
+      },
+    });
+  }
+
+  private dropRestoredEntry(clientId: string): void {
+    this.uploads.update(prev => prev.filter(u => u.clientId !== clientId));
+    this.saveToSession();
+    this.cdr.markForCheck();
   }
 }
