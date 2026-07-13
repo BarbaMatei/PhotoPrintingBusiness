@@ -5,6 +5,7 @@ answers_review: review-v2.md
 version: 2
 branch: feat/bolt-042-thumbnail-cache
 status: resolved
+verified_in: review-v3.md
 fixed_commit: e3a77d9
 opened: 2026-07-14
 closed: 2026-07-14
@@ -66,5 +67,10 @@ Each behavioral fix is proven **fail-before / pass-after** (revert → red):
   keeps the FE-4 401-retry path intact. NEW-4 changes only the key *separator* (Guid/owner
   format preserved), and the integration suite (real UploadService + FakeStorage, which was
   already `/`-based) stays green, confirming the round-trip.
-- **Next step:** a **verification re-review** (`review-v3`) against `fixed_commit` `e3a77d9`
-  to flip NEW-1/NEW-2/NEW-4 to `verified` and rule on the NEW-3 deferral. Not self-verified.
+## Verification (review-v3)
+
+Verified in [review-v3.md](review-v3.md) — revert→red on NEW-1/NEW-2/NEW-4 + an independent
+verifier. **NEW-1/NEW-2/NEW-4 → verified; NEW-3 deferral accepted (sound); 0 reopened.** The
+`verified` verdicts live in review-v3 (this resolution keeps the fixer's `fixed`/`deferred`).
+Two comment drifts the fixes introduced were caught by v3 and fixed in-pass (`f8b1325`). A
+deploy-time note was recorded (decode concurrency limit for concurrent large previews).
