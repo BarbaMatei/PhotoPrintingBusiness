@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using FluentAssertions;
@@ -19,21 +20,14 @@ public class ExceptionHandlerMiddlewareTests
     private ExceptionHandlerMiddleware CreateSut()
         => new(_loggerMock.Object, _envMock.Object);
 
-    private static DefaultHttpContext CreateContext(bool isDev = false)
+    // QUAL-6 (review 035-v8): the middleware now uses its injected IHostEnvironment
+    // (_envMock) for the dev/prod shape decision, not context.RequestServices — so the
+    // context no longer needs a service-locator env stub. Each test sets _envMock directly.
+    private static DefaultHttpContext CreateContext()
     {
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.Items["CorrelationId"] = "test-correlation-id";
-
-        var envMock = new Mock<IHostEnvironment>();
-        envMock.Setup(e => e.EnvironmentName)
-               .Returns(isDev ? Environments.Development : Environments.Production);
-
-        var servicesMock = new Mock<IServiceProvider>();
-        servicesMock.Setup(s => s.GetService(typeof(IHostEnvironment)))
-                    .Returns(envMock.Object);
-        context.RequestServices = servicesMock.Object;
-
         return context;
     }
 
@@ -79,7 +73,7 @@ public class ExceptionHandlerMiddlewareTests
         // Arrange
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
         var sut = CreateSut();
-        var context = CreateContext(isDev: false);
+        var context = CreateContext();
         RequestDelegate next = _ => throw new InvalidOperationException("Secret internal detail");
 
         // Act
@@ -100,7 +94,7 @@ public class ExceptionHandlerMiddlewareTests
         // Arrange
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Development);
         var sut = CreateSut();
-        var context = CreateContext(isDev: true);
+        var context = CreateContext();
         RequestDelegate next = _ => throw new InvalidOperationException("Secret internal detail");
 
         // Act
@@ -133,6 +127,103 @@ public class ExceptionHandlerMiddlewareTests
         // Assert
         nextCalled.Should().BeTrue();
         context.Response.StatusCode.Should().Be(200);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyConflict_IncludesDivergentFields_InProduction()
+    {
+        // Arrange
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+
+        // Act
+        await sut.InvokeAsync(context, next);
+
+        // Assert
+        context.Response.StatusCode.Should().Be(409);
+        var body = await ReadResponseBodyAsync(context);
+        var fields = body.RootElement.GetProperty("divergentFields")
+            .EnumerateArray().Select(e => e.GetString()).ToArray();
+        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyConflict_IncludesDivergentFields_InDevelopment()
+    {
+        // OBS-1 (review 035-v5): the documented 409 contract field must be present even in
+        // Development, where the response uses the richer diagnostic shape. A FE developer
+        // building against the dev API otherwise never sees `divergentFields`.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+
+        // Act
+        await sut.InvokeAsync(context, next);
+
+        // Assert
+        context.Response.StatusCode.Should().Be(409);
+        var body = await ReadResponseBodyAsync(context);
+        body.RootElement.TryGetProperty("divergentFields", out var divergent)
+            .Should().BeTrue("the 409 contract field must be present in Development too (OBS-1)");
+        var fields = divergent.EnumerateArray().Select(e => e.GetString()).ToArray();
+        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyConflict_EmitsReservedConflictLogEvent()
+    {
+        // OBS-2 (review 035-v5): ddd-01 reserves `payments.idempotency.conflict` as a
+        // distinct structured event; the middleware must emit it (not only the generic
+        // "Handled exception" warning) so a conflict is independently observable.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new IdempotencyConflictException(new[] { "paymentProcessor" });
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("payments.idempotency.conflict")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyKeyTaken_Returns409_AndEmitsReservedCrossTenantLogEvent()
+    {
+        // OBS-1 (review 035-v8): a cross-tenant key collision must map to 409 (it is a
+        // ConflictException subtype) AND be logged as its own reserved event, distinct
+        // from both the generic "Handled exception" warning and the same-caller
+        // `payments.idempotency.conflict`. Before the fix the type was unmapped (→ 500)
+        // and there was no cross-tenant marker at all.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new IdempotencyKeyTakenException();
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(409);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("payments.idempotency.cross-tenant-conflict")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]

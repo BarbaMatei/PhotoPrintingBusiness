@@ -48,6 +48,8 @@ The `Order` aggregate is otherwise unchanged. The new property is **additive** �
 
 The 24-hour window is a domain rule, not a storage detail — it caps how long a retry is honoured. Stale keys remain on the row (audit value), but they no longer participate in lookup.
 
+> **As-built caveat (REQ-1, review 035-v8):** the "may be reused after 24 h" reuse is **owner-scoped**, not global. Reclamation (nulling the stale row's key so the index frees it) only runs when the **original owner** resubmits — because both the lookup and the free are scoped to the caller (SEC-1). A *different* caller presenting the same stale key finds nothing in their scoped lookup, then collides on the **global** single-column unique index (which still holds the stale key) → 409. So across callers the key is effectively reserved for as long as the stale row exists, not freed at 24 h. This is a consequence of the global single-column index + owner-scoped reclamation; making the window truly per-caller needs the composite `(owner, key)` index tracked under the deferred SEC-1. In practice keys are unpredictable GUIDs so cross-caller reuse is a non-scenario; documented so the contract matches the code.
+
 ---
 
 ## Domain Events
@@ -85,7 +87,7 @@ The 24-hour window is a domain rule, not a storage detail — it caps how long a
 
 | Repository | Entity | Methods (additive — existing methods unchanged) |
 |------------|--------|------------------------------------------------|
-| `IOrderService` (existing) | `Order` | `GetByIdempotencyKeyAsync(IdempotencyKey key, CancellationToken ct) -> Task<Order?>` — returns the matching `Order` only when `CreatedAt + 24h > UtcNow`; returns `null` otherwise. `IsSameLogicalRequest(Order existing, LogicalRequest current) -> bool` — pure comparison; no I/O |
+| `IOrderService` (existing) | `Order` | ~~`GetByIdempotencyKeyAsync(...)`~~ **removed as dead code (QUAL-1, review 035-v8)** — idempotency resolution lives entirely inside `CreateFromCartAsync` via the private `FindKeyHolderAsync`; the standalone public lookup had no production caller. `IsSameLogicalRequest(Order existing, LogicalRequest current) -> bool` — pure comparison; no I/O (as-built: `DivergentFields`) |
 
 The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) so `Replay` can return it directly. EuPlatesc has no equivalent secret — the redirect URL is reconstructed deterministically from the persisted `Order` (HMAC-MD5 of stable fields).
 
@@ -100,7 +102,7 @@ The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) 
 | **Replay** | The successful path of a repeat call: the existing order is returned unchanged, no new database row, no new Stripe `PaymentIntent`. |
 | **Conflict** | A repeat call with the same key but a divergent logical request. Yields 409 ProblemDetails. The client must either change the key or change the request. |
 | **Idempotency Window** | The 24-hour interval starting at `Order.CreatedAt` during which the key dedupes. After the window, the key is *stale* — it remains on the row for audit but no longer matches in lookup. |
-| **Missing Key (transitional)** | A request without the `Idempotency-Key` header. The endpoint accepts it (preserving current behaviour during the FE migration window) but logs `WARN payments.idempotency.missing-key`. After the FE adopts the header globally, missing-key should escalate to 400 — that decision is out of scope for this bolt. |
+| **Missing Key (transitional)** | A request without the `Idempotency-Key` header. The endpoint accepts it (preserving current behaviour during the FE migration window) and logs `INFO payments.idempotency.missing-key` (OBS-3, review 035-v8: Information, not Warning — it is the expected transitional state on ~100% of requests, so a Warning is constant alert noise). After the FE adopts the header globally, missing-key should escalate to 400 (and the log back to Warning) — that decision is out of scope for this bolt. |
 | **Replay Token** | The Stripe `ClientSecret` returned to a replay caller. Identical bytes to the original response. Equivalent for EuPlatesc is the redirect URL. |
 
 ---
@@ -113,7 +115,7 @@ The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) 
 | 001 | Down-migration drops index and column | Implicit from additive-only modelling; reversibility is a stage-2 / migration concern |
 | 002 | Two consecutive calls with same key + identical body → same OrderId + ClientSecret, one DB row, one Stripe PaymentIntent | `Replay(existingOrder)` outcome + Stripe SDK `RequestOptions.IdempotencyKey` (stage-2 wiring) |
 | 002 | Same key + divergent body → 409 "Idempotency conflict" naming divergent fields | `Conflict(divergentFields)` outcome → 409 ProblemDetails (NOT 422, per ADR-002) |
-| 002 | Missing key behaves as today + Warning log | `MissingIdempotencyKeyObserved` event (logged) + resolver short-circuit (treat as `NewOrder`) |
+| 002 | Missing key behaves as today + Information log (OBS-3, v8 — was Warning) | `MissingIdempotencyKeyObserved` event (logged) + resolver short-circuit (treat as `NewOrder`) |
 | 002 | Stripe SDK `RequestOptions.IdempotencyKey` set | Stage-2 wiring; modelled here as "Replay Token" parity requirement |
 | 003 | Same key on EuPlatesc → same redirect URL + OrderId | `Replay(existingOrder)` outcome; EuPlatesc redirect URL is deterministic from the persisted order |
 | 003 | First-call failure before persist → retry allowed | Resolver returns `NewOrder` because no row was ever written; no special state to clean up |

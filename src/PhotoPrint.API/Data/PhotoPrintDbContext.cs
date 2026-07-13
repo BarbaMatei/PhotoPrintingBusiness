@@ -8,6 +8,21 @@ namespace PhotoPrint.API.Data;
 
 public class PhotoPrintDbContext : DbContext
 {
+    /// <summary>
+    /// Name of the unique index enforcing at-most-one order per non-null Idempotency-Key.
+    /// Shared with <c>OrderService.IsIdempotencyKeyViolation</c> (the Postgres
+    /// <c>ConstraintName</c> match) so a rename here is a compile break there, not a silent
+    /// detection regression that degrades the canonical double-submit to a 500 (BUG-1, v8).
+    /// </summary>
+    public const string IdempotencyKeyIndexName = "ix_orders_idempotency_key";
+
+    /// <summary>
+    /// Name of the unique index on <c>OrderNumber</c>. Shared with
+    /// <c>OrderService.IsOrderNumberViolation</c> so the order-number collision retry
+    /// (BUG-4, v8) keys off the same literal the index is named with (rename → compile break).
+    /// </summary>
+    public const string OrderNumberIndexName = "ix_orders_order_number";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {
@@ -37,7 +52,7 @@ public class PhotoPrintDbContext : DbContext
 
         // SQLite doesn't support DateTimeOffset natively — store as Unix ms (long)
         // so that range comparisons (<=, >=) translate correctly in LINQ queries.
-        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        if (Database.ProviderName == DbProviders.Sqlite)
         {
             var dtConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, long>(
                 v => v.ToUnixTimeMilliseconds(),
@@ -185,7 +200,7 @@ public class PhotoPrintDbContext : DbContext
         modelBuilder.Entity<PricingTier>(entity =>
         {
             entity.HasKey(pt => pt.Id);
-            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+            if (Database.ProviderName != DbProviders.Sqlite)
                 entity.Property(pt => pt.UnitPrice).HasColumnType("decimal(10,2)");
             entity.HasIndex(pt => pt.ProductSizeId)
                   .HasDatabaseName("ix_pricing_tiers_product_size_id");
@@ -236,7 +251,7 @@ public class PhotoPrintDbContext : DbContext
 
         // Check constraint: exactly one of UserId / GuestSessionId must be set.
         // Skipped for InMemory provider (used in tests) — relational-only API.
-        if (Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+        if (Database.ProviderName != DbProviders.InMemory)
         {
             modelBuilder.Entity<Upload>()
                 .ToTable(t => t.HasCheckConstraint(
@@ -290,7 +305,40 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(o => o.OrderNumber).HasMaxLength(20);
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
-            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+
+            // ── Idempotency (bolt 035) ──────────────────────────────────────
+            entity.Property(o => o.IdempotencyKey).HasMaxLength(80);
+            // DB-2 (review 035-v5): 512, not Stripe's exact 255-char ID ceiling. Today's
+            // client secrets are ~60–90 chars, but a zero-headroom column throws "value
+            // too long" on prod Postgres AFTER the Stripe charge exists if Stripe ever
+            // lengthens IDs (SQLite/InMemory don't enforce it, so tests wouldn't catch it).
+            entity.Property(o => o.StripeClientSecret).HasMaxLength(512);
+            entity.Property(o => o.EuPlatescRedirectUrl).HasMaxLength(1000);
+
+            // At most one order may carry any given non-null IdempotencyKey.
+            // Both Postgres and SQLite permit multiple NULLs in a unique index, so
+            // key-less orders coexist freely (DOC-2). The explicit HasFilter on Postgres
+            // documents intent and keeps the index small; SQLite gets a plain unique
+            // index (multiple NULLs still permitted).
+            //
+            // SEC-1 + REQ-1 (review 035-v8, ACCEPTED RESIDUAL — deferred): this uniqueness is
+            // GLOBAL single-column, while the lookup/reclamation are owner-scoped. Consequences:
+            //   • a cross-tenant 409-vs-200 is a weak existence oracle + a key-squatting DoS
+            //     vector (SEC-1); and
+            //   • a stale key is only reclaimable by its original owner, so cross-caller the
+            //     24h window doesn't actually free it (REQ-1).
+            // Both dissolve with a per-tenant COMPOSITE unique index — (UserId, IdempotencyKey)
+            // / (GuestSessionId, IdempotencyKey) — plus updating IsIdempotencyKeyViolation to
+            // that index name. That is a schema/migration change, so it is deferred to the
+            // migration/deploy phase (with DB-1/DB-2), not this bolt. Real-world exploitability
+            // is LOW: keys are client-chosen GUIDs (unpredictable) and the 200 probe self-limits
+            // (it creates a real charge on the attacker's own account). Accepted for now.
+            var idempotencyIndex = entity.HasIndex(o => o.IdempotencyKey)
+                  .IsUnique()
+                  .HasDatabaseName(IdempotencyKeyIndexName);
+            if (Database.ProviderName == DbProviders.Postgres)
+                idempotencyIndex.HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            if (Database.ProviderName != DbProviders.Sqlite)
             {
                 entity.Property(o => o.ShippingCostRon).HasColumnType("decimal(10,2)");
                 entity.Property(o => o.SubtotalRon).HasColumnType("decimal(10,2)");
@@ -299,7 +347,7 @@ public class PhotoPrintDbContext : DbContext
 
             entity.Property(o => o.ShippingAddress)
                   .HasConversion(shippingConverter);
-            if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (Database.ProviderName == DbProviders.Postgres)
                 entity.Property(o => o.ShippingAddress).HasColumnType("jsonb");
 
             entity.HasOne(o => o.User)
@@ -325,7 +373,7 @@ public class PhotoPrintDbContext : DbContext
             entity.HasKey(oi => oi.Id);
             entity.HasIndex(oi => oi.OrderId)
                   .HasDatabaseName("ix_order_items_order_id");
-            if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+            if (Database.ProviderName != DbProviders.Sqlite)
             {
                 entity.Property(oi => oi.UnitPriceRon).HasColumnType("decimal(10,2)");
                 entity.Property(oi => oi.LineTotalRon).HasColumnType("decimal(10,2)");
@@ -333,7 +381,7 @@ public class PhotoPrintDbContext : DbContext
 
             entity.Property(oi => oi.ProductSnapshot)
                   .HasConversion(productSnapshotConverter);
-            if (Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            if (Database.ProviderName == DbProviders.Postgres)
                 entity.Property(oi => oi.ProductSnapshot).HasColumnType("jsonb");
 
             entity.HasOne(oi => oi.Order)

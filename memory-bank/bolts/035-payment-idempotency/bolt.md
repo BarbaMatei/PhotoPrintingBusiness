@@ -3,15 +3,15 @@ id: 035-payment-idempotency
 unit: 002-payment-idempotency
 intent: 014-payment-hardening
 type: ddd-construction-bolt
-status: in-progress
+status: complete
 stories:
   - 001-idempotency-key-migration
   - 002-stripe-intent-idempotency
   - 003-euplatesc-initiate-idempotency
 created: 2026-05-25T10:05:00Z
 started: 2026-05-25T13:10:00Z
-completed: null
-current_stage: adr-analysis
+completed: 2026-05-25T14:15:00Z
+current_stage: null
 stages_completed:
   - name: model
     completed: 2026-05-25T13:20:00Z
@@ -22,6 +22,12 @@ stages_completed:
   - name: adr-analysis
     completed: 2026-05-25T13:36:00Z
     artifacts: [adr-004-state-conflict-409.md, adr-005-logical-request-excludes-shipping-address.md]
+  - name: implement
+    completed: 2026-05-25T13:55:00Z
+    artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-05-25T14:10:00Z
+    artifact: ddd-03-test-report.md
 
 requires_bolts: [034-shipping-cost-server-side, 016-payment-backends]
 enables_bolts: []

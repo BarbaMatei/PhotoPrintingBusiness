@@ -3,10 +3,10 @@
 ## Overview
 - **Total stories**: 114 (59 prior + 51 from arch-analysis + 4 from intent 023)
 - **Generated**: 103
-- **Implemented**: 9 (bolts 033 + 049 + 034)
-- **Intents complete**: 013, 023 (full); 014 partial (unit 001 done, unit 002 pending)
+- **Implemented**: 12 (bolts 033 + 049 + 034 + 035)
+- **Intents complete**: 013, 014, 023
 - **Planned (not yet story-filed)**: 11
-- **Last updated**: 2026-05-25T13:00:00Z
+- **Last updated**: 2026-05-25T14:15:00Z
 
 ---
 
@@ -637,19 +637,19 @@
 
 #### Unit: 002-payment-idempotency (3 stories) — Bolt: 035
 
-### 001-idempotency-key-migration.md ⬜ NOT STARTED
+### 001-idempotency-key-migration.md ✅ IMPLEMENTED
 **Title**: Add nullable `Orders.IdempotencyKey` + partial unique index
 **Priority**: Must
 **Path**: `intents/014-payment-hardening/units/002-payment-idempotency/stories/001-idempotency-key-migration.md`
 **Bolt**: 035
 
-### 002-stripe-intent-idempotency.md ⬜ NOT STARTED
+### 002-stripe-intent-idempotency.md ✅ IMPLEMENTED
 **Title**: Wire idempotency to Stripe intent endpoint + SDK request options
 **Priority**: Must
 **Path**: `intents/014-payment-hardening/units/002-payment-idempotency/stories/002-stripe-intent-idempotency.md`
 **Bolt**: 035
 
-### 003-euplatesc-initiate-idempotency.md ⬜ NOT STARTED
+### 003-euplatesc-initiate-idempotency.md ✅ IMPLEMENTED
 **Title**: Reuse persisted EuPlatesc redirect URL on repeat calls
 **Priority**: Must
 **Path**: `intents/014-payment-hardening/units/002-payment-idempotency/stories/003-euplatesc-initiate-idempotency.md`

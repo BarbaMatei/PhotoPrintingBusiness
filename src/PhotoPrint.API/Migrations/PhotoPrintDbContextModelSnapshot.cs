@@ -297,6 +297,10 @@ namespace PhotoPrint.API.Migrations
                     b.Property<Guid?>("EasyboxLockerId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("EuPlatescRedirectUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("EuPlatescTransactionId")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
@@ -305,6 +309,10 @@ namespace PhotoPrint.API.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<Guid?>("GuestSessionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(80)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("InternalNotes")
@@ -337,6 +345,10 @@ namespace PhotoPrint.API.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("StripeClientSecret")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("SubtotalRon")
                         .HasColumnType("TEXT");
 
@@ -356,6 +368,10 @@ namespace PhotoPrint.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EasyboxLockerId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_idempotency_key");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique()

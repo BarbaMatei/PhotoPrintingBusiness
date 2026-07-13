@@ -1,6 +1,8 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.DTOs.Payments;
@@ -35,6 +37,216 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         _factory = factory;
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
     }
+
+    // ── bolt 035 — payment idempotency ────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateStripeIntent_SameIdempotencyKey_ReplaysOneOrderAndOneStripeCall()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+        var callsBefore = _factory.StripeGateway.CreateCallCount;
+
+        var first = await SendStripeIntent(client, ValidRequest, key);
+        var second = await SendStripeIntent(client, ValidRequest, key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var dto1 = await first.Content.ReadFromJsonAsync<StripeIntentResponse>();
+        var dto2 = await second.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // Same order + same secret on replay.
+        Assert.Equal(dto1!.OrderId, dto2!.OrderId);
+        Assert.Equal(dto1.ClientSecret, dto2.ClientSecret);
+
+        // Stripe was hit exactly once across the two requests.
+        Assert.Equal(callsBefore + 1, _factory.StripeGateway.CreateCallCount);
+        // BUG-4: Stripe is keyed by the order id (stable per order), not the client key.
+        Assert.Equal(dto1.OrderId.ToString(), _factory.StripeGateway.LastIdempotencyKey);
+
+        // Exactly one order persisted for this key.
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        var count = db.Orders.Count(o => o.IdempotencyKey == key);
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task CreateStripeIntent_SecondTenantReusesAnothersKey_DoesNotReceiveTheirOrder()
+    {
+        // Tenant A creates an intent under a key.
+        var (userA, tokenA) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userA, unitPrice: 2.00m, quantity: 5);
+        var clientA = _factory.CreateClient();
+        clientA.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenA);
+
+        var key = Guid.NewGuid().ToString();
+        var respA = await SendStripeIntent(clientA, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, respA.StatusCode);
+        var dtoA = await respA.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // Tenant B presents the SAME key (IDOR attempt via header).
+        var (userB, tokenB) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userB, unitPrice: 2.00m, quantity: 5);
+        var clientB = _factory.CreateClient();
+        clientB.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenB);
+
+        var respB = await SendStripeIntent(clientB, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, respB.StatusCode);
+        var dtoB = await respB.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // SEC-1: B must NOT be handed A's order — that order (and its live secret) is A's.
+        Assert.NotEqual(dtoA!.OrderId, dtoB!.OrderId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        var orderA = await db.Orders.FindAsync(dtoA.OrderId);
+        var orderB = await db.Orders.FindAsync(dtoB.OrderId);
+        Assert.Equal(userA, orderA!.UserId);
+        Assert.Equal(userB, orderB!.UserId); // B received only B's own order
+    }
+
+    [Fact]
+    public async Task CreateStripeIntent_SameKey_DivergentProcessor_Returns409()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+
+        var first = await SendStripeIntent(client, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        // Same key, different processor → conflict.
+        var divergent = ValidRequest with { PaymentProcessor = PaymentProcessor.EuPlatesc };
+        var second = await SendStripeIntent(client, divergent, key);
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+
+        // OBS-1: the 409 body must NAME the divergent field, not just carry the status.
+        using var body = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        var divergentFields = body.RootElement.GetProperty("divergentFields")
+            .EnumerateArray().Select(e => e.GetString()).ToArray();
+        Assert.Contains("paymentProcessor", divergentFields);
+    }
+
+    [Fact]
+    public async Task CreateStripeIntent_OverLengthIdempotencyKey_Returns400()
+    {
+        // SEC-2: a key longer than the documented 80-char ceiling must be rejected at the
+        // filter with a 400, not accepted (dev/SQLite) or 500'd (prod Postgres truncation).
+        // The cart is seeded so a passing request would otherwise be a 200 — the 400 is
+        // attributable to the length check, not an empty cart.
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var overLength = new string('k', 81); // ceiling is 80
+
+        var response = await SendStripeIntent(client, ValidRequest, overLength);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InitiateEuPlatesc_SameIdempotencyKey_ReturnsSameUrlAndOneOrder()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 1.50m, quantity: 4);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+
+        var first = await SendEuPlatescInitiate(client, EuPlatescRequest, key);
+        var second = await SendEuPlatescInitiate(client, EuPlatescRequest, key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        var dto1 = await first.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
+        var dto2 = await second.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
+
+        Assert.Equal(dto1!.OrderId, dto2!.OrderId);
+        // Same redirect URL verbatim (persisted, not rebuilt with a fresh nonce).
+        Assert.Equal(dto1.RedirectUrl, dto2.RedirectUrl);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        Assert.Equal(1, db.Orders.Count(o => o.IdempotencyKey == key));
+    }
+
+    [Fact]
+    public async Task CreateStripeIntent_ReplayWithNullCachedSecret_RecoversByRecallingGateway()
+    {
+        // OBS-3 (review 035-v5): an earlier attempt created the order but died before
+        // persisting the secret. A replay then resolves the same order with a null cached
+        // secret and recovers by re-calling the gateway — safe because Stripe is keyed by
+        // the stable order id — returning a usable secret without creating a second order.
+        // This exercises the previously-unobserved recovery-replay completion path.
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var key = Guid.NewGuid().ToString();
+
+        var first = await SendStripeIntent(client, ValidRequest, key);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var dto1 = await first.Content.ReadFromJsonAsync<StripeIntentResponse>();
+
+        // Simulate the crash-before-persist state: the order exists (fresh, non-divergent)
+        // but its secret was never saved.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+            var order = await db.Orders.FindAsync(dto1!.OrderId);
+            order!.StripeClientSecret = null;
+            await db.SaveChangesAsync();
+        }
+
+        var callsBefore = _factory.StripeGateway.CreateCallCount;
+        var second = await SendStripeIntent(client, ValidRequest, key);
+
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var dto2 = await second.Content.ReadFromJsonAsync<StripeIntentResponse>();
+        Assert.Equal(dto1!.OrderId, dto2!.OrderId);            // same order — a replay, not a new one
+        Assert.False(string.IsNullOrEmpty(dto2.ClientSecret)); // recovered a usable secret
+        Assert.Equal(callsBefore + 1, _factory.StripeGateway.CreateCallCount); // gateway re-called
+
+        using var verify = _factory.Services.CreateScope();
+        var vdb = verify.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
+        Assert.Equal(1, vdb.Orders.Count(o => o.IdempotencyKey == key)); // still exactly one order
+    }
+
+    // QUAL-4 (review 035-v5): request building centralized in PaymentRequestHelpers.
+    private static Task<HttpResponseMessage> SendStripeIntent(
+        HttpClient client, CreateOrderRequest body, string idempotencyKey)
+        => client.PostStripeIntentAsync(body, idempotencyKey);
+
+    private static Task<HttpResponseMessage> SendEuPlatescInitiate(
+        HttpClient client, CreateOrderRequest body, string idempotencyKey)
+        => client.PostEuPlatescInitiateAsync(body, idempotencyKey);
 
     // ── POST /api/payments/stripe/intent ──────────────────────────────────────
 

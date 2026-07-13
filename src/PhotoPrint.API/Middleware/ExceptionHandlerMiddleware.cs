@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Extensions;
 
 namespace PhotoPrint.API.Middleware;
 
@@ -10,6 +11,8 @@ public class ExceptionHandlerMiddleware : IMiddleware
     {
         [typeof(NotFoundException)]             = (StatusCodes.Status404NotFound, "Not Found"),
         [typeof(ConflictException)]             = (StatusCodes.Status409Conflict, "Conflict"),
+        [typeof(IdempotencyConflictException)]  = (StatusCodes.Status409Conflict, "Idempotency conflict"),
+        [typeof(IdempotencyKeyTakenException)]  = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(ForbiddenException)]            = (StatusCodes.Status403Forbidden, "Forbidden"),
         [typeof(UnauthorizedException)]         = (StatusCodes.Status401Unauthorized, "Unauthorized"),
         [typeof(BadGatewayException)]           = (StatusCodes.Status502BadGateway, "Bad Gateway"),
@@ -51,7 +54,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var correlationId = context.Items["CorrelationId"]?.ToString() ?? Guid.NewGuid().ToString();
+        var correlationId = context.GetCorrelationId() ?? Guid.NewGuid().ToString();
 
         if (_exceptionMappings.TryGetValue(exception.GetType(), out var mapping))
         {
@@ -61,6 +64,24 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 exception.Message,
                 context.Request.Path,
                 correlationId);
+
+            // OBS-2 (review 035-v5): emit the structured event ddd-01:61 reserves so a
+            // conflict is distinctly observable (a signal of client bugs / key-reuse abuse)
+            // rather than buried in the generic warning above. Field NAMES only — no values.
+            if (exception is IdempotencyConflictException conflict)
+                _logger.LogWarning(
+                    "payments.idempotency.conflict correlation_id={CorrelationId} divergent_fields={DivergentFields}",
+                    correlationId, string.Join(",", conflict.DivergentFields));
+
+            // OBS-1 (review 035-v8): a cross-tenant key collision (a borrowed/guessed key
+            // or a key-squatting probe) also 409s, but via a plain ConflictException that
+            // was indistinguishable from any other 409 in the logs — exactly the signal an
+            // operator needs to grep during a duplicate-charge incident. Emit it as a
+            // distinct reserved event (no key value — just the class + correlation id).
+            if (exception is IdempotencyKeyTakenException)
+                _logger.LogWarning(
+                    "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
+                    correlationId);
 
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,
                 exception.Message, correlationId, exception);
@@ -85,7 +106,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         }
     }
 
-    private static async Task WriteProblemDetailsAsync(
+    private async Task WriteProblemDetailsAsync(
         HttpContext context,
         int statusCode,
         string title,
@@ -96,9 +117,20 @@ public class ExceptionHandlerMiddleware : IMiddleware
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
 
+        // OBS-1 (review 035-v5): the documented 409 contract is "names the divergent
+        // fields". Compute it once and surface it in BOTH the Development diagnostic shape
+        // and the production ProblemDetails — previously only the prod branch carried it,
+        // so a FE built against the dev API never saw the contract field. Field NAMES only,
+        // never values (no PII).
+        var divergentFields = (exception as IdempotencyConflictException)?.DivergentFields;
+
         object response;
 
-        if (exception != null && IsDevContext(context))
+        // QUAL-6 (review 035-v8): use the injected _environment (this is now an instance
+        // method) instead of re-resolving IHostEnvironment via context.RequestServices — the
+        // middleware already holds it, and the service-locator hop was a second, redundant
+        // way to answer the same question.
+        if (exception != null && _environment.IsDevelopment())
         {
             response = new
             {
@@ -107,6 +139,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 status = statusCode,
                 detail,
                 correlationId,
+                divergentFields,
                 exception = new
                 {
                     type = exception.GetType().FullName,
@@ -117,7 +150,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         }
         else
         {
-            response = new ProblemDetails
+            var problem = new ProblemDetails
             {
                 Type = "https://tools.ietf.org/html/rfc7807",
                 Title = title,
@@ -125,14 +158,13 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 Detail = detail,
                 Extensions = { ["correlationId"] = correlationId },
             };
+
+            if (divergentFields is not null)
+                problem.Extensions["divergentFields"] = divergentFields;
+
+            response = problem;
         }
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, _jsonOptions));
-    }
-
-    private static bool IsDevContext(HttpContext context)
-    {
-        var env = context.RequestServices.GetService<IHostEnvironment>();
-        return env?.IsDevelopment() ?? false;
     }
 }

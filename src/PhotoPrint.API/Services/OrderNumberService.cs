@@ -16,8 +16,11 @@ public class OrderNumberService : IOrderNumberService
     {
         var year = DateTime.UtcNow.Year;
 
-        // InMemory provider (used in tests): fall back to a simple count-based number.
-        if (_db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        // Non-Postgres providers have no per-year sequence: InMemory (tests) and SQLite
+        // (local/dev — appsettings.Development.json sets DatabaseProvider=Sqlite) both use
+        // a simple count-based number. The unique index on OrderNumber is the backstop;
+        // these providers don't carry production write-concurrency. (BUG-6, review 035-v3.)
+        if (_db.Database.ProviderName is DbProviders.InMemory or DbProviders.Sqlite)
         {
             var count = await _db.Orders.CountAsync(ct);
             return FormatOrderNumber(year, count + 1);
@@ -26,6 +29,12 @@ public class OrderNumberService : IOrderNumberService
         // PostgreSQL: use a per-year sequence to guarantee uniqueness under concurrency.
         var seqName = $"order_number_seq_{year}";
 
+        // QUAL-5 (review 035-v5): EF1002 flags the interpolation, but `seqName` is built
+        // ONLY from `DateTime.UtcNow.Year` (a server-side int) — no client/user input
+        // reaches it, so there is no injection vector. The interpolation also targets a
+        // DDL identifier (CREATE SEQUENCE "<name>"), which cannot be a SQL parameter, so
+        // suppression — not parameterization — is the correct resolution here.
+#pragma warning disable EF1002 // Risk of vulnerability to SQL injection — N/A: server-side int only, DDL identifier.
         await _db.Database.ExecuteSqlRawAsync($"""
             DO $$ BEGIN
               IF NOT EXISTS (SELECT 1 FROM pg_sequences WHERE sequencename = '{seqName}') THEN
@@ -33,6 +42,7 @@ public class OrderNumberService : IOrderNumberService
               END IF;
             END $$;
             """, ct);
+#pragma warning restore EF1002
 
         var conn = _db.Database.GetDbConnection();
         if (conn.State != System.Data.ConnectionState.Open)
