@@ -73,7 +73,8 @@ testem.log
 *.pfx
 *.pem
 *.key
-secrets/
+secrets/*
+!secrets/.gitkeep
 appsettings.*.Local.json
 
 # -------------------------------------------------------------

@@ -47,8 +47,11 @@ public static class AuthExtensions
             if (string.IsNullOrWhiteSpace(jwtSettings.PrivateKeyPem))
             {
                 throw new InvalidOperationException(
-                    "JwtSettings:PrivateKeyPem is required. " +
-                    "Provide an RSA private key in PEM format.");
+                    "JwtSettings:PrivateKeyPem is required but was empty. Provide an RSA " +
+                    "private key out of source control via appsettings.{Environment}.Local.json " +
+                    "(gitignored) or `dotnet user-secrets set \"JwtSettings:PrivateKeyPem\"`. " +
+                    "Generate a dev keypair with scripts/gen-dev-keys.sh (or .ps1). " +
+                    "See README -> First-time setup.");
             }
 
             var rsa = RSA.Create();
