@@ -53,3 +53,27 @@ Schema + cache-on-first-request + ImageSharp bomb protection.
 
 - **Requires**: 012-photo-upload-backend, 040-containers-and-pipelines.
 - **Enables**: 043-cloud-storage-provider.
+
+## Bundled scope (documented retroactively — REQ-4, review 042-v1)
+
+The branch `feat/bolt-042-thumbnail-cache` also carried two change-sets that had **no
+story or AC** and existed only as commit messages. The review flagged that a reviewer
+approving "bolt 042" would unknowingly ship an auth-behavior change. They are documented
+here (the minimum REQ-4 accepts); a clean split into their own bolts is left to the owner
+as a process decision.
+
+- **Change B — guest-auth self-heal.** A stale/expired guest token now self-heals instead
+  of logging the user out: the `errorInterceptor` clears the token on a 401 for an
+  unauthenticated caller (never navigates a guest to `/auth/login`), and the format
+  selector re-inits + retries once (upload and restored-preview paths), deduping concurrent
+  inits. Files: `error.interceptor.ts`, `format-selector-page.ts`.
+  *Now covered by tests:* `error.interceptor.spec.ts` (guest/anon 401 branches — TEST-1/FE-3)
+  and `format-selector-page.spec.ts` (dedup + retry — FE-1/FE-2/FE-4).
+- **Change C — dev-warning silencing.** HTTPS-redirect registered non-dev only, static
+  files served only when `wwwroot` exists, EF split-query default. Files: `Program.cs`,
+  `SecurityExtensions.cs`. No behavior change in production; reduces dev/test log noise.
+
+**AC (retroactive) for change B:** an unauthenticated 401 clears any guest token and does
+not navigate; a guest/anonymous session that expires mid-flow re-inits and the failed
+upload/preview is retried exactly once; concurrent `ensureGuestSession()` callers share one
+init. All are enforced by the specs listed above.

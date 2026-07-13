@@ -19,16 +19,29 @@ implemented: true
 
 ## Acceptance Criteria
 
-- [ ] `Configuration.Default.MemoryAllocator` and `MaxImageWidth/MaxImageHeight` capped at 25000 each (≈ 625 MP).
-- [ ] Decoding an image exceeding the cap throws an exception caught and surfaced as 422 with `"Image dimensions exceed limits"`.
-- [ ] Integration test: a 30000×30000 PNG header (small file, large dims) is rejected.
+- [x] `Configuration.Default.MemoryAllocator` allocation cap **and** a decode-dimension guard.
+  - **AC amended (REQ-1 + BUG-1, review 042-v1):**
+    - The `MemoryAllocator` allocation cap (`AllocationLimitMegabytes = 512`) is now set in `Program.cs` — it had been silently dropped, which is what left a within-dimension bomb able to allocate GBs (REQ-1).
+    - `MaxImageWidth/MaxImageHeight` **do not exist** in ImageSharp 3.1.11, so the guard is a per-call check. It was originally a per-axis cap (`> 25000`), which a 25000×25000 (≈625 MP) or multi-frame bomb bypassed. It is now a **total pixel-area cap** (`ImageProcessor.ExceedsDecodeLimits`, 50 MP) plus `DecoderOptions.MaxFrames = 1` (BUG-1).
+- [x] Decoding an image exceeding the cap throws `DecompressionBombException` (subclass of `UnprocessableEntityException`) → 422 `"Image dimensions exceed limits."`, and emits the reserved `uploads.decompression_bomb.rejected` event (OBS-3).
+- [x] Test: `ImageProcessorTests` exercises the REAL processor — an oversized image (54 MP) is rejected before decode; a small valid image yields a ≤300 px JPEG; an unreadable file → 422 (TEST-2).
 
 ## Technical Notes
 
+As-built (review 042-v1). `MaxImageWidth/Height` don't exist in ImageSharp 3.1.11:
+
 ```csharp
-// Program.cs
-SixLabors.ImageSharp.Configuration.Default.MaxImageWidth  = 25_000;
-SixLabors.ImageSharp.Configuration.Default.MaxImageHeight = 25_000;
+// Program.cs — global allocation backstop (REQ-1)
+SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
+    SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
+        new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
+
+// ImageProcessor — per-call area cap + single-frame decode (BUG-1)
+public const long MaxDecodePixels = 50_000_000; // 50 MP
+public static bool ExceedsDecodeLimits(int w, int h) => (long)w * h > MaxDecodePixels;
+// ... var info = await Image.IdentifyAsync(new DecoderOptions { MaxFrames = 1 }, stream, ct);
+//     if (info is not null && ExceedsDecodeLimits(info.Width, info.Height))
+//         throw new DecompressionBombException(info.Width, info.Height, DimensionsExceededMessage);
 ```
 
 ## Dependencies

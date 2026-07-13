@@ -30,6 +30,9 @@ builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
     // Default to split queries so multi-collection Includes don't trigger a cartesian
     // explosion (and silence the MultipleCollectionInclude warning). No effect on the
     // InMemory provider used in tests.
+    // QUAL-5 (review 042-v1): the split-query option is intentionally repeated in both
+    // arms — the UseSqlite/UseNpgsql calls differ, so a shared helper would save only the
+    // one option line and obscure the provider branch. Not worth extracting.
     if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
         options.UseSqlite(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
     else
