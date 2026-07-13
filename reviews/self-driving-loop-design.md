@@ -90,7 +90,7 @@ cheaply testable. Test first, build second.
    passes — with zero misses, miss-correlation is undefined, so independence could not be
    measured. Worse, the implanter and finders were the same model (Opus), so high recall is
    partly a shared-brain artifact. Run 2 needs a *different* implanter model and *harder* seeds
-   that actually produce misses. See [seeded-run-results.md](seeded-run-results.md).
+   that actually produce misses. See [seeded-run-results.md](experiments/seeded-bugs/seeded-run-results.md).
 2. **"The loop can tell serious from minor."** The entire stop rule keys on this classification,
    and it's made by the same fallible reviewer whose recall we already distrust. One serious bug
    mislabeled minor goes silently to the backlog and the loop declares the feature clean.
@@ -350,7 +350,7 @@ least load-bearing tools in the plan and are built last.
    backfilled with all ten passes; the README's Record step now requires the append on every
    pass.
 3. ~~Run the seeded-bug experiment~~ **Run 1 done (2026-07-04):**
-   [seeded-run-results.md](seeded-run-results.md) — 10/10 recall both passes; severity errors all
+   [seeded-run-results.md](experiments/seeded-bugs/seeded-run-results.md) — 10/10 recall both passes; severity errors all
    in the safe (high) direction; DB-parity + completeness lenses were the sole catchers of 2/10
    seeds. But independence is still untested (zero misses) and implanter==finder model — a **run
    2 with a different implanter model and harder seeds** is queued in the results file.
