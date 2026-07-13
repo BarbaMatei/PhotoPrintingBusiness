@@ -198,10 +198,11 @@ internal class FakeStorageService : IStorageService
 {
     private readonly Dictionary<string, byte[]> _store = new(StringComparer.Ordinal);
 
-    public Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null)
+    public Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null, string? prefix = null)
     {
         var id = fileId ?? Guid.NewGuid();
-        var path = $"{ownerId:N}/{id:N}.{extension}";
+        var dir = prefix is null ? $"{ownerId:N}" : $"{prefix}/{ownerId:N}";
+        var path = $"{dir}/{id:N}.{extension}";
         stream.Position = 0;
         using var ms = new MemoryStream();
         stream.CopyTo(ms);

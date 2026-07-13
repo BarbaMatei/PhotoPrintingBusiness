@@ -14,9 +14,12 @@ public class LocalStorageService : IStorageService
         _logger = logger;
     }
 
-    public async Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null)
+    public async Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null, string? prefix = null)
     {
-        var ownerDir = Path.Combine(_basePath, ownerId.ToString());
+        var relativeDir = prefix is null
+            ? ownerId.ToString()
+            : Path.Combine(prefix, ownerId.ToString());
+        var ownerDir = Path.Combine(_basePath, relativeDir);
         Directory.CreateDirectory(ownerDir);
 
         var id = fileId ?? Guid.NewGuid();
@@ -27,7 +30,7 @@ public class LocalStorageService : IStorageService
         stream.Position = 0;
         await stream.CopyToAsync(fs, ct);
 
-        var relativePath = Path.Combine(ownerId.ToString(), fileName);
+        var relativePath = Path.Combine(relativeDir, fileName);
         _logger.LogDebug("Saved upload to {RelativePath}", relativePath);
         return relativePath;
     }

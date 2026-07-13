@@ -11,6 +11,12 @@ public class UploadService : IUploadService
     private const long MaxFileSizeBytes = 52_428_800L; // 50 MB
     private const int MaxUploadsPerSession = 100;
 
+    // Cached thumbnails live under a distinct top-level namespace, keyed deterministically by
+    // the upload id, so a thumbnail can never collide with the original ({owner}/{id}.jpg) and
+    // a racing/cancelled write simply overwrites the same key instead of leaking (bolt 042,
+    // BUG-3/REQ-2). The cleanup job deletes this exact stored path (BUG-2).
+    private const string ThumbnailPrefix = "thumbs";
+
     private readonly IStorageService _storage;
     private readonly IMimeValidator _mimeValidator;
     private readonly IImageProcessor _imageProcessor;
@@ -124,7 +130,11 @@ public class UploadService : IUploadService
         Guid? guestSessionId,
         CancellationToken ct = default)
     {
+        // AsNoTracking keeps the steady-state cache-HIT path allocation-free (no identity-map
+        // entry / original-values snapshot for an entity we never save) (QUAL-1). The miss
+        // branch attaches + marks the single column below.
         var upload = await _db.Uploads
+            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
 
         if (upload is null)
@@ -136,19 +146,29 @@ public class UploadService : IUploadService
         if (!isOwner)
             throw new ForbiddenException("You do not have access to this upload.");
 
-        // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
-        // deletion). Generate once, store via IStorageService, and record the path.
-        if (upload.ThumbnailPath is null || !await _storage.ExistsAsync(upload.ThumbnailPath, ct))
-        {
-            await using var generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
-            var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
-            upload.ThumbnailPath = await _storage.SaveAsync(generated, ownerId, "jpg", ct);
-            await _db.SaveChangesAsync(ct);
-        }
-
         // Cache hit: stream the stored thumbnail — no ImageSharp work on this path.
-        var stream = await _storage.GetStreamAsync(upload.ThumbnailPath!, ct);
-        return (stream, "image/jpeg");
+        if (upload.ThumbnailPath is not null && await _storage.ExistsAsync(upload.ThumbnailPath, ct))
+            return (await _storage.GetStreamAsync(upload.ThumbnailPath, ct), "image/jpeg");
+
+        // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
+        // deletion). Generate once and store under a DETERMINISTIC, id-keyed path in a distinct
+        // namespace so a concurrent or cancelled write overwrites the same key rather than
+        // minting a new random file that leaks, and the cleanup job can target it (BUG-2/BUG-3).
+        var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
+        var generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
+        upload.ThumbnailPath = await _storage.SaveAsync(
+            generated, ownerId, "jpg", ct, fileId: uploadId, prefix: ThumbnailPrefix);
+
+        // Persist only ThumbnailPath. The entity was read AsNoTracking, so attach it and mark
+        // the single column modified instead of tracking the whole graph.
+        _db.Uploads.Attach(upload);
+        _db.Entry(upload).Property(u => u.ThumbnailPath).IsModified = true;
+        await _db.SaveChangesAsync(ct);
+
+        // Return the just-generated stream directly rather than re-opening it from storage —
+        // saves an open+read now and a billed round-trip once cloud storage lands (QUAL-2).
+        generated.Position = 0;
+        return (generated, "image/jpeg");
     }
 
     private static UploadDto MapToDto(Upload u) => new(

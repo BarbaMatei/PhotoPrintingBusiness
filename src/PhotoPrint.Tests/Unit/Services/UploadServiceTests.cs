@@ -18,24 +18,46 @@ public class UploadServiceTests
         0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
     ];
 
+    // The service-under-test uses a DbContext SEPARATE from the arrange/assert context
+    // (_db). Both share the same in-memory database NAME (unique per test instance), so
+    // contexts see each other's committed data via EF's default store — mirroring
+    // production's fresh-scoped-context-per-request, so a persistence bug can no longer hide
+    // behind a single shared change-tracker (TEST-3).
+    private readonly string _dbName = $"UploadSvc_{Guid.NewGuid():N}";
     private readonly PhotoPrintDbContext _db;
     private readonly Mock<IStorageService> _storageMock;
     private readonly Mock<IImageProcessor> _imageProcessorMock;
     private readonly IUploadService _sut;
 
+    private PhotoPrintDbContext NewContext() =>
+        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseInMemoryDatabase(_dbName)
+            .Options);
+
+    private IUploadService NewSut(PhotoPrintDbContext db) =>
+        new UploadService(
+            _storageMock.Object,
+            new MimeValidator(),
+            _imageProcessorMock.Object,
+            db,
+            Mock.Of<ILogger<UploadService>>());
+
     public UploadServiceTests()
     {
-        var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseInMemoryDatabase($"UploadSvc_{Guid.NewGuid():N}")
-            .Options;
-        _db = new PhotoPrintDbContext(options);
+        _db = NewContext();
 
         _storageMock = new Mock<IStorageService>();
+        // Echo the deterministic path the real storage would produce so tests can assert on it.
         _storageMock
             .Setup(s => s.SaveAsync(
                 It.IsAny<Stream>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<CancellationToken>(), It.IsAny<Guid?>()))
-            .ReturnsAsync("owner/abc.jpg");
+                It.IsAny<CancellationToken>(), It.IsAny<Guid?>(), It.IsAny<string?>()))
+            .ReturnsAsync((Stream stream, Guid owner, string ext, CancellationToken ct, Guid? fid, string? prefix) =>
+            {
+                var id = fid ?? Guid.NewGuid();
+                var dir = prefix is null ? owner.ToString("N") : $"{prefix}/{owner:N}";
+                return $"{dir}/{id:N}.{ext}";
+            });
         _storageMock
             .Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => new MemoryStream(JpegMagic));
@@ -48,12 +70,7 @@ public class UploadServiceTests
             .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => new MemoryStream(JpegMagic));
 
-        _sut = new UploadService(
-            _storageMock.Object,
-            new MimeValidator(),
-            _imageProcessorMock.Object,
-            _db,
-            Mock.Of<ILogger<UploadService>>());
+        _sut = NewSut(NewContext());
     }
 
     private static MemoryStream JpegStream() => new(JpegMagic);
@@ -274,9 +291,9 @@ public class UploadServiceTests
         var upload = SeedUpload(userId: userId);
         await _db.SaveChangesAsync();
 
-        // First call stores the thumbnail at "owner/abc.jpg"; thereafter it exists.
+        // Once generated, the stored thumbnail exists on subsequent reads.
         _storageMock
-            .Setup(s => s.ExistsAsync("owner/abc.jpg", It.IsAny<CancellationToken>()))
+            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var (first, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
@@ -288,6 +305,56 @@ public class UploadServiceTests
         _imageProcessorMock.Verify(
             p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_SecondRequestFreshContext_UsesPersistedThumbnail()
+    {
+        // TEST-3: prove the thumbnail path is PERSISTED (SaveChanges ran), not merely cached
+        // in a shared change-tracker. Each request uses its own context, like a new HTTP
+        // request — if the write were missing, the second request would regenerate.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        _storageMock
+            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var sut1 = NewSut(NewContext());
+        (await sut1.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+
+        var sut2 = NewSut(NewContext());
+        (await sut2.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+
+        _imageProcessorMock.Verify(
+            p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        await using var verifyCtx = NewContext();
+        var persisted = await verifyCtx.Uploads.AsNoTracking().FirstAsync(u => u.Id == upload.Id);
+        persisted.ThumbnailPath.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CacheMiss_SavesThumbnailUnderDeterministicNamespacedKey()
+    {
+        // BUG-3/REQ-2: the thumbnail is stored deterministically from the upload id in the
+        // "thumbs" namespace — it can't collide with the original ({owner}/{id}.jpg), and a
+        // racing/cancelled write overwrites the same key instead of orphaning a random file.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        (await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+
+        _storageMock.Verify(s => s.SaveAsync(
+            It.IsAny<Stream>(), userId, "jpg", It.IsAny<CancellationToken>(),
+            (Guid?)upload.Id, "thumbs"), Times.Once);
+
+        await using var verifyCtx = NewContext();
+        var persisted = await verifyCtx.Uploads.AsNoTracking().FirstAsync(u => u.Id == upload.Id);
+        persisted.ThumbnailPath.Should().Be($"thumbs/{userId:N}/{upload.Id:N}.jpg");
     }
 
     [Fact]
