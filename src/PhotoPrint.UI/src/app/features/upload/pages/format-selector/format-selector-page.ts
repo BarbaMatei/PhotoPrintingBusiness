@@ -379,9 +379,10 @@ export class FormatSelectorPage implements OnInit {
   }
 
   /** Fetches a restored upload's preview. On a 401 (expired guest token on refresh) the
-   *  interceptor clears the token; re-init a fresh session and retry ONCE before giving up,
-   *  so a refresh with an expired session doesn't wipe the whole restored grid. Only a
-   *  genuine 404 (or a failed retry) drops the entry (FE-4). */
+   *  interceptor clears the token; re-init a fresh session and retry ONCE, so a refresh with
+   *  an expired session doesn't wipe the whole restored grid. Only a genuine 404 drops the
+   *  entry; transient failures (5xx/network, or a still-failing retry) keep it visible for a
+   *  later refresh (FE-4/NEW-2). */
   private fetchPreviewWithRetry(uploadId: string, clientId: string, isRetry: boolean): void {
     this.uploadService.getPreviewBlob(uploadId).subscribe({
       next: url => this.updateUpload(clientId, { previewUrl: url }),

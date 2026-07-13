@@ -88,8 +88,9 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPr
 // decompression bombs (story 003 AC#1 / REQ-1, review 042-v1). The per-request
 // pixel-area guard (ImageProcessor.ExceedsDecodeLimits) is the primary control;
 // this bounds any decode that slips past it — a 2.5 GB bomb allocation throws
-// InvalidMemoryOperationException instead of OOM-ing the process. 512 MB leaves
-// headroom above a legitimate max-size (50 MP ≈ 200 MB) decode.
+// InvalidMemoryOperationException instead of OOM-ing the process. 512 MB sits just
+// above a legitimate max-size (100 MP ≈ 400 MB) decode; if the pixel cap
+// (MaxDecodePixels) is raised materially, raise this in step.
 SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
     SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
         new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
