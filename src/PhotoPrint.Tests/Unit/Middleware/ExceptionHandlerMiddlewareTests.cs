@@ -227,6 +227,30 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_ClientCancelled_LogsInformationEvent()
+    {
+        // OBS-2 (review 042-v1): the client-abort branch logged at Debug, which is below the
+        // Information floor in every environment, so the signal was never emitted. It must log
+        // at Information as a distinct `request.client_aborted` event.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        context.RequestAborted = new CancellationToken(canceled: true);
+        RequestDelegate next = _ => throw new OperationCanceledException();
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("request.client_aborted")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_DecompressionBomb_Returns422_AndEmitsReservedEvent()
     {
         // OBS-3 (review 042-v1): a rejected pixel bomb must map to 422 (it subclasses

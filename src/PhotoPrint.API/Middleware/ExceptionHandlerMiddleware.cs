@@ -51,9 +51,11 @@ public class ExceptionHandlerMiddleware : IMiddleware
         {
             // The client disconnected/cancelled mid-request (e.g. navigated away or
             // reloaded). That's not a server error — the caller is gone, so there's
-            // nothing to return; log quietly instead of as an unhandled 500.
-            _logger.LogDebug(
-                "Request {Path} was cancelled by the client. | CorrelationId: {CorrelationId}",
+            // nothing to return. Emit at Information (not Debug): the Serilog minimum level
+            // is Information in every environment, so a Debug line is filtered out and the
+            // signal is lost entirely (OBS-2, review 042-v1). Distinct low-cardinality event.
+            _logger.LogInformation(
+                "request.client_aborted path={Path} correlation_id={CorrelationId}",
                 context.Request.Path,
                 context.Items["CorrelationId"]?.ToString());
         }
