@@ -386,14 +386,24 @@ export class FormatSelectorPage implements OnInit {
     this.uploadService.getPreviewBlob(uploadId).subscribe({
       next: url => this.updateUpload(clientId, { previewUrl: url }),
       error: (err: unknown) => {
-        if (!isRetry && err instanceof HttpErrorResponse && err.status === 401) {
+        const status = err instanceof HttpErrorResponse ? err.status : null;
+        if (!isRetry && status === 401) {
+          // Expired guest token on refresh: the interceptor cleared it. Re-init and retry
+          // once before deciding anything (FE-4). If re-init itself fails, keep the entry.
           this.ensureGuestSession().subscribe({
             next: () => this.fetchPreviewWithRetry(uploadId, clientId, true),
-            error: () => this.dropRestoredEntry(clientId),
+            error: () => { /* couldn't re-init now — keep it, a later refresh retries (NEW-2) */ },
           });
           return;
         }
-        this.dropRestoredEntry(clientId);
+        if (status === 404) {
+          // The upload is genuinely gone — drop the stale entry.
+          this.dropRestoredEntry(clientId);
+          return;
+        }
+        // Transient failure (5xx / network / still-401 after retry): keep the completed
+        // upload visible (without a preview) rather than erasing work; a later refresh
+        // retries. Only a definitive 404 discards it (NEW-2, review 042-v2).
       },
     });
   }

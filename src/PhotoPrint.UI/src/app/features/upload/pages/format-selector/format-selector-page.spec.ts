@@ -302,4 +302,19 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
     expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
     expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
   });
+
+  it('keeps a restored entry on a transient (non-404) preview error (NEW-2)', async () => {
+    // A 5xx / network blip must NOT erase a completed upload — only a definitive 404 does.
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = { getPreviewBlob: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeDefined();  // NOT dropped
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();     // no re-init on a 5xx
+  });
 });
