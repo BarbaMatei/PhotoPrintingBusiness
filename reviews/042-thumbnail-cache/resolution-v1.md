@@ -154,10 +154,12 @@ VERIFIED, 0 reopened**; CLOUD-1 deferral re-affirmed. Suites green (.NET 511, fr
   (`095285c`): the test now models the interceptor clearing the token and asserts
   `initAnonymousSession` is called once on retry. FE-2 stays verified.
 
-## Raised in review-v2 — new follow-ups (open)
+## Raised in review-v2 — new follow-ups (answered in [resolution-v2.md](resolution-v2.md))
 
 Fix-generativity + one pre-existing rough edge the fixes make worth handling. **Not
-blocking the v1 findings.** Tracked here for a future fix round.
+blocking the v1 findings.** Now **resolved: NEW-1 fixed (`656c2fd`, cap → 100 MP),
+NEW-2 fixed (`5712aad`), NEW-4 fixed (`e3a77d9`), NEW-3 deferred** (orphan sweep →
+bolt-043). Details in [resolution-v2.md](resolution-v2.md); awaiting a v3 verification.
 
 - **🟠 NEW-1 — 50 MP decode cap rejects legitimate large-format / high-MP uploads**
   (`ImageProcessor.cs`). BUG-1's cap is correct DoS defence but a behavior regression for a
