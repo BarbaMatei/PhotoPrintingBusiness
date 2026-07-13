@@ -80,11 +80,11 @@ public class UploadService : IUploadService
             throw new UnprocessableEntityException("The uploaded file could not be read as an image.");
         }
 
-        if (imageInfo.WidthPx > ImageProcessor.MaxDecodeDimension ||
-            imageInfo.HeightPx > ImageProcessor.MaxDecodeDimension)
+        if (ImageProcessor.ExceedsDecodeLimits(imageInfo.WidthPx, imageInfo.HeightPx))
         {
             await _storage.DeleteAsync(storagePath, ct);
-            throw new UnprocessableEntityException("Image dimensions exceed limits.");
+            throw new DecompressionBombException(
+                imageInfo.WidthPx, imageInfo.HeightPx, ImageProcessor.DimensionsExceededMessage);
         }
 
         var actualLength = fileStream.Length;

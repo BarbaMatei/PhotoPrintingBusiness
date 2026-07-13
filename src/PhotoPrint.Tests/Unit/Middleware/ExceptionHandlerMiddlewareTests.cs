@@ -227,6 +227,34 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_DecompressionBomb_Returns422_AndEmitsReservedEvent()
+    {
+        // OBS-3 (review 042-v1): a rejected pixel bomb must map to 422 (it subclasses
+        // UnprocessableEntityException) AND be logged as its own reserved event carrying the
+        // offending dimensions, so ops can alert on a bomb spike distinctly from an ordinary
+        // "unreadable image" 422.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new DecompressionBombException(30_000, 30_000, "Image dimensions exceed limits.");
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(422);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("uploads.decompression_bomb.rejected")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_KnownException_IncludesCorrelationIdFromContext()
     {
         // Arrange

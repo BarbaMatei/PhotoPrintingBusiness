@@ -81,6 +81,16 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IProductService, PhotoPrint.A
 builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPrint.API.Services.AdminProductService>();
 
 // ── Photo Upload ──────────────────────────────────────────────────────────────
+// Cap ImageSharp's largest single allocation as defence-in-depth against
+// decompression bombs (story 003 AC#1 / REQ-1, review 042-v1). The per-request
+// pixel-area guard (ImageProcessor.ExceedsDecodeLimits) is the primary control;
+// this bounds any decode that slips past it — a 2.5 GB bomb allocation throws
+// InvalidMemoryOperationException instead of OOM-ing the process. 512 MB leaves
+// headroom above a legitimate max-size (50 MP ≈ 200 MB) decode.
+SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
+    SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
+        new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
+
 builder.Services.Configure<PhotoPrint.API.Configuration.StorageSettings>(
     builder.Configuration.GetSection(PhotoPrint.API.Configuration.StorageSettings.SectionName));
 builder.Services.AddSingleton<PhotoPrint.API.Services.IMimeValidator, PhotoPrint.API.Services.MimeValidator>();

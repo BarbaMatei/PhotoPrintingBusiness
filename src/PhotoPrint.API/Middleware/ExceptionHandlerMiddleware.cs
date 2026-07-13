@@ -19,6 +19,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(BadRequestException)]           = (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(InvalidOrderTransitionException)]= (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(UnprocessableEntityException)]  = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
+        [typeof(DecompressionBombException)]    = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         [typeof(UnsupportedMediaTypeException)] = (StatusCodes.Status415UnsupportedMediaType, "Unsupported Media Type"),
         [typeof(RequestEntityTooLargeException)]= (StatusCodes.Status413RequestEntityTooLarge, "Request Entity Too Large"),
         [typeof(TooManyRequestsException)]      = (StatusCodes.Status429TooManyRequests, "Too Many Requests"),
@@ -92,6 +93,14 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 _logger.LogWarning(
                     "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
                     correlationId);
+
+            // OBS-3 (review 042-v1): a rejected decompression bomb 422s like an ordinary
+            // "unreadable image" 422, so ops can't alert on a bomb spike. Emit a distinct
+            // reserved event carrying the offending dimensions (no file data / no PII).
+            if (exception is DecompressionBombException bomb)
+                _logger.LogWarning(
+                    "uploads.decompression_bomb.rejected correlation_id={CorrelationId} width={Width} height={Height}",
+                    correlationId, bomb.WidthPx, bomb.HeightPx);
 
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,
                 exception.Message, correlationId, exception);

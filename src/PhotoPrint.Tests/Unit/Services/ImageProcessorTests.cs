@@ -1,0 +1,124 @@
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Services;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using Xunit;
+
+namespace PhotoPrint.Tests.Unit.Services;
+
+/// <summary>
+/// Exercises the REAL <see cref="ImageProcessor"/> (bolt 042, TEST-2). Every other suite
+/// replaces <see cref="IImageProcessor"/> with a fake, so the actual decompression-bomb
+/// guard, the format-error mapping, and the resize/encode never ran under test. These pin
+/// them against genuine ImageSharp decoding.
+/// </summary>
+public class ImageProcessorTests
+{
+    private readonly Mock<IStorageService> _storage = new();
+    private readonly ImageProcessor _sut;
+
+    public ImageProcessorTests()
+        => _sut = new ImageProcessor(_storage.Object, Mock.Of<ILogger<ImageProcessor>>());
+
+    private void StoreBytes(string path, byte[] bytes)
+        => _storage.Setup(s => s.GetStreamAsync(path, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(() => new MemoryStream(bytes));
+
+    private static byte[] EncodePng<TPixel>(Image<TPixel> image) where TPixel : unmanaged, IPixel<TPixel>
+    {
+        using var ms = new MemoryStream();
+        image.SaveAsPng(ms);
+        return ms.ToArray();
+    }
+
+    // ── ExceedsDecodeLimits (BUG-1: total-pixel area cap) ──────────────────────
+
+    [Fact]
+    public void ExceedsDecodeLimits_AtCapAllowed_OverCapAndOverflowRejected()
+    {
+        ImageProcessor.ExceedsDecodeLimits(10_000, 5_000).Should().BeFalse();   // 50 MP exactly
+        ImageProcessor.ExceedsDecodeLimits(10_000, 5_001).Should().BeTrue();    // one row over
+        // A per-axis check would pass 25000×25000 (≈625 MP); the area cap rejects it.
+        ImageProcessor.ExceedsDecodeLimits(25_000, 25_000).Should().BeTrue();
+        // long multiply: this product overflows a 32-bit int (would wrap negative).
+        ImageProcessor.ExceedsDecodeLimits(60_000, 60_000).Should().BeTrue();
+    }
+
+    // ── GenerateThumbnailAsync ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GenerateThumbnailAsync_OversizedImage_ThrowsDecompressionBomb()
+    {
+        // A genuine image whose pixel area (54 MP) exceeds the 50 MP decode cap. L8 keeps the
+        // test allocation ~54 MB; the guard rejects it at Identify, before the full decode.
+        using var big = new Image<L8>(9_000, 6_000);
+        StoreBytes("big.png", EncodePng(big));
+
+        var act = () => _sut.GenerateThumbnailAsync("big.png");
+
+        var ex = (await act.Should().ThrowAsync<DecompressionBombException>()).Which;
+        ex.WidthPx.Should().Be(9_000);
+        ex.HeightPx.Should().Be(6_000);
+    }
+
+    [Fact]
+    public async Task GenerateThumbnailAsync_SmallValidImage_ReturnsJpegThumbnailMax300px()
+    {
+        using var src = new Image<Rgba32>(800, 600);
+        StoreBytes("photo.png", EncodePng(src));
+
+        await using var thumb = await _sut.GenerateThumbnailAsync("photo.png");
+
+        thumb.Length.Should().BeGreaterThan(0);
+
+        // JPEG magic bytes (FF D8 FF) — the thumbnail is a JPEG.
+        var head = thumb.ToArray();
+        head[0].Should().Be(0xFF);
+        head[1].Should().Be(0xD8);
+        head[2].Should().Be(0xFF);
+
+        thumb.Position = 0;
+        var info = await Image.IdentifyAsync(thumb);
+        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(300);
+    }
+
+    [Fact]
+    public async Task GenerateThumbnailAsync_UnreadableFile_ThrowsUnprocessableEntity()
+    {
+        // A stored file that is not a decodable image (corrupted/replaced ops-side). ImageSharp
+        // throws an ImageFormatException; the processor must surface a clean 422, not a 500 (BUG-4).
+        StoreBytes("corrupt.bin", new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33 });
+
+        var act = () => _sut.GenerateThumbnailAsync("corrupt.bin");
+
+        await act.Should().ThrowAsync<UnprocessableEntityException>();
+    }
+
+    // ── GetInfoAsync ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetInfoAsync_ValidImage_ReturnsDimensions()
+    {
+        using var src = new Image<Rgba32>(640, 480);
+        StoreBytes("dims.png", EncodePng(src));
+
+        var info = await _sut.GetInfoAsync("dims.png");
+
+        info.Should().NotBeNull();
+        info!.WidthPx.Should().Be(640);
+        info.HeightPx.Should().Be(480);
+    }
+
+    [Fact]
+    public async Task GetInfoAsync_NonImage_ReturnsNull()
+    {
+        StoreBytes("notimg.bin", new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 });
+
+        var info = await _sut.GetInfoAsync("notimg.bin");
+
+        info.Should().BeNull();
+    }
+}
