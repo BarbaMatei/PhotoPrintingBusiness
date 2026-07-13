@@ -16,6 +16,14 @@ public class UploadsController : ControllerBase
     private const long MaxFileSizeBytes = 52_428_800L;        // 50 MB per file
     private const long MaxBatchSizeBytes = 524_288_000L;       // 500 MB total batch
 
+    // A preview is an ownership-checked, per-user resource, so it must never be
+    // shared-cacheable (SEC-1 + QUAL-4, review 042-v1). `private` keeps it out of
+    // ASP.NET Core ResponseCaching and any shared proxy/CDN while still allowing a
+    // per-user browser cache. `immutable` is intentionally dropped: a thumbnail can
+    // be regenerated after an ops-side deletion, so the response is not immutable.
+    private static readonly string PreviewCacheControl =
+        $"private, max-age={(int)TimeSpan.FromDays(30).TotalSeconds}";
+
     private readonly IUploadService _uploadService;
 
     public UploadsController(IUploadService uploadService)
@@ -122,8 +130,7 @@ public class UploadsController : ControllerBase
         var (stream, contentType) = await _uploadService.GetPreviewAsync(
             id, userId, guestSessionId, cancellationToken);
 
-        // Thumbnails are UUID-keyed and immutable — allow long-lived shared caching.
-        Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+        Response.Headers.CacheControl = PreviewCacheControl;
 
         var etag = $"\"{id}-{stream.Length}\"";
         Response.Headers.ETag = etag;
