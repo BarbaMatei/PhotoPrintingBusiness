@@ -2,7 +2,7 @@
 type: review-system
 status: active
 created: 2026-06-18
-updated: 2026-06-19
+updated: 2026-07-13
 owner: Matei Barba
 ---
 
@@ -76,6 +76,10 @@ verification rounds run as if interchangeable.
   can't anchor on them. When two isolated lenses independently land on the same finding,
   that convergence is real signal (bolt 035 v8: the SQLite message-substring fragility was
   hit by **5** lenses independently; the dead-code method by 3).
+  **Caveat — convergence is only as independent as the prompts.** Every lens shares the same
+  base context (project hints like "tests use InMemory, so migration DDL is not exercised").
+  Agreement on a topic a shared hint planted is manufactured, not independent: the dedup agent
+  marks such findings `hinted`, and they don't get the ≥3-convergence skeptic discount (measure #2).
 - **Clean main context.** Subagents read whole files and dump excerpts; only their distilled
   findings return. The orchestrator never holds the raw file noise.
 - **Throughput.** All lenses run at once instead of serially.
@@ -124,43 +128,84 @@ names becomes the next pass's work.
 ## Orchestration flow
 
 ```
-                 ┌─ Correctness finders (×N)  ─┐
-                 ├─ Security  + FP filters     ─┤
-  [main agent] ──┼─ PR / requirements          ─┼──► [adversarial verify] ──► [main agent:
-  scope,         ├─ Quality / altitude         ─┤     2 skeptics/finding       synthesize ·
-  fan out        ├─ DB / parity (if migration) ─┤     confirm/plausible/       dedupe · rank ·
-  (whole feature ├─ Tests / coverage           ─┤     refute                   write review.md]
-   for discovery)└─ Completeness critic        ─┘                                    │
-        │                                                                            │
-        └────────── build + run tests (verify) ──────────────────────────────────────┘
+  [main agent]         ┌─ lens ─┐    [dedup:          [verify:            [main agent:
+  scope · codePack ───►│  ×N    │───► same defect ───► skeptics tiered ──► drop refuted ·
+  · pick manifest      └────────┘     across lenses +  by severity &       rank · write
+  · build+tests                       convergence]     convergence]        review · record]
+        └───────────────── lens → dedup → verify all run inside the Workflow script ─────────┘
 ```
 
-This fan-out is now prototyped as a **`Workflow` script** (parallel lens stage → adversarial
-verify stage → main-agent synthesis); bolt-035 v8 ran it end to end (7 lenses + build/test +
-2 skeptics per finding). Run shape:
+The fan-out is a committed **`Workflow` script**: [lib/discovery-review.wf.js](lib/discovery-review.wf.js).
+Everything below in this section is the **discovery-pass runbook** — a verification pass never runs
+the script or the manifest; its much cheaper runbook is [further down](#verification-pass--the-runbook).
+The steps are **strict — follow them in order**; don't improvise the parts the script owns.
 
-1. **Scope.** Main agent confirms `HEAD == origin/<branch>`. Save the source diff
-   (`git diff main...HEAD -- 'src/**/*.cs' ':!*Designer.cs'`) to a temp file. **For a
-   verification pass**, the diff path is what every subagent gets. **For a discovery pass**,
-   give finders the diff path *for orientation* but explicitly tell them to open the full
-   changed files and search the repo for call sites — interactions with *unchanged* code
-   (e.g. bolt-035's OrderNumber `CountAsync` collision and `ResolveUnitPrice` divergence)
-   live outside the diff and are missed by diff-only scoping.
-2. **Fan out.** Launch the manifest lenses in one parallel batch. Each returns structured
-   findings: `file:line · severity · summary · concrete failure/cost · suggested fix · confidence`.
-3. **Verify** (in parallel with the read-only lenses): build, run the relevant tests, record
-   pass/fail. *A green suite that doesn't exercise the found failure modes is itself a finding.*
-4. **Adversarially verify each finding.** Two independent skeptics per finding — one hunts
-   for an existing guard that *prevents* it, one tries to *construct* the concrete failing
-   trace — yielding Confirmed / Plausible / Refuted (below). This is precision insurance; it
-   does not find new bugs, so don't let it crowd out finder breadth.
-5. **Synthesize.** Dedupe (same defect+location → one, but *record the convergence count* —
-   N lenses agreeing is signal), reconcile disagreements, drop refuted false-positives *with
-   a reason*, rank by severity, write `review.md`.
-6. **Record.** Append a row to [index.md](index.md), and append the pass's metrics line to
-   `reviews/<target>/metrics.jsonl` per [metrics-schema.md](metrics-schema.md) — every pass,
-   discovery and verification alike (this feeds the stop-rule/saturation analysis; it cannot
-   be reconstructed later).
+### Discovery: the main agent MUST do (before and after the script)
+
+1. **Scope.** Confirm `HEAD == origin/<branch>`. Save the source diff(s) to temp files
+   (`git diff main...HEAD -- 'src/**/*.cs' ':!*Designer.cs'`; a second for `src/PhotoPrint.UI/**`
+   if the branch touches the frontend). Decide **discovery** vs **verification** pass (opposite
+   exit criteria — see *Two loops*); for verification, stop here and follow the
+   [verification runbook](#verification-pass--the-runbook) instead.
+2. **Assemble the `codePack` (measure #4).** Read the changed files **and their key collaborators**
+   (callers, cleanup/background jobs, middleware, config) **once**, concatenate into one string, and
+   pass it as `args.codePack`. This is how agents avoid re-reading the same files ~100×. Include the
+   collaborators because discovery-critical defects live in *unchanged* code (bolt-035's OrderNumber
+   `CountAsync` collision lived outside the diff). Omit the pack only if you deliberately want lenses
+   to explore fresh — but then say so. **Budget the pack:** changed files in full, collaborators
+   trimmed to the relevant members, whole pack under ~50k tokens — it is injected into every lens
+   *and* every skeptic, so its size multiplies across the whole fan-out. Past the budget, drop
+   collaborators to grep hints. Never include anything under `reviews/` (it would break blinding).
+3. **Pick the manifest lenses.** Map the change's characteristics to lenses per the
+   [manifest table](#choosing-the-lenses-the-manifest); pass as `args.lenses`. Breadth is
+   front-loaded here, not accreted over rounds.
+4. **Build + run tests yourself**, record pass/fail for the review. *A green suite that doesn't
+   exercise the found failure modes is itself a finding* (feed that to the tests-coverage lens).
+5. **Invoke the script:** `Workflow({ scriptPath: 'reviews/lib/discovery-review.wf.js', args: {
+   target, repoRoot, scope, changedFiles, backendDiff, frontendDiff?, specDocs?, lenses, codePack } })`.
+6. **Synthesize.** The returned findings are **already deduped, convergence-counted, and verdicted**
+   — do NOT re-run verification or re-dedup. Your job: drop `refuted` false-positives *with a reason*,
+   sanity-check the `plausible`/high-convergence calls, rank by severity, write `review-v<n>.md`
+   (record each finding's convergence count — N lenses agreeing is signal).
+7. **Record.** Append a row to [index.md](index.md) and the pass's metrics line to
+   `reviews/<target>/metrics.jsonl` per [metrics-schema.md](metrics-schema.md) — every pass, discovery
+   and verification alike (it feeds the saturation analysis and can't be reconstructed later).
+
+### The script does automatically (do NOT re-do these)
+
+- **Fans out** the manifest lenses in one blinded parallel batch (whole-feature for discovery).
+- **#1 Dedups** all lens findings into canonical findings with a convergence count, via one in-pass
+  **dedup agent** — so each real defect is verified once, not once per lens that raised it. (Not to
+  be confused with the cross-pass **ledger reconciler**, which matches findings *across* passes and
+  is still unbuilt — see *The persistent finding ledger*.) The dedup agent also marks findings whose
+  topic the shared prompt hints planted (`hinted: true`) — see the convergence caveat under *Why
+  parallel isolated subagents*.
+- **#2 Convergence-weighted adversarial verify:** ≥3 lenses agree and not `hinted` → one
+  anti-groupthink guard-hunt (escalate to a trace only on a surprising guard claim); 🔴/🟠 at
+  convergence 1–2 (or `hinted`) → two independent skeptics; 🟡 → one trace, escalate to a guard-hunt
+  only if no trace; ⚪ → none. Verdicts: `confirmed` / `plausible` / `refuted`, plus `disputed` when
+  the two skeptics contradict each other (a guard found *and* a failing trace built) and
+  `unverified-cleanup` for ⚪ (skeptics skipped).
+- **#3 Output caps** on every agent (verdict + brief reason, not essays).
+- **Reports skeptic-run counts** in the `_canonical` summary line — copy them into the pass's
+  metrics entry (`cost.agents_by_stage`).
+
+### Verification pass — the runbook
+
+Anchored, per-fix, cheap — the opposite posture of discovery (see *Two loops*). No blinding, no
+manifest, no codePack, no workflow script:
+
+1. Read the latest `review-v<n>.md` + `resolution-v<n>.md`; check out the resolution's
+   `fixed_commit`.
+2. **Revert-and-rerun every `fixed` finding:** revert the fix, confirm its regression test goes
+   red; restore, confirm green. A fix whose test cannot go red is not verified — reopen it.
+3. For findings that need judgment rather than a test (doc items, `wont-fix`/`deferred`/`disputed`
+   rationales), dispatch one anchored Explore agent per finding — give it the finding, the
+   resolution note, and the fix delta, not the whole feature.
+4. **Skim the fix diffs for fix-introduced regressions** (bolt-035: 2 of the 5 out-of-audit
+   findings were caused by fixes) — the one place a verification pass looks beyond its anchor.
+5. Write `review-v<n+1>.md` (`pass-type: verification`; verdict at most `approve-with-followups`),
+   flip held findings to `verified`, reopen the failures, and append the metrics line.
 
 ## Severity scale
 
@@ -186,7 +231,10 @@ most `approve-with-followups`, because "this fix held" is not "the feature is cl
 
 Findings are kept as **Confirmed** (constructible from the code) or **Plausible** (realistic
 state, not proven impossible). **Refuted** findings are dropped but recorded with the reason,
-so the same false-positive isn't re-raised next time. Security findings additionally carry a
+so the same false-positive isn't re-raised next time. A finding whose two skeptics *contradict*
+each other — a guard found **and** a failing trace built — is kept as **Disputed**: the conflict
+is surfaced to the synthesizer (and the round summary) instead of being averaged into
+"plausible". ⚪ cleanups skip skeptics entirely and carry `unverified-cleanup`. Security findings additionally carry a
 1–10 confidence; `/security-review` only *reports* ≥8, but this system records 7s too when
 they're real (below-bar ≠ false).
 
@@ -272,8 +320,9 @@ cost is that the system can't, on its own, tell a *re-find* from a *new find*, c
 overlap (the saturation signal above), and re-litigates accepted deferrals as if fresh (v8
 unknowingly re-raised v7's accepted-deferred Postgres-coverage item as if it were brand new).
 
-Fix *(proposed)*: a single **canonical ledger** per target, maintained by a post-hoc
-**reconciler** that maps each blinded pass's findings onto stable cross-pass identities
+Fix *(proposed)*: a single **canonical ledger** per target, living at `reviews/<target>/ledger.md`
+(hand-built today, tool-maintained later), kept by a post-hoc **ledger reconciler** that maps each
+blinded pass's findings onto stable cross-pass identities
 *after* the passes complete (so blinding is preserved during the search). That ledger gives
 you (a) the overlap data for capture–recapture, (b) a memory of known-and-accepted so
 deferrals aren't re-argued *blindly*, and (c) a true cumulative recall count. (Caveat from the
@@ -307,6 +356,11 @@ Only these two — it does not re-derive findings.
 
 **May touch:** source + tests for the finding being fixed. **Must not:** edit the
 `review-v<n>.md` file; silently change unrelated behavior; mark anything `verified`.
+
+**Comment discipline.** Keep code comments minimal — **do not narrate the fix in-code** ("fixed
+X", "now handles Y", "cache miss: …"). The *why* of a change lives in the commit message and the
+`resolution-v<n>.md` note, not scattered through the source where it drifts. Comment only genuinely
+non-obvious intent the code can't express (a subtle invariant, a "why not the obvious approach").
 
 **Bounding fix-generativity.** Fixes create new review surface — and in bolt 035, **2 of the
 5** findings ever raised outside a full audit were regressions a *fix* introduced (a refactor
@@ -347,10 +401,12 @@ Fresh/unbiased re-audit (a discovery pass):
 > and verifier is barred from reading `reviews/`; produces the next `review-v<n>` as a
 > clean-room audit of the whole feature. This is what surfaces what earlier passes missed.
 
-Automation: the fan-out is prototyped as a `Workflow` script (parallel lens stage →
-adversarial-verify stage → main-agent synthesis). The remaining gaps toward a one-command
-review are the **reconciler** (cross-pass ledger / overlap) and an automated **saturation**
-check — tracked in [index.md](index.md) backlog.
+Automation: the discovery fan-out is a committed three-stage `Workflow` script — lenses →
+in-pass dedup → convergence-weighted verify — at [lib/discovery-review.wf.js](lib/discovery-review.wf.js)
+(operating steps in *Orchestration flow*). The remaining gaps toward a one-command review are
+the **ledger reconciler** (cross-pass identity / overlap — a different thing from the script's
+in-pass dedup agent) and an automated **saturation** check — tracked in [index.md](index.md)
+backlog and owned by [self-driving-loop-design.md](self-driving-loop-design.md).
 
 ## Cost discipline
 
@@ -366,14 +422,69 @@ ones — so spend by loop type:
 - Estimate before launching large fan-outs. Adversarial verification adds ~2 agents per
   finding; useful for precision, but it's not discovery — don't let it eat the finder budget.
 
+### Tiering the adversarial skeptics (what they're actually worth)
+
+Adversarial verification is **precision insurance, not recall** — it drops false positives and
+calibrates severity; it does not find new bugs. So spend on it where a *wrong call is expensive*,
+and trim the long tail. **Convergence overrides severity:** ≥3 non-`hinted` lenses independently
+agreeing is itself the precision signal, so such a finding gets a single anti-groupthink
+guard-hunt whatever its severity (measure #2). For the rest:
+
+| Finding severity (convergence 1–2) | Skeptics to run |
+|---|---|
+| 🔴 High / 🟠 Medium | **Both** — independent guard-hunter *and* trace-constructor (a false blocker wastes fixer time; a missed refutation ships a bad fix) |
+| 🟡 Low | **One — trace-constructor only.** If it builds a concrete trace → *confirmed* + you get the failure scenario for the write-up. If it *can't*, escalate to one guard-hunter to decide *refuted* vs *plausible*. |
+| ⚪ Cleanup | **None** — accept the lens, or let the fixer judge. |
+
+This cuts the skeptic count by roughly a quarter on a full discovery pass (bolt-042: 98 → ~73
+skeptics; convergence-weighting — measure #2 — cuts it further) and materially lowers the odds
+of a mid-run stall, while keeping full rigor on everything that could block a merge.
+
+**What the skeptics bought on bolt-042 (the calibration datapoint):** 98 skeptics over 49
+non-cleanup findings caught **2 genuine false positives** (~4%) and correctly downgraded **7**
+findings to "plausible / not-triggerable-today" (latent cloud-provider + migration-parity) so
+they weren't over-ranked as active bugs. The remaining ~40 findings were *corroborated* — added
+confidence and a concrete trace, but no new information. The single highest-value skeptic was a
+trace-constructor that **ran the real ImageSharp 3.1.11 API** to prove `IdentifyAsync` throws
+rather than returning null, refuting a "fail-open" finding two lenses had independently raised —
+a non-obvious refutation the synthesizer would likely have accepted. Takeaway: the value is real
+but concentrated in (a) findings hinging on a checkable external fact (library/config behavior, a
+guard elsewhere) and (b) High/Medium calls; blanket 2×-on-everything over-pays.
+
+### Where the tokens actually go, and how to cut them without cutting recall
+
+*This subsection is rationale — the **why**. The operating steps are in [Orchestration flow](#orchestration-flow)
+(what the main agent does) and are enforced by [lib/discovery-review.wf.js](lib/discovery-review.wf.js)
+(what the script does automatically).*
+
+On the bolt-042 pass the **12 lenses were ~11% of the agents; the ~98 skeptics were ~89%** and a
+similar share of the ~3.5M tokens. So the waste is in the *verification* layer, not the *finding*
+layer — cut there, and leave lens breadth alone (breadth is the product; under-provisioning it is the
+documented bolt-035 failure). That is why the four baked-in measures — **#1 dedup-before-verify, #2
+convergence-weighted verify, #3 output caps, #4 read-once codePack** — all trim verification cost or
+redundant re-reading and none touch how many lenses run. On bolt-042 the bomb guard / leak / TOCTOU
+were each found by 5 lenses, i.e. up to 10 skeptic runs per bug before dedup — that is the redundancy
+#1/#2 remove. Measure #4's payoff depends on prompt caching being shared across the fan-out, so it is
+**off unless the caller supplies the pack** — and pack size multiplies across every agent that
+receives it, which is why step 2 gives it a budget.
+
+**Held in reserve (apply only if token use is still too high):** model tiering — Opus for lenses +
+High/Med skeptics, Sonnet for the bulk of Low/spot skeptics. Deferred because it carries a small
+confidence cost the four above do not; revisit if #1–#4 don't move the number enough.
+
+**Always measure a change like this** the honest way (per *Recall & convergence*): re-run one frozen
+commit with and without the change and confirm the lenses still surface the same findings and no
+outcome-changing verdict flips. If nothing flips, the saving was free.
+
 ## Conventions
 
 - One folder per reviewed unit: `reviews/<bolt-or-branch-id>/`.
 - **Versioned review files:** `review-v<n>.md`, one per review pass. The first pass is
   `review-v1.md`; re-reviewing produces `review-v2.md`, etc. Never overwrite a prior version —
   each pass is a point-in-time record of what was found against which commit. Frontmatter
-  carries `version:`, `supersedes:` (`null` for v1), the `commit:` reviewed, and (recommended)
-  a `pass-type: discovery | verification` so the index can tell a clean-room audit from a fix-check.
+  carries `version:`, `supersedes:` (`null` for v1), the `commit:` reviewed, and a **required**
+  `pass-type: discovery | verification` so the index and the saturation analysis can tell a
+  clean-room audit from a fix-check.
 - `index.md` always links the **latest** review version + resolution per target, and carries
   a `Status` column for the resolution loop.
 - Each target folder carries a `metrics.jsonl` (one line per pass, append-only) — schema and

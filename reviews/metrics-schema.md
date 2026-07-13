@@ -33,10 +33,11 @@ recorded them at the time.
 | `refinds_identity` | int | findings that are the *same problem* as an earlier finding (reconciler / hand judgment) |
 | `reraises_of_decided` | int | findings re-raising an accepted wont-fix / deferral / dismissal |
 | `refuted` | int | candidate findings recorded as false positives this pass |
+| `disputed` | int \| null | findings whose two skeptics contradicted each other (a guard found *and* a failing trace built); `null` when not tracked |
 | `verified` | int | findings flipped to `verified` this pass |
 | `reopened` | int | findings reopened this pass |
 | `tests` | `{passed, failed}` \| null | suite result at the reviewed commit |
-| `cost` | `{agents, tokens}` | fan-out size and rough token spend; `null` when not tracked |
+| `cost` | `{agents, tokens, agents_by_stage?}` | fan-out size and rough token spend; `null` when not tracked. `agents_by_stage` = `{lenses, dedup, skeptics_guard, skeptics_trace}` — the discovery script reports these counts in its `_canonical` summary line; copy them in. They're what shows whether the skeptic tiering actually saves what it claims |
 | `notes` | string | anything a future analysis will wish it knew |
 
 ## Example
