@@ -1,0 +1,73 @@
+name: ci
+
+# Runs on every PR and on pushes to non-main branches. (deploy.yml chains off a
+# successful run on main via workflow_run.) secret-scan.yml runs independently.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  dotnet:
+    name: API — build & test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fototipar
+          POSTGRES_PASSWORD: fototipar
+          POSTGRES_DB: fototipar
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U fototipar"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+      - run: dotnet restore PhotoPrint.sln
+      - run: dotnet build PhotoPrint.sln --no-restore -c Release
+      - name: Test
+        run: >-
+          dotnet test PhotoPrint.sln --no-build -c Release
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+        env:
+          # Integration tests swap to an InMemory DB; this is here for any test
+          # that opts into the real provider in future.
+          ConnectionStrings__Default: Host=localhost;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dotnet-test-results
+          path: TestResults/**/*.trx
+
+  web:
+    name: UI — test & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/PhotoPrint.UI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/PhotoPrint.UI/package-lock.json
+      - run: npm ci
+      # Angular 21 unit tests run on Vitest (@angular/build:unit-test); --watch=false runs once.
+      # No lint step: this project has no `lint` script / ESLint config yet.
+      - run: npm test -- --watch=false
+      - run: npm run build -- --configuration=production

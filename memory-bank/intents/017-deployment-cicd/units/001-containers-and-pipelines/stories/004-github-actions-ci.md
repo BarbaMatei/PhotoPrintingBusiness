@@ -2,11 +2,11 @@
 id: 004-github-actions-ci
 unit: 001-containers-and-pipelines
 intent: 017-deployment-cicd
-status: draft
+status: complete
 priority: must
 created: 2026-05-25T10:20:00Z
 assigned_bolt: 040-containers-and-pipelines
-implemented: false
+implemented: true
 ---
 
 # Story: 004-github-actions-ci

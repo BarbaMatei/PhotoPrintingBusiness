@@ -50,18 +50,51 @@ cd src/PhotoPrint.UI && npm install && npm start   # SPA
 
 ---
 
+## Run with Docker
+
+Brings up the full backend stack (API + PostgreSQL 16 + MailHog) in containers — no
+local Postgres or SMTP install needed.
+
+```sh
+# 1. one-time: create a keypair and copy the env template
+scripts/gen-dev-keys.sh                 # or: pwsh scripts/gen-dev-keys.ps1
+cp .env.example .env
+#    then set JwtSettings__PrivateKeyPem in .env to the contents of
+#    secrets/dev-jwt-private.pem (single line, '\n' between lines)
+
+# 2. up
+docker compose up --build
+```
+
+- API: <http://localhost:8080>  ·  MailHog UI: <http://localhost:8025>
+- The dev compose uses Postgres, so the API applies EF migrations at boot.
+- Run the Angular dev server on the host (`npm start`, proxied to `:8080`), or rely on
+  the SPA baked into the image for a prod-like check.
+
+The production image (Caddy + API, auto-TLS) and the full deploy procedure live in
+**[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — including hosting proposals, server
+provisioning, CI/CD secrets, the migrations note, and rollback.
+
+---
+
 ## Environment / secret matrix
 
-Provided via env vars (prod), user-secrets, or `appsettings.{Environment}.Local.json` (dev). Never committed.
+Provided via env vars (prod / Docker), user-secrets, or `appsettings.{Environment}.Local.json`
+(dev). Never committed. **`.env.example` is the authoritative, full list**; the config-key
+convention is `Section:Key` → `Section__Key` (double underscore) as an env var. Required
+Production secrets are validated at boot — a missing one fails startup with the field named.
 
-| Key | Purpose |
-|-----|---------|
-| `JwtSettings:PrivateKeyPem` | RSA private key for signing JWTs (required) |
-| `ConnectionStrings:Default` | Database connection string |
-| `Stripe:SecretKey`, `Stripe:WebhookSecret` | Stripe payment + webhook verification |
-| `EuPlatesc:MerchantId`, `EuPlatesc:SecretKey` | EuPlatesc payment gateway |
-| `GoogleAuth:ClientId` | Google OAuth |
-| `Email:SendGrid:ApiKey` | Transactional email (prod) |
+| Key | Purpose | Required |
+|-----|---------|----------|
+| `ConnectionStrings:Default` | Database connection string | always |
+| `DatabaseProvider` | `Postgres` (prod/Docker) or `Sqlite` (local dev) | always |
+| `JwtSettings:PrivateKeyPem` | RSA private key for signing JWTs | always (boot-fails if empty) |
+| `Stripe:SecretKey`, `Stripe:WebhookSecret` | Stripe payment + webhook verification | Production |
+| `EuPlatesc:MerchantId`, `EuPlatesc:SecretKey` | EuPlatesc payment gateway | Production |
+| `Cors:AllowedOrigins` | Comma-separated allowed SPA origins | always |
+| `Email:Provider` (+ `Email:Smtp:*` / `Email:SendGrid:ApiKey`) | SMTP (dev) or SendGrid (prod) | always |
+| `GoogleAuth:ClientId` | Google OAuth | if Google sign-in enabled |
+| `App:BaseUrl` | Public base URL for links in emails | always |
 
 ---
 

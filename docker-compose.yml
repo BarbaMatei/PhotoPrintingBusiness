@@ -1,0 +1,58 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  Local development stack:  API + PostgreSQL 16 + MailHog.
+#  Usage:
+#    1. cp .env.example .env   and fill in JwtSettings__PrivateKeyPem
+#       (scripts/gen-dev-keys.* produces the keypair — see README "Run with Docker").
+#    2. docker compose up --build
+#  MailHog UI: http://localhost:8025   ·   API: http://localhost:8080
+# ──────────────────────────────────────────────────────────────────────────────
+name: fototipar-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fototipar
+      POSTGRES_PASSWORD: fototipar
+      POSTGRES_DB: fototipar
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fototipar -d fototipar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # web UI
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      DatabaseProvider: Postgres
+      ConnectionStrings__Default: Host=db;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
+      Email__Provider: Smtp
+      Email__Smtp__Host: mailhog
+      Email__Smtp__Port: "1025"
+      Email__Smtp__UseSsl: "false"
+      Cors__AllowedOrigins: http://localhost:4200
+    ports:
+      - "8080:8080"
+    volumes:
+      - apidata:/app/Storage
+
+volumes:
+  pgdata:
+  apidata:

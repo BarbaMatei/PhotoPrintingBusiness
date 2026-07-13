@@ -88,7 +88,12 @@ public class UploadService : IUploadService
             UserId          = userId,
             GuestSessionId  = guestSessionId,
             FilePath        = storagePath,
-            OriginalFileName = Path.GetFileName(originalFileName), // strip any path component
+            // Strip any directory component OS-independently. Path.GetFileName only treats
+            // '\' as a separator on Windows, so on the Linux server a crafted name like
+            // "C:\evil\x.jpg" would pass through unsanitised — strip both '/' and '\'.
+            OriginalFileName = string.IsNullOrEmpty(originalFileName)
+                ? originalFileName
+                : originalFileName[(originalFileName.LastIndexOfAny(new[] { '/', '\\' }) + 1)..],
             ContentType     = mimeType,
             WidthPx         = imageInfo.WidthPx,
             HeightPx        = imageInfo.HeightPx,

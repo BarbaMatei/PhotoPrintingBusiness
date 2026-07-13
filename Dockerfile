@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+# ──────────────────────────────────────────────────────────────────────────────
+#  FotoTipar combined image — ASP.NET Core API that also serves the Angular SPA.
+#  (Bolt 040, decision D1: one image; split to a separate static host later if
+#   traffic warrants — see docs/DEPLOYMENT.md.)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: build + publish the .NET API ─────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS api-build
+WORKDIR /src
+# Restore against just the API project first for Docker layer caching.
+COPY src/PhotoPrint.API/*.csproj ./PhotoPrint.API/
+RUN dotnet restore ./PhotoPrint.API/PhotoPrint.API.csproj
+COPY src/PhotoPrint.API/ ./PhotoPrint.API/
+RUN dotnet publish ./PhotoPrint.API/PhotoPrint.API.csproj \
+      -c Release -o /app/publish /p:UseAppHost=false
+
+# ── Stage 2: build the Angular SPA ─────────────────────────────────────────────
+FROM node:22-alpine AS ui-build
+WORKDIR /ui
+COPY src/PhotoPrint.UI/package*.json ./
+RUN npm ci
+COPY src/PhotoPrint.UI/ ./
+# @angular/build:application emits to dist/PhotoPrint.UI/browser
+RUN npm run build -- --configuration=production
+
+# ── Stage 3: runtime ───────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
+# curl for HEALTHCHECK; non-root runtime user.
+RUN apk add --no-cache curl \
+ && addgroup -g 1001 app \
+ && adduser -D -u 1001 -G app app
+WORKDIR /app
+COPY --from=api-build /app/publish ./
+COPY --from=ui-build  /ui/dist/PhotoPrint.UI/browser ./wwwroot
+# Writable uploads dir (mount a volume here in compose for persistence).
+RUN mkdir -p /app/Storage && chown -R app:app /app
+USER app
+EXPOSE 8080
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_URLS=http://+:8080 \
+    DatabaseProvider=Postgres
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://localhost:8080/health || exit 1
+ENTRYPOINT ["dotnet", "PhotoPrint.API.dll"]
