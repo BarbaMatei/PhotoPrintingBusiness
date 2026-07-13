@@ -11,33 +11,33 @@ verified_commit: 095285c
 opened: 2026-07-13
 closed: 2026-07-14
 findings:
-  SEC-1:  { status: verified, commit: 9af3b87, note: "preview Cache-Control now `private, max-age=30d` (drops public + immutable); ResponseCaching no longer stores it. Named TTL const (QUAL-4). Integration test pins Private=true/Public=false/MaxAge=30d." }   # blocker
-  BUG-1:  { status: verified, commit: 533996c, note: "per-axis 25000 check replaced by a total-pixel area cap (ExceedsDecodeLimits, 50 MP, long multiply) at BOTH decode sites + DecoderOptions.MaxFrames=1. Real-ImageProcessor test rejects a 54 MP image before decode." }   # blocker
-  TEST-1: { status: verified, commit: 978620c, note: "error.interceptor.spec now covers the guest branches: guest token present -> clearGuestToken, no logout/nav; anon no-token -> no logout/nav. Existing 401 tests re-pointed at an authenticated user." }   # blocker
-  BUG-2:  { status: verified, commit: c245a1e, note: "UploadCleanupJob now deletes ThumbnailPath alongside FilePath (same try/catch, counted as file error). Tests: deletes both; upload w/o thumbnail deletes only original." }
-  BUG-3:  { status: verified, commit: c245a1e, note: "deterministic id-keyed thumbnail path in a distinct 'thumbs/' namespace (SaveAsync prefix param) -> a racing/cancelled write overwrites the same key instead of orphaning. No RowVersion (deterministic key makes the race benign; avoids the 500-on-conflict caveat noted below)." }
-  BUG-4:  { status: verified, commit: 533996c, note: "GenerateThumbnailAsync catches ImageFormatException (covers UnknownImageFormat + InvalidImageContent) -> UnprocessableEntityException (422) instead of a raw 500. ImageProcessorTests: unreadable file -> 422." }
-  REQ-1:  { status: verified, commit: 533996c, note: "Configuration.Default.MemoryAllocator allocation cap (512 MB) added in Program.cs (code); story 003 AC amended (eb8a6f8). MaxImageWidth/Height don't exist in ImageSharp 3.1.11 -> replaced by the area cap." }
-  REQ-2:  { status: verified, commit: c245a1e, note: "deterministic path thumbs/{ownerId}/{uploadId:N}.jpg (owner-scoped namespace, not the spec's thumbs/{id}.jpg to avoid colliding with the original). Story 002 AC updated to the as-built path (eb8a6f8)." }
-  REQ-3:  { status: verified, commit: eb8a6f8, note: "amended story 002's soft-delete edge case to 404 (implemented + tested behavior); the 'serve the thumbnail' variant was never built and 404 is defensible (cleanup is about to remove both files). Spec/code no longer contradict." }
-  REQ-4:  { status: verified, commit: eb8a6f8, note: "documented the bundled guest-auth self-heal (change B) + dev-warning (change C) scope in bolt.md with a retroactive AC, now backed by the TEST-1/FE-* specs. Full split into separate bolts left to the owner (see decisions)." }
-  FE-1:   { status: verified, commit: f55daae, note: "ensureGuestSession shares one in-flight init (shareReplay + finalize-reset) so concurrent callers don't mint duplicate sessions. Spec: two concurrent calls -> initAnonymousSession called once." }
-  FE-2:   { status: verified, commit: f55daae, note: "upload auto-retries exactly once after a 401 (interceptor clears the stale token, ensureGuestSession re-inits). Spec: 401-then-success -> upload called twice, ends 'done'; 500 -> no retry." }
-  FE-3:   { status: verified, commit: 978620c, note: "interceptor 401 handler restructured: authenticated -> logout+redirect; else -> clearGuestToken (no navigation). An anonymous/no-token client is no longer bounced to a login page it has no account for." }
-  FE-4:   { status: verified, commit: f55daae, note: "restoreFromSession distinguishes 401 (re-init + retry once) from 404 (drop). Specs: 401 keeps the entry after retry; 404 drops it without re-init." }
-  OBS-1:  { status: verified, commit: 21e66c8, note: "UploadsController injects ILogger; each swallowed batch rejection logs a Warning (uploads.batch.item_rejected: file, reason type, correlation id). Controller unit test verifies the log + 200." }
-  OBS-2:  { status: verified, commit: 26165a3, note: "client-abort log raised Debug -> Information as a distinct request.client_aborted event (Serilog floor is Information everywhere). Middleware test verifies the Information emit." }
-  OBS-3:  { status: verified, commit: 533996c, note: "distinct DecompressionBombException(w,h) mapped to 422; middleware emits uploads.decompression_bomb.rejected with dimensions + correlation id (mirrors the idempotency-event pattern). Middleware test verifies." }
-  QUAL-1: { status: verified, commit: c245a1e, note: "AsNoTracking() restored on the preview read (hot cache-hit path); the miss branch Attaches + marks only ThumbnailPath modified." }
-  QUAL-2: { status: verified, commit: c245a1e, note: "miss branch returns the just-generated MemoryStream directly (rewound) instead of disposing + re-reading from storage." }
-  QUAL-3: { status: verified, commit: 533996c, note: "single ImageProcessor.ExceedsDecodeLimits(w,h) helper + DimensionsExceededMessage const used at both decode sites." }
-  QUAL-4: { status: verified, commit: 9af3b87, note: "PreviewCacheControl const derived from TimeSpan.FromDays(30); no more inline 2592000 magic string." }
-  QUAL-5: { status: verified, commit: eb8a6f8, note: "brief 'intentional duplication' comment on the split-query provider branches (extraction not worth it, per the review's own guidance)." }
-  DB-1:   { status: verified, commit: bca68fa, note: "migration now provider-aware (varchar(512) on Npgsql, TEXT on SQLite), mirroring the sibling AddOrderIdempotencyKey; safe in-place edit (no Postgres has applied it). The Migrate()-based DDL smoke test is deferred to the 3-env phase per the roadmap (see decisions)." }
-  INPUT-1:{ status: verified, commit: f850f69, note: "HEIF brand at bytes 8-11 now verified against a HEIF-brand set; generic ISO-BMFF containers (MP4/MOV/M4A) rejected up front. HEIC is still advertised (fails cleanly at decode until a HEIF decoder lands) — see decisions." }
-  TEST-2: { status: verified, commit: 533996c, note: "new ImageProcessorTests exercises the REAL processor: oversized -> DecompressionBomb, small valid -> <=300px JPEG, unreadable -> 422, GetInfo dimensions/null, ExceedsDecodeLimits boundary+overflow." }
-  TEST-3: { status: verified, commit: c245a1e, note: "UploadServiceTests drives the SUT through a context SEPARATE from the seed/assert context (same in-memory db name); a fresh-context persistence test proves SaveChanges ran, not a shared tracker." }
-  TEST-4: { status: verified, commit: fad7693, note: "added: Cache-Control directive (9af3b87), deterministic-key/TOCTOU proxy (c245a1e), ensureGuestSession dedup (f55daae), 304/If-None-Match (fad7693). Migration-DDL smoke test deferred with DB-1." }
+  SEC-1:  { status: fixed, commit: 9af3b87, note: "preview Cache-Control now `private, max-age=30d` (drops public + immutable); ResponseCaching no longer stores it. Named TTL const (QUAL-4). Integration test pins Private=true/Public=false/MaxAge=30d." }   # blocker
+  BUG-1:  { status: fixed, commit: 533996c, note: "per-axis 25000 check replaced by a total-pixel area cap (ExceedsDecodeLimits, 50 MP, long multiply) at BOTH decode sites + DecoderOptions.MaxFrames=1. Real-ImageProcessor test rejects a 54 MP image before decode." }   # blocker
+  TEST-1: { status: fixed, commit: 978620c, note: "error.interceptor.spec now covers the guest branches: guest token present -> clearGuestToken, no logout/nav; anon no-token -> no logout/nav. Existing 401 tests re-pointed at an authenticated user." }   # blocker
+  BUG-2:  { status: fixed, commit: c245a1e, note: "UploadCleanupJob now deletes ThumbnailPath alongside FilePath (same try/catch, counted as file error). Tests: deletes both; upload w/o thumbnail deletes only original." }
+  BUG-3:  { status: fixed, commit: c245a1e, note: "deterministic id-keyed thumbnail path in a distinct 'thumbs/' namespace (SaveAsync prefix param) -> a racing/cancelled write overwrites the same key instead of orphaning. No RowVersion (deterministic key makes the race benign; avoids the 500-on-conflict caveat noted below)." }
+  BUG-4:  { status: fixed, commit: 533996c, note: "GenerateThumbnailAsync catches ImageFormatException (covers UnknownImageFormat + InvalidImageContent) -> UnprocessableEntityException (422) instead of a raw 500. ImageProcessorTests: unreadable file -> 422." }
+  REQ-1:  { status: fixed, commit: 533996c, note: "Configuration.Default.MemoryAllocator allocation cap (512 MB) added in Program.cs (code); story 003 AC amended (eb8a6f8). MaxImageWidth/Height don't exist in ImageSharp 3.1.11 -> replaced by the area cap." }
+  REQ-2:  { status: fixed, commit: c245a1e, note: "deterministic path thumbs/{ownerId}/{uploadId:N}.jpg (owner-scoped namespace, not the spec's thumbs/{id}.jpg to avoid colliding with the original). Story 002 AC updated to the as-built path (eb8a6f8)." }
+  REQ-3:  { status: fixed, commit: eb8a6f8, note: "amended story 002's soft-delete edge case to 404 (implemented + tested behavior); the 'serve the thumbnail' variant was never built and 404 is defensible (cleanup is about to remove both files). Spec/code no longer contradict." }
+  REQ-4:  { status: fixed, commit: eb8a6f8, note: "documented the bundled guest-auth self-heal (change B) + dev-warning (change C) scope in bolt.md with a retroactive AC, now backed by the TEST-1/FE-* specs. Full split into separate bolts left to the owner (see decisions)." }
+  FE-1:   { status: fixed, commit: f55daae, note: "ensureGuestSession shares one in-flight init (shareReplay + finalize-reset) so concurrent callers don't mint duplicate sessions. Spec: two concurrent calls -> initAnonymousSession called once." }
+  FE-2:   { status: fixed, commit: f55daae, note: "upload auto-retries exactly once after a 401 (interceptor clears the stale token, ensureGuestSession re-inits). Spec: 401-then-success -> upload called twice, ends 'done'; 500 -> no retry." }
+  FE-3:   { status: fixed, commit: 978620c, note: "interceptor 401 handler restructured: authenticated -> logout+redirect; else -> clearGuestToken (no navigation). An anonymous/no-token client is no longer bounced to a login page it has no account for." }
+  FE-4:   { status: fixed, commit: f55daae, note: "restoreFromSession distinguishes 401 (re-init + retry once) from 404 (drop). Specs: 401 keeps the entry after retry; 404 drops it without re-init." }
+  OBS-1:  { status: fixed, commit: 21e66c8, note: "UploadsController injects ILogger; each swallowed batch rejection logs a Warning (uploads.batch.item_rejected: file, reason type, correlation id). Controller unit test verifies the log + 200." }
+  OBS-2:  { status: fixed, commit: 26165a3, note: "client-abort log raised Debug -> Information as a distinct request.client_aborted event (Serilog floor is Information everywhere). Middleware test verifies the Information emit." }
+  OBS-3:  { status: fixed, commit: 533996c, note: "distinct DecompressionBombException(w,h) mapped to 422; middleware emits uploads.decompression_bomb.rejected with dimensions + correlation id (mirrors the idempotency-event pattern). Middleware test verifies." }
+  QUAL-1: { status: fixed, commit: c245a1e, note: "AsNoTracking() restored on the preview read (hot cache-hit path); the miss branch Attaches + marks only ThumbnailPath modified." }
+  QUAL-2: { status: fixed, commit: c245a1e, note: "miss branch returns the just-generated MemoryStream directly (rewound) instead of disposing + re-reading from storage." }
+  QUAL-3: { status: fixed, commit: 533996c, note: "single ImageProcessor.ExceedsDecodeLimits(w,h) helper + DimensionsExceededMessage const used at both decode sites." }
+  QUAL-4: { status: fixed, commit: 9af3b87, note: "PreviewCacheControl const derived from TimeSpan.FromDays(30); no more inline 2592000 magic string." }
+  QUAL-5: { status: fixed, commit: eb8a6f8, note: "brief 'intentional duplication' comment on the split-query provider branches (extraction not worth it, per the review's own guidance)." }
+  DB-1:   { status: fixed, commit: bca68fa, note: "migration now provider-aware (varchar(512) on Npgsql, TEXT on SQLite), mirroring the sibling AddOrderIdempotencyKey; safe in-place edit (no Postgres has applied it). The Migrate()-based DDL smoke test is deferred to the 3-env phase per the roadmap (see decisions)." }
+  INPUT-1:{ status: fixed, commit: f850f69, note: "HEIF brand at bytes 8-11 now verified against a HEIF-brand set; generic ISO-BMFF containers (MP4/MOV/M4A) rejected up front. HEIC is still advertised (fails cleanly at decode until a HEIF decoder lands) — see decisions." }
+  TEST-2: { status: fixed, commit: 533996c, note: "new ImageProcessorTests exercises the REAL processor: oversized -> DecompressionBomb, small valid -> <=300px JPEG, unreadable -> 422, GetInfo dimensions/null, ExceedsDecodeLimits boundary+overflow." }
+  TEST-3: { status: fixed, commit: c245a1e, note: "UploadServiceTests drives the SUT through a context SEPARATE from the seed/assert context (same in-memory db name); a fresh-context persistence test proves SaveChanges ran, not a shared tracker." }
+  TEST-4: { status: fixed, commit: fad7693, note: "added: Cache-Control directive (9af3b87), deterministic-key/TOCTOU proxy (c245a1e), ensureGuestSession dedup (f55daae), 304/If-None-Match (fad7693). Migration-DDL smoke test deferred with DB-1." }
   CLOUD-1:{ status: deferred, commit: null, note: "Latent until bolt-043 cloud storage provider; not triggerable today. Design constraint for 043, not a v1 fix. QUAL-2 (returning the in-memory stream on a miss) already removes one per-miss storage round-trip ahead of the cloud port." }
 ---
 
@@ -45,9 +45,12 @@ findings:
 
 Fixer's response to [review-v1.md](review-v1.md). One row per finding; the reviewer's
 file stays immutable. All 27 open findings reached a terminal status (**26 fixed, 1
-deferred**), and the verification re-review [review-v2.md](review-v2.md) (@`095285c`)
-confirmed **all 26 fixes hold — 0 reopened** and re-affirmed the CLOUD-1 deferral, so the
-statuses below are now `verified`. Both suites are green:
+deferred**). The per-finding statuses below are the **fixer's** (`fixed`/`deferred`) — the
+`verified` verdicts live in the review file, not here, so this stays a fixer artifact and
+the review stays the verification record. The verification re-review
+[review-v2.md](review-v2.md) (@`095285c`) confirmed **all 26 fixes hold — 0 reopened** and
+re-affirmed the CLOUD-1 deferral (see the *Verification (review-v2)* section below). Both
+suites are green:
 
 - **.NET:** `dotnet test` → **510 passed / 0 failed** (was 490 at v1; +20 tests).
 - **Frontend:** `ng test` (vitest/jsdom) → **402 passed / 0 failed** (46 files).
@@ -62,34 +65,34 @@ which flips surviving findings to `verified` (or reopens). I have **not** self-v
 
 | ID | Sev | Status | Summary | Fix commit |
 |----|-----|--------|---------|-----------|
-| SEC-1 | 🔴 | verified | `Cache-Control: private` (not public/immutable) + pinning test | 9af3b87 |
-| BUG-1 | 🔴 | verified | Total-pixel area cap + `MaxFrames=1` at both decode sites | 533996c |
-| TEST-1 | 🔴 | verified | Guest-401 interceptor branches now covered | 978620c |
-| BUG-2 | 🟠 | verified | Cleanup deletes `ThumbnailPath` too | c245a1e |
-| BUG-3 | 🟠 | verified | Deterministic id-keyed thumbnail path (no orphans) | c245a1e |
-| REQ-1 | 🟠 | verified | `MemoryAllocator` allocation cap added (+ story AC) | 533996c / eb8a6f8 |
-| OBS-1 | 🟠 | verified | Batch rejections logged (Warning + correlation id) | 21e66c8 |
-| FE-1 | 🟠 | verified | In-flight `ensureGuestSession` dedup (shareReplay) | f55daae |
-| FE-2 | 🟠 | verified | Upload auto-retries once after a 401 | f55daae |
-| TEST-2 | 🟠 | verified | Real `ImageProcessor` exercised (bomb/valid/unreadable) | 533996c |
-| TEST-3 | 🟠 | verified | Separate seed/SUT contexts prove persistence | c245a1e |
-| BUG-4 | 🟡 | verified | `ImageFormatException` → 422, not 500 | 533996c |
-| QUAL-1 | 🟡 | verified | `AsNoTracking` restored on hit path; Attach on miss | c245a1e |
-| QUAL-2 | 🟡 | verified | Return generated stream on miss (no re-read) | c245a1e |
-| OBS-2 | 🟡 | verified | Client-abort log at Information (`request.client_aborted`) | 26165a3 |
-| OBS-3 | 🟡 | verified | Reserved `uploads.decompression_bomb.rejected` event | 533996c |
-| FE-3 | 🟡 | verified | Anon 401 clears token, no login dead-end | 978620c |
-| FE-4 | 🟡 | verified | `restoreFromSession` distinguishes 401 from 404 | f55daae |
-| REQ-2 | 🟡 | verified | Deterministic `thumbs/{owner}/{id}.jpg` path (+ story AC) | c245a1e / eb8a6f8 |
-| REQ-3 | 🟡 | verified | Story 002 soft-delete AC amended to 404 | eb8a6f8 |
-| REQ-4 | 🟡 | verified | Bundled guest-auth + dev-warning scope documented + AC'd | eb8a6f8 |
-| DB-1 | 🟡 | verified | Migration provider-aware (`varchar(512)` on Npgsql) | bca68fa |
-| INPUT-1 | 🟡 | verified | HEIF brand verified (rejects MP4/MOV/M4A early) | f850f69 |
-| TEST-4 | 🟡 | verified | Cache-Control + 304 + dedup + TOCTOU-proxy tests added | fad7693 |
+| SEC-1 | 🔴 | fixed | `Cache-Control: private` (not public/immutable) + pinning test | 9af3b87 |
+| BUG-1 | 🔴 | fixed | Total-pixel area cap + `MaxFrames=1` at both decode sites | 533996c |
+| TEST-1 | 🔴 | fixed | Guest-401 interceptor branches now covered | 978620c |
+| BUG-2 | 🟠 | fixed | Cleanup deletes `ThumbnailPath` too | c245a1e |
+| BUG-3 | 🟠 | fixed | Deterministic id-keyed thumbnail path (no orphans) | c245a1e |
+| REQ-1 | 🟠 | fixed | `MemoryAllocator` allocation cap added (+ story AC) | 533996c / eb8a6f8 |
+| OBS-1 | 🟠 | fixed | Batch rejections logged (Warning + correlation id) | 21e66c8 |
+| FE-1 | 🟠 | fixed | In-flight `ensureGuestSession` dedup (shareReplay) | f55daae |
+| FE-2 | 🟠 | fixed | Upload auto-retries once after a 401 | f55daae |
+| TEST-2 | 🟠 | fixed | Real `ImageProcessor` exercised (bomb/valid/unreadable) | 533996c |
+| TEST-3 | 🟠 | fixed | Separate seed/SUT contexts prove persistence | c245a1e |
+| BUG-4 | 🟡 | fixed | `ImageFormatException` → 422, not 500 | 533996c |
+| QUAL-1 | 🟡 | fixed | `AsNoTracking` restored on hit path; Attach on miss | c245a1e |
+| QUAL-2 | 🟡 | fixed | Return generated stream on miss (no re-read) | c245a1e |
+| OBS-2 | 🟡 | fixed | Client-abort log at Information (`request.client_aborted`) | 26165a3 |
+| OBS-3 | 🟡 | fixed | Reserved `uploads.decompression_bomb.rejected` event | 533996c |
+| FE-3 | 🟡 | fixed | Anon 401 clears token, no login dead-end | 978620c |
+| FE-4 | 🟡 | fixed | `restoreFromSession` distinguishes 401 from 404 | f55daae |
+| REQ-2 | 🟡 | fixed | Deterministic `thumbs/{owner}/{id}.jpg` path (+ story AC) | c245a1e / eb8a6f8 |
+| REQ-3 | 🟡 | fixed | Story 002 soft-delete AC amended to 404 | eb8a6f8 |
+| REQ-4 | 🟡 | fixed | Bundled guest-auth + dev-warning scope documented + AC'd | eb8a6f8 |
+| DB-1 | 🟡 | fixed | Migration provider-aware (`varchar(512)` on Npgsql) | bca68fa |
+| INPUT-1 | 🟡 | fixed | HEIF brand verified (rejects MP4/MOV/M4A early) | f850f69 |
+| TEST-4 | 🟡 | fixed | Cache-Control + 304 + dedup + TOCTOU-proxy tests added | fad7693 |
 | CLOUD-1 | 🟡 | deferred | Stream seekability/`Length`/`ExistsAsync` — bolt-043 design constraint | — |
-| QUAL-3 | ⚪ | verified | Shared `ExceedsDecodeLimits` helper + message const | 533996c |
-| QUAL-4 | ⚪ | verified | Named 30-day cache TTL constant | 9af3b87 |
-| QUAL-5 | ⚪ | verified | Intentional-duplication comment on split-query branches | eb8a6f8 |
+| QUAL-3 | ⚪ | fixed | Shared `ExceedsDecodeLimits` helper + message const | 533996c |
+| QUAL-4 | ⚪ | fixed | Named 30-day cache TTL constant | 9af3b87 |
+| QUAL-5 | ⚪ | fixed | Intentional-duplication comment on split-query branches | eb8a6f8 |
 
 ## Decisions / rationale
 
