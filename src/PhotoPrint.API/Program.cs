@@ -97,10 +97,14 @@ SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
 
 // Bound concurrent image decodes process-wide (M3, review 042-v4). Each ~100 MP decode is
 // ~400 MB, so an unbounded burst of concurrent first previews can OOM the box even under the
-// per-image caps. Decode is CPU-bound, so the core count is a sane default ceiling; ops can
-// lower it on a memory-constrained/high-core host via ImageProcessing:MaxConcurrentDecodes.
+// per-image caps. The default must bound by memory, not just cores: on a high-core / low-RAM
+// host, ProcessorCount slots × ~400 MB overrun available RAM (F1, review 042-v6). Derive the
+// default from both CPU and the host's available memory; ops can still override via
+// ImageProcessing:MaxConcurrentDecodes.
 var maxConcurrentDecodes = builder.Configuration.GetValue<int?>("ImageProcessing:MaxConcurrentDecodes")
-    ?? Environment.ProcessorCount;
+    ?? PhotoPrint.API.Services.ImageDecodeLimiter.RecommendedMaxConcurrentDecodes(
+           GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
+           Environment.ProcessorCount);
 builder.Services.AddSingleton(new PhotoPrint.API.Services.ImageDecodeLimiter(Math.Max(1, maxConcurrentDecodes)));
 
 builder.Services.Configure<PhotoPrint.API.Configuration.StorageSettings>(
