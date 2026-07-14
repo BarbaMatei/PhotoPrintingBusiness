@@ -17,7 +17,12 @@ public interface IStorageService
     /// <summary>Deletes the object at the given key. No-op if absent.</summary>
     Task DeleteAsync(string key, CancellationToken ct = default);
 
-    /// <summary>Opens a read stream for a stored file. Callers must dispose.</summary>
+    /// <summary>
+    /// Opens a read stream for a stored file. Callers must dispose. Every adapter throws
+    /// <see cref="FileNotFoundException"/> when the key is absent (the S3 adapter translates its
+    /// typed <c>NotFound</c> — F3, review 043-v1) so callers can catch one exception type across
+    /// tiers to map a missing object to a 404.
+    /// </summary>
     Task<Stream> GetStreamAsync(string key, CancellationToken ct = default);
 
     /// <summary>Returns true if an object exists at the given key.</summary>
