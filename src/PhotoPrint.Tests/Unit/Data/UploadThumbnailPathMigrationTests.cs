@@ -1,0 +1,56 @@
+using FluentAssertions;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using PhotoPrint.API.Data;
+using Xunit;
+
+namespace PhotoPrint.Tests.Unit.Data;
+
+/// <summary>
+/// M9 (review 042-v4): every upload/preview test uses the InMemory provider (ignores migrations)
+/// and the SQLite tests use EnsureCreated (the model, not migrations), so the
+/// AddUploadThumbnailPath migration DDL — including a typo in Up() — was exercised by NO test and
+/// could ship green. This applies the REAL migration chain to a SQLite database and asserts the
+/// column lands. The Npgsql "character varying(512)" arm stays deferred to the 3-env/Testcontainers
+/// phase (DB-1) — this covers the SQLite arm and the Up()/Down() DDL running at all.
+/// </summary>
+public class UploadThumbnailPathMigrationTests : IDisposable
+{
+    private readonly SqliteConnection _connection;
+
+    public UploadThumbnailPathMigrationTests()
+    {
+        _connection = new SqliteConnection("DataSource=:memory:");
+        _connection.Open();
+    }
+
+    public void Dispose() => _connection.Dispose();
+
+    private (string name, string type, bool notNull)? ThumbnailPathColumn()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT name, type, \"notnull\" FROM pragma_table_info('Uploads');";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.GetString(0) == "ThumbnailPath")
+                return (reader.GetString(0), reader.GetString(1), reader.GetInt32(2) == 1);
+        }
+        return null;
+    }
+
+    [Fact]
+    public void Migrate_OnSqlite_CreatesNullableUploadsThumbnailPathColumn()
+    {
+        var opts = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+        using var db = new PhotoPrintDbContext(opts);
+
+        db.Database.Migrate();
+
+        var column = ThumbnailPathColumn();
+        column.Should().NotBeNull("the AddUploadThumbnailPath migration must add the column");
+        column!.Value.notNull.Should().BeFalse("ThumbnailPath is nullable until a preview is generated");
+    }
+}
