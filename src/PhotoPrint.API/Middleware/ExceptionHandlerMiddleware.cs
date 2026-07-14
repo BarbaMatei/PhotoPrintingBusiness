@@ -20,6 +20,10 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(InvalidOrderTransitionException)]= (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(UnprocessableEntityException)]  = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         [typeof(DecompressionBombException)]    = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
+        // A decode that slips the pixel-area check but trips ImageSharp's allocation backstop
+        // (Program.cs) throws this, not an ImageFormatException — map it to 422, not a raw 500
+        // (L13, review 042-v4).
+        [typeof(SixLabors.ImageSharp.Memory.InvalidMemoryOperationException)] = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         [typeof(UnsupportedMediaTypeException)] = (StatusCodes.Status415UnsupportedMediaType, "Unsupported Media Type"),
         [typeof(RequestEntityTooLargeException)]= (StatusCodes.Status413RequestEntityTooLarge, "Request Entity Too Large"),
         [typeof(TooManyRequestsException)]      = (StatusCodes.Status429TooManyRequests, "Too Many Requests"),

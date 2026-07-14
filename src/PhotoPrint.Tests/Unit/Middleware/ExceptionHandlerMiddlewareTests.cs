@@ -89,6 +89,26 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_ImageAllocationBackstopTripped_Returns422NotRaw500()
+    {
+        // L13 (review 042-v4): a bomb whose header understated its decode size slips the
+        // pixel-area check, then the decode trips the 512 MB allocator backstop (Program.cs)
+        // throwing ImageSharp's InvalidMemoryOperationException — not an ImageFormatException —
+        // so it surfaced as a raw 500. Map it to 422.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new SixLabors.ImageSharp.Memory.InvalidMemoryOperationException("allocation exceeded");
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(422);
+        var body = await ReadResponseBodyAsync(context);
+        body.RootElement.GetProperty("status").GetInt32().Should().Be(422);
+    }
+
+    [Fact]
     public async Task InvokeAsync_UnknownException_Returns500WithExceptionDetailInDevelopment()
     {
         // Arrange
