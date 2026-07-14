@@ -318,6 +318,43 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
     expect(c.uploads()[0].status).toBe('error');
   });
 
+  it('does not mint a guest session for a logged-in user whose upload 401s (F3)', async () => {
+    // A logged-in user's JWT expires mid-upload. The interceptor logs out + navigates, flipping
+    // isAuthenticated to false (modelled by flipping `authed` on the 401). The component must NOT
+    // then see "not authenticated", re-init as an anonymous guest, and retry — that orphans the
+    // upload from the user's account. No init, no retry — the upload just fails.
+    let authed = true;
+    const auth = { isAuthenticated: () => authed, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = {
+      upload: vi.fn(() => { authed = false; return throwError(() => new HttpErrorResponse({ status: 401 })); }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+
+    c.onFilesAccepted([new File(['x'], 'p.jpg')]);
+
+    expect(upload.upload).toHaveBeenCalledTimes(1);            // no guest retry
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
+    expect(c.uploads()[0].status).toBe('error');
+  });
+
+  it('does not mint a guest session for a logged-in user whose restored preview 401s (F3)', async () => {
+    let authed = true;
+    const auth = { isAuthenticated: () => authed, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = {
+      getPreviewBlob: vi.fn(() => { authed = false; return throwError(() => new HttpErrorResponse({ status: 401 })); }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(1);    // no guest retry
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
+  });
+
   it('re-inits and retries a restored preview once on 401, keeping the entry (FE-4)', async () => {
     const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
     const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };

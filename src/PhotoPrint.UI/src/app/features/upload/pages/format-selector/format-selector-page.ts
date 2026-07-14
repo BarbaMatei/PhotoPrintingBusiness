@@ -223,13 +223,20 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
       clientIds.forEach(id =>
         this.updateUpload(id, { status: 'error', error: this.UPLOAD_ERROR }));
 
+    // F3 (review 042-v6): capture guest-ness BEFORE the request. A logged-in user whose JWT
+    // expires mid-upload 401s; the interceptor then runs logout()+navigate, flipping
+    // isAuthenticated to false. If we re-checked here we'd see "not authenticated", mint a
+    // throwaway anonymous guest, and retry — silently orphaning the upload from the user's
+    // account. Only self-heal when the caller was already a guest at send time.
+    const wasGuest = !this.authService.isAuthenticated();
+
     // FE-2: a stale-but-present guest token isn't caught by ensureGuestSession (it only
     // checks presence, not expiry — the token is an opaque id, so expiry can't be read
     // client-side), so the upload goes out stale and 401s; the interceptor then clears the
     // token. Re-init a fresh session and retry the upload exactly once so the self-heal is
     // seamless instead of surfacing a generic error the user must resolve by re-dropping.
     const onUploadError = (err: unknown) => {
-      if (!isRetry && err instanceof HttpErrorResponse && err.status === 401) {
+      if (wasGuest && !isRetry && err instanceof HttpErrorResponse && err.status === 401) {
         this.ensureGuestSession().subscribe({
           next: () => this.performUpload(files, newStates, true),
           error: () => failAll(),
@@ -390,11 +397,15 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
    *  entry; transient failures (5xx/network, or a still-failing retry) keep it visible for a
    *  later refresh (FE-4/NEW-2). */
   private fetchPreviewWithRetry(uploadId: string, clientId: string, isRetry: boolean): void {
+    // F3 (review 042-v6): capture guest-ness before the request — see performUpload. A
+    // logged-in user with an expired JWT must not be re-attributed to a throwaway guest by the
+    // preview self-heal; only guests re-init.
+    const wasGuest = !this.authService.isAuthenticated();
     this.uploadService.getPreviewBlob(uploadId).subscribe({
       next: url => this.updateUpload(clientId, { previewUrl: url }),
       error: (err: unknown) => {
         const status = err instanceof HttpErrorResponse ? err.status : null;
-        if (!isRetry && status === 401) {
+        if (wasGuest && !isRetry && status === 401) {
           // Expired guest token on refresh: the interceptor cleared it. Re-init and retry
           // once before deciding anything (FE-4). If re-init itself fails, keep the entry.
           this.ensureGuestSession().subscribe({
