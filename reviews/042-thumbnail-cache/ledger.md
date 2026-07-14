@@ -4,6 +4,12 @@ target: 042-thumbnail-cache
 updated: 2026-07-14
 ---
 
+<!-- v8 (2026-07-14, @e2093bd, third blinded discovery pass, Opus 4.8): +13 new (D85–D97),
+     15 re-raises of open/deferred items, 3 refuted (D78 re-raise + 2 new candidates).
+     New-finding curve finally decaying: v4 32 → v6 24 → v8 13. F3/D86 defeats the v7-verified
+     F2 fix; fix-generativity loop still live. Not saturated. -->
+
+
 # Defect ledger — Bolt 042: Thumbnail Cache
 
 The **cross-pass** record. Each pass numbers its findings locally and blindly (v1: `SEC-1`…;
@@ -17,7 +23,15 @@ The join key **within** a pass is the pass-local ID; the join key **across** pas
 
 ## Summary
 
-- **Cumulative distinct defects: 84** (D1–D84). 2 candidates refuted (not defects — v4-L2, v6-FP).
+- **Cumulative distinct defects: 97** (D1–D97). 3 candidates refuted (not defects — v4-L2, v6-FP,
+  v8's benign-→-bomb). D78 was raised then refuted at v8 (kept in the ledger, `refuted-this-pass`).
+- **v8 (third discovery pass, @`e2093bd`, Opus 4.8):** +13 new (`D85–D97`), **15 re-raises** of already-open
+  / deferred items, 3 refuted. **New-finding curve finally decaying: v4 32 → v6 24 → v8 13.** But **not
+  saturated** — 5 new mediums, and the fix-generativity loop is still live: **`D86`/F3 defeats the v6 F2 fix
+  that v7 just verified** (contact-info preserved by `clearGuestToken`, wiped by the next `storeSession`
+  re-init), `D96`/F22 residual of the F1/D61 decode limiter, `D92`/`D95` residual of the C1/D54 blob-URL fix.
+  Headline new medium `D85`/F2: the bundled Change C global `SplitQuery` default mis-pages un-tiebroken
+  collection-`Include` queries — a correctness angle no prior pass audited.
 - **Discovery-pass overlap (the saturation signal):** three blinded *discovery* passes — v1, v4, v6.
   v1↔v4 shared-identity overlap was **2** (`D23`, `D28`). v6 (post-v4-fix) re-found **all** items still
   open at its commit — the four standing deferrals/disputes `D23`, `D28`, `D31`/`D34`-residual, `D48` —
@@ -30,24 +44,26 @@ The join key **within** a pass is the pass-local ID; the join key **across** pas
   **fix-generated residuals** (`D61` decode-limiter default re-opens `D33`'s OOM; `D75` move-target race
   residual of `D35`/M2; `D62` bomb-event gap on the `D52`/L13 422 mapping). The feature is **not
   saturated** — closure still wants *another* quiet discovery pass (one that finds nothing new).
-- **Current state (after review-v6 discovery @`6c0ed93`):** all 26 fixed v4 findings remain
-  **verified** (none re-found open). v6 adds **D61–D84** (24 new, 0 High / 5 M / 15 L / 4 ⚪) + re-raised
-  4 deferrals + 1 dispute (`D48`, sharpened) + 1 refuted (v6-FP). Recommended before merge: `D61`/F1
-  (OOM default), `D48`/F2 (guest-session wipe at checkout), `D63`/F3 (JWT→guest re-attribution),
-  `D62`/F5 (bomb observability) + cheap doc fixes `D64`/F6, `D65`/F7. Cross-pass deferrals still stand:
-  **`D28`**→bolt-043 (F8), **`D31`/`D34`**→bolt-043 orphan sweep (F4, the residual TOCTOU),
-  **`D23`** Npgsql-DDL/snapshot→3-env (F24/F25). **`D46`/L5** (read-replica) upheld from v5. Per-finding:
-  [findings-v6.md](findings-v6.md) + [resolution-v6.md] (pending fixer). **Still not saturated.**
+- **Current state (after review-v8 discovery @`e2093bd`):** all v6 fixes (F1/F2/F3/F5 + doc F6/F7)
+  remain **verified** (v7) and none re-found open — except **`D86`/F3**, which shows the v6 **F2** fix is
+  **defeated** by an adjacent `storeSession` overwrite (a fix-generated residual, not a re-open of D48
+  itself). v8 adds **D85–D97** (13 new, 0 High / 5 M / 7 L / 1 ⚪). Recommended before merge: `D85`/F2
+  (split-query paging), `D86`/F3 (contact-info wipe), `D87`/F4 (bomb-alert test) + cheap obs `D88`/F5,
+  `D89`/F6 + doc `D91`/F23; bounded fix `D77`/F7 (bit-depth cap). Cross-pass deferrals still stand:
+  **`D28`**→bolt-043 (F24), **`D31`/`D34`**→bolt-043 orphan sweep (F1/F18), **`D23`** Npgsql-DDL/snapshot→3-env
+  (F14). Prior v6 recommendations already fixed+verified: `D61`/`D62`/`D63`/`D64`/`D65`. **`D46`/L5**
+  (read-replica) still upheld. Per-finding: [findings-v8.md](findings-v8.md). **Still not saturated, but the
+  new-finding curve is decaying (32 → 24 → 13) and 15 of 28 findings are re-raises.**
 
 ## Cross-pass defects (the ones that matter)
 
 | D# | Defect | Seen in (pass · local-id) | Status |
 |----|--------|---------------------------|--------|
-| **D23** | Migration provider-parity **and** its DDL exercised by no test | v1·`DB-1` (provider-aware **fixed**@bca68fa; DDL-test deferred) · v4·`M9` (DDL untested) · v4·`L10` (snapshot phantom AlterColumn) · v6·`F24`/`F25` | provider-aware **verified**; DDL/snapshot-test **deferred → 3-env phase** (v6 skeptic confirmed SQLite arm IS tested; only Npgsql uncovered) |
-| **D28** | Cloud `IStorageService` seekable-stream / `stream.Length` assumptions | v1·`CLOUD-1` (deferred) · v4·`L11` (ETag/seek) · v6·`F8` | **deferred → bolt-043** (re-affirmed v4, v6) |
-| **D33** | Image decode has no aggregate/concurrency memory bound (OOM under concurrent large images) | v3·deploy-note · v4·`M3` (**fixed**) · v6·`F1`=**D61** (limiter default still OOMs) | fix **verified (v5)**; **residual D61 open** — default slot count = `ProcessorCount`, ignores RAM |
-| **D31 / D34** | Cache-fill write vs cleanup TOCTOU → permanently orphaned thumbnail | v2·`NEW-3` (deferred) · v4·`M1` (**fixed**) · v5·`V5-1` (M1 residual) · v6·`F4` (residual re-found) | **deferred → bolt-043** orphan sweep; the M1 `stillLive` guard is non-atomic vs cleanup's end-of-batch commit |
-| **D48** | Self-heal broadened to swallow **every** unauth 401 (wipes guest session) | v4·`L7` (disputed) · v6·`F2` (sharpened: checkout contact-info + cart data-loss) | **disputed** on the redirect question; v6 gives a concrete data-loss scenario — **revisit** |
+| **D23** | Migration provider-parity **and** its DDL exercised by no test | v1·`DB-1` (provider-aware **fixed**@bca68fa; DDL-test deferred) · v4·`M9` (DDL untested) · v4·`L10` (snapshot phantom AlterColumn) · v6·`F24`/`F25` · v8·`F14` | provider-aware **verified**; DDL/snapshot-test **deferred → 3-env phase** (v6/v8 skeptics confirm SQLite arm IS tested; only Npgsql uncovered) |
+| **D28** | Cloud `IStorageService` seekable-stream / `stream.Length` assumptions | v1·`CLOUD-1` (deferred) · v4·`L11` (ETag/seek) · v6·`F8` · v8·`F24` | **deferred → bolt-043** (re-affirmed v4, v6, v8) |
+| **D33** | Image decode has no aggregate/concurrency memory bound (OOM under concurrent large images) | v3·deploy-note · v4·`M3` (**fixed**) · v6·`F1`=**D61** (limiter default still OOMs) · v8·`F22`=**D96** (budget ignores upload buffering) | fix **verified (v5)**; **D61 open** (default = `ProcessorCount`, ignores RAM); **D96 open** (budget excludes concurrent upload buffers) |
+| **D31 / D34** | Cache-fill write vs cleanup TOCTOU → permanently orphaned thumbnail | v2·`NEW-3` (deferred) · v4·`M1` (**fixed**) · v5·`V5-1` (M1 residual) · v6·`F4` · v8·`F1` (re-found) + v8·`F18` (hard-kill variant) | **deferred → bolt-043** orphan sweep; the M1 `stillLive` guard is non-atomic vs cleanup's end-of-batch commit; v8·F6/D89 adds the unlogged-partial-state face |
+| **D48 / D86** | Guest self-heal + contact-info handling | v4·`L7` (disputed) · v6·`F2`=**D48** (sharpened: checkout contact-info wipe) — **fixed v6 (F2)**, verified v7 · v8·`F3`=**D86** (the F2 fix is *defeated*: `clearGuestToken` preserves contact info but `storeSession` re-init overwrites it) | **D48 fixed+verified**; **D86 open** — fix-generated residual, recommend before merge |
 
 > Note the fix-generativity chain: v1·`BUG-3` (D5, deterministic thumbnail key — *fixed*) is the
 > **cause** of three new v4 defects: `D34` (`M1` write-vs-cleanup orphan), `D35` (`M2` concurrent
@@ -168,3 +184,26 @@ v4-`L10` map to **D23**, v4-`L11` to **D28**, v4-`M3` to **D33** — re-raises, 
 | D82 | `dropRestoredEntry` duplicates `onRemoveUpload` verbatim *(from D40/M8 fix)* | F27 | ⚪ | open |
 | D83 | `client_aborted` reads raw `Items["CorrelationId"]` not `GetCorrelationId()` | F28 | ⚪ | open |
 | D84 | Storage save/delete traces at `Debug` under Information floor → never emit | F29 | ⚪ | open |
+
+### v8 discovery (commit `e2093bd`, Opus 4.8) — full detail in [findings-v8.md](findings-v8.md)
+
+13 new (D85–D97). Re-raises (no new `D#`): v8·`F1`→**D34/D31**, `F7`→**D77** (bumped 🟡→🟠), `F9`→**D66**,
+`F10`→**D75**, `F11`→**D67**, `F12`→**D69**, `F14`→**D23**, `F15`→**D68**, `F16`→**D42**, `F17`→**D50**,
+`F18`→**D31**, `F24`→**D28**, `F25`→**D81**, `F26`→**D66**, `F27`→**D59**. Refuted: `H1`→**D78** (dead today),
+plus 2 fresh candidates (benign-→-bomb; orphan-reclaim-swallow = same FP as v6). Full per-finding: [findings-v8.md](findings-v8.md).
+
+| D# | Defect | v8 id | Sev | Status |
+|----|--------|-------|-----|--------|
+| D85 | Global `SplitQuery` default mis-pages un-tiebroken collection-`Include` (admin orders lose items) | F2 | 🟠 | open — recommend before merge |
+| D86 | `storeSession` re-init overwrites the contact info the F2/D48 fix preserved *(defeats v7-verified F2)* | F3 | 🟠 | open — recommend before merge |
+| D87 | Bomb test asserts base `UnprocessableEntityException`, so `decompression_bomb.rejected` alert can regress green | F4 | 🟠 | open — recommend before merge |
+| D88 | Lost ORIGINAL blob on a live row logged as a generic 404 (no distinct signal) | F5 | 🟠 | open — recommend (cheap log) |
+| D89 | Soft-delete-race thumbnail deletion leaves silent partial DB/file state | F6 | 🟠 | open — recommend (cheap log) |
+| D90 | Preview `private, max-age=2592000` recoverable device-locally on a shared browser *(residual of D1)* | F8 | 🟡 | open |
+| D91 | Bundled Change C (global split-query) has no AC/test, mislabeled "no behavior change" | F23 | 🟡 | open (doc) |
+| D92 | In-flight restore preview resolving after `ngOnDestroy` leaks an object URL *(residual of C1/D54)* | F21 | 🟡 | open |
+| D93 | No end-to-end bomb/oversize→422 test (integration `FakeImageProcessor` pins 800×600) | F13 | 🟡 | open |
+| D94 | Guest 401 off the upload page is a silent dead-end (self-heal is format-selector-only) | F19 | 🟡 | open |
+| D95 | `localUrl()` mints untracked blob URLs per change-detection for in-session photos *(residual of C1/D54)* | F20 | 🟡 | open |
+| D96 | Decode memory budget ignores concurrent upload buffering sharing the same RAM *(residual of D61/F1)* | F22 | 🟡 | open |
+| D97 | Conditional-GET `If-None-Match` only handles an exact strong tag (weak/list/`*` → full 200) | F28 | ⚪ | open |
