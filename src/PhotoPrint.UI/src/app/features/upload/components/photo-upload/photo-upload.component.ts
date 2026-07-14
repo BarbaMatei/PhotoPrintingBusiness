@@ -15,7 +15,9 @@ export interface FileValidationError {
 
 export const MAX_FILE_SIZE_BYTES = 52_428_800; // 50 MB
 export const MAX_UPLOAD_COUNT = 100;
-export const ACCEPTED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.heic']);
+// HEIC dropped (M5, review 042-v4): the API stack has no HEIF decoder, so a .heic upload only
+// fails later at decode. Re-add '.heic' here and in the accept attr / hint once decode lands.
+export const ACCEPTED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 
 /** Returns the lowercase extension including the dot, e.g. '.jpg'. */
 export function getExtension(fileName: string): string {
@@ -44,7 +46,7 @@ export function getExtension(fileName: string): string {
       <input
         #fileInput
         type="file"
-        accept=".jpg,.jpeg,.png,.heic"
+        accept=".jpg,.jpeg,.png"
         multiple
         hidden
         (change)="onFileInputChange($event)"
@@ -56,7 +58,7 @@ export function getExtension(fileName: string): string {
         <p class="upload-zone__text">
           Trage fotografiile aici sau <strong>alege fișiere</strong>
         </p>
-        <p class="upload-zone__hint">JPG, PNG, HEIC &middot; max 50 MB/fișier &middot; max 100 fotografii</p>
+        <p class="upload-zone__hint">JPG, PNG &middot; max 50 MB/fișier &middot; max 100 fotografii</p>
       </div>
     </div>
   `,
