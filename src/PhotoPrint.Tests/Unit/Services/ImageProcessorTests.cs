@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -144,6 +145,32 @@ public class ImageProcessorTests
                 It.Is<Exception?>(e => e != null),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task LoadSingleFrameAsync_MultiFrameGif_DecodesOnlyOneFrame()
+    {
+        // M11 (review 042-v4): the frame-bomb cap (MaxFrames=1) is invisible in
+        // GenerateThumbnailAsync's JPEG output (JPEG is single-frame regardless), so nothing
+        // pinned it — removing it kept the suite green while a thousands-of-frames file again
+        // materialised frames x canvas x 4 bytes on decode. A genuine 3-frame GIF must decode to
+        // exactly one frame. (internal method reached by reflection, matching the repo pattern.)
+        using var f1 = new Image<Rgba32>(8, 8);
+        using var f2 = new Image<Rgba32>(8, 8);
+        using var animated = new Image<Rgba32>(8, 8);
+        animated.Frames.AddFrame(f1.Frames.RootFrame);
+        animated.Frames.AddFrame(f2.Frames.RootFrame);
+        animated.Frames.Count.Should().Be(3);
+
+        using var gif = new MemoryStream();
+        await animated.SaveAsGifAsync(gif);
+        gif.Position = 0;
+
+        var method = typeof(ImageProcessor).GetMethod(
+            "LoadSingleFrameAsync", BindingFlags.NonPublic | BindingFlags.Static);
+        using var decoded = await (Task<Image>)method!.Invoke(null, new object[] { gif, CancellationToken.None })!;
+
+        decoded.Frames.Count.Should().Be(1);
     }
 
     // ── GetInfoAsync ───────────────────────────────────────────────────────────

@@ -68,21 +68,17 @@ public class ImageProcessor : IImageProcessor
 
         await using var stream = await _storage.GetStreamAsync(storagePath, ct);
 
-        // MaxFrames = 1 caps a multi-frame (e.g. APNG) bomb: without it a small-canvas file
-        // with thousands of near-identical frames materialises frames × canvas × 4 bytes on
-        // decode. This app only ever needs one still frame (bolt 042, BUG-1).
-        var decoderOptions = new DecoderOptions { MaxFrames = 1 };
-
         Image image;
         try
         {
             // Reject pixel bombs before the full decode allocates pixel buffers (bolt 042, BUG-1).
-            var info = await Image.IdentifyAsync(decoderOptions, stream, ct);
+            // Identify reads only header metadata, so it needs no frame cap; the load below does.
+            var info = await Image.IdentifyAsync(stream, ct);
             if (info is not null && ExceedsDecodeLimits(info.Width, info.Height))
                 throw new DecompressionBombException(info.Width, info.Height, DimensionsExceededMessage);
             stream.Position = 0;
 
-            image = await Image.LoadAsync(decoderOptions, stream, ct);
+            image = await LoadSingleFrameAsync(stream, ct);
         }
         catch (ImageFormatException ex)
         {
@@ -111,4 +107,11 @@ public class ImageProcessor : IImageProcessor
             return ms;
         }
     }
+
+    // MaxFrames = 1 caps a multi-frame (APNG/GIF/WebP) bomb: without it a small-canvas file with
+    // thousands of near-identical frames materialises frames × canvas × 4 bytes on decode. This
+    // app only ever needs one still frame (bolt 042, BUG-1). Extracted + internal so a test can
+    // prove the cap holds — it can't be observed in the single-frame JPEG output (M11, review 042-v4).
+    internal static Task<Image> LoadSingleFrameAsync(Stream stream, CancellationToken ct = default)
+        => Image.LoadAsync(new DecoderOptions { MaxFrames = 1 }, stream, ct);
 }
