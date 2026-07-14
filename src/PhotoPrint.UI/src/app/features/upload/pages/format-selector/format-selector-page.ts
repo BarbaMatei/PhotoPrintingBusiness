@@ -397,14 +397,16 @@ export class FormatSelectorPage implements OnInit {
           });
           return;
         }
-        if (status === 404) {
-          // The upload is genuinely gone — drop the stale entry.
+        // Drop the entry when it is permanently un-fetchable AND un-cartable: a 404 (gone), a
+        // 403 (a re-init minted a new guest session that no longer owns this upload), or a
+        // still-401 after the re-init retry. Keeping it preview-less would let the user cart an
+        // orphan that then 403s at checkout (M8, review 042-v4).
+        if (status === 404 || status === 403 || (isRetry && status === 401)) {
           this.dropRestoredEntry(clientId);
           return;
         }
-        // Transient failure (5xx / network / still-401 after retry): keep the completed
-        // upload visible (without a preview) rather than erasing work; a later refresh
-        // retries. Only a definitive 404 discards it (NEW-2, review 042-v2).
+        // Transient failure (5xx / network): keep the completed upload visible (without a
+        // preview) rather than erasing work; a later refresh retries (NEW-2, review 042-v2).
       },
     });
   }

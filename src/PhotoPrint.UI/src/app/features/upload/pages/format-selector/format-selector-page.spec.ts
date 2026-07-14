@@ -217,6 +217,40 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
     return TestBed.createComponent(FormatSelectorPage).componentInstance;
   }
 
+  it('fails the upload after a persistent 401 without looping (L8)', async () => {
+    // The one-shot !isRetry guard must stop after a single retry even if the retry also 401s —
+    // otherwise it loops, hammering initAnonymousSession and the endpoint.
+    let token: string | null = 'stale';
+    const auth = { isAuthenticated: () => false, getGuestToken: () => token, clearGuestToken: vi.fn(() => { token = null; }) };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = {
+      upload: vi.fn(() => {
+        token = null; // interceptor clears the token on each 401
+        return throwError(() => new HttpErrorResponse({ status: 401 }));
+      }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+
+    c.onFilesAccepted([new File(['x'], 'p.jpg')]);
+
+    expect(upload.upload).toHaveBeenCalledTimes(2);  // initial + exactly one retry, then stop
+    expect(c.uploads()[0].status).toBe('error');
+  });
+
+  it('re-inits after a settled init when the token is still absent (L9)', async () => {
+    // FE-1 dedups concurrent inits via a shared in-flight observable; the finalize() reset must
+    // let a LATER expiry re-init. With a COMPLETING init and the token still null, a second
+    // ensureGuestSession must fire a second init (removing finalize would replay the stale one).
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const c = await setupWithMocks({ auth, guestAuth, upload: {} });
+
+    (c as unknown as { ensureGuestSession(): { subscribe(): void } }).ensureGuestSession().subscribe();
+    (c as unknown as { ensureGuestSession(): { subscribe(): void } }).ensureGuestSession().subscribe();
+
+    expect(guestAuth.initAnonymousSession).toHaveBeenCalledTimes(2);
+  });
+
   it('shares one in-flight anonymous-session init across concurrent callers (FE-1)', async () => {
     const init$ = new Subject<{ guestToken: string }>();
     const guestAuth = { initAnonymousSession: vi.fn(() => init$.asObservable()), storeSession: vi.fn() };
@@ -301,6 +335,45 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
 
     expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
     expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
+  });
+
+  it('drops a restored entry when the retried preview 403s — a new guest session no longer owns it (M8)', async () => {
+    // Long-lived tab, token expired: preview 401 -> interceptor clears -> re-init mints a NEW
+    // session -> retry 403 (new session doesn't own the old upload). The entry must be dropped,
+    // not kept preview-less (which leaves an un-cartable orphan the user carts -> checkout 403).
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    let n = 0;
+    const upload = {
+      getPreviewBlob: vi.fn(() => {
+        n++;
+        return n === 1
+          ? throwError(() => new HttpErrorResponse({ status: 401 }))
+          : throwError(() => new HttpErrorResponse({ status: 403 }));
+      }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(2);
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
+  });
+
+  it('drops a restored entry on a persistent 401 after re-init (M8)', async () => {
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = { getPreviewBlob: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 401 }))) };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(2);  // initial + one retry, then drop
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
   });
 
   it('keeps a restored entry on a transient (non-404) preview error (NEW-2)', async () => {
