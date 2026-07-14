@@ -280,19 +280,24 @@ public class ExceptionHandlerMiddlewareTests
         _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
         var sut = CreateSut();
         var context = CreateContext();
+        // Distinct width/height so the assertion proves BOTH dimensions are carried, not just one.
         RequestDelegate next = _ =>
-            throw new DecompressionBombException(30_000, 30_000, "Image dimensions exceed limits.");
+            throw new DecompressionBombException(31_000, 32_000, "Image dimensions exceed limits.");
 
         await sut.InvokeAsync(context, next);
 
         context.Response.StatusCode.Should().Be(422);
 
+        // L12 (review 042-v4): assert the event carries the dimensions it exists to convey, not
+        // just its name — dropping width/height (the whole point of the event) must fail this.
         _loggerMock.Verify(
             l => l.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((v, _) =>
-                    v.ToString()!.Contains("uploads.decompression_bomb.rejected")),
+                    v.ToString()!.Contains("uploads.decompression_bomb.rejected") &&
+                    v.ToString()!.Contains("31000") &&
+                    v.ToString()!.Contains("32000")),
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
