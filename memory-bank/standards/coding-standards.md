@@ -1,196 +1,139 @@
 # Coding Standards
 
-## Overview
-Consistent code style and quality standards for both the Angular frontend (TypeScript/SCSS) and ASP.NET Core backend (C#), optimized for AI code generation and team consistency.
+*(Rewritten 2026-07-14 from the code. Descriptive — states what IS, not what is planned.)*
 
-## Code Formatting
+## Formatting & linting — current reality
 
 ### Backend (C#)
-**Tool**: Built-in .NET formatting / EditorConfig
-**Key Settings**:
-- Indentation: 4 spaces
-- Braces: Allman style (new line)
-- Max line length: 120 characters
-- Usings: sorted, `System` first
+- 4-space indent, Allman braces, ~120-char lines, `System` usings first.
+- Nullable reference types enabled.
+- No analyzer/lint step in CI beyond the compiler.
 
 ### Frontend (TypeScript/SCSS)
-**Tool**: Angular CLI defaults (TSLint/ESLint + Prettier)
-**Key Settings**:
-- Indentation: 2 spaces
-- Semicolons: always
-- Quotes: single quotes
-- Trailing commas: multi-line only
-- Max line length: 120 characters
+- **Prettier** (`.prettierrc`) is the only formatter. 2-space indent, single quotes.
+- **There is no ESLint** — no config, no `lint` script, no CI lint step (ci.yml says so
+  explicitly). Do not "fix lint" that doesn't exist; adding ESLint is planned work, not current
+  reality.
+- `tsconfig` is strict: `strict`, `strictTemplates`, `strictInjectionParameters`,
+  `noPropertyAccessFromIndexSignature`.
 
-**Enforcement**: Angular CLI lint on save and in CI pipeline
+## Naming conventions
 
-## Linting
-
-### Backend (C#)
-**Tool**: .NET analyzers + nullable reference types enabled
-**Strictness**: Strict
-- Nullable reference types: enabled (`<Nullable>enable</Nullable>`)
-- Treat warnings as errors in CI
-- No unused variables or imports
-
-### Frontend (TypeScript)
-**Tool**: ESLint with Angular plugin
-**Strictness**: Strict
-- `strict: true` in tsconfig
-- No `any` type — use `unknown` where type is uncertain
-- No unused variables (error)
-- No console.log in production code
-
-## Naming Conventions
-
-### Backend (C#)
+### Backend (C#) — unchanged and accurate
 
 | Element | Convention | Example |
 |---------|------------|---------|
-| Classes | PascalCase | `AuthService`, `OrderController` |
-| Interfaces | `I` prefix + PascalCase | `IUserRepository`, `IEmailService` |
-| Methods | PascalCase | `GetUserByIdAsync`, `RegisterAsync` |
-| Properties | PascalCase | `Email`, `CreatedAt` |
-| Variables | camelCase | `userName`, `isActive` |
-| Constants | PascalCase | `MaxUploadSize`, `DefaultPageSize` |
-| Private fields | `_camelCase` | `_userRepository`, `_logger` |
-| Async methods | `Async` suffix | `RegisterAsync`, `GetOrdersAsync` |
+| Classes / methods / properties | PascalCase | `AuthService`, `GetUserByIdAsync` |
+| Interfaces | `I` + PascalCase | `IStorageService` |
+| Private fields | `_camelCase` | `_logger` |
+| Async methods | `Async` suffix | `RegisterAsync` |
+| Constants | PascalCase | `MaxUploadSize` |
 
-**File Naming**: PascalCase matching class name — `AuthService.cs`, `OrderController.cs`
-
-### Frontend (TypeScript)
+### Frontend (TypeScript) — as actually practiced (Angular 21)
 
 | Element | Convention | Example |
 |---------|------------|---------|
-| Components | PascalCase class, kebab-case selector | `RegisterComponent`, `app-register` |
-| Services | PascalCase | `AuthService`, `CartService` |
-| Interfaces/Types | PascalCase (no `I` prefix) | `User`, `OrderSummary` |
-| Variables | camelCase | `userName`, `isLoading` |
-| Constants | UPPER_SNAKE_CASE | `MAX_FILE_SIZE`, `API_URL` |
-| Observables | `$` suffix | `user$`, `orders$` |
-| Booleans | `is`/`has`/`can` prefix | `isActive`, `hasPermission` |
+| Components | standalone class, kebab selector, short file names | `Header` in `header.ts` (`app-header`) |
+| DI | **`inject()` only** — no constructor-parameter injection | `private auth = inject(AuthService)` |
+| Service state | RxJS `BehaviorSubject`, `$$` private / `$` public | `isAuthenticated$$` / `isAuthenticated$` |
+| Component state | **signals** (`signal`, `computed`); bridge services via `toSignal()` | `cartCount = toSignal(this.cart.itemCount$)` |
+| Templates | `@if/@for/@switch` for new code (legacy `*ngIf/*ngFor` still exists in older templates — migrate opportunistically, don't mix within one template) | |
+| Files | kebab-case, sibling `.spec.ts` | `auth.service.ts` / `auth.service.spec.ts` |
 
-**File Naming**: kebab-case — `register.component.ts`, `auth.service.ts`, `order-summary.model.ts`
+Component defaults: standalone, `OnPush` change detection (the app runs **zoneless** — no
+zone.js polyfill; forgetting OnPush/signals means missed change detection, not just slowness),
+external `templateUrl`/`styleUrl`, SCSS. UI strings are **Romanian**.
 
-## File Organization
+## File organization
 
-### Backend Pattern: Type-based with domain context
-
-```text
-src/PhotoPrint.API/
-  Controllers/       → API controllers (thin, delegate to services)
-  Services/          → Business logic (IService + Service pairs)
-  Models/            → EF Core entities (POCO classes)
-  DTOs/              → Request + Response DTOs per feature
-  Validators/        → FluentValidation validators
-  Hubs/              → SignalR hubs
-  Middleware/         → Exception handling, correlation ID, security headers
-  BackgroundJobs/    → IHostedService implementations
-  EmailTemplates/    → Razor .cshtml templates
-  Migrations/        → EF Core auto-generated
-  Exceptions/        → Custom exception types
-  Filters/           → Action filters
-  Configuration/     → Settings POCO classes
-```
-
-### Frontend Pattern: Feature-based with shared core
+### Backend — `src/PhotoPrint.API/`
 
 ```text
-photo-print-fe/src/app/
-  core/              → Singletons: services, guards, interceptors, models
-  shared/            → Reusable components, pipes, directives
-  features/          → Lazy-loaded feature modules
-    auth/
-    upload/
-    checkout/
-    orders/
-    account/
-    admin/
-    legal/
-  environments/      → Environment config files
+Authentication/    → guest-token auth handler
+BackgroundJobs/    → hosted services (cleanup, promotion, recovery, email…)
+Cli/               → CLI commands (e.g. backfill-archive) run via Program args
+Configuration/     → settings POCOs
+Controllers/       → thin controllers, delegate to Services/
+Data/              → PhotoPrintDbContext, DbProviders
+DTOs/ Exceptions/ Extensions/ Filters/ HealthChecks/ Hubs/ Middleware/
+Migrations/        → single shared set — see data-stack.md before touching
+Models/            → EF entities
+Services/          → business logic (IService + Service pairs)
+Validators/        → FluentValidation (data annotations are prohibited — ADR-002)
 ```
 
-**Conventions**:
-- Tests: co-located `.spec.ts` (frontend), separate `Tests/` project (backend)
-- Types: co-located in `core/models/` (frontend), `DTOs/` and `Models/` (backend)
-- One component per file; co-locate `.ts`, `.html`, `.scss`, `.spec.ts`
+### Frontend — `src/PhotoPrint.UI/src/app/`
 
-## Testing Strategy
+```text
+core/       → guards, interceptors, models, pipes, services (singletons)
+shared/     → reusable components, utils, validators, toast
+features/   → lazy areas: account, admin, auth, cart, checkout, home, legal,
+              orders, pricing, upload — each with pages/ (+ components/, *.routes.ts)
+layout/     → header, footer
+src/styles/ → _variables (tokens), _mixins, _buttons, _auth-forms partials
+```
 
-### Backend (xUnit)
+Routing: Romanian slugs, everything lazy (`loadComponent`/`loadChildren`); heavy libs
+(leaflet, stripe-js) are additionally deferred via dynamic `import()` inside the component.
 
-**Framework**: xUnit + Moq + FluentAssertions
-**Coverage Target**: 80%+ line coverage (services), 100% rule coverage (validators)
+## Testing
 
-| Type | Tool | Location |
-|------|------|----------|
-| Unit | xUnit + Moq | `src/PhotoPrint.Tests/Unit/` |
-| Integration | xUnit + WebApplicationFactory + Testcontainers | `src/PhotoPrint.Tests/Integration/` |
+### Backend (xUnit + Moq + FluentAssertions + Xunit.SkippableFact)
 
-**Conventions**:
-- Test naming: `MethodName_StateUnderTest_ExpectedBehavior`
-- Structure: Arrange-Act-Assert
-- Mock all dependencies via interfaces
-- Use `InMemoryDatabase` for simple EF queries; Testcontainers (real PostgreSQL) for complex queries
+- Naming: `Method_Scenario_ExpectedOutcome`. Arrange-Act-Assert.
+- Integration tests use the `WebApplicationFactory<Program>` family (`AuthFactory` base →
+  feature factories). **Default DB is EF InMemory** — it cannot enforce unique indexes or
+  check constraints; for relational behavior use the `SqlitePaymentFactory` pattern (real
+  SQLite on a shared in-memory connection). See data-stack.md *"what the test matrix can and
+  cannot prove"*.
+- Real-S3 tests are `[SkippableFact]` gated on `STORAGE_TEST_*` env vars (set in CI's MinIO
+  step; skipped locally unless you run MinIO).
+- **The mocking rule (definition-of-done class 5): mock only at system boundaries** — network,
+  external APIs, SMTP. The component under test's own collaborators (image processing, storage
+  routing, DB behavior) must run REAL in at least one test of their guards. History: a fully
+  mocked `IImageProcessor` made 490 green tests prove nothing about image handling (042-D25).
+- Every failure mode named in the bolt's ddd-02 table has a test that goes red when the bug is
+  injected. Fix-regression tests must fail on revert (the review loop checks this).
+- There is **no clock abstraction** — code calls `DateTimeOffset.UtcNow` directly; time-window
+  tests assert against real time. Factor this in before writing time-sensitive assertions.
+- Each suite/report states **what it cannot prove** (Postgres semantics, real image decoding,
+  live payment APIs) and where that gap is covered.
 
-### Frontend (Jasmine/Karma)
+### Frontend (Vitest 4)
 
-**Framework**: Jasmine + Karma (Angular default)
-**Coverage Target**: 70%+ branch coverage (components), 80%+ (services)
+- Runner is Vitest via the Angular builder (`@angular/build:unit-test`); **there is no
+  vitest.config file** — configuration lives in angular.json/tsconfig.spec.json. jsdom
+  environment. `npm test` → `ng test`; CI adds `--watch=false`.
+- Pattern: `TestBed.configureTestingModule` with standalone providers;
+  `provideHttpClient(withInterceptors([...]))` + `provideHttpClientTesting()` +
+  `HttpTestingController`; `provideRouter([])`; mocking via `vi.spyOn`/`vi.fn`.
+- Sibling `*.spec.ts` files, co-located.
 
-| Type | Tool | Location |
-|------|------|----------|
-| Unit | Jasmine + Karma | Co-located `.spec.ts` files |
-| E2E | Cypress or Playwright | `e2e/` folder |
+## Error handling
 
-**Conventions**:
-- Use `TestBed` for component tests
-- Mock services with `jasmine.createSpyObj()`
-- Use `HttpClientTestingModule` for HTTP service tests
-- Use `data-testid` attributes for stable E2E selectors
-
-### Test Data
-- Use factories/builders for test data creation
-- Seed realistic Romanian test data (names, addresses, phone numbers)
-- Never use production data in tests
-
-### CI Integration
-- Unit tests: run on every PR
-- Integration tests: run on merge to main
-- E2E tests: nightly or before release
-
-## Error Handling
-
-### Backend Pattern: Custom exceptions + middleware
-
-**Custom Exceptions**: `NotFoundException` (404), `ConflictException` (409), `ForbiddenException` (403)
-**Global Handler**: `ExceptionHandlerMiddleware` catches all unhandled exceptions → ProblemDetails (RFC 7807)
-**API Errors**: include `correlationId`, never expose stack traces in production
-
-### Frontend Pattern: Interceptors + toast notifications
-
-**HTTP Errors**: `ErrorInterceptor` handles 403/5xx with toast notifications
-**Form Validation**: inline field errors shown on blur and submit
-**Loading States**: spinner/disabled button during API calls
+- Backend: custom exceptions (`NotFoundException` 404, `ConflictException` 409 per ADR-004,
+  `ForbiddenException` 403, validation 422 per ADR-002) → `ExceptionHandlerMiddleware` →
+  ProblemDetails with `correlationId`. Every exception type a dependency can throw is mapped or
+  deliberately propagated, with a test (definition-of-done class 10).
+- Frontend: `errorInterceptor` — 401: authenticated → logout + redirect to login; guest/anon →
+  `clearGuestToken()` only (never redirect a guest to login). 403/5xx/network-0 → Romanian
+  toasts. **There is no refresh-token / silent-renew flow** — deliberately deferred; don't
+  assume one exists.
+- Any change to interceptor/guard/session behavior must walk the user-type × token-state
+  matrix (definition-of-done class 11) — this cluster produced more re-found defects than any
+  other.
 
 ## Logging
 
-### Backend
-**Tool**: Serilog (structured JSON logging)
-**Format**: JSON (structured)
+- Serilog, structured JSON (compact formatter), enrichers for environment/thread; always
+  `correlationId`.
+- **Level floor is Information** — a `Debug` log line in production code paths effectively
+  does not exist (042-D16/D84). New error/side-effect paths log at `Information`+ and must be
+  distinguishable per incident type (definition-of-done class 6).
+- Never log secrets, tokens, or PII; bound any user-controlled string you log.
 
-| Level | Usage |
-|-------|-------|
-| Information | Business events (user registered, order placed) |
-| Warning | Expected errors (validation failures, not found) |
-| Error | Unexpected failures (unhandled exceptions, integration errors) |
-| Debug | Detailed technical info (development only) |
+## Comments
 
-**Rules**:
-- Always log: API requests (method, path, status, duration), auth events, business events, errors with context
-- Never log: passwords, tokens, API keys, PII without consent
-- Always include `correlationId` in log entries
-
-### Frontend
-- No `console.log` in production — use `environment.production` guard
-- Error interceptor logs to browser console in dev mode only
+Minimal. Comment only non-obvious intent or invariants the code can't express. Never narrate a
+fix in-code ("now handles X") — rationale lives in the commit message and, for review fixes,
+the resolution file.

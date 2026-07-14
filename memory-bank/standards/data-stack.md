@@ -1,55 +1,90 @@
 # Data Stack
 
-## Overview
-PostgreSQL 16 serves as the single relational database, accessed via Entity Framework Core 8 with a Code-First migration approach. All data is modeled relationally with UUID primary keys.
+*(Rewritten 2026-07-14 from the code. Descriptive — this states what IS, not what is planned.)*
 
-## Database
+## Overview — the dual-provider reality
 
-**PostgreSQL 16** — self-hosted via Docker (dev), managed service (prod)
+There is no single database. The app runs on **two providers plus one test double**, selected by
+the `DatabaseProvider` config key (default `"Postgres"`; constants in
+`src/PhotoPrint.API/Data/DbProviders.cs`):
 
-PostgreSQL was chosen for its robustness, JSON support (JSONB for flexible fields like shipping addresses and crop data), excellent indexing, and wide hosting availability. The data model is fully relational — users, orders, products, cart items — with clear foreign key relationships.
+| Environment | Provider | Schema creation |
+|---|---|---|
+| Production / default | **PostgreSQL 16** (`UseNpgsql`) | `Database.Migrate()` at boot (Program.cs, Npgsql branch only) |
+| Development (`appsettings.Development.json`) | **SQLite file** (`photoPrint-dev.db`) | `EnsureCreated()` + a self-heal that drops/recreates if core tables are missing — **migrations never run here** |
+| Integration tests (default) | **EF InMemory** | model-built; relational features (unique indexes, check constraints) not enforced |
+| Specific relational tests | **SQLite in-memory** (shared open connection) | `EnsureCreated()`, or `Database.Migrate()` in the migration-chain test |
 
-### Key Characteristics
-- All primary keys: UUID (Guid) — no auto-increment integers
-- All entities include `CreatedAt` (DateTimeOffset) and `UpdatedAt` (DateTimeOffset, nullable)
-- Soft deletes where applicable via `DeletedAt` (DateTimeOffset, nullable)
-- JSONB columns for semi-structured data: `ShippingAddress`, `CropData`
-- Currency stored as `decimal(18,2)` in RON
+**The standing parity warning (recurring review finding, D23-class):** the single migration set
+under `Migrations/` was scaffolded against SQLite — the snapshot carries `TEXT/INTEGER/REAL`
+store types and no Npgsql annotations — yet those migrations execute **only against Postgres**
+(at prod boot). Dev never runs them; the InMemory test default can't validate them; only one
+unit test (`UploadThumbnailPathMigrationTests`) applies the chain, on SQLite. Nothing in the
+repo proves the DDL against Postgres today (deferred to the Testcontainers/3-env work). Any
+bolt touching a migration must read this paragraph and D-o-D class 2.
 
-### Core Tables
-- `Users` — accounts with email, password hash, role, Google ID
-- `GuestSessions` — anonymous sessions with hashed tokens, 7-day TTL
-- `RefreshTokens` — SHA-256 hashed, with rotation tracking
-- `Products` — print format × finish combinations (6 products)
-- `CartItems` — per-user or per-guest-session, linked to product and upload
-- `Orders` — payment, shipping, status tracking with `FT-YYYYNNNN` order numbers
-- `OrderItems` — individual photos in an order with quantity
-- `EasyboxLockers` — Sameday locker locations with coordinates
+## Provider-conditional model configuration (read before touching OnModelCreating)
 
-## ORM / Database Client
+`PhotoPrintDbContext.OnModelCreating` branches on `Database.ProviderName`:
 
-**Entity Framework Core 8** (Code-First) with `Npgsql.EntityFrameworkCore.PostgreSQL` provider
+- **SQLite only:** every `DateTimeOffset` property gets a value converter to Unix-epoch
+  milliseconds (`long`) — SQLite has no native DateTimeOffset. Ordering/precision behavior
+  therefore differs from Postgres.
+- **Non-SQLite only:** `decimal(10,2)` column types on money fields (`PricingTier.UnitPrice`,
+  `Order.*Ron`, `OrderItem.*Ron`). On SQLite, decimals are TEXT.
+- **Postgres only:** `jsonb` column type for `Order.ShippingAddress` and
+  `OrderItem.ProductSnapshot` (both serialized via a camelCase `JsonSerializer` value
+  converter; TEXT elsewhere).
+- **Skipped on InMemory:** check constraints `CK_Uploads_OneOwner`, `CK_CartItems_OneOwner`
+  (exactly one of `UserId`/`GuestSessionId`) — relational-only API.
 
-EF Core was chosen for its tight integration with ASP.NET Core, LINQ-based query composition, automatic migration generation, and strong typing via navigation properties.
+Consequence for tests: a behavior resting on unique indexes, check constraints, `jsonb`, or
+decimal precision is **invisible to the InMemory default** — use the SQLite-in-memory pattern
+(`SqlitePaymentFactory` is the model) and note the remaining Postgres gap.
 
-### Conventions
-- DbContext: `PhotoPrintDbContext` with `DbSet<T>` for each entity
-- Entities are POCO classes in `Models/` folder with navigation properties
-- Use `IQueryable<T>` for composable queries; materialize with `ToListAsync()`
-- Never expose entities directly — map to/from DTOs
-- Never use raw SQL with user input — always parameterized queries
-- Composite indexes on frequently filtered columns (e.g., `Status` + `CreatedAt`)
-- Table names: PascalCase (EF Core default)
-- Column names: PascalCase (EF Core default)
-- Foreign keys: `EntityNameId` pattern (e.g., `UserId`, `OrderId`)
+## Entities (17 DbSets)
 
-### Migration Strategy
-- Development: `dotnet ef database update`
-- Production: apply migrations at startup or via CI/CD pipeline
-- Rollback: `dotnet ef database update <previous-migration>`
-- Never drop tables in production — use data-preserving migrations
+`User`, `RefreshToken`, `EmailConfirmationToken`, `PasswordResetToken`, `ExternalLogin`,
+`GuestSession`, `Product`, `ProductSize`, `ProductFinish`, `PricingTier`, `Upload`, `CartItem`,
+`EasyboxLocker`, `Order`, `OrderItem`, `SavedAddress`, `EmailQueue`.
 
-## Decision Relationships
-- PostgreSQL JSONB is used for `ShippingAddress` and `CropData` to avoid excessive normalization for address fields
-- EF Core Code-First allows the schema to evolve with the domain model during development
-- UUID keys prevent enumeration attacks and simplify distributed ID generation
+### Key conventions (as implemented)
+
+- **PKs:** `Guid Id` everywhere, defaulted by property initializer (`Guid.NewGuid()`), not by
+  the database.
+- **Timestamps:** no EF interceptor/automation. `CreatedAt` is set by property initializer
+  (`DateTimeOffset.UtcNow`); only `Order` and `SavedAddress` carry `UpdatedAt`
+  (nullable, maintained manually in services). `Upload` uses `UploadedAt`; `CartItem` uses
+  `AddedAt`. Don't assume an `UpdatedAt` exists.
+- **Soft delete:** `Upload` only (`DeletedAt`), enforced **manually per query** — there is no
+  global query filter. Every new Upload query must filter `DeletedAt == null` itself.
+- **Enums:** stored as strings via `HasConversion<string>()` (`Order.Status`,
+  `User.Role`, `EmailQueue.Status`, payment/delivery enums) — except `Upload.StorageLocation`,
+  stored as `int` with default `Local`.
+- **Concurrency:** there are **no concurrency tokens** (no RowVersion/xmin anywhere).
+  Correctness under concurrency is achieved by unique indexes + violation detection + retry —
+  the named index constants `ix_orders_idempotency_key` / `ix_orders_order_number` are exposed
+  on the DbContext and string-matched by `OrderService`. A change that needs optimistic
+  concurrency is a schema decision (see ledger D9 / bolt-035 deferral), not a quick add.
+- **Idempotency:** `Order.IdempotencyKey`, globally-unique index (partial on Postgres,
+  `IS NOT NULL` filter; plain unique on SQLite). Known accepted residual: not tenant-scoped.
+
+## Migration rules (as they actually work today)
+
+- One shared migration set, currently SQLite-typed. New migrations are scaffolded from the
+  SQLite-flavored snapshot — check what the generated DDL means on Postgres before committing.
+- Dev does not run migrations at all (`EnsureCreated`) — do not rely on dev boot to validate a
+  migration; run the migration-chain unit test pattern instead.
+- Production applies pending migrations at boot. Never drop tables; data-preserving migrations
+  only.
+- Seeding: `--seed` / `--seed-dev` boot modes; one migration (`AddShippingAndOrderTables`)
+  seeds ~50 `EasyboxLocker` rows via `InsertData`.
+
+## What the test matrix can and cannot prove
+
+| Layer | Provider | Proves |
+|---|---|---|
+| Integration default (WebApplicationFactory family) | InMemory | wiring, auth pipeline, contract shapes — **not** unique indexes, constraints, SQL semantics |
+| `SqlitePaymentFactory` + SQLite `:memory:` unit tests | SQLite | unique-index 409 paths, migration chain (SQLite arm), relational behavior |
+| MinIO `SkippableFact` suite (CI-gated via `STORAGE_TEST_*` env) | — | real S3 protocol behavior |
+| *(nothing)* | Postgres | **nothing is proven against Postgres today** — CI starts a postgres:16 service container that no test uses. The Npgsql arm is the standing gap (D23), planned via Testcontainers. |

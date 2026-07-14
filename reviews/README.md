@@ -233,6 +233,12 @@ The steps are **strict — follow them in order**; don't improvise the parts the
 7. **Record.** Append a row to [index.md](index.md) and the pass's metrics line to
    `reviews/<target>/metrics.jsonl` per [metrics-schema.md](metrics-schema.md) — every pass, discovery
    and verification alike (it feeds the saturation analysis and can't be reconstructed later).
+   Two feedback edges into the dev process: (a) a **v1** discovery pass's severity-weighted
+   new-findings count is the dev-process KPI
+   (`memory-bank/standards/bolt-process.md`, *Measuring*) — note it in the pass summary; (b) any
+   finding **class** now observed in ≥2 targets gets a line in
+   `memory-bank/standards/definition-of-done.md`, so the checklist stays empirical rather than
+   aspirational.
 
 ### The script does automatically (do NOT re-do these)
 
