@@ -79,6 +79,33 @@ public class CloudPreviewIntegrationTests : IAsyncLifetime
         cache.MaxAge.Should().Be(TimeSpan.FromHours(1));
     }
 
+    // ── Cloud regenerate branch (F14, review 043-v1) ──────────────────────────
+
+    [Fact]
+    public async Task GetPreview_CloudUpload_NoThumbnail_RegeneratesSavesAndPersists()
+    {
+        // Every other cloud test seeds ThumbnailPath, so GetPreview returns at the cache-hit
+        // early return and the cloud regenerate→save→persist path never runs. Seed with no thumb
+        // and only the original in the cloud store: the thumbnail must be generated, saved to the
+        // cloud tier, and persisted to the row (break the persist or the save and this reddens).
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        var upload = await _factory.SeedCloudUploadWithoutThumbAsync(userId);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.GetAsync($"/api/uploads/{upload.Id}/preview");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Found);
+        var thumbKey = $"thumbs/{upload.Id:N}.jpg";
+        response.Headers.Location!.ToString().Should().Contain(thumbKey);
+
+        // Persisted to the row (break the SaveChanges → this assertion reddens).
+        var persisted = await _factory.GetUploadAsync(upload.Id);
+        persisted!.ThumbnailPath.Should().Be(thumbKey);
+
+        // Saved to the cloud tier (break the SaveAsync → this assertion reddens).
+        _factory.CloudHasObject(thumbKey).Should().BeTrue();
+    }
+
     // ── Authz runs BEFORE any URL is issued ───────────────────────────────────
 
     [Fact]
@@ -254,6 +281,45 @@ public class CloudUploadFactory : WebApplicationFactory<Program>
 
         return upload;
     }
+
+    /// <summary>
+    /// Seeds a Cloud upload with ThumbnailPath=null and ONLY the original in the cloud store —
+    /// forces GetPreview through the cloud regenerate → save → persist branch (F14, review 043-v1).
+    /// </summary>
+    public async Task<Upload> SeedCloudUploadWithoutThumbAsync(Guid userId)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+
+        var upload = new Upload
+        {
+            UserId           = userId,
+            FilePath         = "uploads/2026/05/cloud-noThumb.jpg",
+            ThumbnailPath    = null,     // no cached thumb → must regenerate
+            StorageLocation  = StorageLocation.Cloud,
+            OriginalFileName = "cloud.jpg",
+            ContentType      = "image/jpeg",
+            WidthPx          = 800,
+            HeightPx         = 600,
+            FileSizeBytes    = 1024,
+        };
+        db.Uploads.Add(upload);
+        await db.SaveChangesAsync();
+
+        // Only the ORIGINAL exists in the cloud store — no thumbnail.
+        _cloudFake.Store(upload.FilePath, [0xFF, 0xD8, 0xFF, 0xE0]);
+
+        return upload;
+    }
+
+    public async Task<Upload?> GetUploadAsync(Guid id)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+        return await db.Uploads.FindAsync(id);
+    }
+
+    public bool CloudHasObject(string key) => _cloudFake.Contains(key);
 }
 
 /// <summary>
@@ -295,6 +361,8 @@ internal class FakeCloudStorageService : IStorageService
         => Task.FromResult($"https://fake-cdn.test/{key}?sig=test&exp={(int)ttl.TotalSeconds}");
 
     public void Store(string key, byte[] bytes) => _store[key] = bytes;
+
+    public bool Contains(string key) => _store.ContainsKey(key);
 }
 
 /// <summary>JWT helper duplicated locally because the existing one in UploadFactory is `file`-scoped.</summary>
