@@ -64,7 +64,12 @@ public class AdminOrderService : IAdminOrderService
                 (o.GuestEmail != null && o.GuestEmail.ToUpper().Contains(q)));
         }
 
-        query = query.OrderByDescending(o => o.CreatedAt);
+        // Unique tiebreaker on this Skip/Take + Include(Items) query. Under the global SplitQuery
+        // default (Program.cs) the parent page and the Items child run as separate round-trips; a
+        // non-unique ORDER BY (CreatedAt ties) can resolve the tie differently between them on
+        // Postgres under concurrency, so a paged order comes back with missing Items. Id makes the
+        // order total (F2, review 042-v8).
+        query = query.OrderByDescending(o => o.CreatedAt).ThenBy(o => o.Id);
 
         var total = await query.CountAsync(ct);
         var items = await query

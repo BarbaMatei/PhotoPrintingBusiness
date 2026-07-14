@@ -364,7 +364,11 @@ public class OrderService : IOrderService
     {
         var query = _db.Orders
             .Where(o => o.UserId == userId)
-            .OrderByDescending(o => o.CreatedAt);
+            // Unique tiebreaker so Skip/Take paging stays stable when CreatedAt ties (F2 class sweep,
+            // review 042-v8). This query projects Items.Sum (one correlated query, not a split
+            // Include), so it can't drop items like the admin list — but paging must still be total.
+            .OrderByDescending(o => o.CreatedAt)
+            .ThenBy(o => o.Id);
 
         var total = await query.CountAsync(ct);
 
