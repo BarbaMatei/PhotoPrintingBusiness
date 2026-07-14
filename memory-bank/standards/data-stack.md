@@ -23,6 +23,16 @@ unit test (`UploadThumbnailPathMigrationTests`) applies the chain, on SQLite. No
 repo proves the DDL against Postgres today (deferred to the Testcontainers/3-env work). Any
 bolt touching a migration must read this paragraph and D-o-D class 2.
 
+**Sharper, unexecuted-but-high-confidence risk (2026-07-14 survey):** because the migrations
+carry explicit SQLite store types, prod boot's `Database.Migrate()` on Postgres would create
+`TEXT`/`INTEGER`/`REAL` columns (all valid Postgres types — the DDL *succeeds*) while the
+Npgsql-configured model expects `uuid` for Guids and `timestamptz` for DateTimeOffsets
+(whose SQLite Unix-ms converter doesn't apply on Postgres). First queries would likely fail on
+type mismatch. If true, this is **deploy-blocking, not merely untested** — the planned
+Testcontainers run (blocked on a Docker-capable environment) is the experiment that
+confirms or refutes it, and it must run before the first Postgres deployment. Possible fixes if
+confirmed: re-scaffold the chain against Npgsql design-time, or provider-split migrations.
+
 ## Provider-conditional model configuration (read before touching OnModelCreating)
 
 `PhotoPrintDbContext.OnModelCreating` branches on `Database.ProviderName`:
