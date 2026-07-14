@@ -21,7 +21,8 @@ public class ImageProcessorTests
     private readonly ImageProcessor _sut;
 
     public ImageProcessorTests()
-        => _sut = new ImageProcessor(_storage.Object, Mock.Of<ILogger<ImageProcessor>>());
+        => _sut = new ImageProcessor(_storage.Object, Mock.Of<ILogger<ImageProcessor>>(),
+            new ImageDecodeLimiter(maxConcurrentDecodes: 8));
 
     private void StoreBytes(string path, byte[] bytes)
         => _storage.Setup(s => s.GetStreamAsync(path, It.IsAny<CancellationToken>()))
@@ -83,6 +84,28 @@ public class ImageProcessorTests
         thumb.Position = 0;
         var info = await Image.IdentifyAsync(thumb);
         Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(300);
+    }
+
+    [Fact]
+    public async Task GenerateThumbnailAsync_DecodeSlotUnavailable_WaitsOnGateBeforeReadingStorage()
+    {
+        // M3: the decode gate must precede the storage read + decode, so total in-flight decode
+        // memory stays bounded. With the only slot held and the request cancelled, the call
+        // abandons while waiting on the gate and never opens the stored file.
+        using var limiter = new ImageDecodeLimiter(maxConcurrentDecodes: 1);
+        using var _held = await limiter.AcquireAsync();
+
+        var storage = new Mock<IStorageService>(MockBehavior.Strict);
+        var sut = new ImageProcessor(storage.Object, Mock.Of<ILogger<ImageProcessor>>(), limiter);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => sut.GenerateThumbnailAsync("held.png", cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        storage.Verify(
+            s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

@@ -95,6 +95,14 @@ SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
     SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
         new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
 
+// Bound concurrent image decodes process-wide (M3, review 042-v4). Each ~100 MP decode is
+// ~400 MB, so an unbounded burst of concurrent first previews can OOM the box even under the
+// per-image caps. Decode is CPU-bound, so the core count is a sane default ceiling; ops can
+// lower it on a memory-constrained/high-core host via ImageProcessing:MaxConcurrentDecodes.
+var maxConcurrentDecodes = builder.Configuration.GetValue<int?>("ImageProcessing:MaxConcurrentDecodes")
+    ?? Environment.ProcessorCount;
+builder.Services.AddSingleton(new PhotoPrint.API.Services.ImageDecodeLimiter(Math.Max(1, maxConcurrentDecodes)));
+
 builder.Services.Configure<PhotoPrint.API.Configuration.StorageSettings>(
     builder.Configuration.GetSection(PhotoPrint.API.Configuration.StorageSettings.SectionName));
 builder.Services.AddSingleton<PhotoPrint.API.Services.IMimeValidator, PhotoPrint.API.Services.MimeValidator>();

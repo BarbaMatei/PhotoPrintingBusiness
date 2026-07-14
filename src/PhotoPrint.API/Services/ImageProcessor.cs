@@ -35,11 +35,13 @@ public class ImageProcessor : IImageProcessor
 
     private readonly IStorageService _storage;
     private readonly ILogger<ImageProcessor> _logger;
+    private readonly ImageDecodeLimiter _decodeLimiter;
 
-    public ImageProcessor(IStorageService storage, ILogger<ImageProcessor> logger)
+    public ImageProcessor(IStorageService storage, ILogger<ImageProcessor> logger, ImageDecodeLimiter decodeLimiter)
     {
         _storage = storage;
         _logger = logger;
+        _decodeLimiter = decodeLimiter;
     }
 
     public async Task<ImageInfo?> GetInfoAsync(string storagePath, CancellationToken ct = default)
@@ -60,6 +62,10 @@ public class ImageProcessor : IImageProcessor
 
     public async Task<MemoryStream> GenerateThumbnailAsync(string storagePath, CancellationToken ct = default)
     {
+        // Bound concurrent decodes process-wide: hold a slot for the whole read+decode so total
+        // in-flight decode memory is capped regardless of request rate (M3, review 042-v4).
+        using var slot = await _decodeLimiter.AcquireAsync(ct);
+
         await using var stream = await _storage.GetStreamAsync(storagePath, ct);
 
         // MaxFrames = 1 caps a multi-frame (e.g. APNG) bomb: without it a small-canvas file
