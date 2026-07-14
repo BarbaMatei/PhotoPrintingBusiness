@@ -180,6 +180,21 @@ describe('FormatSelectorPage', () => {
     await setup(null);
     expect(component.error).toBeTruthy();
   });
+
+  it('revokes a preview object URL when its upload is removed (C1)', async () => {
+    const revoke = vi.fn();
+    // jsdom may not implement revokeObjectURL — install a stub to observe the call.
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = revoke;
+    const withPreview: UploadState = {
+      clientId: 'c1', file: new File([''], 'p.jpg'), progress: 100, status: 'done',
+      quantity: 1, previewUrl: 'blob:abc',
+    };
+    await setup(MOCK_PRODUCT, 'p1', [withPreview]);
+
+    component.onRemoveUpload('c1');
+
+    expect(revoke).toHaveBeenCalledWith('blob:abc');
+  });
 });
 
 // ── Guest-session self-heal (bolt 042: FE-1, FE-2, FE-4) ──────────────────────

@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  OnDestroy,
   OnInit,
   inject,
   computed,
@@ -41,7 +42,10 @@ import { PhotoLightboxComponent } from '../../../../shared/components/photo-ligh
   templateUrl: './format-selector-page.html',
   styleUrl: './format-selector-page.scss',
 })
-export class FormatSelectorPage implements OnInit {
+export class FormatSelectorPage implements OnInit, OnDestroy {
+  /** Single source for the user-facing upload-failure message (C2, review 042-v4). */
+  private readonly UPLOAD_ERROR = 'Eroare la încărcarea fișierului.';
+
   private readonly productService = inject(ProductService);
   private readonly uploadService = inject(UploadService);
   private readonly cartService = inject(CartService);
@@ -172,7 +176,7 @@ export class FormatSelectorPage implements OnInit {
         newStates.forEach(s =>
           this.updateUpload(s.clientId, {
             status: 'error',
-            error: 'Eroare la încărcarea fișierului.',
+            error: this.UPLOAD_ERROR,
           }),
         ),
     });
@@ -217,7 +221,7 @@ export class FormatSelectorPage implements OnInit {
     const clientIds = newStates.map(s => s.clientId);
     const failAll = () =>
       clientIds.forEach(id =>
-        this.updateUpload(id, { status: 'error', error: 'Eroare la încărcarea fișierului.' }));
+        this.updateUpload(id, { status: 'error', error: this.UPLOAD_ERROR }));
 
     // FE-2: a stale-but-present guest token isn't caught by ensureGuestSession (it only
     // checks presence, not expiry — the token is an opaque id, so expiry can't be read
@@ -260,7 +264,7 @@ export class FormatSelectorPage implements OnInit {
               if (result.upload) {
                 this.updateUpload(clientIds[i], { status: 'done', progress: 100, dto: result.upload });
               } else {
-                this.updateUpload(clientIds[i], { status: 'error', error: result.error ?? 'Eroare la încărcarea fișierului.' });
+                this.updateUpload(clientIds[i], { status: 'error', error: result.error ?? this.UPLOAD_ERROR });
               }
             });
           }
@@ -276,6 +280,7 @@ export class FormatSelectorPage implements OnInit {
   }
 
   onRemoveUpload(clientId: string): void {
+    this.revokePreview(this.uploads().find(u => u.clientId === clientId));
     this.uploads.update(prev => prev.filter(u => u.clientId !== clientId));
     this.saveToSession();
     this.cdr.markForCheck();
@@ -307,6 +312,7 @@ export class FormatSelectorPage implements OnInit {
       next: () => {
         // Clear uploads so the user can immediately add another batch of photos
         // (different format/finish) without navigating away.
+        this.revokeAllPreviews();
         this.uploads.set([]);
         sessionStorage.removeItem(this.storageKey);
         this.uploadErrors = [];
@@ -412,8 +418,23 @@ export class FormatSelectorPage implements OnInit {
   }
 
   private dropRestoredEntry(clientId: string): void {
+    this.revokePreview(this.uploads().find(u => u.clientId === clientId));
     this.uploads.update(prev => prev.filter(u => u.clientId !== clientId));
     this.saveToSession();
     this.cdr.markForCheck();
+  }
+
+  ngOnDestroy(): void {
+    this.revokeAllPreviews();
+  }
+
+  /** Frees the blob URLs getPreviewBlob created, so they don't accumulate in memory for the
+   *  tab's lifetime across restores/removals/navigation (C1, review 042-v4). */
+  private revokeAllPreviews(): void {
+    for (const u of this.uploads()) this.revokePreview(u);
+  }
+
+  private revokePreview(state: UploadState | undefined): void {
+    if (state?.previewUrl) URL.revokeObjectURL(state.previewUrl);
   }
 }
