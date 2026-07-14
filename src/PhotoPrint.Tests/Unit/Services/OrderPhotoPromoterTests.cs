@@ -314,6 +314,72 @@ public class OrderPhotoPromoterTests
     }
 
     [Fact]
+    public async Task PromoteOrderAsync_RowUpdateFails_LeavesRowLocal_CountsFailed()
+    {
+        // F16 (review 043-v1): the Step-3 SaveChanges catch was never exercised — InMemory
+        // SaveChanges doesn't throw. A regression there (Failed mis-counted as Promoted, or the
+        // row left flipped after a failed write) would ship green. Use a context whose
+        // SaveChangesAsync throws AFTER the cloud writes succeed.
+        var opts = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        Upload upload;
+        Order order;
+        using (var seed = new PhotoPrintDbContext(opts))
+        {
+            upload = SeedUpload(seed, StorageLocation.Local);
+            order = SeedOrder(seed, OrderStatus.Paid, upload);
+        }
+
+        using var throwingDb = new ThrowingSaveDbContext(opts);
+        var bundle = CreateSut(throwingDb);
+        SetupLocalSource(bundle.Local, upload.FilePath!, [0xFF, 0xD8, 0xFF, 0xE0]);
+        bundle.Cloud.Setup(s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+
+        var outcome = await bundle.Sut.PromoteOrderAsync(order.Id);
+
+        outcome.Failed.Should().Be(1);
+        outcome.Promoted.Should().Be(0);
+
+        using var verify = new PhotoPrintDbContext(opts);
+        var updated = await verify.Uploads.FindAsync(upload.Id);
+        updated!.StorageLocation.Should().Be(StorageLocation.Local); // durability boundary not crossed
+        // Local litter cleanup must NOT run when the row update failed.
+        bundle.Local.Verify(
+            s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PromoteOrderAsync_LargePreviewGenerationThrows_LeavesRowLocal_CountsFailed()
+    {
+        // F16 (review 043-v1): GenerateLargePreviewAsync was always mocked to succeed, so the
+        // corrupt-image → cloud-write-error path was unverified.
+        using var db = CreateDb();
+        var upload = SeedUpload(db, StorageLocation.Local);
+        var order = SeedOrder(db, OrderStatus.Paid, upload);
+        var bundle = CreateSut(db);
+
+        SetupLocalSource(bundle.Local, upload.FilePath!, [0xFF, 0xD8, 0xFF, 0xE0]);
+        bundle.Cloud.Setup(s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+        bundle.ImageProcessor
+              .Setup(p => p.GenerateLargePreviewAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+              .ThrowsAsync(new InvalidOperationException("corrupt image"));
+
+        var outcome = await bundle.Sut.PromoteOrderAsync(order.Id);
+
+        outcome.Failed.Should().Be(1);
+        outcome.Promoted.Should().Be(0);
+
+        var updated = await db.Uploads.FindAsync(upload.Id);
+        updated!.StorageLocation.Should().Be(StorageLocation.Local);
+        bundle.Local.Verify(
+            s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task PromoteOrderAsync_TwoUploads_PartialFailure_OneStaysLocalOnePromoted()
     {
         using var db = CreateDb();
@@ -379,5 +445,15 @@ public class OrderPhotoPromoterTests
 
         bundle.Queue.Verify(q => q.EnqueueAsync(
             It.IsAny<PromotionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // A context whose async save always throws — models a DB write failure at the promoter's
+    // Step-3 durability boundary (InMemory never throws on its own).
+    private sealed class ThrowingSaveDbContext : PhotoPrintDbContext
+    {
+        public ThrowingSaveDbContext(DbContextOptions<PhotoPrintDbContext> options) : base(options) { }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+            => throw new DbUpdateException("simulated row-update failure");
     }
 }
