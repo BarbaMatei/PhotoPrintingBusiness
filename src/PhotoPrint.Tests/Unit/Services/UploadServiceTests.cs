@@ -378,6 +378,39 @@ public class UploadServiceTests
     }
 
     [Fact]
+    public async Task GetPreviewAsync_RowSoftDeletedDuringWrite_DeletesOrphanedThumbnail()
+    {
+        // M1 (review 042-v4): the cleanup job can soft-delete the upload between the preview's
+        // live read (DeletedAt null) and its ThumbnailPath write (which keys only on Id, no
+        // DeletedAt guard). A thumbnail written onto the now-dead row is never revisited by
+        // cleanup -> permanent orphan. The write must detect the row is no longer live and
+        // delete the just-written thumbnail.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        var thumbKey = $"thumbs/{userId:N}/{upload.Id:N}.jpg";
+
+        // GenerateThumbnailAsync runs AFTER the live read and BEFORE the persist, so soft-deleting
+        // here (via a separate context, like the cleanup job) reproduces the race deterministically.
+        _imageProcessorMock
+            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                using var ctx = NewContext();
+                var row = ctx.Uploads.First(u => u.Id == upload.Id);
+                row.DeletedAt = DateTimeOffset.UtcNow;
+                ctx.SaveChanges();
+                return new MemoryStream(JpegMagic);
+            });
+
+        (await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+
+        _storageMock.Verify(
+            s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task UploadAsync_ImageDimensionsExceedLimit_ThrowsUnprocessableEntityException()
     {
         _imageProcessorMock

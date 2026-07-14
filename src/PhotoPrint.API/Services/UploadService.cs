@@ -156,14 +156,25 @@ public class UploadService : IUploadService
         // minting a new random file that leaks, and the cleanup job can target it (BUG-2/BUG-3).
         var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
         var generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
-        upload.ThumbnailPath = await _storage.SaveAsync(
+        var thumbnailPath = await _storage.SaveAsync(
             generated, ownerId, "jpg", ct, fileId: uploadId, prefix: ThumbnailPrefix);
+        upload.ThumbnailPath = thumbnailPath;
 
         // Persist only ThumbnailPath. The entity was read AsNoTracking, so attach it and mark
         // the single column modified instead of tracking the whole graph.
         _db.Uploads.Attach(upload);
         _db.Entry(upload).Property(u => u.ThumbnailPath).IsModified = true;
         await _db.SaveChangesAsync(ct);
+
+        // The cleanup job may have soft-deleted this row between the live read above and this
+        // write (the write keys only on Id — no DeletedAt guard, and Upload has no concurrency
+        // token). A thumbnail written onto a now-dead row is never revisited by cleanup, so
+        // delete it here to stop it leaking forever (M1, review 042-v4).
+        var stillLive = await _db.Uploads
+            .AsNoTracking()
+            .AnyAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
+        if (!stillLive)
+            await _storage.DeleteAsync(thumbnailPath, ct);
 
         // Return the just-generated stream directly rather than re-opening it from storage —
         // saves an open+read now and a billed round-trip once cloud storage lands (QUAL-2).
