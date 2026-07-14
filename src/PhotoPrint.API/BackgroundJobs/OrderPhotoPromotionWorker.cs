@@ -43,6 +43,10 @@ public class OrderPhotoPromotionWorker : BackgroundService
 
         using var concurrency = new SemaphoreSlim(_settings.MaxConcurrentOrders);
 
+        // Tracked out here (not inside the try) so the finally can drain it before the
+        // semaphore is disposed (F6, review 043-v1).
+        var inFlight = new List<Task>();
+
         try
         {
             await foreach (var job in _queue.Reader.ReadAllAsync(stoppingToken))
@@ -51,13 +55,33 @@ public class OrderPhotoPromotionWorker : BackgroundService
 
                 // Fire-and-forget so the reader stays hot. Each slot releases the semaphore
                 // and handles its own exception surface (we don't want one bad job to crash
-                // the worker loop).
-                _ = ProcessAsync(job, concurrency, stoppingToken);
+                // the worker loop). Prune completed tasks so the list can't grow unbounded
+                // over a long-running process.
+                inFlight.Add(ProcessAsync(job, concurrency, stoppingToken));
+                inFlight.RemoveAll(t => t.IsCompleted);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // Normal shutdown — drain in-flight slots up to the worker stop timeout.
+            // Normal shutdown — the in-flight promotions are drained in the finally below.
+        }
+        finally
+        {
+            // Drain in-flight promotions BEFORE `concurrency` is disposed. Otherwise a task
+            // still mid-PromoteOrderAsync reaches its finally { Release() } on a disposed
+            // semaphore → ObjectDisposedException (unobserved), abandoning the promotion
+            // mid-write — the exact defect this drain closes. This is bounded by the host
+            // shutdown timeout; PromoteOrderAsync honours stoppingToken so in-flight work
+            // winds down promptly. ProcessAsync swallows its own exceptions so WhenAll should
+            // not fault; log defensively if it ever does.
+            try
+            {
+                await Task.WhenAll(inFlight);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "promotion.worker.drain-error");
+            }
         }
 
         _logger.LogInformation("promotion.worker.stopped");
