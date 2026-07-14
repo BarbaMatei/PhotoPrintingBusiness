@@ -82,6 +82,22 @@ describe('errorInterceptor', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  // C3 (review 042-v4): the clear->re-init->retry self-heal seam was only unit-tested with each
+  // half mocked (the interceptor spies clearGuestToken; the component nulls the token by hand).
+  // If the interceptor's clear and the component's getGuestToken diverged on storage key/shape,
+  // both isolated tests still pass. Exercise the REAL clear against the REAL reader end-to-end.
+  it('actually clears the stored guest token that getGuestToken reads on a guest 401 (real seam — C3)', () => {
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(false);
+    localStorage.setItem('guestSession', JSON.stringify({ guestToken: 'seeded' }));
+    expect(authService.getGuestToken()).toBe('seeded');   // precondition: reader sees it
+
+    http.get(`${API_URL}/uploads/x/preview`).subscribe({ error: () => {} });
+    httpMock.expectOne(`${API_URL}/uploads/x/preview`).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    // The interceptor's real clearGuestToken must remove the SAME key getGuestToken reads.
+    expect(authService.getGuestToken()).toBeNull();
+  });
+
   it('shows error toast on 403', () => {
     const showSpy = vi.spyOn(toastService, 'show');
     http.get(`${API_URL}/admin`).subscribe({ error: () => {} });
