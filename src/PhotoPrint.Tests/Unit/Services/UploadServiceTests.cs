@@ -358,22 +358,58 @@ public class UploadServiceTests
     }
 
     [Fact]
-    public async Task GetPreviewAsync_CachedFileMissing_RegeneratesThumbnail()
+    public async Task GetPreviewAsync_CachedFileVanished_RegeneratesInsteadOf500()
     {
+        // L1 (review 042-v4): the cache-hit path did ExistsAsync (true) THEN GetStreamAsync; if the
+        // file vanished between the two (ops deletion / cleanup / storage fault), GetStreamAsync
+        // threw FileNotFoundException -> unmapped 500. It must regenerate transparently instead.
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
-        upload.ThumbnailPath = "owner/missing-thumb.jpg";   // recorded, but file is gone
+        upload.ThumbnailPath = "thumbs/owner/vanished.jpg";   // recorded, but the file is gone
         await _db.SaveChangesAsync();
 
         _storageMock
-            .Setup(s => s.ExistsAsync("owner/missing-thumb.jpg", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .Setup(s => s.ExistsAsync("thumbs/owner/vanished.jpg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);   // exists at check time (old code), then vanishes before the read
+        _storageMock
+            .Setup(s => s.GetStreamAsync("thumbs/owner/vanished.jpg", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("cached thumbnail vanished"));
 
         var (stream, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
         stream.Dispose();
 
         _imageProcessorMock.Verify(
             p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CachedFileVanished_EmitsMissingFileSignal()
+    {
+        // L3 (review 042-v4): a recorded-but-absent thumbnail silently regenerated with no signal,
+        // so a cache that has stopped working was indistinguishable from a first-time miss.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        upload.ThumbnailPath = "thumbs/owner/vanished.jpg";
+        await _db.SaveChangesAsync();
+
+        _storageMock
+            .Setup(s => s.GetStreamAsync("thumbs/owner/vanished.jpg", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("gone"));
+
+        var logger = new Mock<ILogger<UploadService>>();
+        var sut = new UploadService(
+            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, NewContext(), logger.Object);
+
+        (await sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.thumbnail.cache_miss_missing_file")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 

@@ -145,9 +145,25 @@ public class UploadService : IUploadService
         if (!isOwner)
             throw new ForbiddenException("You do not have access to this upload.");
 
-        // Cache hit: stream the stored thumbnail — no ImageSharp work on this path.
-        if (upload.ThumbnailPath is not null && await _storage.ExistsAsync(upload.ThumbnailPath, ct))
-            return (await _storage.GetStreamAsync(upload.ThumbnailPath, ct), "image/jpeg");
+        // Cache hit: stream the stored thumbnail — no ImageSharp work on this path. Read directly
+        // rather than Exists-then-Get: one storage round-trip on the hottest read, and no TOCTOU
+        // 500 if the file vanishes between the two calls (L1/QUAL-2, review 042-v4).
+        if (upload.ThumbnailPath is not null)
+        {
+            try
+            {
+                return (await _storage.GetStreamAsync(upload.ThumbnailPath, ct), "image/jpeg");
+            }
+            catch (FileNotFoundException)
+            {
+                // ThumbnailPath is recorded but the file is gone (ops-side deletion / storage
+                // fault). Emit a distinct signal — a silently-broken cache is otherwise
+                // indistinguishable from a first-time miss (L3, review 042-v4) — then fall through
+                // to regenerate below.
+                _logger.LogWarning(
+                    "uploads.thumbnail.cache_miss_missing_file upload_id={UploadId}", uploadId);
+            }
+        }
 
         // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
         // deletion). Generate once and store under a DETERMINISTIC, id-keyed path in a distinct
