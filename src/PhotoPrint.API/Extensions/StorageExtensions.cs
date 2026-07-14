@@ -68,10 +68,10 @@ public static class StorageExtensions
         // Per-upload routing front-door (ADR-008).
         services.AddSingleton<IStorageRouter, StorageRouter>();
 
-        // Legacy default registration — resolves to the local adapter. Kept so any caller
-        // that still injects IStorageService directly (e.g. ImageProcessor's interim wiring,
-        // tests' FakeStorageService swap-in) gets a working store. Two-tier callers should
-        // use IStorageRouter instead.
+        // Default (non-keyed) registration — resolves to the local adapter. No production
+        // caller injects IStorageService directly any more (all route via IStorageRouter);
+        // it is kept only so the test factories that swap in a FakeStorageService have a
+        // default descriptor to replace. Two-tier callers must use IStorageRouter.
         services.AddSingleton<IStorageService>(sp =>
             sp.GetRequiredKeyedService<IStorageService>("local"));
 
