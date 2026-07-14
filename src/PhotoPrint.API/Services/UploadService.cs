@@ -52,7 +52,7 @@ public class UploadService : IUploadService
         var mimeType = _mimeValidator.DetectMimeType(fileStream);
         if (mimeType is null)
             throw new UnsupportedMediaTypeException(
-                "Only JPEG, PNG, and HEIC files are accepted.");
+                "Only JPEG and PNG files are accepted.");
 
         var ownerId = userId ?? guestSessionId
             ?? throw new BadRequestException("Request must be authenticated or carry a guest token.");
@@ -72,7 +72,6 @@ public class UploadService : IUploadService
         {
             "image/jpeg" => "jpg",
             "image/png"  => "png",
-            "image/heic" => "heic",
             _            => "bin",
         };
 

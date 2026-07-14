@@ -33,26 +33,28 @@ public class MimeValidatorTests
         _sut.DetectMimeType(stream).Should().Be("image/png");
     }
 
-    // ── HEIC ──────────────────────────────────────────────────────────────────
+    // ── HEIC/HEIF — no longer accepted (M5, review 042-v4) ─────────────────────
+    // The stack has no HEIF decoder, so accepting HEIC only buffered+wrote a file that then
+    // failed at decode with a confusing 422. Reject it up front until a decoder is integrated.
 
     [Fact]
-    public void DetectMimeType_HeicFtypBox_ReturnsImageHeic()
+    public void DetectMimeType_HeicFtypBox_ReturnsNull()
     {
         using var stream = new MemoryStream(HeicHeader);
 
-        _sut.DetectMimeType(stream).Should().Be("image/heic");
+        _sut.DetectMimeType(stream).Should().BeNull();
     }
 
     [Theory]
     [InlineData("mif1")]
     [InlineData("heix")]
     [InlineData("msf1")]
-    public void DetectMimeType_OtherHeifBrands_ReturnsImageHeic(string brand)
+    public void DetectMimeType_HeifBrands_ReturnsNull(string brand)
     {
         var header = FtypWithBrand(brand);
         using var stream = new MemoryStream(header);
 
-        _sut.DetectMimeType(stream).Should().Be("image/heic");
+        _sut.DetectMimeType(stream).Should().BeNull();
     }
 
     // INPUT-1 (review 042-v1): a plain ISO-BMFF container (MP4/MOV/M4A) also starts with
