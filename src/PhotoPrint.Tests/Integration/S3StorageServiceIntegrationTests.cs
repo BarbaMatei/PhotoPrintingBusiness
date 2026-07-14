@@ -119,6 +119,40 @@ public sealed class S3StorageServiceIntegrationTests : IClassFixture<MinioFixtur
         (await _fx.Sut.ExistsAsync(key)).Should().BeFalse();
     }
 
+    // ── S3BucketVerifier boot probe (F18, review 043-v1) ──────────────────────
+
+    [SkippableFact]
+    public async Task Verifier_ExistingBucket_StartsWithoutThrowing()
+    {
+        Skip.IfNot(_fx.Available, MinioFixture.SkipReason);
+
+        var verifier = new S3BucketVerifier(
+            _fx.S3,
+            Microsoft.Extensions.Options.Options.Create(_fx.SettingsForExistingBucket()),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<S3BucketVerifier>.Instance);
+
+        await verifier.StartAsync(CancellationToken.None); // must not throw
+    }
+
+    [SkippableFact]
+    public async Task Verifier_MissingBucket_ThrowsToAbortBoot()
+    {
+        Skip.IfNot(_fx.Available, MinioFixture.SkipReason);
+
+        var settings = _fx.SettingsForExistingBucket();
+        settings.Bucket = $"nonexistent-{Guid.NewGuid():N}";
+
+        var verifier = new S3BucketVerifier(
+            _fx.S3,
+            Microsoft.Extensions.Options.Options.Create(settings),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<S3BucketVerifier>.Instance);
+
+        var act = () => verifier.StartAsync(CancellationToken.None);
+
+        // Throwing from StartAsync aborts the host — a misconfigured bucket must never boot silently.
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
     // ── Presign — URL shape + actual fetch ────────────────────────────────────
 
     [SkippableFact]
@@ -180,6 +214,21 @@ public sealed class MinioFixture : IAsyncLifetime
     public string Endpoint => _endpoint ?? string.Empty;
     public bool Available { get; private set; }
     public S3StorageService Sut { get; private set; } = default!;
+
+    /// <summary>The live S3 client (MinIO) — exposed so verifier tests can probe real buckets.</summary>
+    public IAmazonS3 S3 => _s3!;
+
+    /// <summary>Settings pointing at the real, existing test bucket.</summary>
+    public StorageSettings SettingsForExistingBucket() => new()
+    {
+        Provider = "S3",
+        Bucket = _bucket,
+        Region = "us-east-1",
+        EndpointUrl = _endpoint,
+        ForcePathStyle = true,
+        AccessKey = _accessKey,
+        SecretKey = _secretKey,
+    };
 
     public async Task InitializeAsync()
     {
