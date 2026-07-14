@@ -30,6 +30,30 @@ three ideas, in priority order:
 
 ---
 
+## Which pass comes next (the router)
+
+**The pass type is never a human decision.** It is derivable from the state of
+`reviews/<target>/`, so the owner's standing instruction is one sentence — *"Continue the review
+loop for `<target>` per reviews/README.md"* — and the orchestrator picks the first matching row:
+
+| If the target's current state is… | …the next step is |
+|---|---|
+| No `review-v1.md` yet | **Full discovery** pass (v1) |
+| Latest review has open findings and no `resolved` resolution answering it | **Fix round** (`/fix-review`) |
+| Latest resolution is `resolved` but not yet re-reviewed | **Verification** pass |
+| Verification clean (0 reopened) and no delta pass since that fix round | **Delta discovery** |
+| Latest delta pass quiet (no new 🔴/🟠) | **Certification**: freeze the commit, two parallel blinded full passes |
+| Certification pair quiet | **Certified** — the only path to `approved`; loop done |
+| Any pass raised new serious findings | Back to **Fix round** (the counter resets) |
+
+Two guard rails: before launching anything at discovery scale (full, delta, or certification),
+the orchestrator states the chosen pass type and expected cost in one line — and **certification
+(~2× full-pass cost) always waits for an explicit owner go-ahead**. Whether a change warrants the
+full loop at all (a doc tweak does not) is the *entry policy* in
+[self-driving-loop-design.md](self-driving-loop-design.md).
+
+---
+
 ## Two loops, not one: Discovery vs Verification
 
 The single most important distinction in this system. A "re-review" is doing one of two
