@@ -69,9 +69,15 @@ as a process decision.
   inits. Files: `error.interceptor.ts`, `format-selector-page.ts`.
   *Now covered by tests:* `error.interceptor.spec.ts` (guest/anon 401 branches — TEST-1/FE-3)
   and `format-selector-page.spec.ts` (dedup + retry — FE-1/FE-2/FE-4).
-- **Change C — dev-warning silencing.** HTTPS-redirect registered non-dev only, static
-  files served only when `wwwroot` exists, EF split-query default. Files: `Program.cs`,
-  `SecurityExtensions.cs`. No behavior change in production; reduces dev/test log noise.
+- **Change C — dev-warning silencing + EF split-query default.** HTTPS-redirect registered
+  non-dev only and static files served only when `wwwroot` exists (both dev/test log-noise
+  reductions, no production behavior change); **plus a global
+  `UseQuerySplittingBehavior(SplitQuery)` default** for both providers. The split-query default
+  **does** change production query execution — multi-collection `Include`s run as separate
+  round-trips instead of one cartesian join — so the earlier "no behavior change" label was wrong:
+  a paginated (`Skip/Take`) collection-`Include` query with a **non-unique `ORDER BY`** can page its
+  parent and child round-trips inconsistently on Postgres and return a page row with **missing
+  children** (F2/D85, review 042-v8). Files: `Program.cs`, `SecurityExtensions.cs`.
 - **Change D — HEIC no longer accepted (M5, review 042-v4).** The upload contract dropped
   HEIC because the stack has no HEIF decoder: `MimeValidator` no longer maps ISO-BMFF `ftyp`
   content to `image/heic` — it falls through to null, so an uploaded `.heic` now 415s — and
@@ -85,6 +91,16 @@ as a process decision.
 not navigate; a guest/anonymous session that expires mid-flow re-inits and the failed
 upload/preview is retried exactly once; concurrent `ensureGuestSession()` callers share one
 init. All are enforced by the specs listed above.
+
+**AC (retroactive) for change C:** every paginated (`Skip/Take`) query that also `Include`s a
+collection carries a **unique tiebreaker** in its `ORDER BY` (e.g. `ThenBy(o => o.Id)`), so the
+split parent/child round-trips cannot page inconsistently under the global split-query default.
+Enforced for the admin order list by
+`AdminOrderServiceTests.GetOrdersAsync_TiedCreatedAt_PagesDeterministicallyKeepingItemsPerOrder`;
+the only other `Skip/Take` site (`OrderService.GetOrdersAsync`) projects an aggregate rather than
+`Include`ing a collection but carries the same tiebreaker. The split-query round-trip behavior
+itself is exercised only against Postgres (the InMemory test provider does not split), so that
+verification rides with the 3-env / Postgres-CI phase (D23/F14).
 
 **AC (retroactive) for change D:** an upload whose content is ISO-BMFF (`ftyp`-based, which
 includes HEIC/HEIF) is rejected with 415 Unsupported Media Type; the UI does not offer

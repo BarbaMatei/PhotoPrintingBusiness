@@ -14,7 +14,7 @@ to track it; and harden ImageSharp against decompression-bomb (pixel-bomb) image
 
 ### Deliverables (by story)
 
-1. **001 — schema**: add `Upload.ThumbnailPath` (`string?`, nullable) + an **Npgsql-flavoured** EF migration adding `Uploads."ThumbnailPath" character varying(500) NULL` + snapshot update. Existing rows stay NULL.
+1. **001 — schema**: add `Upload.ThumbnailPath` (`string?`, nullable) + an **Npgsql-flavoured** EF migration adding `Uploads."ThumbnailPath" character varying(512) NULL` + snapshot update. Existing rows stay NULL.
 2. **002 — cache on first request**: rework `UploadService.GetPreviewAsync` to generate→store→record on a miss and stream the cached file on a hit; add `IStorageService.ExistsAsync`; add a `Cache-Control` header on the preview response.
 3. **003 — pixel-bomb defence**: cap decoded image dimensions (25000×25000) and reject oversized images with **422**.
 
