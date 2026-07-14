@@ -29,9 +29,26 @@ public class LocalStorageService : IStorageService
         var fullPath = ToFullPath(key);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
-        await using var fs = File.Create(fullPath);
-        stream.Position = 0;
-        await stream.CopyToAsync(fs, ct);
+        // Write to a unique temp file then atomically move into place. Two concurrent writers of
+        // the same deterministic key (e.g. two first-previews of one upload) would otherwise
+        // collide on File.Create's exclusive FileShare.None handle → IOException → 500 (M2,
+        // review 042-v4). The same key only ever holds the same logical artifact, so last-writer
+        // overwrite is safe.
+        var tempPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var fs = File.Create(tempPath))
+            {
+                stream.Position = 0;
+                await stream.CopyToAsync(fs, ct);
+            }
+            File.Move(tempPath, fullPath, overwrite: true);
+        }
+        catch
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+            throw;
+        }
 
         _logger.LogDebug("Saved upload to {Key}", key);
         return key;
