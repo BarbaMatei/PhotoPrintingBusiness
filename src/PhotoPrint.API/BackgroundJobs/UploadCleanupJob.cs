@@ -64,7 +64,7 @@ public class UploadCleanupJob : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
-        var storage = scope.ServiceProvider.GetRequiredService<IStorageService>();
+        var router = scope.ServiceProvider.GetRequiredService<IStorageRouter>();
 
         var now = DateTimeOffset.UtcNow;
         var orphanCutoff = now.AddHours(-settings.OrphanRetentionHours);
@@ -85,36 +85,28 @@ public class UploadCleanupJob : BackgroundService
 
         foreach (var upload in candidates)
         {
+            // Route deletes to the tier that owns this upload's bytes. A promoted (Cloud)
+            // upload's blobs live in the object store; resolving the local default no-oped
+            // on disk and orphaned the cloud objects with no row left to reclaim them
+            // (F2, review 043-v1).
+            var store = router.For(upload.StorageLocation);
+
             // Bolt 052: FilePath may have been nulled by the original-purge already. If
             // so, the cloud blob is gone; only the row needs the soft-delete bookkeeping.
             if (upload.FilePath is { } filePath)
-            {
-                try
-                {
-                    await storage.DeleteAsync(filePath, ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to delete upload file {StoragePath}", filePath);
-                    fileErrors++;
-                }
-            }
+                fileErrors += await TryDeleteAsync(store, filePath, "original", ct);
 
             // Bolt 042 adds a second persistent file per upload (the cached thumbnail).
             // Delete it too, otherwise a previewed-then-expired upload leaves its thumbnail
             // on disk forever — the row is soft-deleted so no path ever revisits it (BUG-2).
             if (upload.ThumbnailPath is not null)
-            {
-                try
-                {
-                    await storage.DeleteAsync(upload.ThumbnailPath, ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to delete thumbnail file {StoragePath}", upload.ThumbnailPath);
-                    fileErrors++;
-                }
-            }
+                fileErrors += await TryDeleteAsync(store, upload.ThumbnailPath, "thumbnail", ct);
+
+            // Bolt 043/051 adds a third persistent object for promoted uploads (the large
+            // preview). It was never deleted here, so an aged Cloud upload leaked it
+            // (F2, review 043-v1).
+            if (upload.LargePreviewPath is not null)
+                fileErrors += await TryDeleteAsync(store, upload.LargePreviewPath, "large-preview", ct);
 
             upload.DeletedAt = now;
         }
@@ -123,5 +115,22 @@ public class UploadCleanupJob : BackgroundService
             await db.SaveChangesAsync(ct);
 
         return (candidates.Count, fileErrors);
+    }
+
+    // Returns 1 on a delete failure (counted into fileErrors), 0 otherwise. The row is
+    // soft-deleted regardless — a failed blob delete is logged for ops, not retried here.
+    private async Task<int> TryDeleteAsync(
+        IStorageService store, string key, string kind, CancellationToken ct)
+    {
+        try
+        {
+            await store.DeleteAsync(key, ct);
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete upload {Kind} file {StoragePath}", kind, key);
+            return 1;
+        }
     }
 }

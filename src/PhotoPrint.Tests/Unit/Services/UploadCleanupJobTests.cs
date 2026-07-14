@@ -22,11 +22,36 @@ public class UploadCleanupJobTests
 
     private static IServiceScopeFactory BuildScopeFactory(IStorageService storage, PhotoPrintDbContext db)
     {
+        // Route every tier to the single storage mock so existing (Local) tests are unaffected
+        // by the bolt-043 switch to IStorageRouter.
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(storage);
+        router.Setup(r => r.For(It.IsAny<StorageLocation>())).Returns(storage);
+
         var services = new ServiceCollection();
         services.AddSingleton<PhotoPrintDbContext>(_ => db);
-        services.AddSingleton<IStorageService>(_ => storage);
+        services.AddSingleton<IStorageRouter>(router.Object);
         services.AddLogging();
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+    }
+
+    // Distinct local/cloud stores so a test can assert deletes route to the right tier.
+    private static (IServiceScopeFactory factory, Mock<IStorageService> local, Mock<IStorageService> cloud)
+        BuildTieredScopeFactory(PhotoPrintDbContext db)
+    {
+        var local = new Mock<IStorageService>();
+        var cloud = new Mock<IStorageService>();
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<PhotoPrintDbContext>(_ => db);
+        services.AddSingleton<IStorageRouter>(router.Object);
+        services.AddLogging();
+        return (services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), local, cloud);
     }
 
     private static IOptionsMonitor<UploadCleanupSettings> Settings(
@@ -328,6 +353,39 @@ public class UploadCleanupJobTests
         storageMock.Verify(s => s.DeleteAsync(upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
         // No second delete call for a non-existent thumbnail.
         storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cleanup_agedCloudUpload_deletesAllThreeKeysFromCloudTier()
+    {
+        // F2 (review 043-v1): an aged, promoted (Cloud) upload past ReferencedRetentionDays.
+        // Deletes must route to the CLOUD tier and cover all THREE persistent objects
+        // (original + thumbnail + large preview). The pre-fix code resolved the local default
+        // (a no-op on disk) and never touched LargePreviewPath, orphaning the cloud blobs.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        upload.StorageLocation = StorageLocation.Cloud;
+        upload.ThumbnailPath = "thumbs/cloud/thumb.jpg";
+        upload.LargePreviewPath = "previews/cloud/large.jpg";
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+
+        var (factory, local, cloud) = BuildTieredScopeFactory(db);
+        var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
+            Mock.Of<ILogger<UploadCleanupJob>>());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1);
+        errors.Should().Be(0);
+
+        cloud.Verify(s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(s => s.DeleteAsync("thumbs/cloud/thumb.jpg", It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(s => s.DeleteAsync("previews/cloud/large.jpg", It.IsAny<CancellationToken>()), Times.Once);
+        local.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var after = await db.Uploads.FindAsync(upload.Id);
+        after!.DeletedAt.Should().NotBeNull();
     }
 
     [Fact]
