@@ -15,25 +15,25 @@ namespace PhotoPrint.Tests.Unit.Services;
 /// replaces <see cref="IImageProcessor"/> with a fake, so the actual decompression-bomb
 /// guard, the format-error mapping, and the resize/encode never ran under test. These pin
 /// them against genuine ImageSharp decoding.
+///
+/// Bolt 043 (ADR-008): the processor no longer touches storage — the caller routes via
+/// <see cref="IStorageRouter"/> and hands it an open source stream — so these feed streams
+/// directly. The thumbnail long edge is 300 px (bolt 043 added a separate 2000 px large-preview
+/// tier, see <see cref="ImageProcessorLargePreviewTests"/>).
 /// </summary>
 public class ImageProcessorTests
 {
-    private readonly Mock<IStorageService> _storage = new();
-    private readonly ImageProcessor _sut;
+    private readonly ImageProcessor _sut =
+        new(Mock.Of<ILogger<ImageProcessor>>(), new ImageDecodeLimiter(maxConcurrentDecodes: 8));
 
-    public ImageProcessorTests()
-        => _sut = new ImageProcessor(_storage.Object, Mock.Of<ILogger<ImageProcessor>>(),
-            new ImageDecodeLimiter(maxConcurrentDecodes: 8));
+    private const int ThumbnailMaxDimension = 300;
 
-    private void StoreBytes(string path, byte[] bytes)
-        => _storage.Setup(s => s.GetStreamAsync(path, It.IsAny<CancellationToken>()))
-                   .ReturnsAsync(() => new MemoryStream(bytes));
-
-    private static byte[] EncodePng<TPixel>(Image<TPixel> image) where TPixel : unmanaged, IPixel<TPixel>
+    private static MemoryStream PngStream<TPixel>(Image<TPixel> image) where TPixel : unmanaged, IPixel<TPixel>
     {
-        using var ms = new MemoryStream();
+        var ms = new MemoryStream();
         image.SaveAsPng(ms);
-        return ms.ToArray();
+        ms.Position = 0;
+        return ms;
     }
 
     // ── ExceedsDecodeLimits (BUG-1: total-pixel area cap) ──────────────────────
@@ -57,9 +57,9 @@ public class ImageProcessorTests
         // A genuine image whose pixel area (110 MP) exceeds the 100 MP decode cap. L8 keeps the
         // test allocation ~110 MB; the guard rejects it at Identify, before the full decode.
         using var big = new Image<L8>(11_000, 10_000);
-        StoreBytes("big.png", EncodePng(big));
+        await using var src = PngStream(big);
 
-        var act = () => _sut.GenerateThumbnailAsync("big.png");
+        var act = () => _sut.GenerateThumbnailAsync(src);
 
         var ex = (await act.Should().ThrowAsync<DecompressionBombException>()).Which;
         ex.WidthPx.Should().Be(11_000);
@@ -67,14 +67,13 @@ public class ImageProcessorTests
     }
 
     [Fact]
-    public async Task GenerateThumbnailAsync_LargeImage_ReturnsJpegThumbnailMax800px()
+    public async Task GenerateThumbnailAsync_LargeImage_ReturnsJpegThumbnailWithinCap()
     {
-        // C7 (review 042-v4): the thumbnail long edge is 800px (stories 001/002 + unit brief);
-        // a 2000x1500 source must be downscaled to fit within 800px, not the old 300px.
-        using var src = new Image<Rgba32>(2000, 1500);
-        StoreBytes("photo.png", EncodePng(src));
+        // Bolt 043: the thumbnail long edge is 300 px; a 2000x1500 source is downscaled to fit.
+        using var source = new Image<Rgba32>(2000, 1500);
+        await using var src = PngStream(source);
 
-        await using var thumb = await _sut.GenerateThumbnailAsync("photo.png");
+        await using var thumb = await _sut.GenerateThumbnailAsync(src);
 
         thumb.Length.Should().BeGreaterThan(0);
 
@@ -86,65 +85,65 @@ public class ImageProcessorTests
 
         thumb.Position = 0;
         var info = await Image.IdentifyAsync(thumb);
-        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(800);
-        Math.Max(info.Width, info.Height).Should().BeGreaterThan(300); // proves the cap is 800, not the old 300
+        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(ThumbnailMaxDimension);
+        // Prove the source WAS downscaled (a 2000 px source must not pass through at native size).
+        Math.Max(info.Width, info.Height).Should().Be(ThumbnailMaxDimension);
     }
 
     [Fact]
-    public async Task GenerateThumbnailAsync_DecodeSlotUnavailable_WaitsOnGateBeforeReadingStorage()
+    public async Task GenerateThumbnailAsync_DecodeSlotUnavailable_WaitsOnGateBeforeDecoding()
     {
-        // M3: the decode gate must precede the storage read + decode, so total in-flight decode
-        // memory stays bounded. With the only slot held and the request cancelled, the call
-        // abandons while waiting on the gate and never opens the stored file.
+        // M3: the decode gate must precede the decode, so total in-flight decode memory stays
+        // bounded. With the only slot held and the request cancelled, the call abandons while
+        // waiting on the gate and never reads/decodes the source stream.
         using var limiter = new ImageDecodeLimiter(maxConcurrentDecodes: 1);
         using var _held = await limiter.AcquireAsync();
 
-        var storage = new Mock<IStorageService>(MockBehavior.Strict);
-        var sut = new ImageProcessor(storage.Object, Mock.Of<ILogger<ImageProcessor>>(), limiter);
+        var sut = new ImageProcessor(Mock.Of<ILogger<ImageProcessor>>(), limiter);
+
+        using var source = new Image<Rgba32>(64, 64);
+        await using var src = PngStream(source);
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        var act = () => sut.GenerateThumbnailAsync("held.png", cts.Token);
+        var act = () => sut.GenerateThumbnailAsync(src, cts.Token);
 
         await act.Should().ThrowAsync<OperationCanceledException>();
-        storage.Verify(
-            s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        // The gate blocked before any decode work, so the source stream was never read.
+        src.Position.Should().Be(0);
     }
 
     [Fact]
     public async Task GenerateThumbnailAsync_UnreadableFile_ThrowsUnprocessableEntity()
     {
-        // A stored file that is not a decodable image (corrupted/replaced ops-side). ImageSharp
+        // A source that is not a decodable image (corrupted/replaced ops-side). ImageSharp
         // throws an ImageFormatException; the processor must surface a clean 422, not a 500 (BUG-4).
-        StoreBytes("corrupt.bin", new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33 });
+        await using var src = new MemoryStream(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33 });
 
-        var act = () => _sut.GenerateThumbnailAsync("corrupt.bin");
+        var act = () => _sut.GenerateThumbnailAsync(src);
 
         await act.Should().ThrowAsync<UnprocessableEntityException>();
     }
 
     [Fact]
-    public async Task GenerateThumbnailAsync_UnreadableFile_LogsStoragePathAndCause()
+    public async Task GenerateThumbnailAsync_UnreadableFile_LogsCause()
     {
-        // M7 (review 042-v4): a stored file corrupted/replaced ops-side is unreadable at preview
-        // time. The catch previously rethrew a bare 422 with no log, so ops couldn't tell WHICH
-        // stored file corrupted (GetInfoAsync logs it; the preview path did not). Log storagePath
-        // + the caught exception before rethrowing.
+        // M7 (review 042-v4): a source corrupted/replaced ops-side is unreadable at preview time.
+        // The catch previously rethrew a bare 422 with no log; it must log the caught exception
+        // (mirroring GetInfoAsync) before rethrowing so the incident is visible to ops.
         var logger = new Mock<ILogger<ImageProcessor>>();
-        var storage = new Mock<IStorageService>();
-        storage.Setup(s => s.GetStreamAsync("corrupt.bin", It.IsAny<CancellationToken>()))
-               .ReturnsAsync(() => new MemoryStream(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11 }));
-        var sut = new ImageProcessor(storage.Object, logger.Object, new ImageDecodeLimiter(8));
+        var sut = new ImageProcessor(logger.Object, new ImageDecodeLimiter(8));
+        await using var src = new MemoryStream(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11 });
 
-        var act = () => sut.GenerateThumbnailAsync("corrupt.bin");
+        var act = () => sut.GenerateThumbnailAsync(src);
         await act.Should().ThrowAsync<UnprocessableEntityException>();
 
         logger.Verify(
             l => l.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("corrupt.bin")),
+                It.IsAny<It.IsAnyType>(),
                 It.Is<Exception?>(e => e != null),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
@@ -184,7 +183,7 @@ public class ImageProcessorTests
         // legitimate ~72 MP deep-colour print trips the 512 MB backstop -> permanently un-previewable.
         // A 16-bit source must decode to 32 bpp; reverting to the non-generic load yields 64 bpp.
         using var deep = new Image<Rgba64>(32, 32);
-        using var png = new MemoryStream(EncodePng(deep));
+        using var png = PngStream(deep);
 
         var method = typeof(ImageProcessor).GetMethod(
             "LoadSingleFrameAsync", BindingFlags.NonPublic | BindingFlags.Static);
@@ -200,9 +199,9 @@ public class ImageProcessorTests
         // end-to-end into a valid JPEG, not fail. Small canvas keeps the test fast; the memory bound
         // (≤400 MB at 100 MP with the 4 B/px pin) is arithmetic, guarded by the sibling loader test.
         using var deep = new Image<Rgba64>(1000, 800);
-        StoreBytes("deep.png", EncodePng(deep));
+        await using var src = PngStream(deep);
 
-        await using var thumb = await _sut.GenerateThumbnailAsync("deep.png");
+        await using var thumb = await _sut.GenerateThumbnailAsync(src);
 
         var head = thumb.ToArray();
         head[0].Should().Be(0xFF);
@@ -211,7 +210,7 @@ public class ImageProcessorTests
 
         thumb.Position = 0;
         var info = await Image.IdentifyAsync(thumb);
-        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(800);
+        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(ThumbnailMaxDimension);
     }
 
     [Fact]
@@ -222,15 +221,17 @@ public class ImageProcessorTests
         // was tested. A valid PNG signature + IHDR with corrupt image data is RECOGNISED as PNG,
         // so a decode failure raises InvalidImageContentException — narrowing the catch to
         // UnknownImageFormatException would 500 here. Cover that branch.
-        using var src = new Image<Rgba32>(64, 64);
-        var png = EncodePng(src);
+        using var source = new Image<Rgba32>(64, 64);
+        var png = new MemoryStream();
+        source.SaveAsPng(png);
+        var bytes = png.ToArray();
         // Scramble a window in the middle (the compressed IDAT data), leaving the 8-byte PNG
         // signature + IHDR (so Identify still reads dimensions) and the trailing IEND intact.
-        for (int i = png.Length / 2; i < png.Length / 2 + 24 && i < png.Length; i++)
-            png[i] ^= 0xFF;
-        StoreBytes("broken.png", png);
+        for (int i = bytes.Length / 2; i < bytes.Length / 2 + 24 && i < bytes.Length; i++)
+            bytes[i] ^= 0xFF;
+        await using var src = new MemoryStream(bytes);
 
-        var act = () => _sut.GenerateThumbnailAsync("broken.png");
+        var act = () => _sut.GenerateThumbnailAsync(src);
 
         await act.Should().ThrowAsync<UnprocessableEntityException>();
     }
@@ -240,10 +241,10 @@ public class ImageProcessorTests
     [Fact]
     public async Task GetInfoAsync_ValidImage_ReturnsDimensions()
     {
-        using var src = new Image<Rgba32>(640, 480);
-        StoreBytes("dims.png", EncodePng(src));
+        using var source = new Image<Rgba32>(640, 480);
+        await using var src = PngStream(source);
 
-        var info = await _sut.GetInfoAsync("dims.png");
+        var info = await _sut.GetInfoAsync(src);
 
         info.Should().NotBeNull();
         info!.WidthPx.Should().Be(640);
@@ -253,9 +254,9 @@ public class ImageProcessorTests
     [Fact]
     public async Task GetInfoAsync_NonImage_ReturnsNull()
     {
-        StoreBytes("notimg.bin", new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 });
+        await using var src = new MemoryStream(new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 });
 
-        var info = await _sut.GetInfoAsync("notimg.bin");
+        var info = await _sut.GetInfoAsync(src);
 
         info.Should().BeNull();
     }

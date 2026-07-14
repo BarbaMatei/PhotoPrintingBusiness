@@ -17,7 +17,8 @@ namespace PhotoPrint.Tests.Unit.Services;
 /// </summary>
 public class ImageProcessorLargePreviewTests
 {
-    private static ImageProcessor Create() => new(Mock.Of<ILogger<ImageProcessor>>());
+    private static ImageProcessor Create() =>
+        new(Mock.Of<ILogger<ImageProcessor>>(), new ImageDecodeLimiter(maxConcurrentDecodes: 8));
 
     private static MemoryStream EncodeJpeg(int w, int h)
     {

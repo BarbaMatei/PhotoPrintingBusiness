@@ -2,7 +2,9 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Controllers;
 using PhotoPrint.API.DTOs.Uploads;
 using PhotoPrint.API.Exceptions;
@@ -34,7 +36,11 @@ public class UploadsControllerTests
             .ThrowsAsync(new UnsupportedMediaTypeException("Only images are accepted."));
         var logger = new Mock<ILogger<UploadsController>>();
 
-        var controller = new UploadsController(uploadService.Object, logger.Object)
+        var controller = new UploadsController(
+            uploadService.Object,
+            Mock.Of<IStorageRouter>(),
+            Options.Create(new StorageSettings()),
+            logger.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -71,7 +77,11 @@ public class UploadsControllerTests
             .ThrowsAsync(new UnsupportedMediaTypeException("nope"));
         var logger = new Mock<ILogger<UploadsController>>();
 
-        var controller = new UploadsController(uploadService.Object, logger.Object)
+        var controller = new UploadsController(
+            uploadService.Object,
+            Mock.Of<IStorageRouter>(),
+            Options.Create(new StorageSettings()),
+            logger.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -110,7 +120,11 @@ public class UploadsControllerTests
             .ThrowsAsync(new DecompressionBombException(30_000, 30_000, "Image dimensions exceed limits."));
         var logger = new Mock<ILogger<UploadsController>>();
 
-        var controller = new UploadsController(uploadService.Object, logger.Object)
+        var controller = new UploadsController(
+            uploadService.Object,
+            Mock.Of<IStorageRouter>(),
+            Options.Create(new StorageSettings()),
+            logger.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };

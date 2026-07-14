@@ -19,18 +19,38 @@ public class UploadsController : ControllerBase
     private const long MaxFileSizeBytes = 52_428_800L;        // 50 MB per file
     private const long MaxBatchSizeBytes = 524_288_000L;       // 500 MB total batch
 
+    // A preview is an ownership-checked, per-user resource, so it must never be shared-cacheable
+    // (SEC-1 + QUAL-4, review 042-v1). `private` keeps it out of any shared proxy/CDN while still
+    // allowing a per-user browser cache. `immutable` is intentionally dropped: a thumbnail can be
+    // regenerated after an ops-side deletion, so the response is not immutable.
+    private static readonly string PreviewCacheControl =
+        $"private, max-age={(int)TimeSpan.FromDays(30).TotalSeconds}";
+
     private readonly IUploadService _uploadService;
     private readonly IStorageRouter _storageRouter;
     private readonly StorageSettings _storageSettings;
+    private readonly ILogger<UploadsController> _logger;
 
     public UploadsController(
         IUploadService uploadService,
         IStorageRouter storageRouter,
-        IOptions<StorageSettings> storageSettings)
+        IOptions<StorageSettings> storageSettings,
+        ILogger<UploadsController> logger)
     {
         _uploadService = uploadService;
         _storageRouter = storageRouter;
         _storageSettings = storageSettings.Value;
+        _logger = logger;
+    }
+
+    // Client-controlled filenames must be neutralised before logging (L6, review 042-v4):
+    // strip control chars (a newline forges a fake log line in plain-text sinks) and cap length
+    // (an unbounded name is a log-volume amplification vector).
+    private static string SanitizeForLog(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "(none)";
+        var cleaned = new string(name.Where(c => !char.IsControl(c)).ToArray());
+        return cleaned.Length > 128 ? cleaned[..128] : cleaned;
     }
 
     // POST /api/uploads
@@ -112,6 +132,22 @@ public class UploadsController : ControllerBase
                       RequestEntityTooLargeException or
                       BadRequestException)
             {
+                // A batch rejection is swallowed into a per-item result (200 overall), so it never
+                // reaches ExceptionHandlerMiddleware. Log it here or bulk abuse is invisible to ops
+                // (OBS-1, review 042-v1).
+                var safeName = SanitizeForLog(file.FileName);
+                if (ex is DecompressionBombException bomb)
+                    // DecompressionBombException subclasses UnprocessableEntityException, so without
+                    // this branch the reserved bomb event (with dimensions) that ops alerts key on
+                    // would never fire for the /batch vector (M4, review 042-v4).
+                    _logger.LogWarning(
+                        "uploads.decompression_bomb.rejected file={File} width={Width} height={Height}",
+                        safeName, bomb.WidthPx, bomb.HeightPx);
+                else
+                    _logger.LogWarning(
+                        "uploads.batch.item_rejected file={File} reason={Reason}",
+                        safeName, ex.GetType().Name);
+
                 results.Add(new BatchUploadItemResult(file.FileName, null, ex.Message));
             }
         }
@@ -122,7 +158,7 @@ public class UploadsController : ControllerBase
     // GET /api/uploads/{id}/preview
     //
     // Bolt 043 (ADR-008): the response shape depends on which tier owns the upload's bytes.
-    //   Local upload  -> 200 image/jpeg + immutable cache (bolt 042 behaviour, unchanged).
+    //   Local upload  -> 200 image/jpeg + private 30-day cache (bolt 042 SEC-1 behaviour).
     //   Cloud upload  -> 302 Found to a 1 h presigned URL + Cache-Control: private,
     //                    max-age=3600 (so shared caches never leak a user's signed URL).
     // Authorization runs in the service BEFORE any presigned URL is generated.
@@ -150,10 +186,10 @@ public class UploadsController : ControllerBase
             return Redirect(url);
         }
 
-        // Local tier → stream + long-lived shared cache (UUID-keyed, immutable thumbnail).
+        // Local tier → stream + per-user (private) 30-day cache (UUID-keyed thumbnail).
         var stream = await _storageRouter.Local.GetStreamAsync(loc.ThumbnailKey, cancellationToken);
 
-        Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+        Response.Headers.CacheControl = PreviewCacheControl;
         var etag = $"\"{id}-{stream.Length}\"";
         Response.Headers.ETag = etag;
 

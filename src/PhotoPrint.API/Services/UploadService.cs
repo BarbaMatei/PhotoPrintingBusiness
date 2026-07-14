@@ -80,9 +80,12 @@ public class UploadService : IUploadService
         var imageInfo = await _imageProcessor.GetInfoAsync(fileStream, ct);
         if (imageInfo is null)
             throw new UnprocessableEntityException("The uploaded file could not be read as an image.");
-        if (imageInfo.WidthPx > ImageProcessor.MaxDecodeDimension ||
-            imageInfo.HeightPx > ImageProcessor.MaxDecodeDimension)
-            throw new UnprocessableEntityException("Image dimensions exceed limits.");
+        // Total-pixel-area bomb check (bolt 042, BUG-1) — a per-axis cap misses the square
+        // bomb (25000×25000 passes 25000-per-axis yet decodes to ~625 MP). Reject up-front,
+        // before the file is written (ADR-007: validate-then-save).
+        if (ImageProcessor.ExceedsDecodeLimits(imageInfo.WidthPx, imageInfo.HeightPx))
+            throw new DecompressionBombException(
+                imageInfo.WidthPx, imageInfo.HeightPx, ImageProcessor.DimensionsExceededMessage);
 
         var uploadId = Guid.NewGuid();
         var createdAt = DateTimeOffset.UtcNow;
@@ -148,26 +151,83 @@ public class UploadService : IUploadService
         // Route to the adapter that owns this upload's bytes.
         var store = _router.For(upload.StorageLocation);
 
-        // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
-        // deletion). Generate from the original (in the upload's current tier), store back
-        // to that tier under the deterministic thumbnail key, and record it.
-        if (upload.ThumbnailPath is null || !await store.ExistsAsync(upload.ThumbnailPath, ct))
-        {
-            // FilePath is nullable since bolt 052 (the original-purge nulls it). If the
-            // original is gone, we cannot regenerate a missing thumbnail — surface as 404
-            // ("your photos are no longer available"); unit 003 catches this for UI.
-            if (upload.FilePath is null)
-                throw new NotFoundException($"Upload {uploadId} is no longer available.");
+        // Cache hit: recorded thumbnail still present in the tier. Return without any decode
+        // work. Read-through Exists rather than trusting ThumbnailPath so an ops-side deletion
+        // transparently regenerates below instead of handing the caller a dead key (L1).
+        if (upload.ThumbnailPath is not null && await store.ExistsAsync(upload.ThumbnailPath, ct))
+            return new PreviewLocation(upload.Id, upload.StorageLocation, upload.ThumbnailPath);
 
-            await using var src = await store.GetStreamAsync(upload.FilePath, ct);
-            await using var generated = await _imageProcessor.GenerateThumbnailAsync(src, ct);
-            var thumbKey = StorageKeys.Thumbnail(upload.Id);
-            await store.SaveAsync(generated, thumbKey, ct);
-            upload.ThumbnailPath = thumbKey;
-            await _db.SaveChangesAsync(ct);
+        // Recorded-but-absent thumbnail: emit a distinct signal so a silently-broken cache is not
+        // indistinguishable from a first-time miss (L3, review 042-v4), then regenerate below.
+        if (upload.ThumbnailPath is not null)
+            _logger.LogWarning("uploads.thumbnail.cache_miss_missing_file upload_id={UploadId}", uploadId);
+
+        // Cache miss: regenerate from the original in the upload's current tier. FilePath is
+        // nullable since bolt 052 (the original-purge nulls it). If it is gone, we cannot
+        // regenerate — signal the storage-integrity incident distinctly (F5, review 042-v8) and
+        // surface a clean 404 ("your photos are no longer available"; unit 003 catches this).
+        if (upload.FilePath is null)
+        {
+            _logger.LogWarning("uploads.original.missing_file upload_id={UploadId}", uploadId);
+            throw new NotFoundException($"Upload {uploadId} is no longer available.");
         }
 
-        return new PreviewLocation(upload.Id, upload.StorageLocation, upload.ThumbnailPath!);
+        var thumbKey = StorageKeys.Thumbnail(upload.Id);
+        MemoryStream generated;
+        try
+        {
+            await using var src = await store.GetStreamAsync(upload.FilePath, ct);
+            generated = await _imageProcessor.GenerateThumbnailAsync(src, ct);
+        }
+        catch (FileNotFoundException)
+        {
+            // FilePath is recorded but the blob is physically gone (ops-side deletion / cleanup
+            // race). Unmapped, GetStreamAsync's FileNotFoundException surfaces as a 500 (M6,
+            // review 042-v4). Signal it (F5) and return a clean 404 instead.
+            _logger.LogWarning("uploads.original.missing_file upload_id={UploadId}", uploadId);
+            throw new NotFoundException($"Upload {uploadId} is no longer available.");
+        }
+
+        await using (generated)
+        {
+            await store.SaveAsync(generated, thumbKey, ct);
+        }
+
+        // Persist only ThumbnailPath. The entity is tracked, so setting the single property marks
+        // just that column modified — a concurrent soft-delete's DeletedAt is not overwritten,
+        // which is what lets the deleted-row-race check below observe it.
+        upload.ThumbnailPath = thumbKey;
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // The thumbnail is stored but ThumbnailPath didn't persist, so the cleanup job (which
+            // keys on ThumbnailPath) can never reclaim it. Signal + best-effort delete so it can't
+            // leak silently (L4, review 042-v4), then rethrow.
+            _logger.LogWarning(ex,
+                "uploads.thumbnail.orphaned_on_commit_failure upload_id={UploadId} key={Key}",
+                uploadId, thumbKey);
+            try { await store.DeleteAsync(thumbKey, ct); } catch { /* best-effort */ }
+            throw;
+        }
+
+        // The cleanup job may have soft-deleted this row between the live read above and this
+        // write (the write keys only on Id — no DeletedAt guard, and Upload has no concurrency
+        // token). A thumbnail written onto a now-dead row is never revisited by cleanup, so
+        // delete it here to stop it leaking forever (M1/F6, review 042-v4/v8).
+        var stillLive = await _db.Uploads
+            .AsNoTracking()
+            .AnyAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
+        if (!stillLive)
+        {
+            _logger.LogWarning(
+                "uploads.thumbnail.deleted_row_race upload_id={UploadId} key={Key}", uploadId, thumbKey);
+            await store.DeleteAsync(thumbKey, ct);
+        }
+
+        return new PreviewLocation(upload.Id, upload.StorageLocation, thumbKey);
     }
 
     private static UploadDto MapToDto(Upload u) => new(
