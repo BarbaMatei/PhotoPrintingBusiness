@@ -27,13 +27,15 @@ The join key **within** a pass is the pass-local ID; the join key **across** pas
   population estimate — fixes removed v1's population. The honest signal is qualitative: among defects
   *still open* at v4's commit, v4 re-found both; and it added ~30 genuinely new ones (several
   fix-generated), so the feature is **not saturated** — closure still wants another discovery pass.
-- **Current state (after resolution-v4 @`6c4f334`, pending a verification re-review):** the 28
-  v4-open findings are now terminal — **26 fixed** (each with a revert- or mutation-verified test),
-  **`D46`/L5 deferred** (read-replica hazard, documented), **`D48`/L7 disputed** (conflicts with the
-  verified FE-3 no-login-redirect decision). Cross-pass deferrals stand: **`D28`**→bolt-043,
-  **`D31`**→bolt-043, **`D23`** Npgsql-DDL/snapshot→3-env phase (a SQLite `Migrate()` smoke test *was*
-  added now for the DDL). 29 v1/v2 findings remain verified/closed. **None of the v4 fixes are
-  `verified` yet** — that awaits the re-review. Per-finding detail: [resolution-v4.md](resolution-v4.md).
+- **Current state (after review-v5 verification @`6c4f334`):** the 26 fixed v4 findings are now
+  **verified** — review-v5 confirmed each regression test non-vacuous (revert→red) + correct, with no
+  fix-introduced regression; .NET 531/531, FE 409/409. **`D46`/L5 deferred** (read-replica, documented)
+  and **`D48`/L7 disputed** (conflicts with the verified FE-3 no-login-redirect decision) — both upheld
+  by v5. Cross-pass deferrals stand: **`D28`**→bolt-043, **`D31`**→bolt-043 (also the backstop for the
+  M1 residual `V5-1`), **`D23`** Npgsql-DDL/snapshot→3-env (SQLite `Migrate()` smoke test added
+  @`2945bda`). 29 v1/v2 verified/closed. v5 also closed 2 doc residuals (`V5-2`/`V5-3` @`838c9b6`).
+  Per-finding: [resolution-v4.md](resolution-v4.md) + [resolution-v5.md](resolution-v5.md). **Still not
+  saturated** → closure wants a quiet discovery pass.
 
 ## Cross-pass defects (the ones that matter)
 
@@ -41,8 +43,8 @@ The join key **within** a pass is the pass-local ID; the join key **across** pas
 |----|--------|---------------------------|--------|
 | **D23** | Migration provider-parity **and** its DDL exercised by no test | v1·`DB-1` (provider-aware **fixed**@bca68fa; DDL-test deferred) · v4·`M9` (DDL untested) · v4·`L10` (snapshot phantom AlterColumn) | provider-aware **verified**; DDL/snapshot-test **deferred → 3-env phase** |
 | **D28** | Cloud `IStorageService` seekable-stream / `stream.Length` assumptions | v1·`CLOUD-1` (deferred) · v4·`L11` (ETag/seek) | **deferred → bolt-043** (re-affirmed v4) |
-| **D33** | Image decode has no aggregate/concurrency memory bound (OOM under concurrent large images) | v3·deploy-note (decode concurrency) · v4·`M3` | **open** (recommend a `SemaphoreSlim` gate pre-merge) |
-| D31 | Orphaned-thumbnail sweep for the un-recorded case | v2·`NEW-3` (deferred) | **deferred → bolt-043** |
+| **D33** | Image decode has no aggregate/concurrency memory bound (OOM under concurrent large images) | v3·deploy-note (decode concurrency) · v4·`M3` | **fixed@`aa6639c`, verified (v5)** — process-wide `ImageDecodeLimiter` gate |
+| D31 | Orphaned-thumbnail sweep for the un-recorded case | v2·`NEW-3` (deferred) · v5·`V5-1` (M1 residual) | **deferred → bolt-043** (backstops the M1 residual race) |
 
 > Note the fix-generativity chain: v1·`BUG-3` (D5, deterministic thumbnail key — *fixed*) is the
 > **cause** of three new v4 defects: `D34` (`M1` write-vs-cleanup orphan), `D35` (`M2` concurrent
