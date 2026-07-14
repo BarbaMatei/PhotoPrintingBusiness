@@ -176,18 +176,53 @@ public class UploadsController : ControllerBase
             id, userId, guestSessionId, cancellationToken);
 
         if (loc.Location == StorageLocation.Cloud)
+            return await CloudRedirectAsync(loc, cancellationToken);
+
+        try
         {
-            // Cloud tier → presigned 302. Bytes flow browser ↔ object store directly.
-            var ttl = TimeSpan.FromMinutes(_storageSettings.PresignTtlMinutes);
-            var url = await _storageRouter.Cloud.GetPresignedUrlAsync(
-                loc.ThumbnailKey, ttl, cancellationToken);
-
-            Response.Headers.CacheControl = "private, max-age=3600";
-            return Redirect(url);
+            return await StreamLocalAsync(id, loc, cancellationToken);
         }
+        catch (FileNotFoundException)
+        {
+            // TOCTOU (F8, review 043-v1): GetPreviewAsync resolved Local, then a concurrent
+            // promotion best-effort-deleted the local thumb before we opened it. Re-resolve
+            // once — the upload is now Cloud (→ 302) or the thumb regenerated — rather than
+            // letting the unmapped FileNotFoundException surface as a 500.
+            var reResolved = await _uploadService.GetPreviewAsync(
+                id, userId, guestSessionId, cancellationToken);
 
-        // Local tier → stream + per-user (private) 30-day cache (UUID-keyed thumbnail).
-        var stream = await _storageRouter.Local.GetStreamAsync(loc.ThumbnailKey, cancellationToken);
+            if (reResolved.Location == StorageLocation.Cloud)
+                return await CloudRedirectAsync(reResolved, cancellationToken);
+
+            try
+            {
+                return await StreamLocalAsync(id, reResolved, cancellationToken);
+            }
+            catch (FileNotFoundException)
+            {
+                _logger.LogWarning(
+                    "uploads.preview.local_thumb_vanished upload_id={UploadId}", id);
+                return NotFound();
+            }
+        }
+    }
+
+    private async Task<IActionResult> CloudRedirectAsync(
+        PreviewLocation loc, CancellationToken ct)
+    {
+        // Cloud tier → presigned 302. Bytes flow browser ↔ object store directly.
+        var ttl = TimeSpan.FromMinutes(_storageSettings.PresignTtlMinutes);
+        var url = await _storageRouter.Cloud.GetPresignedUrlAsync(loc.ThumbnailKey, ttl, ct);
+
+        Response.Headers.CacheControl = "private, max-age=3600";
+        return Redirect(url);
+    }
+
+    // Opens the local thumbnail and returns a 200 (or 304). Throws FileNotFoundException if the
+    // thumb has been deleted since GetPreviewAsync resolved it — the caller handles that.
+    private async Task<IActionResult> StreamLocalAsync(Guid id, PreviewLocation loc, CancellationToken ct)
+    {
+        var stream = await _storageRouter.Local.GetStreamAsync(loc.ThumbnailKey, ct);
 
         Response.Headers.CacheControl = PreviewCacheControl;
         var etag = $"\"{id}-{stream.Length}\"";
