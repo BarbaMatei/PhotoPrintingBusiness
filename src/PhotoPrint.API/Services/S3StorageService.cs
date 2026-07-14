@@ -91,10 +91,22 @@ public class S3StorageService : IStorageService
     public async Task<Stream> GetStreamAsync(string key, CancellationToken ct = default)
     {
         StorageKeys.Validate(key);
-        var response = await _pipeline.ExecuteAsync(async cancel =>
-            await _s3.GetObjectAsync(_bucket, key, cancel), ct);
-        // ResponseStream is owned by the caller (returned, not used here).
-        return response.ResponseStream;
+        try
+        {
+            var response = await _pipeline.ExecuteAsync(async cancel =>
+                await _s3.GetObjectAsync(_bucket, key, cancel), ct);
+            // ResponseStream is owned by the caller (returned, not used here).
+            return response.ResponseStream;
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // Uniform missing-object contract across adapters (F3, review 043-v1). The local
+            // adapter throws FileNotFoundException for an absent key; callers such as
+            // UploadService.GetPreviewAsync catch exactly that to return a clean 404. Translate
+            // S3's typed 404 so a missing cloud object is a 404, not an unmapped 500. ExistsAsync
+            // already special-cases the same NotFound — this keeps GetStreamAsync symmetric.
+            throw new FileNotFoundException("Stored object not found.", key, ex);
+        }
     }
 
     public async Task<bool> ExistsAsync(string key, CancellationToken ct = default)

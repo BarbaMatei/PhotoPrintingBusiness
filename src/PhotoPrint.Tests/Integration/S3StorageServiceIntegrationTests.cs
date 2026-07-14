@@ -70,6 +70,19 @@ public sealed class S3StorageServiceIntegrationTests : IClassFixture<MinioFixtur
         ms.ToArray().Should().Equal(payload);
     }
 
+    [SkippableFact]
+    public async Task GetStreamAsync_MissingKey_ThrowsFileNotFoundException()
+    {
+        Skip.IfNot(_fx.Available, MinioFixture.SkipReason);
+
+        // The real S3 protocol returns a typed NotFound; the adapter must translate it to
+        // FileNotFoundException so callers get the uniform missing-object contract (F3,
+        // review 043-v1). Pre-fix this surfaced as AmazonS3Exception → 500 in prod.
+        var act = () => _fx.Sut.GetStreamAsync($"uploads/2026/05/{Guid.NewGuid():N}.bin");
+
+        await act.Should().ThrowAsync<FileNotFoundException>();
+    }
+
     // ── Exists ────────────────────────────────────────────────────────────────
 
     [SkippableFact]
