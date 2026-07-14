@@ -72,32 +72,48 @@ blocker later forces broad changes:
 2. Then remaining 🔴 High and 🟠 Medium by severity.
 3. 🟡 Low and ⚪ Cleanup last — batch related ones into a single commit.
 
-For each finding:
+For each finding (scale the rigor: 🔴/🟠 get every step; 🟡/⚪ get the class sweep and may
+be batched):
 
 1. **Re-read the finding** in the review (its location + recommended fix). Open the cited
    code and confirm the issue still exists at the current commit. If it doesn't (already
    fixed, or you judge it a false positive), set status `false-positive`/`disputed` with a
    one-line rationale instead of changing code.
-2. **Test-first for behavioral findings.** Follow the repo's test conventions (if a
+2. **Name the class, sweep for siblings.** State the defect *class* in one sentence, then
+   grep code and docs for other sites of it — the same pattern, the same stale value. Fix
+   the class; if you deliberately fix only the instance, say why in the note. For doc
+   drift the unit of fix is the stale token repo-wide, never just the file the finding
+   cited.
+3. **Escalate design changes.** If the fix changes a key scheme, concurrency model,
+   resource budget, or retry semantics, it is a design, not a patch: before implementing,
+   dispatch one adversarial agent (race/resource lens as fits) against the proposed
+   approach and fold in what it finds.
+4. **Test-first for behavioral findings.** Follow the repo's test conventions (if a
    test-driven-development skill or `CLAUDE.md` rule applies, obey it). Write the
    regression test the review called for — the concurrency case, the cross-tenant case,
    the edge input — and confirm it FAILS against the current code. This is what turns
    "I think I fixed it" into evidence. Doc-only and pure-cleanup findings need no test.
-3. **Implement the fix** at the right altitude (prefer the review's recommended approach;
-   if you deviate, say why in the note). Re-run the test; confirm it now passes and you
-   broke nothing adjacent.
-4. **Commit** — one focused commit per finding (or per tightly-related cleanup group),
+5. **Implement the fix** at the right altitude (prefer the review's recommended approach;
+   if you deviate, say why in the note). If the fix **adds a mechanism** — a new class,
+   catch/mapping, event, limit, retry, cache — it is a mini-feature and ships at feature
+   grade: defaults/sizing derived from the real constraint (say from what in the note), an
+   observability hook, tests for the failure modes the mechanism itself introduces, and
+   updates to every doc that states the old behavior. Re-run the test; confirm it now
+   passes and you broke nothing adjacent.
+6. **Commit** — one focused commit per finding (or per tightly-related cleanup group),
    message referencing the ID and the review version:
    `fix(<area>): <what> (<FINDING-ID>, review <target>-v<n>)`
    e.g. `fix(payments): scope idempotency lookup to caller (SEC-1, review 035-v1)`.
-5. **Record it** in the resolution file (next section).
+7. **Record it** in the resolution file (next section).
 
 ## Recording in the resolution file
 
 After each finding, update its entry in `resolution-v<n>.md`:
 
 - The frontmatter `findings:` map → set the finding's `status`, `commit` (the SHA you
-  just made), and a one-line `note` (what you did, or why you won't).
+  just made), and a one-line `note` (what you did, or why you won't). A mechanism-adding
+  fix's note also names the **new surface** (the mechanism and its failure modes) — that
+  is where the re-review points the owning lens.
 - The body table row → same status / commit / how.
 
 Status values: `fixed` · `wont-fix` · `deferred` · `disputed` · `false-positive`
@@ -114,6 +130,21 @@ tip), and `closed:` date. If you stopped partway, leave `status: in-progress`.
   QUAL-2: { status: wont-fix, commit: null, note: "DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now" }
 ```
 
+## Fix-diff micro-review — before hand-back
+
+Your own re-read of the diff does not count: it is the same mind that wrote the fixes, and
+it reliably answers "no regressions" over diffs a later discovery pass then mines for a
+round of findings. Dispatch 1–2 anchored Explore agents (fresh context, one per fix
+cluster) over the full fix diff, asking exactly three questions:
+
+1. **Class or instance** — do sibling sites (code or docs) still carry the defect?
+2. **New surface at the bar** — does each added mechanism have sized defaults, a signal,
+   failure-mode tests, and doc updates?
+3. **Regression** — did the fix change any adjacent behavior?
+
+Fix what they find before handing back; anything you leave open goes in the decisions
+section for the re-reviewer. Batched doc/cleanup-only rounds may skip this.
+
 ## Hand back — do not self-verify
 
 When done, summarize to the user: which findings are `fixed` / `deferred` / `wont-fix`,
@@ -127,7 +158,11 @@ Update `reviews/index.md`'s Status column for the target (`open → in-progress/
 ## Guardrails recap
 
 - Immutable review file — respond in the resolution, never edit the review.
+- Class sweep before every fix; doc drift is fixed token-wide, not file-wide.
+- Design-level fixes get an adversarial approach-check before implementation.
+- Mechanism-adding fixes ship at feature grade and name their new surface in the note.
 - Regression test before claiming a behavioral finding fixed.
 - Blocker-first ordering.
 - One commit per finding, message names the ID.
+- Fresh-eyes micro-review of the fix diff before hand-back — self-review alone doesn't count.
 - Never self-mark `verified`; hand back for re-review.

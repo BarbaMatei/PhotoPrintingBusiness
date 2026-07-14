@@ -2,7 +2,7 @@
 type: review-system
 status: active
 created: 2026-06-18
-updated: 2026-07-13
+updated: 2026-07-14
 owner: Matei Barba
 ---
 
@@ -202,8 +202,13 @@ manifest, no codePack, no workflow script:
 3. For findings that need judgment rather than a test (doc items, `wont-fix`/`deferred`/`disputed`
    rationales), dispatch one anchored Explore agent per finding — give it the finding, the
    resolution note, and the fix delta, not the whole feature.
-4. **Skim the fix diffs for fix-introduced regressions** (bolt-035: 2 of the 5 out-of-audit
-   findings were caused by fixes) — the one place a verification pass looks beyond its anchor.
+4. **Review the fix diffs — three questions, not one.** Per fix cluster, by the owning lens:
+   *class or instance* (do sibling sites still carry the defect?); *new surface at the bar*
+   (an added mechanism has sized defaults, a signal, failure-mode tests, docs — the fixer's
+   rule-2 bar; the resolution's new-surface notes say where to look); *regression* (bolt-035:
+   2 of 5 out-of-audit findings were fix-caused). This is the one place a verification pass
+   looks beyond its anchor — v5 asked only the regression question, answered "none", and v6
+   then mined the same diffs for ~13 findings. Ask all three.
 5. Write `review-v<n+1>.md` (`pass-type: verification`; verdict at most `approve-with-followups`),
    flip held findings to `verified`, reopen the failures, and append the metrics line.
 
@@ -382,17 +387,45 @@ X", "now handles Y", "cache miss: …"). The *why* of a change lives in the comm
 `resolution-v<n>.md` note, not scattered through the source where it drifts. Comment only genuinely
 non-obvious intent the code can't express (a subtle invariant, a "why not the obvious approach").
 
-**Bounding fix-generativity.** Fixes create new review surface — and in bolt 035, **2 of the
-5** findings ever raised outside a full audit were regressions a *fix* introduced (a refactor
-that dropped a grep-able `TODO` token; an incomplete doc edit that left a sketch
-self-contradictory). So before handing back, the fixer **self-reviews its own diff** — the
-new tests (duplication? magic-number coupling?), new comments (drift? dropped affordances?),
-removed guards — with the relevant narrow lens. Cheap, and it catches the regression class
-before it costs a whole extra round.
+**Bounding fix-generativity — the four rules.** Fixes create new review surface, and on
+bolt 042 that surface became the dominant loop cost: **~13 of v6's 24 new defects — including
+4 of its 5 mediums — trace to earlier rounds' fixes** (the D5→D34/D35/D38→D75 chain is three
+generations deep; the M3 limiter alone yielded D61/D68/D69; the L13 mapping shipped without
+its bomb event → D62; the stale-doc-token class took four rounds, C4 → V5-2 → F7 → F20).
+Since the loop's only exit is a *quiet* discovery pass, a fixer that re-seeds the population
+each round is what forces extra ~2M-token discovery passes — fix-created surface must not
+wait for the most expensive instrument to inspect it. Four rules, applied per fix; scale by
+severity — 🔴/🟠 get all four, 🟡/⚪ get #1, batched doc/cleanup commits skip #4:
+
+1. **Class sweep before implementing.** State the defect class in one sentence, then search
+   for sibling sites — the same pattern in code, the same stale value in *every* doc — and
+   fix the class, or record in the note why only the instance. For doc drift the unit of fix
+   is the stale token repo-wide, never just the file the finding cited.
+2. **New-mechanism bar.** A fix that adds a mechanism (a class, catch/mapping, event, limit,
+   retry, cache) is a mini-feature and ships at feature grade: defaults/sizing derived from
+   the real constraint and stated in the note; an observability hook; tests for the failure
+   modes the mechanism itself introduces; every doc that states the old behavior updated.
+   D61 (default ignored RAM), D68 (silent saturation), D69 (untested slot release), and D64
+   (undocumented HEIC removal) are one round of this rule not existing.
+3. **Design-check escalation.** A fix that changes a design — key scheme, concurrency model,
+   resource budget, retry semantics — is not a patch: run one adversarial agent against the
+   *proposed approach before implementing* (~20k tokens; a race lens reading "temp file +
+   `File.Move`" names the move-target race immediately). Both deep 042 chains were designs
+   pushed through the patch loop unchecked.
+4. **Fresh-eyes micro-review of the fix diff (replaces self-review).** A self-skim is the
+   mind that wrote the fix asking itself only the regression question — and it answers
+   "none" (resolution-v1/v2's self-reviews did; so did v5's regression-only skim) over a
+   diff the next discovery pass then mines for a round of findings. Before hand-back,
+   dispatch 1–2 anchored Explore agents (fresh context, one per fix cluster) over the full
+   fix diff with exactly three questions: **class or instance? new surface at the bar of
+   rule 2? anything adjacent broken?** ~200–400k tokens per fix round, against the ~2M
+   discovery pass that otherwise finds it.
 
 **Writes (per finding):** update its row in `resolution-v<n>.md` → `status`, `commit` (the
-SHA that fixed it), and a one-line `note`. For `wont-fix`/`deferred`/`disputed`, record the
-rationale in the decisions section.
+SHA that fixed it), and a one-line `note`. A mechanism-adding fix's note also names the
+**new surface** (the mechanism and its failure modes) — that is where the verification pass
+points the owning lens. For `wont-fix`/`deferred`/`disputed`, record the rationale in the
+decisions section.
 
 **Commits:** one focused commit per finding (or per tight group), message referencing the ID,
 e.g. `fix(payments): scope idempotency lookup to caller (SEC-1, review 035-v1)`. When all
