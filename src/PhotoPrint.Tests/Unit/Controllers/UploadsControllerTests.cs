@@ -58,6 +58,43 @@ public class UploadsControllerTests
     }
 
     [Fact]
+    public async Task UploadPhotoBatchAsync_RejectedItem_SanitizesAndTruncatesFilenameInLog()
+    {
+        // L6 (review 042-v4): the batch-reject log emitted the raw client filename verbatim and
+        // unbounded — a newline forges a fake log line in plain-text sinks, and length is
+        // uncapped (volume amplification). Strip control chars and cap length before logging.
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .Setup(s => s.UploadAsync(
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<long>(),
+                It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UnsupportedMediaTypeException("nope"));
+        var logger = new Mock<ILogger<UploadsController>>();
+
+        var controller = new UploadsController(uploadService.Object, logger.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+
+        var evilName = "line1\nFAKE uploads.done line2_" + new string('z', 200);
+        var files = new List<IFormFile> { MakeFormFile(evilName, new byte[] { 0x25, 0x50 }) };
+
+        await controller.UploadPhotoBatchAsync(files, CancellationToken.None);
+
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("uploads.batch.item_rejected") &&
+                    !v.ToString()!.Contains('\n') &&
+                    !v.ToString()!.Contains(new string('z', 150))),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task UploadPhotoBatchAsync_DecompressionBomb_EmitsReservedBombEventWithDimensions()
     {
         // M4 (review 042-v4): DecompressionBombException subclasses UnprocessableEntityException,
