@@ -84,14 +84,16 @@ public class ImageProcessor : IImageProcessor
 
             image = await Image.LoadAsync(decoderOptions, stream, ct);
         }
-        catch (ImageFormatException)
+        catch (ImageFormatException ex)
         {
             // A file that passed the upload-time magic-byte check but was later corrupted or
             // replaced ops-side is unreadable here — IdentifyAsync/LoadAsync throw
             // UnknownImageFormatException (unrecognised) or InvalidImageContentException
-            // (recognised but broken), both deriving from ImageFormatException. Surface it as
-            // a clean 422, not a raw 500 (BUG-4, review 042-v1).
-            throw new UnprocessableEntityException("The file could not be read as an image.");
+            // (recognised but broken), both deriving from ImageFormatException. Log storagePath
+            // + cause so ops can tell WHICH stored file corrupted (M7, review 042-v4) — mirroring
+            // GetInfoAsync — then surface it as a clean 422, not a raw 500 (BUG-4, review 042-v1).
+            _logger.LogWarning(ex, "Failed to decode stored image at {StoragePath}", storagePath);
+            throw new UnprocessableEntityException("The file could not be read as an image.", ex);
         }
 
         using (image)

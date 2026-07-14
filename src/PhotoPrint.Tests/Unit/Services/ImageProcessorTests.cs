@@ -120,6 +120,32 @@ public class ImageProcessorTests
         await act.Should().ThrowAsync<UnprocessableEntityException>();
     }
 
+    [Fact]
+    public async Task GenerateThumbnailAsync_UnreadableFile_LogsStoragePathAndCause()
+    {
+        // M7 (review 042-v4): a stored file corrupted/replaced ops-side is unreadable at preview
+        // time. The catch previously rethrew a bare 422 with no log, so ops couldn't tell WHICH
+        // stored file corrupted (GetInfoAsync logs it; the preview path did not). Log storagePath
+        // + the caught exception before rethrowing.
+        var logger = new Mock<ILogger<ImageProcessor>>();
+        var storage = new Mock<IStorageService>();
+        storage.Setup(s => s.GetStreamAsync("corrupt.bin", It.IsAny<CancellationToken>()))
+               .ReturnsAsync(() => new MemoryStream(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11 }));
+        var sut = new ImageProcessor(storage.Object, logger.Object, new ImageDecodeLimiter(8));
+
+        var act = () => sut.GenerateThumbnailAsync("corrupt.bin");
+        await act.Should().ThrowAsync<UnprocessableEntityException>();
+
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("corrupt.bin")),
+                It.Is<Exception?>(e => e != null),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
     // ── GetInfoAsync ───────────────────────────────────────────────────────────
 
     [Fact]
