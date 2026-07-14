@@ -56,7 +56,9 @@ Status column reflects the cumulative outcome through **v2 (verification)**: `ve
 - **D9 / F9 — duplicate-webhook Order.Status race: deferred → bolt-035** (needs an `Order`
   concurrency token / event-dedup — payment-idempotency remit; no data loss today).
 - **D13 / F13 + D5b / F5(b) — deferred → frontend-ux** (four-way empty-state signal; lightbox
-  fetch-URL-on-open). The lean v1 pass skipped the frontend-ux lens.
+  fetch-URL-on-open). The lean v1 pass skipped the frontend-ux lens. **Scope note for the next
+  pass:** frontend-ux is paying this skipped-lens debt, so it covers the full preview/lightbox +
+  order-photos frontend surface — a deliberate exception to the delta fix-diff scope.
 
 All decisions above were re-checked and **upheld by v2 — last affirmed @ `1e7b9d3`** (the commit
 v2 audited). Per the README's verification-runbook deferral gate, the next verification pass
