@@ -159,8 +159,9 @@ public class UploadsController : ControllerBase
     //
     // Bolt 043 (ADR-008): the response shape depends on which tier owns the upload's bytes.
     //   Local upload  -> 200 image/jpeg + private 30-day cache (bolt 042 SEC-1 behaviour).
-    //   Cloud upload  -> 302 Found to a 1 h presigned URL + Cache-Control: private,
-    //                    max-age=3600 (so shared caches never leak a user's signed URL).
+    //   Cloud upload  -> 302 Found to a presigned URL + Cache-Control: private, max-age =
+    //                    the presign TTL (so a cached redirect never outlives its URL, and
+    //                    shared caches never leak a user's signed URL).
     // Authorization runs in the service BEFORE any presigned URL is generated.
     [HttpGet("{id:guid}/preview")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -214,7 +215,11 @@ public class UploadsController : ControllerBase
         var ttl = TimeSpan.FromMinutes(_storageSettings.PresignTtlMinutes);
         var url = await _storageRouter.Cloud.GetPresignedUrlAsync(loc.ThumbnailKey, ttl, ct);
 
-        Response.Headers.CacheControl = "private, max-age=3600";
+        // Cap the browser cache at the presigned-URL lifetime, so a still-fresh cached redirect
+        // can never replay to an already-expired URL (F5, review 043-v1). Hardcoding max-age=3600
+        // broke thumbnails whenever an operator set PresignTtlMinutes < 60. 'private' keeps a
+        // user's signed URL out of any shared cache.
+        Response.Headers.CacheControl = $"private, max-age={(int)ttl.TotalSeconds}";
         return Redirect(url);
     }
 

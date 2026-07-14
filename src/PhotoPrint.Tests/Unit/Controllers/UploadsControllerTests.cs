@@ -193,6 +193,43 @@ public class UploadsControllerTests
     }
 
     [Fact]
+    public async Task GetPreviewAsync_CloudUpload_MaxAgeTracksPresignTtl()
+    {
+        // F5 (review 043-v1): the redirect's Cache-Control max-age must be derived from
+        // PresignTtlMinutes, not hardcoded to 3600. A shorter TTL previously left the browser
+        // replaying a still-fresh cached redirect to an already-expired URL (broken thumbnail).
+        var uploadId = Guid.NewGuid();
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .Setup(s => s.GetPreviewAsync(
+                uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Cloud, "thumbs/cloud.jpg"));
+
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.GetPresignedUrlAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync("https://cdn.test/thumbs/cloud.jpg?sig=x");
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+
+        var controller = new UploadsController(
+            uploadService.Object, router.Object,
+            Options.Create(new StorageSettings { PresignTtlMinutes = 30 }),
+            Mock.Of<ILogger<UploadsController>>())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+
+        var result = await controller.GetPreviewAsync(uploadId, CancellationToken.None);
+
+        result.Should().BeOfType<RedirectResult>();
+        controller.Response.Headers.CacheControl.ToString()
+            .Should().Be("private, max-age=1800"); // 30 min × 60 s, not the old 3600
+        cloud.Verify(s => s.GetPresignedUrlAsync(
+            "thumbs/cloud.jpg", TimeSpan.FromMinutes(30), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task GetPreviewAsync_LocalThumbGoneOnBothResolves_Returns404()
     {
         // Double race (local thumb still gone on the re-resolve, upload still Local): degrade to
