@@ -58,4 +58,7 @@ Status column reflects the cumulative outcome through **v2 (verification)**: `ve
 - **D13 / F13 + D5b / F5(b) — deferred → frontend-ux** (four-way empty-state signal; lightbox
   fetch-URL-on-open). The lean v1 pass skipped the frontend-ux lens.
 
-All decisions above were re-checked and **upheld by v2**.
+All decisions above were re-checked and **upheld by v2 — last affirmed @ `1e7b9d3`** (the commit
+v2 audited). Per the README's verification-runbook deferral gate, the next verification pass
+re-judges a decision by agent only if `git diff 1e7b9d3..HEAD -- <cited file(s)>` shows the cited
+code moved; otherwise it records "unchanged, stands" with no agent.
