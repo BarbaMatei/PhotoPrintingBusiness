@@ -20,7 +20,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly IOrderEmailService _orderEmailService;
     private readonly IEuPlatescService _euPlatescService;
     private readonly IStripeClient _stripeClient;
-    private readonly IStorageService _storage;
+    private readonly IStorageRouter _storageRouter;
     private readonly IOriginalPurger _originalPurger;
     private readonly ArchiveSettings _archiveSettings;
     private readonly IHubContext<AdminOrderHub> _hub;
@@ -31,7 +31,7 @@ public class AdminOrderService : IAdminOrderService
         IOrderEmailService orderEmailService,
         IEuPlatescService euPlatescService,
         IStripeClient stripeClient,
-        IStorageService storage,
+        IStorageRouter storageRouter,
         IOriginalPurger originalPurger,
         IOptions<ArchiveSettings> archiveSettings,
         IHubContext<AdminOrderHub> hub,
@@ -41,7 +41,7 @@ public class AdminOrderService : IAdminOrderService
         _orderEmailService = orderEmailService;
         _euPlatescService = euPlatescService;
         _stripeClient = stripeClient;
-        _storage = storage;
+        _storageRouter = storageRouter;
         _originalPurger = originalPurger;
         _archiveSettings = archiveSettings.Value;
         _hub = hub;
@@ -165,7 +165,11 @@ public class AdminOrderService : IAdminOrderService
             var entry = archive.CreateEntry(entryName, CompressionLevel.NoCompression);
 
             await using var entryStream = entry.Open();
-            await using var fileStream = await _storage.GetStreamAsync(item.Upload.FilePath, ct);
+            // Route by the upload's tier — a promoted (Cloud) order's original lives in the
+            // object store, not on local disk, once promotion has run (F1, review 043-v1).
+            await using var fileStream = await _storageRouter
+                .For(item.Upload.StorageLocation)
+                .GetStreamAsync(item.Upload.FilePath, ct);
             await fileStream.CopyToAsync(entryStream, ct);
 
             idx++;

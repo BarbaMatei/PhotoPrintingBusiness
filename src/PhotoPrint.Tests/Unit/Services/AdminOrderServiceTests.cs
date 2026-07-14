@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -20,7 +22,9 @@ public class AdminOrderServiceTests
     private readonly Mock<IOrderEmailService> _emailSvc = new();
     private readonly Mock<IEuPlatescService> _euPlatesc = new();
     private readonly Mock<IStripeClient> _stripeClient = new();
-    private readonly Mock<IStorageService> _storage = new();
+    private readonly Mock<IStorageRouter> _router = new();
+    private readonly Mock<IStorageService> _localStore = new();
+    private readonly Mock<IStorageService> _cloudStore = new();
     private readonly Mock<IOriginalPurger> _purger = new();
     private readonly Mock<IHubContext<AdminOrderHub>> _hub = new();
     private readonly Mock<IHubClients> _hubClients = new();
@@ -46,12 +50,19 @@ public class AdminOrderServiceTests
         _purger.Setup(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(PurgeOutcome.Empty);
 
+        // Router resolves each tier to its own fake store; the ZIP read routes by
+        // Upload.StorageLocation (F1, review 043-v1).
+        _router.SetupGet(r => r.Local).Returns(_localStore.Object);
+        _router.SetupGet(r => r.Cloud).Returns(_cloudStore.Object);
+        _router.Setup(r => r.For(StorageLocation.Local)).Returns(_localStore.Object);
+        _router.Setup(r => r.For(StorageLocation.Cloud)).Returns(_cloudStore.Object);
+
         _sut = new AdminOrderService(
             _db,
             _emailSvc.Object,
             _euPlatesc.Object,
             _stripeClient.Object,
-            _storage.Object,
+            _router.Object,
             _purger.Object,
             Options.Create(new ArchiveSettings()),
             _hub.Object,
@@ -272,7 +283,7 @@ public class AdminOrderServiceTests
     /// </summary>
     private AdminOrderService BuildSutWithArchive(ArchiveSettings archive)
         => new(_db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
-            _storage.Object, _purger.Object, Options.Create(archive),
+            _router.Object, _purger.Object, Options.Create(archive),
             _hub.Object, NullLogger<AdminOrderService>.Instance);
 
     [Fact]
@@ -336,6 +347,80 @@ public class AdminOrderServiceTests
         _purger.Verify(
             p => p.PurgeOrderOriginalsAsync(order2.Id, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // ── StreamZipAsync (F1, review 043-v1) ────────────────────────────────────
+
+    [Fact]
+    public async Task StreamZipAsync_PromotedCloudOrder_ReadsOriginalsFromCloudTier()
+    {
+        // A paid order promoted to cloud: StorageLocation=Cloud, FilePath still set (same key,
+        // new tier), local copy best-effort-deleted. The admin fulfilment ZIP must read the
+        // original from the cloud tier. The pre-fix code read the local-only default store →
+        // FileNotFoundException mid-ZIP → corrupt download, admin can't print.
+        var upload = new Upload
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            FilePath = "uploads/2026/05/original.jpg",
+            StorageLocation = StorageLocation.Cloud,
+            OriginalFileName = "photo.jpg",
+            ContentType = "image/jpeg",
+            WidthPx = 800, HeightPx = 600, FileSizeBytes = 4,
+            UploadedAt = DateTimeOffset.UtcNow,
+        };
+        _db.Uploads.Add(upload);
+        var order = new Order
+        {
+            OrderNumber = "FT-ZIP-001",
+            Status = OrderStatus.Printing,
+            PaymentProcessor = PaymentProcessor.Stripe,
+            DeliveryType = DeliveryType.Courier,
+            ShippingAddress = DefaultAddress(),
+            SubtotalRon = 10m, ShippingCostRon = 5m, TotalRon = 15m,
+            Items = new List<OrderItem>
+            {
+                new()
+                {
+                    UploadId = upload.Id, Upload = upload,
+                    ProductSnapshot = new ProductSnapshot
+                    {
+                        ProductName = "Foto", Size = "10x15", Finish = "Lucios",
+                    },
+                    Quantity = 1, UnitPriceRon = 10m, LineTotalRon = 10m,
+                }
+            },
+        };
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        var cloudBytes = new byte[] { 1, 2, 3, 4 };
+        _cloudStore
+            .Setup(s => s.GetStreamAsync(upload.FilePath, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new MemoryStream(cloudBytes));
+        // The local tier no longer holds the bytes — this is where the pre-fix path read.
+        _localStore
+            .Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("Stored upload not found."));
+
+        var httpContext = new DefaultHttpContext();
+        using var body = new MemoryStream();
+        httpContext.Response.Body = body;
+
+        await _sut.StreamZipAsync(order.Id, httpContext.Response);
+
+        body.Position = 0;
+        using var archive = new ZipArchive(body, ZipArchiveMode.Read);
+        var entry = archive.Entries.Should().ContainSingle().Subject;
+        entry.Name.Should().EndWith(".jpg");
+
+        await using var entryStream = entry.Open();
+        using var read = new MemoryStream();
+        await entryStream.CopyToAsync(read);
+        read.ToArray().Should().Equal(cloudBytes);
+
+        _cloudStore.Verify(
+            s => s.GetStreamAsync(upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── CancelOrderAsync ──────────────────────────────────────────────────────
