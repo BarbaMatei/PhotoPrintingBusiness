@@ -119,6 +119,16 @@ public class UploadsController : ControllerBase
                 _logger.LogWarning(
                     "uploads.batch.item_rejected file={FileName} reason={Reason} correlation_id={CorrelationId}",
                     file.FileName, ex.GetType().Name, HttpContext.GetCorrelationId());
+
+                // M4 (review 042-v4): a decompression bomb sent via /batch is caught here and
+                // never reaches ExceptionHandlerMiddleware, so the reserved bomb-alert event ops
+                // key on would never fire for the batch vector — the code's own "most likely bomb
+                // vector". Emit the same reserved event (with dimensions) the middleware does.
+                if (ex is DecompressionBombException bomb)
+                    _logger.LogWarning(
+                        "uploads.decompression_bomb.rejected correlation_id={CorrelationId} width={Width} height={Height}",
+                        HttpContext.GetCorrelationId(), bomb.WidthPx, bomb.HeightPx);
+
                 results.Add(new BatchUploadItemResult(file.FileName, null, ex.Message));
             }
         }

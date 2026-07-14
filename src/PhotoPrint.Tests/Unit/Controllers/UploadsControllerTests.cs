@@ -56,4 +56,41 @@ public class UploadsControllerTests
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task UploadPhotoBatchAsync_DecompressionBomb_EmitsReservedBombEventWithDimensions()
+    {
+        // M4 (review 042-v4): DecompressionBombException subclasses UnprocessableEntityException,
+        // so the batch catch logged only the generic item_rejected event and it never reached the
+        // middleware that emits uploads.decompression_bomb.rejected (with dimensions). Ops alerts
+        // keyed on that event missed bombs sent via /batch — the code's own "most likely bomb
+        // vector". The controller must emit the reserved event (with dimensions) here too.
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .Setup(s => s.UploadAsync(
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<long>(),
+                It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new DecompressionBombException(30_000, 30_000, "Image dimensions exceed limits."));
+        var logger = new Mock<ILogger<UploadsController>>();
+
+        var controller = new UploadsController(uploadService.Object, logger.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+
+        var files = new List<IFormFile> { MakeFormFile("bomb.png", new byte[] { 0x89, 0x50 }) };
+
+        await controller.UploadPhotoBatchAsync(files, CancellationToken.None);
+
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("uploads.decompression_bomb.rejected") &&
+                    v.ToString()!.Contains("30000")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
 }
