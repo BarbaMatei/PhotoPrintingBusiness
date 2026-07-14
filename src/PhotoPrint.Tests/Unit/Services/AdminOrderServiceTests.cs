@@ -45,8 +45,7 @@ public class AdminOrderServiceTests
             .Setup(c => c.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        // Default: cloud tier off so existing tests don't accidentally fire the purger.
-        // Tests that need to verify purge wiring set the option explicitly.
+        // The purger is a no-op stub by default; individual tests assert whether it was called.
         _purger.Setup(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(PurgeOutcome.Empty);
 
@@ -506,6 +505,28 @@ public class AdminOrderServiceTests
         _purger.Verify(
             p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task CancelOrderAsync_CloudTierOff_DoesNotTriggerPurge()
+    {
+        // Gate's false branch (F17 hardening, review 043-v1): on a local-only deployment there is
+        // nothing to purge and the purger's cloud-off refusal logs at Error, so cancel must skip
+        // the call entirely rather than false-alarm.
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        var sut = new AdminOrderService(
+            _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
+            _hub.Object, NullLogger<AdminOrderService>.Instance);
+
+        var order = await SeedOrderAsync(OrderStatus.Paid);
+
+        await sut.CancelOrderAsync(order.Id, null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
