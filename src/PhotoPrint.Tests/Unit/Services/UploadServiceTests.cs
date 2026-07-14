@@ -431,7 +431,7 @@ public class UploadServiceTests
     }
 
     [Fact]
-    public async Task UploadAsync_ImageDimensionsExceedLimit_ThrowsUnprocessableEntityException()
+    public async Task UploadAsync_ImageDimensionsExceedLimit_DeletesStoredFileAndThrows()
     {
         _imageProcessorMock
             .Setup(p => p.GetInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -443,6 +443,11 @@ public class UploadServiceTests
 
         await act.Should().ThrowAsync<UnprocessableEntityException>()
             .WithMessage("*dimensions exceed*");
+
+        // M10 (review 042-v4): the rejected bomb's stored file must be deleted, else a rejected
+        // bomb leaks on disk forever. Pin the DeleteAsync — removing it kept the suite green.
+        _storageMock.Verify(
+            s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
