@@ -9,6 +9,11 @@ created: 2026-05-27T11:45:00Z
 ### Summary
 
 - **Tests**: 460/460 passed, 0 failed, 0 skipped (`dotnet test PhotoPrint.sln`) — was 457; +3 new.
+  *(Point-in-time count at bolt construction, 2026-05-27. The v1–v6 review loop then added
+  ~30 more .NET tests and new services — `ImageDecodeLimiter`, `DecompressionBombException`,
+  the `Cache-Control`/temp-file/decode-limiter fixes — reaching 531/531 .NET + 409/409
+  frontend at review v6, then 535/535 .NET + 413/413 frontend after the v6 resolution fixes.
+  See the review + resolution files for the delta; F7, review 042-v6.)*
 - **Build**: clean (0 errors).
 
 ### Test Files
@@ -25,7 +30,7 @@ created: 2026-05-27T11:45:00Z
 ### Acceptance Criteria Validation
 
 - ✅ **001** `Uploads.ThumbnailPath` nullable column added (migration `AddUploadThumbnailPath`); `Upload` exposes it; existing rows NULL.
-- ✅ **002** First preview generates + persists + records the path; second streams the cached file with no `IImageProcessor` call (test 1); missing cached file regenerates (test 2); `Cache-Control: public, max-age=2592000, immutable` set on the response.
+- ✅ **002** First preview generates + persists + records the path; second streams the cached file with no `IImageProcessor` call (test 1); missing cached file regenerates (test 2); `Cache-Control: private, max-age=2592000` set on the response — `private` (not `public … immutable`) because previews are per-user and must not be shared-cacheable (SEC-1/D1, review 042-v1); the integration test asserts `Private=true / Public=false`.
 - ✅ **003** Oversized images rejected with 422 — enforced at upload (test 3) and, defence-in-depth, at decode in `ImageProcessor` before `Image.Load`.
 - ✅ Full suite stays green (460/460).
 
