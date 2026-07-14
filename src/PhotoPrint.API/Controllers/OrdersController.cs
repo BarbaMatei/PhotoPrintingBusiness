@@ -79,6 +79,10 @@ public class OrdersController : ControllerBase
             return Unauthorized();
 
         var dto = await _orderService.GetOrderPhotosAsync(id, userId.Value, ct);
+
+        // The payload embeds per-user presigned URLs, so it must never sit in a shared cache
+        // (F11, review 043-v1) — matches the preview endpoint's SEC-1 posture.
+        Response.Headers.CacheControl = "private, no-store";
         return Ok(dto);
     }
 }

@@ -159,6 +159,25 @@ public class OrdersControllerIntegrationTests : IClassFixture<OrdersFactory>
         Assert.Null(dto.ShippingAddress);
     }
 
+    // ── GET /api/orders/{id}/photos (bolt 053) ────────────────────────────────
+
+    [Fact]
+    public async Task GetOrderPhotos_OwnOrder_Returns200WithPrivateNoStore()
+    {
+        // F11 (review 043-v1): the payload carries per-user presigned URLs, so the response
+        // must be Cache-Control: private, no-store (matching the preview endpoint), never
+        // shared-cacheable. F15: this also pins the owner → 200 auth path.
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        var order = await _factory.SeedOrderAsync(userId);
+
+        var response = await AuthClient(token).GetAsync($"/api/orders/{order.Id}/photos");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(response.Headers.CacheControl);
+        Assert.True(response.Headers.CacheControl!.Private);
+        Assert.True(response.Headers.CacheControl.NoStore);
+    }
+
     [Fact]
     public async Task GetOrderDetail_CourierOrder_HasShippingAddress()
     {
