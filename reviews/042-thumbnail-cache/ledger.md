@@ -27,8 +27,13 @@ The join key **within** a pass is the pass-local ID; the join key **across** pas
   population estimate — fixes removed v1's population. The honest signal is qualitative: among defects
   *still open* at v4's commit, v4 re-found both; and it added ~30 genuinely new ones (several
   fix-generated), so the feature is **not saturated** — closure still wants another discovery pass.
-- **Current state:** 28 open (27 new in v4 + `D33` re-raised), 3 deferred (`D28`→bolt-043,
-  `D31`→bolt-043, `D23` DDL/snapshot-test→3-env phase), 29 verified/closed (+ `D23` provider-aware part).
+- **Current state (after resolution-v4 @`6c4f334`, pending a verification re-review):** the 28
+  v4-open findings are now terminal — **26 fixed** (each with a revert- or mutation-verified test),
+  **`D46`/L5 deferred** (read-replica hazard, documented), **`D48`/L7 disputed** (conflicts with the
+  verified FE-3 no-login-redirect decision). Cross-pass deferrals stand: **`D28`**→bolt-043,
+  **`D31`**→bolt-043, **`D23`** Npgsql-DDL/snapshot→3-env phase (a SQLite `Migrate()` smoke test *was*
+  added now for the DDL). 29 v1/v2 findings remain verified/closed. **None of the v4 fixes are
+  `verified` yet** — that awaits the re-review. Per-finding detail: [resolution-v4.md](resolution-v4.md).
 
 ## Cross-pass defects (the ones that matter)
 
