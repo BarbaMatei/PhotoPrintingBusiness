@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Services;
 
 public class ImageProcessor : IImageProcessor
 {
-    private const int ThumbnailMaxDimension = 300;
+    private const int ThumbnailMaxDimension = 800;
     private const int ThumbnailJpegQuality = 85;
 
     /// <summary>

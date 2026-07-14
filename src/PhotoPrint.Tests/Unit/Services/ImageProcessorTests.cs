@@ -67,9 +67,11 @@ public class ImageProcessorTests
     }
 
     [Fact]
-    public async Task GenerateThumbnailAsync_SmallValidImage_ReturnsJpegThumbnailMax300px()
+    public async Task GenerateThumbnailAsync_LargeImage_ReturnsJpegThumbnailMax800px()
     {
-        using var src = new Image<Rgba32>(800, 600);
+        // C7 (review 042-v4): the thumbnail long edge is 800px (stories 001/002 + unit brief);
+        // a 2000x1500 source must be downscaled to fit within 800px, not the old 300px.
+        using var src = new Image<Rgba32>(2000, 1500);
         StoreBytes("photo.png", EncodePng(src));
 
         await using var thumb = await _sut.GenerateThumbnailAsync("photo.png");
@@ -84,7 +86,8 @@ public class ImageProcessorTests
 
         thumb.Position = 0;
         var info = await Image.IdentifyAsync(thumb);
-        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(300);
+        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(800);
+        Math.Max(info.Width, info.Height).Should().BeGreaterThan(300); // proves the cap is 800, not the old 300
     }
 
     [Fact]
