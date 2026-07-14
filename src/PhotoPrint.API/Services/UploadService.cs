@@ -190,7 +190,21 @@ public class UploadService : IUploadService
         // the single column modified instead of tracking the whole graph.
         _db.Uploads.Attach(upload);
         _db.Entry(upload).Property(u => u.ThumbnailPath).IsModified = true;
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // The thumbnail is on disk but ThumbnailPath didn't persist, so the cleanup job (which
+            // keys on ThumbnailPath) can never reclaim it. Signal + best-effort delete so it can't
+            // leak silently (L4, review 042-v4), then rethrow.
+            _logger.LogWarning(ex,
+                "uploads.thumbnail.orphaned_on_commit_failure upload_id={UploadId} key={Key}",
+                uploadId, thumbnailPath);
+            try { await _storage.DeleteAsync(thumbnailPath, ct); } catch { /* best-effort */ }
+            throw;
+        }
 
         // The cleanup job may have soft-deleted this row between the live read above and this
         // write (the write keys only on Id — no DeletedAt guard, and Upload has no concurrency

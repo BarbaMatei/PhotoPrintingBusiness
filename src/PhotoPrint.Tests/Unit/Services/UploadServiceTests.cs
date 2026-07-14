@@ -486,7 +486,48 @@ public class UploadServiceTests
             s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task GetPreviewAsync_PersistFailsAfterThumbnailWritten_DeletesOrphanAndSignals()
+    {
+        // L4 (review 042-v4): on cache-miss the thumbnail is written to storage, then
+        // SaveChangesAsync persists ThumbnailPath. If that commit throws (transient DB fault),
+        // the file is on disk but the row never references it, so the cleanup job (which keys on
+        // ThumbnailPath) can never reclaim it — a silent orphan. Signal + best-effort delete.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        var thumbKey = $"thumbs/{userId:N}/{upload.Id:N}.jpg";
+        var logger = new Mock<ILogger<UploadService>>();
+        var throwingCtx = new SaveThrowingDbContext(
+            new DbContextOptionsBuilder<PhotoPrintDbContext>().UseInMemoryDatabase(_dbName).Options);
+        var sut = new UploadService(
+            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, throwingCtx, logger.Object);
+
+        var act = () => sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+        await act.Should().ThrowAsync<InvalidOperationException>();
+
+        _storageMock.Verify(s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.thumbnail.orphaned_on_commit_failure")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>A context whose commit always fails — simulates a transient DB fault on the
+    /// cache-fill persist (L4).</summary>
+    private sealed class SaveThrowingDbContext : PhotoPrintDbContext
+    {
+        public SaveThrowingDbContext(DbContextOptions<PhotoPrintDbContext> options) : base(options) { }
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("simulated transient DB fault");
+    }
 
     private Upload SeedUpload(Guid? userId = null, Guid? guestSessionId = null, DateTimeOffset? deletedAt = null)
     {
