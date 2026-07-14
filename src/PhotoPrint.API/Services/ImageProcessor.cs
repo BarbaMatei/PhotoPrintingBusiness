@@ -2,6 +2,7 @@ using PhotoPrint.API.Exceptions;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
 namespace PhotoPrint.API.Services;
@@ -112,6 +113,14 @@ public class ImageProcessor : IImageProcessor
     // thousands of near-identical frames materialises frames × canvas × 4 bytes on decode. This
     // app only ever needs one still frame (bolt 042, BUG-1). Extracted + internal so a test can
     // prove the cap holds — it can't be observed in the single-frame JPEG output (M11, review 042-v4).
-    internal static Task<Image> LoadSingleFrameAsync(Stream stream, CancellationToken ct = default)
-        => Image.LoadAsync(new DecoderOptions { MaxFrames = 1 }, stream, ct);
+    //
+    // Decode is pinned to Rgba32 (4 B/px). The non-generic Image.LoadAsync auto-selects the source's
+    // pixel type, so a 16-bit source decodes to Rgba64 (8 B/px) and a legitimate ~72 MP deep-colour
+    // print (< the 100 MP cap) blows the 512 MB allocator backstop, leaving the photo permanently
+    // un-previewable. Forcing Rgba32 bounds any ≤100 MP decode to ≤400 MB and loses nothing the
+    // 8-bit JPEG thumbnail could carry (F7/D77, review 042-v8). Returns Task<Image> (not
+    // Task<Image<Rgba32>>, which is not assignable to it) via async/await so the reflection test's
+    // (Task<Image>) cast still holds.
+    internal static async Task<Image> LoadSingleFrameAsync(Stream stream, CancellationToken ct = default)
+        => await Image.LoadAsync<Rgba32>(new DecoderOptions { MaxFrames = 1 }, stream, ct);
 }

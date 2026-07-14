@@ -177,6 +177,44 @@ public class ImageProcessorTests
     }
 
     [Fact]
+    public async Task LoadSingleFrameAsync_DeepColourSource_DecodesAs32BppNot64()
+    {
+        // F7 (review 042-v8): decode is pinned to Rgba32 (4 B/px). The non-generic Image.LoadAsync
+        // auto-selects the source pixel type, so a 16-bit (Rgba64) source decodes to 8 B/px and a
+        // legitimate ~72 MP deep-colour print trips the 512 MB backstop -> permanently un-previewable.
+        // A 16-bit source must decode to 32 bpp; reverting to the non-generic load yields 64 bpp.
+        using var deep = new Image<Rgba64>(32, 32);
+        using var png = new MemoryStream(EncodePng(deep));
+
+        var method = typeof(ImageProcessor).GetMethod(
+            "LoadSingleFrameAsync", BindingFlags.NonPublic | BindingFlags.Static);
+        using var decoded = await (Task<Image>)method!.Invoke(null, new object[] { png, CancellationToken.None })!;
+
+        decoded.PixelType.BitsPerPixel.Should().Be(32);
+    }
+
+    [Fact]
+    public async Task GenerateThumbnailAsync_DeepColourSource_ReturnsValidJpegThumbnail()
+    {
+        // F7 (review 042-v8): a legitimate 16-bit deep-colour source must decode -> resize -> encode
+        // end-to-end into a valid JPEG, not fail. Small canvas keeps the test fast; the memory bound
+        // (≤400 MB at 100 MP with the 4 B/px pin) is arithmetic, guarded by the sibling loader test.
+        using var deep = new Image<Rgba64>(1000, 800);
+        StoreBytes("deep.png", EncodePng(deep));
+
+        await using var thumb = await _sut.GenerateThumbnailAsync("deep.png");
+
+        var head = thumb.ToArray();
+        head[0].Should().Be(0xFF);
+        head[1].Should().Be(0xD8);
+        head[2].Should().Be(0xFF);
+
+        thumb.Position = 0;
+        var info = await Image.IdentifyAsync(thumb);
+        Math.Max(info.Width, info.Height).Should().BeLessThanOrEqualTo(800);
+    }
+
+    [Fact]
     public async Task GenerateThumbnailAsync_TruncatedButRecognizedImage_ThrowsUnprocessableEntity()
     {
         // L14 (review 042-v4): the catch handles both UnknownImageFormatException (unrecognised)
