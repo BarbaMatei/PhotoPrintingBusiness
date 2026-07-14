@@ -5,10 +5,10 @@ version: 1
 answers: review-v1.md
 commit: 5706580
 branch: feat/bolt-043-cloud-storage-provider
-status: in-progress
-fixed_commit: null
+status: resolved
+fixed_commit: 319d7b3
 opened: 2026-07-14
-closed: null
+closed: 2026-07-14
 findings:
   F1: { status: fixed, commit: ec94fca, note: "AdminOrderService now injects IStorageRouter; StreamZipAsync reads via For(upload.StorageLocation). Regression test seeds a Cloud upload, makes the local tier throw, asserts the ZIP streams from cloud (revert-verified red)." }
   F2: { status: fixed, commit: 6b63bd7, note: "UploadCleanupJob routes deletes via For(upload.StorageLocation) and now deletes LargePreviewPath too (via TryDeleteAsync helper). Regression test: aged Cloud upload → cloud tier sees all 3 keys deleted, local tier untouched (revert-verified). Class sweep: F1+F2 were the only two prod callers of the local default; stale StorageExtensions comment corrected in 665ed9a." }
@@ -26,7 +26,7 @@ findings:
   F14: { status: fixed, commit: 0ceabf8, note: "New CloudPreview test seeds a Cloud upload with ThumbnailPath=null + only the original in the cloud store, asserts the thumb is regenerated, saved to cloud, and persisted (ThumbnailPath in DB + cloud store has the key). Added SeedCloudUploadWithoutThumbAsync/GetUploadAsync/CloudHasObject helpers." }
   F15: { status: fixed, commit: cda3685, note: "Added /photos integration tests: 401 no-auth, 403 cross-user, 404 unknown, guest-token-only 401. Also covers F1's fix at the HTTP layer for the ownership gate." }
   F16: { status: fixed, commit: a770a13, note: "Two promoter tests: (1) ThrowingSaveDbContext proves a Step-3 SaveChanges failure counts Failed, leaves the row Local, skips local-litter cleanup; (2) GenerateLargePreviewAsync throwing counts Failed + row Local." }
-  F17: { status: fixed, commit: 2fcdf3d, note: "Owner decision = purge on cancel. AdminOrderService.CancelOrderAsync now fires the purger (after the refund, so the money path isn't delayed); the periodic sweep's status set (OriginalPurgeSweepStatuses) adds Cancelled to backstop a promotion in flight at cancel time. Tests: cancel-fires-purge (admin service) + Cancelled-stuck-order-swept (scanner); Cancelled removed from the not-fired theory." }
+  F17: { status: fixed, commit: 2fcdf3d, note: "Owner decision = purge on cancel. CancelOrderAsync fires the purger after the refund; periodic sweep's OriginalPurgeSweepStatuses adds Cancelled to backstop the promotion-in-flight-at-cancel race. Tests: cancel-fires-purge + Cancelled-stuck-order-swept. Hardened in 957f61a per fresh-eyes: gated on Enabled && CloudEnabled (no false-alarm Error log on a local-only deployment) + try/catch (never fail the committed cancel+refund)." }
   F18: { status: fixed, commit: 682f1e2, note: "BackfillCommand unit tests: cloud-off=2, no-work=0, dry-run-doesn't-promote, live-success=0, any-failure=1. S3BucketVerifier covered by MinIO SkippableFacts (existing bucket boots clean; missing bucket throws to abort boot) — real-protocol probe, not a mock of the static AmazonS3Util (SDK 3.7.406)." }
 ---
 
@@ -119,5 +119,34 @@ Mechanisms added by these fixes (where the re-review's owning lens should look):
 - **F8 — bounded preview re-resolve** (`UploadsController`). Failure mode: exactly one re-resolve, then
   404 (`uploads.preview.local_thumb_vanished`); no unbounded retry.
 - **F17 — purge-on-cancel** (`AdminOrderService.CancelOrderAsync` + `Cancelled` added to the sweep's
-  status set). Failure mode: fires after the refund so the money path is never blocked; purger
-  self-guards when cloud/archive is off.
+  status set). Failure mode: fires after the refund so the money path is never blocked; gated on
+  `Enabled && CloudEnabled` and wrapped in try/catch (957f61a) so it neither false-alarms nor fails
+  the committed cancel; the sweep backstops a failed purge.
+
+## Fresh-eyes micro-review (before hand-back)
+
+Two anchored Explore agents (fresh context) audited the full fix diff `5706580..HEAD` — one over
+the storage/exception/preview cluster, one over the lifecycle/concurrency cluster — each asked the
+three questions (class-or-instance · new-surface-at-the-bar · regression). **Both returned "No
+blocking issues."** Confirmed: no production caller injects the default `IStorageService` any more
+(class cleared); the missing-object exception contract is uniform; no other presign-TTL-tied
+`max-age` remains; the `UploadsController` refactor preserves ETag/304/`File(200)` byte-for-byte and
+the re-resolve is a bounded two-attempt ladder (no recursion/stream-leak); the drain matches the
+approved shape; the sweep is idempotent/bounded/guarded/observable; adding `Cancelled` to the sweep
+is safe (a never-promoted cancelled order keeps `Local` uploads the sweep never matches).
+
+**Non-blocking items they surfaced were fixed before hand-back:** purge-on-cancel gated + try/caught
+(957f61a); `PurgeSweepIntervalHours` surfaced in `appsettings.json`, the `GetStreamAsync`
+missing-key contract documented on `IStorageService`, and the stale pre-F5 `max-age=3600` wording in
+the CloudPreview test summary/comment corrected (319d7b3).
+
+## New observation for the re-reviewer (outside the v1 finding set — NOT fixed)
+
+- **`PromotionRecoveryScanner` is still boot-only** (`BackgroundJobs/PromotionRecoveryScanner.cs`,
+  `IHostedService.StartAsync`). It is the same *class* as F4 — a promotion that exhausts
+  `MaxAttempts` at runtime leaves the upload `Local` and is not re-enqueued until the next reboot.
+  Deliberately **not** fixed here: F4 was scoped to the purge side, and converting the promotion
+  scanner is a separate mini-feature (its own retry/exhaustion semantics, config, tests). Lower
+  severity than F4 (a not-yet-archived upload still serves previews from local and is recovered by
+  the `backfill-archive` CLI or the next boot). Flagged so the re-review / next discovery pass can
+  decide whether to apply the same periodic-sweep treatment.
