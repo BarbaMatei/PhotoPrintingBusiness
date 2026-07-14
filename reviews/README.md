@@ -292,10 +292,26 @@ comments → author resolves → reviewer verifies):
 | `resolution-v<n>.md` | **fixer** | living until closed | one entry **per finding ID**: status + how + fix commit |
 | `review-v<n+1>.md` | reviewer (re-run) | **immutable** | verifies the resolution against the new commit |
 
-The finding IDs (`BUG-1`, `SEC-1`, `QUAL-3`, …) are the join key across all three. The fixer
-**never edits the review file** — it responds in the resolution file. This keeps the
-reviewer's point-in-time record intact and separates "what was found" from "what was done
-about it."
+**Finding ID format (the standard).** Each pass numbers its findings with a **dumb, pass-local
+handle** — `F1, F2, …` in ranked order — and carries `severity` and `category` as **columns, never in
+the ID**. Severity is *mutable*: encoding it in the ID (as v4's `M1`/`L1` did) means a later
+re-classification either lies or forces a renumber that breaks every reference. Older passes used type
+prefixes (`BUG-`/`SEC-`/`QUAL-`); those are grandfathered — **`F#` is the standard going forward.**
+
+**Two keys, two questions.** The pass-local ID (`F#`) is the join key **within** a pass —
+`review-v<n>` ↔ `resolution-v<n>`. **Across** passes the join key is the canonical **`D#`** in the
+ledger (below), *not* the pass-local ID. The fixer **never edits the review file** — it responds in the
+resolution file, keeping the reviewer's point-in-time record intact.
+
+**Nuance the old "IDs join all three" claim missed:** that clean ID join only holds for a
+*verification* re-review — it's anchored and reuses the prior pass's IDs. A *discovery* re-review is
+blinded and mints fresh `F#`, so it **cannot** join by ID; its findings are reconciled to prior passes
+by `D#` in the ledger, after the fact.
+
+Full per-finding detail (scenario/fix/evidence) for every finding — including the Lows/Cleanups the
+review file may list only as one-liners — belongs in a durable `findings-v<n>.md` beside the review, so
+nothing survives only in scratch/session-temp (bolt-042 v4 is the first:
+[042-thumbnail-cache/findings-v4.md](042-thumbnail-cache/findings-v4.md)).
 
 ### Per-finding lifecycle
 
@@ -312,24 +328,28 @@ open → in-progress → fixed → verified
 - The re-review reopens any finding whose fix doesn't hold, and may add NEW findings
   introduced by the fix (see *bounding fix-generativity*).
 
-### The persistent finding ledger (across blinded passes) — *proposed*
+### The persistent finding ledger (across blinded passes)
 
-Per-version review IDs are **pass-local and deliberately do not map across passes** — that's
-what keeps each blinded discovery pass unbiased (bolt-035 v1's `BUG-1` ≠ v5's ≠ v8's). The
-cost is that the system can't, on its own, tell a *re-find* from a *new find*, can't compute
-overlap (the saturation signal above), and re-litigates accepted deferrals as if fresh (v8
-unknowingly re-raised v7's accepted-deferred Postgres-coverage item as if it were brand new).
+Per-version review IDs are **pass-local and deliberately do not map across passes** — that's what keeps
+each blinded discovery pass unbiased (bolt-035 v1's `BUG-1` ≠ v5's ≠ v8's; bolt-042 v1's `SEC-1` ≠
+v4's `M#`). The cost is that the pass IDs alone can't tell a *re-find* from a *new find*, can't compute
+overlap (the saturation signal above), and would re-litigate accepted deferrals as if fresh.
 
-Fix *(proposed)*: a single **canonical ledger** per target, living at `reviews/<target>/ledger.md`
-(hand-built today, tool-maintained later), kept by a post-hoc **ledger reconciler** that maps each
-blinded pass's findings onto stable cross-pass identities
-*after* the passes complete (so blinding is preserved during the search). That ledger gives
-you (a) the overlap data for capture–recapture, (b) a memory of known-and-accepted so
-deferrals aren't re-argued *blindly*, and (c) a true cumulative recall count. (Caveat from the
-labeled data: 3 of the 5 re-raises of already-decided items turned out to be *right* — the ledger
-must attach the prior decision to a re-find, not suppress it.) Until built, the synthesizing main
-agent does this reconciliation by hand and notes re-finds explicitly — the first hand-built
-ledger + eval set is [035-payment-idempotency/overlap-ground-truth.md](035-payment-idempotency/overlap-ground-truth.md).
+**The standard:** one **canonical ledger** per target at `reviews/<target>/ledger.md`. Every real
+defect gets a stable **`D#`** that lives forever for that target; each pass's `F#` findings are mapped
+onto `D#` by the synthesizer **after** the blinded pass completes — so blinding is preserved during the
+search (the finders never see `D#`). The ledger gives you (a) overlap data for the saturation signal,
+(b) a memory of known-and-accepted so deferrals aren't re-argued *blindly*, and (c) a true cumulative
+recall count. **Caveat (from the labeled data): 3 of 5 re-raises of already-decided items turned out
+*right* — the ledger attaches the prior decision to a re-find, it never suppresses it.**
+
+The synthesizing main agent builds the ledger **by hand today** (a **reconciler** to automate the
+`F#`→`D#` mapping is still unbuilt). Worked artifacts: the first hand-labeled eval set is
+[035-payment-idempotency/overlap-ground-truth.md](035-payment-idempotency/overlap-ground-truth.md); the
+first standing per-target ledger is [042-thumbnail-cache/ledger.md](042-thumbnail-cache/ledger.md) —
+whose own caveat is the key lesson: v1 and v4 ran against **different commits**, so their low overlap
+**cannot** feed a capture–recapture population estimate (the fixes removed v1's population). Overlap is
+only a clean saturation estimator across **parallel blinded passes on one frozen commit**.
 
 ### resolution-v<n>.md shape
 

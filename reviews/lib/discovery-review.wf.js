@@ -39,7 +39,10 @@ export const meta = {
 // caller's job via `args`. Lens prompts are GENERIC by category; change detail comes from the diff/pack.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const a = args || {}
+// The harness may deliver `args` as a JSON string rather than a parsed object — parse defensively
+// so both forms work (a plain object, or the stringified JSON the Workflow tool passes through).
+let a = args || {}
+if (typeof a === 'string') { try { a = JSON.parse(a) } catch { a = {} } }
 const REPO = a.repoRoot || '.'
 const TARGET = a.target || '(unnamed target)'
 const SCOPE = a.scope || '(no scope summary supplied)'
