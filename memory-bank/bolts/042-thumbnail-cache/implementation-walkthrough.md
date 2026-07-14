@@ -18,7 +18,7 @@ decompression-bomb guard that rejects oversized images at both upload and decode
 - **Schema**: `Upload.ThumbnailPath` (nullable, max 512) + a single-column EF migration.
 - **Storage**: `IStorageService` gains `ExistsAsync` (used to detect ops-side deletions).
 - **Caching**: lives in `UploadService.GetPreviewAsync` (the service, where preview + auth already are); the controller stays thin and just adds the cache header.
-- **Defence**: a shared `ImageProcessor.MaxDecodeDimension` cap enforced at upload (cheap Identify dims) and again before full decode.
+- **Defence**: a shared `ImageProcessor.MaxDecodePixels` (100 MP total-pixel area — BUG-1/NEW-1) cap enforced at upload (cheap Identify dims) and again before full decode.
 
 ### Completed Work
 
@@ -41,7 +41,7 @@ decompression-bomb guard that rejects oversized images at both upload and decode
 
 ### Deviations from Plan
 
-- **Migration is SQLite-typed (`TEXT`, len 512), not Npgsql `varchar(500)`.** Scaffolding under the Npgsql provider produced a **destructive 86 KB migration** (alter every column `TEXT`→Npgsql, drop the idempotency index) because the model **snapshot is already SQLite-typed** — collateral from bolt-035's SQLite-generated migration. I matched the existing snapshot instead → a clean single `AddColumn`. `TEXT` is valid on Postgres, so this is functionally correct; the **whole-history remediation stays the documented follow-up** (DEPLOYMENT.md §7), now with more evidence (the snapshot itself is SQLite-flavoured).
+- **Migration is provider-aware** (DB-1, review 042-v1): it emits `character varying(512)` on Npgsql and `TEXT` on SQLite (mirroring the sibling `AddOrderIdempotencyKey`), so the shipped column matches the Npgsql runtime model and no phantom `AlterColumn` is scaffolded on a Postgres `migrations add`. The model **snapshot remains SQLite-flavoured** (bolt-035 legacy), so an Npgsql regeneration would still diff `TEXT`→`varchar(512)` for every column — the **whole-history / per-provider-assembly remediation stays the documented follow-up** (DEPLOYMENT.md §7; deferred to the 3-env phase — v4 L10/DB-1).
 - Caching placed in the **service**, not the controller (story snippet); thumbnail long edge is **800px** per stories 001/002 (C7, review 042-v4 — was 300px pre-review).
 - **ImageSharp `Configuration.MaxImageWidth/Height` (story 003) is not used** — that API isn't present in ImageSharp 3.1.11; the `Identify`-dimension guard is the version-independent equivalent.
 
@@ -53,4 +53,4 @@ decompression-bomb guard that rejects oversized images at both upload and decode
 
 - Solution builds clean (0 errors).
 - The decode guard `Identify`s then `stream.Position = 0` before `Load` — relies on a **seekable** stream (local `FileStream` is). Bolt 043's S3 stream must be seekable or buffered.
-- **Stage 3 will test**: (a) two consecutive previews — second makes no `IImageProcessor` call (counter mock); (b) `ThumbnailPath` set but file missing → regenerates; (c) oversized image → 422 (upload-time via a mocked `GetInfoAsync` returning >25000 dims). Then full `dotnet test` green.
+- **Stage 3 will test**: (a) two consecutive previews — second makes no `IImageProcessor` call (counter mock); (b) `ThumbnailPath` set but file missing → regenerates; (c) oversized image → 422 (upload-time via a mocked `GetInfoAsync` returning an over-100 MP area, e.g. 30000×30000). Then full `dotnet test` green.
