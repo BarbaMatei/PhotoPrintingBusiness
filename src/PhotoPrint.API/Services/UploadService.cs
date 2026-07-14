@@ -178,8 +178,10 @@ public class UploadService : IUploadService
         catch (FileNotFoundException)
         {
             // The original blob is gone (ops-side deletion or the cleanup race) though the row
-            // survives. There's nothing to regenerate from, so surface a clean 404 rather than
-            // an unmapped FileNotFoundException -> 500 (M6, review 042-v4).
+            // survives. Signal it distinctly — a plain NotFoundException is indistinguishable from a
+            // routine unknown-id 404 (F5, review 042-v8) — then surface a clean 404 rather than an
+            // unmapped FileNotFoundException -> 500 (M6, review 042-v4).
+            _logger.LogWarning("uploads.original.missing_file upload_id={UploadId}", uploadId);
             throw new NotFoundException($"Upload {uploadId} is no longer available.");
         }
         var thumbnailPath = await _storage.SaveAsync(
@@ -217,7 +219,14 @@ public class UploadService : IUploadService
             .AsNoTracking()
             .AnyAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
         if (!stillLive)
+        {
+            // Signal the race before the delete, consistent with the sibling anomaly paths (:163,
+            // :205); the stale ThumbnailPath this write left on the now-dead row is the deferred
+            // orphan-sweep fix (F1/D31), not this log (F6, review 042-v8).
+            _logger.LogWarning(
+                "uploads.thumbnail.deleted_row_race upload_id={UploadId} key={Key}", uploadId, thumbnailPath);
             await _storage.DeleteAsync(thumbnailPath, ct);
+        }
 
         // Return the just-generated stream directly rather than re-opening it from storage —
         // saves an open+read now and a billed round-trip once cloud storage lands (QUAL-2).

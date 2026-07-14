@@ -434,6 +434,38 @@ public class UploadServiceTests
     }
 
     [Fact]
+    public async Task GetPreviewAsync_CacheMissWithMissingOriginal_EmitsMissingOriginalSignal()
+    {
+        // F5 (review 042-v8): a lost ORIGINAL blob on a still-live row is a storage-integrity
+        // incident, but it threw a bare NotFoundException with no log — indistinguishable in ops
+        // from a routine unknown-id 404. It must emit its own reserved signal, like the cache-miss
+        // path, so the severe case isn't hidden in ordinary 404 noise.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        _imageProcessorMock
+            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("Stored upload not found."));
+
+        var logger = new Mock<ILogger<UploadService>>();
+        var sut = new UploadService(
+            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, NewContext(), logger.Object);
+
+        var act = () => sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+        await act.Should().ThrowAsync<NotFoundException>();
+
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.original.missing_file")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task GetPreviewAsync_RowSoftDeletedDuringWrite_DeletesOrphanedThumbnail()
     {
         // M1 (review 042-v4): the cleanup job can soft-delete the upload between the preview's
@@ -467,6 +499,47 @@ public class UploadServiceTests
     }
 
     [Fact]
+    public async Task GetPreviewAsync_RowSoftDeletedDuringWrite_EmitsDeletedRowRaceSignal()
+    {
+        // F6 (review 042-v8): the soft-delete race deletes the just-written thumbnail but logged
+        // nothing, unlike its sibling anomaly paths (cache_miss_missing_file, orphaned_on_commit_
+        // failure). The resulting partial state (stale ThumbnailPath left on a dead row) was
+        // invisible to ops; the delete must be signalled.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        var thumbKey = $"thumbs/{userId:N}/{upload.Id:N}.jpg";
+        var logger = new Mock<ILogger<UploadService>>();
+        var sut = new UploadService(
+            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, NewContext(), logger.Object);
+
+        _imageProcessorMock
+            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                using var ctx = NewContext();
+                var row = ctx.Uploads.First(u => u.Id == upload.Id);
+                row.DeletedAt = DateTimeOffset.UtcNow;
+                ctx.SaveChanges();
+                return new MemoryStream(JpegMagic);
+            });
+
+        (await sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+
+        _storageMock.Verify(
+            s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
+        logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.thumbnail.deleted_row_race")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task UploadAsync_ImageDimensionsExceedLimit_DeletesStoredFileAndThrows()
     {
         _imageProcessorMock
@@ -477,8 +550,13 @@ public class UploadServiceTests
             JpegStream(), "huge.jpg", declaredLength: 100L,
             userId: Guid.NewGuid(), guestSessionId: null);
 
-        await act.Should().ThrowAsync<UnprocessableEntityException>()
-            .WithMessage("*dimensions exceed*");
+        // F4 (review 042-v8): assert the DERIVED DecompressionBombException + its dimensions, not
+        // just the 422 base — the bomb-alert emitters gate on `is DecompressionBombException`, so a
+        // base-type-only assertion let a regression to the plain base kill the alert while green.
+        var ex = (await act.Should().ThrowAsync<DecompressionBombException>()
+            .WithMessage("*dimensions exceed*")).Which;
+        ex.WidthPx.Should().Be(30_000);
+        ex.HeightPx.Should().Be(30_000);
 
         // M10 (review 042-v4): the rejected bomb's stored file must be deleted, else a rejected
         // bomb leaks on disk forever. Pin the DeleteAsync — removing it kept the suite green.
