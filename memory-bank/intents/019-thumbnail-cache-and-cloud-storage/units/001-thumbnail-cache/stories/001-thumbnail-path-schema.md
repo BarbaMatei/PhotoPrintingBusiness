@@ -19,13 +19,13 @@ implemented: true
 
 ## Acceptance Criteria
 
-- [ ] EF migration adds `Uploads.ThumbnailPath varchar(500) NULL`.
+- [ ] EF migration adds `Uploads.ThumbnailPath varchar(512) NULL`.
 - [ ] `Upload` entity exposes the property.
 - [ ] Existing rows have `NULL`; no backfill required.
 
 ## Technical Notes
 
-- Same shape as `StoragePath`, also nullable to indicate "not generated yet".
+- Same shape as `FilePath` (`varchar(512)`), also nullable to indicate "not generated yet".
 
 ## Dependencies
 
