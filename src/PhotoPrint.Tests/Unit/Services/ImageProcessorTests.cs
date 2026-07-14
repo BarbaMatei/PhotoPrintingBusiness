@@ -173,6 +173,27 @@ public class ImageProcessorTests
         decoded.Frames.Count.Should().Be(1);
     }
 
+    [Fact]
+    public async Task GenerateThumbnailAsync_TruncatedButRecognizedImage_ThrowsUnprocessableEntity()
+    {
+        // L14 (review 042-v4): the catch handles both UnknownImageFormatException (unrecognised)
+        // and InvalidImageContentException (recognised header, broken body), but only the former
+        // was tested. A valid PNG signature + IHDR with corrupt image data is RECOGNISED as PNG,
+        // so a decode failure raises InvalidImageContentException — narrowing the catch to
+        // UnknownImageFormatException would 500 here. Cover that branch.
+        using var src = new Image<Rgba32>(64, 64);
+        var png = EncodePng(src);
+        // Scramble a window in the middle (the compressed IDAT data), leaving the 8-byte PNG
+        // signature + IHDR (so Identify still reads dimensions) and the trailing IEND intact.
+        for (int i = png.Length / 2; i < png.Length / 2 + 24 && i < png.Length; i++)
+            png[i] ^= 0xFF;
+        StoreBytes("broken.png", png);
+
+        var act = () => _sut.GenerateThumbnailAsync("broken.png");
+
+        await act.Should().ThrowAsync<UnprocessableEntityException>();
+    }
+
     // ── GetInfoAsync ───────────────────────────────────────────────────────────
 
     [Fact]
