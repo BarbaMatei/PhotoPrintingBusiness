@@ -72,8 +72,20 @@ as a process decision.
 - **Change C — dev-warning silencing.** HTTPS-redirect registered non-dev only, static
   files served only when `wwwroot` exists, EF split-query default. Files: `Program.cs`,
   `SecurityExtensions.cs`. No behavior change in production; reduces dev/test log noise.
+- **Change D — HEIC no longer accepted (M5, review 042-v4).** The upload contract dropped
+  HEIC because the stack has no HEIF decoder: `MimeValidator` no longer maps ISO-BMFF `ftyp`
+  content to `image/heic` — it falls through to null, so an uploaded `.heic` now 415s — and
+  the UI removed `.heic` from its accepted extensions / `accept` attribute / hint and the
+  home-page copy. Accepted types are now JPEG/PNG only. Files: `MimeValidator.cs`,
+  `UploadService`, `photo-upload.component.ts`, home copy. Real HEIC decode is deferred to a
+  future bolt. *Now covered by tests:* `MimeValidatorTests` and
+  `photo-upload.component.spec.ts` (accept → reject flip).
 
 **AC (retroactive) for change B:** an unauthenticated 401 clears any guest token and does
 not navigate; a guest/anonymous session that expires mid-flow re-inits and the failed
 upload/preview is retried exactly once; concurrent `ensureGuestSession()` callers share one
 init. All are enforced by the specs listed above.
+
+**AC (retroactive) for change D:** an upload whose content is ISO-BMFF (`ftyp`-based, which
+includes HEIC/HEIF) is rejected with 415 Unsupported Media Type; the UI does not offer
+`.heic` as a selectable/among-accepted type. Enforced by the specs listed above.
