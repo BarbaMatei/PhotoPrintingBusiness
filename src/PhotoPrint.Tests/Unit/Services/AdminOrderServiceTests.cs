@@ -51,7 +51,9 @@ public class AdminOrderServiceTests
                .ReturnsAsync(PurgeOutcome.Empty);
 
         // Router resolves each tier to its own fake store; the ZIP read routes by
-        // Upload.StorageLocation (F1, review 043-v1).
+        // Upload.StorageLocation (F1, review 043-v1). Cloud tier on so purge-on-cancel (F17)
+        // runs — the purger mock returns Empty.
+        _router.SetupGet(r => r.CloudEnabled).Returns(true);
         _router.SetupGet(r => r.Local).Returns(_localStore.Object);
         _router.SetupGet(r => r.Cloud).Returns(_cloudStore.Object);
         _router.Setup(r => r.For(StorageLocation.Local)).Returns(_localStore.Object);

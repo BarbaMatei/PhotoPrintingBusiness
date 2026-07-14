@@ -223,11 +223,26 @@ public class AdminOrderService : IAdminOrderService
         _orderEmailService.FireOrderCancelledEmail(order, reason);
 
         // Bolt 052 / F17 (review 043-v1): a cancelled/refunded order's cloud original must be
-        // purged too (owner decision — minimise storage/GDPR exposure). Runs after the refund
-        // so it never delays the money path. Self-refuses if the cloud tier or archive is off;
-        // if promotion is still in flight, the periodic recovery sweep backstops it (it now
-        // includes Cancelled).
-        await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+        // purged too (owner decision — minimise storage/GDPR exposure). Runs after the refund so
+        // it never delays the money path. Best-effort cleanup: gated on the cloud tier + archive
+        // being on (cancel with cloud off has nothing to purge, and the purger's refusal logs at
+        // Error, which would false-alarm on every cancel in a local-only deployment — unlike the
+        // production-complete hook, where cloud-off IS a misconfiguration worth surfacing), and a
+        // purge hiccup must never fail the already-committed cancel + refund. The periodic
+        // recovery sweep (now including Cancelled) backstops the promotion-in-flight-at-cancel race.
+        if (_archiveSettings.Enabled && _storageRouter.CloudEnabled)
+        {
+            try
+            {
+                await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "purge-on-cancel failed for order {OrderNumber} — recovery sweep will retry",
+                    order.OrderNumber);
+            }
+        }
 
         return BuildDetailDto(order);
     }
