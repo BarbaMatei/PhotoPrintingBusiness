@@ -68,6 +68,34 @@ verification rounds run as if interchangeable.
 > seven rounds were really *two full audits + five verification rounds*, and the iteration
 > count came from re-discovering breadth the first audit missed — not from churning bugs.
 
+### The middle tier: delta discovery
+
+*(Added 2026-07-14, from the 042 cost data.)* After a fix round, the population of new defects
+lives almost entirely in the **fix diff** — 042-v4's headline mediums (M1/M2) came from the v1
+BUG-3 key change, and v6's (D61/D62/D75) from the v4 fixes — yet the only blinded instrument was
+the ~2M-token whole-feature pass, which re-audited everything to find bugs sitting in the code
+that had just changed. The **delta-discovery pass** is the middle instrument:
+
+| | **Delta discovery** |
+|---|---|
+| Question | "What did the work since the last full pass break or introduce?" |
+| Scope | The **cumulative diff since the last full discovery pass** + collaborators of the changed lines |
+| Bias posture | **Blinded** like discovery (no `reviews/`); pass `passType: 'delta'` so lenses scope to the delta |
+| Lenses | The lenses owning the fix classes + `correctness` + `race` + `completeness-critic` (~6–7, not the full manifest) |
+| Cost | ~400–600k tokens — vs ~2M for a full pass |
+| May declare the feature approved? | **No** — a quiet delta pass is the gate **to** certification, never certification itself |
+
+**When each tier runs:** full discovery only at the ends — the first pass on a bolt, and the
+two-parallel-pass certification at the close ([self-driving-loop-design.md](self-driving-loop-design.md)).
+After every fix round: verification (unchanged) → delta discovery. Repeat fix → verify → delta
+until a delta pass is quiet, then freeze and certify. What a delta pass structurally cannot see —
+original-population defects outside the fix surface, like 042's D85 (the SplitQuery mis-paging
+bug, found only on the *third* full pass) — is exactly what the certification pair exists to
+catch: the delta tier replaces the middle full passes, not the safety net.
+
+Metrics: record `type: "delta-discovery"`. The saturation / decay curve is computed on **full**
+discovery passes only.
+
 ---
 
 ## Why parallel isolated subagents
@@ -144,25 +172,36 @@ The steps are **strict — follow them in order**; don't improvise the parts the
 
 1. **Scope.** Confirm `HEAD == origin/<branch>`. Save the source diff(s) to temp files
    (`git diff main...HEAD -- 'src/**/*.cs' ':!*Designer.cs'`; a second for `src/PhotoPrint.UI/**`
-   if the branch touches the frontend). Decide **discovery** vs **verification** pass (opposite
-   exit criteria — see *Two loops*); for verification, stop here and follow the
-   [verification runbook](#verification-pass--the-runbook) instead.
-2. **Assemble the `codePack` (measure #4).** Read the changed files **and their key collaborators**
-   (callers, cleanup/background jobs, middleware, config) **once**, concatenate into one string, and
-   pass it as `args.codePack`. This is how agents avoid re-reading the same files ~100×. Include the
-   collaborators because discovery-critical defects live in *unchanged* code (bolt-035's OrderNumber
-   `CountAsync` collision lived outside the diff). Omit the pack only if you deliberately want lenses
-   to explore fresh — but then say so. **Budget the pack:** changed files in full, collaborators
-   trimmed to the relevant members, whole pack under ~50k tokens — it is injected into every lens
-   *and* every skeptic, so its size multiplies across the whole fan-out. Past the budget, drop
-   collaborators to grep hints. Never include anything under `reviews/` (it would break blinding).
+   if the branch touches the frontend). Decide **discovery** vs **delta-discovery** vs
+   **verification** pass (see *Two loops* and *The middle tier*); for verification, stop here and
+   follow the [verification runbook](#verification-pass--the-runbook) instead; for delta, the
+   diffs cover the work **since the last full discovery pass**, not `main...HEAD`.
+2. **Assemble the `codePack` (measure #4).** Concatenate the changed files **and their key
+   collaborators** (callers, cleanup/background jobs, middleware, config) into a **scratch file**
+   (filename headers + contents — a small PowerShell loop, so the orchestrator's own context stays
+   clean) and pass its path as `args.codePackPath`; each lens reads it once instead of re-reading
+   the same files ~100×. (Inline `args.codePack` still works, but was skipped as "impractical" on
+   every real run — the path form is the standard.) Include the collaborators because
+   discovery-critical defects live in *unchanged* code (bolt-035's OrderNumber `CountAsync`
+   collision lived outside the diff). Omit the pack only if you deliberately want lenses to
+   explore fresh — but then say so. The pack goes to **lenses only** — a skeptic checks one
+   finding and reads its file(s) directly, so pack × skeptic-count multiplication is gone by
+   construction. **Budget the pack:** changed files in full, collaborators trimmed to the relevant
+   members, whole pack under ~50k tokens (every lens still reads it). Past the budget, drop
+   collaborators to grep hints. Never include anything under `reviews/` (it would break blinding —
+   the pack file is one of the blinding auditor's scan targets).
 3. **Pick the manifest lenses.** Map the change's characteristics to lenses per the
    [manifest table](#choosing-the-lenses-the-manifest); pass as `args.lenses`. Breadth is
    front-loaded here, not accreted over rounds.
 4. **Build + run tests yourself**, record pass/fail for the review. *A green suite that doesn't
    exercise the found failure modes is itself a finding* (feed that to the tests-coverage lens).
-5. **Invoke the script:** `Workflow({ scriptPath: 'reviews/lib/discovery-review.wf.js', args: {
-   target, repoRoot, scope, changedFiles, backendDiff, frontendDiff?, specDocs?, lenses, codePack } })`.
+5. **Extract `decidedFindings`, then invoke the script.** Pull the terminal-status rows (deferred /
+   wont-fix / false-positive / disputed-upheld) from `reviews/<target>/ledger.md` as
+   `[{dId, title, file, status, decision}]` — blinding holds because only the post-lens dedup agent
+   ever sees them (measure #5). Then: `Workflow({ scriptPath: 'reviews/lib/discovery-review.wf.js',
+   args: { target, repoRoot, scope, changedFiles, backendDiff, frontendDiff?, specDocs?, lenses,
+   codePackPath, decidedFindings, passType? } })` — `passType: 'delta'` for a delta pass. Launch
+   per the [launch checklist](#launch-checklist-discovery--delta-workflow).
 6. **Synthesize.** The returned findings are **already deduped, convergence-counted, and verdicted**
    — do NOT re-run verification or re-dedup. Your job: drop `refuted` false-positives *with a reason*,
    sanity-check the `plausible`/high-convergence calls, rank by severity, write `review-v<n>.md`
@@ -187,8 +226,17 @@ The steps are **strict — follow them in order**; don't improvise the parts the
   the two skeptics contradict each other (a guard found *and* a failing trace built) and
   `unverified-cleanup` for ⚪ (skeptics skipped).
 - **#3 Output caps** on every agent (verdict + brief reason, not essays).
-- **Reports skeptic-run counts** in the `_canonical` summary line — copy them into the pass's
-  metrics entry (`cost.agents_by_stage`).
+- **#5 Decided re-raises skip skeptics:** groups the dedup agent conservatively matches to a
+  `decidedFindings` entry (same root cause, same site — when unsure, no match) get verdict
+  `re-raise` with the prior decision attached and run **no skeptics**: existence was settled when
+  the item entered the ledger; the synthesizer re-judges only the *decision* (3 of 5 recorded
+  re-raises overturned the prior call, so a match never suppresses the find). On 042-v8 numbers —
+  15 of 28 findings were re-raises — this removes roughly 40% of the skeptic layer.
+- **Aborts before fan-out if args didn't bind** (no diff and no codePack resolved) — the 042-v4
+  void run (~1.2M tokens of lenses reviewing placeholder defaults) was this failure. Override with
+  `allowBare: true` only when you deliberately want free exploration.
+- **Reports skeptic-run counts** (and the decided-re-raise skip count) in the `_canonical` summary
+  line — copy them into the pass's metrics entry (`cost.agents_by_stage`).
 
 ### Verification pass — the runbook
 
@@ -201,7 +249,11 @@ manifest, no codePack, no workflow script:
    red; restore, confirm green. A fix whose test cannot go red is not verified — reopen it.
 3. For findings that need judgment rather than a test (doc items, `wont-fix`/`deferred`/`disputed`
    rationales), dispatch one anchored Explore agent per finding — give it the finding, the
-   resolution note, and the fix delta, not the whole feature.
+   resolution note, and the fix delta, not the whole feature. **Gate deferral re-checks on the
+   code actually moving:** first run `git diff <last-affirmed-commit>..HEAD -- <cited file(s)>`
+   yourself; unchanged → record "unchanged since `<commit>`, stands" with **no agent** (042 v7+v9
+   re-affirmed 42 deferrals by agent, zero flips); changed → dispatch as before. The ledger row
+   carries the commit at which each deferral was last affirmed.
 4. **Review the fix diffs — three questions, not one.** Per fix cluster, by the owning lens:
    *class or instance* (do sibling sites still carry the defect?); *new surface at the bar*
    (an added mechanism has sized defaults, a signal, failure-mode tests, docs — the fixer's
@@ -227,9 +279,10 @@ A review file's frontmatter carries exactly one verdict:
 - `approve-with-followups` — no blockers; residual 🟡/⚪ remain.
 - `approved` — a saturated discovery pass found nothing new.
 
-**Only a *discovery* pass may emit `approved`.** A verification pass, however green, emits at
+**Only a *full discovery* pass may emit `approved`.** A verification pass, however green, emits at
 most `approve-with-followups`, because "this fix held" is not "the feature is clean" (see
-*Two loops*). Bolt-035 v8 — a single fresh discovery pass — correctly landed
+*Two loops*). A **delta-discovery** pass is capped the same way — it audits only the diff since
+the last full pass, so a quiet delta gates *to* certification, it never certifies. Bolt-035 v8 — a single fresh discovery pass — correctly landed
 `approve-with-followups`, not `approved`, precisely because one pass can't certify saturation.
 
 ## Verification model
@@ -347,6 +400,10 @@ search (the finders never see `D#`). The ledger gives you (a) overlap data for t
 (b) a memory of known-and-accepted so deferrals aren't re-argued *blindly*, and (c) a true cumulative
 recall count. **Caveat (from the labeled data): 3 of 5 re-raises of already-decided items turned out
 *right* — the ledger attaches the prior decision to a re-find, it never suppresses it.**
+Two mechanics hang off the ledger: its terminal-status rows feed the discovery script's
+`decidedFindings` arg (measure #5 — re-raises skip skeptics, prior decision attached), and each
+deferred/wont-fix row records the **commit at which it was last affirmed**, which the verification
+runbook's deferral gate diffs against.
 
 The synthesizing main agent builds the ledger **by hand today** (a **reconciler** to automate the
 `F#`→`D#` mapping is still unbuilt). Worked artifacts: the first hand-labeled eval set is
@@ -454,6 +511,21 @@ Fresh/unbiased re-audit (a discovery pass):
 > and verifier is barred from reading `reviews/`; produces the next `review-v<n>` as a
 > clean-room audit of the whole feature. This is what surfaces what earlier passes missed.
 
+### Launch checklist (discovery / delta workflow)
+
+Each of these has already burned a real run:
+
+1. **Launch from an Opus 4.8 session** — three 042-v8 launches on Fable died on its session limit
+   with zero lenses done.
+2. **Resume, never relaunch:** on any mid-run death, re-invoke with
+   `Workflow({ scriptPath, resumeFromRunId })` — completed agents return from cache (042-v1
+   resumed 40 dead skeptics with zero errors).
+3. **Run from an LF copy** — the Workflow tool rejects the committed CRLF file; and keep newlines
+   out of arg strings (use ` || ` / ` · ` separators).
+4. **Respect the arg-bind abort:** the script refuses to fan out if neither a diff nor a codePack
+   resolved (the 042-v4 void run, ~1.2M tokens over placeholder defaults, was this failure). If it
+   aborts, fix the args; `allowBare: true` is only for deliberate free-exploration.
+
 Automation: the discovery fan-out is a committed three-stage `Workflow` script — lenses →
 in-pass dedup → convergence-weighted verify — at [lib/discovery-review.wf.js](lib/discovery-review.wf.js)
 (operating steps in *Orchestration flow*). The remaining gaps toward a one-command review are
@@ -469,6 +541,9 @@ ones — so spend by loop type:
 - **Verification passes** are cheap and frequent: give finders the saved **diff** path (don't
   point them at the whole repo — that's the discovery pass's job), prefer Explore, and scale
   finder count to the *fix* size — a 50-line fix doesn't need 8 finders.
+- **Delta-discovery passes** sit between the two (see *The middle tier*): blinded manifest-subset
+  lenses over the cumulative fix diff, ~400–600k tokens, after every fix round — so full passes
+  run only at the ends (first pass + certification).
 - **Discovery passes** are expensive and rare: they review the **whole feature** with the
   full manifest, and you run *several* independent ones to reach saturation. Budget for that
   — completeness is the product here, and one cheap pass demonstrably under-delivers it.
@@ -513,17 +588,23 @@ guard elsewhere) and (b) High/Medium calls; blanket 2×-on-everything over-pays.
 On the bolt-042 pass the **12 lenses were ~11% of the agents; the ~98 skeptics were ~89%** and a
 similar share of the ~3.5M tokens. So the waste is in the *verification* layer, not the *finding*
 layer — cut there, and leave lens breadth alone (breadth is the product; under-provisioning it is the
-documented bolt-035 failure). That is why the four baked-in measures — **#1 dedup-before-verify, #2
-convergence-weighted verify, #3 output caps, #4 read-once codePack** — all trim verification cost or
-redundant re-reading and none touch how many lenses run. On bolt-042 the bomb guard / leak / TOCTOU
+documented bolt-035 failure). That is why the five baked-in measures — **#1 dedup-before-verify, #2
+convergence-weighted verify, #3 output caps, #4 read-once codePack, #5 decided-re-raise skip** — all
+trim verification cost or redundant re-reading and none touch how many lenses run. On bolt-042 the bomb guard / leak / TOCTOU
 were each found by 5 lenses, i.e. up to 10 skeptic runs per bug before dedup — that is the redundancy
-#1/#2 remove. Measure #4's payoff depends on prompt caching being shared across the fan-out, so it is
-**off unless the caller supplies the pack** — and pack size multiplies across every agent that
-receives it, which is why step 2 gives it a budget.
+#1/#2 remove. Measure #4 now takes a **file path** (`codePackPath`) — the inline-args form was skipped as
+impractical on every real run — and goes to **lenses only**: a skeptic checks one finding and reads
+its file(s) directly, so the pack no longer multiplies across the skeptic layer. Step 2 still
+budgets the pack (~50k) because every lens reads it.
 
 **Held in reserve (apply only if token use is still too high):** model tiering — Opus for lenses +
 High/Med skeptics, Sonnet for the bulk of Low/spot skeptics. Deferred because it carries a small
-confidence cost the four above do not; revisit if #1–#4 don't move the number enough.
+confidence cost the five above do not; revisit if #1–#5 don't move the number enough. Validation is
+now cheap and pre-registered:
+[experiments/skeptic-tiering/experiment-design.md](experiments/skeptic-tiering/experiment-design.md)
+replays 042-v8's low-tier skeptics on the cheaper model and diffs the verdicts — run it only after
+#5 has landed in a real pass (it removes many low-tier runs, shrinking both the cost and the
+benefit of tiering).
 
 **Always measure a change like this** the honest way (per *Recall & convergence*): re-run one frozen
 commit with and without the change and confirm the lenses still surface the same findings and no
@@ -536,8 +617,8 @@ outcome-changing verdict flips. If nothing flips, the saving was free.
   `review-v1.md`; re-reviewing produces `review-v2.md`, etc. Never overwrite a prior version —
   each pass is a point-in-time record of what was found against which commit. Frontmatter
   carries `version:`, `supersedes:` (`null` for v1), the `commit:` reviewed, and a **required**
-  `pass-type: discovery | verification` so the index and the saturation analysis can tell a
-  clean-room audit from a fix-check.
+  `pass-type: discovery | delta-discovery | verification` so the index and the saturation analysis
+  can tell a clean-room audit from a delta sweep from a fix-check.
 - `index.md` always links the **latest** review version + resolution per target, and carries
   a `Status` column for the resolution loop.
 - Each target folder carries a `metrics.jsonl` (one line per pass, append-only) — schema and

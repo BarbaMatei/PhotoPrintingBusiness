@@ -7,7 +7,7 @@ owner: Matei Barba
 
 # Review metrics — what every pass records, and why
 
-Every review pass (discovery *and* verification) appends **one line** to the target's
+Every review pass (discovery, delta-discovery, *and* verification) appends **one line** to the target's
 `reviews/<target>/metrics.jsonl` at synthesis time — after findings are settled, before the
 review file is finalized. Append-only: never edit a past line; a correction is a note in the
 next line. Unknown values are `null`, never guessed.
@@ -24,7 +24,7 @@ recorded them at the time.
 |---|---|---|
 | `target` | string | the reviewed unit, e.g. `"035-payment-idempotency"` |
 | `pass` | int | review version number (matches `review-v<n>.md`) |
-| `type` | `"discovery"` \| `"verification"` | see the two-loops distinction in [README.md](README.md) |
+| `type` | `"discovery"` \| `"delta-discovery"` \| `"verification"` | see the two-loops distinction + *The middle tier* in [README.md](README.md); the saturation/decay curve uses full `"discovery"` passes only |
 | `date` | ISO date | when the pass ran |
 | `commit` | string | the commit reviewed |
 | `lenses` | array \| null | lenses/finders actually run |

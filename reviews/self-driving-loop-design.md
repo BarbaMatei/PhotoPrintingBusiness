@@ -214,7 +214,9 @@ one after another.
 
 - **Two kinds of review** (the README's *discovery* vs *verification*): a wide, blinded one that
   looks at the whole feature — run rarely; and a quick, anchored one that checks a specific fix —
-  run per fix. The README owns the full contract for both.
+  run per fix. The README owns the full contract for both. *(2026-07-14: the README added a third,
+  middle tier — **delta discovery**, blinded lenses over the diff since the last full pass, run
+  after each fix round; full passes now run only first and at certification. The README owns it.)*
 - **Front-load breadth** using the README's **lens manifest** — the checklist that maps what the
   change touches (a migration, a second provider, money, concurrency…) to which specialists must
   run. This helps; whether it's the *biggest* lever or repetition matters more is exactly what
