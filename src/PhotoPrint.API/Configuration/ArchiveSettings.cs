@@ -27,6 +27,13 @@ public class ArchiveSettings
     /// <summary>Retention job cadence. Default 6 hours.</summary>
     public int JobIntervalHours { get; set; } = 6;
 
+    /// <summary>
+    /// Cadence of the original-purge recovery sweep (<see cref="Services.IOriginalPurger"/> backstop).
+    /// Default 6 hours: the retention/GDPR window is measured in months, so an hours-scale backstop
+    /// bounds how long a late-completing promotion's original can linger to at most one interval.
+    /// </summary>
+    public int PurgeSweepIntervalHours { get; set; } = 6;
+
     /// <summary>Max rows the retention job processes per tick. Default 500.</summary>
     public int BatchSize { get; set; } = 500;
 
@@ -67,6 +74,8 @@ public class ArchiveSettingsValidator : IValidateOptions<ArchiveSettings>
             failures.Add("Archive:RetentionMonths must be > 0.");
         if (options.JobIntervalHours <= 0)
             failures.Add("Archive:JobIntervalHours must be > 0.");
+        if (options.PurgeSweepIntervalHours <= 0)
+            failures.Add("Archive:PurgeSweepIntervalHours must be > 0.");
         if (options.BatchSize <= 0)
             failures.Add("Archive:BatchSize must be > 0.");
 

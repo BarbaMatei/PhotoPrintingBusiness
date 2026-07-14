@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -13,8 +14,10 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// Unit tests for <see cref="OriginalPurgeRecoveryScanner"/>. Verifies the startup
-/// query (status floor + non-null FilePath) and the refusal posture.
+/// Unit tests for <see cref="OriginalPurgeRecoveryScanner"/> (bolt 052 backstop). Targets the
+/// <c>RunSweepAsync</c> tick directly via reflection (matching <see cref="ArchiveRetentionJob"/>'s
+/// pattern) plus the <c>ExecuteAsync</c> refusal guards. The scanner is periodic since F4
+/// (review 043-v1) — the sweep catches promotions that complete after the Shipped transition.
 /// </summary>
 public class OriginalPurgeRecoveryScannerTests
 {
@@ -46,6 +49,13 @@ public class OriginalPurgeRecoveryScannerTests
             Enabled = enabled,
             PurgeOriginalAtStatus = purgeStatus,
         });
+
+    private static async Task<int> RunSweepAsync(OriginalPurgeRecoveryScanner sut, CancellationToken ct)
+    {
+        var method = typeof(OriginalPurgeRecoveryScanner).GetMethod(
+            "RunSweepAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        return await (Task<int>)method!.Invoke(sut, new object[] { ct })!;
+    }
 
     private static Upload SeedUpload(
         PhotoPrintDbContext db,
@@ -99,8 +109,10 @@ public class OriginalPurgeRecoveryScannerTests
         return o;
     }
 
+    // ── ExecuteAsync refusal guards ───────────────────────────────────────────
+
     [Fact]
-    public async Task StartAsync_ArchiveDisabled_DoesNothing()
+    public async Task ExecuteAsync_ArchiveDisabled_DoesNothing()
     {
         using var db = CreateDb();
         var purger = new Mock<IOriginalPurger>();
@@ -109,12 +121,13 @@ public class OriginalPurgeRecoveryScannerTests
             Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
 
         await sut.StartAsync(CancellationToken.None);
+        await sut.StopAsync(CancellationToken.None);
 
         purger.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task StartAsync_CloudTierOff_DoesNothing()
+    public async Task ExecuteAsync_CloudTierOff_DoesNothing()
     {
         using var db = CreateDb();
         var purger = new Mock<IOriginalPurger>();
@@ -123,12 +136,15 @@ public class OriginalPurgeRecoveryScannerTests
             Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
 
         await sut.StartAsync(CancellationToken.None);
+        await sut.StopAsync(CancellationToken.None);
 
         purger.VerifyNoOtherCalls();
     }
 
+    // ── RunSweepAsync selection ───────────────────────────────────────────────
+
     [Fact]
-    public async Task StartAsync_NoStuckOrders_EnqueuesNothing()
+    public async Task RunSweep_NoStuckOrders_FiresNothing()
     {
         using var db = CreateDb();
         // Shipped order with a properly-purged upload (FilePath null) — not stuck.
@@ -140,7 +156,7 @@ public class OriginalPurgeRecoveryScannerTests
             BuildScopes(db, purger.Object), Router(true).Object, Settings(),
             Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         purger.Verify(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -149,8 +165,11 @@ public class OriginalPurgeRecoveryScannerTests
     [Theory]
     [InlineData(OrderStatus.Shipped)]
     [InlineData(OrderStatus.Delivered)]
-    public async Task StartAsync_StuckOrderAtOrPastShipped_FiresPurger(OrderStatus status)
+    public async Task RunSweep_StuckOrderAtOrPastShipped_FiresPurger(OrderStatus status)
     {
+        // F4 (review 043-v1): a promotion that completed after Shipped leaves the upload Cloud
+        // with FilePath still set. The periodic sweep must catch it — the one-shot Shipped purge
+        // skipped it while it was still Local.
         using var db = CreateDb();
         var u = SeedUpload(db);  // FilePath still set, StorageLocation Cloud → stuck
         var order = SeedOrder(db, status, u);
@@ -162,7 +181,7 @@ public class OriginalPurgeRecoveryScannerTests
             BuildScopes(db, purger.Object), Router(true).Object, Settings("Shipped"),
             Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         purger.Verify(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()),
             Times.Once);
@@ -174,7 +193,7 @@ public class OriginalPurgeRecoveryScannerTests
     [InlineData(OrderStatus.Printing)]
     [InlineData(OrderStatus.Cancelled)]
     [InlineData(OrderStatus.PaymentFailed)]
-    public async Task StartAsync_PrePurgeStatuses_NotFired(OrderStatus status)
+    public async Task RunSweep_PrePurgeStatuses_NotFired(OrderStatus status)
     {
         using var db = CreateDb();
         var u = SeedUpload(db);
@@ -185,14 +204,14 @@ public class OriginalPurgeRecoveryScannerTests
             BuildScopes(db, purger.Object), Router(true).Object, Settings("Shipped"),
             Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         purger.Verify(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task StartAsync_ConfiguredDelivered_ShippedOrderNotFired()
+    public async Task RunSweep_ConfiguredDelivered_ShippedOrderNotFired()
     {
         // When PurgeOriginalAtStatus = Delivered, only Delivered orders should be in scope.
         using var db = CreateDb();
@@ -208,7 +227,7 @@ public class OriginalPurgeRecoveryScannerTests
             BuildScopes(db, purger.Object), Router(true).Object, Settings("Delivered"),
             Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         purger.Verify(p => p.PurgeOrderOriginalsAsync(deliveredOrder.Id, It.IsAny<CancellationToken>()),
             Times.Once);

@@ -53,8 +53,9 @@ public static class PhotoArchiveExtensions
         // (request-scoped) and inline from the recovery scanner (its own scope).
         services.AddScoped<IOriginalPurger, OriginalPurger>();
 
-        // Recovery scanner registered before the retention job so a crash-stuck purge
-        // gets fixed on boot rather than waiting up to JobIntervalHours for the sweep.
+        // Periodic backstop for the synchronous admin-transition purge: one sweep at boot,
+        // then every ArchiveSettings.PurgeSweepIntervalHours. Catches promotions that complete
+        // after the production-complete transition (F4, review 043-v1) plus crash-stuck purges.
         services.AddHostedService<OriginalPurgeRecoveryScanner>();
         services.AddHostedService<ArchiveRetentionJob>();
 
