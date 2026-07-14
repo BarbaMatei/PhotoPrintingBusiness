@@ -378,6 +378,26 @@ public class UploadServiceTests
     }
 
     [Fact]
+    public async Task GetPreviewAsync_CacheMissWithMissingOriginal_ThrowsNotFoundNot500()
+    {
+        // M6 (review 042-v4): the original blob was deleted (ops-side or the cleanup race) though
+        // the row/DeletedAt survives. The cache-miss decode reads the original via GetStreamAsync,
+        // which throws FileNotFoundException — outside the ImageFormatException catch and unmapped,
+        // so it surfaced as a 500. It must surface a clean 4xx instead.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        await _db.SaveChangesAsync();
+
+        _imageProcessorMock
+            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("Stored upload not found."));
+
+        var act = () => _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+
+        await act.Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
     public async Task GetPreviewAsync_RowSoftDeletedDuringWrite_DeletesOrphanedThumbnail()
     {
         // M1 (review 042-v4): the cleanup job can soft-delete the upload between the preview's

@@ -155,7 +155,18 @@ public class UploadService : IUploadService
         // namespace so a concurrent or cancelled write overwrites the same key rather than
         // minting a new random file that leaks, and the cleanup job can target it (BUG-2/BUG-3).
         var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
-        var generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
+        MemoryStream generated;
+        try
+        {
+            generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
+        }
+        catch (FileNotFoundException)
+        {
+            // The original blob is gone (ops-side deletion or the cleanup race) though the row
+            // survives. There's nothing to regenerate from, so surface a clean 404 rather than
+            // an unmapped FileNotFoundException -> 500 (M6, review 042-v4).
+            throw new NotFoundException($"Upload {uploadId} is no longer available.");
+        }
         var thumbnailPath = await _storage.SaveAsync(
             generated, ownerId, "jpg", ct, fileId: uploadId, prefix: ThumbnailPrefix);
         upload.ThumbnailPath = thumbnailPath;
