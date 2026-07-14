@@ -109,6 +109,33 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_ImageAllocationBackstopTripped_EmitsReservedBombEvent()
+    {
+        // F5 (review 042-v6): a bomb that under-reports its dimensions passes the pixel guard but
+        // trips the 512 MB allocator backstop (InvalidMemoryOperationException). It must emit the
+        // SAME reserved `uploads.decompression_bomb.rejected` event ops alert on — otherwise the
+        // bombs that evade the primary guard show up only as a generic "Handled exception" warning.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new SixLabors.ImageSharp.Memory.InvalidMemoryOperationException("allocation exceeded");
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("uploads.decompression_bomb.rejected") &&
+                    v.ToString()!.Contains("allocator_backstop")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_UnknownException_Returns500WithExceptionDetailInDevelopment()
     {
         // Arrange

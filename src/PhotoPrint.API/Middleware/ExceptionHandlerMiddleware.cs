@@ -105,8 +105,18 @@ public class ExceptionHandlerMiddleware : IMiddleware
             // reserved event carrying the offending dimensions (no file data / no PII).
             if (exception is DecompressionBombException bomb)
                 _logger.LogWarning(
-                    "uploads.decompression_bomb.rejected correlation_id={CorrelationId} width={Width} height={Height}",
+                    "uploads.decompression_bomb.rejected correlation_id={CorrelationId} source=pixel_guard width={Width} height={Height}",
                     correlationId, bomb.WidthPx, bomb.HeightPx);
+
+            // F5 (review 042-v6): a bomb that under-reported its dimensions passes the pixel
+            // guard but trips the 512 MB allocator backstop, throwing InvalidMemoryOperationException.
+            // Emit the SAME reserved bomb event so ops alerting on it catch exactly the bombs that
+            // evaded the primary guard — not just a generic "Handled exception" warning. No
+            // dimensions are available here (the decoder never surfaced them); source distinguishes it.
+            if (exception is SixLabors.ImageSharp.Memory.InvalidMemoryOperationException)
+                _logger.LogWarning(
+                    "uploads.decompression_bomb.rejected correlation_id={CorrelationId} source=allocator_backstop",
+                    correlationId);
 
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,
                 exception.Message, correlationId, exception);
