@@ -492,6 +492,21 @@ public class AdminOrderServiceTests
     }
 
     [Fact]
+    public async Task CancelOrderAsync_TriggersOriginalPurge()
+    {
+        // F17 (review 043-v1): a cancelled/refunded order's cloud original must be purged
+        // (owner decision). The purger self-refuses when cloud/archive is off, so cancel
+        // always fires it and the purger decides.
+        var order = await SeedOrderAsync(OrderStatus.Paid);
+
+        await _sut.CancelOrderAsync(order.Id, null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task CancelOrderAsync_BroadcastsSignalR()
     {
         var order = await SeedOrderAsync(OrderStatus.Paid);

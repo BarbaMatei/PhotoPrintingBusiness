@@ -222,6 +222,13 @@ public class AdminOrderService : IAdminOrderService
 
         _orderEmailService.FireOrderCancelledEmail(order, reason);
 
+        // Bolt 052 / F17 (review 043-v1): a cancelled/refunded order's cloud original must be
+        // purged too (owner decision — minimise storage/GDPR exposure). Runs after the refund
+        // so it never delays the money path. Self-refuses if the cloud tier or archive is off;
+        // if promotion is still in flight, the periodic recovery sweep backstops it (it now
+        // includes Cancelled).
+        await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+
         return BuildDetailDto(order);
     }
 

@@ -90,7 +90,7 @@ public class OriginalPurgeRecoveryScanner : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
         var purger = scope.ServiceProvider.GetRequiredService<IOriginalPurger>();
 
-        var statuses = _settings.ProductionCompleteFloor();
+        var statuses = _settings.OriginalPurgeSweepStatuses();
         var orderIds = await db.Orders
             .Where(o => statuses.Contains(o.Status))
             .Where(o => o.Items.Any(i =>

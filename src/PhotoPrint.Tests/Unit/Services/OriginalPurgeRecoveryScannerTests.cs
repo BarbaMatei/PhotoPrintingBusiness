@@ -191,7 +191,6 @@ public class OriginalPurgeRecoveryScannerTests
     [InlineData(OrderStatus.AwaitingPayment)]
     [InlineData(OrderStatus.Paid)]
     [InlineData(OrderStatus.Printing)]
-    [InlineData(OrderStatus.Cancelled)]
     [InlineData(OrderStatus.PaymentFailed)]
     public async Task RunSweep_PrePurgeStatuses_NotFired(OrderStatus status)
     {
@@ -208,6 +207,29 @@ public class OriginalPurgeRecoveryScannerTests
 
         purger.Verify(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task RunSweep_CancelledStuckOrder_FiresPurger()
+    {
+        // F17 (review 043-v1): a paid-then-cancelled order whose promotion completed leaves a
+        // Cloud original with FilePath set. Cancel fires purge synchronously, but a promotion
+        // still in flight at cancel time is skipped there — the sweep must backstop it.
+        using var db = CreateDb();
+        var u = SeedUpload(db);  // Cloud + FilePath still set → stuck
+        var order = SeedOrder(db, OrderStatus.Cancelled, u);
+
+        var purger = new Mock<IOriginalPurger>();
+        purger.Setup(p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+              .ReturnsAsync(PurgeOutcome.Empty);
+        var sut = new OriginalPurgeRecoveryScanner(
+            BuildScopes(db, purger.Object), Router(true).Object, Settings("Shipped"),
+            Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
+
+        await RunSweepAsync(sut, CancellationToken.None);
+
+        purger.Verify(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

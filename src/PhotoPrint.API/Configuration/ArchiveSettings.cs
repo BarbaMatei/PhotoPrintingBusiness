@@ -51,6 +51,15 @@ public class ArchiveSettings
         => PurgeOriginalAtStatus.Equals("Delivered", StringComparison.OrdinalIgnoreCase)
             ? [OrderStatus.Delivered]
             : [OrderStatus.Shipped, OrderStatus.Delivered];
+
+    /// <summary>
+    /// Statuses whose cloud original is no longer retained and is therefore eligible for the
+    /// purge-recovery sweep: the production-complete floor (fulfilled) plus <c>Cancelled</c>
+    /// (refunded/aborted — the original is purged on cancel; F17, review 043-v1). PaymentFailed
+    /// never promoted, so it has no cloud original to sweep.
+    /// </summary>
+    public OrderStatus[] OriginalPurgeSweepStatuses()
+        => [.. ProductionCompleteFloor(), OrderStatus.Cancelled];
 }
 
 /// <summary>
