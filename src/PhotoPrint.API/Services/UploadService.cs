@@ -188,6 +188,9 @@ public class UploadService : IUploadService
 
         // Persist only ThumbnailPath. The entity was read AsNoTracking, so attach it and mark
         // the single column modified instead of tracking the whole graph.
+        // NOTE (L5, review 042-v4): this makes GET /preview perform a DB write on a cache miss,
+        // so it MUST be routed to the primary — it cannot run on a read replica. No replica
+        // routing exists today; moving cache-fill off the GET path is deferred until one does.
         _db.Uploads.Attach(upload);
         _db.Entry(upload).Property(u => u.ThumbnailPath).IsModified = true;
         try
