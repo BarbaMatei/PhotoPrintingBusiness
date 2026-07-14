@@ -11,7 +11,7 @@ public interface IImageProcessor
     Task<ImageInfo?> GetInfoAsync(string storagePath, CancellationToken ct = default);
 
     /// <summary>
-    /// Generates a JPEG thumbnail (max 300 px on longest dimension, quality 85).
+    /// Generates a JPEG thumbnail (max 800 px on longest dimension, quality 85).
     /// Returns the thumbnail as a MemoryStream.
     /// </summary>
     Task<MemoryStream> GenerateThumbnailAsync(string storagePath, CancellationToken ct = default);

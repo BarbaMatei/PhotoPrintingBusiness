@@ -158,6 +158,44 @@ public class UploadControllerIntegrationTests : IAsyncLifetime
         response.Headers.ETag.Should().NotBeNull();
     }
 
+    // TEST-4 (review 042-v1): the conditional-GET path — a second request echoing the ETag
+    // in If-None-Match gets 304 Not Modified with no body.
+    [Fact]
+    public async Task GetPreview_IfNoneMatchMatchesEtag_Returns304()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        var upload = await _factory.SeedUploadAsync(userId: userId);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var first = await _client.GetAsync($"/api/uploads/{upload.Id}/preview");
+        var etag = first.Headers.ETag!.ToString();
+
+        var conditional = new HttpRequestMessage(HttpMethod.Get, $"/api/uploads/{upload.Id}/preview");
+        conditional.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        var second = await _client.SendAsync(conditional);
+
+        second.StatusCode.Should().Be(HttpStatusCode.NotModified);
+    }
+
+    // SEC-1 (review 042-v1): the preview is ownership-checked, so its Cache-Control must be
+    // `private` (never `public`/shared). A `public` response would be stored by ResponseCaching
+    // — which runs before authentication and keys only on the URL — and served to a different
+    // guest/anonymous client, leaking one user's photo. Pin the exact directive.
+    [Fact]
+    public async Task GetPreview_CacheControl_IsPrivateNotPublic()
+    {
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        var upload = await _factory.SeedUploadAsync(userId: userId);
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.GetAsync($"/api/uploads/{upload.Id}/preview");
+
+        response.Headers.CacheControl.Should().NotBeNull();
+        response.Headers.CacheControl!.Private.Should().BeTrue("a per-user preview must not be shared-cacheable");
+        response.Headers.CacheControl.Public.Should().BeFalse();
+        response.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromDays(30));
+    }
+
     // ── GET /api/uploads/{id}/preview — error cases ───────────────────────────
 
     [Fact]

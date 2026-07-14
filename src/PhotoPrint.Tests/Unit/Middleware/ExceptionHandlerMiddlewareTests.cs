@@ -89,6 +89,53 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_ImageAllocationBackstopTripped_Returns422NotRaw500()
+    {
+        // L13 (review 042-v4): a bomb whose header understated its decode size slips the
+        // pixel-area check, then the decode trips the 512 MB allocator backstop (Program.cs)
+        // throwing ImageSharp's InvalidMemoryOperationException — not an ImageFormatException —
+        // so it surfaced as a raw 500. Map it to 422.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new SixLabors.ImageSharp.Memory.InvalidMemoryOperationException("allocation exceeded");
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(422);
+        var body = await ReadResponseBodyAsync(context);
+        body.RootElement.GetProperty("status").GetInt32().Should().Be(422);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ImageAllocationBackstopTripped_EmitsReservedBombEvent()
+    {
+        // F5 (review 042-v6): a bomb that under-reports its dimensions passes the pixel guard but
+        // trips the 512 MB allocator backstop (InvalidMemoryOperationException). It must emit the
+        // SAME reserved `uploads.decompression_bomb.rejected` event ops alert on — otherwise the
+        // bombs that evade the primary guard show up only as a generic "Handled exception" warning.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ =>
+            throw new SixLabors.ImageSharp.Memory.InvalidMemoryOperationException("allocation exceeded");
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("uploads.decompression_bomb.rejected") &&
+                    v.ToString()!.Contains("allocator_backstop")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_UnknownException_Returns500WithExceptionDetailInDevelopment()
     {
         // Arrange
@@ -221,6 +268,63 @@ public class ExceptionHandlerMiddlewareTests
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((v, _) =>
                     v.ToString()!.Contains("payments.idempotency.cross-tenant-conflict")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ClientCancelled_LogsInformationEvent()
+    {
+        // OBS-2 (review 042-v1): the client-abort branch logged at Debug, which is below the
+        // Information floor in every environment, so the signal was never emitted. It must log
+        // at Information as a distinct `request.client_aborted` event.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        context.RequestAborted = new CancellationToken(canceled: true);
+        RequestDelegate next = _ => throw new OperationCanceledException();
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("request.client_aborted")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_DecompressionBomb_Returns422_AndEmitsReservedEvent()
+    {
+        // OBS-3 (review 042-v1): a rejected pixel bomb must map to 422 (it subclasses
+        // UnprocessableEntityException) AND be logged as its own reserved event carrying the
+        // offending dimensions, so ops can alert on a bomb spike distinctly from an ordinary
+        // "unreadable image" 422.
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        // Distinct width/height so the assertion proves BOTH dimensions are carried, not just one.
+        RequestDelegate next = _ =>
+            throw new DecompressionBombException(31_000, 32_000, "Image dimensions exceed limits.");
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(422);
+
+        // L12 (review 042-v4): assert the event carries the dimensions it exists to convey, not
+        // just its name — dropping width/height (the whole point of the event) must fail this.
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("uploads.decompression_bomb.rejected") &&
+                    v.ToString()!.Contains("31000") &&
+                    v.ToString()!.Contains("32000")),
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);

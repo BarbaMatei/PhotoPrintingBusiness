@@ -2,11 +2,11 @@
 id: 001-thumbnail-path-schema
 unit: 001-thumbnail-cache
 intent: 019-thumbnail-cache-and-cloud-storage
-status: draft
+status: complete
 priority: must
 created: 2026-05-25T10:30:00Z
 assigned_bolt: 042-thumbnail-cache
-implemented: false
+implemented: true
 ---
 
 # Story: 001-thumbnail-path-schema
@@ -19,13 +19,13 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] EF migration adds `Uploads.ThumbnailPath varchar(500) NULL`.
+- [ ] EF migration adds `Uploads.ThumbnailPath varchar(512) NULL`.
 - [ ] `Upload` entity exposes the property.
 - [ ] Existing rows have `NULL`; no backfill required.
 
 ## Technical Notes
 
-- Same shape as `StoragePath`, also nullable to indicate "not generated yet".
+- Same shape as `FilePath` (`varchar(512)`), also nullable to indicate "not generated yet".
 
 ## Dependencies
 

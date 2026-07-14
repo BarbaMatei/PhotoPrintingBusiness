@@ -95,6 +95,22 @@ public class UploadCleanupJob : BackgroundService
                 fileErrors++;
             }
 
+            // Bolt 042 adds a second persistent file per upload (the cached thumbnail).
+            // Delete it too, otherwise a previewed-then-expired upload leaves its thumbnail
+            // on disk forever — the row is soft-deleted so no path ever revisits it (BUG-2).
+            if (upload.ThumbnailPath is not null)
+            {
+                try
+                {
+                    await storage.DeleteAsync(upload.ThumbnailPath, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete thumbnail file {StoragePath}", upload.ThumbnailPath);
+                    fileErrors++;
+                }
+            }
+
             upload.DeletedAt = now;
         }
 

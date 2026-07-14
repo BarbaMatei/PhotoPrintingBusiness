@@ -36,17 +36,66 @@ describe('errorInterceptor', () => {
     httpMock.verify();
   });
 
-  it('calls logout on 401', () => {
+  it('logs out an authenticated user on 401', () => {
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(true);
     const logoutSpy = vi.spyOn(authService, 'logout');
     http.get(`${API_URL}/me`).subscribe({ error: () => {} });
     httpMock.expectOne(`${API_URL}/me`).flush(null, { status: 401, statusText: 'Unauthorized' });
     expect(logoutSpy).toHaveBeenCalled();
   });
 
-  it('navigates to /auth/login on 401', () => {
+  it('navigates an authenticated user to /auth/login on 401', () => {
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(true);
     http.get(`${API_URL}/me`).subscribe({ error: () => {} });
     httpMock.expectOne(`${API_URL}/me`).flush(null, { status: 401, statusText: 'Unauthorized' });
     expect(router.navigateByUrl).toHaveBeenCalledWith('/auth/login');
+  });
+
+  // TEST-1 (review 042-v1): the guest-401 self-heal branch — the core of the bolt's auth
+  // change — previously had zero coverage; both existing tests only hit the logout branch.
+  it('clears the guest token (no logout/navigation) on 401 for a guest', () => {
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(false);
+    vi.spyOn(authService, 'getGuestToken').mockReturnValue('guest-token');
+    const clearSpy = vi.spyOn(authService, 'clearGuestToken');
+    const logoutSpy = vi.spyOn(authService, 'logout');
+
+    http.get(`${API_URL}/uploads/x/preview`).subscribe({ error: () => {} });
+    httpMock.expectOne(`${API_URL}/uploads/x/preview`).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(clearSpy).toHaveBeenCalled();
+    expect(logoutSpy).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  // FE-3 (review 042-v1): an anonymous client with no/corrupt guest token must NOT be
+  // bounced to a login page it has no account for — treat any unauthenticated 401 as a
+  // stale/absent guest session.
+  it('does not navigate an anonymous user (no guest token) to login on 401', () => {
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(false);
+    vi.spyOn(authService, 'getGuestToken').mockReturnValue(null);
+    const logoutSpy = vi.spyOn(authService, 'logout');
+
+    http.get(`${API_URL}/uploads/x/preview`).subscribe({ error: () => {} });
+    httpMock.expectOne(`${API_URL}/uploads/x/preview`).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(logoutSpy).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  // C3 (review 042-v4): the clear->re-init->retry self-heal seam was only unit-tested with each
+  // half mocked (the interceptor spies clearGuestToken; the component nulls the token by hand).
+  // If the interceptor's clear and the component's getGuestToken diverged on storage key/shape,
+  // both isolated tests still pass. Exercise the REAL clear against the REAL reader end-to-end.
+  it('actually clears the stored guest token that getGuestToken reads on a guest 401 (real seam — C3)', () => {
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(false);
+    localStorage.setItem('guestSession', JSON.stringify({ guestToken: 'seeded' }));
+    expect(authService.getGuestToken()).toBe('seeded');   // precondition: reader sees it
+
+    http.get(`${API_URL}/uploads/x/preview`).subscribe({ error: () => {} });
+    httpMock.expectOne(`${API_URL}/uploads/x/preview`).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    // The interceptor's real clearGuestToken must remove the SAME key getGuestToken reads.
+    expect(authService.getGuestToken()).toBeNull();
   });
 
   it('shows error toast on 403', () => {

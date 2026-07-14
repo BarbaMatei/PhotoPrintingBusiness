@@ -124,6 +124,69 @@ public class AdminOrderServiceTests
         await act.Should().ThrowAsync<NotFoundException>();
     }
 
+    // ── GetOrdersAsync (pagination) ───────────────────────────────────────────
+
+    [Fact]
+    public async Task GetOrdersAsync_TiedCreatedAt_PagesDeterministicallyKeepingItemsPerOrder()
+    {
+        // F2 (review 042-v8): the admin list is OrderByDescending(CreatedAt) + Skip/Take +
+        // Include(Items) under the global SplitQuery default. With no unique tiebreaker, a page
+        // boundary splitting orders that share a CreatedAt can page the parent and the Items child
+        // inconsistently on Postgres -> an order returns with missing items. ThenBy(Id) makes the
+        // order total so paging is stable and complete.
+        // NOTE: InMemory can't split queries, so this pins the deterministic-ordering + per-order
+        // item contract; the split-query symptom itself is a Postgres/3-env concern (see resolution).
+        var sharedTime = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var seeded = new List<Order>();
+        for (var i = 0; i < 5; i++)
+        {
+            seeded.Add(new Order
+            {
+                OrderNumber = $"FT-TIE-{i:D2}",
+                Status = OrderStatus.Paid,
+                PaymentProcessor = PaymentProcessor.Stripe,
+                DeliveryType = DeliveryType.Courier,
+                ShippingAddress = DefaultAddress(),
+                CreatedAt = sharedTime,                       // all tied — ThenBy(Id) is the sole discriminator
+                SubtotalRon = 10m,
+                ShippingCostRon = 5m,
+                TotalRon = 15m,
+                Items = Enumerable.Range(0, i + 1).Select(_ => new OrderItem
+                {
+                    UploadId = Guid.NewGuid(),
+                    ProductSnapshot = new ProductSnapshot { ProductName = "P", Size = "S", Finish = "F" },
+                    Quantity = 1,
+                    UnitPriceRon = 1m,
+                    LineTotalRon = 1m,
+                }).ToList(),                                  // order i carries i+1 items (ItemCount = i+1)
+            });
+        }
+        // Insert in reverse-Id order so a stable sort WITHOUT the tiebreaker would not match Id order.
+        foreach (var o in seeded.OrderByDescending(o => o.Id)) _db.Orders.Add(o);
+        await _db.SaveChangesAsync();
+
+        // Page through in size-2 pages (2 + 2 + 1), which splits the tied group across boundaries.
+        var paged = new List<(Guid Id, string OrderNumber, int ItemCount)>();
+        for (var page = 1; page <= 3; page++)
+        {
+            var (items, total) = await _sut.GetOrdersAsync(page, pageSize: 2, status: null, search: null);
+            total.Should().Be(5);
+            foreach (var dto in items)
+                paged.Add((dto.Id, dto.OrderNumber, dto.ItemCount));
+        }
+
+        // Completeness: every order exactly once — none dropped or duplicated across page boundaries.
+        paged.Should().HaveCount(5);
+        paged.Select(p => p.Id).Should().OnlyHaveUniqueItems();
+
+        // Per-order items survive paging (the "missing items" symptom): ItemCount == i+1.
+        foreach (var p in paged)
+            p.ItemCount.Should().Be(int.Parse(p.OrderNumber["FT-TIE-".Length..]) + 1);
+
+        // Deterministic total order: tied CreatedAt -> ThenBy(Id) ascending decides the sequence.
+        paged.Select(p => p.Id).Should().Equal(seeded.OrderBy(o => o.Id).Select(o => o.Id));
+    }
+
     // ── UpdateStatusAsync ─────────────────────────────────────────────────────
 
     [Fact]

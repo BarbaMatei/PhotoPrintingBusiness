@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PhotoPrint.API.Authentication;
@@ -16,11 +17,21 @@ public class UploadsController : ControllerBase
     private const long MaxFileSizeBytes = 52_428_800L;        // 50 MB per file
     private const long MaxBatchSizeBytes = 524_288_000L;       // 500 MB total batch
 
-    private readonly IUploadService _uploadService;
+    // A preview is an ownership-checked, per-user resource, so it must never be
+    // shared-cacheable (SEC-1 + QUAL-4, review 042-v1). `private` keeps it out of
+    // ASP.NET Core ResponseCaching and any shared proxy/CDN while still allowing a
+    // per-user browser cache. `immutable` is intentionally dropped: a thumbnail can
+    // be regenerated after an ops-side deletion, so the response is not immutable.
+    private static readonly string PreviewCacheControl =
+        $"private, max-age={(int)TimeSpan.FromDays(30).TotalSeconds}";
 
-    public UploadsController(IUploadService uploadService)
+    private readonly IUploadService _uploadService;
+    private readonly ILogger<UploadsController> _logger;
+
+    public UploadsController(IUploadService uploadService, ILogger<UploadsController> logger)
     {
         _uploadService = uploadService;
+        _logger = logger;
     }
 
     // POST /api/uploads
@@ -102,6 +113,23 @@ public class UploadsController : ControllerBase
                       RequestEntityTooLargeException or
                       BadRequestException)
             {
+                // OBS-1 (review 042-v1): the batch endpoint turns each rejection into a
+                // per-item result and returns 200, so without this the exception never
+                // reaches ExceptionHandlerMiddleware and bulk abuse (the most likely bomb
+                // vector) is invisible to ops. Log it — Warning, no file bytes / no PII.
+                _logger.LogWarning(
+                    "uploads.batch.item_rejected file={FileName} reason={Reason} correlation_id={CorrelationId}",
+                    SanitizeFileNameForLog(file.FileName), ex.GetType().Name, HttpContext.GetCorrelationId());
+
+                // M4 (review 042-v4): a decompression bomb sent via /batch is caught here and
+                // never reaches ExceptionHandlerMiddleware, so the reserved bomb-alert event ops
+                // key on would never fire for the batch vector — the code's own "most likely bomb
+                // vector". Emit the same reserved event (with dimensions) the middleware does.
+                if (ex is DecompressionBombException bomb)
+                    _logger.LogWarning(
+                        "uploads.decompression_bomb.rejected correlation_id={CorrelationId} width={Width} height={Height}",
+                        HttpContext.GetCorrelationId(), bomb.WidthPx, bomb.HeightPx);
+
                 results.Add(new BatchUploadItemResult(file.FileName, null, ex.Message));
             }
         }
@@ -122,6 +150,8 @@ public class UploadsController : ControllerBase
         var (stream, contentType) = await _uploadService.GetPreviewAsync(
             id, userId, guestSessionId, cancellationToken);
 
+        Response.Headers.CacheControl = PreviewCacheControl;
+
         var etag = $"\"{id}-{stream.Length}\"";
         Response.Headers.ETag = etag;
 
@@ -132,5 +162,24 @@ public class UploadsController : ControllerBase
         }
 
         return File(stream, contentType);
+    }
+
+    private const int MaxLoggedFileNameLength = 128;
+
+    // Client filenames are attacker-controlled. Cap the length (log-volume amplification) and
+    // strip control characters (a newline forges a fake log line in plain-text sinks) before
+    // logging (L6, review 042-v4).
+    private static string SanitizeFileNameForLog(string? fileName)
+    {
+        if (string.IsNullOrEmpty(fileName)) return "(none)";
+
+        var capped = fileName.Length > MaxLoggedFileNameLength
+            ? fileName[..MaxLoggedFileNameLength]
+            : fileName;
+
+        var sb = new StringBuilder(capped.Length);
+        foreach (var c in capped)
+            sb.Append(char.IsControl(c) ? '?' : c);
+        return sb.ToString();
     }
 }

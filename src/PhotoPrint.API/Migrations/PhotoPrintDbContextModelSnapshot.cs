@@ -704,6 +704,10 @@ namespace PhotoPrint.API.Migrations
                         .HasMaxLength(260)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ThumbnailPath")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("UploadedAt")
                         .HasColumnType("INTEGER");
 

@@ -293,6 +293,44 @@ public class UploadCleanupJobTests
     }
 
     [Fact]
+    public async Task Cleanup_deletes_cached_thumbnail_file_alongside_original()
+    {
+        // BUG-2 (review 042-v1): a previewed-then-expired upload has a second persistent file
+        // (its cached thumbnail). Cleanup must delete it too, or it leaks on disk forever.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25));
+        upload.ThumbnailPath = "thumbs/owner/thumb.jpg";
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1);
+        errors.Should().Be(0);
+        storageMock.Verify(s => s.DeleteAsync(upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+        storageMock.Verify(s => s.DeleteAsync("thumbs/owner/thumb.jpg", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cleanup_upload_without_thumbnail_only_deletes_original()
+    {
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25)); // ThumbnailPath stays null
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings());
+
+        await InvokeCleanupAsync(job);
+
+        storageMock.Verify(s => s.DeleteAsync(upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+        // No second delete call for a non-existent thumbnail.
+        storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Cleanup_deletes_orphan_upload_past_referenced_window()
     {
         // Upload IS referenced by a cart, but is older than ReferencedRetentionDays —

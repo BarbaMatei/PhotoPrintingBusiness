@@ -115,7 +115,7 @@ import { PricingTier } from '../../core/models/product.model';
               </svg>
             </div>
             <h3 class="step__name">Încarci fotografiile</h3>
-            <p class="step__desc">Selectezi pozele de pe dispozitiv. Acceptăm JPEG, PNG, HEIC – până la 100 fotografii odată.</p>
+            <p class="step__desc">Selectezi pozele de pe dispozitiv. Acceptăm JPEG, PNG – până la 100 fotografii odată.</p>
           </div>
           <div class="step__connector" aria-hidden="true"></div>
           <div class="step">

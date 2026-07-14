@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { GuestAuthService, GuestSessionData } from './guest-auth.service';
+import { AuthService } from './auth.service';
 import { environment } from '../../../environments/environment';
 
 const API_URL = environment.apiUrl;
@@ -67,6 +68,52 @@ describe('GuestAuthService', () => {
       const raw = localStorage.getItem('guestSession');
       expect(raw).not.toBeNull();
       expect(JSON.parse(raw!)).toEqual(data);
+    });
+
+    // F3 (review 042-v8): the anonymous re-init self-heal calls storeSession with a fresh token but
+    // EMPTY contact fields; a blind overwrite wiped the checkout contact info that clearGuestToken
+    // (F2) was fixed to preserve. storeSession must merge — empty incoming fields keep existing.
+    it('preserves existing contact info when re-initing with an empty profile', () => {
+      service.storeSession({
+        guestToken: 'old', firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678',
+      });
+
+      service.storeSession({ guestToken: 'fresh', firstName: '', lastName: '', email: '', phone: '' });
+
+      expect(service.getStoredSession()).toEqual({
+        guestToken: 'fresh', firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678',
+      });
+    });
+
+    it('overwrites contact fields when the caller supplies non-empty values', () => {
+      service.storeSession({
+        guestToken: 'old', firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678',
+      });
+
+      service.storeSession({
+        guestToken: 'fresh', firstName: 'Ion', lastName: 'Ionescu', email: 'ion@y.ro', phone: '0700000000',
+      });
+
+      expect(service.getStoredSession()).toEqual({
+        guestToken: 'fresh', firstName: 'Ion', lastName: 'Ionescu', email: 'ion@y.ro', phone: '0700000000',
+      });
+    });
+
+    // The full F3 scenario end-to-end: a stale-token 401 clears the token (AuthService, keeps
+    // contact — F2), then the self-heal re-inits (GuestAuthService.storeSession with empty contact).
+    // Both services share the `guestSession` key; contact info must survive the whole sequence.
+    it('keeps contact info across the clear-token -> re-init self-heal sequence', () => {
+      const auth = TestBed.inject(AuthService);
+      service.storeSession({
+        guestToken: 'stale', firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678',
+      });
+
+      auth.clearGuestToken();                                             // 401 self-heal: drop token, keep contact
+      service.storeSession({ guestToken: 'fresh', firstName: '', lastName: '', email: '', phone: '' }); // re-init
+
+      expect(service.getStoredSession()).toEqual({
+        guestToken: 'fresh', firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678',
+      });
     });
   });
 

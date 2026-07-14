@@ -16,6 +16,10 @@ public class UploadConfiguration : IEntityTypeConfiguration<Upload>
             .IsRequired()
             .HasMaxLength(512);
 
+        // Nullable cached-thumbnail path (bolt 042) — same length budget as FilePath.
+        builder.Property(u => u.ThumbnailPath)
+            .HasMaxLength(512);
+
         builder.Property(u => u.OriginalFileName)
             .IsRequired()
             .HasMaxLength(260);

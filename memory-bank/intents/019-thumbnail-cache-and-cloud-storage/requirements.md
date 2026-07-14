@@ -63,7 +63,7 @@ priority_score: 18
 - **Related Stories**: US-019-5
 
 ### FR-5: Schema additions
-- **Description**: `Uploads.ThumbnailPath varchar(500) NULL` added.
+- **Description**: `Uploads.ThumbnailPath varchar(512) NULL` added.
 - **Acceptance Criteria**: Migration applies cleanly on Postgres and SQLite.
 - **Priority**: Must
 - **Related Stories**: US-019-6

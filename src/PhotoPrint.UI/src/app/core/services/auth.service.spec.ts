@@ -53,6 +53,29 @@ describe('AuthService', () => {
     expect(service.getGuestToken()).toBe('guest-abc');
   });
 
+  // F2 (review 042-v6): a self-heal on any unauthenticated 401 clears the guest token, but the
+  // token shares the `guestSession` key with checkout contact info. Clearing must drop the token
+  // WITHOUT wiping name/email/phone the user entered at checkout.
+  it('clearGuestToken preserves checkout contact info while dropping the token', () => {
+    localStorage.setItem('guestSession', JSON.stringify({
+      guestToken: 'stale', firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678',
+    }));
+
+    service.clearGuestToken();
+
+    expect(service.getGuestToken()).toBeNull();
+    const remaining = JSON.parse(localStorage.getItem('guestSession')!);
+    expect(remaining).toEqual({ firstName: 'Ana', lastName: 'Pop', email: 'ana@x.ro', phone: '0712345678' });
+  });
+
+  it('clearGuestToken removes the whole entry when it holds only the token', () => {
+    localStorage.setItem('guestSession', JSON.stringify({ guestToken: 'stale', firstName: '', lastName: '', email: '', phone: '' }));
+
+    service.clearGuestToken();
+
+    expect(localStorage.getItem('guestSession')).toBeNull();
+  });
+
   it('setReturnUrl / getReturnUrl round-trips the URL', () => {
     service.setReturnUrl('/checkout');
     expect(service.getReturnUrl()).toBe('/checkout');

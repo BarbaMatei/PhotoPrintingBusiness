@@ -19,6 +19,11 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(BadRequestException)]           = (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(InvalidOrderTransitionException)]= (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(UnprocessableEntityException)]  = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
+        [typeof(DecompressionBombException)]    = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
+        // A decode that slips the pixel-area check but trips ImageSharp's allocation backstop
+        // (Program.cs) throws this, not an ImageFormatException — map it to 422, not a raw 500
+        // (L13, review 042-v4).
+        [typeof(SixLabors.ImageSharp.Memory.InvalidMemoryOperationException)] = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         [typeof(UnsupportedMediaTypeException)] = (StatusCodes.Status415UnsupportedMediaType, "Unsupported Media Type"),
         [typeof(RequestEntityTooLargeException)]= (StatusCodes.Status413RequestEntityTooLarge, "Request Entity Too Large"),
         [typeof(TooManyRequestsException)]      = (StatusCodes.Status429TooManyRequests, "Too Many Requests"),
@@ -45,6 +50,18 @@ public class ExceptionHandlerMiddleware : IMiddleware
         try
         {
             await next(context);
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client disconnected/cancelled mid-request (e.g. navigated away or
+            // reloaded). That's not a server error — the caller is gone, so there's
+            // nothing to return. Emit at Information (not Debug): the Serilog minimum level
+            // is Information in every environment, so a Debug line is filtered out and the
+            // signal is lost entirely (OBS-2, review 042-v1). Distinct low-cardinality event.
+            _logger.LogInformation(
+                "request.client_aborted path={Path} correlation_id={CorrelationId}",
+                context.Request.Path,
+                context.Items["CorrelationId"]?.ToString());
         }
         catch (Exception ex)
         {
@@ -81,6 +98,24 @@ public class ExceptionHandlerMiddleware : IMiddleware
             if (exception is IdempotencyKeyTakenException)
                 _logger.LogWarning(
                     "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
+                    correlationId);
+
+            // OBS-3 (review 042-v1): a rejected decompression bomb 422s like an ordinary
+            // "unreadable image" 422, so ops can't alert on a bomb spike. Emit a distinct
+            // reserved event carrying the offending dimensions (no file data / no PII).
+            if (exception is DecompressionBombException bomb)
+                _logger.LogWarning(
+                    "uploads.decompression_bomb.rejected correlation_id={CorrelationId} source=pixel_guard width={Width} height={Height}",
+                    correlationId, bomb.WidthPx, bomb.HeightPx);
+
+            // F5 (review 042-v6): a bomb that under-reported its dimensions passes the pixel
+            // guard but trips the 512 MB allocator backstop, throwing InvalidMemoryOperationException.
+            // Emit the SAME reserved bomb event so ops alerting on it catch exactly the bombs that
+            // evaded the primary guard — not just a generic "Handled exception" warning. No
+            // dimensions are available here (the decoder never surfaced them); source distinguishes it.
+            if (exception is SixLabors.ImageSharp.Memory.InvalidMemoryOperationException)
+                _logger.LogWarning(
+                    "uploads.decompression_bomb.rejected correlation_id={CorrelationId} source=allocator_backstop",
                     correlationId);
 
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,

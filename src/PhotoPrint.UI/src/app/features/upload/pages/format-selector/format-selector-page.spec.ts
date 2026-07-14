@@ -1,10 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { of, throwError, Subject } from 'rxjs';
 import { FormatSelectorPage } from './format-selector-page';
 import { ProductService } from '../../../../core/services/product.service';
+import { AuthService } from '../../../../core/services/auth.service';
+import { GuestAuthService } from '../../../../core/services/guest-auth.service';
+import { UploadService } from '../../../../core/services/upload.service';
+import { CartService } from '../../../../core/services/cart.service';
 import { Product } from '../../../../core/models/product.model';
-import { UploadState } from '../../../../core/models/upload.model';
+import { UploadState, UploadDto } from '../../../../core/models/upload.model';
 
 const TEST_ROUTES: Routes = [{ path: '**', redirectTo: '' }];
 
@@ -174,5 +179,267 @@ describe('FormatSelectorPage', () => {
   it('sets error message when product not found', async () => {
     await setup(null);
     expect(component.error).toBeTruthy();
+  });
+
+  it('revokes a preview object URL when its upload is removed (C1)', async () => {
+    const revoke = vi.fn();
+    // jsdom may not implement revokeObjectURL — install a stub to observe the call.
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = revoke;
+    const withPreview: UploadState = {
+      clientId: 'c1', file: new File([''], 'p.jpg'), progress: 100, status: 'done',
+      quantity: 1, previewUrl: 'blob:abc',
+    };
+    await setup(MOCK_PRODUCT, 'p1', [withPreview]);
+
+    component.onRemoveUpload('c1');
+
+    expect(revoke).toHaveBeenCalledWith('blob:abc');
+  });
+});
+
+// ── Guest-session self-heal (bolt 042: FE-1, FE-2, FE-4) ──────────────────────
+// These drive the component with mocked auth/upload services so the guest-session
+// dedup and 401 retry paths can be exercised deterministically. ngOnInit is NOT run
+// (no detectChanges), so each test invokes the target method directly.
+describe('FormatSelectorPage — guest-session self-heal', () => {
+  const DTO: UploadDto = {
+    id: 'u1', originalFileName: 'p.jpg', contentType: 'image/jpeg',
+    widthPx: 800, heightPx: 600, fileSizeBytes: 1024, uploadedAt: '',
+  };
+
+  function doneUpload(clientId: string): UploadState {
+    return { clientId, progress: 100, status: 'done', quantity: 1, dto: { ...DTO } };
+  }
+
+  async function setupWithMocks(opts: {
+    auth: Partial<AuthService>;
+    guestAuth: Partial<GuestAuthService>;
+    upload: Partial<UploadService>;
+  }): Promise<FormatSelectorPage> {
+    const productService = { getProduct: vi.fn().mockReturnValue(of(MOCK_PRODUCT)), getCatalog: vi.fn().mockReturnValue(of([])) };
+    await TestBed.configureTestingModule({
+      imports: [FormatSelectorPage],
+      providers: [
+        provideRouter(TEST_ROUTES),
+        { provide: ProductService, useValue: productService },
+        { provide: ActivatedRoute, useValue: makeRoute('p1') },
+        { provide: AuthService, useValue: opts.auth },
+        { provide: GuestAuthService, useValue: opts.guestAuth },
+        { provide: UploadService, useValue: opts.upload },
+        { provide: CartService, useValue: { snapshot: { groups: [] }, setCart: () => of(void 0) } },
+      ],
+    }).compileComponents();
+    return TestBed.createComponent(FormatSelectorPage).componentInstance;
+  }
+
+  it('fails the upload after a persistent 401 without looping (L8)', async () => {
+    // The one-shot !isRetry guard must stop after a single retry even if the retry also 401s —
+    // otherwise it loops, hammering initAnonymousSession and the endpoint.
+    let token: string | null = 'stale';
+    const auth = { isAuthenticated: () => false, getGuestToken: () => token, clearGuestToken: vi.fn(() => { token = null; }) };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = {
+      upload: vi.fn(() => {
+        token = null; // interceptor clears the token on each 401
+        return throwError(() => new HttpErrorResponse({ status: 401 }));
+      }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+
+    c.onFilesAccepted([new File(['x'], 'p.jpg')]);
+
+    expect(upload.upload).toHaveBeenCalledTimes(2);  // initial + exactly one retry, then stop
+    expect(c.uploads()[0].status).toBe('error');
+  });
+
+  it('re-inits after a settled init when the token is still absent (L9)', async () => {
+    // FE-1 dedups concurrent inits via a shared in-flight observable; the finalize() reset must
+    // let a LATER expiry re-init. With a COMPLETING init and the token still null, a second
+    // ensureGuestSession must fire a second init (removing finalize would replay the stale one).
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const c = await setupWithMocks({ auth, guestAuth, upload: {} });
+
+    (c as unknown as { ensureGuestSession(): { subscribe(): void } }).ensureGuestSession().subscribe();
+    (c as unknown as { ensureGuestSession(): { subscribe(): void } }).ensureGuestSession().subscribe();
+
+    expect(guestAuth.initAnonymousSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares one in-flight anonymous-session init across concurrent callers (FE-1)', async () => {
+    const init$ = new Subject<{ guestToken: string }>();
+    const guestAuth = { initAnonymousSession: vi.fn(() => init$.asObservable()), storeSession: vi.fn() };
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const c = await setupWithMocks({ auth, guestAuth, upload: {} });
+
+    (c as unknown as { ensureGuestSession(): { subscribe(): void } }).ensureGuestSession().subscribe();
+    (c as unknown as { ensureGuestSession(): { subscribe(): void } }).ensureGuestSession().subscribe();
+
+    expect(guestAuth.initAnonymousSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-inits a fresh session and retries the upload exactly once after a 401 (FE-2)', async () => {
+    // Model the real flow: the first attempt goes out with a stale token, 401s, and the
+    // errorInterceptor clears the token; on retry ensureGuestSession sees no token and
+    // re-inits. Simulate the interceptor's clear by nulling the token on the 401 so the
+    // re-init path is genuinely exercised (not just the retry wiring).
+    let token: string | null = 'stale';
+    const auth = { isAuthenticated: () => false, getGuestToken: () => token, clearGuestToken: vi.fn(() => { token = null; }) };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    let attempts = 0;
+    const upload = {
+      upload: vi.fn(() => {
+        attempts++;
+        if (attempts === 1) {
+          token = null; // interceptor clears the stale token on the 401
+          return throwError(() => new HttpErrorResponse({ status: 401 }));
+        }
+        return of({ type: 'done' as const, dto: { ...DTO } });
+      }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+
+    c.onFilesAccepted([new File(['x'], 'p.jpg')]);
+
+    expect(upload.upload).toHaveBeenCalledTimes(2);
+    expect(guestAuth.initAnonymousSession).toHaveBeenCalledTimes(1); // re-init actually happened
+    expect(c.uploads()[0].status).toBe('done');
+  });
+
+  it('does not retry a non-401 upload failure (FE-2)', async () => {
+    const auth = { isAuthenticated: () => false, getGuestToken: () => 'tok', clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = { upload: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+
+    c.onFilesAccepted([new File(['x'], 'p.jpg')]);
+
+    expect(upload.upload).toHaveBeenCalledTimes(1);
+    expect(c.uploads()[0].status).toBe('error');
+  });
+
+  it('does not mint a guest session for a logged-in user whose upload 401s (F3)', async () => {
+    // A logged-in user's JWT expires mid-upload. The interceptor logs out + navigates, flipping
+    // isAuthenticated to false (modelled by flipping `authed` on the 401). The component must NOT
+    // then see "not authenticated", re-init as an anonymous guest, and retry — that orphans the
+    // upload from the user's account. No init, no retry — the upload just fails.
+    let authed = true;
+    const auth = { isAuthenticated: () => authed, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = {
+      upload: vi.fn(() => { authed = false; return throwError(() => new HttpErrorResponse({ status: 401 })); }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+
+    c.onFilesAccepted([new File(['x'], 'p.jpg')]);
+
+    expect(upload.upload).toHaveBeenCalledTimes(1);            // no guest retry
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
+    expect(c.uploads()[0].status).toBe('error');
+  });
+
+  it('does not mint a guest session for a logged-in user whose restored preview 401s (F3)', async () => {
+    let authed = true;
+    const auth = { isAuthenticated: () => authed, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = {
+      getPreviewBlob: vi.fn(() => { authed = false; return throwError(() => new HttpErrorResponse({ status: 401 })); }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(1);    // no guest retry
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
+  });
+
+  it('re-inits and retries a restored preview once on 401, keeping the entry (FE-4)', async () => {
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    let n = 0;
+    const upload = {
+      getPreviewBlob: vi.fn(() => {
+        n++;
+        return n === 1 ? throwError(() => new HttpErrorResponse({ status: 401 })) : of('blob:x');
+      }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(2);
+    expect(c.uploads().find(u => u.clientId === 'c1')?.previewUrl).toBe('blob:x');
+  });
+
+  it('drops a restored entry on a 404 without re-init (FE-4)', async () => {
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = { getPreviewBlob: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404 }))) };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();
+  });
+
+  it('drops a restored entry when the retried preview 403s — a new guest session no longer owns it (M8)', async () => {
+    // Long-lived tab, token expired: preview 401 -> interceptor clears -> re-init mints a NEW
+    // session -> retry 403 (new session doesn't own the old upload). The entry must be dropped,
+    // not kept preview-less (which leaves an un-cartable orphan the user carts -> checkout 403).
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    let n = 0;
+    const upload = {
+      getPreviewBlob: vi.fn(() => {
+        n++;
+        return n === 1
+          ? throwError(() => new HttpErrorResponse({ status: 401 }))
+          : throwError(() => new HttpErrorResponse({ status: 403 }));
+      }),
+    };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(2);
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
+  });
+
+  it('drops a restored entry on a persistent 401 after re-init (M8)', async () => {
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = { getPreviewBlob: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 401 }))) };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(upload.getPreviewBlob).toHaveBeenCalledTimes(2);  // initial + one retry, then drop
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeUndefined();
+  });
+
+  it('keeps a restored entry on a transient (non-404) preview error (NEW-2)', async () => {
+    // A 5xx / network blip must NOT erase a completed upload — only a definitive 404 does.
+    const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };
+    const guestAuth = { initAnonymousSession: vi.fn(() => of({ guestToken: 'fresh' })), storeSession: vi.fn() };
+    const upload = { getPreviewBlob: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) };
+    const c = await setupWithMocks({ auth, guestAuth, upload });
+    c.uploads.set([doneUpload('c1')]);
+
+    (c as unknown as { fetchPreviewWithRetry(id: string, cid: string, r: boolean): void })
+      .fetchPreviewWithRetry('u1', 'c1', false);
+
+    expect(c.uploads().find(u => u.clientId === 'c1')).toBeDefined();  // NOT dropped
+    expect(guestAuth.initAnonymousSession).not.toHaveBeenCalled();     // no re-init on a 5xx
   });
 });

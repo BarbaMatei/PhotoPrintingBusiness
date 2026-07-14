@@ -2,7 +2,7 @@
 type: review-system-design
 status: notes to build from — core assumptions still untested
 created: 2026-07-04
-updated: 2026-07-04
+updated: 2026-07-14
 owner: Matei Barba
 extends: README.md
 ---
@@ -70,6 +70,13 @@ What we learned — with honest limits on each lesson:
   the round count on the mixed-up stops — that was wrong.)
 - **Honest limit:** all of this is from one feature, and a payments one. Treat every conclusion
   as "observed once, on payments-like code."
+- **A second datapoint now exists (bolt 042, thumbnails, discovery v1 on 2026-07-13):** one full
+  discovery pass under the committed script — 12 lenses, 110 agents, ~3.5M tokens. The skeptic
+  layer (89% of the agents) caught 2 false positives and downgraded 7 findings out of 49 checked;
+  the rest was corroboration. That calibration is written up in the README's *Cost discipline*
+  section and drove its four token measures (dedup-before-verify, convergence-weighted verify,
+  output caps, read-once codePack). Still zero features have completed the whole loop under the
+  new mechanics.
 
 ## Three assumptions the design stands on — test them before building
 
@@ -117,8 +124,11 @@ the review approach changes materially.
 
 ## Which changes get the loop at all (entry policy)
 
-A full discovery pass is expensive (≈7 lenses + 2 skeptics per finding ≈ 40+ agents), and
-certification needs several. Without an admission rule, a self-driving loop burns that on a
+A full discovery pass is expensive, but there is no fixed price: the manifest decides how many
+lenses run, and the code under review decides how many findings — and therefore skeptics — come
+back. One measured example, not a rule: bolt 042 took 12 lenses + 98 skeptics = 110 agents and
+~3.5M tokens; the README's in-pass dedup + convergence-tiered skeptics shrink the skeptic layer
+on any pass. Whatever a pass costs on a given feature, certification needs several of them. Without an admission rule, a self-driving loop burns that on a
 30-line styling tweak — or gets bypassed ad hoc, which defeats "self-driving." Provisional
 tiers, to be revised once the metrics (below) say what things actually cost and catch:
 
@@ -158,6 +168,8 @@ Rules that keep this honest:
   *different* things means keep going. But the reverse is only weak evidence: two *similar*
   reviewers finding the same things may just share attention habits (assumption 1). Overlap says
   "keep going" reliably; it says "you're done" only as well as the passes are genuinely diverse.
+  And count overlap on non-`hinted` findings only — agreement the shared prompt context planted
+  is not diversity (see the README's convergence caveat).
 
 ### The certification protocol (what "frozen snapshot" means in practice)
 
@@ -183,7 +195,9 @@ folder is not enough. Findings leak through every one of these channels:
 - **commit messages** — the fixer's own contract requires finding IDs in them, so `git log` hands
   a "fresh" reviewer the complete finding history;
 - **test names** — `Should_not_double_charge_when_retried` announces the old bug;
-- code comments left by fixes; PR titles/descriptions; branch names.
+- code comments left by fixes; PR titles/descriptions; branch names;
+- **the codePack** — the source bundle the caller hand-assembles for the discovery script. It
+  must never include `reviews/` content, and the blinding auditor scans it like everything else.
 
 Policy: keep the IDs in commits and the descriptive test names — they're too valuable to give up.
 Instead, a discovery pass's workspace is **the code at the frozen commit with no git history and
@@ -209,8 +223,10 @@ one after another.
   self-reviews its own diff before handing back (fixes caused 2 of bolt 035's 5 out-of-audit
   findings). The README owns the fixer contract; the `/fix-review` skill implements it.
 - **The fixer never grades itself.** A separate verification pass checks each fix.
-- **A reconciler** (the README's name; earlier notes said "comparer") that matches findings
-  across passes — specified below, because it's the piece everything measurable depends on.
+- **A reconciler** (the README now calls it the *ledger reconciler*; earlier notes said
+  "comparer") that matches findings across passes — specified below, because it's the piece
+  everything measurable depends on. Not to be confused with the discovery script's in-pass
+  *dedup agent*, which merges duplicates within a single pass and already exists.
 - **A severity devil's advocate**: after each discovery pass, a separate reviewer takes
   everything classified *below* serious and argues the opposite — "make the case this is
   serious." Anything it makes a plausible case for gets escalated (to serious, or to the human
@@ -219,7 +235,9 @@ one after another.
   suggested action; minors filed to the backlog automatically. With two additions:
   - a **dissent section**, built from raw data rather than the review's self-assessment: the
     new-findings-per-pass trend, lenses that didn't run, borderline severity calls the advocate
-    flagged, known blinding leaks. Reasons to doubt, next to reasons to believe.
+    flagged, findings whose skeptics contradicted each other (the script's `disputed` verdict),
+    convergence that was hint-planted rather than independent (`hinted`), known blinding leaks.
+    Reasons to doubt, next to reasons to believe.
   - the **evidence rule** from the top of this file: every claim links to its test, commit, or
     metric.
 - **Safety default:** the loop asks a person before declaring a feature done — until it has
@@ -236,9 +254,10 @@ re-raised an already-accepted deferral as if it were new).
 **Spec:** *In:* two or more finding lists (file/line, severity, description) plus the code at the
 reviewed commit. *Out:* matched groups with a confidence and a one-line reason per match;
 everything unmatched is new. It also maintains the running ledger per feature (the README's
-"canonical ledger"): every distinct problem ever found, its status, and which passes found it —
-the memory that provides the overlap numbers and lets a pass see a prior decision before
-re-arguing it. **Important nuance from the hand-labeling:** of the 5 times a later pass re-raised
+"canonical ledger", at `reviews/<target>/ledger.md`): every distinct problem ever found, its
+status, and which passes found it — with each pass's convergence count and `hinted` flag, so
+hint-planted agreement doesn't inflate the overlap numbers. This is the memory that provides
+the overlap data and lets a pass see a prior decision before re-arguing it. **Important nuance from the hand-labeling:** of the 5 times a later pass re-raised
 an already-decided item, the re-raise *won* 3 times — the recorded "intentional" or "not a
 finding" call was wrong and the code got better. So the ledger must **link** a re-find to the
 prior decision and hand that context to the pass; it must never auto-suppress the re-find.
@@ -308,27 +327,57 @@ least load-bearing tools in the plan and are built last.
 | 1 | **Reconciler** | skill + hand-labeled bolt-035 eval set | after every discovery pass; during certification; inside the groomer | Everything measurable (overlap, ledger, saturation, dedup) depends on it, and its test data already exists for free |
 | 2 | **Seeded-bug calibration** | skill / workflow script | before building the loop; re-run when the review approach changes | Tests all three core assumptions; turns recall and severity accuracy into numbers; settles breadth-vs-repetition |
 | 3 | **Metrics recorder** | tiny skill, or a stage in the review workflow | every pass, starting with the very next review | Nearly free now, unrecoverable later; the stop-rule hypothesis is untestable without it |
-| 4 | **Blinding auditor** | plain script / pre-pass hook — not an agent | before every discovery pass | Mechanical checks (grep IDs, no `reviews/`, no git history) don't need a model; cheap and strict |
-| 5 | **Severity devil's advocate** | subagent stage in the review workflow | after finders + skeptics, before synthesis | Guards the stop rule's single point of failure |
-| 6 | **Dissent section** | part of the summary stage | every round summary | Partial fix for the shared-brain approval problem; needs metrics (3) to exist |
-| 7 | **Backlog groomer** | skill, run every N features | periodic / on request | Needs the reconciler (1) for cross-feature dedup |
-| 8 | **compress-review + plain-language** | skills | once per finished feature | Most specified, least consequential — last |
+| 4 | **Verification-pass script** | today: the README's written runbook; later a small script or a `/fix-review` handback stage | after every fix batch — the loop's most-run stage | Cheap to build, runs more often than anything else, and its spec is already written (README, *Orchestration flow*); needs metrics (3) for its append step |
+| 5 | **Blinding auditor** | plain script / pre-pass hook — not an agent | before every discovery pass | Mechanical checks (grep IDs, no `reviews/`, no git history, scan the codePack) don't need a model; cheap and strict |
+| 6 | **Severity devil's advocate** | subagent stage in the review workflow | after finders + skeptics, before synthesis | Guards the stop rule's single point of failure |
+| 7 | **Dissent section** | part of the summary stage | every round summary | Partial fix for the shared-brain approval problem; needs metrics (3) to exist |
+| 8 | **Backlog groomer** | skill, run every N features | periodic / on request | Needs the reconciler (1) for cross-feature dedup |
+| 9 | **compress-review + plain-language** | skills | once per finished feature | Most specified, least consequential — last |
 
-**How they extend the existing review workflow** (the README's prototyped `Workflow` script):
+**How they extend the existing review workflow** (the README's committed
+[lib/discovery-review.wf.js](lib/discovery-review.wf.js)):
 
-- *Discovery pass:* blinding audit (4) → fan out manifest lenses → adversarial skeptics →
-  severity advocate (5) → synthesis → reconciler (1) updates the ledger → metrics append (3) →
-  summary with dissent (6).
-- *Verification pass:* fixer (`/fix-review`) → fix-verification → metrics append (3). No blinding,
-  no advocate — it's anchored on purpose.
+- *Discovery pass:* blinding audit (5) → the script (manifest lenses → in-pass dedup →
+  convergence-weighted tiered skeptics) → severity advocate (6) → synthesis → reconciler (1)
+  updates the ledger → metrics append (3) → summary with dissent (7).
+- *Verification pass:* fixer (`/fix-review`) → the README's verification runbook (4)
+  (revert-and-rerun per fix; anchored checkers for judgment items) → metrics append (3). No
+  blinding, no advocate — it's anchored on purpose.
 - *Certification:* the two-parallel-passes protocol above, reconciled by (1), recorded by (3).
-- *Every N features:* groomer (7). *Per finished feature:* compress (8).
+- *Every N features:* groomer (8). *Per finished feature:* compress (9).
+
+### What the 2026-07-13 README/script hardening already delivers for this plan
+
+The README review that landed on 2026-07-13 built pieces this file used to treat as future
+work. Where each one plugs in:
+
+- **In-pass dedup agent + convergence-tiered skeptics** (in the committed script) cut a
+  discovery pass's dominant cost layer — the skeptics were 89% of bolt-042's agents. That
+  directly funds the certification protocol: two parallel discovery passes per round only stay
+  affordable if a single pass is lean.
+- **The `disputed` verdict** (a finding's two skeptics contradict each other) is a ready-made
+  input for the dissent section (7) and the "needs your decision" summary — conflicting
+  evidence is exactly what a person should see, and it now survives synthesis instead of being
+  averaged into "plausible".
+- **The `hinted` flag** is a finding-level guard on assumption 1 (shared-brain convergence):
+  agreement planted by shared prompt context no longer counts as independent agreement. The
+  reconciler (1) must carry it into the ledger so the overlap/saturation math ignores
+  manufactured convergence.
+- **The verification runbook** (README, *Orchestration flow*) codifies the loop's fix-check
+  stage — now tool (4) in the build table; when built it becomes a small script or a
+  `/fix-review` handback stage, and the spec is already written.
+- **The codePack budget** belongs to the scoping stage and hands the blinding auditor (5) one
+  more mechanical check: scan the pack for `reviews/` content and finding-ID strings.
+- **Skeptic-run counts → `cost.agents_by_stage`** extend the metrics recorder (3): the script
+  reports its own stage costs, so recording them is copy-paste and the stop-rule analysis gets
+  per-stage cost curves for free.
 
 ## Honest concerns
 
-1. **Everything still rests on one example** (payments). Now with a concrete remedy instead of a
-   shrug: the seeded-bug experiment, the metrics file, and revisiting the entry-policy tiers once
-   a few more features have real numbers.
+1. **Everything still rests on one and a half examples** (payments end to end; thumbnails
+   mid-loop). Now with a concrete remedy instead of a shrug: the seeded-bug experiment, the
+   metrics file, and revisiting the entry-policy tiers once a few more features have real
+   numbers.
 2. **The human-approval step gets *weaker* over time, by design.** The owner reads only summaries
    and knows less about the code every month — that's the goal, not a bug. But it means approval
    by reading can never be the trust mechanism: the summary is written by the same AI that did
@@ -356,5 +405,6 @@ least load-bearing tools in the plan and are built last.
    2 with a different implanter model and harder seeds** is queued in the results file.
 4. Meanwhile, **review the ready PRs with the current README approach** — every one is another
    real example for checking whether independent reviews settling down actually tracks clean
-   code.
+   code. *Status 2026-07-14: bolt 042 is mid-loop (discovery v1 done, fixes landed, verification
+   pass pending) — the first feature running the new mechanics end to end.*
 5. Then build the loop stages in the order in the table.

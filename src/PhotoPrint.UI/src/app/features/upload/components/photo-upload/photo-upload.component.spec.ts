@@ -74,9 +74,11 @@ describe('PhotoUploadComponent – processFiles', () => {
     expect(accepted.length).toBe(1);
   });
 
-  it('accepts .heic extension', () => {
+  it('rejects .heic extension — no HEIF decoder in the stack (M5)', () => {
     component.processFiles([makeFile('photo.heic')]);
-    expect(accepted.length).toBe(1);
+    expect(accepted.length).toBe(0);
+    expect(rejected.length).toBe(1);
+    expect(rejected[0][0].reason).toBe('type');
   });
 
   it('rejects mixed: type error + valid in same batch', () => {

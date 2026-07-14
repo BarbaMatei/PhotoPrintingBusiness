@@ -27,10 +27,16 @@ var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
 {
     var connStr = builder.Configuration.GetConnectionString("Default");
+    // Default to split queries so multi-collection Includes don't trigger a cartesian
+    // explosion (and silence the MultipleCollectionInclude warning). No effect on the
+    // InMemory provider used in tests.
+    // QUAL-5 (review 042-v1): the split-query option is intentionally repeated in both
+    // arms — the UseSqlite/UseNpgsql calls differ, so a shared helper would save only the
+    // one option line and obscure the provider branch. Not worth extracting.
     if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
-        options.UseSqlite(connStr);
+        options.UseSqlite(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
     else
-        options.UseNpgsql(connStr);
+        options.UseNpgsql(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -78,6 +84,29 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IProductService, PhotoPrint.A
 builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPrint.API.Services.AdminProductService>();
 
 // ── Photo Upload ──────────────────────────────────────────────────────────────
+// Cap ImageSharp's largest single allocation as defence-in-depth against
+// decompression bombs (story 003 AC#1 / REQ-1, review 042-v1). The per-request
+// pixel-area guard (ImageProcessor.ExceedsDecodeLimits) is the primary control;
+// this bounds any decode that slips past it — a 2.5 GB bomb allocation throws
+// InvalidMemoryOperationException instead of OOM-ing the process. 512 MB sits just
+// above a legitimate max-size (100 MP ≈ 400 MB) decode; if the pixel cap
+// (MaxDecodePixels) is raised materially, raise this in step.
+SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
+    SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
+        new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
+
+// Bound concurrent image decodes process-wide (M3, review 042-v4). Each ~100 MP decode is
+// ~400 MB, so an unbounded burst of concurrent first previews can OOM the box even under the
+// per-image caps. The default must bound by memory, not just cores: on a high-core / low-RAM
+// host, ProcessorCount slots × ~400 MB overrun available RAM (F1, review 042-v6). Derive the
+// default from both CPU and the host's available memory; ops can still override via
+// ImageProcessing:MaxConcurrentDecodes.
+var maxConcurrentDecodes = builder.Configuration.GetValue<int?>("ImageProcessing:MaxConcurrentDecodes")
+    ?? PhotoPrint.API.Services.ImageDecodeLimiter.RecommendedMaxConcurrentDecodes(
+           GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
+           Environment.ProcessorCount);
+builder.Services.AddSingleton(new PhotoPrint.API.Services.ImageDecodeLimiter(Math.Max(1, maxConcurrentDecodes)));
+
 builder.Services.Configure<PhotoPrint.API.Configuration.StorageSettings>(
     builder.Configuration.GetSection(PhotoPrint.API.Configuration.StorageSettings.SectionName));
 builder.Services.AddSingleton<PhotoPrint.API.Services.IMimeValidator, PhotoPrint.API.Services.MimeValidator>();
@@ -239,9 +268,13 @@ app.UseSecurityBaselines();      // 4th: HSTS, HTTPS, security headers, CORS, ra
 app.UseResponseCaching();        // 5th: serve cached responses for catalog endpoints
 
 // ── Static SPA assets (D1: combined image serves the built Angular app) ───────
-// No-op when wwwroot is absent (API-only local dev / tests).
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Registered only when wwwroot exists (the production image bundles the SPA there);
+// skipped in API-only local dev / tests so StaticFileMiddleware doesn't warn.
+if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot")))
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 
 app.UseRouting();
 app.UseAuthentication();

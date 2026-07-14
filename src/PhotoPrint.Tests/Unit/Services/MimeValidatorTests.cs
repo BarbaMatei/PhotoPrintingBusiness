@@ -33,14 +33,49 @@ public class MimeValidatorTests
         _sut.DetectMimeType(stream).Should().Be("image/png");
     }
 
-    // ── HEIC ──────────────────────────────────────────────────────────────────
+    // ── HEIC/HEIF — no longer accepted (M5, review 042-v4) ─────────────────────
+    // The stack has no HEIF decoder, so accepting HEIC only buffered+wrote a file that then
+    // failed at decode with a confusing 422. Reject it up front until a decoder is integrated.
 
     [Fact]
-    public void DetectMimeType_HeicFtypBox_ReturnsImageHeic()
+    public void DetectMimeType_HeicFtypBox_ReturnsNull()
     {
         using var stream = new MemoryStream(HeicHeader);
 
-        _sut.DetectMimeType(stream).Should().Be("image/heic");
+        _sut.DetectMimeType(stream).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("mif1")]
+    [InlineData("heix")]
+    [InlineData("msf1")]
+    public void DetectMimeType_HeifBrands_ReturnsNull(string brand)
+    {
+        var header = FtypWithBrand(brand);
+        using var stream = new MemoryStream(header);
+
+        _sut.DetectMimeType(stream).Should().BeNull();
+    }
+
+    // INPUT-1 (review 042-v1): a plain ISO-BMFF container (MP4/MOV/M4A) also starts with
+    // "ftyp" but is NOT a HEIF image; it must be rejected by magic bytes, not accepted and
+    // written to disk only to fail later at decode.
+    [Theory]
+    [InlineData("isom")]  // MP4
+    [InlineData("mp42")]  // MP4
+    [InlineData("qt  ")]  // QuickTime MOV
+    public void DetectMimeType_NonHeifIsoBmffContainer_ReturnsNull(string brand)
+    {
+        var header = FtypWithBrand(brand);
+        using var stream = new MemoryStream(header);
+
+        _sut.DetectMimeType(stream).Should().BeNull();
+    }
+
+    private static byte[] FtypWithBrand(string brand)
+    {
+        var b = System.Text.Encoding.ASCII.GetBytes(brand);
+        return [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, b[0], b[1], b[2], b[3]];
     }
 
     // ── Unknown / rejected ────────────────────────────────────────────────────
