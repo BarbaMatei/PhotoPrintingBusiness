@@ -89,10 +89,28 @@ export class AuthService {
     }
   }
 
-  /** Removes the stored guest session — e.g. after it expires or the server
-   *  rejects it (401), so the app can create a fresh one. */
+  /** Drops the stored guest token after it expires or the server rejects it (401), so the
+   *  app re-inits a fresh session on the next request. Preserves any checkout contact info
+   *  held under the same `guestSession` key (name/email/phone) instead of wiping it — a
+   *  self-heal on an unrelated 401 must not silently discard what the user typed at checkout
+   *  (F2, review 042-v6). Removes the whole entry only when it holds nothing but the token. */
   clearGuestToken(): void {
-    localStorage.removeItem('guestSession');
+    const raw = localStorage.getItem('guestSession');
+    if (!raw) return;
+    let session: Record<string, unknown>;
+    try {
+      session = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      localStorage.removeItem('guestSession');
+      return;
+    }
+    delete session['guestToken'];
+    const hasContactInfo = Object.values(session).some(v => typeof v === 'string' && v.length > 0);
+    if (hasContactInfo) {
+      localStorage.setItem('guestSession', JSON.stringify(session));
+    } else {
+      localStorage.removeItem('guestSession');
+    }
   }
 
   /** Persists the URL the user tried to access before being redirected to login. */
