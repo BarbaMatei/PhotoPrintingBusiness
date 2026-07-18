@@ -37,9 +37,9 @@ public static class PhotoArchiveExtensions
         // via IServiceScopeFactory.CreateScope() per job (matches UploadCleanupJob pattern).
         services.AddScoped<IOrderPhotoPromoter, OrderPhotoPromoter>();
 
-        // The recovery scanner must run before the worker. IHostedServices start in the
-        // order they're registered; AddHostedService<Scanner> first guarantees the channel
-        // is primed by the time the worker begins reading.
+        // Both are BackgroundServices: StartAsync returns before the boot sweep runs, so
+        // registration order no longer sequences them — the channel decouples them (the worker
+        // blocks on ReadAllAsync until the scanner enqueues, whenever that lands).
         services.AddHostedService<PromotionRecoveryScanner>();
         services.AddHostedService<OrderPhotoPromotionWorker>();
 

@@ -1,4 +1,4 @@
-using FluentAssertions;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,9 +14,11 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// Unit tests for <see cref="PromotionRecoveryScanner"/>. The scanner runs once on
-/// host start; these tests cover the four states that matter:
-/// archive disabled, cloud tier off, no work, work found.
+/// Unit tests for <see cref="PromotionRecoveryScanner"/> (periodic since F1, review 043-v3 — the
+/// class sibling of F4's purge-sweep fix). The selection logic is driven through <c>RunSweepAsync</c>
+/// via reflection (matching <see cref="OriginalPurgeRecoveryScanner"/>'s pattern); a separate
+/// <c>ExecuteAsync</c> boot-sweep test proves the periodic wiring actually invokes the sweep, and the
+/// two refusal-guard tests cover archive-disabled / cloud-off.
 /// </summary>
 public class PromotionRecoveryScannerTests
 {
@@ -42,6 +44,13 @@ public class PromotionRecoveryScannerTests
 
     private static IOptions<OrderPhotoArchiveSettings> Settings(bool enabled = true) =>
         Options.Create(new OrderPhotoArchiveSettings { Enabled = enabled });
+
+    private static async Task<int> RunSweepAsync(PromotionRecoveryScanner sut, CancellationToken ct)
+    {
+        var method = typeof(PromotionRecoveryScanner).GetMethod(
+            "RunSweepAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        return await (Task<int>)method!.Invoke(sut, new object[] { ct })!;
+    }
 
     private static Upload SeedUpload(PhotoPrintDbContext db, StorageLocation loc)
     {
@@ -92,8 +101,10 @@ public class PromotionRecoveryScannerTests
         return o;
     }
 
+    // ── ExecuteAsync refusal guards ───────────────────────────────────────────
+
     [Fact]
-    public async Task StartAsync_ArchiveDisabled_DoesNothing()
+    public async Task ExecuteAsync_ArchiveDisabled_DoesNothing()
     {
         using var db = CreateDb();
         var queue = new Mock<IPromotionQueue>();
@@ -102,12 +113,13 @@ public class PromotionRecoveryScannerTests
             Mock.Of<ILogger<PromotionRecoveryScanner>>());
 
         await sut.StartAsync(CancellationToken.None);
+        await sut.StopAsync(CancellationToken.None);
 
         queue.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task StartAsync_CloudTierOff_DoesNothing()
+    public async Task ExecuteAsync_CloudTierOff_DoesNothing()
     {
         using var db = CreateDb();
         var queue = new Mock<IPromotionQueue>();
@@ -116,12 +128,45 @@ public class PromotionRecoveryScannerTests
             Mock.Of<ILogger<PromotionRecoveryScanner>>());
 
         await sut.StartAsync(CancellationToken.None);
+        await sut.StopAsync(CancellationToken.None);
 
         queue.VerifyNoOtherCalls();
     }
 
+    // ── ExecuteAsync happy path — proves the boot sweep is actually wired (F1/F3 class) ──
+
     [Fact]
-    public async Task StartAsync_NoStuckOrders_EnqueuesNothing()
+    public async Task ExecuteAsync_StuckOrder_BootSweepEnqueues()
+    {
+        // Guards the ExecuteAsync → boot-sweep → RunSweepAsync wiring: delete the boot sweep and
+        // this test times out (the enqueue never fires). Mirrors the F3 fix for the purge sibling.
+        using var db = CreateDb();
+        var u = SeedUpload(db, StorageLocation.Local);
+        var order = SeedOrder(db, OrderStatus.Paid, u);
+
+        var enqueued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var queue = new Mock<IPromotionQueue>();
+        queue.Setup(q => q.EnqueueAsync(
+                It.Is<PromotionJob>(j => j.OrderId == order.Id), It.IsAny<CancellationToken>()))
+             .Callback(() => enqueued.TrySetResult())
+             .Returns(ValueTask.CompletedTask);
+        var sut = new PromotionRecoveryScanner(
+            BuildScopes(db), queue.Object, Router(true).Object, Settings(),
+            Mock.Of<ILogger<PromotionRecoveryScanner>>());
+
+        await sut.StartAsync(CancellationToken.None);
+        await enqueued.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.StopAsync(CancellationToken.None);
+
+        queue.Verify(q => q.EnqueueAsync(
+            It.Is<PromotionJob>(j => j.OrderId == order.Id),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── RunSweepAsync selection ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task RunSweep_NoStuckOrders_EnqueuesNothing()
     {
         using var db = CreateDb();
         // One Paid order whose uploads are already Cloud — not stuck.
@@ -133,14 +178,14 @@ public class PromotionRecoveryScannerTests
             BuildScopes(db), queue.Object, Router(true).Object, Settings(),
             Mock.Of<ILogger<PromotionRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         queue.Verify(q => q.EnqueueAsync(It.IsAny<PromotionJob>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task StartAsync_PaidOrderWithLocalUploads_Enqueued()
+    public async Task RunSweep_PaidOrderWithLocalUploads_Enqueued()
     {
         using var db = CreateDb();
         var u = SeedUpload(db, StorageLocation.Local);
@@ -151,7 +196,7 @@ public class PromotionRecoveryScannerTests
             BuildScopes(db), queue.Object, Router(true).Object, Settings(),
             Mock.Of<ILogger<PromotionRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         queue.Verify(q => q.EnqueueAsync(
             It.Is<PromotionJob>(j => j.OrderId == order.Id),
@@ -162,7 +207,7 @@ public class PromotionRecoveryScannerTests
     [InlineData(OrderStatus.Printing)]
     [InlineData(OrderStatus.Shipped)]
     [InlineData(OrderStatus.Delivered)]
-    public async Task StartAsync_PostPaidStatusesAlsoCovered(OrderStatus status)
+    public async Task RunSweep_PostPaidStatusesAlsoCovered(OrderStatus status)
     {
         using var db = CreateDb();
         var u = SeedUpload(db, StorageLocation.Local);
@@ -173,7 +218,7 @@ public class PromotionRecoveryScannerTests
             BuildScopes(db), queue.Object, Router(true).Object, Settings(),
             Mock.Of<ILogger<PromotionRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         queue.Verify(q => q.EnqueueAsync(
             It.Is<PromotionJob>(j => j.OrderId == order.Id),
@@ -184,7 +229,7 @@ public class PromotionRecoveryScannerTests
     [InlineData(OrderStatus.AwaitingPayment)]
     [InlineData(OrderStatus.PaymentFailed)]
     [InlineData(OrderStatus.Cancelled)]
-    public async Task StartAsync_NonPaidStatuses_NotEnqueued(OrderStatus status)
+    public async Task RunSweep_NonPaidStatuses_NotEnqueued(OrderStatus status)
     {
         using var db = CreateDb();
         var u = SeedUpload(db, StorageLocation.Local);
@@ -195,7 +240,7 @@ public class PromotionRecoveryScannerTests
             BuildScopes(db), queue.Object, Router(true).Object, Settings(),
             Mock.Of<ILogger<PromotionRecoveryScanner>>());
 
-        await sut.StartAsync(CancellationToken.None);
+        await RunSweepAsync(sut, CancellationToken.None);
 
         queue.Verify(q => q.EnqueueAsync(It.IsAny<PromotionJob>(), It.IsAny<CancellationToken>()),
             Times.Never);

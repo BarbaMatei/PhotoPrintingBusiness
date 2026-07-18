@@ -8,12 +8,16 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.API.BackgroundJobs;
 
 /// <summary>
-/// Startup self-heal (ADR-010). Runs once during host start; queries orders that are paid
-/// (or beyond) but still have <c>StorageLocation = Local</c> uploads, and re-enqueues each
-/// onto <see cref="IPromotionQueue"/>. Closes the crash window between webhook receipt and
-/// successful promotion.
+/// Self-heal for the promote-on-paid lifecycle (ADR-010). Runs one sweep at boot, then repeats
+/// every <see cref="OrderPhotoArchiveSettings.PromotionRecoverySweepIntervalHours"/>. Each sweep
+/// finds orders that are paid (or beyond) but still have <c>StorageLocation = Local</c> uploads and
+/// re-enqueues each onto <see cref="IPromotionQueue"/>.
+/// <para>Boot-only was insufficient on an always-on server (F1, review 043-v3): a promotion that
+/// exhausts <see cref="OrderPhotoArchiveSettings.MaxAttempts"/> at runtime stays Local, and its
+/// original never reached the durable cloud tier until the next reboot. This mirrors the periodic
+/// treatment F4 gave the purge sibling (<see cref="OriginalPurgeRecoveryScanner"/>).</para>
 /// </summary>
-public class PromotionRecoveryScanner : IHostedService
+public class PromotionRecoveryScanner : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IPromotionQueue _queue;
@@ -35,7 +39,7 @@ public class PromotionRecoveryScanner : IHostedService
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken ct)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!_settings.Enabled)
         {
@@ -50,6 +54,43 @@ public class PromotionRecoveryScanner : IHostedService
             return;
         }
 
+        _logger.LogInformation(
+            "promotion.recovery.started interval_hours={Hours}",
+            _settings.PromotionRecoverySweepIntervalHours);
+
+        // Immediate boot sweep — close the crash window between webhook receipt and successful
+        // promotion, then re-scan periodically for orders whose promotion later went terminal.
+        await SafeSweepAsync("boot", stoppingToken);
+
+        using var timer = new PeriodicTimer(
+            TimeSpan.FromHours(_settings.PromotionRecoverySweepIntervalHours));
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+            await SafeSweepAsync("periodic", stoppingToken);
+
+        _logger.LogInformation("promotion.recovery.stopped");
+    }
+
+    private async Task SafeSweepAsync(string phase, CancellationToken ct)
+    {
+        try
+        {
+            await RunSweepAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Shutdown — stop cleanly.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "promotion.recovery.sweep.error phase={Phase}", phase);
+        }
+    }
+
+    // Re-enqueues every paid-or-beyond order still holding a Local upload. Returns the count.
+    // Enqueue is cheap and the worker's MaxConcurrentOrders bounds real work, so the sweep
+    // enqueues the whole stuck set rather than a batch — a cap would only delay recovery.
+    internal async Task<int> RunSweepAsync(CancellationToken ct)
+    {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
 
@@ -65,11 +106,12 @@ public class PromotionRecoveryScanner : IHostedService
             .ToListAsync(ct);
 
         foreach (var id in stuckIds)
+        {
+            ct.ThrowIfCancellationRequested();
             await _queue.EnqueueAsync(new PromotionJob(id), ct);
+        }
 
-        _logger.LogInformation(
-            "promotion.recovery.enqueued count={Count}", stuckIds.Count);
+        _logger.LogInformation("promotion.recovery.enqueued count={Count}", stuckIds.Count);
+        return stuckIds.Count;
     }
-
-    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
 }

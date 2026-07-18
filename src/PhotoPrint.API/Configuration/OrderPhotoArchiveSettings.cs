@@ -30,6 +30,16 @@ public class OrderPhotoArchiveSettings
     /// last value, so a 7-element schedule extends naturally to attempts beyond the array.
     /// </summary>
     public int[] BackoffSeconds { get; set; } = [30, 120, 300, 900, 3600];
+
+    /// <summary>
+    /// Cadence of the promotion-recovery sweep (<see cref="BackgroundJobs.PromotionRecoveryScanner"/>).
+    /// Default 6 hours: the per-order retry envelope (<see cref="MaxAttempts"/> × backoff) tops out
+    /// in ~1.5h, so a 6h re-scan bounds how long a paid order that went terminal-Local waits before
+    /// it is re-enqueued for another promotion attempt. Boot-only was insufficient on an always-on
+    /// server — its original never reached the durable cloud tier until the next reboot (F1, review
+    /// 043-v3, the class sibling of F4's purge-sweep fix).
+    /// </summary>
+    public int PromotionRecoverySweepIntervalHours { get; set; } = 6;
 }
 
 /// <summary>
@@ -50,6 +60,8 @@ public class OrderPhotoArchiveSettingsValidator : IValidateOptions<OrderPhotoArc
             failures.Add("OrderPhotoArchive:BackoffSeconds must contain at least one entry.");
         else if (options.BackoffSeconds.Any(s => s < 0))
             failures.Add("OrderPhotoArchive:BackoffSeconds values must be ≥ 0.");
+        if (options.PromotionRecoverySweepIntervalHours <= 0)
+            failures.Add("OrderPhotoArchive:PromotionRecoverySweepIntervalHours must be > 0.");
 
         return failures.Count > 0
             ? ValidateOptionsResult.Fail(failures)
