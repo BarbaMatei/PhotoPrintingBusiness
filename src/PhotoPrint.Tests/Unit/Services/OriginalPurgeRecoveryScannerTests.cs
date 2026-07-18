@@ -141,6 +141,34 @@ public class OriginalPurgeRecoveryScannerTests
         purger.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task ExecuteAsync_EnabledCloudOn_BootSweepFiresPurger()
+    {
+        // F3 (review 043-v3): the RunSweep tests all reach the sweep via reflection, and the two
+        // guard tests short-circuit before it — so nothing drove ExecuteAsync's boot sweep. Deleting
+        // the boot-sweep line (or breaking the periodic loop) left the suite green. This test drives
+        // the real ExecuteAsync path: a stuck order must be purged by the boot sweep, or it times out.
+        using var db = CreateDb();
+        var u = SeedUpload(db);  // Cloud + FilePath set → stuck
+        var order = SeedOrder(db, OrderStatus.Shipped, u);
+
+        var fired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var purger = new Mock<IOriginalPurger>();
+        purger.Setup(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()))
+              .Callback(() => fired.TrySetResult())
+              .ReturnsAsync(PurgeOutcome.Empty);
+        var sut = new OriginalPurgeRecoveryScanner(
+            BuildScopes(db, purger.Object), Router(true).Object, Settings("Shipped"),
+            Mock.Of<ILogger<OriginalPurgeRecoveryScanner>>());
+
+        await sut.StartAsync(CancellationToken.None);
+        await fired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.StopAsync(CancellationToken.None);
+
+        purger.Verify(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     // ── RunSweepAsync selection ───────────────────────────────────────────────
 
     [Fact]
