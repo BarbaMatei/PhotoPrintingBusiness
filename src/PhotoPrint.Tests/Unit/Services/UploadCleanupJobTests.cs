@@ -42,6 +42,7 @@ public class UploadCleanupJobTests
         var local = new Mock<IStorageService>();
         var cloud = new Mock<IStorageService>();
         var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true); // this factory provides a cloud store
         router.SetupGet(r => r.Local).Returns(local.Object);
         router.SetupGet(r => r.Cloud).Returns(cloud.Object);
         router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
@@ -52,6 +53,25 @@ public class UploadCleanupJobTests
         services.AddSingleton<IStorageRouter>(router.Object);
         services.AddLogging();
         return (services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), local, cloud);
+    }
+
+    // Cloud tier disabled: For(Cloud) throws exactly as the real StorageRouter does when _cloud is null.
+    private static (IServiceScopeFactory factory, Mock<IStorageService> local)
+        BuildCloudDisabledScopeFactory(PhotoPrintDbContext db)
+    {
+        var local = new Mock<IStorageService>();
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud))
+              .Throws(new InvalidOperationException("Cloud storage is not enabled."));
+
+        var services = new ServiceCollection();
+        services.AddSingleton<PhotoPrintDbContext>(_ => db);
+        services.AddSingleton<IStorageRouter>(router.Object);
+        services.AddLogging();
+        return (services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), local);
     }
 
     private static IOptionsMonitor<UploadCleanupSettings> Settings(
@@ -386,6 +406,34 @@ public class UploadCleanupJobTests
 
         var after = await db.Uploads.FindAsync(upload.Id);
         after!.DeletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Cleanup_cloudRowWithCloudDisabled_skipsItAndStillCleansLocalBatch()
+    {
+        // F2 (review 043-v3): cloud was enabled, an upload was promoted (Cloud), then Storage:Provider
+        // reverted to local. For(Cloud) now throws; before this fix it threw OUTSIDE the per-upload
+        // try, aborting the whole deterministic batch and wedging cleanup (incl. local orphans) every
+        // hour. The unroutable Cloud row must be skipped so the rest of the batch still proceeds.
+        var db = CreateDb();
+        var cloudUpload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400)); // oldest → first in batch
+        cloudUpload.StorageLocation = StorageLocation.Cloud;
+        var localOrphan = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25)); // Local, aged out
+        await db.Uploads.AddRangeAsync(cloudUpload, localOrphan);
+        await db.SaveChangesAsync();
+
+        var (factory, local) = BuildCloudDisabledScopeFactory(db);
+        var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
+            Mock.Of<ILogger<UploadCleanupJob>>());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1); // only the routable local orphan
+        errors.Should().Be(0);
+        local.Verify(s => s.DeleteAsync(localOrphan.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
+
+        (await db.Uploads.FindAsync(localOrphan.Id))!.DeletedAt.Should().NotBeNull();
+        (await db.Uploads.FindAsync(cloudUpload.Id))!.DeletedAt.Should().BeNull(); // skipped, retried later
     }
 
     [Fact]

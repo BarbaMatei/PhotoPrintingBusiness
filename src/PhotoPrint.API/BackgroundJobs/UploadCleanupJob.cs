@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
+using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 
 namespace PhotoPrint.API.BackgroundJobs;
@@ -82,9 +83,21 @@ public class UploadCleanupJob : BackgroundService
             .ToListAsync(ct);
 
         var fileErrors = 0;
+        var unroutable = 0;
 
         foreach (var upload in candidates)
         {
+            // A Cloud-located row with the cloud tier disabled is unroutable: For(Cloud) would
+            // throw here — outside TryDeleteAsync and before SaveChanges — aborting the whole
+            // deterministic batch and wedging cleanup (incl. local orphans) every hour
+            // (F2, review 043-v3). Skip it (no soft-delete) so the batch proceeds; it is retried
+            // when Storage:Provider is set back to S3.
+            if (upload.StorageLocation == StorageLocation.Cloud && !router.CloudEnabled)
+            {
+                unroutable++;
+                continue;
+            }
+
             // Route deletes to the tier that owns this upload's bytes. A promoted (Cloud)
             // upload's blobs live in the object store; resolving the local default no-oped
             // on disk and orphaned the cloud objects with no row left to reclaim them
@@ -111,10 +124,15 @@ public class UploadCleanupJob : BackgroundService
             upload.DeletedAt = now;
         }
 
+        if (unroutable > 0)
+            _logger.LogWarning(
+                "upload.cleanup.unroutable count={Count} reason=cloud-tier-off — Cloud-located uploads cannot be reclaimed while Storage:Provider is local; left for a later sweep",
+                unroutable);
+
         if (candidates.Count > 0)
             await db.SaveChangesAsync(ct);
 
-        return (candidates.Count, fileErrors);
+        return (candidates.Count - unroutable, fileErrors);
     }
 
     // Returns 1 on a delete failure (counted into fileErrors), 0 otherwise. The row is
