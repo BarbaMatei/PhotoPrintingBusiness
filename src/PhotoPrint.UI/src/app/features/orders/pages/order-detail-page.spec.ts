@@ -241,31 +241,78 @@ describe('OrderDetailPage', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.lightbox__backdrop')).toBeNull();
   });
 
-  it('silently empties the photos list when the photos call fails (no navigation)', async () => {
-    // A photos-endpoint failure must NOT redirect the page — the customer still sees their
-    // order detail, with the "no longer available" copy in the photos section.
-    await TestBed.configureTestingModule({
-      imports: [OrderDetailPage],
-      providers: [
-        provideRouter([]),
-        {
-          provide: OrderService,
-          useValue: makeOrderService({
-            getOrderPhotos: vi.fn().mockReturnValue(throwError(() => ({ status: 500 }))),
-          }),
-        },
-      ],
-    }).compileComponents();
-
+  it('shows a photos error + retry (NOT "no longer available") when the photos call fails, without navigating', async () => {
+    // F6/D13 (review 043-v3): a photos-endpoint FAILURE must be distinguished from a genuine empty
+    // result. The old code mapped any error to [] and showed the permanent "no longer available"
+    // copy. It must now show a retryable error, and still not redirect the page.
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(throwError(() => ({ status: 500 }))),
+    });
     router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    fixture = TestBed.createComponent(OrderDetailPage);
-    component = fixture.componentInstance;
-    fixture.componentRef.setInput('orderId', 'order-1');
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Fotografiile nu au putut fi încărcate');
+    expect(el.textContent).not.toContain('nu mai sunt disponibile');
+    expect(el.querySelector('.photos-retry')).not.toBeNull();
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('retries the photos fetch when the retry button is clicked (F6/D13)', async () => {
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(throwError(() => ({ status: 500 })))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('.photos-retry')!.click();
     fixture.detectChanges();
 
-    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2);
+    expect(el.querySelectorAll('.photo-tile').length).toBe(1);
+    expect(el.querySelector('.photos-retry')).toBeNull();
+  });
+
+  it('shows an inline order error + retry (no redirect) on a transient 500 (F16/D32)', async () => {
+    // The strand-a-logged-out-user Medium was refuted; the residual is that a transient/5xx error
+    // must NOT bounce the user to the orders list with no retry.
+    const navigateSpy = await setupWithErrorAndNavigateSpy(500);
+
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Fotografiile pentru această comandă nu mai sunt disponibile');
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(el.querySelector('.order-error')).not.toBeNull();
+    expect(el.textContent).toContain('Comanda nu a putut fi încărcată');
+  });
+
+  it('does NOT navigate on a 401 — leaves it to the auth interceptor (F16/D32)', async () => {
+    const navigateSpy = await setupWithErrorAndNavigateSpy(401);
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an expired lightbox URL on image error and re-points the lightbox (F7/D5b)', async () => {
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'https://cdn/stale' }],
+      }))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'https://cdn/fresh' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.photo-tile')!.click();
+    fixture.detectChanges();
+    expect(component.lightboxSrc()).toBe('https://cdn/stale');
+
+    // The <img> fails to load the expired URL → the lightbox emits (imgError).
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.lightbox__img')!
+      .dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2);
+    expect(component.lightboxSrc()).toBe('https://cdn/fresh');
   });
 });

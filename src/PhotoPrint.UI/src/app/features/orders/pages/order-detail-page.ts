@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { catchError, EMPTY, of } from 'rxjs';
+import { catchError, EMPTY } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
 import { OrderStatusPipe } from '../../../core/pipes/order-status.pipe';
 import { statusClass, isAtLeast } from '../../../core/models/order-status.constants';
@@ -31,6 +31,13 @@ interface StepDef {
     <div class="order-detail-page">
       @if (loading()) {
         <app-spinner label="Se încarcă comanda..." [showLabel]="true" />
+      }
+
+      @if (!loading() && orderError()) {
+        <div class="order-error">
+          <p>Comanda nu a putut fi încărcată.</p>
+          <button type="button" (click)="retryOrder()">Reîncearcă</button>
+        </div>
       }
 
       @if (!loading() && order()) {
@@ -99,6 +106,11 @@ interface StepDef {
 
             @if (photosLoading()) {
               <app-spinner label="Se încarcă fotografiile..." [showLabel]="true" />
+            } @else if (photosError()) {
+              <p class="photos-error">Fotografiile nu au putut fi încărcate.</p>
+              <button type="button" class="photos-retry" (click)="retryPhotos()">
+                Reîncearcă
+              </button>
             } @else if (photos().length === 0) {
               <p class="photos-empty">
                 Fotografiile pentru această comandă nu mai sunt disponibile.
@@ -142,11 +154,13 @@ interface StepDef {
         </div>
       }
 
-      <!-- Lightbox overlay — mounted only when a photo is selected. The large URL
-           is requested by the browser at this point (lazy-load per story 002). -->
+      <!-- Lightbox overlay — mounted only when a photo is selected; the browser fetches the
+           large image bytes then. The presigned URL is minted at list-fetch time, so an expired
+           one (>1h TTL) is refreshed on (imgError) rather than shown broken (F7/D5b). -->
       <app-photo-lightbox
         [src]="lightboxSrc()"
         (close)="lightboxSrc.set(null)"
+        (imgError)="onLightboxError()"
       />
     </div>
   `,
@@ -289,6 +303,25 @@ interface StepDef {
       margin: 0;
     }
 
+    .photos-error { color: #c62828; margin: 0 0 0.5rem; }
+
+    .photos-retry,
+    .order-error button {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4rem 0.9rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .order-error {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #6c757d;
+    }
+
     .photo-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -332,11 +365,15 @@ export class OrderDetailPage implements OnInit {
 
   readonly loading = signal(true);
   readonly order = signal<OrderDetailDto | null>(null);
+  readonly orderError = signal(false);
 
   // Bolt 053: photo archive + lightbox
   readonly photosLoading = signal(true);
   readonly photos = signal<OrderPhotoDto[]>([]);
+  readonly photosError = signal(false);
   readonly lightboxSrc = signal<string | null>(null);
+  private lightboxPhotoId: string | null = null;
+  private lightboxRefreshed = false;
 
   readonly badgeClass = statusClass;
   readonly stepDone = isAtLeast;
@@ -349,13 +386,29 @@ export class OrderDetailPage implements OnInit {
   ];
 
   ngOnInit(): void {
-    const id = this.orderId();
+    this.loadOrder();
+    this.loadPhotos();
+  }
+
+  private loadOrder(): void {
+    this.loading.set(true);
+    this.orderError.set(false);
 
     this.orderService
-      .getOrderDetail(id)
+      .getOrderDetail(this.orderId())
       .pipe(
-        catchError(() => {
-          this.router.navigate(['/comenzile-mele']);
+        catchError((err: { status?: number }) => {
+          const status = err?.status ?? 0;
+          if (status === 403 || status === 404) {
+            // Definitive — not the caller's order / doesn't exist; retrying can't help.
+            this.router.navigate(['/comenzile-mele']);
+          } else if (status !== 401) {
+            // Transient (5xx / network / status 0): keep the user on the page with a retry
+            // instead of bouncing them to the orders list (F16/D32, review 043-v3). A 401 is
+            // left to the auth interceptor's logout -> login redirect — don't override it.
+            this.orderError.set(true);
+          }
+          this.loading.set(false);
           return EMPTY;
         })
       )
@@ -363,19 +416,59 @@ export class OrderDetailPage implements OnInit {
         this.order.set(order);
         this.loading.set(false);
       });
+  }
 
-    // Bolt 053: fetch photos in parallel. A failure here doesn't navigate away —
-    // the empty-state copy ("no longer available") covers it gracefully.
+  retryOrder(): void {
+    this.loadOrder();
+  }
+
+  private loadPhotos(): void {
+    this.photosLoading.set(true);
+    this.photosError.set(false);
+
+    // Bolt 053: fetch photos in parallel; a failure here never navigates away. Distinguish a
+    // fetch FAILURE (retryable) from a genuine empty 200 (F6/D13, review 043-v3) — the old code
+    // mapped any error to [] and showed the permanent "no longer available" copy.
     this.orderService
-      .getOrderPhotos(id)
-      .pipe(catchError(() => of({ photos: [] })))
+      .getOrderPhotos(this.orderId())
+      .pipe(
+        catchError(() => {
+          this.photosError.set(true);
+          this.photosLoading.set(false);
+          return EMPTY;
+        })
+      )
       .subscribe(result => {
         this.photos.set(result.photos);
         this.photosLoading.set(false);
       });
   }
 
+  retryPhotos(): void {
+    this.loadPhotos();
+  }
+
   openLightbox(photo: OrderPhotoDto): void {
+    this.lightboxPhotoId = photo.uploadId;
+    this.lightboxRefreshed = false;
     this.lightboxSrc.set(photo.largeUrl);
+  }
+
+  // The presigned largeUrl has a ~1h TTL captured at list-fetch; if it expired the <img> errors.
+  // Re-fetch once for fresh URLs and re-point the lightbox (F7/D5b, review 043-v3). The guard
+  // prevents a refresh loop if the fresh URL also fails.
+  onLightboxError(): void {
+    if (this.lightboxRefreshed || this.lightboxPhotoId === null) return;
+    this.lightboxRefreshed = true;
+    const photoId = this.lightboxPhotoId;
+
+    this.orderService
+      .getOrderPhotos(this.orderId())
+      .pipe(catchError(() => EMPTY))
+      .subscribe(result => {
+        this.photos.set(result.photos);
+        const fresh = result.photos.find(p => p.uploadId === photoId);
+        if (fresh) this.lightboxSrc.set(fresh.largeUrl);
+      });
   }
 }
