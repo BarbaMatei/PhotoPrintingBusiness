@@ -70,4 +70,18 @@ public class OrderPhotoArchiveSettingsValidatorTests
         result.Failed.Should().BeTrue();
         result.Failures!.Should().ContainMatch("*BackoffSeconds*≥ 0*");
     }
+
+    [Fact]
+    public void Validate_NonPositivePromotionRecoveryInterval_Fails()
+    {
+        // F1 (review 043-v3) added the periodic promotion-recovery sweep; its interval feeds a
+        // PeriodicTimer, so <= 0 must fail fast at boot rather than crash at runtime.
+        var s = Defaults();
+        s.PromotionRecoverySweepIntervalHours = 0;
+
+        var result = _sut.Validate(null, s);
+
+        result.Failed.Should().BeTrue();
+        result.Failures!.Should().ContainMatch("*PromotionRecoverySweepIntervalHours*");
+    }
 }

@@ -91,6 +91,20 @@ public class ArchiveSettingsValidatorTests
         result.Failures!.Should().ContainMatch("*BatchSize*");
     }
 
+    [Fact]
+    public void Validate_NonPositivePurgeSweepInterval_Fails()
+    {
+        // F12 (review 043-v3): the PurgeSweepIntervalHours <= 0 rule shipped without a test, so
+        // dropping it would boot fine and then crash at `new PeriodicTimer(TimeSpan.Zero)` at runtime.
+        var s = Defaults();
+        s.PurgeSweepIntervalHours = 0;
+
+        var result = _sut.Validate(null, s);
+
+        result.Failed.Should().BeTrue();
+        result.Failures!.Should().ContainMatch("*PurgeSweepIntervalHours*");
+    }
+
     // ── IsProductionCompleteStatus + ProductionCompleteFloor helpers ─────────
 
     [Fact]

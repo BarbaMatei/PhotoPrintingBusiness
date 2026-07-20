@@ -253,4 +253,37 @@ public class UploadsControllerTests
 
         result.Should().BeOfType<NotFoundResult>();
     }
+
+    [Fact]
+    public async Task GetPreviewAsync_LocalThumbRegeneratedOnReResolve_Returns200()
+    {
+        // F14 (review 043-v3): the re-resolve can also land back on Local with the thumb
+        // regenerated → 200. Both prior TOCTOU tests make the local read ALWAYS throw, so this
+        // success branch (StreamLocalAsync at UploadsController line 200) was never exercised —
+        // a regression there would ship green.
+        var uploadId = Guid.NewGuid();
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .SetupSequence(s => s.GetPreviewAsync(
+                uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Local, "thumbs/local.jpg"))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Local, "thumbs/local.jpg"));
+
+        var local = new Mock<IStorageService>();
+        local.SetupSequence(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("local thumb gone"))      // first open races a delete
+             .ReturnsAsync(new MemoryStream(new byte[] { 9, 8, 7 }));          // re-resolve: thumb regenerated
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(local.Object);
+
+        var controller = BuildPreviewController(uploadService.Object, router.Object);
+
+        var result = await controller.GetPreviewAsync(uploadId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>()
+              .Which.ContentType.Should().Be("image/jpeg");
+        uploadService.Verify(s => s.GetPreviewAsync(
+            uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
 }

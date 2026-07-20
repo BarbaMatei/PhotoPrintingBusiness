@@ -144,4 +144,43 @@ public class BackfillCommandTests
 
         code.Should().Be(1);
     }
+
+    // ── Filter-parity boundary (F13, review 043-v3) ───────────────────────────
+    // The prior tests seeded only INCLUDED statuses (Paid/Printing), so filter drift that started
+    // promoting excluded statuses shipped green. Pin both sides of the boundary.
+
+    [Theory]
+    [InlineData(OrderStatus.Cancelled)]
+    [InlineData(OrderStatus.PaymentFailed)]
+    [InlineData(OrderStatus.AwaitingPayment)]
+    public async Task RunAsync_ExcludedStatus_IsNotPromoted(OrderStatus status)
+    {
+        // e.g. a drift adding `|| o.Status == Cancelled` would re-promote a refunded order's
+        // purged photos — this asserts excluded statuses are never selected.
+        var promoter = Promoter(new PromotionOutcome(1, 0, 0, 100));
+        using var sp = BuildProvider(Guid.NewGuid().ToString(), cloudEnabled: true, promoter.Object);
+        await SeedLocalUploadOrderAsync(sp, status);
+
+        var code = await BackfillCommand.RunAsync(sp, [], CancellationToken.None);
+
+        code.Should().Be(0); // nothing selected
+        promoter.Verify(p => p.PromoteOrderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Shipped)]
+    [InlineData(OrderStatus.Delivered)]
+    public async Task RunAsync_IncludedPostPaidStatus_IsPromoted(OrderStatus status)
+    {
+        var promoter = Promoter(new PromotionOutcome(1, 0, 0, 100));
+        using var sp = BuildProvider(Guid.NewGuid().ToString(), cloudEnabled: true, promoter.Object);
+        await SeedLocalUploadOrderAsync(sp, status);
+
+        var code = await BackfillCommand.RunAsync(sp, [], CancellationToken.None);
+
+        code.Should().Be(0);
+        promoter.Verify(p => p.PromoteOrderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }
