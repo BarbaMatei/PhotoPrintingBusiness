@@ -128,6 +128,7 @@ interface StepDef {
                       [src]="photo.thumbnailUrl"
                       [alt]="photo.fileName"
                       loading="lazy"
+                      (error)="onThumbnailError()"
                     />
                   </button>
                 }
@@ -373,7 +374,9 @@ export class OrderDetailPage implements OnInit {
   readonly photosError = signal(false);
   readonly lightboxSrc = signal<string | null>(null);
   private lightboxPhotoId: string | null = null;
-  private lightboxRefreshed = false;
+  // One presigned-URL refresh per grid load / per lightbox open — enough to recover an expired URL
+  // without looping if the refreshed URL also fails (F7/D5b).
+  private urlsRefreshed = false;
 
   readonly badgeClass = statusClass;
   readonly stepDone = isAtLeast;
@@ -425,6 +428,7 @@ export class OrderDetailPage implements OnInit {
   private loadPhotos(): void {
     this.photosLoading.set(true);
     this.photosError.set(false);
+    this.urlsRefreshed = false;
 
     // Bolt 053: fetch photos in parallel; a failure here never navigates away. Distinguish a
     // fetch FAILURE (retryable) from a genuine empty 200 (F6/D13, review 043-v3) — the old code
@@ -450,25 +454,36 @@ export class OrderDetailPage implements OnInit {
 
   openLightbox(photo: OrderPhotoDto): void {
     this.lightboxPhotoId = photo.uploadId;
-    this.lightboxRefreshed = false;
+    this.urlsRefreshed = false; // allow one refresh for this open
     this.lightboxSrc.set(photo.largeUrl);
   }
 
-  // The presigned largeUrl has a ~1h TTL captured at list-fetch; if it expired the <img> errors.
-  // Re-fetch once for fresh URLs and re-point the lightbox (F7/D5b, review 043-v3). The guard
-  // prevents a refresh loop if the fresh URL also fails.
+  // Both the grid thumbnails (thumbnailUrl) and the lightbox (largeUrl) hold presigned URLs with a
+  // ~1h TTL captured at list-fetch; an expired one makes the <img> error. Re-fetch once for fresh
+  // URLs — updating photos() re-points every thumbnail, and the open lightbox too (F7/D5b,
+  // review 043-v3). The guard prevents a refresh loop if the fresh URL also fails.
+  onThumbnailError(): void {
+    this.refreshPhotoUrls();
+  }
+
   onLightboxError(): void {
-    if (this.lightboxRefreshed || this.lightboxPhotoId === null) return;
-    this.lightboxRefreshed = true;
-    const photoId = this.lightboxPhotoId;
+    this.refreshPhotoUrls();
+  }
+
+  private refreshPhotoUrls(): void {
+    if (this.urlsRefreshed) return;
+    this.urlsRefreshed = true;
+    const openPhotoId = this.lightboxPhotoId;
 
     this.orderService
       .getOrderPhotos(this.orderId())
       .pipe(catchError(() => EMPTY))
       .subscribe(result => {
         this.photos.set(result.photos);
-        const fresh = result.photos.find(p => p.uploadId === photoId);
-        if (fresh) this.lightboxSrc.set(fresh.largeUrl);
+        if (openPhotoId !== null) {
+          const fresh = result.photos.find(p => p.uploadId === openPhotoId);
+          if (fresh) this.lightboxSrc.set(fresh.largeUrl);
+        }
       });
   }
 }

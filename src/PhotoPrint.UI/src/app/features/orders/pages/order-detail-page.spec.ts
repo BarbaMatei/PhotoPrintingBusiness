@@ -315,4 +315,26 @@ describe('OrderDetailPage', () => {
     expect(getOrderPhotos).toHaveBeenCalledTimes(2);
     expect(component.lightboxSrc()).toBe('https://cdn/fresh');
   });
+
+  it('refreshes photo URLs when a GRID thumbnail image errors (F7/D5b class-sweep)', async () => {
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/stale-t', largeUrl: 'l1' }],
+      }))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/fresh-t', largeUrl: 'l1' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLImageElement>('.photo-tile img')!
+      .dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.photo-tile img')!.getAttribute('src'),
+    ).toBe('https://cdn/fresh-t');
+  });
 });
