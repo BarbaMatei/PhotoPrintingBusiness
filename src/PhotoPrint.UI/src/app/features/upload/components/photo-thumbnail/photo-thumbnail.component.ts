@@ -3,6 +3,7 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnDestroy,
   Output,
   computed,
   input,
@@ -56,11 +57,18 @@ import { computeQuality, qualityLabel, QualityLevel } from '../../../../shared/u
     .thumbnail__error { font-size: 0.7rem; color: #c62828; }
   `],
 })
-export class PhotoThumbnailComponent {
+export class PhotoThumbnailComponent implements OnDestroy {
   @Input({ required: true }) state!: UploadState;
   @Input() selectedSize: ProductSize | null = null;
   @Output() removed = new EventEmitter<string>();
   @Output() preview = new EventEmitter<string>();
+
+  // Object URL is minted ONCE per File and cached. localUrl() is called from the template on
+  // every change-detection cycle (each upload-progress event rebuilds `state`), so calling
+  // URL.createObjectURL there directly leaked a fresh, unrevoked blob URL every tick and churned
+  // the <img> (F8, review 043-v3). Revoked when the File changes or the component is destroyed.
+  private objectUrl: string | null = null;
+  private objectUrlFile: File | null = null;
 
   quality = computed<QualityLevel>(() => {
     if (!this.state.dto || !this.selectedSize) return 'green';
@@ -83,7 +91,19 @@ export class PhotoThumbnailComponent {
   });
 
   localUrl(): string {
-    return this.state.previewUrl ?? URL.createObjectURL(this.state.file!);
+    if (this.state.previewUrl) return this.state.previewUrl;
+
+    const file = this.state.file!;
+    if (this.objectUrl && this.objectUrlFile === file) return this.objectUrl;
+
+    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+    this.objectUrl = URL.createObjectURL(file);
+    this.objectUrlFile = file;
+    return this.objectUrl;
+  }
+
+  ngOnDestroy(): void {
+    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
   }
 
   displayName(): string {
