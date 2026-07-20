@@ -324,7 +324,8 @@ public class UploadServiceTests
     public async Task GetPreviewAsync_CloudUpload_ReturnsCloudLocation()
     {
         // A promoted (Cloud) upload returns Location=Cloud; the controller is responsible
-        // for translating that into a 302 presigned URL.
+        // for translating that into a 302 presigned URL. Cloud tier enabled (the routable case).
+        _routerMock.Setup(r => r.CloudEnabled).Returns(true);
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
         upload.StorageLocation = StorageLocation.Cloud;
@@ -341,6 +342,22 @@ public class UploadServiceTests
 
         loc.Location.Should().Be(StorageLocation.Cloud);
         loc.ThumbnailKey.Should().Be($"thumbs/{upload.Id:N}.jpg");
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CloudUploadWithCloudDisabled_ThrowsNotFound()
+    {
+        // F2/F9 class-sweep (review 043-v3): a Cloud-located upload with the cloud tier disabled
+        // (Storage:Provider reverted to local) is unroutable — For(Cloud) would throw
+        // InvalidOperationException, unmapped -> 500 on the customer preview. Degrade to a clean 404.
+        // The shared setup already has CloudEnabled = false.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        upload.StorageLocation = StorageLocation.Cloud;
+        await _db.SaveChangesAsync();
+
+        await _sut.Invoking(s => s.GetPreviewAsync(upload.Id, userId, guestSessionId: null))
+            .Should().ThrowAsync<NotFoundException>();
     }
 
     // ── GetPreviewAsync — thumbnail caching (bolt 042) ────────────────────────

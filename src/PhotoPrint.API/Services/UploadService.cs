@@ -148,6 +148,16 @@ public class UploadService : IUploadService
         if (!isOwner)
             throw new ForbiddenException("You do not have access to this upload.");
 
+        // A Cloud-located upload with the cloud tier disabled is unroutable: For(Cloud) would throw
+        // InvalidOperationException (unmapped -> 500) on the customer preview path. Degrade to the
+        // same clean 404 as a missing original and signal the misconfiguration for ops. This is the
+        // customer-preview sibling of the F2/F9 cleanup/ZIP guards (review 043-v3).
+        if (upload.StorageLocation == StorageLocation.Cloud && !_router.CloudEnabled)
+        {
+            _logger.LogWarning("uploads.preview.unroutable upload_id={UploadId} reason=cloud-tier-off", uploadId);
+            throw new NotFoundException($"Upload {uploadId} is no longer available.");
+        }
+
         // Route to the adapter that owns this upload's bytes.
         var store = _router.For(upload.StorageLocation);
 
