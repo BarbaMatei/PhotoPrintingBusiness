@@ -133,7 +133,21 @@ public class AdminOrderService : IAdminOrderService
         // ~50–100 ms per upload to this admin PATCH but keeps the lifecycle ordering
         // simple. Self-refuses if the cloud tier is off or archive is disabled.
         if (_archiveSettings.IsProductionCompleteStatus(newStatus))
-            await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+        {
+            // Best-effort, mirroring the cancel path (F4, review 043-v3): the transition is already
+            // committed + emailed + broadcast, so a purge hiccup (transient DB load, client-disconnect
+            // cancellation) must not 500 the PATCH. The periodic recovery sweep backstops a miss.
+            try
+            {
+                await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "production-complete purge failed for order {OrderNumber} — recovery sweep will retry",
+                    order.OrderNumber);
+            }
+        }
 
         return BuildDetailDto(order);
     }
@@ -147,6 +161,19 @@ public class AdminOrderService : IAdminOrderService
                 .ThenInclude(i => i.Upload)
             .FirstOrDefaultAsync(o => o.Id == orderId, ct)
             ?? throw new NotFoundException($"Order {orderId} not found.");
+
+        // Fail before writing any response bytes if the ZIP cannot be produced completely. A
+        // Cloud-located original with the cloud tier disabled is unroutable — For(Cloud) would throw
+        // mid-stream, after the headers + earlier entries are already committed to Response.Body,
+        // handing the admin a truncated ZIP with no clean error (F9, review 043-v3).
+        if (!_storageRouter.CloudEnabled &&
+            order.Items.Any(i => i.Upload?.FilePath is not null &&
+                                 i.Upload.StorageLocation == StorageLocation.Cloud))
+        {
+            throw new InvalidOperationException(
+                $"Order {order.OrderNumber} has cloud-stored originals but the cloud tier is disabled " +
+                "(Storage:Provider=local) — cannot build the fulfilment ZIP.");
+        }
 
         response.ContentType = "application/zip";
         response.Headers.ContentDisposition =

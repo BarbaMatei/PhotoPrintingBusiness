@@ -350,6 +350,27 @@ public class AdminOrderServiceTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task UpdateStatusAsync_ProductionCompletePurgeThrows_TransitionStillCommittedAndNotified()
+    {
+        // F4 (review 043-v3): the production-complete purge is best-effort, like its cancel sibling
+        // (F17). A purge throw must NOT 500 the PATCH after Shipped is already committed + emailed +
+        // broadcast — the recovery sweep backstops it. Removing the try/catch reddens this.
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+        _purger.Setup(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()))
+               .ThrowsAsync(new InvalidOperationException("purge backend unavailable"));
+
+        var result = await _sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null); // must NOT throw
+
+        result.Status.Should().Be("Shipped");
+        (await _db.Orders.FindAsync(order.Id))!.Status.Should().Be(OrderStatus.Shipped);
+        _emailSvc.Verify(e => e.FireOrderShippedEmail(It.IsAny<Order>()), Times.Once);
+        _clientProxy.Verify(c => c.SendCoreAsync(
+            "OrderStatusChanged", It.IsAny<object[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ── StreamZipAsync (F1, review 043-v1) ────────────────────────────────────
 
     [Fact]
@@ -422,6 +443,71 @@ public class AdminOrderServiceTests
 
         _cloudStore.Verify(
             s => s.GetStreamAsync(upload.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task StreamZipAsync_CloudOriginalWithCloudDisabled_FailsBeforeWritingAnyBody()
+    {
+        // F9 (review 043-v3): cloud was reverted to local while a Cloud-located original is
+        // un-purged. For(Cloud) is unroutable. The pre-fix code threw mid-stream — after the ZIP
+        // headers + earlier entries were committed to Response.Body — handing the admin a truncated
+        // ZIP with no clean error. The fix fails BEFORE writing any response byte.
+        var upload = new Upload
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            FilePath = "uploads/2026/05/original.jpg",
+            StorageLocation = StorageLocation.Cloud,
+            OriginalFileName = "photo.jpg",
+            ContentType = "image/jpeg",
+            WidthPx = 800, HeightPx = 600, FileSizeBytes = 4,
+            UploadedAt = DateTimeOffset.UtcNow,
+        };
+        _db.Uploads.Add(upload);
+        var order = new Order
+        {
+            OrderNumber = "FT-ZIP-OFF",
+            Status = OrderStatus.Printing,
+            PaymentProcessor = PaymentProcessor.Stripe,
+            DeliveryType = DeliveryType.Courier,
+            ShippingAddress = DefaultAddress(),
+            SubtotalRon = 10m, ShippingCostRon = 5m, TotalRon = 15m,
+            Items = new List<OrderItem>
+            {
+                new()
+                {
+                    UploadId = upload.Id, Upload = upload,
+                    ProductSnapshot = new ProductSnapshot
+                    {
+                        ProductName = "Foto", Size = "10x15", Finish = "Lucios",
+                    },
+                    Quantity = 1, UnitPriceRon = 10m, LineTotalRon = 10m,
+                }
+            },
+        };
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(_localStore.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(_localStore.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud))
+              .Throws(new InvalidOperationException("Cloud storage is not enabled."));
+        var sut = new AdminOrderService(
+            _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
+            _hub.Object, NullLogger<AdminOrderService>.Instance);
+
+        var httpContext = new DefaultHttpContext();
+        using var body = new MemoryStream();
+        httpContext.Response.Body = body;
+
+        var act = () => sut.StreamZipAsync(order.Id, httpContext.Response);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        body.Length.Should().Be(0);                       // nothing written — no truncated ZIP
+        httpContext.Response.ContentType.Should().BeNull(); // headers never set
     }
 
     // ── CancelOrderAsync ──────────────────────────────────────────────────────
@@ -527,6 +613,23 @@ public class AdminOrderServiceTests
         _purger.Verify(
             p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelOrderAsync_PurgeThrows_OrderStillCancelledAndExceptionSwallowed()
+    {
+        // F5 (review 043-v3): the purge-on-cancel try/catch (F17) must keep a purge failure from
+        // failing the already-committed cancel + refund. Removing the try/catch reddens this.
+        var order = await SeedOrderAsync(OrderStatus.Paid);
+        _purger.Setup(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()))
+               .ThrowsAsync(new InvalidOperationException("purge backend unavailable"));
+
+        var result = await _sut.CancelOrderAsync(order.Id, null); // must NOT throw
+
+        result.Status.Should().Be("Cancelled");
+        (await _db.Orders.FindAsync(order.Id))!.Status.Should().Be(OrderStatus.Cancelled);
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
