@@ -84,10 +84,17 @@ be batched):
    the class; if you deliberately fix only the instance, say why in the note. For doc
    drift the unit of fix is the stale token repo-wide, never just the file the finding
    cited.
-3. **Escalate design changes.** If the fix changes a key scheme, concurrency model,
-   resource budget, or retry semantics, it is a design, not a patch: before implementing,
-   dispatch one adversarial agent (race/resource lens as fits) against the proposed
-   approach and fold in what it finds.
+3. **Escalate design changes and new mechanisms — MANDATORY, trigger-list based.** If the
+   fix changes a key scheme, concurrency model, resource budget, or retry semantics, OR
+   adds/converts any of: a background job / timer / periodic sweep, a cache, a retry/backoff,
+   an event, a limiter, a catch/mapping layer, a refresh/self-heal or other UI state
+   machine — it is a design, not a patch. BEFORE implementing, dispatch one adversarial
+   agent (~20k tokens; race/resource/frontend lens as fits) against the proposed approach,
+   fold in what it finds, and record in the resolution note that the check ran and what it
+   flagged. This is a trigger list, not a judgment call: on 043, the two fix clusters that
+   skipped it (a boot-sweep→periodic conversion; a frontend URL-refresh state machine)
+   generated 8 findings across the next two delta passes — ~3M tokens of review to find
+   what the ~20k check names up front.
 4. **Test-first for behavioral findings.** Follow the repo's test conventions (if a
    test-driven-development skill or `CLAUDE.md` rule applies, obey it). Write the
    regression test the review called for — the concurrency case, the cross-tenant case,
@@ -159,7 +166,10 @@ Update `reviews/index.md`'s Status column for the target (`open → in-progress/
 
 - Immutable review file — respond in the resolution, never edit the review.
 - Class sweep before every fix; doc drift is fixed token-wide, not file-wide.
-- Design-level fixes get an adversarial approach-check before implementation.
+- Design-level AND mechanism-adding fixes get an adversarial approach-check before
+  implementation — mandatory on the trigger list (background job/timer/sweep, cache,
+  retry, event, limiter, catch/mapping, UI state machine, key scheme, concurrency model,
+  resource budget), recorded in the note.
 - Mechanism-adding fixes ship at feature grade and name their new surface in the note.
 - Regression test before claiming a behavioral finding fixed.
 - Blocker-first ordering.

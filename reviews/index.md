@@ -35,4 +35,10 @@ Findings column is H / M / L / Cleanup. Status tracks the resolution loop: `open
 - ~~Encode the lens fan-out as a `Workflow` script~~ **done** → [lib/discovery-review.wf.js](lib/discovery-review.wf.js) (generic lenses + args-driven scope + severity-tiered skeptics; main agent still does scoping + synthesis).
 - Add a reusable DB/migration-parity lens (dual SQLite/Postgres is a recurring risk here).
 - Auto-append findings as inline PR comments once `gh` is available in the environment.
+- **2026-07-22 recalibration** (from the 043 data: 5 passes / ~4.9M tok; ~75 skeptics refuted 2
+  findings; both deltas 2–3× over the 400–600k budget; every v3/v5 medium fix-generated):
+  severity-based **stop rule** + delta-worthiness gate in the router (README) · **delta skeptic
+  tiers + 5-lens cap + `tokenBudget` guard** ([lib/discovery-review.wf.js](lib/discovery-review.wf.js)) ·
+  **mandatory approach-check trigger list** for mechanism/design fixes (`/fix-review` step 3) ·
+  periodic-mechanism bar added to `definition-of-done.md` class 12.
 - **Redesign codePack (#4).** Authoring a ~25k-token pack into the workflow `args` is impractical (the main agent would emit it verbatim) and a path-based pack forces every agent to over-read. Options: a prep sub-agent that builds+caches the pack, or drop #4 and rely on targeted per-lens reading (what v4 did). (Harness quirk found in v4: `args` arrives as a JSON *string* — the script now `JSON.parse`s it defensively.)

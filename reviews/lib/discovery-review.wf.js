@@ -23,10 +23,12 @@ export const meta = {
 //   5. Workflow({ scriptPath: 'reviews/lib/discovery-review.wf.js', args: {
 //        target, repoRoot, scope, changedFiles, backendDiff, frontendDiff?, specDocs?, lenses?,
 //        codePackPath? (or codePack?), decidedFindings?, passType? ('delta' = scope lenses to the
-//        diff since the last full pass), allowBare? (skip the no-args-bound abort)
+//        diff since the last full pass), tokenBudget? (output-token cap; delta defaults to 600k,
+//        0 = uncapped), allowBare? (skip the no-args-bound abort)
 //      }})
 //   Returns [{lens, overall, findings:[...]}] where each finding carries: verdict (confirmed |
-//   plausible | refuted | disputed | unverified-cleanup | re-raise), convergence, hinted, agreeingLenses,
+//   plausible | refuted | disputed | unverified-cleanup | unverified-low | unverified-over-budget |
+//   re-raise), convergence, hinted, agreeingLenses,
 //   guardEvidence, traceEvidence. The '_canonical' overall line reports skeptic-run counts for
 //   the metrics entry (cost.agents_by_stage). The main agent then synthesizes.
 //
@@ -65,6 +67,13 @@ const CODEPACK = a.codePack || ''
 const CODEPACK_PATH = a.codePackPath || ''
 const DECIDED = Array.isArray(a.decidedFindings) ? a.decidedFindings : []
 const PASSTYPE = a.passType === 'delta' ? 'delta' : 'full'
+
+// Budget guard (2026-07-22): both 043 deltas blew the README's 400-600k budget 2-3x. Delta passes
+// default to a 600k output-token cap; past it, remaining skeptics are skipped (verdict
+// 'unverified-over-budget', logged). Pass tokenBudget to override; 0 = uncapped (full passes' default).
+const TOKEN_BUDGET = a.tokenBudget !== undefined ? Number(a.tokenBudget) || 0 : (PASSTYPE === 'delta' ? 600000 : 0)
+const SPENT_AT_START = budget.spent()
+const used = () => budget.spent() - SPENT_AT_START
 
 const DEFAULT_LENSES = ['correctness', 'security', 'requirements', 'quality', 'tests-coverage', 'completeness-critic']
 const SELECTED = Array.isArray(a.lenses) && a.lenses.length ? a.lenses : DEFAULT_LENSES
@@ -246,7 +255,7 @@ FINDING — ${f.title}
   failure scenario: ${f.failureScenario}
 Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/. Keep your answer <= 80 words.`
 
-let guardRuns = 0, traceRuns = 0, reraiseSkips = 0
+let guardRuns = 0, traceRuns = 0, reraiseSkips = 0, budgetSkips = 0
 const guardAgent = (f, i) => {
   guardRuns++
   return agent(findingCtx(f) + `\n\nROLE: skeptic — hunt for an EXISTING guard/check/invariant that already PREVENTS this. guardExists=true only for a genuine guard (with file:line); a partial guard that misses THIS case is false.`,
@@ -269,6 +278,26 @@ async function verifyFinding(f, i) {
   }
   if (f.severity === 'cleanup') {
     return { ...f, verdict: 'unverified-cleanup', guardEvidence: '(cleanup — not verified)', traceEvidence: '(cleanup — not verified)' }
+  }
+  // Budget guard: past the cap the lens verdict stands unchallenged (not a refutation).
+  if (TOKEN_BUDGET && used() > TOKEN_BUDGET) {
+    budgetSkips++
+    return { ...f, verdict: 'unverified-over-budget', guardEvidence: `(tokenBudget ${TOKEN_BUDGET} exceeded — skeptic skipped)`, traceEvidence: '(unchallenged lens verdict, not a refutation)' }
+  }
+  // Delta tiers (2026-07-22 — 043 calibration: ~75 skeptics across v1/v3/v5 refuted 2 findings):
+  // lows unchallenged, strong non-hinted agreement accepted, high/medium get ONE trace
+  // (escalate to a guard-hunt only if no trace builds). Full passes keep the tiers below.
+  if (PASSTYPE === 'delta') {
+    if (f.severity === 'low') {
+      return { ...f, verdict: 'unverified-low', guardEvidence: '(delta: low — skeptics skipped)', traceEvidence: '(unchallenged lens verdict, not a refutation)' }
+    }
+    if (f.convergence >= 3 && !f.hinted) {
+      return { ...f, verdict: 'confirmed', guardEvidence: `(delta: ${f.convergence}-lens independent agreement accepted without skeptic)`, traceEvidence: '(convergence is the precision signal)' }
+    }
+    const trace = await traceAgent(f, i)
+    if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(delta: guard-hunt skipped; trace built)', traceEvidence: trace.trace }
+    const guard = await guardAgent(f, i)
+    return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
   }
   // Strong cross-lens agreement is itself the precision signal: one anti-groupthink guard-hunt,
   // escalate to a trace only if it surprisingly claims a guard (contradicting the crowd).
@@ -299,6 +328,12 @@ const SEV_RANK = { high: 3, medium: 2, low: 1, cleanup: 0 }
 // ── Phase 1: Discovery (barrier so we can dedup across all lenses) ─────────────
 const lensDefs = SELECTED.map(key => ({ key, focus: LENS_LIBRARY[key] })).filter(l => l.focus)
 if (!lensDefs.length) { log('No valid lenses selected; nothing to do.'); return [] }
+// Delta lens cap (2026-07-22): both 043 deltas ran 6-7 lenses and blew the 400-600k budget 2-3x.
+// Callers order args.lenses by priority; the overflow is dropped LOUDLY, never silently.
+if (PASSTYPE === 'delta' && lensDefs.length > 5) {
+  const dropped = lensDefs.splice(5).map(l => l.key)
+  log(`DELTA LENS CAP: keeping the first 5 lenses [${lensDefs.map(l => l.key).join(', ')}]; dropped [${dropped.join(', ')}] — order args.lenses by priority.`)
+}
 log(`Discovery review of ${TARGET}: ${lensDefs.length} lenses -> reconcile -> convergence-weighted verify.`)
 
 const lensResults = await parallel(lensDefs.map(lens => () =>
@@ -343,13 +378,16 @@ for (const f of flat) if (!seen.has(f.id)) canonical.push({ ...f, hinted: false,
 log(`Deduped ${flat.length} raw findings -> ${canonical.length} canonical (max convergence ${Math.max(...canonical.map(c => c.convergence))}; ${canonical.filter(c => c.matchesDecided).length} re-raises of decided items).`)
 
 // ── Phase 3: Verify canonical findings (convergence-weighted) ─────────────────
+// Severity-descending so highs claim concurrency slots (and any tokenBudget headroom) first —
+// if the budget cap trips mid-phase, it sheds lows, not highs.
+canonical.sort((x, y) => SEV_RANK[y.severity] - SEV_RANK[x.severity])
 const verified = await parallel(canonical.map((f, i) => () => verifyFinding(f, i)))
 
 const flatTwoPer = 2 * canonical.filter(c => c.severity !== 'cleanup').length
-log(`Verify done: ${guardRuns} guard + ${traceRuns} trace skeptic runs, ${reraiseSkips} decided re-raises skipped (flat 2-per-finding would be ${flatTwoPer}).`)
+log(`Verify done: ${guardRuns} guard + ${traceRuns} trace skeptic runs, ${reraiseSkips} decided re-raises skipped, ${budgetSkips} budget-skipped (flat 2-per-finding would be ${flatTwoPer}).${TOKEN_BUDGET ? ` Budget: ~${used()} of ${TOKEN_BUDGET} output tokens.` : ''}`)
 
 // Return grouped back under a single synthesized lens bucket + keep per-lens overalls for context.
 return [
-  { lens: '_canonical', overall: `Deduped ${flat.length} raw findings across ${lensDefs.length} lenses into ${canonical.length}. Skeptic runs: ${guardRuns} guard + ${traceRuns} trace (flat 2-per-finding: ${flatTwoPer}); ${reraiseSkips} decided re-raises skipped skeptics — record as cost.agents_by_stage.`, findings: verified.filter(Boolean) },
+  { lens: '_canonical', overall: `Deduped ${flat.length} raw findings across ${lensDefs.length} lenses into ${canonical.length}. Skeptic runs: ${guardRuns} guard + ${traceRuns} trace (flat 2-per-finding: ${flatTwoPer}); ${reraiseSkips} decided re-raises + ${budgetSkips} budget-capped skipped skeptics — record as cost.agents_by_stage.`, findings: verified.filter(Boolean) },
   ...lensResults.filter(Boolean).map(lr => ({ lens: lr.lens, overall: lr.r?.overall || '', findings: [] })),
 ]

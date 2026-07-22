@@ -104,8 +104,14 @@ wipe state the user typed. In-flight request dedup for shared async init. *(042'
 self-heal family — D11–D14, D48, D63, D72–D74, D86, D94 — the single most re-found cluster.)*
 
 **12. Recovery liveness.** Recovery/sweep mechanisms state whether they run boot-only or
-periodically, and the staleness window is a written decision, not an accident. *(043 F4: the
-purge scanner ran at boot only — a stuck order waited for the next deploy.)*
+periodically, and the staleness window is a written decision, not an accident. A *periodic*
+mechanism additionally ships with: a testable time seam (`TimeSpan`/`TimeProvider` — an
+hours-only interval makes the loop untestable), dedup against work already in flight or queued,
+a give-up marker for permanently-terminal items (no perpetual re-enqueue), and stated
+boot-vs-runtime config semantics (which settings need a restart). *(043 F4: the purge scanner
+ran at boot only — a stuck order waited for the next deploy. 043 D35/D37/D46/D47: one
+boot→periodic conversion shipped without the four extras above = four findings and a
+1.1M-token delta pass to surface them.)*
 
 ---
 

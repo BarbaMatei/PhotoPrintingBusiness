@@ -2,7 +2,7 @@
 type: review-system-design
 status: notes to build from — core assumptions still untested
 created: 2026-07-04
-updated: 2026-07-14
+updated: 2026-07-22
 owner: Matei Barba
 extends: README.md
 ---
@@ -216,7 +216,11 @@ one after another.
   looks at the whole feature — run rarely; and a quick, anchored one that checks a specific fix —
   run per fix. The README owns the full contract for both. *(2026-07-14: the README added a third,
   middle tier — **delta discovery**, blinded lenses over the diff since the last full pass, run
-  after each fix round; full passes now run only first and at certification. The README owns it.)*
+  after each fix round; full passes now run only first and at certification. The README owns it.
+  2026-07-22, from the 043 cost data: delta now runs only after **delta-worthy** fix rounds — a 🔴
+  fix, a new/converted mechanism, or a design change; patch-grade rounds exit on verification +
+  the fixer's micro-review, minor findings go to the ledger backlog. That implements this file's
+  severity-based stop — see the README's router + stop rule.)*
 - **Front-load breadth** using the README's **lens manifest** — the checklist that maps what the
   change touches (a migration, a second provider, money, concurrency…) to which specialists must
   run. This helps; whether it's the *biggest* lever or repetition matters more is exactly what
