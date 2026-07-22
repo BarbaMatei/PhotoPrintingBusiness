@@ -25,8 +25,10 @@ stop rule, README 2026-07-22); `wont-fix` = decision upheld. v4 flipped D13/D5b/
 fixables to `verified` and upheld the 4 deferrals; **v5 added D36–D48 (13 new, all fix-generative)
 and corroborated D35**. **resolution-v5** then fixed the two recommended Mediums (**D36, D38**),
 deferred **cluster A (D35/D37/D46/D47)** to bolt-035 as one design item, and sent the Low/Cleanup
-tail (**D39–D45, D48**) to **backlog**. Current open population awaiting the v6 verification: **D36,
-D38** (fixed → to be verified). 0 High, 0 blockers.
+tail (**D39–D45, D48**) to **backlog**. **v6 (independent verification, 2026-07-22) verified
+D36 + D38** non-vacuously (revert-and-rerun, clean single-test attribution, green on restore; 0
+regression; all 12 deferred/backlog items upheld). No open findings remain from the v5 population;
+the fix→verify loop is **quiet**. 0 High, 0 blockers.
 
 | D# | First seen | Sev (v1) | Status (through v2) | Title |
 |----|-----------|----------|--------|-------|
@@ -66,9 +68,9 @@ D38** (fixed → to be verified). 0 High, 0 blockers.
 | D33 | v3 · F17 | 🟡 Low | **verified** (v4 · F17) | Lightbox modal lacks focus trap / `role=dialog` / `aria-modal` / focus restore (a11y — first-time frontend coverage) |
 | D34 | v3 · F18 | 🟡 Low | **deferred** (latent) *(upheld v4)* | order-detail loads only in `ngOnInit` despite route-bound `orderId` input → stale on a future detail→detail reuse |
 | D35 | v4 · NF1 | 🟡 Low | **deferred** → bolt-035 *(cluster A; with D9/D27)* | F1's periodic promotion sweep has **no in-flight/queued dedup** (worker uses a plain `List<Task>`, `MaxConcurrentOrders=4`; promoter never re-reads live state before its row-flip) → the sweep can spawn a second concurrent promotion of one order and hit the [[D27]] orphan race **without** duplicate webhooks. v5's blinded race lens independently re-found the dedup gap (added consequence: a spurious `promotion.upload.failed reason=local-original-missing` + wasted retry). Folds into the D27/D9 concurrency-token fix (bolt-035) |
-| D36 | v5 · F1 | 🟠 Med | **fixed** (resolution-v5 @2d02b13) *(regression — F7 fix, conv 4)* | Stale `lightboxPhotoId` (never cleared on close) makes `refreshPhotoUrls` **re-open a closed lightbox** when a grid/lightbox thumbnail's expired presigned URL fires `(error)`. 4 lenses converged |
+| D36 | v5 · F1 | 🟠 Med | **verified** (v6 @2d02b13) *(regression — F7 fix, conv 4)* | Stale `lightboxPhotoId` (never cleared on close) makes `refreshPhotoUrls` **re-open a closed lightbox** when a grid/lightbox thumbnail's expired presigned URL fires `(error)`. 4 lenses converged |
 | D37 | v5 · F3 | 🟠 Med | **deferred** → bolt-035 *(cluster A)* | F1's periodic re-scan (its whole purpose) is **untested + untestable** — only the boot sweep is tested; delete the `PeriodicTimer` loop and the suite stays green; interval is whole-hours so no fast periodic test. Wants a `TimeSpan`/`TimeProvider` seam |
-| D38 | v5 · F2 | 🟠 Med | **fixed** (resolution-v5 @036ba05) *(F2 fix edge)* | Unroutable-Cloud cleanup skip is **post-fetch**, so ≥500 aged Cloud rows re-fill the deterministic batch every sweep and **starve local-orphan cleanup indefinitely** — the "later sweep" comment is wrong. Needs a query-level `WHERE` filter |
+| D38 | v5 · F2 | 🟠 Med | **verified** (v6 @036ba05) *(F2 fix edge)* | Unroutable-Cloud cleanup skip is **post-fetch**, so ≥500 aged Cloud rows re-fill the deterministic batch every sweep and **starve local-orphan cleanup indefinitely** — the "later sweep" comment is wrong. Needs a query-level `WHERE` filter |
 | D39 | v5 · F13 | 🟡 Low | **backlog** *(F1 test quality)* | Renamed `ExecuteAsync_ArchiveDisabled/_CloudTierOff` guard tests seed an **empty DB** → guard removal enqueues nothing anyway → `VerifyNoOtherCalls()` passes for the wrong reason. Seed a stuck Paid+Local order |
 | D40 | v5 · F11 | 🟡 Low | **backlog** *(F7 coverage)* | Anti-refresh-loop guard (`urlsRefreshed`) untested — no spec dispatches a *second* img `(error)` to assert no third `getOrderPhotos` fetch |
 | D41 | v5 · F12 | 🟡 Low | **backlog** *(F17 coverage)* | Lightbox focus-trap (`trapFocus` Tab/Shift+Tab `preventDefault` + refocus) has no spec — drop `preventDefault` and Tab escapes the modal, no test reddens |
