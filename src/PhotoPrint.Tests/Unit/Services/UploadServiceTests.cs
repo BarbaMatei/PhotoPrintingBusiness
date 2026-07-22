@@ -93,7 +93,25 @@ public class UploadServiceTests
             pdfStream, "file.pdf", declaredLength: 100L,
             userId: Guid.NewGuid(), guestSessionId: null);
 
-        await act.Should().ThrowAsync<UnsupportedMediaTypeException>();
+        // The copy must not advertise HEIC — dropped end-to-end in bolt 042 (M5); the stale
+        // promise was reintroduced here (D54, review 043-v7).
+        await act.Should().ThrowAsync<UnsupportedMediaTypeException>()
+            .WithMessage("Only JPEG and PNG files are accepted.");
+    }
+
+    [Fact]
+    public async Task UploadAsync_OverlongFileName_IsTruncatedToColumnLength()
+    {
+        // D55 (review 043-v7): HasMaxLength(260) sizes the column but never truncates — an
+        // over-length client filename passed InMemory/SQLite tests yet failed on prod
+        // Postgres with a 22001 string-truncation -> 500. Truncate at the service boundary.
+        var longName = new string('a', 300) + ".jpg";
+
+        var dto = await _sut.UploadAsync(
+            JpegStream(), longName, declaredLength: 100L,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        dto.OriginalFileName.Length.Should().Be(260);
     }
 
     [Fact]

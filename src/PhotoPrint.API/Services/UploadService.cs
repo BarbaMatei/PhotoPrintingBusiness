@@ -10,6 +10,15 @@ public class UploadService : IUploadService
 {
     private const long MaxFileSizeBytes = 52_428_800L; // 50 MB
     private const int MaxUploadsPerSession = 100;
+    private const int MaxOriginalFileNameLength = 260; // UploadConfiguration HasMaxLength(260)
+
+    private static string SanitizeFileName(string originalFileName)
+    {
+        if (string.IsNullOrEmpty(originalFileName))
+            return originalFileName;
+        var name = originalFileName[(originalFileName.LastIndexOfAny(new[] { '/', '\\' }) + 1)..];
+        return name.Length <= MaxOriginalFileNameLength ? name : name[..MaxOriginalFileNameLength];
+    }
 
     private readonly IStorageRouter _router;
     private readonly IMimeValidator _mimeValidator;
@@ -49,7 +58,7 @@ public class UploadService : IUploadService
         var mimeType = _mimeValidator.DetectMimeType(fileStream);
         if (mimeType is null)
             throw new UnsupportedMediaTypeException(
-                "Only JPEG, PNG, and HEIC files are accepted.");
+                "Only JPEG and PNG files are accepted.");
 
         var ownerId = userId ?? guestSessionId
             ?? throw new BadRequestException("Request must be authenticated or carry a guest token.");
@@ -69,7 +78,6 @@ public class UploadService : IUploadService
         {
             "image/jpeg" => "jpg",
             "image/png"  => "png",
-            "image/heic" => "heic",
             _            => "bin",
         };
 
@@ -110,9 +118,10 @@ public class UploadService : IUploadService
             // Strip any directory component OS-independently. Path.GetFileName only treats
             // '\' as a separator on Windows, so on the Linux server a crafted name like
             // "C:\evil\x.jpg" would pass through unsanitised — strip both '/' and '\'.
-            OriginalFileName = string.IsNullOrEmpty(originalFileName)
-                ? originalFileName
-                : originalFileName[(originalFileName.LastIndexOfAny(new[] { '/', '\\' }) + 1)..],
+            // Then cap to the column length: HasMaxLength(260) sizes the column but never
+            // truncates, so an over-length name 201s on InMemory/SQLite yet 22001-500s on
+            // prod Postgres (D55, review 043-v7).
+            OriginalFileName = SanitizeFileName(originalFileName),
             ContentType     = mimeType,
             WidthPx         = imageInfo.WidthPx,
             HeightPx        = imageInfo.HeightPx,
