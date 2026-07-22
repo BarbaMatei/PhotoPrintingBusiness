@@ -415,6 +415,40 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     }
 
     [Fact]
+    public async Task StripeWebhook_PaymentSucceeded_EnqueuesPhotoPromotion()
+    {
+        // D59 (review 043-v7): the webhook→promotion wiring had no test — deleting the
+        // EnqueueAsync call shipped green while paid orders silently never promoted to cloud.
+        var order = await _factory.SeedOrderAsync(paymentIntentId: "pi_wh_promo", totalRon: 30.00m);
+
+        var eventJson = $$"""
+            {
+              "id": "evt_test_promo",
+              "object": "event",
+              "type": "payment_intent.succeeded",
+              "data": {
+                "object": {
+                  "id": "pi_wh_promo",
+                  "object": "payment_intent",
+                  "amount": 3000,
+                  "currency": "ron",
+                  "client_secret": "pi_wh_promo_secret"
+                }
+              }
+            }
+            """;
+
+        _factory.StripeVerifier.ShouldThrow = false;
+
+        var response = await _client.PostAsync(
+            "/api/webhooks/stripe",
+            new StringContent(eventJson, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(order.Id, _factory.PhotoPromoter.Enqueued);
+    }
+
+    [Fact]
     public async Task StripeWebhook_InvalidSignature_Returns400()
     {
         _factory.StripeVerifier.ShouldThrow = true;

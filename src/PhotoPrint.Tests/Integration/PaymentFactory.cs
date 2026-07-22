@@ -56,6 +56,22 @@ public class FakeStripeSignatureVerifier : IStripeSignatureVerifier
     }
 }
 
+/// <summary>Records promotion enqueues so tests can assert the webhook→promotion wiring
+/// (D59, review 043-v7) without a running worker consuming the channel.</summary>
+public class RecordingPhotoPromoter : IOrderPhotoPromoter
+{
+    public List<Guid> Enqueued { get; } = new();
+
+    public ValueTask EnqueueAsync(Guid orderId, CancellationToken ct = default)
+    {
+        Enqueued.Add(orderId);
+        return ValueTask.CompletedTask;
+    }
+
+    public Task<PromotionOutcome> PromoteOrderAsync(Guid orderId, CancellationToken ct = default)
+        => Task.FromResult(PromotionOutcome.Empty);
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -69,6 +85,9 @@ public class PaymentFactory : ShippingFactory
     /// <summary>Shared fake gateway so tests can inspect call count / forwarded key
     /// across multiple requests (bolt 035 idempotency).</summary>
     public FakeStripePaymentGateway StripeGateway { get; } = new();
+
+    /// <summary>Shared recording promoter — asserts the webhook→promotion wiring (D59).</summary>
+    public RecordingPhotoPromoter PhotoPromoter { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -92,6 +111,7 @@ public class PaymentFactory : ShippingFactory
             services.AddSingleton<IStripeClient>(new StripeClient("sk_test_fake"));
             services.AddScoped<IStripePaymentGateway>(_ => StripeGateway);
             services.AddScoped<IStripeSignatureVerifier>(_ => StripeVerifier);
+            services.AddScoped<IOrderPhotoPromoter>(_ => PhotoPromoter);
         });
     }
 
