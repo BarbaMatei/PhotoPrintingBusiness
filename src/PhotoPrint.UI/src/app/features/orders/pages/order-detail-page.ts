@@ -160,7 +160,7 @@ interface StepDef {
            one (>1h TTL) is refreshed on (imgError) rather than shown broken (F7/D5b). -->
       <app-photo-lightbox
         [src]="lightboxSrc()"
-        (close)="lightboxSrc.set(null)"
+        (close)="closeLightbox()"
         (imgError)="onLightboxError()"
       />
     </div>
@@ -458,6 +458,13 @@ export class OrderDetailPage implements OnInit {
     this.lightboxSrc.set(photo.largeUrl);
   }
 
+  closeLightbox(): void {
+    this.lightboxSrc.set(null);
+    // Clear the tracked id too: refreshPhotoUrls re-points the lightbox from lightboxPhotoId, so a
+    // stale id would let a later grid-thumbnail (error) re-open a closed lightbox (D36, review 043-v5).
+    this.lightboxPhotoId = null;
+  }
+
   // Both the grid thumbnails (thumbnailUrl) and the lightbox (largeUrl) hold presigned URLs with a
   // ~1h TTL captured at list-fetch; an expired one makes the <img> error. Re-fetch once for fresh
   // URLs — updating photos() re-points every thumbnail, and the open lightbox too (F7/D5b,
@@ -473,13 +480,16 @@ export class OrderDetailPage implements OnInit {
   private refreshPhotoUrls(): void {
     if (this.urlsRefreshed) return;
     this.urlsRefreshed = true;
-    const openPhotoId = this.lightboxPhotoId;
 
     this.orderService
       .getOrderPhotos(this.orderId())
       .pipe(catchError(() => EMPTY))
       .subscribe(result => {
         this.photos.set(result.photos);
+        // Re-read lightboxPhotoId at resolve time, not capture time: if the user closed the
+        // lightbox before OR during this fetch, closeLightbox() nulled it and we must not
+        // re-point (which would re-open the closed modal) (D36, review 043-v5).
+        const openPhotoId = this.lightboxPhotoId;
         if (openPhotoId !== null) {
           const fresh = result.photos.find(p => p.uploadId === openPhotoId);
           if (fresh) this.lightboxSrc.set(fresh.largeUrl);

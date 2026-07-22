@@ -316,6 +316,39 @@ describe('OrderDetailPage', () => {
     expect(component.lightboxSrc()).toBe('https://cdn/fresh');
   });
 
+  it('does NOT re-open a closed lightbox when a grid thumbnail errors after close (D36 regression)', async () => {
+    // D36 (review 043-v5): close() cleared lightboxSrc but not lightboxPhotoId, so a later grid
+    // thumbnail (error) → refreshPhotoUrls re-pointed the lightbox from the stale id and the closed
+    // modal spontaneously re-opened. A closed lightbox must stay closed through a URL refresh.
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/stale-t', largeUrl: 'https://cdn/stale-l' }],
+      }))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/fresh-t', largeUrl: 'https://cdn/fresh-l' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Open the lightbox, then close it.
+    el.querySelector<HTMLButtonElement>('.photo-tile')!.click();
+    fixture.detectChanges();
+    expect(component.lightboxSrc()).toBe('https://cdn/stale-l');
+    el.querySelector<HTMLElement>('.lightbox__backdrop')!.click();
+    fixture.detectChanges();
+    expect(component.lightboxSrc()).toBeNull();
+
+    // A stale grid thumbnail now errors → refreshPhotoUrls runs. The lightbox must NOT re-open.
+    el.querySelector<HTMLImageElement>('.photo-tile img')!.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2); // refresh did run (grid URLs updated)
+    expect(component.lightboxSrc()).toBeNull(); // but the closed lightbox stayed closed
+    expect(el.querySelector('.lightbox__backdrop')).toBeNull();
+  });
+
   it('refreshes photo URLs when a GRID thumbnail image errors (F7/D5b class-sweep)', async () => {
     const getOrderPhotos = vi
       .fn()
