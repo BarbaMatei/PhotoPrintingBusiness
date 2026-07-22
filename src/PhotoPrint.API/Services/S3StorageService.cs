@@ -60,11 +60,22 @@ public class S3StorageService : IStorageService
     public async Task SaveAsync(Stream content, string key, CancellationToken ct = default)
     {
         StorageKeys.Validate(key);
-        if (content.CanSeek)
-            content.Position = 0;
+        var firstAttempt = true;
 
         await _pipeline.ExecuteAsync(async cancel =>
         {
+            // Rewind on EVERY attempt — the SDK consumes the stream, so a retry after a
+            // transient failure would otherwise upload the leftovers of a spent stream: a
+            // truncated/empty object that "succeeds" and lets promotion delete the local
+            // original (D49, review 043-v7). A non-seekable stream can't be rewound, so a
+            // retry of one must fail loudly instead of re-sending garbage.
+            if (content.CanSeek)
+                content.Position = 0;
+            else if (!firstAttempt)
+                throw new NotSupportedException(
+                    "SaveAsync cannot retry a non-seekable stream — the first attempt consumed it.");
+            firstAttempt = false;
+
             // TransferUtility handles multipart upload for large objects without
             // buffering the whole stream in memory.
             using var transfer = new TransferUtility(_s3);
