@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 043-cloud-storage-provider
-updated: 2026-07-14
+updated: 2026-07-22
 ---
 
 # Canonical finding ledger — 043-cloud-storage-provider
@@ -19,7 +19,7 @@ population across **parallel blinded passes on one frozen commit** — the still
 
 Status column reflects the cumulative outcome through **resolution-v5 (2026-07-22 fix round)**:
 `verified` = fix held (revert-and-rerun / construction / inspection); `fixed` = fixed with a
-revert-verified regression test, awaiting the v6 verification; `deferred` = assigned to future work
+regression test, awaiting the next verification pass; `deferred` = assigned to future work
 (bolt-035 / 3-env); `backlog` = triaged Low/Cleanup that does not re-arm the loop (severity-based
 stop rule, README 2026-07-22); `wont-fix` = decision upheld. v4 flipped D13/D5b/D19/D21–D34's 14
 fixables to `verified` and upheld the 4 deferrals; **v5 added D36–D48 (13 new, all fix-generative)
@@ -30,8 +30,12 @@ D36 + D38** non-vacuously. The fix→verify loop for the v5 population went quie
 certification pair, 2026-07-22) did NOT certify**: the first full-manifest audit ever run on this
 feature found **1 High (D49, silent data loss on S3 retry)** + a **cross-order data-loss class (D50)**
 independently confirmed by both passes, plus D51–D82. Per the protocol, new serious findings reset the
-counter → **back to a fix round**; the feature is **not merge-ready**. Current open serious population:
-**D49 (High) + D50–D60 (Med)**; D61–D82 (Low/Cleanup) open.
+counter → back to a fix round. **resolution-v7 (2026-07-22, same day) then fixed all 8 fixable serious
+findings** (D49 High + D50/D51/D52/D54/D55/D56/D57, plus coverage D58/D59) with regression tests @
+`ac97e42` (incl. the micro-review's **A4 class-sweep**: the D50 guard extended to UploadCleanupJob's
+referenced-retention branch — a third site of the same class), deferred **D53 → bolt-035** (with D9)
+and **D60 → 3-env** (with D20), and sent **D61–D82 to backlog**. Awaiting the v8 verification;
+certification pair to be re-run on a new frozen commit after that (counter reset).
 
 | D# | First seen | Sev (v1) | Status (through v2) | Title |
 |----|-----------|----------|--------|-------|
@@ -84,40 +88,40 @@ counter → **back to a fix round**; the feature is **not merge-ready**. Current
 | D46 | v5 · F5 | 🟡 Low | **deferred** → bolt-035 *(cluster A)* | Periodic sweep re-enqueues **permanently-terminal** promotions (lost local original) **forever** — re-burns `MaxAttempts` + re-logs terminal every interval (boot-only never repeated this). Needs a give-up marker |
 | D47 | v5 · F7 | 🟡 Low | **deferred** → bolt-035 *(cluster A)* | `CloudEnabled` fixed at boot (`StorageRouter._cloud` set once) → a runtime `Provider=local→S3` flip **needs a restart**; contradicts the "retried when set back to S3" claim. Document or `IOptionsMonitor` |
 | D48 | v5 · F10 | 🟡 Low | **backlog** *(F7/F17 edge)* | Lightbox `failed()` reset keyed on `src !== lastSrc`; an identical refreshed presigned URL leaves `failed` stuck (+ `urlsRefreshed` blocks retry) → error until page reload |
-| D49 | v7 · A/B | 🔴 High | **open** *(certification blocker; confirmed by inspection)* | S3 `SaveAsync` rewinds the stream (`Position=0`) **outside** the Polly retry loop → a retried transient upload re-sends from EOF (truncated/empty), PUT "succeeds", row flips Cloud, local original deleted → **silent data loss** of a paid original (`S3StorageService.cs:63-72`) |
-| D50 | v7 · A+B | 🟠 Med | **open** *(design; both passes; upload shared across orders confirmed)* | Shared-`Upload` cross-order data loss: purge (`OriginalPurger.cs:103`) and retention (`ArchiveRetentionJob.cs:95` `Any(PaidAt<cutoff)`) destroy a photo a **second still-active order** needs. Needs ref-count / all-orders-past-cutoff guard (rule-3 approach-check) |
-| D51 | v7 · A+B | 🟠 Med | **open** *(both passes)* | Promotion worker holds the concurrency slot **and DI scope** for the whole retry backoff (`Task.Delay` up to 3600s inside the semaphore) → all `MaxConcurrentOrders` slots park in backoff during a cloud blip, starving fresh promotions (`OrderPhotoPromotionWorker.cs:107/283`) |
-| D52 | v7 · A | 🟠 Med | **open** | `GetOrderPhotosAsync` lacks a `DeletedAt==null` filter → serves presigned URLs for soft-deleted uploads (blobs gone) → broken thumbnails/lightbox refresh can't fix (`OrderService.cs:460`) |
-| D53 | v7 · B | 🟠 Med | **open** *(extends [[D9]] — new consequence)* | Webhook Paid-transition unguarded check-then-act → concurrent duplicate Stripe deliveries double-enqueue promotion **and send duplicate confirmation emails** (`WebhooksController.cs:215`) |
-| D54 | v7 · B | 🟠 Med | **open** *(cross-feature regression of bolt-042 M5)* | `UploadService` re-advertises **HEIC** as accepted while the MIME validator + UI still reject it (`UploadService.cs:52`) |
-| D55 | v7 · B | 🟠 Med | **open** *(hinted; prod-only)* | Client filename not truncated to `varchar(260)` → InMemory/SQLite accept, **Postgres 22001 → 500 in prod**; passes all tests (`UploadService.cs:113`) |
-| D56 | v7 · A | 🟠 Med | **open** | `ArchiveExpired` audit event logged **before** the batched `SaveChanges` → duplicate/false audit records on save failure, re-fired next tick (`ArchiveRetentionJob.cs:123`) |
-| D57 | v7 · A | 🟠 Med | **open** | Cloud-off purge refusal logged at **Error on every ship** in the default `Provider=local` config (ship path lacks the cancel path's `CloudEnabled` gate) → chronic false-Error noise (`OriginalPurger.cs:43`) |
-| D58 | v7 · B | 🟠 Med | **open** *(coverage)* | Promotion worker retry/backoff/re-enqueue path entirely untested (`OrderPhotoPromotionWorker.cs:130`) |
-| D59 | v7 · B | 🟠 Med | **open** *(coverage)* | Webhook→promotion `EnqueueAsync` wiring never asserted by a test (`WebhooksController.cs:183`) |
-| D60 | v7 · B | 🟠 Med | **open** *(coverage)* | Real cloud provider exercised only by skip-gated MinIO + in-memory fakes; R2/AWS (incl. the [[D49]] retry path) never run (`S3StorageServiceIntegrationTests.cs:18`) |
-| D61 | v7 · A | 🟡 Low | **open** *(D38 class in a 2nd job)* | Retention `OrderBy/Take` window starved by persistent delete-failures (`ArchiveRetentionJob.cs:98`) |
-| D62 | v7 · A+B | 🟡 Low | **open** *(both passes)* | Admin ZIP mid-loop `GetStream` failure (incl. concurrent purge) truncates the archive after headers committed (`AdminOrderService.cs:197`) |
-| D63 | v7 · A+B | 🟡 Low | **open** *(both passes)* | Preview cache-fill regeneration races retention delete → orphaned blob, ref nulled (`UploadService.cs:203` / `ArchiveRetentionJob.cs:124`) |
-| D64 | v7 · B | 🟡 Low | **open** | Failed best-effort local delete in `OrderPhotoPromoter` leaks unreclaimable local bytes (`OrderPhotoPromoter.cs:212`) |
-| D65 | v7 · B | 🟡 Low | **open** *(plausible)* | `LocalStorageService` storage-root re-anchor uses prefix match without a separator boundary (`LocalStorageService.cs:99`) |
-| D66 | v7 · B | 🟡 Low | **open** | ZIP entry extension taken from untrusted client filename instead of validated MIME (`AdminOrderService.cs:190`) |
-| D67 | v7 · B | 🟡 Low | **open** | Batch upload has no file-**count** cap (only 500MB total) (`UploadsController.cs:102`) |
-| D68 | v7 · B | 🟡 Low | **open** | Broken grid thumbnails have no fallback/retry after the single presigned-URL refresh (`order-detail-page.ts:472`) |
-| D69 | v7 · B | 🟡 Low | **open** | Originals of orders never reaching production-complete/Cancelled escape the retention window (`ArchiveRetentionJob.cs:92`) |
-| D70 | v7 · A | 🟡 Low | **open** | 043 NFR "persistent S3 → 502 (BadGatewayException)" not implemented → surfaces as 500 (`S3StorageService.cs:145`) |
-| D71 | v7 · A | 🟡 Low | **open** | Idempotent-skip reasons at Debug never emit under the Information floor (`OrderPhotoPromoter.cs:120`) |
-| D72 | v7 · A | 🟡 Low | **open** | Transient vs permanent cloud-write failures collapsed into one Warning → poison retried like a blip (`OrderPhotoPromoter.cs:182`) |
-| D73 | v7 · A | 🟡 Low | **open** *(bolt-042 QUAL-1 regression)* | `GetPreviewAsync` dropped `AsNoTracking` on the hot cache-hit path (`UploadService.cs:139`) |
-| D74 | v7 · A | 🟡 Low | **open** *(plausible)* | Promotable-status set triplicated with a false "single source of truth" comment (`BackfillCommand.cs:43`) |
-| D75 | v7 · B | 🟡 Low | **open** *(coverage; [[D49]] sibling)* | S3 Polly retry classification/re-upload + presign HTTP/HTTPS protocol untested (`S3StorageService.cs:60/41`) |
-| D76 | v7 · B | 🟡 Low | **open** | Storage DI/config/CLI outside the lens manifest; AWS-native region config foot-gun (`StorageExtensions.cs:56`) |
-| D77 | v7 · B | 🟡 Low | **open** *(plausible)* | Recovery/retention sweeps run unindexed full scans every 6h; masked by InMemory tests (`UploadConfiguration.cs:30`) |
-| D78 | v7 · A | ⚪ Cleanup | **open** *(conv 2)* | Promoter materializes the whole original via `ToArray` + multiple undisposed `MemoryStream`s (`OrderPhotoPromoter.cs:138`) |
-| D79 | v7 · A | ⚪ Cleanup | **open** | Best-effort orphan-thumbnail delete swallows its exception with no log (`UploadService.cs:222`) |
-| D80 | v7 · A | ⚪ Cleanup | **open** | Local-preview `Cache-Control` mismatch: ADR-008 says public/immutable, code sends `private` (`UploadsController.cs:26`) |
-| D81 | v7 · A | ⚪ Cleanup | **open** | Freshly generated local thumbnail re-read from disk on cache miss (`UploadService.cs:240`) |
-| D82 | v7 · B | ⚪ Cleanup | **open** | Redundant dual feedback: interceptor toast plus inline error/redirect (`order-detail-page.ts:403`) |
+| D49 | v7 · A/B | 🔴 High | **fixed** (resolution-v7 @c37ca44) *(was certification blocker)* | S3 `SaveAsync` rewinds the stream (`Position=0`) **outside** the Polly retry loop → a retried transient upload re-sends from EOF (truncated/empty), PUT "succeeds", row flips Cloud, local original deleted → **silent data loss** of a paid original (`S3StorageService.cs:63-72`) |
+| D50 | v7 · A+B | 🟠 Med | **fixed** (resolution-v7 @4dfd755) *(design-checked; AwaitingPayment residual accepted)* | Shared-`Upload` cross-order data loss: purge (`OriginalPurger.cs:103`) and retention (`ArchiveRetentionJob.cs:95` `Any(PaidAt<cutoff)`) destroy a photo a **second still-active order** needs. Needs ref-count / all-orders-past-cutoff guard (rule-3 approach-check) |
+| D51 | v7 · A+B | 🟠 Med | **fixed** (resolution-v7 @df1026d) *(design-checked: bounded detach)* | Promotion worker holds the concurrency slot **and DI scope** for the whole retry backoff (`Task.Delay` up to 3600s inside the semaphore) → all `MaxConcurrentOrders` slots park in backoff during a cloud blip, starving fresh promotions (`OrderPhotoPromotionWorker.cs:107/283`) |
+| D52 | v7 · A | 🟠 Med | **fixed** (resolution-v7 @5cfc9f9) | `GetOrderPhotosAsync` lacks a `DeletedAt==null` filter → serves presigned URLs for soft-deleted uploads (blobs gone) → broken thumbnails/lightbox refresh can't fix (`OrderService.cs:460`) |
+| D53 | v7 · B | 🟠 Med | **deferred** → bolt-035 *(with [[D9]]; adds the duplicate-email consequence)* | Webhook Paid-transition unguarded check-then-act → concurrent duplicate Stripe deliveries double-enqueue promotion **and send duplicate confirmation emails** (`WebhooksController.cs:215`) |
+| D54 | v7 · B | 🟠 Med | **fixed** (resolution-v7 @b171ce8) *(bolt-042 M5 regression closed)* | `UploadService` re-advertises **HEIC** as accepted while the MIME validator + UI still reject it (`UploadService.cs:52`) |
+| D55 | v7 · B | 🟠 Med | **fixed** (resolution-v7 @b171ce8) *(hinted; prod-only)* | Client filename not truncated to `varchar(260)` → InMemory/SQLite accept, **Postgres 22001 → 500 in prod**; passes all tests (`UploadService.cs:113`) |
+| D56 | v7 · A | 🟠 Med | **fixed** (resolution-v7 @04149fa) | `ArchiveExpired` audit event logged **before** the batched `SaveChanges` → duplicate/false audit records on save failure, re-fired next tick (`ArchiveRetentionJob.cs:123`) |
+| D57 | v7 · A | 🟠 Med | **fixed** (resolution-v7 @fe0e6d2) | Cloud-off purge refusal logged at **Error on every ship** in the default `Provider=local` config (ship path lacks the cancel path's `CloudEnabled` gate) → chronic false-Error noise (`OriginalPurger.cs:43`) |
+| D58 | v7 · B | 🟠 Med | **fixed** (resolution-v7 @df1026d) *(coverage)* | Promotion worker retry/backoff/re-enqueue path entirely untested (`OrderPhotoPromotionWorker.cs:130`) |
+| D59 | v7 · B | 🟠 Med | **fixed** (resolution-v7 @a80b819) *(coverage)* | Webhook→promotion `EnqueueAsync` wiring never asserted by a test (`WebhooksController.cs:183`) |
+| D60 | v7 · B | 🟠 Med | **deferred** → 3-env *(with [[D20]]; real-provider exercise is env infra)* | Real cloud provider exercised only by skip-gated MinIO + in-memory fakes; R2/AWS (incl. the [[D49]] retry path) never run (`S3StorageServiceIntegrationTests.cs:18`) |
+| D61 | v7 · A | 🟡 Low | **backlog** *(D38 class in a 2nd job)* | Retention `OrderBy/Take` window starved by persistent delete-failures (`ArchiveRetentionJob.cs:98`) |
+| D62 | v7 · A+B | 🟡 Low | **backlog** *(both passes)* | Admin ZIP mid-loop `GetStream` failure (incl. concurrent purge) truncates the archive after headers committed (`AdminOrderService.cs:197`) |
+| D63 | v7 · A+B | 🟡 Low | **backlog** *(both passes)* | Preview cache-fill regeneration races retention delete → orphaned blob, ref nulled (`UploadService.cs:203` / `ArchiveRetentionJob.cs:124`) |
+| D64 | v7 · B | 🟡 Low | **backlog** | Failed best-effort local delete in `OrderPhotoPromoter` leaks unreclaimable local bytes (`OrderPhotoPromoter.cs:212`) |
+| D65 | v7 · B | 🟡 Low | **backlog** *(plausible)* | `LocalStorageService` storage-root re-anchor uses prefix match without a separator boundary (`LocalStorageService.cs:99`) |
+| D66 | v7 · B | 🟡 Low | **backlog** | ZIP entry extension taken from untrusted client filename instead of validated MIME (`AdminOrderService.cs:190`) |
+| D67 | v7 · B | 🟡 Low | **backlog** | Batch upload has no file-**count** cap (only 500MB total) (`UploadsController.cs:102`) |
+| D68 | v7 · B | 🟡 Low | **backlog** | Broken grid thumbnails have no fallback/retry after the single presigned-URL refresh (`order-detail-page.ts:472`) |
+| D69 | v7 · B | 🟡 Low | **backlog** | Originals of orders never reaching production-complete/Cancelled escape the retention window (`ArchiveRetentionJob.cs:92`) |
+| D70 | v7 · A | 🟡 Low | **backlog** | 043 NFR "persistent S3 → 502 (BadGatewayException)" not implemented → surfaces as 500 (`S3StorageService.cs:145`) |
+| D71 | v7 · A | 🟡 Low | **backlog** | Idempotent-skip reasons at Debug never emit under the Information floor (`OrderPhotoPromoter.cs:120`) |
+| D72 | v7 · A | 🟡 Low | **backlog** | Transient vs permanent cloud-write failures collapsed into one Warning → poison retried like a blip (`OrderPhotoPromoter.cs:182`) |
+| D73 | v7 · A | 🟡 Low | **backlog** *(bolt-042 QUAL-1 regression)* | `GetPreviewAsync` dropped `AsNoTracking` on the hot cache-hit path (`UploadService.cs:139`) |
+| D74 | v7 · A | 🟡 Low | **backlog** *(plausible)* | Promotable-status set triplicated with a false "single source of truth" comment (`BackfillCommand.cs:43`) |
+| D75 | v7 · B | 🟡 Low | **backlog** *(coverage; [[D49]] sibling)* | S3 Polly retry classification/re-upload + presign HTTP/HTTPS protocol untested (`S3StorageService.cs:60/41`) |
+| D76 | v7 · B | 🟡 Low | **backlog** | Storage DI/config/CLI outside the lens manifest; AWS-native region config foot-gun (`StorageExtensions.cs:56`) |
+| D77 | v7 · B | 🟡 Low | **backlog** *(plausible)* | Recovery/retention sweeps run unindexed full scans every 6h; masked by InMemory tests (`UploadConfiguration.cs:30`) |
+| D78 | v7 · A | ⚪ Cleanup | **backlog** *(conv 2)* | Promoter materializes the whole original via `ToArray` + multiple undisposed `MemoryStream`s (`OrderPhotoPromoter.cs:138`) |
+| D79 | v7 · A | ⚪ Cleanup | **backlog** | Best-effort orphan-thumbnail delete swallows its exception with no log (`UploadService.cs:222`) |
+| D80 | v7 · A | ⚪ Cleanup | **backlog** | Local-preview `Cache-Control` mismatch: ADR-008 says public/immutable, code sends `private` (`UploadsController.cs:26`) |
+| D81 | v7 · A | ⚪ Cleanup | **backlog** | Freshly generated local thumbnail re-read from disk on cache miss (`UploadService.cs:240`) |
+| D82 | v7 · B | ⚪ Cleanup | **backlog** | Redundant dual feedback: interceptor toast plus inline error/redirect (`order-detail-page.ts:403`) |
 
 ## Refuted (recorded, no D# assigned)
 
@@ -232,3 +236,29 @@ trigger of the D27 orphan race; the fixer's "wasteful not corrupting" note was u
 Verdict `approve-with-followups` (a verification pass cannot certify). Suites: .NET 701/701 (+10 CI
 MinIO) · FE 438/438 (3 non-043 load-flakes, green isolated). **NF1 surfaced → loop not quiet; owed:
 full-manifest discovery + certification pair.** See [review-v4.md](review-v4.md).
+
+## resolution-v7 fix round (2026-07-22)
+
+Owner-directed **lean round** (cost pressure): no discovery fan-outs; exactly two subagents, both
+process-mandated — the rule-3 **design check** (one agent covering D51's concurrency change + D50's
+guards; its three corrections applied: bounded thread-safe retry tracking, purge status set
+{Paid, Printing}, `PaidAt != null` mirror in the retention clause) and the **fresh-eyes micro-review**
+of the final diff. All 8 fixable serious findings fixed with regression tests:
+
+- **D49** @`c37ca44` — rewind inside the S3 retry lambda; non-seekable retry fails loudly. The
+  regression test was red with the exact bug signature (retry received 0 of 8 bytes) pre-fix.
+- **D50** @`4dfd755` — live-order-reference guards at purge ({Paid, Printing} blockers; sweep
+  liveness) + retention (no in-window referencing order). Accepted residual: AwaitingPayment sharer
+  that pays post-purge (owner: corner-case; revisit with bolt-035).
+- **D51+D58** @`df1026d` — backoff detached from the slot, bounded (100) parked retries, sweep
+  backstop; slot-starvation + retry-success tests.
+- **D52** @`5cfc9f9`, **D54+D55** @`b171ce8`, **D56** @`04149fa`, **D57** @`fe0e6d2`, **D59** @`a80b819`.
+- **A4 (micro-review class-sweep)** @`ac97e42` — the D50 guard extended to UploadCleanupJob's
+  referenced-retention branch (third site of the shared-upload data-loss class; live-order +
+  in-window exclusions in the shared `retentionExpired` predicate, 3 regression tests).
+- **Deferred:** D53 → bolt-035 (with D9; adds the duplicate-email consequence); D60 → 3-env (with D20).
+- **Backlog:** D61–D77 (Low), D78–D82 (Cleanup) — severity-based stop rule.
+
+Suites **.NET 719/719** (+10 CI MinIO) · **FE 439/439**. Next: **v8 verification** @`ac97e42`, then
+re-freeze + re-run the **certification pair** (owner chooses full pair vs the cheaper single-pass
+variant leveraging the existing A/B overlap data). See [resolution-v7.md](resolution-v7.md).
