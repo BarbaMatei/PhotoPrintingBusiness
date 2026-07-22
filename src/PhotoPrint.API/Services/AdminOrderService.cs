@@ -133,8 +133,9 @@ public class AdminOrderService : IAdminOrderService
         // ~50–100 ms per upload to this admin PATCH but keeps the lifecycle ordering
         // simple. Gated on archive-on + cloud-on like the cancel path: with the supported
         // Provider=local config the purger's self-refusal logged an Error on EVERY ship
-        // (chronic false alarm, D57 review 043-v7); the archive-on-but-cloud-off mismatch
-        // is surfaced once per sweep by the recovery scanners' cloud-tier-off logs instead.
+        // (chronic false alarm, D57 review 043-v7). The archive-on-but-cloud-off mismatch
+        // stays visible via the purge recovery scanner's boot-time cloud-tier-off log and
+        // UploadCleanupJob's hourly unroutable-count warning when Cloud rows accumulate.
         if (_archiveSettings.IsProductionCompleteStatus(newStatus)
             && _archiveSettings.Enabled && _storageRouter.CloudEnabled)
         {

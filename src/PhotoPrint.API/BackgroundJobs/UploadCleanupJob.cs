@@ -15,16 +15,19 @@ public class UploadCleanupJob : BackgroundService
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<UploadCleanupSettings> _settings;
+    private readonly ArchiveSettings _archiveSettings;
     private readonly ILogger<UploadCleanupJob> _logger;
     private bool _loggedRetentionOnce;
 
     public UploadCleanupJob(
         IServiceScopeFactory scopeFactory,
         IOptionsMonitor<UploadCleanupSettings> settings,
+        IOptions<ArchiveSettings> archiveSettings,
         ILogger<UploadCleanupJob> logger)
     {
         _scopeFactory = scopeFactory;
         _settings = settings;
+        _archiveSettings = archiveSettings.Value;
         _logger = logger;
     }
 
@@ -72,12 +75,22 @@ public class UploadCleanupJob : BackgroundService
         var now = DateTimeOffset.UtcNow;
         var orphanCutoff = now.AddHours(-settings.OrphanRetentionHours);
         var referencedCutoff = now.AddDays(-settings.ReferencedRetentionDays);
+        var archiveCutoff = now.AddMonths(-_archiveSettings.RetentionMonths);
 
+        // The referenced branch is the same shared-upload destructive class the D50 guards
+        // closed in OriginalPurger/ArchiveRetentionJob (review 043-v7 class-sweep): age alone
+        // must not delete an upload a live order still needs to fulfil ({Paid, Printing}) or
+        // an in-window paid order is still entitled to view. Excluded rows re-qualify once
+        // every referencing order is complete and past the archive window.
         Expression<Func<Upload, bool>> retentionExpired = u =>
             (u.UploadedAt < orphanCutoff
                 && !db.CartItems.Any(ci => ci.UploadId == u.Id)
                 && !db.OrderItems.Any(oi => oi.UploadId == u.Id))
-            || u.UploadedAt < referencedCutoff;
+            || (u.UploadedAt < referencedCutoff
+                && !db.OrderItems.Any(oi => oi.UploadId == u.Id
+                    && (oi.Order.Status == OrderStatus.Paid
+                        || oi.Order.Status == OrderStatus.Printing
+                        || (oi.Order.PaidAt != null && oi.Order.PaidAt >= archiveCutoff))));
 
         var candidates = await db.Uploads
             .Where(u => u.DeletedAt == null)

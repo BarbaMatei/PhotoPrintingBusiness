@@ -88,6 +88,9 @@ public class UploadCleanupJobTests
         return monitor.Object;
     }
 
+    private static IOptions<ArchiveSettings> ArchiveOpts(int retentionMonths = 12)
+        => Options.Create(new ArchiveSettings { RetentionMonths = retentionMonths });
+
     private static Upload MakeUpload(DateTimeOffset uploadedAt, bool softDeleted = false) => new()
     {
         Id = Guid.NewGuid(),
@@ -113,7 +116,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         using var cts = new CancellationTokenSource();
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
@@ -136,7 +139,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -158,7 +161,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -181,7 +184,7 @@ public class UploadCleanupJobTests
 
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -207,7 +210,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -230,7 +233,7 @@ public class UploadCleanupJobTests
         var job = new UploadCleanupJob(
             BuildScopeFactory(storageMock.Object, db),
             settings,
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
         return (Task.CompletedTask, storageMock.Object, storageMock, job);
     }
 
@@ -392,7 +395,7 @@ public class UploadCleanupJobTests
 
         var (factory, local, cloud) = BuildTieredScopeFactory(db);
         var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var (deleted, errors) = await InvokeCleanupAsync(job);
 
@@ -424,7 +427,7 @@ public class UploadCleanupJobTests
 
         var (factory, local) = BuildCloudDisabledScopeFactory(db);
         var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var (deleted, errors) = await InvokeCleanupAsync(job);
 
@@ -460,7 +463,7 @@ public class UploadCleanupJobTests
 
         var (factory, local) = BuildCloudDisabledScopeFactory(db);
         var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var (deleted, errors) = await InvokeCleanupAsync(job);
 
@@ -503,5 +506,107 @@ public class UploadCleanupJobTests
         storageMock.Verify(
             s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // ── D50 class-sweep (micro-review A4, review 043-v7): the referenced-retention branch
+    //    must not delete uploads a live or in-window order still needs ────────────────────
+
+    private static async Task SeedOrderRefAsync(
+        PhotoPrintDbContext db, Upload upload, OrderStatus status, DateTimeOffset? paidAt)
+    {
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            OrderNumber = "FT-" + Random.Shared.Next(100_000, 999_999),
+            Status = status,
+            GuestSessionId = upload.GuestSessionId,
+            GuestEmail = "buyer@example.com",
+            PaymentProcessor = PaymentProcessor.Stripe,
+            DeliveryType = DeliveryType.Courier,
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "Strada Exemplu", Number = "1", City = "București",
+                County = "Bucuresti", PostalCode = "010101",
+                RecipientName = "Test Buyer", Phone = "+40712345678",
+            },
+            ShippingCostRon = 25m, SubtotalRon = 100m, TotalRon = 125m,
+            CreatedAt = paidAt ?? DateTimeOffset.UtcNow.AddDays(-400),
+            PaidAt = paidAt,
+        };
+        await db.Orders.AddAsync(order);
+        await db.OrderItems.AddAsync(new OrderItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            UploadId = upload.Id,
+            ProductId = Guid.NewGuid(),
+            Quantity = 1, UnitPriceRon = 100m, LineTotalRon = 100m,
+            ProductSnapshot = new ProductSnapshot
+            {
+                ProductName = "Fotografie clasică", Size = "10x15", Finish = "Lucioasă",
+            },
+        });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Cleanup_agedReferencedUpload_withLiveOrder_isNotDeleted()
+    {
+        // An aged (past ReferencedRetentionDays) upload whose referencing order is still
+        // Paid (awaiting fulfilment): deleting it would truncate that order's fulfilment ZIP —
+        // the same shared-upload data-loss class as D50, at a third site.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+        await SeedOrderRefAsync(db, upload, OrderStatus.Paid, DateTimeOffset.UtcNow.AddDays(-3));
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings(referencedRetentionDays: 365));
+
+        var (deleted, _) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(0);
+        (await db.Uploads.FindAsync(upload.Id))!.DeletedAt.Should().BeNull();
+        storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cleanup_agedReferencedUpload_withRecentlyPaidOrder_isNotDeleted()
+    {
+        // Complete (Delivered) order, but paid INSIDE the archive window: the customer is
+        // still entitled to view the photos; age-from-upload alone must not delete them.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+        await SeedOrderRefAsync(db, upload, OrderStatus.Delivered, DateTimeOffset.UtcNow.AddMonths(-2));
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings(referencedRetentionDays: 365));
+
+        var (deleted, _) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(0);
+        (await db.Uploads.FindAsync(upload.Id))!.DeletedAt.Should().BeNull();
+        storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cleanup_agedReferencedUpload_allOrdersCompleteAndPastWindow_isDeleted()
+    {
+        // Liveness: once every referencing order is complete AND past the archive window,
+        // the aged upload must still be reclaimed.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+        await SeedOrderRefAsync(db, upload, OrderStatus.Delivered, DateTimeOffset.UtcNow.AddMonths(-13));
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings(referencedRetentionDays: 365));
+
+        var (deleted, _) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1);
+        (await db.Uploads.FindAsync(upload.Id))!.DeletedAt.Should().NotBeNull();
+        storageMock.Verify(s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
     }
 }
