@@ -300,6 +300,30 @@ public class AdminOrderServiceTests
     }
 
     [Fact]
+    public async Task UpdateStatusAsync_ShipWithCloudTierOff_DoesNotInvokePurger()
+    {
+        // D57 (review 043-v7): with the supported Provider=local config the ship path called
+        // the purger ungated and its self-refusal logged an Error on EVERY ship — chronic
+        // false-alarm noise. The ship path now gates on CloudEnabled like the cancel path;
+        // the archive-on-but-cloud-off mismatch is surfaced by the recovery scanners instead.
+        var cloudOffRouter = new Mock<IStorageRouter>();
+        cloudOffRouter.SetupGet(r => r.CloudEnabled).Returns(false);
+        cloudOffRouter.SetupGet(r => r.Local).Returns(_localStore.Object);
+        cloudOffRouter.Setup(r => r.For(StorageLocation.Local)).Returns(_localStore.Object);
+        var sut = new AdminOrderService(
+            _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            cloudOffRouter.Object, _purger.Object, Options.Create(new ArchiveSettings()),
+            _hub.Object, NullLogger<AdminOrderService>.Instance);
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+
+        await sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null);
+
+        _purger.Verify(
+            p => p.PurgeOrderOriginalsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateStatusAsync_PaidToPrinting_DoesNotTriggerPurge()
     {
         var order = await SeedOrderAsync(OrderStatus.Paid);

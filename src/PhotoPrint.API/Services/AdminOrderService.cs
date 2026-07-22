@@ -131,8 +131,12 @@ public class AdminOrderService : IAdminOrderService
         // Bolt 052: when the order enters the configured production-complete status
         // (default Shipped), purge each upload's cloud original. Synchronous — adds
         // ~50–100 ms per upload to this admin PATCH but keeps the lifecycle ordering
-        // simple. Self-refuses if the cloud tier is off or archive is disabled.
-        if (_archiveSettings.IsProductionCompleteStatus(newStatus))
+        // simple. Gated on archive-on + cloud-on like the cancel path: with the supported
+        // Provider=local config the purger's self-refusal logged an Error on EVERY ship
+        // (chronic false alarm, D57 review 043-v7); the archive-on-but-cloud-off mismatch
+        // is surfaced once per sweep by the recovery scanners' cloud-tier-off logs instead.
+        if (_archiveSettings.IsProductionCompleteStatus(newStatus)
+            && _archiveSettings.Enabled && _storageRouter.CloudEnabled)
         {
             // Best-effort, mirroring the cancel path (F4, review 043-v3): the transition is already
             // committed + emailed + broadcast, so a purge hiccup (transient DB load, client-disconnect
