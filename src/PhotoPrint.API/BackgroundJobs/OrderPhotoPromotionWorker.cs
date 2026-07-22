@@ -104,7 +104,7 @@ public class OrderPhotoPromotionWorker : BackgroundService
                 // also reflected in Failed via the promoter; we don't distinguish here.
                 if (outcome.Failed > 0 && job.Attempt < _settings.MaxAttempts)
                 {
-                    await ScheduleRetryAsync(job, stoppingToken);
+                    ScheduleRetryDetached(job, stoppingToken);
                 }
                 else if (outcome.Failed > 0)
                 {
@@ -124,12 +124,53 @@ public class OrderPhotoPromotionWorker : BackgroundService
                     job.OrderId, job.Attempt);
 
                 if (job.Attempt < _settings.MaxAttempts)
-                    await ScheduleRetryAsync(job, stoppingToken);
+                    ScheduleRetryDetached(job, stoppingToken);
             }
         }
         finally
         {
             concurrency.Release();
+        }
+    }
+
+    // Backoff must not hold a concurrency slot: awaiting the delay inside ProcessAsync parked
+    // every slot in Task.Delay during a cloud blip, starving fresh promotions until the backoff
+    // elapsed (D51, review 043-v7). The detached retry never touches the semaphore (safe past
+    // the shutdown drain; a post-shutdown enqueue lands in the dead channel and is dropped —
+    // the recovery sweep re-enqueues stuck orders). Parked retries are bounded: past the cap
+    // the retry is dropped to the sweep instead of accumulating unbounded tasks under a
+    // poison-order storm.
+    private const int MaxParkedRetries = 100;
+    private int _parkedRetries;
+
+    private void ScheduleRetryDetached(PromotionJob job, CancellationToken stoppingToken)
+    {
+        if (Interlocked.Increment(ref _parkedRetries) > MaxParkedRetries)
+        {
+            Interlocked.Decrement(ref _parkedRetries);
+            _logger.LogWarning(
+                "promotion.retry.dropped order_id={OrderId} attempt={Attempt} reason=retry-backlog-full cap={Cap} — recovery sweep will re-enqueue",
+                job.OrderId, job.Attempt, MaxParkedRetries);
+            return;
+        }
+
+        _ = RunAsync();
+
+        async Task RunAsync()
+        {
+            try
+            {
+                await ScheduleRetryAsync(job, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                // Fire-and-forget: never let a retry fault go unobserved.
+                _logger.LogWarning(ex, "promotion.retry.error order_id={OrderId}", job.OrderId);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _parkedRetries);
+            }
         }
     }
 
