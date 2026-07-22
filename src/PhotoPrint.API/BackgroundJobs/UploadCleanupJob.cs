@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
@@ -66,42 +67,39 @@ public class UploadCleanupJob : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
         var router = scope.ServiceProvider.GetRequiredService<IStorageRouter>();
+        var cloudEnabled = router.CloudEnabled;
 
         var now = DateTimeOffset.UtcNow;
         var orphanCutoff = now.AddHours(-settings.OrphanRetentionHours);
         var referencedCutoff = now.AddDays(-settings.ReferencedRetentionDays);
 
+        Expression<Func<Upload, bool>> retentionExpired = u =>
+            (u.UploadedAt < orphanCutoff
+                && !db.CartItems.Any(ci => ci.UploadId == u.Id)
+                && !db.OrderItems.Any(oi => oi.UploadId == u.Id))
+            || u.UploadedAt < referencedCutoff;
+
         var candidates = await db.Uploads
             .Where(u => u.DeletedAt == null)
-            .Where(u =>
-                (u.UploadedAt < orphanCutoff
-                    && !db.CartItems.Any(ci => ci.UploadId == u.Id)
-                    && !db.OrderItems.Any(oi => oi.UploadId == u.Id))
-                || u.UploadedAt < referencedCutoff)
+            // Exclude unroutable Cloud rows in the QUERY, not after: For(Cloud) would throw with
+            // the cloud tier off, but skipping post-fetch let >=BatchSize aged Cloud rows re-fill
+            // the OrderBy/Take window every sweep and starve local-orphan cleanup indefinitely
+            // (D38, review 043-v5; the wedge the F2/043-v3 post-fetch skip missed at scale).
+            .Where(u => cloudEnabled || u.StorageLocation != StorageLocation.Cloud)
+            .Where(retentionExpired)
             .OrderBy(u => u.UploadedAt)
             .Take(BatchSize)
             .ToListAsync(ct);
 
         var fileErrors = 0;
-        var unroutable = 0;
 
         foreach (var upload in candidates)
         {
-            // A Cloud-located row with the cloud tier disabled is unroutable: For(Cloud) would
-            // throw here — outside TryDeleteAsync and before SaveChanges — aborting the whole
-            // deterministic batch and wedging cleanup (incl. local orphans) every hour
-            // (F2, review 043-v3). Skip it (no soft-delete) so the batch proceeds; it is retried
-            // when Storage:Provider is set back to S3.
-            if (upload.StorageLocation == StorageLocation.Cloud && !router.CloudEnabled)
-            {
-                unroutable++;
-                continue;
-            }
-
             // Route deletes to the tier that owns this upload's bytes. A promoted (Cloud)
             // upload's blobs live in the object store; resolving the local default no-oped
             // on disk and orphaned the cloud objects with no row left to reclaim them
-            // (F2, review 043-v1).
+            // (F2, review 043-v1). Cloud rows only reach here when the cloud tier is enabled
+            // (excluded above otherwise), so For(Cloud) never throws.
             var store = router.For(upload.StorageLocation);
 
             // Bolt 052: FilePath may have been nulled by the original-purge already. If
@@ -124,15 +122,25 @@ public class UploadCleanupJob : BackgroundService
             upload.DeletedAt = now;
         }
 
-        if (unroutable > 0)
-            _logger.LogWarning(
-                "upload.cleanup.unroutable count={Count} reason=cloud-tier-off — Cloud-located uploads cannot be reclaimed while Storage:Provider is local; left for a later sweep",
-                unroutable);
-
         if (candidates.Count > 0)
             await db.SaveChangesAsync(ct);
 
-        return (candidates.Count - unroutable, fileErrors);
+        // Observability: the Cloud rows excluded above are silently out of the batch, so surface how
+        // many aged Cloud uploads can't be reclaimed while the cloud tier is off (D38 keeps the F2
+        // ops signal that the query filter would otherwise drop). Only runs when cloud is disabled.
+        if (!cloudEnabled)
+        {
+            var unroutable = await db.Uploads
+                .Where(u => u.DeletedAt == null && u.StorageLocation == StorageLocation.Cloud)
+                .Where(retentionExpired)
+                .CountAsync(ct);
+            if (unroutable > 0)
+                _logger.LogWarning(
+                    "upload.cleanup.unroutable count={Count} reason=cloud-tier-off — Cloud-located uploads cannot be reclaimed while Storage:Provider is local; excluded from the batch so local cleanup proceeds",
+                    unroutable);
+        }
+
+        return (candidates.Count, fileErrors);
     }
 
     // Returns 1 on a delete failure (counted into fileErrors), 0 otherwise. The row is

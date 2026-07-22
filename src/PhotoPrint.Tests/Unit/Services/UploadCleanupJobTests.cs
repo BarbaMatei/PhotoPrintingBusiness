@@ -411,10 +411,10 @@ public class UploadCleanupJobTests
     [Fact]
     public async Task Cleanup_cloudRowWithCloudDisabled_skipsItAndStillCleansLocalBatch()
     {
-        // F2 (review 043-v3): cloud was enabled, an upload was promoted (Cloud), then Storage:Provider
-        // reverted to local. For(Cloud) now throws; before this fix it threw OUTSIDE the per-upload
-        // try, aborting the whole deterministic batch and wedging cleanup (incl. local orphans) every
-        // hour. The unroutable Cloud row must be skipped so the rest of the batch still proceeds.
+        // F2 (review 043-v3) + D38 (review 043-v5): cloud was enabled, an upload was promoted (Cloud),
+        // then Storage:Provider reverted to local, so For(Cloud) would throw. The unroutable Cloud row
+        // must not be deleted, and must not block cleanup of the local batch. Since D38 the exclusion
+        // is at the QUERY level (the row never enters the batch), so For(Cloud) is never called for it.
         var db = CreateDb();
         var cloudUpload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400)); // oldest → first in batch
         cloudUpload.StorageLocation = StorageLocation.Cloud;
@@ -433,7 +433,42 @@ public class UploadCleanupJobTests
         local.Verify(s => s.DeleteAsync(localOrphan.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
 
         (await db.Uploads.FindAsync(localOrphan.Id))!.DeletedAt.Should().NotBeNull();
-        (await db.Uploads.FindAsync(cloudUpload.Id))!.DeletedAt.Should().BeNull(); // skipped, retried later
+        (await db.Uploads.FindAsync(cloudUpload.Id))!.DeletedAt.Should().BeNull(); // excluded, retried later
+    }
+
+    [Fact]
+    public async Task Cleanup_manyUnroutableCloudRows_doNotStarveLocalOrphanCleanup()
+    {
+        // D38 (review 043-v5): with the cloud tier disabled and >= BatchSize aged Cloud rows, the
+        // pre-fix code fetched the oldest BatchSize (all Cloud), skipped them post-fetch, and never
+        // advanced the OrderBy/Take window to a local orphan sorted after them → local cleanup
+        // wedged every sweep. The query-level exclusion must let the batch reach the routable orphan.
+        var db = CreateDb();
+
+        // BatchSize (500) aged Cloud rows, all OLDER than the local orphan so — unfiltered — they
+        // would fill the entire Take(500) window and the orphan would never be reached.
+        var baseTime = DateTimeOffset.UtcNow.AddDays(-500);
+        for (var i = 0; i < 500; i++)
+        {
+            var cloud = MakeUpload(baseTime.AddSeconds(i));
+            cloud.StorageLocation = StorageLocation.Cloud;
+            await db.Uploads.AddAsync(cloud);
+        }
+        var localOrphan = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25)); // newest → sorted last
+        await db.Uploads.AddAsync(localOrphan);
+        await db.SaveChangesAsync();
+
+        var (factory, local) = BuildCloudDisabledScopeFactory(db);
+        var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
+            Mock.Of<ILogger<UploadCleanupJob>>());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        // The local orphan is reached and cleaned despite 500 unroutable Cloud rows ahead of it.
+        deleted.Should().Be(1);
+        errors.Should().Be(0);
+        local.Verify(s => s.DeleteAsync(localOrphan.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
+        (await db.Uploads.FindAsync(localOrphan.Id))!.DeletedAt.Should().NotBeNull();
     }
 
     [Fact]
