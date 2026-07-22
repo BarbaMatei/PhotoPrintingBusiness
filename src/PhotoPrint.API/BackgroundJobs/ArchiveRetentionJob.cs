@@ -95,6 +95,7 @@ public class ArchiveRetentionJob : BackgroundService
 
         var blobsDeleted = 0;
         var failed = 0;
+        var expired = new List<Guid>();
 
         foreach (var u in rows)
         {
@@ -119,9 +120,7 @@ public class ArchiveRetentionJob : BackgroundService
                     blobsDeleted++;
                 }
 
-                _logger.LogInformation(
-                    "ArchiveExpired upload_id={UploadId} retention_months={Months}",
-                    u.Id, _settings.RetentionMonths);
+                expired.Add(u.Id);
             }
             catch (Exception ex)
             {
@@ -133,6 +132,14 @@ public class ArchiveRetentionJob : BackgroundService
 
         if (rows.Count > 0)
             await db.SaveChangesAsync(ct);
+
+        // Audit only after the durable commit: emitting inside the loop fired ArchiveExpired
+        // for rows whose key-null update then failed to persist — duplicate/false audit
+        // records re-emitted every tick (D56, review 043-v7).
+        foreach (var id in expired)
+            _logger.LogInformation(
+                "ArchiveExpired upload_id={UploadId} retention_months={Months}",
+                id, _settings.RetentionMonths);
 
         return (rows.Count, blobsDeleted, failed);
     }

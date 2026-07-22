@@ -309,4 +309,73 @@ public class ArchiveRetentionJobTests
 
         cleaned.Should().Be(1);
     }
+
+    // ── D56 (review 043-v7): ArchiveExpired audit must follow the durable commit ──
+
+    private sealed class ThrowingSaveDbContext : PhotoPrintDbContext
+    {
+        public ThrowingSaveDbContext(DbContextOptions<PhotoPrintDbContext> options) : base(options) { }
+        public override Task<int> SaveChangesAsync(CancellationToken ct = default)
+            => throw new InvalidOperationException("simulated save failure");
+    }
+
+    private static bool LogsArchiveExpired(Mock<ILogger<ArchiveRetentionJob>> logger, Times times)
+    {
+        logger.Verify(l => l.Log(
+            It.IsAny<LogLevel>(),
+            It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("ArchiveExpired")),
+            It.IsAny<Exception?>(),
+            It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            times);
+        return true;
+    }
+
+    [Fact]
+    public async Task SweepAsync_SaveFails_EmitsNoArchiveExpiredAudit()
+    {
+        // The audit event fired per-upload BEFORE the batched SaveChanges: a failed save left
+        // ArchiveExpired on record for rows never persisted, re-emitted every subsequent tick
+        // (duplicate/false audit trail). No commit -> no audit event.
+        var storeName = Guid.NewGuid().ToString();
+        var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseInMemoryDatabase(storeName).Options;
+        using (var seedDb = new PhotoPrintDbContext(options))
+        {
+            var u = SeedUpload(seedDb);
+            SeedOrderItem(seedDb, u, DateTimeOffset.UtcNow.AddMonths(-13));
+        }
+
+        using var throwingDb = new ThrowingSaveDbContext(options);
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .Returns(Task.CompletedTask);
+        var logger = new Mock<ILogger<ArchiveRetentionJob>>();
+        var sut = new ArchiveRetentionJob(
+            BuildScopes(throwingDb, Router(true, cloud).Object), Settings(), logger.Object);
+
+        var act = () => SweepAsync(sut, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        LogsArchiveExpired(logger, Times.Never());
+    }
+
+    [Fact]
+    public async Task SweepAsync_SaveSucceeds_EmitsArchiveExpiredAuditPerUpload()
+    {
+        using var db = CreateDb();
+        var u = SeedUpload(db);
+        SeedOrderItem(db, u, DateTimeOffset.UtcNow.AddMonths(-13));
+
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .Returns(Task.CompletedTask);
+        var logger = new Mock<ILogger<ArchiveRetentionJob>>();
+        var sut = new ArchiveRetentionJob(
+            BuildScopes(db, Router(true, cloud).Object), Settings(), logger.Object);
+
+        await SweepAsync(sut, CancellationToken.None);
+
+        LogsArchiveExpired(logger, Times.Once());
+    }
 }
