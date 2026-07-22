@@ -292,4 +292,47 @@ public class OriginalPurgerTests
         (await db.Uploads.FindAsync(ok.Id))!.FilePath.Should().BeNull();
         (await db.Uploads.FindAsync(bad.Id))!.FilePath.Should().NotBeNull();
     }
+
+    // ── D50 (review 043-v7): shared uploads across orders ─────────────────────
+
+    [Fact]
+    public async Task PurgeOrderOriginals_UploadSharedWithLiveOrder_IsSkippedNotDeleted()
+    {
+        // Checkout does not clear the cart, so a payment-fail retry / double-checkout creates
+        // a second order referencing the SAME Upload row. Purging because order A completed
+        // destroyed the original order B (Paid, unfulfilled) still needs — B's fulfilment ZIP
+        // silently truncated, the photo unrecoverable.
+        using var db = CreateDb();
+        var shared = SeedUpload(db);
+        var shipped = SeedOrder(db, OrderStatus.Shipped, shared);
+        SeedOrder(db, OrderStatus.Paid, shared); // second, still-live order
+        var bundle = CreateSut(db);
+        // Strict cloud mock: any DeleteAsync call fails the test.
+
+        var outcome = await bundle.Sut.PurgeOrderOriginalsAsync(shipped.Id);
+
+        outcome.Purged.Should().Be(0);
+        outcome.Skipped.Should().Be(1);
+        (await db.Uploads.FindAsync(shared.Id))!.FilePath.Should().NotBeNull();
+        bundle.Cloud.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task PurgeOrderOriginals_SharingOrderAlreadyDelivered_PurgeProceeds()
+    {
+        // Liveness: once every other referencing order is past fulfilment, the (re-)purge
+        // must go through — the recovery sweep re-visits rows with FilePath != null.
+        using var db = CreateDb();
+        var shared = SeedUpload(db);
+        var shipped = SeedOrder(db, OrderStatus.Shipped, shared);
+        SeedOrder(db, OrderStatus.Delivered, shared);
+        var bundle = CreateSut(db);
+        bundle.Cloud.Setup(s => s.DeleteAsync(shared.FilePath!, It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+
+        var outcome = await bundle.Sut.PurgeOrderOriginalsAsync(shipped.Id);
+
+        outcome.Purged.Should().Be(1);
+        (await db.Uploads.FindAsync(shared.Id))!.FilePath.Should().BeNull();
+    }
 }

@@ -310,6 +310,56 @@ public class ArchiveRetentionJobTests
         cleaned.Should().Be(1);
     }
 
+    // ── D50 (review 043-v7): shared uploads across orders ─────────────────────
+
+    [Fact]
+    public async Task SweepAsync_UploadSharedWithInWindowOrder_IsNotExpired()
+    {
+        // Retention keyed on ANY referencing order aging out deleted previews a NEWER paid
+        // order was still entitled to view — permanent loss once the original is purged.
+        // Delete only when NO referencing order is inside the window.
+        using var db = CreateDb();
+        var u = SeedUpload(db);
+        SeedOrderItem(db, u, DateTimeOffset.UtcNow.AddMonths(-13)); // aged out
+        SeedOrderItem(db, u, DateTimeOffset.UtcNow.AddMonths(-1));  // still in-window
+
+        var cloud = new Mock<IStorageService>(MockBehavior.Strict);
+        var sut = BuildSut(db, Router(true, cloud).Object);
+
+        var (cleaned, blobs, _) = await SweepAsync(sut, CancellationToken.None);
+
+        cleaned.Should().Be(0);
+        blobs.Should().Be(0);
+        cloud.VerifyNoOtherCalls();
+        var after = await db.Uploads.FindAsync(u.Id);
+        after!.LargePreviewPath.Should().NotBeNull();
+        after.ThumbnailPath.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task SweepAsync_D50Query_TranslatesOnSqlite()
+    {
+        // The InMemory provider runs LINQ-to-objects and proves nothing about SQL translation
+        // (data-stack parity rule). The D50 fix added a second correlated NOT-EXISTS to the
+        // candidate query; an untranslatable shape throws at ToListAsync regardless of rows,
+        // so an empty-DB sweep on real SQLite pins translatability. Filtering semantics are
+        // covered by SweepAsync_UploadSharedWithInWindowOrder_IsNotExpired (InMemory); the
+        // full relational-graph seeding belongs to the deferred D20 Testcontainers track.
+        using var conn = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
+        conn.Open();
+        var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseSqlite(conn).Options;
+        using var db = new PhotoPrintDbContext(options);
+        db.Database.EnsureCreated();
+
+        var cloud = new Mock<IStorageService>(MockBehavior.Strict);
+        var sut = BuildSut(db, Router(true, cloud).Object);
+
+        var (cleaned, blobs, failed) = await SweepAsync(sut, CancellationToken.None);
+
+        (cleaned, blobs, failed).Should().Be((0, 0, 0));
+    }
+
     // ── D56 (review 043-v7): ArchiveExpired audit must follow the durable commit ──
 
     private sealed class ThrowingSaveDbContext : PhotoPrintDbContext

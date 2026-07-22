@@ -83,12 +83,18 @@ public class ArchiveRetentionJob : BackgroundService
 
         // Anchor on Order.PaidAt — see ADR-012. Cancelled orders included naturally because
         // they had a non-null PaidAt before status changed; we don't filter by status here.
+        // Second clause: a cart-reused upload can back multiple orders — expiring it because
+        // ANY referencing order aged out deleted previews a NEWER paid order was still entitled
+        // to view (D50, review 043-v7). Delete only when no referencing order is in-window.
         var rows = await db.Uploads
             .Where(u => u.StorageLocation == StorageLocation.Cloud)
             .Where(u => u.LargePreviewPath != null || u.ThumbnailPath != null)
             .Where(u => db.OrderItems
                 .Where(oi => oi.UploadId == u.Id)
                 .Any(oi => oi.Order.PaidAt != null && oi.Order.PaidAt < cutoff))
+            .Where(u => !db.OrderItems
+                .Where(oi => oi.UploadId == u.Id)
+                .Any(oi => oi.Order.PaidAt != null && oi.Order.PaidAt >= cutoff))
             .OrderBy(u => u.UploadedAt)
             .Take(_settings.BatchSize)
             .ToListAsync(ct);

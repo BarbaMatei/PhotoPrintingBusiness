@@ -94,6 +94,25 @@ public class OriginalPurger : IOriginalPurger
             return new PurgeOutcome(0, 1, 0, 0);
         }
 
+        // A cart-reused upload can be referenced by MULTIPLE orders (checkout does not clear
+        // the cart, so a payment-fail retry / double-checkout shares the Upload row). Deleting
+        // the original because THIS order completed would truncate the other order's fulfilment
+        // ZIP (D50, review 043-v7). Skip while any other order still needs the bytes
+        // ({Paid, Printing} = pre-fulfilment); liveness holds because the recovery sweep keys
+        // on FilePath != null and re-attempts once the blocking order resolves.
+        var blockingOrderId = await _db.OrderItems
+            .Where(oi => oi.UploadId == upload.Id && oi.OrderId != orderId)
+            .Where(oi => oi.Order.Status == OrderStatus.Paid || oi.Order.Status == OrderStatus.Printing)
+            .Select(oi => oi.OrderId)
+            .FirstOrDefaultAsync(ct);
+        if (blockingOrderId != Guid.Empty)
+        {
+            _logger.LogInformation(
+                "purge.upload.skipped upload_id={UploadId} reason=shared-with-live-order blocking_order_id={BlockingOrderId}",
+                upload.Id, blockingOrderId);
+            return new PurgeOutcome(0, 1, 0, 0);
+        }
+
         var oldPath = upload.FilePath;
         var sizeBytes = upload.FileSizeBytes;
 
