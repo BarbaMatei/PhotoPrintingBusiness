@@ -17,11 +17,12 @@ post-fix), and all three were known carry-forward / deferred-to-this-lens items,
 *expected* to re-surface, not a saturation signal (per the README, overlap only estimates a
 population across **parallel blinded passes on one frozen commit** — the still-owed certification pair).
 
-Status column reflects the cumulative outcome through **v4 (verification)**: `verified` = fix held
+Status column reflects the cumulative outcome through **v5 (delta-discovery)**: `verified` = fix held
 (revert-and-rerun / construction / inspection); `wont-fix` / `deferred` = decision upheld;
-`open` = live finding awaiting a fix round. The v3 fix round drove D13/D5b/D19/D21–D34's fixables to
-`fixed`, and **v4 (independent verification) flipped all 14 to `verified`** (revert-and-rerun) and
-upheld the 4 deferrals; v4 also added **D35 (NF1)**.
+`open` = live finding awaiting a fix round. v4 (independent verification) flipped D13/D5b/D19/D21–D34's
+14 fixables to `verified` and upheld the 4 deferrals; **v5 (blinded delta over the v3 fix round)
+added D36–D48 (13 new, all fix-generative) and corroborated D35** — so D35–D48 are the current open
+population (0 High, 0 blockers; 3 Med + 9 Low + 1 Cleanup).
 
 | D# | First seen | Sev (v1) | Status (through v2) | Title |
 |----|-----------|----------|--------|-------|
@@ -60,7 +61,20 @@ upheld the 4 deferrals; v4 also added **D35 (NF1)**.
 | D32 | v3 · F16 | 🟡 Low | **verified** (v4 · F16) *(Medium strand refuted)* | getOrderDetail blanket catchError bounces on transient/5xx with no retry (the logged-out-**strand** Medium was refuted — authGuard covers it) |
 | D33 | v3 · F17 | 🟡 Low | **verified** (v4 · F17) | Lightbox modal lacks focus trap / `role=dialog` / `aria-modal` / focus restore (a11y — first-time frontend coverage) |
 | D34 | v3 · F18 | 🟡 Low | **deferred** (latent) *(upheld v4)* | order-detail loads only in `ngOnInit` despite route-bound `orderId` input → stale on a future detail→detail reuse |
-| D35 | v4 · NF1 | 🟡 Low | **open** *(fix-generative)* | F1's periodic promotion sweep has **no in-flight/queued dedup** (worker uses a plain `List<Task>`, `MaxConcurrentOrders=4`; promoter never re-reads live state before its row-flip) → the sweep can spawn a second concurrent promotion of one order and hit the [[D27]] orphan race **without** duplicate webhooks. Folds into the D27/D9 concurrency-token fix (bolt-035) |
+| D35 | v4 · NF1 | 🟡 Low | **open** *(fix-generative; corroborated v5 · F4, conv 2)* | F1's periodic promotion sweep has **no in-flight/queued dedup** (worker uses a plain `List<Task>`, `MaxConcurrentOrders=4`; promoter never re-reads live state before its row-flip) → the sweep can spawn a second concurrent promotion of one order and hit the [[D27]] orphan race **without** duplicate webhooks. v5's blinded race lens independently re-found the dedup gap (added consequence: a spurious `promotion.upload.failed reason=local-original-missing` + wasted retry). Folds into the D27/D9 concurrency-token fix (bolt-035) |
+| D36 | v5 · F1 | 🟠 Med | **open** *(regression — F7 fix, conv 4)* | Stale `lightboxPhotoId` (never cleared on close) makes `refreshPhotoUrls` **re-open a closed lightbox** when a grid/lightbox thumbnail's expired presigned URL fires `(error)`. 4 lenses converged |
+| D37 | v5 · F3 | 🟠 Med | **open** *(F1 fix-generated)* | F1's periodic re-scan (its whole purpose) is **untested + untestable** — only the boot sweep is tested; delete the `PeriodicTimer` loop and the suite stays green; interval is whole-hours so no fast periodic test. Wants a `TimeSpan`/`TimeProvider` seam |
+| D38 | v5 · F2 | 🟠 Med | **open** *(F2 fix edge)* | Unroutable-Cloud cleanup skip is **post-fetch**, so ≥500 aged Cloud rows re-fill the deterministic batch every sweep and **starve local-orphan cleanup indefinitely** — the "later sweep" comment is wrong. Needs a query-level `WHERE` filter |
+| D39 | v5 · F13 | 🟡 Low | **open** *(F1 test quality)* | Renamed `ExecuteAsync_ArchiveDisabled/_CloudTierOff` guard tests seed an **empty DB** → guard removal enqueues nothing anyway → `VerifyNoOtherCalls()` passes for the wrong reason. Seed a stuck Paid+Local order |
+| D40 | v5 · F11 | 🟡 Low | **open** *(F7 coverage)* | Anti-refresh-loop guard (`urlsRefreshed`) untested — no spec dispatches a *second* img `(error)` to assert no third `getOrderPhotos` fetch |
+| D41 | v5 · F12 | 🟡 Low | **open** *(F17 coverage)* | Lightbox focus-trap (`trapFocus` Tab/Shift+Tab `preventDefault` + refocus) has no spec — drop `preventDefault` and Tab escapes the modal, no test reddens |
+| D42 | v5 · F9 | 🟡 Low | **open** *(F7 UX)* | Auto-heal shows "Reîncarcă pagina" **while** silently re-fetching a fresh URL → the user is told to reload for an error the app then auto-recovers. Show a neutral reloading state first |
+| D43 | v5 · F8 | 🟡 Low | **open** *(hinted)* | 401 on order fetch for a **non-authenticated** user (interceptor guest branch only clears the token, no navigate) → `loadOrder` sets neither error nor redirect → **blank order body**, no retry |
+| D44 | v5 · F14 | ⚪ Cleanup | **open** | Order retries + `ngOnInit` subs have no in-flight dedup / `takeUntilDestroyed` / `switchMap` — last-arriving-wins on rapid retries; late response sets signals post-destroy |
+| D45 | v5 · F6 | 🟡 Low | **open** *(F9 residual)* | F9's ZIP pre-flight throws `InvalidOperationException` — unmapped → generic **500 logged "Unhandled exception"**; ops can't tell config-error from a crash. Map to 409/422 + Warning log |
+| D46 | v5 · F5 | 🟡 Low | **open** *(F1 fix-generated)* | Periodic sweep re-enqueues **permanently-terminal** promotions (lost local original) **forever** — re-burns `MaxAttempts` + re-logs terminal every interval (boot-only never repeated this). Needs a give-up marker |
+| D47 | v5 · F7 | 🟡 Low | **open** *(F1/F2 claim)* | `CloudEnabled` fixed at boot (`StorageRouter._cloud` set once) → a runtime `Provider=local→S3` flip **needs a restart**; contradicts the "retried when set back to S3" claim. Document or `IOptionsMonitor` |
+| D48 | v5 · F10 | 🟡 Low | **open** *(F7/F17 edge)* | Lightbox `failed()` reset keyed on `src !== lastSrc`; an identical refreshed presigned URL leaves `failed` stuck (+ `urlsRefreshed` blocks retry) → error until page reload |
 
 ## Refuted (recorded, no D# assigned)
 
@@ -104,6 +118,20 @@ Verdict `approve-with-followups` (0 High, 0 blockers; a delta pass cannot certif
 theme: fix-generativity** — nearly every backend finding traces to a v1→v2 fix (F4's periodic
 conversion, F17's cancel try/catch, F1/F2's `IStorageRouter` routing). **Not quiet → fix → verify →
 delta again.** See [review-v3.md](review-v3.md) + [findings-v3.md](findings-v3.md).
+
+## v5 delta-discovery provenance (2026-07-20)
+
+Blinded 5-lens delta (correctness · race · tests-coverage · frontend-ux · completeness-critic) over
+the **v3 fix round** `151abef..972a8b4`, `passType: delta`, 9 terminal decisions passed as
+`decidedFindings`. 19 raw → **14 canonical** (max convergence **4**), 0 refuted, 0 decided-re-raises.
+Verdict `approve-with-followups` (0 High, 0 blockers). **Not quiet — the v3 fix round was itself
+fix-generative**, in two clusters: (A) F1's periodic promotion sweep shipped under-built — D35
+(corroborated), D37 (untested), D46 (perpetual terminal re-enqueue), D47 (boot-fixed config); (B) the
+frontend F7 refresh introduced a conv-4 Medium regression D36 (reopens a closed lightbox) + Lows
+D40/D42/D48. Plus D38 (F2 batch-starvation edge) and D45 (F9 unmapped 500). Recommend: fix D36 + D38
+now; treat cluster A as one design item folded into bolt-035 (D9/D27); batch cluster B. See
+[review-v5.md](review-v5.md) + [findings-v5.md](findings-v5.md). **Certification remains gated behind a
+quiet delta — not yet reached.**
 
 ## v4 verification provenance (2026-07-20)
 
