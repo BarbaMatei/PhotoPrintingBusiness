@@ -606,6 +606,24 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetOrderPhotosAsync_SoftDeletedUpload_ExcludedFromResults()
+    {
+        // D52 (review 043-v7): UploadCleanupJob soft-deletes the row and deletes its cloud
+        // blobs but leaves the path fields set; without a DeletedAt filter this endpoint
+        // presigned URLs for the deleted blobs — broken thumbnails/lightbox that the
+        // one-shot refresh cannot recover.
+        var (sut, cloud) = CreateSutWithCloud();
+        var (order, upload) = await SeedPaidOrderWithPromotedUploadAsync();
+        upload.DeletedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var result = await sut.GetOrderPhotosAsync(order.Id, order.UserId!.Value);
+
+        Assert.Empty(result.Photos);
+        cloud.VerifyNoOtherCalls(); // no presigning of dead blobs
+    }
+
+    [Fact]
     public async Task GetOrderPhotosAsync_ThumbnailPathNull_ExcludedFromResults()
     {
         // Mirror of the above — preview kept, thumb gone. Either-null filters the row out.

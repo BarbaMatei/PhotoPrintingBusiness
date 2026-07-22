@@ -475,11 +475,14 @@ public class OrderService : IOrderService
 
         var ttl = TimeSpan.FromMinutes(_storageSettings.PresignTtlMinutes);
 
-        // Filter: only Cloud-promoted uploads with BOTH blob keys still present. A row
-        // mid-retention with one key nulled is excluded — the lightbox would otherwise
-        // fail when the user clicked through.
+        // Filter: only live (not soft-deleted), Cloud-promoted uploads with BOTH blob keys
+        // still present. UploadCleanupJob soft-deletes a row but leaves its path fields set,
+        // so without the DeletedAt check this presigned URLs for already-deleted blobs —
+        // broken thumbnails the refresh can't fix (D52, review 043-v7). A row mid-retention
+        // with one key nulled is excluded — the lightbox would otherwise fail on click.
         var viewable = order.Items
             .Select(i => i.Upload)
+            .Where(u => u.DeletedAt == null)
             .Where(u => u.StorageLocation == StorageLocation.Cloud)
             .Where(u => u.LargePreviewPath is not null && u.ThumbnailPath is not null)
             .DistinctBy(u => u.Id)
