@@ -79,6 +79,21 @@ our own fixes. The loop now keys on severity, which was the design intent all al
   pair** (one event, lenses split across the two passes — not two separate endgames). Lower
   tiers may close on a quiet loop with explicit owner sign-off, recorded in the index.
 
+  **The pair is not sacred (2026-07-22, first time certification actually ran — 043).** The
+  second simultaneous pass earns its keep *only* via the capture–recapture "two independent
+  looks agree ⇒ near-saturated" idea, which the design doc itself flags as the weakest, still
+  **unproven** assumption in the system (bolt-035's one attempt to measure overlap collapsed —
+  passes on different commits, true overlap ≈ 0). So a **single fresh full-manifest pass** is an
+  acceptable certification close, recorded as an owner-approved deviation, when: (a) a full pair
+  (or an equivalently broad blinded review) already ran recently on near-identical code, and
+  (b) the fix round since was small and independently verified. That was exactly 043 at v9 — the
+  v7 pair had just audited the whole feature; the v7→v8 fix round moved 8 files, all verified,
+  and its new surface got a fresh-eyes micro-review. A single full-manifest pass then still
+  catches a fresh serious bug (its actual job); it just closes on "one clean look" rather than
+  "two independent looks agreed" — honest, not dressed up as the full protocol. Re-run the full
+  pair when there is **no** recent broad look, or the fix round was large/design-level. This is
+  a calibration to revisit as the (still-unproven) saturation model earns or loses trust.
+
 ---
 
 ## Two loops, not one: Discovery vs Verification
