@@ -37,9 +37,13 @@ referenced-retention branch — a third site of the same class), deferred **D53 
 and **D60 → 3-env** (with D20), and sent **D61–D82 to backlog**. **v8 (independent verification,
 2026-07-22) verified all 10 fixes non-vacuously** (D49 red with its exact data-loss signature; D51
 red with the slot-starvation timeout; D59 by mutation) and upheld both deferrals + the backlog —
-**0 reopened, 0 new.** The v7 counter-reset is fully serviced; the one remaining gate is the
-**re-run certification on a re-frozen commit**, awaiting owner choice (full pair vs single-pass
-variant).
+**0 reopened, 0 new.** **v9 (single-pass certification, owner-approved deviation, 2026-07-22 @
+`ac97e42`) — CERTIFIED CLEAN OF SERIOUS DEFECTS: 0 High, 0 fix-caused regression.** The 10 Mediums
+it surfaced are all accepted-residual / folded-into-deferred / re-raises / sub-serious follow-ups
+(new: D83 empty-state-before-promotion, D84 EuPlatesc coverage, D85 backfill review-gap; new Lows
+D86–D88/D90; new codebase-wide Cleanup D89). Under the severity-based stop rule the loop does **not**
+re-arm — 043's serious population is closed and confirmed. Remaining Mediums/Lows/Cleanup are
+triaged follow-ups, not blockers.
 
 | D# | First seen | Sev (v1) | Status (through v2) | Title |
 |----|-----------|----------|--------|-------|
@@ -279,3 +283,31 @@ upheld** (D53: WebhooksController source unchanged in the round; D60: integratio
 backlog spot-checks clean. Suites **.NET 719/719** (+10 CI MinIO) · **FE 439/439** (one non-043
 `format-selector` load-flake, green isolated + on the clean run — backlog note, not a reopen).
 **0 reopened, 0 new → the v7 counter-reset is serviced.** See [review-v8.md](review-v8.md).
+
+## v9 certification (single full-manifest pass, 2026-07-22)
+
+Owner-approved single blinded full-manifest pass on frozen `ac97e42` (deviation from the two-pass
+protocol — README *The pair is not sacred*; justified by the v7 pair having just audited the same
+feature + a small, verified v7→v8 fix round). `wf_f9c87958-fa1`, 45 agents / 2.87M tok, 31 raw → 30
+canonical. **Verdict: certified clean of serious defects — 0 High, 0 fix-caused regression.** See
+[review-v9.md](review-v9.md).
+
+New / updated identities:
+
+| D# | Sev | Status | Title |
+|----|-----|--------|-------|
+| D83 | 🟠 Med | **open** *(new; [[D13]] follow-up)* | "Fotografiile … nu mai sunt disponibile" shown for a just-paid order before in-process promotion runs, and for pending orders — needs an order-status/backend-state gate (`order-detail-page.ts`) |
+| D84 | 🟠 Med | **open** *(new; [[D59]] coverage sibling)* | EuPlatesc IPN → promotion `EnqueueAsync` wiring never asserted (only the Stripe twin is) (`PaymentControllerIntegrationTests.cs`) |
+| D85 | 🟠 Med | **open** *(new; review-scope)* | Backfill CLI omitted from the review manifest (lighter scrutiny); backfill × live-worker concurrent promotion untested (`BackfillCommand.cs`) |
+| D86 | 🟡 Low | **backlog** *(new)* | Retention deletes blobs before persisting key-null → broken-URL window on a concurrent read (`ArchiveRetentionJob.cs:146`) |
+| D87 | 🟡 Low | **backlog** *(new; [[D52]]/[[D56]] class)* | Retention sweep query omits the `DeletedAt` filter → reprocesses soft-deleted rows, re-emits false audit (`ArchiveRetentionJob.cs:96`) |
+| D88 | 🟡 Low | **backlog** *(new)* | Promoter tests assert cloud-write keys but never the bytes written (`OrderPhotoPromoterTests.cs`) |
+| D89 | ⚪ Cleanup | **backlog** *(new; codebase-wide)* | Fix comments cite finding/decision/ADR IDs — CLAUDE.md hard-rule violation, 67 occurrences / 27 files (mostly pre-existing; this session added to it). Dedicated comment-hygiene sweep |
+| D90 | 🟡 Low | **backlog** *(new; [[D36]] coverage)* | D36 close-*during*-refresh resolve-time re-read has no spec (only close-before-error is tested) (`order-detail-page.spec.ts`) |
+| D62 | 🟡 Low | **backlog** *(widened v9)* | ZIP mid-loop `GetStream` truncation — v9 adds the concurrent-**promotion** trigger (Local→Cloud+delete) alongside the original concurrent-purge one (`AdminOrderService.cs`) |
+
+Re-raises upheld (prior decisions stand): **D10** (403-vs-404 wont-fix — but reconcile 053's
+implementation-plan AC, which says 404: doc-vs-code discrepancy), D42, D69, D74, D75, D80.
+Folded: worker-dedup → **D35** (cluster A → bolt-035); cost/poison-amplification → **D46/D51**;
+sweep-query parity → **D20**. Refuted (dropped, do not re-raise): frontend manifest-path skip
+(file was reviewed), ImageProcessor fail-open (fail-closed confirmed), MimeValidator partial-read.
