@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using PhotoPrint.API.BackgroundJobs;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
@@ -101,5 +102,30 @@ public class AwbInfrastructureTests
             job.EnqueuedAt.Should().Be(clock.GetUtcNow());
             return;
         }
+    }
+
+    // ── AwbDispatcher.NextDispatchDelay (in-process backoff schedule) ─────────
+
+    [Theory]
+    [InlineData(1, 30)]
+    [InlineData(2, 120)]
+    [InlineData(3, 300)]
+    [InlineData(4, 900)]
+    [InlineData(5, 3600)]
+    public void NextDispatchDelay_covers_every_configured_attempt_including_the_last(int attempt, int expectedSeconds)
+    {
+        var backoffs = new[] { 30, 120, 300, 900, 3600 };
+        AwbDispatcher.NextDispatchDelay(attempt, backoffs)
+            .Should().Be(TimeSpan.FromSeconds(expectedSeconds));
+    }
+
+    [Fact]
+    public void NextDispatchDelay_is_exhausted_only_past_the_last_attempt()
+    {
+        var backoffs = new[] { 30, 120, 300, 900, 3600 };
+        // The off-by-one exhausted at attempt == Length (5), skipping the final 3600s entry.
+        AwbDispatcher.NextDispatchDelay(5, backoffs).Should().Be(TimeSpan.FromSeconds(3600));
+        AwbDispatcher.NextDispatchDelay(6, backoffs).Should().BeNull();
+        AwbDispatcher.NextDispatchDelay(0, backoffs).Should().BeNull();
     }
 }

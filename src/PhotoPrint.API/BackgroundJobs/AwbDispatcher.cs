@@ -112,10 +112,18 @@ public sealed class AwbDispatcher : BackgroundService
         }
     }
 
+    // Attempt is 1-based; a schedule of N entries covers attempts 1..N (index attempt-1),
+    // exhausted only past the last entry.
+    public static TimeSpan? NextDispatchDelay(int attempt, IReadOnlyList<int> backoffSeconds)
+    {
+        if (attempt < 1 || attempt > backoffSeconds.Count) return null;
+        return TimeSpan.FromSeconds(backoffSeconds[attempt - 1]);
+    }
+
     private async Task ScheduleReEnqueueAsync(AwbJob job, string reason, CancellationToken ct)
     {
-        var backoffs = _settings.DispatchBackoffSeconds;
-        if (job.Attempt >= backoffs.Length)
+        var delay = NextDispatchDelay(job.Attempt, _settings.DispatchBackoffSeconds);
+        if (delay is null)
         {
             _logger.LogInformation(
                 "sameday.awb.dispatcher-backoff-exhausted order_id={OrderId} attempt={Attempt} — handing off to AwbRetryJob",
@@ -123,19 +131,16 @@ public sealed class AwbDispatcher : BackgroundService
             return;
         }
 
-        var delaySeconds = backoffs[Math.Min(job.Attempt - 1, backoffs.Length - 1)];
-        var delay = TimeSpan.FromSeconds(delaySeconds);
-
         _logger.LogInformation(
             "sameday.awb.retry-scheduled order_id={OrderId} attempt={Attempt} delay={Delay}s reason={Reason}",
-            job.OrderId, job.Attempt, delaySeconds, reason);
+            job.OrderId, job.Attempt, (int)delay.Value.TotalSeconds, reason);
 
         // Fire-and-forget delayed re-enqueue.
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(delay, ct);
+                await Task.Delay(delay.Value, ct);
                 await _queue.EnqueueAsync(
                     new AwbJob(job.OrderId, job.Attempt + 1, _clock.GetUtcNow()),
                     ct);
