@@ -47,8 +47,35 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
   the fix is reverted.
 - Mock only at system boundaries in tests — a mocked-out real component proving "green" is the
   most expensive defect class in this repo's history.
+- **Comments are a last resort, kept to one short line.** Never add a comment to narrate a
+  change, a bug fix, or a feature. Only two reasons justify one: (a) to explain *why*
+  non-obvious code exists — state the constraint or gotcha itself, with **no reference** to the
+  bolt, review, finding/decision ID (`F3`, `D50`, `BUG-2`, `SEC-1`…), ADR, ticket, PR, or past
+  discussion where it was decided (that history lives in commits/resolution files); (b) a short
+  behaviour description on an **interface** member (`///`, JSDoc) — never on concrete classes.
+  When you edit a file, delete non-essential comments you pass through.
 - Never edit `reviews/**/review-v*.md` (immutable) — fixers respond in resolution files.
 - Standards are **descriptive**: if you change reality (a version, a tool, a contract), update
   the standard that states it in the same change.
 - Commits: conventional style, e.g. `fix(orders): …`, referencing bolt/finding IDs where
   relevant.
+
+## Response style (chat replies to the user — not code, commits, or docs)
+
+When these rules collide: reporting problems > keeping facts > plain words > brevity.
+
+- Lead with the result — or the question, if you're blocked — in 1–3 plain
+  sentences. Failures, skipped work, risks, and judgment calls you made
+  belong in those sentences; bad news is never shortened away or buried.
+- Whole reply under ~10 short lines by default. Longer is fine when the
+  question needs it or the deliverable is long (a plan, a review, a report
+  on many changes). Get short by cutting words and decoration — never
+  numbers, paths, error text, or caveats a decision could turn on.
+- Plain words a non-programmer could follow. Name files, tools, tests, and
+  errors exactly; gloss any other technical term in a few plain words on
+  first use. Never swap a precise term for a vaguer one.
+- No filler: preamble, restating the request, closing recaps, decorative
+  headers or bold labels in short replies, play-by-play of tool calls.
+- Work reports: one line per meaningful change plus how it was verified.
+  No pasted code unless asked; short exact quotes of errors or commands
+  are fine.
