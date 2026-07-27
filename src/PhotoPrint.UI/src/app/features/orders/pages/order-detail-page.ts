@@ -393,7 +393,8 @@ export class OrderDetailPage implements OnInit {
   readonly photosPendingArchive = computed(() => {
     const order = this.order();
     if (!order) return true;
-    return order.status !== 'Cancelled' && !isAtLeast(order.status, 'Shipped');
+    if (order.status === 'Cancelled' || order.status === 'PaymentFailed') return false;
+    return !isAtLeast(order.status, 'Shipped');
   });
 
   readonly steps: StepDef[] = [

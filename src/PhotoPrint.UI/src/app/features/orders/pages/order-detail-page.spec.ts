@@ -159,7 +159,7 @@ describe('OrderDetailPage', () => {
 
   // An empty archive only means "purged" once the order could have been purged (shipped /
   // delivered / cancelled). Before that, photos are still being prepared.
-  for (const status of ['AwaitingPayment', 'Paid', 'Printing'] as const) {
+  for (const status of ['AwaitingPayment', 'Pending', 'Paid', 'Printing'] as const) {
     it(`shows the "available soon" copy for an empty archive on a ${status} order`, async () => {
       await setup({
         getOrderDetail: vi.fn().mockReturnValue(of({ ...MOCK_DETAIL, status: status as OrderDetailDto['status'] })),
@@ -171,7 +171,7 @@ describe('OrderDetailPage', () => {
     });
   }
 
-  for (const status of ['Shipped', 'Delivered', 'Cancelled'] as const) {
+  for (const status of ['Shipped', 'Delivered', 'Cancelled', 'PaymentFailed'] as const) {
     it(`keeps the "no longer available" copy for an empty archive on a ${status} order`, async () => {
       await setup({
         getOrderDetail: vi.fn().mockReturnValue(of({ ...MOCK_DETAIL, status: status as OrderDetailDto['status'] })),
