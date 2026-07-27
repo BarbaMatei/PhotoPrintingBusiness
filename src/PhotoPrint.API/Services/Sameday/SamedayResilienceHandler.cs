@@ -21,11 +21,13 @@ namespace PhotoPrint.API.Services.Sameday;
 public sealed class SamedayResilienceHandler : DelegatingHandler
 {
     private readonly ResiliencePipeline<HttpResponseMessage> _pipeline;
+    private readonly System.Threading.RateLimiting.RateLimiter? _rateLimiter;
 
     public SamedayResilienceHandler(IOptions<SamedaySettings> settings)
     {
         var limit = settings.Value.Jobs.MaxConcurrentSamedayCalls;
-        _pipeline = SamedayPolicies.BuildPipeline(limit > 0 ? limit : 5);
+        _rateLimiter = SamedayPolicies.CreateRateLimiter(limit > 0 ? limit : 5);
+        _pipeline = SamedayPolicies.BuildPipeline(_rateLimiter);
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -35,5 +37,11 @@ public sealed class SamedayResilienceHandler : DelegatingHandler
         return await _pipeline.ExecuteAsync(
             async ct => await base.SendAsync(request, ct),
             cancellationToken);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _rateLimiter?.Dispose();
+        base.Dispose(disposing);
     }
 }

@@ -6,53 +6,40 @@ using Polly.Retry;
 
 namespace PhotoPrint.API.Services.Sameday;
 
-/// <summary>
-/// Resilience pipeline for the Sameday transport. Aligned with the project's
-/// Polly v8 pattern (see <c>S3StorageService</c>).
-///
-/// <para>Pipeline order (outer → inner):</para>
-/// <list type="number">
-///   <item><b>Rate limiter</b> — bolt 037 caps outbound traffic at
-///   <c>maxRequestsPerSecond</c> (default 5) using a sliding window. Pending
-///   callers queue rather than fail; <c>SamedayResilienceHandler</c> is
-///   responsible only for transient retry, not for shedding load.</item>
-///   <item><b>Retry</b> — 3 attempts, exponential backoff 1 s / 4 s / 16 s.
-///   Retries on 5xx, 408 RequestTimeout, 429 TooManyRequests, and
-///   <see cref="HttpRequestException"/>. 401 deliberately NOT in the
-///   retryable set (ADR-014).</item>
-/// </list>
-/// </summary>
+// Resilience pipeline for the Sameday transport (Polly v8). Pipeline order,
+// outer→inner: rate limiter (optional) → retry (3×, 1s/4s/16s; 5xx/408/429/
+// HttpRequestException). 401 is deliberately outside this pipeline — owned by
+// SamedayAuthHandler (the caller must not retry it).
 public static class SamedayPolicies
 {
-    /// <summary>Build the retry-only pipeline used by bolt 036. Kept for tests
-    /// that exercise the retry semantics without rate-limit interference.</summary>
-    public static ResiliencePipeline<HttpResponseMessage> BuildRetryPipeline()
-        => BuildPipeline(rateLimitPermitsPerSecond: int.MaxValue);
+    // One limiter is created per handler instance and shared across every call it
+    // makes (a per-call limiter never throttles and leaks its replenishment timer).
+    // The int.MaxValue sentinel opts out entirely (bolt-036 retry-only callers).
+    public static RateLimiter? CreateRateLimiter(int permitsPerSecond)
+    {
+        if (permitsPerSecond == int.MaxValue) return null;
+        return new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit          = Math.Max(1, permitsPerSecond),
+            Window               = TimeSpan.FromSeconds(1),
+            SegmentsPerWindow    = 4,
+            QueueLimit           = int.MaxValue,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        });
+    }
 
-    /// <summary>Full pipeline (rate limit + retry). Bolt 037's
-    /// high-frequency callers (`ShipmentTrackingJob` polling many orders per
-    /// tick, `AwbDispatcher` draining a backlog) require the cap.</summary>
-    public static ResiliencePipeline<HttpResponseMessage> BuildPipeline(int rateLimitPermitsPerSecond)
+    public static ResiliencePipeline<HttpResponseMessage> BuildRetryPipeline()
+        => BuildPipeline(rateLimiter: null);
+
+    public static ResiliencePipeline<HttpResponseMessage> BuildPipeline(RateLimiter? rateLimiter)
     {
         var builder = new ResiliencePipelineBuilder<HttpResponseMessage>();
 
-        // Skip the rate limiter when the caller explicitly opts out (legacy bolt-036 callers).
-        if (rateLimitPermitsPerSecond != int.MaxValue)
+        if (rateLimiter is not null)
         {
             builder.AddRateLimiter(new RateLimiterStrategyOptions
             {
-                RateLimiter = args =>
-                {
-                    var limiter = new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
-                    {
-                        PermitLimit          = Math.Max(1, rateLimitPermitsPerSecond),
-                        Window               = TimeSpan.FromSeconds(1),
-                        SegmentsPerWindow    = 4,
-                        QueueLimit           = int.MaxValue,
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    });
-                    return limiter.AcquireAsync(1, args.Context.CancellationToken);
-                },
+                RateLimiter = args => rateLimiter.AcquireAsync(1, args.Context.CancellationToken),
             });
         }
 
@@ -64,7 +51,6 @@ public static class SamedayPolicies
             UseJitter = false,
             ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                 .Handle<HttpRequestException>()
-                // NOTE: 401 deliberately NOT here — owned by SamedayAuthHandler (ADR-014).
                 .HandleResult(r => IsRetryableStatus(r.StatusCode)),
         });
 

@@ -1,6 +1,8 @@
 using System.Net;
+using System.Threading.RateLimiting;
 using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Polly.RateLimiting;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Services.Sameday;
 
@@ -95,5 +97,40 @@ public class SamedayPoliciesTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         script.CallCount.Should().Be(2);
+    }
+
+    // ── Rate limiter (bolt 037): one shared limiter, actually throttling ─────────
+
+    [Fact]
+    public async Task Shared_rate_limiter_throttles_when_its_only_permit_is_held()
+    {
+        using var limiter = new SlidingWindowRateLimiter(new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 1,
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 1,
+            QueueLimit = 0,
+        });
+        var pipeline = SamedayPolicies.BuildPipeline(limiter);
+
+        // Hold the only permit. The pipeline shares THIS limiter, so an execution is
+        // rejected — a per-call `new` limiter (the bug) would hand it a fresh permit.
+        using var held = limiter.AttemptAcquire(1);
+        held.IsAcquired.Should().BeTrue();
+
+        var act = async () => await pipeline.ExecuteAsync(
+            async _ => { await Task.Yield(); return new HttpResponseMessage(HttpStatusCode.OK); });
+
+        await act.Should().ThrowAsync<RateLimiterRejectedException>();
+    }
+
+    [Theory]
+    [InlineData(int.MaxValue, false)]
+    [InlineData(5, true)]
+    public void CreateRateLimiter_opts_out_only_on_the_sentinel(int permits, bool expectLimiter)
+    {
+        var limiter = SamedayPolicies.CreateRateLimiter(permits);
+        (limiter is not null).Should().Be(expectLimiter);
+        limiter?.Dispose();
     }
 }
