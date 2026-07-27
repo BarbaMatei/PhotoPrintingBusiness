@@ -1,6 +1,6 @@
 ---
 type: review-index
-updated: 2026-07-24
+updated: 2026-07-27
 ---
 
 # Review Index
@@ -13,6 +13,7 @@ history. Findings = new 🔴/🟠/🟡/⚪. Dormant targets live under `archive/
 
 | Target | State |
 |---|---|
+| 015 sameday shipping | **v1 fix round resolved 2026-07-27** (`835e932`) — all 19 serious findings fixed with regression tests (2 blocker clusters approach-checked; fix diff micro-reviewed); backend 892/frontend 450 green. **Verification (review-v2) next.** Still dormant behind two false flags |
 | 043 cloud storage | **Certified 2026-07-22** (no serious defect survives; D83–D90 → backlog) — loop complete |
 | 042 thumbnail cache | Archived. Loop quiet after v9; certification never ran (pre-dates the risk tiers) |
 | 035 payment idempotency | Archived. Fix loop complete at v10; never certified (pre-dates the protocol) |
@@ -21,6 +22,7 @@ history. Findings = new 🔴/🟠/🟡/⚪. Dormant targets live under `archive/
 
 | Date | Target | Pass | Verdict | New H/M/L/C | Outcome | Files |
 |---|---|---|---|---|---|---|
+| 2026-07-27 | 015 | v1 discovery (full 11-lens) | request-changes | 5/14/16/6 | 🔴 D1 constant AWB idempotency key (breaks ADR-015) + D2 dup-create + D3 tracking DbContext share + D4/D5 Easybox mapping → fix round; 1 refuted; 48 agents / ~2.58M tok | [review](015-sameday-shipping/review-v1.md) · [findings](015-sameday-shipping/findings-v1.md) · [ledger](015-sameday-shipping/ledger.md) |
 | 2026-07-22 | 043 | v9 certification (single-pass deviation) | approve-with-followups | 0/10/14/6 | **Certified** — 0 High, 0 regression; owner triage 2026-07-27: D83 fixed `d041295` · D84 wont-fix (EuPlatesc removal planned) · D85 → 3-env; D86–D90 backlog | [review](043-cloud-storage-provider/review-v9.md) · [resolution](043-cloud-storage-provider/resolution-v9.md) · [ledger](043-cloud-storage-provider/ledger.md) |
 | 2026-07-22 | 043 | v8 verification | approve-with-followups | 0/0/0/0 | 10/10 v7 fixes non-vacuous; both deferrals upheld; 0 reopened | [review](043-cloud-storage-provider/review-v8.md) · [resolution](043-cloud-storage-provider/resolution-v7.md) |
 | 2026-07-22 | 043 | v7 certification pair | request-changes | 1/11/17/5 | **Not certified**: 🔴 D49 S3-retry data loss + D50 shared-upload class → fix round (all 8 serious fixed same day) | [review](043-cloud-storage-provider/review-v7.md) · [resolution](043-cloud-storage-provider/resolution-v7.md) |

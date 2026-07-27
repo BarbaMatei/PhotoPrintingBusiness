@@ -1,0 +1,78 @@
+---
+type: review-ledger
+target: 015-sameday-shipping
+updated: 2026-07-27
+---
+
+<!-- v1 fix round (resolution-v1, commits edd49f7..835e932): D1–D19 + D32/D34 → fixed, awaiting
+verification (review-v2). D20–D41 remain backlog; D42 false-positive. -->
+
+
+# Canonical finding ledger — 015-sameday-shipping
+
+Stable `D#` identities for this target, per the README's persistent-ledger standard. Each real defect
+gets a `D#` that lives forever; each pass's pass-local `F#` maps onto a `D#` **after** the blinded pass
+completes (finders never see `D#` during the search).
+
+**v1 is the first pass**, so `F#` ↔ `D#` is **1:1** (no reconciliation against a prior ledger — nothing
+to match). The pass ran full-manifest (11 lenses) against commit `1765918`, `feat/bolt-036-sameday-api-client`.
+
+Status legend: `open` = confirmed, awaiting fix · `backlog` = triaged Low/Cleanup that does not re-arm
+the loop (severity-based stop rule) · `false-positive` = refuted, terminal · (later: `in-progress` /
+`fixed` / `verified` / `wont-fix` / `deferred` / `disputed`). Terminal rows feed the discovery script's
+`decidedFindings` on the next pass; a re-raise gets the prior decision **attached, never suppressed**.
+
+## v1 — discovery (2026-07-27, commit `1765918`)
+
+| D# | F# (v1) | Sev | Status | Title | Site |
+|----|---------|-----|--------|-------|------|
+| D1 | F1 | 🔴 High | fixed | AWB vendor idempotency key wired to constant `PickupPointId`, not per-order (breaks ADR-015) | `Services/Sameday/SamedayClient.cs:104` |
+| D2 | F2 | 🔴 High | fixed | Concurrent AWB creators double-create (check-then-act, no DB guard) | `Services/Sameday/AwbCreator.cs:69` |
+| D3 | F3 | 🔴 High | fixed | One `DbContext` shared across concurrent tracking-poll tasks → tick faults | `BackgroundJobs/ShipmentTrackingJob.cs:87` |
+| D4 | F4 | 🔴 High | fixed | Easybox AWB carries null recipient name/phone (dead null-guard) → permanent give-up | `Services/Sameday/OrderToAwbRequestMapper.cs:60` |
+| D5 | F5 | 🔴 High | fixed | Easybox locker `SamedayId` dropped + wire `Service` hardcoded 7 → unroutable / wrong service | `Services/Sameday/OrderToAwbRequestMapper.cs:66` |
+| D6 | F6 | 🟠 Med | fixed | Webhook→AWB enqueue wiring untested (green suite hides removal) | `Controllers/WebhooksController.cs:192` |
+| D7 | F7 | 🟠 Med | fixed | ADR-016 CAS race-lost test seeds Cancelled → never reaches the CAS | `Tests/…/ShipmentTrackingJobTests.cs:136` |
+| D8 | F8 | 🟠 Med | fixed | `AwbDispatcher` backoff off-by-one: last entry unreachable | `BackgroundJobs/AwbDispatcher.cs:124` |
+| D9 | F9 | 🟠 Med | fixed | Rate limiter re-created per request → throttle inert + timer leak | `Services/Sameday/SamedayPolicies.cs:44` |
+| D10 | F10 | 🟠 Med | fixed | Admin `→Shipped` nulls machine-created `AwbNumber` when field omitted | `Services/AdminOrderService.cs:117` |
+| D11 | F11 | 🟠 Med | fixed | AWB enqueue in webhooks only, not the transition hook → admin-Paid never creates AWB | `Services/AdminOrderService.cs:113` |
+| D12 | F12 | 🟠 Med | fixed | AWB persisted onto an order cancelled mid-call (no re-check before save) | `Services/Sameday/AwbCreator.cs:93` |
+| D13 | F13 | 🟠 Med | fixed | Courier recipient name/phone/street/number unvalidated → AWB give-up | `Validators/Payments/CreateOrderRequestValidator.cs:27` |
+| D14 | F14 | 🟠 Med | fixed | `SamedayUnreachableException` swallowed with no log → tracking stalls silently | `BackgroundJobs/ShipmentTrackingJob.cs:128` |
+| D15 | F15 | 🟠 Med | fixed | Created AWB number not logged before `SaveChanges` → orphan billable AWB invisible | `Services/Sameday/AwbCreator.cs:96` |
+| D16 | F16 | 🟠 Med | fixed | `AwbCreator` test green even if `SaveChangesAsync` removed (identity-map read) | `Tests/…/AwbCreatorTests.cs:141` |
+| D17 | F17 | 🟠 Med | fixed | Admin `ShippedAt`/`DeliveredAt` assignment untested | `Services/AdminOrderService.cs:119` |
+| D18 | F18 | 🟠 Med | fixed | Clearing city search can permanently kill the locker-search pipe on transient error | `UI/…/delivery-step.ts:332` |
+| D19 | F19 | 🟠 Med | fixed | Init priming `getLockers('')` races city-search `switchMap`, overwrites filter | `UI/…/delivery-step.ts:317` |
+| D20 | F20 | 🟡 Low | backlog | `MaxConcurrentSamedayCalls` overloaded as concurrency gate AND req/s rate limit | `Services/Sameday/SamedayResilienceHandler.cs:25` |
+| D21 | F21 | 🟡 Low | backlog | Raw vendor error body in exception + logged at Error (conditional PII) | `Services/Sameday/SamedayClient.cs:140` |
+| D22 | F22 | 🟡 Low | backlog | `AwbLabelUrl` migration hardcodes `text` → unbounded on Postgres, diverges from model *(hinted)* | `Migrations/20260602141429_AddSamedayOrderFields.cs:23` |
+| D23 | F23 | 🟡 Low | backlog | Dual-DB parity: migrations + `timestamptz` CAS never run on Postgres (offset-write may throw) *(hinted)* | `Tests/…/OrderSamedayFieldsTests.cs:21` |
+| D24 | F24 | 🟡 Low | backlog | Tracking `observedAt` fabricated to `UtcNow` when vendor omits timestamps → wrong `DeliveredAt` | `Services/Sameday/SamedayClient.cs:224` |
+| D25 | F25 | 🟡 Low | backlog | `expire_at_utc` bound without UTC guarantee (non-UTC host shifts token expiry) | `Services/Sameday/SamedayClient.cs:90` |
+| D26 | F26 | 🟡 Low | backlog | Monotonic guard can drop a legitimate `Delivered` snapshot (untested) | `BackgroundJobs/ShipmentTrackingJob.cs:132` |
+| D27 | F27 | 🟡 Low | backlog | Non-delivered tracking write not monotonic across replicas (early-repoll leg refuted) — *plausible* | `BackgroundJobs/ShipmentTrackingJob.cs:182` |
+| D28 | F28 | 🟡 Low | backlog | AWB-enqueue logged at Debug, below Information floor → never emits | `Services/Sameday/AwbCreationNotifier.cs:32` |
+| D29 | F29 | 🟡 Low | backlog | Polly retry has no `OnRetry` callback → transient retries invisible | `Services/Sameday/SamedayPolicies.cs` (retry) |
+| D30 | F30 | 🟡 Low | backlog | Documented `/health` `sameday:enabled` field not delivered | `HealthChecks/HealthCheckResponseWriter.cs:36` |
+| D31 | F31 | 🟡 Low | backlog | `GenerateAwbAsync` returns stale "generate manually" + pre-037 comment | `Services/SamedayShippingService.cs:52` |
+| D32 | F32 | 🟡 Low | fixed | `AwbCreationRequest` documented as validated value object but has no validation | `Services/Sameday/AwbCreationRequest.cs:11` |
+| D33 | F33 | 🟡 Low | backlog | Tracking job re-queries already-loaded order; `inWindow` tracked-but-unused | `BackgroundJobs/ShipmentTrackingJob.cs:172` |
+| D34 | F34 | 🟡 Low | fixed | Production rate-limiter path never exercised in tests (incl. POST path from F42) | `Tests/…/SamedayPoliciesTests.cs:40` |
+| D35 | F35 | 🟡 Low | backlog | Locker list fetched on every init even for Courier-only users (wasted fetch + toast) | `UI/…/delivery-step.ts:317` |
+| D36 | F36 | ⚪ Cleanup | backlog | `TrackingPollOutcome` dead code (declared return type, never constructed) | `Services/Sameday/TrackingPollOutcome.cs:15` |
+| D37 | F37 | ⚪ Cleanup | backlog | `LogRedactor` defined but never referenced → no HTTP transport tracing | `Services/Sameday/LogRedactor.cs:13` |
+| D38 | F38 | ⚪ Cleanup | backlog | `TrackingStopRegistry` is a near-copy of `AwbGiveUpRegistry` | `Services/Sameday/TrackingStopRegistry.cs:9` |
+| D39 | F39 | ⚪ Cleanup | backlog | Hand-constructs `StaticShippingService` instead of injecting | `Services/SamedayShippingService.cs:35` |
+| D40 | F40 | ⚪ Cleanup | backlog | New migration designer snapshots embed stale `StripeClientSecret` 255 vs 512 *(hinted)* | `Migrations/20260602190046_…Designer.cs:365` |
+| D41 | F41 | ⚪ Cleanup | backlog | Per-print gram weight bare literal `50` colliding with `MinimumGrams` | `Services/Sameday/ParcelWeight.cs:35` |
+| D42 | F42 | — | false-positive | "5xx retry unsafe for POST bodies" — `JsonContent` re-serializes each attempt; no defect (test-gap → D34) | `Services/Sameday/SamedayResilienceHandler.cs:33` |
+
+**Fixed (v1 fix round, awaiting verification):** D1–D19 + D32 + D34 (5 High + 14 Medium + 2 Low).
+**Backlog:** D20–D31, D33, D35–D41 (14 Low + 6 Cleanup). **Terminal:** D42 (false-positive).
+
+**Cluster notes (for the fixer):**
+- **Idempotency/concurrency cluster:** D1 (root) → D2, D12, D15 depend on the per-order key + guarded
+  write; D3 is the tracking-side DbContext scoping. Fix D1 first.
+- **Recipient-mapping cluster:** D4, D5, D13, D32 — one decision on where recipient validation lives.
