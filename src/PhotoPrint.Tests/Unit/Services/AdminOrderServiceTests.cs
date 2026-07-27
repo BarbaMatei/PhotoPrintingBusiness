@@ -12,6 +12,7 @@ using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
 namespace PhotoPrint.Tests.Unit.Services;
@@ -29,6 +30,7 @@ public class AdminOrderServiceTests
     private readonly Mock<IHubContext<AdminOrderHub>> _hub = new();
     private readonly Mock<IHubClients> _hubClients = new();
     private readonly Mock<IClientProxy> _clientProxy = new();
+    private readonly Mock<IAwbCreationNotifier> _awbNotifier = new();
 
     private readonly AdminOrderService _sut;
 
@@ -58,6 +60,9 @@ public class AdminOrderServiceTests
         _router.Setup(r => r.For(StorageLocation.Local)).Returns(_localStore.Object);
         _router.Setup(r => r.For(StorageLocation.Cloud)).Returns(_cloudStore.Object);
 
+        _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                    .Returns(Task.CompletedTask);
+
         _sut = new AdminOrderService(
             _db,
             _emailSvc.Object,
@@ -67,6 +72,7 @@ public class AdminOrderServiceTests
             _purger.Object,
             Options.Create(new ArchiveSettings()),
             _hub.Object,
+            _awbNotifier.Object,
             NullLogger<AdminOrderService>.Instance);
     }
 
@@ -275,6 +281,53 @@ public class AdminOrderServiceTests
         await act.Should().ThrowAsync<InvalidOrderTransitionException>();
     }
 
+    [Fact]
+    public async Task UpdateStatusAsync_PrintingToShipped_StampsShippedAt()
+    {
+        // The tracking job only polls orders with ShippedAt != null.
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+
+        await _sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null);
+
+        (await _db.Orders.FindAsync(order.Id))!.ShippedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ShippedToDelivered_StampsDeliveredAt()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Shipped);
+
+        await _sut.UpdateStatusAsync(order.Id, "Delivered", null, null);
+
+        (await _db.Orders.FindAsync(order.Id))!.DeliveredAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ShippedWithoutAwb_PreservesMachineCreatedAwb()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+        order.AwbNumber = "RO-AUTO-999"; // machine-created by the AWB job while Paid
+        await _db.SaveChangesAsync();
+
+        await _sut.UpdateStatusAsync(order.Id, "Shipped", awbNumber: null, trackingUrl: null);
+
+        (await _db.Orders.FindAsync(order.Id))!.AwbNumber.Should().Be("RO-AUTO-999");
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_AwaitingPaymentToPaid_StampsPaidAtAndEnqueuesAwb()
+    {
+        // Offline / manual reconciliation: must mirror the webhook Paid path.
+        var order = await SeedOrderAsync(OrderStatus.AwaitingPayment);
+
+        await _sut.UpdateStatusAsync(order.Id, "Paid", null, null);
+
+        var dbOrder = await _db.Orders.FindAsync(order.Id);
+        dbOrder!.PaidAt.Should().NotBeNull();
+        _awbNotifier.Verify(
+            n => n.NotifyPaidAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ── Bolt 052: original-purge hook on production-complete transition ──────
 
     /// <summary>
@@ -285,7 +338,7 @@ public class AdminOrderServiceTests
     private AdminOrderService BuildSutWithArchive(ArchiveSettings archive)
         => new(_db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
             _router.Object, _purger.Object, Options.Create(archive),
-            _hub.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
 
     [Fact]
     public async Task UpdateStatusAsync_PrintingToShipped_TriggersOriginalPurge()
@@ -313,7 +366,7 @@ public class AdminOrderServiceTests
         var sut = new AdminOrderService(
             _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
             cloudOffRouter.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
         var order = await SeedOrderAsync(OrderStatus.Printing);
 
         await sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null);
@@ -521,7 +574,7 @@ public class AdminOrderServiceTests
         var sut = new AdminOrderService(
             _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
             router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
 
         var httpContext = new DefaultHttpContext();
         using var body = new MemoryStream();
@@ -628,7 +681,7 @@ public class AdminOrderServiceTests
         var sut = new AdminOrderService(
             _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
             router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
 
         var order = await SeedOrderAsync(OrderStatus.Paid);
 
