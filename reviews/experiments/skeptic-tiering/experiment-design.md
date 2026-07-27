@@ -1,6 +1,6 @@
 ---
 type: experiment-design
-status: not-run
+status: run 2026-07-27 — owner adopted low→sonnet (the strict gate had failed)
 created: 2026-07-14
 owner: Matei Barba
 ---
@@ -45,6 +45,38 @@ Run only **after measure #5** (decided re-raises skip skeptics) has landed in a 
 removes many low-tier skeptic runs, shrinking both the cost and the benefit of tiering; measure
 what is actually left.
 
-## Result
+## Result (launched 2026-07-24, completed 2026-07-27)
 
-*(not yet run)*
+All 17 v8 Lows replayed on Sonnet against frozen `e2093bd`, original prompts/schemas/tier
+logic (runs `wf_f89f4e8f-90d`). A session-limit crash forced a resume that re-ran 13 findings
+live while the first run was still finishing — an accidental second independent Sonnet sample
+for those 13 (it measures same-model rerun noise; total cost ~1.7M tokens vs the ~400k a clean
+single run would have been).
+
+| Outcome | Findings |
+|---|---|
+| Match (13/17) | F8 F9 F10 F13 F14 F15 F17 F18 F19 F20 F21 F22 F24 |
+| Flip, stable across both Sonnet runs (3) | F12 F16 F23 — all `plausible → confirmed` |
+| Unstable between the two Sonnet runs (1) | F11 — Opus `confirmed`; Sonnet run 1 `plausible`, run 2 `confirmed` |
+
+- Every flip is `plausible → confirmed` on a coverage-gap/doc finding: Sonnet accepts a
+  mutation-style trace ("apply this edit and the suite stays green") as a failing execution;
+  Opus declined to. A systematic judgment-convention difference, not a capability gap — the
+  Sonnet traces were accurate and detailed (F10's full 500-path trace is as good as the
+  original).
+- Zero `confirmed ↔ refuted`, zero new `disputed`. No flip would have changed the v8 review's
+  ranking or any blocker call — all four are Lows that survive into the review either way.
+
+**Pre-registered outcome: tiering NOT adopted.** The strict gate above was "zero enum flips"
+and 3–4 occurred, so the adopt condition fails; the keep-Opus condition ("a flip that changed
+a synthesis call") also never triggered — the result lands between the two registered
+outcomes. The rule missed a case: enum flips that change no synthesis call. What would settle
+it: an **Opus-replay control** on the same 17 to measure the same-model noise floor (F11's
+instability proves rerun noise exists; without the control, model difference and noise are
+inseparable).
+
+**Owner decision (2026-07-27): adopted anyway.** The flips were one-directional, Lows-only,
+and changed no synthesis call, and the ~5× price difference won: 🟡 skeptics now run on
+Sonnet (`SKEPTIC_MODEL` in [lib/discovery-review.wf.js](../../lib/discovery-review.wf.js));
+⚪ continue to skip skeptics, with Haiku designated if they ever get one. The Opus-replay
+noise control stays open for whoever wants to fund it.

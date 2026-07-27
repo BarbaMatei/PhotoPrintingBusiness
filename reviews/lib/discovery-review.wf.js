@@ -27,7 +27,7 @@ export const meta = {
 //        0 = uncapped), allowBare? (skip the no-args-bound abort)
 //      }})
 //   Returns [{lens, overall, findings:[...]}] where each finding carries: verdict (confirmed |
-//   plausible | refuted | disputed | unverified-cleanup | unverified-low | unverified-over-budget |
+//   plausible | refuted | unverified-cleanup | unverified-low | unverified-over-budget |
 //   re-raise), convergence, hinted, agreeingLenses,
 //   guardEvidence, traceEvidence. The '_canonical' overall line reports skeptic-run counts for
 //   the metrics entry (cost.agents_by_stage). The main agent then synthesizes.
@@ -256,15 +256,18 @@ FINDING — ${f.title}
 Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/. Keep your answer <= 80 words.`
 
 let guardRuns = 0, traceRuns = 0, reraiseSkips = 0, budgetSkips = 0
+// Serious findings keep the session model; cheaper tiers carry the low-stakes checks.
+const SKEPTIC_MODEL = { low: 'sonnet', cleanup: 'haiku' }
+const skepticOpts = (f) => (SKEPTIC_MODEL[f.severity] ? { model: SKEPTIC_MODEL[f.severity] } : {})
 const guardAgent = (f, i) => {
   guardRuns++
   return agent(findingCtx(f) + `\n\nROLE: skeptic — hunt for an EXISTING guard/check/invariant that already PREVENTS this. guardExists=true only for a genuine guard (with file:line); a partial guard that misses THIS case is false.`,
-    { label: `guard#${i}`, phase: 'Verify', schema: GUARD_SCHEMA })
+    { label: `guard#${i}`, phase: 'Verify', schema: GUARD_SCHEMA, ...skepticOpts(f) })
 }
 const traceAgent = (f, i) => {
   traceRuns++
   return agent(findingCtx(f) + `\n\nROLE: skeptic — try to CONSTRUCT a concrete failing execution from the real code (inputs/state/timing -> the claimed wrong result). traceConstructible=true with the steps if you can; false with the reason if impossible.`,
-    { label: `trace#${i}`, phase: 'Verify', schema: TRACE_SCHEMA })
+    { label: `trace#${i}`, phase: 'Verify', schema: TRACE_SCHEMA, ...skepticOpts(f) })
 }
 
 // #2 convergence-weighted verification tiers.
@@ -284,43 +287,21 @@ async function verifyFinding(f, i) {
     budgetSkips++
     return { ...f, verdict: 'unverified-over-budget', guardEvidence: `(tokenBudget ${TOKEN_BUDGET} exceeded — skeptic skipped)`, traceEvidence: '(unchallenged lens verdict, not a refutation)' }
   }
-  // Delta tiers (2026-07-22 — 043 calibration: ~75 skeptics across v1/v3/v5 refuted 2 findings):
-  // lows unchallenged, strong non-hinted agreement accepted, high/medium get ONE trace
-  // (escalate to a guard-hunt only if no trace builds). Full passes keep the tiers below.
-  if (PASSTYPE === 'delta') {
-    if (f.severity === 'low') {
-      return { ...f, verdict: 'unverified-low', guardEvidence: '(delta: low — skeptics skipped)', traceEvidence: '(unchallenged lens verdict, not a refutation)' }
-    }
-    if (f.convergence >= 3 && !f.hinted) {
-      return { ...f, verdict: 'confirmed', guardEvidence: `(delta: ${f.convergence}-lens independent agreement accepted without skeptic)`, traceEvidence: '(convergence is the precision signal)' }
-    }
-    const trace = await traceAgent(f, i)
-    if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(delta: guard-hunt skipped; trace built)', traceEvidence: trace.trace }
-    const guard = await guardAgent(f, i)
-    return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
+  // One ladder for every pass type; deltas additionally leave lows unchallenged.
+  if (PASSTYPE === 'delta' && f.severity === 'low') {
+    return { ...f, verdict: 'unverified-low', guardEvidence: '(delta: low — skeptics skipped)', traceEvidence: '(unchallenged lens verdict, not a refutation)' }
   }
-  // Strong cross-lens agreement is itself the precision signal: one anti-groupthink guard-hunt,
-  // escalate to a trace only if it surprisingly claims a guard (contradicting the crowd).
-  // Hint-planted agreement doesn't count — shared prompt context manufactures convergence.
+  // Strong non-hinted cross-lens agreement is itself the precision signal — no skeptic.
+  // Hint-planted agreement doesn't count: shared prompt context manufactures convergence.
   if (f.convergence >= 3 && !f.hinted) {
-    const guard = await guardAgent(f, i)
-    if (!guard?.guardExists) return { ...f, verdict: 'confirmed', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: `(spot-check: ${f.convergence} lenses agreed, no guard found)` }
-    const trace = await traceAgent(f, i) // surprise: guard claimed despite consensus -> adjudicate
-    return { ...f, verdict: trace?.traceConstructible ? 'confirmed' : 'refuted', guardEvidence: guard.evidence, traceEvidence: trace?.trace ?? '(skeptic failed)' }
+    return { ...f, verdict: 'confirmed', guardEvidence: `(${f.convergence}-lens independent agreement accepted without skeptic)`, traceEvidence: '(convergence is the precision signal)' }
   }
-  if (f.severity === 'low') {
-    const trace = await traceAgent(f, i)
-    if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(low — guard-hunt skipped; trace built)', traceEvidence: trace.trace }
-    const guard = await guardAgent(f, i)
-    return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
-  }
-  // low-convergence (or hinted) high | medium: full independent pair
-  const [guard, trace] = await Promise.all([guardAgent(f, i), traceAgent(f, i)])
-  let verdict = 'plausible'
-  if (guard?.guardExists && trace?.traceConstructible) verdict = 'disputed' // conflicting evidence — surface it, don't average it
-  else if (guard?.guardExists && !trace?.traceConstructible) verdict = 'refuted'
-  else if (trace?.traceConstructible && !guard?.guardExists) verdict = 'confirmed'
-  return { ...f, verdict, guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
+  // Trace-first: a built trace settles it; the guard-hunt runs only when no trace builds,
+  // so the two can never contradict.
+  const trace = await traceAgent(f, i)
+  if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(guard-hunt skipped; trace built)', traceEvidence: trace.trace }
+  const guard = await guardAgent(f, i)
+  return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
 }
 
 const SEV_RANK = { high: 3, medium: 2, low: 1, cleanup: 0 }
