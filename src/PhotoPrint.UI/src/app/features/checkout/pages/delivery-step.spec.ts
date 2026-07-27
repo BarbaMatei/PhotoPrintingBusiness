@@ -218,6 +218,28 @@ describe('DeliveryStep', () => {
     expect(fixture.componentInstance.lockers().length).toBe(2);
   });
 
+  it('a failed locker search does not kill the search pipe', async () => {
+    const fixture = createFixture();
+    flushShippingCosts();
+    fixture.detectChanges();
+    fixture.componentInstance.selectMethod('Easybox');
+    fixture.detectChanges();
+
+    // First search errors (server 500).
+    fixture.componentInstance.citySearch.setValue('Clu');
+    await new Promise(r => setTimeout(r, 350));
+    http.expectOne(`${BASE}/lockers?city=Clu`).flush('boom', { status: 500, statusText: 'Server Error' });
+
+    // The pipe must survive: a later search still issues a request (without catchError
+    // the errored inner would tear down valueChanges and this expectOne would find none).
+    fixture.componentInstance.citySearch.setValue('Bucur');
+    await new Promise(r => setTimeout(r, 350));
+    http.expectOne(`${BASE}/lockers?city=Bucur`).flush([
+      { id: 'l2', samedayId: 'SD2', name: 'Box B', address: 'Str 2', city: 'București', lat: 44, lng: 26 },
+    ]);
+    expect(fixture.componentInstance.lockers().length).toBe(1);
+  });
+
   it('selectLocker updates CheckoutStateService', () => {
     const fixture = createFixture();
     flushShippingCosts();
