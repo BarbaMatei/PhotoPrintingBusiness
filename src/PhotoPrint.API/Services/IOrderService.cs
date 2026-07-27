@@ -45,4 +45,14 @@ public interface IOrderService
     /// Throws <see cref="Exceptions.ForbiddenException"/> if the order belongs to a different user.
     /// </summary>
     Task<OrderDetailDto> GetOrderDetailAsync(Guid orderId, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the order's photos as presigned cloud URLs (thumbnail + large preview),
+    /// scoped to the calling user (bolt 053). Pre-promotion uploads and post-retention
+    /// blobs are omitted from the result (not errored). Cloud-tier-off returns an empty
+    /// photos list — see ADR-008.
+    /// Throws <see cref="Exceptions.NotFoundException"/> if the order is not found.
+    /// Throws <see cref="Exceptions.ForbiddenException"/> if the order belongs to a different user.
+    /// </summary>
+    Task<OrderPhotosDto> GetOrderPhotosAsync(Guid orderId, Guid userId, CancellationToken ct = default);
 }

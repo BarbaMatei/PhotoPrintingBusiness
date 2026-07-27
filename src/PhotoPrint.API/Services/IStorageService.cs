@@ -1,22 +1,44 @@
 namespace PhotoPrint.API.Services;
 
+/// <summary>
+/// Byte-persistence contract for upload storage adapters. Naming policy lives in
+/// <see cref="StorageKeys"/> (ADR-007); the adapter persists bytes at a caller-supplied key.
+/// Two implementations are wired by <see cref="IStorageRouter"/> per upload (ADR-008):
+/// <see cref="LocalStorageService"/> (disk) and <see cref="S3StorageService"/> (cloud).
+/// </summary>
 public interface IStorageService
 {
     /// <summary>
-    /// Saves the stream to storage under a UUID filename.
-    /// Returns the relative storage path (never contains user-supplied data).
-    /// <paramref name="fileId"/> makes the filename deterministic; <paramref name="prefix"/>
-    /// places the file under a distinct top-level namespace (e.g. "thumbs") so a derived
-    /// artifact cannot collide with the original's path (bolt 042, BUG-3/REQ-2).
+    /// Persists <paramref name="content"/> at the caller-supplied <paramref name="key"/>.
+    /// The key is validated against <see cref="StorageKeys.Validate"/> by every adapter.
     /// </summary>
-    Task<string> SaveAsync(Stream stream, Guid ownerId, string extension, CancellationToken ct = default, Guid? fileId = null, string? prefix = null);
+    Task SaveAsync(Stream content, string key, CancellationToken ct = default);
 
-    /// <summary>Deletes a file by its storage path. No-op if the file does not exist.</summary>
-    Task DeleteAsync(string storagePath, CancellationToken ct = default);
+    /// <summary>Deletes the object at the given key. No-op if absent.</summary>
+    Task DeleteAsync(string key, CancellationToken ct = default);
 
-    /// <summary>Opens a read stream for a stored file.</summary>
-    Task<Stream> GetStreamAsync(string storagePath, CancellationToken ct = default);
+    /// <summary>
+    /// Opens a read stream for a stored file. Callers must dispose. Every adapter throws
+    /// <see cref="FileNotFoundException"/> when the key is absent (the S3 adapter translates its
+    /// typed <c>NotFound</c> — F3, review 043-v1) so callers can catch one exception type across
+    /// tiers to map a missing object to a 404.
+    /// </summary>
+    Task<Stream> GetStreamAsync(string key, CancellationToken ct = default);
 
-    /// <summary>Returns true if a file exists at the given storage path.</summary>
-    Task<bool> ExistsAsync(string storagePath, CancellationToken ct = default);
+    /// <summary>Returns true if an object exists at the given key.</summary>
+    Task<bool> ExistsAsync(string key, CancellationToken ct = default);
+
+    /// <summary>
+    /// True if this adapter can produce pre-signed URLs (cloud=true, local=false).
+    /// Callers branch on this (or on <c>Upload.StorageLocation</c> via the router) to choose
+    /// stream-vs-302 — they must never call <see cref="GetPresignedUrlAsync"/> when this is false.
+    /// </summary>
+    bool SupportsPresignedUrls { get; }
+
+    /// <summary>
+    /// Generates a time-limited URL granting direct read access to <paramref name="key"/>.
+    /// Throws <see cref="NotSupportedException"/> on adapters where
+    /// <see cref="SupportsPresignedUrls"/> is false.
+    /// </summary>
+    Task<string> GetPresignedUrlAsync(string key, TimeSpan ttl, CancellationToken ct = default);
 }

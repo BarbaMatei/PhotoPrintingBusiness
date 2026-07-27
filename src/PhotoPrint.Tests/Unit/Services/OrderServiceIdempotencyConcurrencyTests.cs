@@ -1,7 +1,9 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.DTOs.Shipping;
@@ -54,7 +56,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var shippingMock = new Mock<IShippingService>();
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
-        return new OrderService(db, numberMock.Object, shippingMock.Object);
+        return new OrderService(db, numberMock.Object, shippingMock.Object,
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
     }
 
     // BUG-4: the REAL OrderNumberService (SQLite COUNT+1 branch) — the mock's always-unique
@@ -64,7 +67,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var shippingMock = new Mock<IShippingService>();
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
-        return new OrderService(db, new OrderNumberService(db), shippingMock.Object);
+        return new OrderService(db, new OrderNumberService(db), shippingMock.Object,
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
     }
 
     // QUAL-4 (review 035-v8): build the concurrent "winner" by running the REAL
@@ -81,7 +85,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var shippingMock = new Mock<IShippingService>();
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
-        var svc = new OrderService(winnerDb, numberMock.Object, shippingMock.Object);
+        var svc = new OrderService(winnerDb, numberMock.Object, shippingMock.Object,
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
 
         var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);
         return result.Order;

@@ -26,31 +26,51 @@ public class UploadThumbnailPathMigrationTests : IDisposable
 
     public void Dispose() => _connection.Dispose();
 
-    private (string name, string type, bool notNull)? ThumbnailPathColumn()
+    private (string name, string type, bool notNull)? Column(string columnName)
     {
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = "SELECT name, type, \"notnull\" FROM pragma_table_info('Uploads');";
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            if (reader.GetString(0) == "ThumbnailPath")
+            if (reader.GetString(0) == columnName)
                 return (reader.GetString(0), reader.GetString(1), reader.GetInt32(2) == 1);
         }
         return null;
     }
 
-    [Fact]
-    public void Migrate_OnSqlite_CreatesNullableUploadsThumbnailPathColumn()
+    private void ApplyMigrations()
     {
         var opts = new DbContextOptionsBuilder<PhotoPrintDbContext>()
             .UseSqlite(_connection)
             .Options;
         using var db = new PhotoPrintDbContext(opts);
-
         db.Database.Migrate();
+    }
 
-        var column = ThumbnailPathColumn();
+    [Fact]
+    public void Migrate_OnSqlite_CreatesNullableUploadsThumbnailPathColumn()
+    {
+        ApplyMigrations();
+
+        var column = Column("ThumbnailPath");
         column.Should().NotBeNull("the AddUploadThumbnailPath migration must add the column");
         column!.Value.notNull.Should().BeFalse("ThumbnailPath is nullable until a preview is generated");
+    }
+
+    [Fact]
+    public void Migrate_OnSqlite_MakesUploadsFilePathNullable()
+    {
+        // F7 (review 043-v1): the original-purge (bolt 052) sets FilePath=null then SaveChanges,
+        // which requires the MakeUploadFilePathNullable migration's NOT-NULL drop to have run.
+        // Purger tests use the InMemory provider (null always allowed regardless of DDL), so a
+        // regression in this migration would surface only as silently-Failed purges in prod.
+        // Assert the real migration chain leaves Uploads.FilePath nullable.
+        ApplyMigrations();
+
+        var column = Column("FilePath");
+        column.Should().NotBeNull("Uploads.FilePath must exist");
+        column!.Value.notNull.Should().BeFalse(
+            "MakeUploadFilePathNullable must drop the NOT NULL constraint so the purge can null it");
     }
 }

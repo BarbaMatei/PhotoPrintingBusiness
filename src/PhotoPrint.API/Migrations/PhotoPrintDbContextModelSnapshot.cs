@@ -686,7 +686,6 @@ namespace PhotoPrint.API.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("FilePath")
-                        .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
@@ -699,10 +698,22 @@ namespace PhotoPrint.API.Migrations
                     b.Property<int>("HeightPx")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("LargePreviewPath")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
                         .HasMaxLength(260)
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("OriginalPurgedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StorageLocation")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("ThumbnailPath")
                         .HasMaxLength(512)

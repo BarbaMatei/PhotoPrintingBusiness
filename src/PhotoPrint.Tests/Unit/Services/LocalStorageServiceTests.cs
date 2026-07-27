@@ -4,167 +4,112 @@ using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Services;
-using Xunit;
 
 namespace PhotoPrint.Tests.Unit.Services;
 
 public class LocalStorageServiceTests : IDisposable
 {
-    private readonly string _baseDir =
-        Path.Combine(Path.GetTempPath(), $"pp-storage-tests-{Guid.NewGuid():N}");
+    private readonly string _tempRoot;
     private readonly LocalStorageService _sut;
 
     public LocalStorageServiceTests()
     {
-        Directory.CreateDirectory(_baseDir);
-        _sut = new LocalStorageService(
-            Options.Create(new StorageSettings { BasePath = _baseDir }),
-            Mock.Of<ILogger<LocalStorageService>>());
+        _tempRoot = Path.Combine(Path.GetTempPath(), $"pp-localstorage-{Guid.NewGuid():N}");
+        var settings = Options.Create(new StorageSettings { BasePath = _tempRoot });
+        _sut = new LocalStorageService(settings, Mock.Of<ILogger<LocalStorageService>>());
     }
 
     public void Dispose()
     {
-        try { Directory.Delete(_baseDir, recursive: true); } catch { /* best-effort cleanup */ }
-    }
-
-    private static MemoryStream Bytes(params byte[] b) => new(b);
-
-    // NEW-4 (review 042-v2): stored keys must be OS-independent ('/'-separated), not
-    // backslash-separated on Windows — a key written on a Windows dev box must read on Linux
-    // and map cleanly to a cloud object key (bolt-043).
-    [Fact]
-    public async Task SaveAsync_WithPrefix_ReturnsForwardSlashKey()
-    {
-        var owner = Guid.NewGuid();
-        var id = Guid.NewGuid();
-
-        var key = await _sut.SaveAsync(Bytes(1, 2, 3), owner, "jpg", fileId: id, prefix: "thumbs");
-
-        key.Should().Be($"thumbs/{owner}/{id:N}.jpg");
-        key.Should().NotContain("\\");
+        if (Directory.Exists(_tempRoot))
+            Directory.Delete(_tempRoot, recursive: true);
     }
 
     [Fact]
-    public async Task SaveAsync_WithoutPrefix_ReturnsForwardSlashKey()
+    public void SupportsPresignedUrls_IsFalse()
     {
-        var owner = Guid.NewGuid();
-        var id = Guid.NewGuid();
-
-        var key = await _sut.SaveAsync(Bytes(1, 2, 3), owner, "png", fileId: id);
-
-        key.Should().Be($"{owner}/{id:N}.png");
-        key.Should().NotContain("\\");
+        _sut.SupportsPresignedUrls.Should().BeFalse();
     }
 
     [Fact]
-    public async Task SaveAsync_ThenRoundTrips_ExistsGetDelete()
+    public async Task SaveAsync_AtNestedKey_CreatesDirectoriesAndWritesBytes()
     {
-        var owner = Guid.NewGuid();
-        var payload = new byte[] { 0xFF, 0xD8, 0xFF, 0x42 };
+        var bytes = new byte[] { 1, 2, 3, 4, 5 };
+        var key = "uploads/2026/05/abc.jpg";
 
-        var key = await _sut.SaveAsync(Bytes(payload), owner, "jpg", fileId: Guid.NewGuid(), prefix: "thumbs");
+        await _sut.SaveAsync(new MemoryStream(bytes), key);
+
+        var fullPath = Path.Combine(_tempRoot, "uploads", "2026", "05", "abc.jpg");
+        File.Exists(fullPath).Should().BeTrue();
+        (await File.ReadAllBytesAsync(fullPath)).Should().Equal(bytes);
+    }
+
+    [Fact]
+    public async Task ExistsAsync_AfterSave_ReturnsTrue()
+    {
+        var key = "thumbs/abc.jpg";
+        await _sut.SaveAsync(new MemoryStream(new byte[] { 1 }), key);
 
         (await _sut.ExistsAsync(key)).Should().BeTrue();
+    }
 
-        await using (var stream = await _sut.GetStreamAsync(key))
-        {
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-            ms.ToArray().Should().Equal(payload);
-        }
+    [Fact]
+    public async Task ExistsAsync_MissingKey_ReturnsFalse()
+    {
+        (await _sut.ExistsAsync("missing/x.jpg")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetStreamAsync_RoundTripsBytes()
+    {
+        var bytes = new byte[] { 0xFF, 0xD8, 0xFF };
+        var key = "uploads/2026/05/round-trip.jpg";
+        await _sut.SaveAsync(new MemoryStream(bytes), key);
+
+        await using var stream = await _sut.GetStreamAsync(key);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+
+        ms.ToArray().Should().Equal(bytes);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesObject()
+    {
+        var key = "uploads/2026/05/delete-me.jpg";
+        await _sut.SaveAsync(new MemoryStream(new byte[] { 1 }), key);
 
         await _sut.DeleteAsync(key);
+
         (await _sut.ExistsAsync(key)).Should().BeFalse();
     }
 
     [Fact]
-    public async Task DeleteAsync_MissingFile_IsNoOp()
+    public async Task DeleteAsync_NonexistentKey_NoOp()
     {
-        var act = () => _sut.DeleteAsync($"thumbs/{Guid.NewGuid()}/{Guid.NewGuid():N}.jpg");
+        var act = () => _sut.DeleteAsync("missing/y.jpg");
         await act.Should().NotThrowAsync();
     }
 
-    // M2 (review 042-v4): two concurrent writers of the SAME deterministic key (e.g. two
-    // first-previews of one upload) must not collide. The first writer is held with the
-    // destination handle open; a second writer of the same key must still succeed rather than
-    // throw a sharing-violation IOException that surfaces as a 500.
+    // ── Presigned URLs are not supported on the local adapter ─────────────────
+
     [Fact]
-    public async Task SaveAsync_ConcurrentWritersSameKey_BothSucceedWithoutCollision()
+    public async Task GetPresignedUrlAsync_ThrowsNotSupportedException()
     {
-        var owner = Guid.NewGuid();
-        var id = Guid.NewGuid();
-        var payloadHeld = new byte[] { 0x01, 0x02, 0x03, 0x04 };
-        var payloadFast = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
-
-        var opened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        using var heldSource = new GatedStream(payloadHeld, opened, release.Task);
-
-        // Writer 1 opens its output and blocks mid-copy, holding the handle.
-        var writer1 = _sut.SaveAsync(heldSource, owner, "jpg", fileId: id, prefix: "thumbs");
-        await opened.Task;
-
-        // Writer 2 targets the identical key while writer 1 still holds its handle open.
-        Func<Task> writer2 = () => _sut.SaveAsync(Bytes(payloadFast), owner, "jpg", fileId: id, prefix: "thumbs");
-        await writer2.Should().NotThrowAsync();
-
-        release.SetResult();
-        var key = await writer1;
-
-        (await _sut.ExistsAsync(key)).Should().BeTrue();
-        await using var stream = await _sut.GetStreamAsync(key);
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
-        // Writer 1 committed last (released after writer 2 finished), so its bytes win.
-        ms.ToArray().Should().Equal(payloadHeld);
+        var act = () => _sut.GetPresignedUrlAsync("thumbs/x.jpg", TimeSpan.FromHours(1));
+        await act.Should().ThrowAsync<NotSupportedException>()
+            .WithMessage("*LocalStorageService*");
     }
 
-    /// <summary>
-    /// A seekable source stream that blocks on its first read until released, signalling when
-    /// that first read begins — lets a test hold one writer's output handle open while a second
-    /// writer races the same storage key.
-    /// </summary>
-    private sealed class GatedStream : Stream
+    // ── Path-traversal guards (ADR-007 / StorageKeys.Validate) ────────────────
+
+    [Theory]
+    [InlineData("../etc/passwd")]
+    [InlineData("/absolute/path.jpg")]
+    [InlineData("uploads\\evil.jpg")]
+    public async Task SaveAsync_RejectsUnsafeKey(string key)
     {
-        private readonly MemoryStream _inner;
-        private readonly TaskCompletionSource _opened;
-        private readonly Task _release;
-        private bool _blockedOnce;
-
-        public GatedStream(byte[] data, TaskCompletionSource opened, Task release)
-        {
-            _inner = new MemoryStream(data);
-            _opened = opened;
-            _release = release;
-        }
-
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
-        {
-            if (!_blockedOnce)
-            {
-                _blockedOnce = true;
-                _opened.TrySetResult();
-                await _release;
-            }
-            return await _inner.ReadAsync(buffer, ct);
-        }
-
-        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
-        public override bool CanRead => true;
-        public override bool CanSeek => true;
-        public override bool CanWrite => false;
-        public override long Length => _inner.Length;
-        public override long Position { get => _inner.Position; set => _inner.Position = value; }
-        public override void Flush() { }
-        public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) _inner.Dispose();
-            base.Dispose(disposing);
-        }
+        var act = () => _sut.SaveAsync(new MemoryStream(new byte[] { 1 }), key);
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 }

@@ -7,7 +7,7 @@ owner: Matei Barba
 
 # Review metrics — what every pass records, and why
 
-Every review pass (discovery *and* verification) appends **one line** to the target's
+Every review pass (discovery, delta-discovery, *and* verification) appends **one line** to the target's
 `reviews/<target>/metrics.jsonl` at synthesis time — after findings are settled, before the
 review file is finalized. Append-only: never edit a past line; a correction is a note in the
 next line. Unknown values are `null`, never guessed.
@@ -16,7 +16,8 @@ This data is what eventually answers the open questions in
 [self-driving-loop-design.md](self-driving-loop-design.md): does new-serious-per-pass actually
 decay (the stop rule)? what does a pass cost (the entry policy)? which lenses earn their keep?
 It cannot be reconstructed later — bolt 035's `cost` fields are `null` forever because nobody
-recorded them at the time.
+recorded them at the time. (035's rows were backfilled on 2026-07-04 from its review files;
+unstated values are `null`, never guessed.)
 
 ## Fields (one JSON object per line)
 
@@ -24,7 +25,7 @@ recorded them at the time.
 |---|---|---|
 | `target` | string | the reviewed unit, e.g. `"035-payment-idempotency"` |
 | `pass` | int | review version number (matches `review-v<n>.md`) |
-| `type` | `"discovery"` \| `"verification"` | see the two-loops distinction in [README.md](README.md) |
+| `type` | `"discovery"` \| `"delta-discovery"` \| `"verification"` | see the two-loops distinction + *The middle tier* in [README.md](README.md); the saturation/decay curve uses full `"discovery"` passes only |
 | `date` | ISO date | when the pass ran |
 | `commit` | string | the commit reviewed |
 | `lenses` | array \| null | lenses/finders actually run |
@@ -33,7 +34,7 @@ recorded them at the time.
 | `refinds_identity` | int | findings that are the *same problem* as an earlier finding (reconciler / hand judgment) |
 | `reraises_of_decided` | int | findings re-raising an accepted wont-fix / deferral / dismissal |
 | `refuted` | int | candidate findings recorded as false positives this pass |
-| `disputed` | int \| null | findings whose two skeptics contradicted each other (a guard found *and* a failing trace built); `null` when not tracked |
+| `disputed` | int \| null | findings whose two skeptics contradicted each other (a guard found *and* a failing trace built); `null` when not tracked. Historical only — trace-first verification (2026-07-27) can no longer produce it |
 | `verified` | int | findings flipped to `verified` this pass |
 | `reopened` | int | findings reopened this pass |
 | `tests` | `{passed, failed}` \| null | suite result at the reviewed commit |
@@ -51,8 +52,6 @@ recorded them at the time.
 - The **synthesis step appends the line** — the fixer never writes here.
 - `refinds_identity` / `reraises_of_decided` use the ledger's judgment
   (until the reconciler exists: the synthesizing agent's judgment, per the labeling rules in
-  [035-payment-idempotency/overlap-ground-truth.md](035-payment-idempotency/overlap-ground-truth.md)).
+  [archive/035-payment-idempotency/overlap-ground-truth.md](archive/035-payment-idempotency/overlap-ground-truth.md)).
 - No global roll-up file: compute cross-feature summaries on demand from the per-feature files;
   a hand-maintained roll-up would drift.
-- Bolt 035's rows were **backfilled on 2026-07-04** from the review/resolution files; verdicts
-  and lens lists not stated in those files are `null` rather than reconstructed guesses.

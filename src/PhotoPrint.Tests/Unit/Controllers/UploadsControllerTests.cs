@@ -2,10 +2,13 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Controllers;
 using PhotoPrint.API.DTOs.Uploads;
 using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 using Xunit;
 
@@ -34,7 +37,11 @@ public class UploadsControllerTests
             .ThrowsAsync(new UnsupportedMediaTypeException("Only images are accepted."));
         var logger = new Mock<ILogger<UploadsController>>();
 
-        var controller = new UploadsController(uploadService.Object, logger.Object)
+        var controller = new UploadsController(
+            uploadService.Object,
+            Mock.Of<IStorageRouter>(),
+            Options.Create(new StorageSettings()),
+            logger.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -71,7 +78,11 @@ public class UploadsControllerTests
             .ThrowsAsync(new UnsupportedMediaTypeException("nope"));
         var logger = new Mock<ILogger<UploadsController>>();
 
-        var controller = new UploadsController(uploadService.Object, logger.Object)
+        var controller = new UploadsController(
+            uploadService.Object,
+            Mock.Of<IStorageRouter>(),
+            Options.Create(new StorageSettings()),
+            logger.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -110,7 +121,11 @@ public class UploadsControllerTests
             .ThrowsAsync(new DecompressionBombException(30_000, 30_000, "Image dimensions exceed limits."));
         var logger = new Mock<ILogger<UploadsController>>();
 
-        var controller = new UploadsController(uploadService.Object, logger.Object)
+        var controller = new UploadsController(
+            uploadService.Object,
+            Mock.Of<IStorageRouter>(),
+            Options.Create(new StorageSettings()),
+            logger.Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -129,5 +144,146 @@ public class UploadsControllerTests
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    // ── GetPreviewAsync TOCTOU (F8, review 043-v1) ────────────────────────────
+
+    private static UploadsController BuildPreviewController(
+        IUploadService uploadService, IStorageRouter router)
+        => new(uploadService, router, Options.Create(new StorageSettings()),
+            Mock.Of<ILogger<UploadsController>>())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+
+    [Fact]
+    public async Task GetPreviewAsync_LocalThumbDeletedMidRequest_ReResolvesToCloud302()
+    {
+        // GetPreviewAsync resolves Local, then a concurrent promotion best-effort-deletes the
+        // local thumb before the controller opens it. The controller must re-resolve (now the
+        // upload is Cloud → 302 presigned) rather than surface an unmapped 500 (F8).
+        var uploadId = Guid.NewGuid();
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .SetupSequence(s => s.GetPreviewAsync(
+                uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Local, "thumbs/local.jpg"))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Cloud, "thumbs/cloud.jpg"));
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("local thumb gone"));
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.GetPresignedUrlAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync("https://cdn.test/thumbs/cloud.jpg?sig=x");
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+
+        var controller = BuildPreviewController(uploadService.Object, router.Object);
+
+        var result = await controller.GetPreviewAsync(uploadId, CancellationToken.None);
+
+        result.Should().BeOfType<RedirectResult>()
+              .Which.Url.Should().Contain("cloud.jpg");
+        uploadService.Verify(s => s.GetPreviewAsync(
+            uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CloudUpload_MaxAgeTracksPresignTtl()
+    {
+        // F5 (review 043-v1): the redirect's Cache-Control max-age must be derived from
+        // PresignTtlMinutes, not hardcoded to 3600. A shorter TTL previously left the browser
+        // replaying a still-fresh cached redirect to an already-expired URL (broken thumbnail).
+        var uploadId = Guid.NewGuid();
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .Setup(s => s.GetPreviewAsync(
+                uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Cloud, "thumbs/cloud.jpg"));
+
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.GetPresignedUrlAsync(
+                It.IsAny<string>(), It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync("https://cdn.test/thumbs/cloud.jpg?sig=x");
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+
+        var controller = new UploadsController(
+            uploadService.Object, router.Object,
+            Options.Create(new StorageSettings { PresignTtlMinutes = 30 }),
+            Mock.Of<ILogger<UploadsController>>())
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+
+        var result = await controller.GetPreviewAsync(uploadId, CancellationToken.None);
+
+        result.Should().BeOfType<RedirectResult>();
+        controller.Response.Headers.CacheControl.ToString()
+            .Should().Be("private, max-age=1800"); // 30 min × 60 s, not the old 3600
+        cloud.Verify(s => s.GetPresignedUrlAsync(
+            "thumbs/cloud.jpg", TimeSpan.FromMinutes(30), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_LocalThumbGoneOnBothResolves_Returns404()
+    {
+        // Double race (local thumb still gone on the re-resolve, upload still Local): degrade to
+        // a clean 404 instead of a 500. Bounded — only one re-resolve.
+        var uploadId = Guid.NewGuid();
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .Setup(s => s.GetPreviewAsync(
+                uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Local, "thumbs/local.jpg"));
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("local thumb gone"));
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(local.Object);
+
+        var controller = BuildPreviewController(uploadService.Object, router.Object);
+
+        var result = await controller.GetPreviewAsync(uploadId, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_LocalThumbRegeneratedOnReResolve_Returns200()
+    {
+        // F14 (review 043-v3): the re-resolve can also land back on Local with the thumb
+        // regenerated → 200. Both prior TOCTOU tests make the local read ALWAYS throw, so this
+        // success branch (StreamLocalAsync at UploadsController line 200) was never exercised —
+        // a regression there would ship green.
+        var uploadId = Guid.NewGuid();
+        var uploadService = new Mock<IUploadService>();
+        uploadService
+            .SetupSequence(s => s.GetPreviewAsync(
+                uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Local, "thumbs/local.jpg"))
+            .ReturnsAsync(new PreviewLocation(uploadId, StorageLocation.Local, "thumbs/local.jpg"));
+
+        var local = new Mock<IStorageService>();
+        local.SetupSequence(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("local thumb gone"))      // first open races a delete
+             .ReturnsAsync(new MemoryStream(new byte[] { 9, 8, 7 }));          // re-resolve: thumb regenerated
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(local.Object);
+
+        var controller = BuildPreviewController(uploadService.Object, router.Object);
+
+        var result = await controller.GetPreviewAsync(uploadId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>()
+              .Which.ContentType.Should().Be("image/jpeg");
+        uploadService.Verify(s => s.GetPreviewAsync(
+            uploadId, It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
     }
 }

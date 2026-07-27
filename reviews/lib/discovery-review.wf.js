@@ -2,24 +2,33 @@ export const meta = {
   name: 'discovery-review',
   description: 'Reusable multi-lens blinded discovery review: lenses -> in-pass dedup -> convergence-weighted adversarial verify -> return for synthesis',
   phases: [
-    { title: 'Discovery', detail: 'blinded isolated lenses over the whole feature' },
-    { title: 'Dedup', detail: 'one agent merges same-defect findings across lenses into canonical findings + convergence counts, flagging hint-planted topics' },
-    { title: 'Verify', detail: 'adversarial skeptics, tiered by severity AND convergence' },
+    { title: 'Discovery', detail: 'blinded isolated lenses (whole feature, or the delta since the last full pass)' },
+    { title: 'Dedup', detail: 'one agent merges same-defect findings across lenses into canonical findings + convergence counts, flagging hint-planted topics and decided re-raises' },
+    { title: 'Verify', detail: 'adversarial skeptics, tiered by severity AND convergence; decided re-raises skip skeptics' },
   ],
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HOW TO RUN (the main agent scopes, then invokes this script):
 //   1. Confirm HEAD == origin/<branch>. Save the source diff(s) to temp files.
-//   2. (Token win #4) Optionally assemble a `codePack`: the FULL text of the changed files +
-//      their key collaborators (callers, cleanup jobs, middleware, config), read ONCE. Pass it in
-//      args so the lenses/skeptics don't each re-read the same files.
+//   2. (Token win #4) Assemble the `codePack`: the FULL text of the changed files + their key
+//      collaborators (callers, cleanup jobs, middleware, config), concatenated ONCE into a scratch
+//      FILE; pass its path as `codePackPath`. Lenses read it once. LENSES ONLY — skeptics read
+//      their finding's file(s) directly. (Inline `codePack` is still accepted.)
 //   3. Pick the manifest lenses for the change (LENS_LIBRARY keys below).
-//   4. Workflow({ scriptPath: 'reviews/lib/discovery-review.wf.js', args: {
-//        target, repoRoot, scope, changedFiles, backendDiff, frontendDiff?, specDocs?, lenses?, codePack?
+//   4. (Token win #5) Extract `decidedFindings` from reviews/<target>/ledger.md — TERMINAL-status
+//      rows only (deferred / wont-fix / false-positive / disputed-upheld):
+//      [{dId, title, file, status, decision}]. Lenses never see them (blinding holds); only the
+//      post-lens dedup agent does.
+//   5. Workflow({ scriptPath: 'reviews/lib/discovery-review.wf.js', args: {
+//        target, repoRoot, scope, changedFiles, backendDiff, frontendDiff?, specDocs?, lenses?,
+//        codePackPath? (or codePack?), decidedFindings?, passType? ('delta' = scope lenses to the
+//        diff since the last full pass), tokenBudget? (output-token cap; delta defaults to 600k,
+//        0 = uncapped), allowBare? (skip the no-args-bound abort)
 //      }})
 //   Returns [{lens, overall, findings:[...]}] where each finding carries: verdict (confirmed |
-//   plausible | refuted | disputed | unverified-cleanup), convergence, hinted, agreeingLenses,
+//   plausible | refuted | unverified-cleanup | unverified-low | unverified-over-budget |
+//   re-raise), convergence, hinted, agreeingLenses,
 //   guardEvidence, traceEvidence. The '_canonical' overall line reports skeptic-run counts for
 //   the metrics entry (cost.agents_by_stage). The main agent then synthesizes.
 //
@@ -33,8 +42,12 @@ export const meta = {
 //      prompt context manufactures convergence.
 //   #3 Output caps: lenses and skeptics are told to keep prose short (verdict + brief reason), since
 //      output tokens dominate cost and synthesis only needs the gist.
-//   #4 Read-once codePack: files handed to agents via args instead of re-read 100x (best with prompt
-//      caching across the fan-out; measure — its payoff depends on shared caching).
+//   #4 Read-once codePack: lenses read ONE pack file instead of each re-reading the same files.
+//      Lenses only — pack x skeptic-count is the multiplication the ~50k budget forbids.
+//   #5 Decided-re-raise skip: findings the dedup agent conservatively matches to a decided ledger
+//      item skip the skeptic stage -> verdict 're-raise' + the prior decision attached. Never
+//      suppressed: the synthesizer re-judges the DECISION; existence was settled when the item
+//      entered the ledger. (042-v8: 15 of 28 findings were re-raises.)
 // NOTE: the sandbox has no git/fs access, so scoping (diff, file list, codePack, manifest) is the
 // caller's job via `args`. Lens prompts are GENERIC by category; change detail comes from the diff/pack.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,20 +64,44 @@ const BACKEND_DIFF = a.backendDiff || '(none)'
 const FRONTEND_DIFF = a.frontendDiff || '(none)'
 const SPEC_DOCS = a.specDocs || '(no spec/story docs supplied)'
 const CODEPACK = a.codePack || ''
+const CODEPACK_PATH = a.codePackPath || ''
+const DECIDED = Array.isArray(a.decidedFindings) ? a.decidedFindings : []
+const PASSTYPE = a.passType === 'delta' ? 'delta' : 'full'
+
+// Budget guard (2026-07-22): both 043 deltas blew the README's 400-600k budget 2-3x. Delta passes
+// default to a 600k output-token cap; past it, remaining skeptics are skipped (verdict
+// 'unverified-over-budget', logged). Pass tokenBudget to override; 0 = uncapped (full passes' default).
+const TOKEN_BUDGET = a.tokenBudget !== undefined ? Number(a.tokenBudget) || 0 : (PASSTYPE === 'delta' ? 600000 : 0)
+const SPENT_AT_START = budget.spent()
+const used = () => budget.spent() - SPENT_AT_START
 
 const DEFAULT_LENSES = ['correctness', 'security', 'requirements', 'quality', 'tests-coverage', 'completeness-critic']
 const SELECTED = Array.isArray(a.lenses) && a.lenses.length ? a.lenses : DEFAULT_LENSES
 
+// Abort before fan-out if args silently failed to bind (the 042-v4 void run: stringified args ->
+// every lens reviewed placeholder defaults, ~1.2M tokens lost).
+if (BACKEND_DIFF === '(none)' && FRONTEND_DIFF === '(none)' && !CODEPACK && !CODEPACK_PATH && !a.allowBare) {
+  log('ABORT: no diff and no codePack bound — args likely failed to parse. Pass allowBare: true to override.')
+  return { error: 'args did not bind (no diff, no codePack) — aborted before fan-out' }
+}
+
 const BRIEF = `BE CONCISE: keep each field short. failureScenario <= 60 words, suggestedFix <= 40 words. State the defect, not an essay.`
 
-// #4: hand agents the code once. A stable top-of-prompt prefix maximizes any shared prompt caching.
+// #4: hand LENSES the code once — prefer codePackPath (a scratch file the caller assembled).
+// Skeptics never get the pack: each checks ONE finding and reads its file(s) directly.
 const PACK = CODEPACK
   ? `\n\nRELEVANT SOURCE (provided so you do NOT re-read these files — grep only for something NOT included here):\n${CODEPACK}\n`
-  : ''
+  : CODEPACK_PATH
+    ? `\n\nRELEVANT SOURCE: your FIRST action is to Read the code pack file at "${CODEPACK_PATH}" — every changed file plus key collaborators, read it ONCE; do not re-read those files individually. (It contains nothing from reviews/.)\n`
+    : ''
 
-const EXPLORE = CODEPACK
+const EXPLORE = (CODEPACK || CODEPACK_PATH)
   ? `Work from the RELEVANT SOURCE provided above; open/grep additional files only if you need something not included.`
   : `Do NOT limit yourself to the diff — open the full changed files below AND grep the repo for their call sites / collaborators. The highest-value defects live in the interaction between changed and UNCHANGED code.`
+
+const DELTA_NOTE = PASSTYPE === 'delta'
+  ? `\nPASS TYPE: DELTA — earlier blinded passes already reviewed the whole feature. Your scope is the DIFF below (work done since the last full pass) and its interactions with unchanged code; do NOT re-audit the whole feature.`
+  : ''
 
 // Shared hints seeded into EVERY lens — a recall aid, but agreement on these topics is not
 // independent evidence (the dedup agent flags findings these hints planted).
@@ -80,7 +117,7 @@ ${SCOPE}
 
 Diff(s) for orientation: backend = "${BACKEND_DIFF}", frontend = "${FRONTEND_DIFF}".
 ${PACK}
-DISCOVERY SCOPE — ${EXPLORE}
+DISCOVERY SCOPE — ${EXPLORE}${DELTA_NOTE}
 
 CHANGED FILES:
 ${CHANGED}
@@ -191,8 +228,9 @@ const DEDUP_SCHEMA = {
           severity: { type: 'string', enum: ['high', 'medium', 'low', 'cleanup'] },
           canonicalTitle: { type: 'string' },
           hinted: { type: 'boolean', description: 'true if the finding topic was planted by the shared PROJECT CONTEXT hints rather than discovered from the code alone' },
+          matchesDecided: { type: 'string', description: 'D# of the KNOWN DECIDED ITEM this group re-raises (same root cause at the same site), else ""' },
         },
-        required: ['memberIds', 'representativeId', 'severity', 'canonicalTitle', 'hinted'],
+        required: ['memberIds', 'representativeId', 'severity', 'canonicalTitle', 'hinted', 'matchesDecided'],
       },
     },
   },
@@ -209,53 +247,61 @@ const TRACE_SCHEMA = {
   required: ['traceConstructible', 'trace'],
 }
 
-// PACK leads the prompt so every skeptic shares a stable prefix (prompt-cache friendly — the
-// skeptic layer is where most agents run); the varying finding text comes after it.
-const findingCtx = (f) => `${PACK ? PACK.trimStart() + '\n' : ''}A code-review finding to adversarially check. Repo root: "${REPO}".
+// Skeptics never get the code pack (#4) — each checks ONE finding; a targeted read of that
+// finding's file(s) is cheaper than pack x skeptic-count.
+const findingCtx = (f) => `A code-review finding to adversarially check. Repo root: "${REPO}".
 FINDING — ${f.title}
   file: ${f.file}:${f.line ?? '?'}  severity: ${f.severity}  (independently raised by ${f.convergence} lens(es))
   failure scenario: ${f.failureScenario}
-Judge whether this is REAL against the code. Do NOT read anything under reviews/. Keep your answer <= 80 words.`
+Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/. Keep your answer <= 80 words.`
 
-let guardRuns = 0, traceRuns = 0
+let guardRuns = 0, traceRuns = 0, reraiseSkips = 0, budgetSkips = 0
+// Serious findings keep the session model; cheaper tiers carry the low-stakes checks.
+const SKEPTIC_MODEL = { low: 'sonnet', cleanup: 'haiku' }
+const skepticOpts = (f) => (SKEPTIC_MODEL[f.severity] ? { model: SKEPTIC_MODEL[f.severity] } : {})
 const guardAgent = (f, i) => {
   guardRuns++
   return agent(findingCtx(f) + `\n\nROLE: skeptic — hunt for an EXISTING guard/check/invariant that already PREVENTS this. guardExists=true only for a genuine guard (with file:line); a partial guard that misses THIS case is false.`,
-    { label: `guard#${i}`, phase: 'Verify', schema: GUARD_SCHEMA })
+    { label: `guard#${i}`, phase: 'Verify', schema: GUARD_SCHEMA, ...skepticOpts(f) })
 }
 const traceAgent = (f, i) => {
   traceRuns++
   return agent(findingCtx(f) + `\n\nROLE: skeptic — try to CONSTRUCT a concrete failing execution from the real code (inputs/state/timing -> the claimed wrong result). traceConstructible=true with the steps if you can; false with the reason if impossible.`,
-    { label: `trace#${i}`, phase: 'Verify', schema: TRACE_SCHEMA })
+    { label: `trace#${i}`, phase: 'Verify', schema: TRACE_SCHEMA, ...skepticOpts(f) })
 }
 
 // #2 convergence-weighted verification tiers.
 async function verifyFinding(f, i) {
+  // #5: a re-raise of a decided ledger item was already judged real once — skip skeptics, attach
+  // the prior decision. Never suppressed: the synthesizer re-judges the DECISION with this pass's
+  // framing (3 of 5 recorded re-raises overturned the prior call).
+  if (f.matchesDecided) {
+    reraiseSkips++
+    return { ...f, verdict: 're-raise', guardEvidence: `(skeptics skipped — re-raise of ${f.matchesDecided})`, traceEvidence: `(prior decision: ${f.priorDecision || 'see ledger'})` }
+  }
   if (f.severity === 'cleanup') {
     return { ...f, verdict: 'unverified-cleanup', guardEvidence: '(cleanup — not verified)', traceEvidence: '(cleanup — not verified)' }
   }
-  // Strong cross-lens agreement is itself the precision signal: one anti-groupthink guard-hunt,
-  // escalate to a trace only if it surprisingly claims a guard (contradicting the crowd).
-  // Hint-planted agreement doesn't count — shared prompt context manufactures convergence.
+  // Budget guard: past the cap the lens verdict stands unchallenged (not a refutation).
+  if (TOKEN_BUDGET && used() > TOKEN_BUDGET) {
+    budgetSkips++
+    return { ...f, verdict: 'unverified-over-budget', guardEvidence: `(tokenBudget ${TOKEN_BUDGET} exceeded — skeptic skipped)`, traceEvidence: '(unchallenged lens verdict, not a refutation)' }
+  }
+  // One ladder for every pass type; deltas additionally leave lows unchallenged.
+  if (PASSTYPE === 'delta' && f.severity === 'low') {
+    return { ...f, verdict: 'unverified-low', guardEvidence: '(delta: low — skeptics skipped)', traceEvidence: '(unchallenged lens verdict, not a refutation)' }
+  }
+  // Strong non-hinted cross-lens agreement is itself the precision signal — no skeptic.
+  // Hint-planted agreement doesn't count: shared prompt context manufactures convergence.
   if (f.convergence >= 3 && !f.hinted) {
-    const guard = await guardAgent(f, i)
-    if (!guard?.guardExists) return { ...f, verdict: 'confirmed', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: `(spot-check: ${f.convergence} lenses agreed, no guard found)` }
-    const trace = await traceAgent(f, i) // surprise: guard claimed despite consensus -> adjudicate
-    return { ...f, verdict: trace?.traceConstructible ? 'confirmed' : 'refuted', guardEvidence: guard.evidence, traceEvidence: trace?.trace ?? '(skeptic failed)' }
+    return { ...f, verdict: 'confirmed', guardEvidence: `(${f.convergence}-lens independent agreement accepted without skeptic)`, traceEvidence: '(convergence is the precision signal)' }
   }
-  if (f.severity === 'low') {
-    const trace = await traceAgent(f, i)
-    if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(low — guard-hunt skipped; trace built)', traceEvidence: trace.trace }
-    const guard = await guardAgent(f, i)
-    return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
-  }
-  // low-convergence (or hinted) high | medium: full independent pair
-  const [guard, trace] = await Promise.all([guardAgent(f, i), traceAgent(f, i)])
-  let verdict = 'plausible'
-  if (guard?.guardExists && trace?.traceConstructible) verdict = 'disputed' // conflicting evidence — surface it, don't average it
-  else if (guard?.guardExists && !trace?.traceConstructible) verdict = 'refuted'
-  else if (trace?.traceConstructible && !guard?.guardExists) verdict = 'confirmed'
-  return { ...f, verdict, guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
+  // Trace-first: a built trace settles it; the guard-hunt runs only when no trace builds,
+  // so the two can never contradict.
+  const trace = await traceAgent(f, i)
+  if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(guard-hunt skipped; trace built)', traceEvidence: trace.trace }
+  const guard = await guardAgent(f, i)
+  return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
 }
 
 const SEV_RANK = { high: 3, medium: 2, low: 1, cleanup: 0 }
@@ -263,6 +309,12 @@ const SEV_RANK = { high: 3, medium: 2, low: 1, cleanup: 0 }
 // ── Phase 1: Discovery (barrier so we can dedup across all lenses) ─────────────
 const lensDefs = SELECTED.map(key => ({ key, focus: LENS_LIBRARY[key] })).filter(l => l.focus)
 if (!lensDefs.length) { log('No valid lenses selected; nothing to do.'); return [] }
+// Delta lens cap (2026-07-22): both 043 deltas ran 6-7 lenses and blew the 400-600k budget 2-3x.
+// Callers order args.lenses by priority; the overflow is dropped LOUDLY, never silently.
+if (PASSTYPE === 'delta' && lensDefs.length > 5) {
+  const dropped = lensDefs.splice(5).map(l => l.key)
+  log(`DELTA LENS CAP: keeping the first 5 lenses [${lensDefs.map(l => l.key).join(', ')}]; dropped [${dropped.join(', ')}] — order args.lenses by priority.`)
+}
 log(`Discovery review of ${TARGET}: ${lensDefs.length} lenses -> reconcile -> convergence-weighted verify.`)
 
 const lensResults = await parallel(lensDefs.map(lens => () =>
@@ -278,8 +330,12 @@ if (!flat.length) { log('No findings.'); return lensResults.filter(Boolean).map(
 
 // ── Phase 2: Dedup (#1) — one cheap agent clusters same-defect findings ──
 const digest = flat.map(f => `#${f.id} [${f.lens}] ${f.severity} ${f.file}:${f.line ?? '?'} — ${f.title}`).join('\n')
+// #5: decided ledger items — only this post-lens agent ever sees them, so blinding holds.
+const decidedBlock = DECIDED.length
+  ? `\n\nKNOWN DECIDED ITEMS (terminal-status ledger rows — each already judged real and decided in a prior pass):\n${DECIDED.map(d => `${d.dId} [${d.status}] ${d.file || ''} — ${d.title}${d.decision ? ` | decision: ${d.decision}` : ''}`).join('\n')}\nIf a group re-raises one of these — SAME root cause at the SAME site, not merely the same theme — set matchesDecided to its D#. Match conservatively: when unsure, leave it "". Matching never suppresses a finding; it only attaches the prior decision.`
+  : ''
 const recon = await agent(
-  `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, SQLite/Postgres parity, the cloud-provider follow-up, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nFINDINGS:\n${digest}`,
+  `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, SQLite/Postgres parity, the cloud-provider follow-up, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nSet matchesDecided="" for every group unless the KNOWN DECIDED ITEMS block below says otherwise.${decidedBlock}\n\nFINDINGS:\n${digest}`,
   { label: 'dedup', phase: 'Dedup', schema: DEDUP_SCHEMA })
 
 // Build canonical findings from groups; fall back to no-dedup if the dedup agent failed.
@@ -294,20 +350,25 @@ if (recon?.groups?.length) {
     const members = ids.map(id => flat[id])
     const sev = [g.severity, ...members.map(m => m.severity)].sort((x, y) => SEV_RANK[y] - SEV_RANK[x])[0]
     const lenses = [...new Set(members.map(m => m.lens))]
-    canonical.push({ ...rep, severity: sev, title: g.canonicalTitle || rep.title, hinted: !!g.hinted, convergence: lenses.length, agreeingLenses: lenses, memberCount: members.length })
+    // A matchesDecided that names no real ledger row (hallucinated D#) is dropped -> skeptics run.
+    const prior = g.matchesDecided ? DECIDED.find(d => d.dId === g.matchesDecided) : null
+    canonical.push({ ...rep, severity: sev, title: g.canonicalTitle || rep.title, hinted: !!g.hinted, matchesDecided: prior ? g.matchesDecided : '', priorDecision: prior ? `${prior.dId} ${prior.status}${prior.decision ? `: ${prior.decision}` : ''}` : '', convergence: lenses.length, agreeingLenses: lenses, memberCount: members.length })
   }
 }
-for (const f of flat) if (!seen.has(f.id)) canonical.push({ ...f, hinted: false, convergence: 1, agreeingLenses: [f.lens], memberCount: 1 })
-log(`Deduped ${flat.length} raw findings -> ${canonical.length} canonical (max convergence ${Math.max(...canonical.map(c => c.convergence))}).`)
+for (const f of flat) if (!seen.has(f.id)) canonical.push({ ...f, hinted: false, matchesDecided: '', priorDecision: '', convergence: 1, agreeingLenses: [f.lens], memberCount: 1 })
+log(`Deduped ${flat.length} raw findings -> ${canonical.length} canonical (max convergence ${Math.max(...canonical.map(c => c.convergence))}; ${canonical.filter(c => c.matchesDecided).length} re-raises of decided items).`)
 
 // ── Phase 3: Verify canonical findings (convergence-weighted) ─────────────────
+// Severity-descending so highs claim concurrency slots (and any tokenBudget headroom) first —
+// if the budget cap trips mid-phase, it sheds lows, not highs.
+canonical.sort((x, y) => SEV_RANK[y.severity] - SEV_RANK[x.severity])
 const verified = await parallel(canonical.map((f, i) => () => verifyFinding(f, i)))
 
 const flatTwoPer = 2 * canonical.filter(c => c.severity !== 'cleanup').length
-log(`Verify done: ${guardRuns} guard + ${traceRuns} trace skeptic runs (flat 2-per-finding would be ${flatTwoPer}).`)
+log(`Verify done: ${guardRuns} guard + ${traceRuns} trace skeptic runs, ${reraiseSkips} decided re-raises skipped, ${budgetSkips} budget-skipped (flat 2-per-finding would be ${flatTwoPer}).${TOKEN_BUDGET ? ` Budget: ~${used()} of ${TOKEN_BUDGET} output tokens.` : ''}`)
 
 // Return grouped back under a single synthesized lens bucket + keep per-lens overalls for context.
 return [
-  { lens: '_canonical', overall: `Deduped ${flat.length} raw findings across ${lensDefs.length} lenses into ${canonical.length}. Skeptic runs: ${guardRuns} guard + ${traceRuns} trace (flat 2-per-finding: ${flatTwoPer}) — record as cost.agents_by_stage.`, findings: verified.filter(Boolean) },
+  { lens: '_canonical', overall: `Deduped ${flat.length} raw findings across ${lensDefs.length} lenses into ${canonical.length}. Skeptic runs: ${guardRuns} guard + ${traceRuns} trace (flat 2-per-finding: ${flatTwoPer}); ${reraiseSkips} decided re-raises + ${budgetSkips} budget-capped skipped skeptics — record as cost.agents_by_stage.`, findings: verified.filter(Boolean) },
   ...lensResults.filter(Boolean).map(lr => ({ lens: lr.lens, overall: lr.r?.overall || '', findings: [] })),
 ]

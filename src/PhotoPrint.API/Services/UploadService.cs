@@ -10,27 +10,33 @@ public class UploadService : IUploadService
 {
     private const long MaxFileSizeBytes = 52_428_800L; // 50 MB
     private const int MaxUploadsPerSession = 100;
+    private const int MaxOriginalFileNameLength = 260; // UploadConfiguration HasMaxLength(260)
 
-    // Cached thumbnails live under a distinct top-level namespace, keyed deterministically by
-    // the upload id, so a thumbnail can never collide with the original ({owner}/{id}.jpg) and
-    // a racing/cancelled write simply overwrites the same key instead of leaking (bolt 042,
-    // BUG-3/REQ-2). The cleanup job deletes this exact stored path (BUG-2).
-    private const string ThumbnailPrefix = "thumbs";
+    private static string SanitizeFileName(string originalFileName)
+    {
+        if (string.IsNullOrEmpty(originalFileName))
+            return originalFileName;
+        var name = originalFileName[(originalFileName.LastIndexOfAny(new[] { '/', '\\' }) + 1)..];
+        return name.Length <= MaxOriginalFileNameLength ? name : name[..MaxOriginalFileNameLength];
+    }
 
-    private readonly IStorageService _storage;
+    private readonly IStorageRouter _router;
     private readonly IMimeValidator _mimeValidator;
     private readonly IImageProcessor _imageProcessor;
     private readonly PhotoPrintDbContext _db;
     private readonly ILogger<UploadService> _logger;
 
+    // Bolt 043 (ADR-008): the router replaces the single IStorageService injection so a
+    // promoted (Cloud) upload's bytes are read/written against the cloud adapter — every
+    // path here routes by upload.StorageLocation.
     public UploadService(
-        IStorageService storage,
+        IStorageRouter router,
         IMimeValidator mimeValidator,
         IImageProcessor imageProcessor,
         PhotoPrintDbContext db,
         ILogger<UploadService> logger)
     {
-        _storage = storage;
+        _router = router;
         _mimeValidator = mimeValidator;
         _imageProcessor = imageProcessor;
         _db = db;
@@ -67,7 +73,7 @@ public class UploadService : IUploadService
                     $"Guest sessions are limited to {MaxUploadsPerSession} active uploads.");
         }
 
-        // Determine file extension from MIME type — never trust client filename extension
+        // Determine file extension from MIME type — never trust client filename extension.
         var extension = mimeType switch
         {
             "image/jpeg" => "jpg",
@@ -75,22 +81,30 @@ public class UploadService : IUploadService
             _            => "bin",
         };
 
-        var uploadId = Guid.NewGuid();
-        var storagePath = await _storage.SaveAsync(fileStream, ownerId, extension, ct, fileId: uploadId);
-
-        var imageInfo = await _imageProcessor.GetInfoAsync(storagePath, ct);
+        // Validate the image up-front, BEFORE writing it (ADR-007: caller owns key + I/O).
+        // No need to save-then-delete on validation failure now.
+        if (fileStream.CanSeek)
+            fileStream.Position = 0;
+        var imageInfo = await _imageProcessor.GetInfoAsync(fileStream, ct);
         if (imageInfo is null)
-        {
-            await _storage.DeleteAsync(storagePath, ct);
             throw new UnprocessableEntityException("The uploaded file could not be read as an image.");
-        }
-
+        // Total-pixel-area bomb check (bolt 042, BUG-1) — a per-axis cap misses the square
+        // bomb (25000×25000 passes 25000-per-axis yet decodes to ~625 MP). Reject up-front,
+        // before the file is written (ADR-007: validate-then-save).
         if (ImageProcessor.ExceedsDecodeLimits(imageInfo.WidthPx, imageInfo.HeightPx))
-        {
-            await _storage.DeleteAsync(storagePath, ct);
             throw new DecompressionBombException(
                 imageInfo.WidthPx, imageInfo.HeightPx, ImageProcessor.DimensionsExceededMessage);
-        }
+
+        var uploadId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow;
+        var key = StorageKeys.Original(uploadId, createdAt, extension);
+
+        // New uploads always start on the Local tier — pre-payment bytes never go to cloud.
+        // The intent-024 promoter flips StorageLocation to Cloud (and re-writes the bytes
+        // there) when the order is paid.
+        if (fileStream.CanSeek)
+            fileStream.Position = 0;
+        await _router.Local.SaveAsync(fileStream, key, ct);
 
         var actualLength = fileStream.Length;
 
@@ -99,18 +113,20 @@ public class UploadService : IUploadService
             Id              = uploadId,
             UserId          = userId,
             GuestSessionId  = guestSessionId,
-            FilePath        = storagePath,
+            FilePath        = key,
+            StorageLocation = StorageLocation.Local,
             // Strip any directory component OS-independently. Path.GetFileName only treats
             // '\' as a separator on Windows, so on the Linux server a crafted name like
             // "C:\evil\x.jpg" would pass through unsanitised — strip both '/' and '\'.
-            OriginalFileName = string.IsNullOrEmpty(originalFileName)
-                ? originalFileName
-                : originalFileName[(originalFileName.LastIndexOfAny(new[] { '/', '\\' }) + 1)..],
+            // Then cap to the column length: HasMaxLength(260) sizes the column but never
+            // truncates, so an over-length name 201s on InMemory/SQLite yet 22001-500s on
+            // prod Postgres (D55, review 043-v7).
+            OriginalFileName = SanitizeFileName(originalFileName),
             ContentType     = mimeType,
             WidthPx         = imageInfo.WidthPx,
             HeightPx        = imageInfo.HeightPx,
             FileSizeBytes   = actualLength,
-            UploadedAt      = DateTimeOffset.UtcNow,
+            UploadedAt      = createdAt,
         };
 
         _db.Uploads.Add(upload);
@@ -123,17 +139,13 @@ public class UploadService : IUploadService
         return MapToDto(upload);
     }
 
-    public async Task<(Stream stream, string contentType)> GetPreviewAsync(
+    public async Task<PreviewLocation> GetPreviewAsync(
         Guid uploadId,
         Guid? userId,
         Guid? guestSessionId,
         CancellationToken ct = default)
     {
-        // AsNoTracking keeps the steady-state cache-HIT path allocation-free (no identity-map
-        // entry / original-values snapshot for an entity we never save) (QUAL-1). The miss
-        // branch attaches + marks the single column below.
         var upload = await _db.Uploads
-            .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
 
         if (upload is null)
@@ -145,93 +157,96 @@ public class UploadService : IUploadService
         if (!isOwner)
             throw new ForbiddenException("You do not have access to this upload.");
 
-        // Cache hit: stream the stored thumbnail — no ImageSharp work on this path. Read directly
-        // rather than Exists-then-Get: one storage round-trip on the hottest read, and no TOCTOU
-        // 500 if the file vanishes between the two calls (L1/QUAL-2, review 042-v4).
-        if (upload.ThumbnailPath is not null)
+        // A Cloud-located upload with the cloud tier disabled is unroutable: For(Cloud) would throw
+        // InvalidOperationException (unmapped -> 500) on the customer preview path. Degrade to the
+        // same clean 404 as a missing original and signal the misconfiguration for ops. This is the
+        // customer-preview sibling of the F2/F9 cleanup/ZIP guards (review 043-v3).
+        if (upload.StorageLocation == StorageLocation.Cloud && !_router.CloudEnabled)
         {
-            try
-            {
-                return (await _storage.GetStreamAsync(upload.ThumbnailPath, ct), "image/jpeg");
-            }
-            catch (FileNotFoundException)
-            {
-                // ThumbnailPath is recorded but the file is gone (ops-side deletion / storage
-                // fault). Emit a distinct signal — a silently-broken cache is otherwise
-                // indistinguishable from a first-time miss (L3, review 042-v4) — then fall through
-                // to regenerate below.
-                _logger.LogWarning(
-                    "uploads.thumbnail.cache_miss_missing_file upload_id={UploadId}", uploadId);
-            }
+            _logger.LogWarning("uploads.preview.unroutable upload_id={UploadId} reason=cloud-tier-off", uploadId);
+            throw new NotFoundException($"Upload {uploadId} is no longer available.");
         }
 
-        // Cache miss: thumbnail never generated, or the cached file was removed (ops-side
-        // deletion). Generate once and store under a DETERMINISTIC, id-keyed path in a distinct
-        // namespace so a concurrent or cancelled write overwrites the same key rather than
-        // minting a new random file that leaks, and the cleanup job can target it (BUG-2/BUG-3).
-        var ownerId = upload.UserId ?? upload.GuestSessionId!.Value;
-        MemoryStream generated;
-        try
+        // Route to the adapter that owns this upload's bytes.
+        var store = _router.For(upload.StorageLocation);
+
+        // Cache hit: recorded thumbnail still present in the tier. Return without any decode
+        // work. Read-through Exists rather than trusting ThumbnailPath so an ops-side deletion
+        // transparently regenerates below instead of handing the caller a dead key (L1).
+        if (upload.ThumbnailPath is not null && await store.ExistsAsync(upload.ThumbnailPath, ct))
+            return new PreviewLocation(upload.Id, upload.StorageLocation, upload.ThumbnailPath);
+
+        // Recorded-but-absent thumbnail: emit a distinct signal so a silently-broken cache is not
+        // indistinguishable from a first-time miss (L3, review 042-v4), then regenerate below.
+        if (upload.ThumbnailPath is not null)
+            _logger.LogWarning("uploads.thumbnail.cache_miss_missing_file upload_id={UploadId}", uploadId);
+
+        // Cache miss: regenerate from the original in the upload's current tier. FilePath is
+        // nullable since bolt 052 (the original-purge nulls it). If it is gone, we cannot
+        // regenerate — signal the storage-integrity incident distinctly (F5, review 042-v8) and
+        // surface a clean 404 ("your photos are no longer available"; unit 003 catches this).
+        if (upload.FilePath is null)
         {
-            generated = await _imageProcessor.GenerateThumbnailAsync(upload.FilePath, ct);
-        }
-        catch (FileNotFoundException)
-        {
-            // The original blob is gone (ops-side deletion or the cleanup race) though the row
-            // survives. Signal it distinctly — a plain NotFoundException is indistinguishable from a
-            // routine unknown-id 404 (F5, review 042-v8) — then surface a clean 404 rather than an
-            // unmapped FileNotFoundException -> 500 (M6, review 042-v4).
             _logger.LogWarning("uploads.original.missing_file upload_id={UploadId}", uploadId);
             throw new NotFoundException($"Upload {uploadId} is no longer available.");
         }
-        var thumbnailPath = await _storage.SaveAsync(
-            generated, ownerId, "jpg", ct, fileId: uploadId, prefix: ThumbnailPrefix);
-        upload.ThumbnailPath = thumbnailPath;
 
-        // Persist only ThumbnailPath. The entity was read AsNoTracking, so attach it and mark
-        // the single column modified instead of tracking the whole graph.
-        // NOTE (L5, review 042-v4): this makes GET /preview perform a DB write on a cache miss,
-        // so it MUST be routed to the primary — it cannot run on a read replica. No replica
-        // routing exists today; moving cache-fill off the GET path is deferred until one does.
-        _db.Uploads.Attach(upload);
-        _db.Entry(upload).Property(u => u.ThumbnailPath).IsModified = true;
+        var thumbKey = StorageKeys.Thumbnail(upload.Id);
+        MemoryStream generated;
+        try
+        {
+            await using var src = await store.GetStreamAsync(upload.FilePath, ct);
+            generated = await _imageProcessor.GenerateThumbnailAsync(src, ct);
+        }
+        catch (FileNotFoundException)
+        {
+            // FilePath is recorded but the blob is physically gone (ops-side deletion / cleanup
+            // race). Unmapped, GetStreamAsync's FileNotFoundException surfaces as a 500 (M6,
+            // review 042-v4). Signal it (F5) and return a clean 404 instead.
+            _logger.LogWarning("uploads.original.missing_file upload_id={UploadId}", uploadId);
+            throw new NotFoundException($"Upload {uploadId} is no longer available.");
+        }
+
+        await using (generated)
+        {
+            await store.SaveAsync(generated, thumbKey, ct);
+        }
+
+        // Persist only ThumbnailPath. The entity is tracked, so setting the single property marks
+        // just that column modified — a concurrent soft-delete's DeletedAt is not overwritten,
+        // which is what lets the deleted-row-race check below observe it.
+        upload.ThumbnailPath = thumbKey;
         try
         {
             await _db.SaveChangesAsync(ct);
         }
         catch (Exception ex)
         {
-            // The thumbnail is on disk but ThumbnailPath didn't persist, so the cleanup job (which
+            // The thumbnail is stored but ThumbnailPath didn't persist, so the cleanup job (which
             // keys on ThumbnailPath) can never reclaim it. Signal + best-effort delete so it can't
             // leak silently (L4, review 042-v4), then rethrow.
             _logger.LogWarning(ex,
                 "uploads.thumbnail.orphaned_on_commit_failure upload_id={UploadId} key={Key}",
-                uploadId, thumbnailPath);
-            try { await _storage.DeleteAsync(thumbnailPath, ct); } catch { /* best-effort */ }
+                uploadId, thumbKey);
+            try { await store.DeleteAsync(thumbKey, ct); } catch { /* best-effort */ }
             throw;
         }
 
         // The cleanup job may have soft-deleted this row between the live read above and this
         // write (the write keys only on Id — no DeletedAt guard, and Upload has no concurrency
         // token). A thumbnail written onto a now-dead row is never revisited by cleanup, so
-        // delete it here to stop it leaking forever (M1, review 042-v4).
+        // delete it here to stop it leaking forever (M1/F6, review 042-v4/v8).
         var stillLive = await _db.Uploads
             .AsNoTracking()
             .AnyAsync(u => u.Id == uploadId && u.DeletedAt == null, ct);
         if (!stillLive)
         {
-            // Signal the race before the delete, consistent with the sibling anomaly paths (:163,
-            // :205); the stale ThumbnailPath this write left on the now-dead row is the deferred
-            // orphan-sweep fix (F1/D31), not this log (F6, review 042-v8).
             _logger.LogWarning(
-                "uploads.thumbnail.deleted_row_race upload_id={UploadId} key={Key}", uploadId, thumbnailPath);
-            await _storage.DeleteAsync(thumbnailPath, ct);
+                "uploads.thumbnail.deleted_row_race upload_id={UploadId} key={Key}", uploadId, thumbKey);
+            await store.DeleteAsync(thumbKey, ct);
         }
 
-        // Return the just-generated stream directly rather than re-opening it from storage —
-        // saves an open+read now and a billed round-trip once cloud storage lands (QUAL-2).
-        generated.Position = 0;
-        return (generated, "image/jpeg");
+        return new PreviewLocation(upload.Id, upload.StorageLocation, thumbKey);
     }
 
     private static UploadDto MapToDto(Upload u) => new(

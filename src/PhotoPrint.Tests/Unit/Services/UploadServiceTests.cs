@@ -18,59 +18,56 @@ public class UploadServiceTests
         0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
     ];
 
-    // The service-under-test uses a DbContext SEPARATE from the arrange/assert context
-    // (_db). Both share the same in-memory database NAME (unique per test instance), so
-    // contexts see each other's committed data via EF's default store — mirroring
-    // production's fresh-scoped-context-per-request, so a persistence bug can no longer hide
-    // behind a single shared change-tracker (TEST-3).
-    private readonly string _dbName = $"UploadSvc_{Guid.NewGuid():N}";
     private readonly PhotoPrintDbContext _db;
+    private readonly DbContextOptions<PhotoPrintDbContext> _options;
     private readonly Mock<IStorageService> _storageMock;
+    private readonly Mock<IStorageRouter> _routerMock;
     private readonly Mock<IImageProcessor> _imageProcessorMock;
     private readonly IUploadService _sut;
 
-    private PhotoPrintDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseInMemoryDatabase(_dbName)
-            .Options);
-
-    private IUploadService NewSut(PhotoPrintDbContext db) =>
-        new UploadService(
-            _storageMock.Object,
-            new MimeValidator(),
-            _imageProcessorMock.Object,
-            db,
-            Mock.Of<ILogger<UploadService>>());
-
     public UploadServiceTests()
     {
-        _db = NewContext();
+        _options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseInMemoryDatabase($"UploadSvc_{Guid.NewGuid():N}")
+            .Options;
+        _db = new PhotoPrintDbContext(_options);
 
+        // Bolt 043: storage adapter contract is now caller-supplied key. The router
+        // returns the same mock for both Local and the per-location lookup, so tests
+        // exercise the routing layer without needing two adapters.
         _storageMock = new Mock<IStorageService>();
-        // Echo the deterministic path the real storage would produce so tests can assert on it.
         _storageMock
             .Setup(s => s.SaveAsync(
-                It.IsAny<Stream>(), It.IsAny<Guid>(), It.IsAny<string>(),
-                It.IsAny<CancellationToken>(), It.IsAny<Guid?>(), It.IsAny<string?>()))
-            .ReturnsAsync((Stream stream, Guid owner, string ext, CancellationToken ct, Guid? fid, string? prefix) =>
-            {
-                var id = fid ?? Guid.NewGuid();
-                var dir = prefix is null ? owner.ToString("N") : $"{prefix}/{owner:N}";
-                return $"{dir}/{id:N}.{ext}";
-            });
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         _storageMock
             .Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => new MemoryStream(JpegMagic));
+        _storageMock
+            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false); // default: cache miss → regenerate
 
+        _routerMock = new Mock<IStorageRouter>();
+        _routerMock.Setup(r => r.Local).Returns(_storageMock.Object);
+        _routerMock.Setup(r => r.For(It.IsAny<StorageLocation>())).Returns(_storageMock.Object);
+        _routerMock.Setup(r => r.CloudEnabled).Returns(false);
+
+        // ImageProcessor's signature changed in bolt 043: it now reads from a Stream
+        // supplied by the caller (no IStorageService dependency).
         _imageProcessorMock = new Mock<IImageProcessor>();
         _imageProcessorMock
-            .Setup(p => p.GetInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.GetInfoAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ImageInfo(800, 600));
         _imageProcessorMock
-            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => new MemoryStream(JpegMagic));
 
-        _sut = NewSut(NewContext());
+        _sut = new UploadService(
+            _routerMock.Object,
+            new MimeValidator(),
+            _imageProcessorMock.Object,
+            _db,
+            Mock.Of<ILogger<UploadService>>());
     }
 
     private static MemoryStream JpegStream() => new(JpegMagic);
@@ -96,7 +93,25 @@ public class UploadServiceTests
             pdfStream, "file.pdf", declaredLength: 100L,
             userId: Guid.NewGuid(), guestSessionId: null);
 
-        await act.Should().ThrowAsync<UnsupportedMediaTypeException>();
+        // The copy must not advertise HEIC — dropped end-to-end in bolt 042 (M5); the stale
+        // promise was reintroduced here (D54, review 043-v7).
+        await act.Should().ThrowAsync<UnsupportedMediaTypeException>()
+            .WithMessage("Only JPEG and PNG files are accepted.");
+    }
+
+    [Fact]
+    public async Task UploadAsync_OverlongFileName_IsTruncatedToColumnLength()
+    {
+        // D55 (review 043-v7): HasMaxLength(260) sizes the column but never truncates — an
+        // over-length client filename passed InMemory/SQLite tests yet failed on prod
+        // Postgres with a 22001 string-truncation -> 500. Truncate at the service boundary.
+        var longName = new string('a', 300) + ".jpg";
+
+        var dto = await _sut.UploadAsync(
+            JpegStream(), longName, declaredLength: 100L,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        dto.OriginalFileName.Length.Should().Be(260);
     }
 
     [Fact]
@@ -138,10 +153,12 @@ public class UploadServiceTests
     }
 
     [Fact]
-    public async Task UploadAsync_ImageProcessorReturnsNull_DeletesStorageFileAndThrows()
+    public async Task UploadAsync_ImageProcessorReturnsNull_ThrowsWithoutSavingToStorage()
     {
+        // Bolt 043 (ADR-007): validation runs BEFORE storage — invalid images never
+        // reach the adapter, so there's nothing to clean up.
         _imageProcessorMock
-            .Setup(p => p.GetInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.GetInfoAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ImageInfo?)null);
 
         var act = () => _sut.UploadAsync(
@@ -149,7 +166,9 @@ public class UploadServiceTests
             userId: Guid.NewGuid(), guestSessionId: null);
 
         await act.Should().ThrowAsync<UnprocessableEntityException>();
-        _storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        _storageMock.Verify(
+            s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     // ── UploadAsync — happy path ───────────────────────────────────────────────
@@ -169,7 +188,26 @@ public class UploadServiceTests
         upload.ContentType.Should().Be("image/jpeg");
         upload.WidthPx.Should().Be(800);
         upload.HeightPx.Should().Be(600);
+        upload.StorageLocation.Should().Be(StorageLocation.Local);
         upload.DeletedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadAsync_ValidJpeg_WritesToLocalTierWithCallerSuppliedKey()
+    {
+        // Bolt 043 (ADR-007 + ADR-008): new uploads start on the Local tier and the
+        // storage key follows the StorageKeys.Original scheme.
+        await _sut.UploadAsync(
+            JpegStream(), "photo.jpg", declaredLength: (long)JpegMagic.Length,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        _routerMock.Verify(r => r.Local, Times.AtLeastOnce);
+        _storageMock.Verify(
+            s => s.SaveAsync(
+                It.IsAny<Stream>(),
+                It.Is<string>(k => k.StartsWith("uploads/") && k.EndsWith(".jpg")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -202,13 +240,31 @@ public class UploadServiceTests
     {
         var guestId = Guid.NewGuid();
 
-        var dto = await _sut.UploadAsync(
+        await _sut.UploadAsync(
             JpegStream(), "photo.jpg", declaredLength: 100L,
             userId: null, guestSessionId: guestId);
 
         var upload = await _db.Uploads.SingleAsync();
         upload.GuestSessionId.Should().Be(guestId);
         upload.UserId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadAsync_ImageDimensionsExceedLimit_ThrowsAndDoesNotSaveToStorage()
+    {
+        _imageProcessorMock
+            .Setup(p => p.GetInfoAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageInfo(30_000, 30_000)); // pixel bomb
+
+        var act = () => _sut.UploadAsync(
+            JpegStream(), "huge.jpg", declaredLength: 100L,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        await act.Should().ThrowAsync<UnprocessableEntityException>()
+            .WithMessage("*dimensions exceed*");
+        _storageMock.Verify(
+            s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     // ── GetPreviewAsync ───────────────────────────────────────────────────────
@@ -256,30 +312,70 @@ public class UploadServiceTests
     }
 
     [Fact]
-    public async Task GetPreviewAsync_MatchingUserId_ReturnsJpegThumbnailStream()
+    public async Task GetPreviewAsync_MatchingUserId_ReturnsLocalLocationWithThumbnailKey()
     {
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
         await _db.SaveChangesAsync();
 
-        var (stream, contentType) = await _sut.GetPreviewAsync(upload.Id, userId: userId, guestSessionId: null);
+        var loc = await _sut.GetPreviewAsync(upload.Id, userId: userId, guestSessionId: null);
 
-        contentType.Should().Be("image/jpeg");
-        stream.Should().NotBeNull();
-        stream.Length.Should().BeGreaterThan(0);
+        loc.UploadId.Should().Be(upload.Id);
+        loc.Location.Should().Be(StorageLocation.Local);
+        loc.ThumbnailKey.Should().Be($"thumbs/{upload.Id:N}.jpg");
     }
 
     [Fact]
-    public async Task GetPreviewAsync_MatchingGuestSessionId_ReturnsJpegThumbnailStream()
+    public async Task GetPreviewAsync_MatchingGuestSessionId_ReturnsLocalLocation()
     {
         var guestId = Guid.NewGuid();
         var upload = SeedUpload(guestSessionId: guestId);
         await _db.SaveChangesAsync();
 
-        var (stream, contentType) = await _sut.GetPreviewAsync(upload.Id, userId: null, guestSessionId: guestId);
+        var loc = await _sut.GetPreviewAsync(upload.Id, userId: null, guestSessionId: guestId);
 
-        contentType.Should().Be("image/jpeg");
-        stream.Length.Should().BeGreaterThan(0);
+        loc.Location.Should().Be(StorageLocation.Local);
+        loc.ThumbnailKey.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CloudUpload_ReturnsCloudLocation()
+    {
+        // A promoted (Cloud) upload returns Location=Cloud; the controller is responsible
+        // for translating that into a 302 presigned URL. Cloud tier enabled (the routable case).
+        _routerMock.Setup(r => r.CloudEnabled).Returns(true);
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        upload.StorageLocation = StorageLocation.Cloud;
+        upload.ThumbnailPath = $"thumbs/{upload.Id:N}.jpg";
+        await _db.SaveChangesAsync();
+
+        // For a Cloud upload, the thumbnail is assumed already present in cloud — the
+        // router still routes to our single fake; ExistsAsync returns true so no regen.
+        _storageMock
+            .Setup(s => s.ExistsAsync($"thumbs/{upload.Id:N}.jpg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var loc = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+
+        loc.Location.Should().Be(StorageLocation.Cloud);
+        loc.ThumbnailKey.Should().Be($"thumbs/{upload.Id:N}.jpg");
+    }
+
+    [Fact]
+    public async Task GetPreviewAsync_CloudUploadWithCloudDisabled_ThrowsNotFound()
+    {
+        // F2/F9 class-sweep (review 043-v3): a Cloud-located upload with the cloud tier disabled
+        // (Storage:Provider reverted to local) is unroutable — For(Cloud) would throw
+        // InvalidOperationException, unmapped -> 500 on the customer preview. Degrade to a clean 404.
+        // The shared setup already has CloudEnabled = false.
+        var userId = Guid.NewGuid();
+        var upload = SeedUpload(userId: userId);
+        upload.StorageLocation = StorageLocation.Cloud;
+        await _db.SaveChangesAsync();
+
+        await _sut.Invoking(s => s.GetPreviewAsync(upload.Id, userId, guestSessionId: null))
+            .Should().ThrowAsync<NotFoundException>();
     }
 
     // ── GetPreviewAsync — thumbnail caching (bolt 042) ────────────────────────
@@ -291,320 +387,156 @@ public class UploadServiceTests
         var upload = SeedUpload(userId: userId);
         await _db.SaveChangesAsync();
 
-        // Once generated, the stored thumbnail exists on subsequent reads.
+        // The first GetPreviewAsync never queries ExistsAsync (ThumbnailPath is null, the
+        // null check short-circuits). It regenerates, sets ThumbnailPath, and saves.
+        // The second call asks ExistsAsync(thumbKey) — we say true to model a cache hit.
+        var thumbKey = $"thumbs/{upload.Id:N}.jpg";
         _storageMock
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.ExistsAsync(thumbKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var (first, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
-        first.Dispose();
-        var (second, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
-        second.Dispose();
+        await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
+        await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
 
         // Cache hit on the second call — no thumbnail regeneration.
         _imageProcessorMock.Verify(
-            p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            p => p.GenerateThumbnailAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
-    public async Task GetPreviewAsync_SecondRequestFreshContext_UsesPersistedThumbnail()
+    public async Task GetPreviewAsync_CachedFileMissing_RegeneratesThumbnail()
     {
-        // TEST-3: prove the thumbnail path is PERSISTED (SaveChanges ran), not merely cached
-        // in a shared change-tracker. Each request uses its own context, like a new HTTP
-        // request — if the write were missing, the second request would regenerate.
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
+        upload.ThumbnailPath = "thumbs/stale.jpg";   // recorded, but file is gone
         await _db.SaveChangesAsync();
 
         _storageMock
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .Setup(s => s.ExistsAsync("thumbs/stale.jpg", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
-        var sut1 = NewSut(NewContext());
-        (await sut1.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
-
-        var sut2 = NewSut(NewContext());
-        (await sut2.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+        await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
 
         _imageProcessorMock.Verify(
-            p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            p => p.GenerateThumbnailAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()),
             Times.Once);
-
-        await using var verifyCtx = NewContext();
-        var persisted = await verifyCtx.Uploads.AsNoTracking().FirstAsync(u => u.Id == upload.Id);
-        persisted.ThumbnailPath.Should().NotBeNull();
     }
 
-    [Fact]
-    public async Task GetPreviewAsync_CacheMiss_SavesThumbnailUnderDeterministicNamespacedKey()
-    {
-        // BUG-3/REQ-2: the thumbnail is stored deterministically from the upload id in the
-        // "thumbs" namespace — it can't collide with the original ({owner}/{id}.jpg), and a
-        // racing/cancelled write overwrites the same key instead of orphaning a random file.
-        var userId = Guid.NewGuid();
-        var upload = SeedUpload(userId: userId);
-        await _db.SaveChangesAsync();
-
-        (await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
-
-        _storageMock.Verify(s => s.SaveAsync(
-            It.IsAny<Stream>(), userId, "jpg", It.IsAny<CancellationToken>(),
-            (Guid?)upload.Id, "thumbs"), Times.Once);
-
-        await using var verifyCtx = NewContext();
-        var persisted = await verifyCtx.Uploads.AsNoTracking().FirstAsync(u => u.Id == upload.Id);
-        persisted.ThumbnailPath.Should().Be($"thumbs/{userId:N}/{upload.Id:N}.jpg");
-    }
+    // ── GetPreviewAsync — ported bolt-042 hardening (adapted to the router design) ─────
 
     [Fact]
-    public async Task GetPreviewAsync_CachedFileVanished_RegeneratesInsteadOf500()
+    public async Task GetPreviewAsync_OriginalBlobGone_ThrowsNotFoundAndSignals()
     {
-        // L1 (review 042-v4): the cache-hit path did ExistsAsync (true) THEN GetStreamAsync; if the
-        // file vanished between the two (ops deletion / cleanup / storage fault), GetStreamAsync
-        // threw FileNotFoundException -> unmapped 500. It must regenerate transparently instead.
+        // M6/F5 (review 042-v4/v8): FilePath is recorded but the blob is physically gone (ops-side
+        // deletion / cleanup race). Unmapped, GetStreamAsync's FileNotFoundException would surface
+        // as a 500; it must be a clean 404 + a reserved signal so the storage-integrity incident
+        // is not lost in ordinary 404 noise.
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
-        upload.ThumbnailPath = "thumbs/owner/vanished.jpg";   // recorded, but the file is gone
         await _db.SaveChangesAsync();
 
         _storageMock
-            .Setup(s => s.ExistsAsync("thumbs/owner/vanished.jpg", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);   // exists at check time (old code), then vanishes before the read
-        _storageMock
-            .Setup(s => s.GetStreamAsync("thumbs/owner/vanished.jpg", It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FileNotFoundException("cached thumbnail vanished"));
+            .Setup(s => s.GetStreamAsync(upload.FilePath!, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FileNotFoundException("original gone"));
 
-        var (stream, _) = await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
-        stream.Dispose();
+        var (sut, logger) = NewSutWithLogger();
 
-        _imageProcessorMock.Verify(
-            p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        await sut.Invoking(s => s.GetPreviewAsync(upload.Id, userId, guestSessionId: null))
+            .Should().ThrowAsync<NotFoundException>();
+
+        VerifyLogged(logger, "uploads.original.missing_file");
     }
 
     [Fact]
-    public async Task GetPreviewAsync_CachedFileVanished_EmitsMissingFileSignal()
+    public async Task GetPreviewAsync_RowSoftDeletedDuringGeneration_DeletesOrphanAndSignals()
     {
-        // L3 (review 042-v4): a recorded-but-absent thumbnail silently regenerated with no signal,
-        // so a cache that has stopped working was indistinguishable from a first-time miss.
-        var userId = Guid.NewGuid();
-        var upload = SeedUpload(userId: userId);
-        upload.ThumbnailPath = "thumbs/owner/vanished.jpg";
-        await _db.SaveChangesAsync();
-
-        _storageMock
-            .Setup(s => s.GetStreamAsync("thumbs/owner/vanished.jpg", It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FileNotFoundException("gone"));
-
-        var logger = new Mock<ILogger<UploadService>>();
-        var sut = new UploadService(
-            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, NewContext(), logger.Object);
-
-        (await sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
-
-        logger.Verify(
-            l => l.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.thumbnail.cache_miss_missing_file")),
-                It.IsAny<Exception?>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task GetPreviewAsync_CacheMissWithMissingOriginal_ThrowsNotFoundNot500()
-    {
-        // M6 (review 042-v4): the original blob was deleted (ops-side or the cleanup race) though
-        // the row/DeletedAt survives. The cache-miss decode reads the original via GetStreamAsync,
-        // which throws FileNotFoundException — outside the ImageFormatException catch and unmapped,
-        // so it surfaced as a 500. It must surface a clean 4xx instead.
+        // M1/F6 (review 042-v4/v8): the cleanup job can soft-delete the row between the live read
+        // and the ThumbnailPath write (which keys only on Id — no DeletedAt guard). A thumbnail
+        // written onto a now-dead row is never revisited by cleanup, so the write must detect the
+        // row is gone and delete the just-written orphan.
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
         await _db.SaveChangesAsync();
 
+        var thumbKey = $"thumbs/{upload.Id:N}.jpg";
+        _storageMock.Setup(s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // GenerateThumbnailAsync runs AFTER the live read and BEFORE the persist; soft-deleting via
+        // a separate context here (as the cleanup job would) reproduces the race deterministically.
         _imageProcessorMock
-            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FileNotFoundException("Stored upload not found."));
-
-        var act = () => _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
-
-        await act.Should().ThrowAsync<NotFoundException>();
-    }
-
-    [Fact]
-    public async Task GetPreviewAsync_CacheMissWithMissingOriginal_EmitsMissingOriginalSignal()
-    {
-        // F5 (review 042-v8): a lost ORIGINAL blob on a still-live row is a storage-integrity
-        // incident, but it threw a bare NotFoundException with no log — indistinguishable in ops
-        // from a routine unknown-id 404. It must emit its own reserved signal, like the cache-miss
-        // path, so the severe case isn't hidden in ordinary 404 noise.
-        var userId = Guid.NewGuid();
-        var upload = SeedUpload(userId: userId);
-        await _db.SaveChangesAsync();
-
-        _imageProcessorMock
-            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new FileNotFoundException("Stored upload not found."));
-
-        var logger = new Mock<ILogger<UploadService>>();
-        var sut = new UploadService(
-            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, NewContext(), logger.Object);
-
-        var act = () => sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
-        await act.Should().ThrowAsync<NotFoundException>();
-
-        logger.Verify(
-            l => l.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.original.missing_file")),
-                It.IsAny<Exception?>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task GetPreviewAsync_RowSoftDeletedDuringWrite_DeletesOrphanedThumbnail()
-    {
-        // M1 (review 042-v4): the cleanup job can soft-delete the upload between the preview's
-        // live read (DeletedAt null) and its ThumbnailPath write (which keys only on Id, no
-        // DeletedAt guard). A thumbnail written onto the now-dead row is never revisited by
-        // cleanup -> permanent orphan. The write must detect the row is no longer live and
-        // delete the just-written thumbnail.
-        var userId = Guid.NewGuid();
-        var upload = SeedUpload(userId: userId);
-        await _db.SaveChangesAsync();
-
-        var thumbKey = $"thumbs/{userId:N}/{upload.Id:N}.jpg";
-
-        // GenerateThumbnailAsync runs AFTER the live read and BEFORE the persist, so soft-deleting
-        // here (via a separate context, like the cleanup job) reproduces the race deterministically.
-        _imageProcessorMock
-            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(() =>
             {
-                using var ctx = NewContext();
+                using var ctx = new PhotoPrintDbContext(_options);
                 var row = ctx.Uploads.First(u => u.Id == upload.Id);
                 row.DeletedAt = DateTimeOffset.UtcNow;
                 ctx.SaveChanges();
                 return new MemoryStream(JpegMagic);
             });
 
-        (await _sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
+        var (sut, logger) = NewSutWithLogger(new PhotoPrintDbContext(_options));
 
-        _storageMock.Verify(
-            s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
-    }
+        await sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
 
-    [Fact]
-    public async Task GetPreviewAsync_RowSoftDeletedDuringWrite_EmitsDeletedRowRaceSignal()
-    {
-        // F6 (review 042-v8): the soft-delete race deletes the just-written thumbnail but logged
-        // nothing, unlike its sibling anomaly paths (cache_miss_missing_file, orphaned_on_commit_
-        // failure). The resulting partial state (stale ThumbnailPath left on a dead row) was
-        // invisible to ops; the delete must be signalled.
-        var userId = Guid.NewGuid();
-        var upload = SeedUpload(userId: userId);
-        await _db.SaveChangesAsync();
-
-        var thumbKey = $"thumbs/{userId:N}/{upload.Id:N}.jpg";
-        var logger = new Mock<ILogger<UploadService>>();
-        var sut = new UploadService(
-            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, NewContext(), logger.Object);
-
-        _imageProcessorMock
-            .Setup(p => p.GenerateThumbnailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() =>
-            {
-                using var ctx = NewContext();
-                var row = ctx.Uploads.First(u => u.Id == upload.Id);
-                row.DeletedAt = DateTimeOffset.UtcNow;
-                ctx.SaveChanges();
-                return new MemoryStream(JpegMagic);
-            });
-
-        (await sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null)).stream.Dispose();
-
-        _storageMock.Verify(
-            s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
-        logger.Verify(
-            l => l.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.thumbnail.deleted_row_race")),
-                It.IsAny<Exception?>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task UploadAsync_ImageDimensionsExceedLimit_DeletesStoredFileAndThrows()
-    {
-        _imageProcessorMock
-            .Setup(p => p.GetInfoAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ImageInfo(30_000, 30_000)); // pixel bomb
-
-        var act = () => _sut.UploadAsync(
-            JpegStream(), "huge.jpg", declaredLength: 100L,
-            userId: Guid.NewGuid(), guestSessionId: null);
-
-        // F4 (review 042-v8): assert the DERIVED DecompressionBombException + its dimensions, not
-        // just the 422 base — the bomb-alert emitters gate on `is DecompressionBombException`, so a
-        // base-type-only assertion let a regression to the plain base kill the alert while green.
-        var ex = (await act.Should().ThrowAsync<DecompressionBombException>()
-            .WithMessage("*dimensions exceed*")).Which;
-        ex.WidthPx.Should().Be(30_000);
-        ex.HeightPx.Should().Be(30_000);
-
-        // M10 (review 042-v4): the rejected bomb's stored file must be deleted, else a rejected
-        // bomb leaks on disk forever. Pin the DeleteAsync — removing it kept the suite green.
-        _storageMock.Verify(
-            s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        _storageMock.Verify(s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
+        VerifyLogged(logger, "uploads.thumbnail.deleted_row_race");
     }
 
     [Fact]
     public async Task GetPreviewAsync_PersistFailsAfterThumbnailWritten_DeletesOrphanAndSignals()
     {
-        // L4 (review 042-v4): on cache-miss the thumbnail is written to storage, then
-        // SaveChangesAsync persists ThumbnailPath. If that commit throws (transient DB fault),
-        // the file is on disk but the row never references it, so the cleanup job (which keys on
-        // ThumbnailPath) can never reclaim it — a silent orphan. Signal + best-effort delete.
+        // L4 (review 042-v4): on cache-miss the thumbnail is written to storage, then the
+        // ThumbnailPath persist runs. If that commit throws, the file is on disk but the row never
+        // references it, so the cleanup job (which keys on ThumbnailPath) can never reclaim it —
+        // a silent orphan. Signal + best-effort delete before rethrowing.
         var userId = Guid.NewGuid();
         var upload = SeedUpload(userId: userId);
         await _db.SaveChangesAsync();
 
-        var thumbKey = $"thumbs/{userId:N}/{upload.Id:N}.jpg";
-        var logger = new Mock<ILogger<UploadService>>();
-        var throwingCtx = new SaveThrowingDbContext(
-            new DbContextOptionsBuilder<PhotoPrintDbContext>().UseInMemoryDatabase(_dbName).Options);
-        var sut = new UploadService(
-            _storageMock.Object, new MimeValidator(), _imageProcessorMock.Object, throwingCtx, logger.Object);
+        var thumbKey = $"thumbs/{upload.Id:N}.jpg";
+        _storageMock.Setup(s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
-        var act = () => sut.GetPreviewAsync(upload.Id, userId, guestSessionId: null);
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        var throwingDb = new SaveThrowingDbContext(_options);
+        var (sut, logger) = NewSutWithLogger(throwingDb);
+
+        await sut.Invoking(s => s.GetPreviewAsync(upload.Id, userId, guestSessionId: null))
+            .Should().ThrowAsync<InvalidOperationException>();
 
         _storageMock.Verify(s => s.DeleteAsync(thumbKey, It.IsAny<CancellationToken>()), Times.Once);
-        logger.Verify(
-            l => l.Log(
-                LogLevel.Warning,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("uploads.thumbnail.orphaned_on_commit_failure")),
-                It.IsAny<Exception?>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
+        VerifyLogged(logger, "uploads.thumbnail.orphaned_on_commit_failure");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /// <summary>A context whose commit always fails — simulates a transient DB fault on the
-    /// cache-fill persist (L4).</summary>
-    private sealed class SaveThrowingDbContext : PhotoPrintDbContext
+    private (IUploadService sut, Mock<ILogger<UploadService>> logger) NewSutWithLogger(
+        PhotoPrintDbContext? db = null)
     {
-        public SaveThrowingDbContext(DbContextOptions<PhotoPrintDbContext> options) : base(options) { }
+        var logger = new Mock<ILogger<UploadService>>();
+        var sut = new UploadService(
+            _routerMock.Object, new MimeValidator(), _imageProcessorMock.Object, db ?? _db, logger.Object);
+        return (sut, logger);
+    }
+
+    private static void VerifyLogged(Mock<ILogger<UploadService>> logger, string marker)
+        => logger.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains(marker)),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+
+    // A DbContext whose SaveChangesAsync always throws — models a transient commit fault after the
+    // thumbnail bytes are already written to storage (L4).
+    private sealed class SaveThrowingDbContext(DbContextOptions<PhotoPrintDbContext> options)
+        : PhotoPrintDbContext(options)
+    {
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("simulated transient DB fault");
+            => throw new InvalidOperationException("simulated commit failure");
     }
 
     private Upload SeedUpload(Guid? userId = null, Guid? guestSessionId = null, DateTimeOffset? deletedAt = null)
@@ -613,13 +545,14 @@ public class UploadServiceTests
         {
             UserId           = userId,
             GuestSessionId   = guestSessionId,
-            FilePath         = "owner/file.jpg",
+            FilePath         = "uploads/2026/05/file.jpg",
             OriginalFileName = "file.jpg",
             ContentType      = "image/jpeg",
             WidthPx          = 800,
             HeightPx         = 600,
             FileSizeBytes    = 1024,
             DeletedAt        = deletedAt,
+            // StorageLocation defaults to Local via the Upload model's initializer
         };
         _db.Uploads.Add(upload);
         return upload;

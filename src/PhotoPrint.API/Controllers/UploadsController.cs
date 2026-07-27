@@ -1,10 +1,12 @@
-using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using PhotoPrint.API.Authentication;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.DTOs.Uploads;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Extensions;
+using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 
 namespace PhotoPrint.API.Controllers;
@@ -17,21 +19,38 @@ public class UploadsController : ControllerBase
     private const long MaxFileSizeBytes = 52_428_800L;        // 50 MB per file
     private const long MaxBatchSizeBytes = 524_288_000L;       // 500 MB total batch
 
-    // A preview is an ownership-checked, per-user resource, so it must never be
-    // shared-cacheable (SEC-1 + QUAL-4, review 042-v1). `private` keeps it out of
-    // ASP.NET Core ResponseCaching and any shared proxy/CDN while still allowing a
-    // per-user browser cache. `immutable` is intentionally dropped: a thumbnail can
-    // be regenerated after an ops-side deletion, so the response is not immutable.
+    // A preview is an ownership-checked, per-user resource, so it must never be shared-cacheable
+    // (SEC-1 + QUAL-4, review 042-v1). `private` keeps it out of any shared proxy/CDN while still
+    // allowing a per-user browser cache. `immutable` is intentionally dropped: a thumbnail can be
+    // regenerated after an ops-side deletion, so the response is not immutable.
     private static readonly string PreviewCacheControl =
         $"private, max-age={(int)TimeSpan.FromDays(30).TotalSeconds}";
 
     private readonly IUploadService _uploadService;
+    private readonly IStorageRouter _storageRouter;
+    private readonly StorageSettings _storageSettings;
     private readonly ILogger<UploadsController> _logger;
 
-    public UploadsController(IUploadService uploadService, ILogger<UploadsController> logger)
+    public UploadsController(
+        IUploadService uploadService,
+        IStorageRouter storageRouter,
+        IOptions<StorageSettings> storageSettings,
+        ILogger<UploadsController> logger)
     {
         _uploadService = uploadService;
+        _storageRouter = storageRouter;
+        _storageSettings = storageSettings.Value;
         _logger = logger;
+    }
+
+    // Client-controlled filenames must be neutralised before logging (L6, review 042-v4):
+    // strip control chars (a newline forges a fake log line in plain-text sinks) and cap length
+    // (an unbounded name is a log-volume amplification vector).
+    private static string SanitizeForLog(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return "(none)";
+        var cleaned = new string(name.Where(c => !char.IsControl(c)).ToArray());
+        return cleaned.Length > 128 ? cleaned[..128] : cleaned;
     }
 
     // POST /api/uploads
@@ -113,22 +132,21 @@ public class UploadsController : ControllerBase
                       RequestEntityTooLargeException or
                       BadRequestException)
             {
-                // OBS-1 (review 042-v1): the batch endpoint turns each rejection into a
-                // per-item result and returns 200, so without this the exception never
-                // reaches ExceptionHandlerMiddleware and bulk abuse (the most likely bomb
-                // vector) is invisible to ops. Log it — Warning, no file bytes / no PII.
-                _logger.LogWarning(
-                    "uploads.batch.item_rejected file={FileName} reason={Reason} correlation_id={CorrelationId}",
-                    SanitizeFileNameForLog(file.FileName), ex.GetType().Name, HttpContext.GetCorrelationId());
-
-                // M4 (review 042-v4): a decompression bomb sent via /batch is caught here and
-                // never reaches ExceptionHandlerMiddleware, so the reserved bomb-alert event ops
-                // key on would never fire for the batch vector — the code's own "most likely bomb
-                // vector". Emit the same reserved event (with dimensions) the middleware does.
+                // A batch rejection is swallowed into a per-item result (200 overall), so it never
+                // reaches ExceptionHandlerMiddleware. Log it here or bulk abuse is invisible to ops
+                // (OBS-1, review 042-v1).
+                var safeName = SanitizeForLog(file.FileName);
                 if (ex is DecompressionBombException bomb)
+                    // DecompressionBombException subclasses UnprocessableEntityException, so without
+                    // this branch the reserved bomb event (with dimensions) that ops alerts key on
+                    // would never fire for the /batch vector (M4, review 042-v4).
                     _logger.LogWarning(
-                        "uploads.decompression_bomb.rejected correlation_id={CorrelationId} width={Width} height={Height}",
-                        HttpContext.GetCorrelationId(), bomb.WidthPx, bomb.HeightPx);
+                        "uploads.decompression_bomb.rejected file={File} width={Width} height={Height}",
+                        safeName, bomb.WidthPx, bomb.HeightPx);
+                else
+                    _logger.LogWarning(
+                        "uploads.batch.item_rejected file={File} reason={Reason}",
+                        safeName, ex.GetType().Name);
 
                 results.Add(new BatchUploadItemResult(file.FileName, null, ex.Message));
             }
@@ -138,8 +156,16 @@ public class UploadsController : ControllerBase
     }
 
     // GET /api/uploads/{id}/preview
+    //
+    // Bolt 043 (ADR-008): the response shape depends on which tier owns the upload's bytes.
+    //   Local upload  -> 200 image/jpeg + private 30-day cache (bolt 042 SEC-1 behaviour).
+    //   Cloud upload  -> 302 Found to a presigned URL + Cache-Control: private, max-age =
+    //                    the presign TTL (so a cached redirect never outlives its URL, and
+    //                    shared caches never leak a user's signed URL).
+    // Authorization runs in the service BEFORE any presigned URL is generated.
     [HttpGet("{id:guid}/preview")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPreviewAsync(Guid id, CancellationToken cancellationToken)
@@ -147,11 +173,63 @@ public class UploadsController : ControllerBase
         var userId = User.GetUserIdOrNull();
         var guestSessionId = User.GetGuestSessionIdOrNull();
 
-        var (stream, contentType) = await _uploadService.GetPreviewAsync(
+        var loc = await _uploadService.GetPreviewAsync(
             id, userId, guestSessionId, cancellationToken);
 
-        Response.Headers.CacheControl = PreviewCacheControl;
+        if (loc.Location == StorageLocation.Cloud)
+            return await CloudRedirectAsync(loc, cancellationToken);
 
+        try
+        {
+            return await StreamLocalAsync(id, loc, cancellationToken);
+        }
+        catch (FileNotFoundException)
+        {
+            // TOCTOU (F8, review 043-v1): GetPreviewAsync resolved Local, then a concurrent
+            // promotion best-effort-deleted the local thumb before we opened it. Re-resolve
+            // once — the upload is now Cloud (→ 302) or the thumb regenerated — rather than
+            // letting the unmapped FileNotFoundException surface as a 500.
+            var reResolved = await _uploadService.GetPreviewAsync(
+                id, userId, guestSessionId, cancellationToken);
+
+            if (reResolved.Location == StorageLocation.Cloud)
+                return await CloudRedirectAsync(reResolved, cancellationToken);
+
+            try
+            {
+                return await StreamLocalAsync(id, reResolved, cancellationToken);
+            }
+            catch (FileNotFoundException)
+            {
+                _logger.LogWarning(
+                    "uploads.preview.local_thumb_vanished upload_id={UploadId}", id);
+                return NotFound();
+            }
+        }
+    }
+
+    private async Task<IActionResult> CloudRedirectAsync(
+        PreviewLocation loc, CancellationToken ct)
+    {
+        // Cloud tier → presigned 302. Bytes flow browser ↔ object store directly.
+        var ttl = TimeSpan.FromMinutes(_storageSettings.PresignTtlMinutes);
+        var url = await _storageRouter.Cloud.GetPresignedUrlAsync(loc.ThumbnailKey, ttl, ct);
+
+        // Cap the browser cache at the presigned-URL lifetime, so a still-fresh cached redirect
+        // can never replay to an already-expired URL (F5, review 043-v1). Hardcoding max-age=3600
+        // broke thumbnails whenever an operator set PresignTtlMinutes < 60. 'private' keeps a
+        // user's signed URL out of any shared cache.
+        Response.Headers.CacheControl = $"private, max-age={(int)ttl.TotalSeconds}";
+        return Redirect(url);
+    }
+
+    // Opens the local thumbnail and returns a 200 (or 304). Throws FileNotFoundException if the
+    // thumb has been deleted since GetPreviewAsync resolved it — the caller handles that.
+    private async Task<IActionResult> StreamLocalAsync(Guid id, PreviewLocation loc, CancellationToken ct)
+    {
+        var stream = await _storageRouter.Local.GetStreamAsync(loc.ThumbnailKey, ct);
+
+        Response.Headers.CacheControl = PreviewCacheControl;
         var etag = $"\"{id}-{stream.Length}\"";
         Response.Headers.ETag = etag;
 
@@ -161,25 +239,6 @@ public class UploadsController : ControllerBase
             return StatusCode(StatusCodes.Status304NotModified);
         }
 
-        return File(stream, contentType);
-    }
-
-    private const int MaxLoggedFileNameLength = 128;
-
-    // Client filenames are attacker-controlled. Cap the length (log-volume amplification) and
-    // strip control characters (a newline forges a fake log line in plain-text sinks) before
-    // logging (L6, review 042-v4).
-    private static string SanitizeFileNameForLog(string? fileName)
-    {
-        if (string.IsNullOrEmpty(fileName)) return "(none)";
-
-        var capped = fileName.Length > MaxLoggedFileNameLength
-            ? fileName[..MaxLoggedFileNameLength]
-            : fileName;
-
-        var sb = new StringBuilder(capped.Length);
-        foreach (var c in capped)
-            sb.Append(char.IsControl(c) ? '?' : c);
-        return sb.ToString();
+        return File(stream, "image/jpeg");
     }
 }

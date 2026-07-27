@@ -22,11 +22,56 @@ public class UploadCleanupJobTests
 
     private static IServiceScopeFactory BuildScopeFactory(IStorageService storage, PhotoPrintDbContext db)
     {
+        // Route every tier to the single storage mock so existing (Local) tests are unaffected
+        // by the bolt-043 switch to IStorageRouter.
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.Local).Returns(storage);
+        router.Setup(r => r.For(It.IsAny<StorageLocation>())).Returns(storage);
+
         var services = new ServiceCollection();
         services.AddSingleton<PhotoPrintDbContext>(_ => db);
-        services.AddSingleton<IStorageService>(_ => storage);
+        services.AddSingleton<IStorageRouter>(router.Object);
         services.AddLogging();
         return services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
+    }
+
+    // Distinct local/cloud stores so a test can assert deletes route to the right tier.
+    private static (IServiceScopeFactory factory, Mock<IStorageService> local, Mock<IStorageService> cloud)
+        BuildTieredScopeFactory(PhotoPrintDbContext db)
+    {
+        var local = new Mock<IStorageService>();
+        var cloud = new Mock<IStorageService>();
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true); // this factory provides a cloud store
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<PhotoPrintDbContext>(_ => db);
+        services.AddSingleton<IStorageRouter>(router.Object);
+        services.AddLogging();
+        return (services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), local, cloud);
+    }
+
+    // Cloud tier disabled: For(Cloud) throws exactly as the real StorageRouter does when _cloud is null.
+    private static (IServiceScopeFactory factory, Mock<IStorageService> local)
+        BuildCloudDisabledScopeFactory(PhotoPrintDbContext db)
+    {
+        var local = new Mock<IStorageService>();
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud))
+              .Throws(new InvalidOperationException("Cloud storage is not enabled."));
+
+        var services = new ServiceCollection();
+        services.AddSingleton<PhotoPrintDbContext>(_ => db);
+        services.AddSingleton<IStorageRouter>(router.Object);
+        services.AddLogging();
+        return (services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), local);
     }
 
     private static IOptionsMonitor<UploadCleanupSettings> Settings(
@@ -42,6 +87,9 @@ public class UploadCleanupJobTests
         monitor.SetupGet(m => m.CurrentValue).Returns(value);
         return monitor.Object;
     }
+
+    private static IOptions<ArchiveSettings> ArchiveOpts(int retentionMonths = 12)
+        => Options.Create(new ArchiveSettings { RetentionMonths = retentionMonths });
 
     private static Upload MakeUpload(DateTimeOffset uploadedAt, bool softDeleted = false) => new()
     {
@@ -68,7 +116,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         using var cts = new CancellationTokenSource();
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
@@ -77,7 +125,7 @@ public class UploadCleanupJobTests
 
         var updated = await db.Uploads.FindAsync(old.Id);
         updated!.DeletedAt.Should().NotBeNull();
-        storageMock.Verify(s => s.DeleteAsync(old.FilePath, It.IsAny<CancellationToken>()), Times.Once);
+        storageMock.Verify(s => s.DeleteAsync(old.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -91,7 +139,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -113,7 +161,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -136,7 +184,7 @@ public class UploadCleanupJobTests
 
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -162,7 +210,7 @@ public class UploadCleanupJobTests
         var storageMock = new Mock<IStorageService>();
         var job = new UploadCleanupJob(BuildScopeFactory(storageMock.Object, db),
             Settings(),
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
 
         var method = typeof(UploadCleanupJob).GetMethod("CleanupAsync",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -185,7 +233,7 @@ public class UploadCleanupJobTests
         var job = new UploadCleanupJob(
             BuildScopeFactory(storageMock.Object, db),
             settings,
-            Mock.Of<ILogger<UploadCleanupJob>>());
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
         return (Task.CompletedTask, storageMock.Object, storageMock, job);
     }
 
@@ -331,6 +379,102 @@ public class UploadCleanupJobTests
     }
 
     [Fact]
+    public async Task Cleanup_agedCloudUpload_deletesAllThreeKeysFromCloudTier()
+    {
+        // F2 (review 043-v1): an aged, promoted (Cloud) upload past ReferencedRetentionDays.
+        // Deletes must route to the CLOUD tier and cover all THREE persistent objects
+        // (original + thumbnail + large preview). The pre-fix code resolved the local default
+        // (a no-op on disk) and never touched LargePreviewPath, orphaning the cloud blobs.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        upload.StorageLocation = StorageLocation.Cloud;
+        upload.ThumbnailPath = "thumbs/cloud/thumb.jpg";
+        upload.LargePreviewPath = "previews/cloud/large.jpg";
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+
+        var (factory, local, cloud) = BuildTieredScopeFactory(db);
+        var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1);
+        errors.Should().Be(0);
+
+        cloud.Verify(s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(s => s.DeleteAsync("thumbs/cloud/thumb.jpg", It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(s => s.DeleteAsync("previews/cloud/large.jpg", It.IsAny<CancellationToken>()), Times.Once);
+        local.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        var after = await db.Uploads.FindAsync(upload.Id);
+        after!.DeletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Cleanup_cloudRowWithCloudDisabled_skipsItAndStillCleansLocalBatch()
+    {
+        // F2 (review 043-v3) + D38 (review 043-v5): cloud was enabled, an upload was promoted (Cloud),
+        // then Storage:Provider reverted to local, so For(Cloud) would throw. The unroutable Cloud row
+        // must not be deleted, and must not block cleanup of the local batch. Since D38 the exclusion
+        // is at the QUERY level (the row never enters the batch), so For(Cloud) is never called for it.
+        var db = CreateDb();
+        var cloudUpload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400)); // oldest → first in batch
+        cloudUpload.StorageLocation = StorageLocation.Cloud;
+        var localOrphan = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25)); // Local, aged out
+        await db.Uploads.AddRangeAsync(cloudUpload, localOrphan);
+        await db.SaveChangesAsync();
+
+        var (factory, local) = BuildCloudDisabledScopeFactory(db);
+        var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1); // only the routable local orphan
+        errors.Should().Be(0);
+        local.Verify(s => s.DeleteAsync(localOrphan.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
+
+        (await db.Uploads.FindAsync(localOrphan.Id))!.DeletedAt.Should().NotBeNull();
+        (await db.Uploads.FindAsync(cloudUpload.Id))!.DeletedAt.Should().BeNull(); // excluded, retried later
+    }
+
+    [Fact]
+    public async Task Cleanup_manyUnroutableCloudRows_doNotStarveLocalOrphanCleanup()
+    {
+        // D38 (review 043-v5): with the cloud tier disabled and >= BatchSize aged Cloud rows, the
+        // pre-fix code fetched the oldest BatchSize (all Cloud), skipped them post-fetch, and never
+        // advanced the OrderBy/Take window to a local orphan sorted after them → local cleanup
+        // wedged every sweep. The query-level exclusion must let the batch reach the routable orphan.
+        var db = CreateDb();
+
+        // BatchSize (500) aged Cloud rows, all OLDER than the local orphan so — unfiltered — they
+        // would fill the entire Take(500) window and the orphan would never be reached.
+        var baseTime = DateTimeOffset.UtcNow.AddDays(-500);
+        for (var i = 0; i < 500; i++)
+        {
+            var cloud = MakeUpload(baseTime.AddSeconds(i));
+            cloud.StorageLocation = StorageLocation.Cloud;
+            await db.Uploads.AddAsync(cloud);
+        }
+        var localOrphan = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25)); // newest → sorted last
+        await db.Uploads.AddAsync(localOrphan);
+        await db.SaveChangesAsync();
+
+        var (factory, local) = BuildCloudDisabledScopeFactory(db);
+        var job = new UploadCleanupJob(factory, Settings(referencedRetentionDays: 365),
+            ArchiveOpts(), Mock.Of<ILogger<UploadCleanupJob>>());
+
+        var (deleted, errors) = await InvokeCleanupAsync(job);
+
+        // The local orphan is reached and cleaned despite 500 unroutable Cloud rows ahead of it.
+        deleted.Should().Be(1);
+        errors.Should().Be(0);
+        local.Verify(s => s.DeleteAsync(localOrphan.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
+        (await db.Uploads.FindAsync(localOrphan.Id))!.DeletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Cleanup_deletes_orphan_upload_past_referenced_window()
     {
         // Upload IS referenced by a cart, but is older than ReferencedRetentionDays —
@@ -360,7 +504,109 @@ public class UploadCleanupJobTests
         var after = await db.Uploads.FindAsync(upload.Id);
         after!.DeletedAt.Should().NotBeNull();
         storageMock.Verify(
-            s => s.DeleteAsync(upload.FilePath, It.IsAny<CancellationToken>()),
+            s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    // ── D50 class-sweep (micro-review A4, review 043-v7): the referenced-retention branch
+    //    must not delete uploads a live or in-window order still needs ────────────────────
+
+    private static async Task SeedOrderRefAsync(
+        PhotoPrintDbContext db, Upload upload, OrderStatus status, DateTimeOffset? paidAt)
+    {
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            OrderNumber = "FT-" + Random.Shared.Next(100_000, 999_999),
+            Status = status,
+            GuestSessionId = upload.GuestSessionId,
+            GuestEmail = "buyer@example.com",
+            PaymentProcessor = PaymentProcessor.Stripe,
+            DeliveryType = DeliveryType.Courier,
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "Strada Exemplu", Number = "1", City = "București",
+                County = "Bucuresti", PostalCode = "010101",
+                RecipientName = "Test Buyer", Phone = "+40712345678",
+            },
+            ShippingCostRon = 25m, SubtotalRon = 100m, TotalRon = 125m,
+            CreatedAt = paidAt ?? DateTimeOffset.UtcNow.AddDays(-400),
+            PaidAt = paidAt,
+        };
+        await db.Orders.AddAsync(order);
+        await db.OrderItems.AddAsync(new OrderItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            UploadId = upload.Id,
+            ProductId = Guid.NewGuid(),
+            Quantity = 1, UnitPriceRon = 100m, LineTotalRon = 100m,
+            ProductSnapshot = new ProductSnapshot
+            {
+                ProductName = "Fotografie clasică", Size = "10x15", Finish = "Lucioasă",
+            },
+        });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Cleanup_agedReferencedUpload_withLiveOrder_isNotDeleted()
+    {
+        // An aged (past ReferencedRetentionDays) upload whose referencing order is still
+        // Paid (awaiting fulfilment): deleting it would truncate that order's fulfilment ZIP —
+        // the same shared-upload data-loss class as D50, at a third site.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+        await SeedOrderRefAsync(db, upload, OrderStatus.Paid, DateTimeOffset.UtcNow.AddDays(-3));
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings(referencedRetentionDays: 365));
+
+        var (deleted, _) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(0);
+        (await db.Uploads.FindAsync(upload.Id))!.DeletedAt.Should().BeNull();
+        storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cleanup_agedReferencedUpload_withRecentlyPaidOrder_isNotDeleted()
+    {
+        // Complete (Delivered) order, but paid INSIDE the archive window: the customer is
+        // still entitled to view the photos; age-from-upload alone must not delete them.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+        await SeedOrderRefAsync(db, upload, OrderStatus.Delivered, DateTimeOffset.UtcNow.AddMonths(-2));
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings(referencedRetentionDays: 365));
+
+        var (deleted, _) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(0);
+        (await db.Uploads.FindAsync(upload.Id))!.DeletedAt.Should().BeNull();
+        storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cleanup_agedReferencedUpload_allOrdersCompleteAndPastWindow_isDeleted()
+    {
+        // Liveness: once every referencing order is complete AND past the archive window,
+        // the aged upload must still be reclaimed.
+        var db = CreateDb();
+        var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
+        await db.Uploads.AddAsync(upload);
+        await db.SaveChangesAsync();
+        await SeedOrderRefAsync(db, upload, OrderStatus.Delivered, DateTimeOffset.UtcNow.AddMonths(-13));
+
+        var (_, _, storageMock, job) = await BuildJobAsync(db, Settings(referencedRetentionDays: 365));
+
+        var (deleted, _) = await InvokeCleanupAsync(job);
+
+        deleted.Should().Be(1);
+        (await db.Uploads.FindAsync(upload.Id))!.DeletedAt.Should().NotBeNull();
+        storageMock.Verify(s => s.DeleteAsync(upload.FilePath!, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

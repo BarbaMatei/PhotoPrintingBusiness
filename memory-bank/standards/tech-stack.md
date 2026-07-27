@@ -1,62 +1,54 @@
 # Tech Stack
 
-## Overview
-FotoTipar is a full-stack web application for photo printing e-commerce, built with Angular 17+ on the frontend and ASP.NET Core 8 on the backend, targeting Romanian customers.
+*(Rewritten 2026-07-14 from the code. Descriptive — states what IS, not what is planned.)*
 
-## Languages
+## Frontend — `src/PhotoPrint.UI`
 
-**Frontend**: TypeScript 5.x (strict mode)
-**Backend**: C# 12 (.NET 8)
+- **Angular 21.2** — fully standalone (no NgModules), effectively **zoneless** (no zone.js
+  polyfill; OnPush + signals + `toSignal`), SPA-only (no SSR). TypeScript **5.9** strict,
+  RxJS 7.8.
+- **Testing: Vitest 4** via the Angular builder (`@angular/build:unit-test`, jsdom). Karma and
+  Jasmine are not used.
+- **Tooling: Prettier only.** There is no ESLint (no config, no lint script, no CI step) and no
+  e2e framework — adding either is future work, not current reality.
+- Runtime libraries actually imported:
+  - `@stripe/stripe-js` — lazy `import()` in the checkout payment step (Stripe Elements).
+  - `leaflet` — lazy `import()` in the Easybox locker map (OpenStreetMap tiles).
+  - `chart.js` (direct, **not** ng2-charts) — admin dashboard charts.
+  - `@microsoft/signalr` v10 — admin order notifications hub client.
+  - **No HEIC library** — HEIC support was removed (042); accepted uploads are JPG/PNG.
 
-TypeScript provides type safety for the Angular SPA. C# with ASP.NET Core 8 provides a robust, high-performance backend with excellent tooling for enterprise web APIs.
+## Backend — `src/PhotoPrint.API`
 
-## Framework
+- **ASP.NET Core 8 Web API** (.NET 8 / C# 12), single deployable, can also serve the SPA.
+- Data: **EF Core 8** with BOTH `Npgsql.EntityFrameworkCore.PostgreSQL` (prod) and
+  `Microsoft.EntityFrameworkCore.Sqlite` (dev/tests) — the dual-provider setup is load-bearing;
+  see [data-stack.md](data-stack.md).
+- Key libraries: `FluentValidation` (all request validation — data annotations prohibited,
+  ADR-002) · `Serilog.AspNetCore` + enrichers, compact JSON · `Stripe.net` ·
+  `AWSSDK.S3` (R2/S3/MinIO via one client) · `Polly` (S3 transient retry) ·
+  `SixLabors.ImageSharp` (image pipeline + bomb guards) · `RazorLight` (email templates) ·
+  `MailKit` (SMTP dev) + `SendGrid` (prod) · `Microsoft.AspNetCore.Authentication.JwtBearer` ·
+  `Microsoft.AspNetCore.Identity` (**only** `PasswordHasher<User>` — PBKDF2; not the Identity
+  stack).
+- Tests: xUnit + Moq + FluentAssertions + `Xunit.SkippableFact` (MinIO-gated S3 suite).
 
-**Frontend**: Angular 17+ (standalone components, lazy-loaded feature modules)
-**Backend**: ASP.NET Core 8 Web API
+## Authentication (summary — details in system-architecture.md)
 
-Angular was chosen for its opinionated structure, built-in dependency injection, reactive forms, and strong TypeScript integration. ASP.NET Core 8 was chosen for its performance, mature ecosystem (EF Core, SignalR, FluentValidation), and first-class support for REST APIs.
+JWT RS256 (15-min access, claims-based roles) + rotated 30-day refresh token in an HttpOnly
+SameSite=Strict cookie + Google OAuth (server-side id_token verification) + guest sessions via
+`X-Guest-Token` (`DualAuth` policy). No refresh/silent-renew flow exists in the SPA.
 
-### Key Frontend Libraries
-- `@stripe/stripe-js` — Stripe Elements for PCI-compliant card payments
-- `leaflet` + `@types/leaflet` — maps for Easybox locker selection
-- `ng2-charts` (Chart.js) — admin dashboard charts
-- `@microsoft/signalr` — real-time admin order notifications
-- `heic2any` — HEIC image preview conversion in browser
+## Infrastructure & delivery
 
-### Key Backend Libraries
-- `Npgsql.EntityFrameworkCore.PostgreSQL` — EF Core PostgreSQL provider
-- `FluentValidation` — request DTO validation
-- `Serilog` — structured logging
-- `Stripe.net` — Stripe payment integration
-- `MailKit` (dev) / `SendGrid` (prod) — email delivery
-
-## Authentication
-
-**Strategy**: JWT RS256 + Google OAuth + Guest Tokens
-
-- JWT RS256: 15-min access token, 30-day refresh token (HttpOnly cookie, SHA-256 hashed in DB, rotated on use)
-- Google OAuth: via Google Identity Services; backend verifies `id_token` and issues own JWT
-- Guest sessions: `X-Guest-Token` header, 7-day TTL, can be claimed after registration
-- Dual auth: endpoints accept EITHER Bearer JWT OR X-Guest-Token
-
-## Infrastructure & Deployment
-
-**Development**: Docker Compose (PostgreSQL 16 + API + MailHog)
-**Production**: Docker container on VPS/cloud (Azure App Service or DigitalOcean)
-**Frontend hosting**: Static files on CDN (Vercel, Netlify, or Nginx)
-**Database hosting**: Managed PostgreSQL (Azure Database for PostgreSQL or DigitalOcean Managed DB)
-**File storage**: Local disk initially → S3/Azure Blob via `IStorageService` abstraction
-**Reverse proxy**: Nginx or Caddy for HTTPS termination (Let's Encrypt)
-**CI/CD**: GitHub Actions (lint, test, build on PR; deploy on merge to main)
-
-## Package Manager
-
-**Frontend**: npm (Angular default)
-**Backend**: NuGet (dotnet restore)
-
-## Decision Relationships
-- Angular's TypeScript-first design pairs naturally with strict typing in the frontend
-- ASP.NET Core + EF Core + PostgreSQL is a well-established full-stack pattern for .NET projects
-- SignalR (built into ASP.NET Core) provides real-time admin notifications without additional infrastructure
-- JWT + refresh token rotation follows OWASP best practices for stateless authentication
+- **Dev**: SQLite file DB (no Docker needed for the API); optional MinIO for real-S3 tests
+  (`STORAGE_TEST_*` env vars); SMTP dev default `localhost:1025` (MailHog-style).
+- **CI (GitHub Actions)**: `ci.yml` — .NET build + test (with a MinIO container un-skipping the
+  S3 suite; a postgres:16 service is provisioned but currently unused by tests) and UI Vitest +
+  production build; no lint step. `secret-scan.yml` — gitleaks on every push/PR.
+  `deploy.yml` — on green main CI: build/push `ghcr.io/<owner>/fototipar/api` image, SSH
+  `docker compose pull/up` (self-skips without a `DEPLOY_HOST` secret).
+- **Prod shape**: Docker Compose (`docker-compose.prod.yml`) + Caddy (`Caddyfile`) for TLS;
+  PostgreSQL 16; cloud storage target recommendation is **Cloudflare R2** (ADR-009 — $0
+  egress; S3/MinIO equally supported by config).
+- Package managers: npm (UI, node 22 in CI), NuGet (API).

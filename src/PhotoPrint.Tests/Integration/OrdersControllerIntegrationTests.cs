@@ -159,6 +159,69 @@ public class OrdersControllerIntegrationTests : IClassFixture<OrdersFactory>
         Assert.Null(dto.ShippingAddress);
     }
 
+    // ── GET /api/orders/{id}/photos (bolt 053) ────────────────────────────────
+
+    [Fact]
+    public async Task GetOrderPhotos_OwnOrder_Returns200WithPrivateNoStore()
+    {
+        // F11 (review 043-v1): the payload carries per-user presigned URLs, so the response
+        // must be Cache-Control: private, no-store (matching the preview endpoint), never
+        // shared-cacheable. F15: this also pins the owner → 200 auth path.
+        var (userId, token) = await _factory.SeedUserWithJwtAsync();
+        var order = await _factory.SeedOrderAsync(userId);
+
+        var response = await AuthClient(token).GetAsync($"/api/orders/{order.Id}/photos");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(response.Headers.CacheControl);
+        Assert.True(response.Headers.CacheControl!.Private);
+        Assert.True(response.Headers.CacheControl.NoStore);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotos_Unauthenticated_Returns401()
+    {
+        // F15 (review 043-v1): the HTTP auth pipeline was untested — dropping [Authorize]
+        // would redden nothing. This pins no-Bearer → 401.
+        var response = await _anonClient.GetAsync($"/api/orders/{Guid.NewGuid()}/photos");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotos_OtherUsersOrder_Returns403()
+    {
+        // F15: cross-user access must be forbidden (the service's UserId==userId gate, wired
+        // through the endpoint).
+        var (ownerUserId, _) = await _factory.SeedUserWithJwtAsync();
+        var (_, attackerToken) = await _factory.SeedUserWithJwtAsync();
+        var order = await _factory.SeedOrderAsync(ownerUserId);
+
+        var response = await AuthClient(attackerToken).GetAsync($"/api/orders/{order.Id}/photos");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotos_UnknownId_Returns404()
+    {
+        var (_, token) = await _factory.SeedUserWithJwtAsync();
+        var response = await AuthClient(token).GetAsync($"/api/orders/{Guid.NewGuid()}/photos");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOrderPhotos_GuestTokenOnly_Returns401()
+    {
+        // F12 (review 043-v1): the endpoint is intentionally user-only (no DualAuth policy),
+        // so a guest-token-only request is rejected — guests cannot reach order-history photos.
+        // This pins the owner's "keep user-only" decision.
+        var guestClient = _factory.CreateClient(
+            new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        guestClient.DefaultRequestHeaders.Add("X-Guest-Token", Guid.NewGuid().ToString());
+
+        var response = await guestClient.GetAsync($"/api/orders/{Guid.NewGuid()}/photos");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task GetOrderDetail_CourierOrder_HasShippingAddress()
     {

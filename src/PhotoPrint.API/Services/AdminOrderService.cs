@@ -2,6 +2,8 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Admin;
 using PhotoPrint.API.DTOs.Orders;
@@ -18,7 +20,9 @@ public class AdminOrderService : IAdminOrderService
     private readonly IOrderEmailService _orderEmailService;
     private readonly IEuPlatescService _euPlatescService;
     private readonly IStripeClient _stripeClient;
-    private readonly IStorageService _storage;
+    private readonly IStorageRouter _storageRouter;
+    private readonly IOriginalPurger _originalPurger;
+    private readonly ArchiveSettings _archiveSettings;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly ILogger<AdminOrderService> _logger;
 
@@ -27,7 +31,9 @@ public class AdminOrderService : IAdminOrderService
         IOrderEmailService orderEmailService,
         IEuPlatescService euPlatescService,
         IStripeClient stripeClient,
-        IStorageService storage,
+        IStorageRouter storageRouter,
+        IOriginalPurger originalPurger,
+        IOptions<ArchiveSettings> archiveSettings,
         IHubContext<AdminOrderHub> hub,
         ILogger<AdminOrderService> logger)
     {
@@ -35,7 +41,9 @@ public class AdminOrderService : IAdminOrderService
         _orderEmailService = orderEmailService;
         _euPlatescService = euPlatescService;
         _stripeClient = stripeClient;
-        _storage = storage;
+        _storageRouter = storageRouter;
+        _originalPurger = originalPurger;
+        _archiveSettings = archiveSettings.Value;
         _hub = hub;
         _logger = logger;
     }
@@ -120,6 +128,32 @@ public class AdminOrderService : IAdminOrderService
         await _hub.Clients.All.SendAsync(
             "OrderStatusChanged", orderId, order.Status.ToString(), ct);
 
+        // Bolt 052: when the order enters the configured production-complete status
+        // (default Shipped), purge each upload's cloud original. Synchronous — adds
+        // ~50–100 ms per upload to this admin PATCH but keeps the lifecycle ordering
+        // simple. Gated on archive-on + cloud-on like the cancel path: with the supported
+        // Provider=local config the purger's self-refusal logged an Error on EVERY ship
+        // (chronic false alarm, D57 review 043-v7). The archive-on-but-cloud-off mismatch
+        // stays visible via the purge recovery scanner's boot-time cloud-tier-off log and
+        // UploadCleanupJob's hourly unroutable-count warning when Cloud rows accumulate.
+        if (_archiveSettings.IsProductionCompleteStatus(newStatus)
+            && _archiveSettings.Enabled && _storageRouter.CloudEnabled)
+        {
+            // Best-effort, mirroring the cancel path (F4, review 043-v3): the transition is already
+            // committed + emailed + broadcast, so a purge hiccup (transient DB load, client-disconnect
+            // cancellation) must not 500 the PATCH. The periodic recovery sweep backstops a miss.
+            try
+            {
+                await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "production-complete purge failed for order {OrderNumber} — recovery sweep will retry",
+                    order.OrderNumber);
+            }
+        }
+
         return BuildDetailDto(order);
     }
 
@@ -132,6 +166,19 @@ public class AdminOrderService : IAdminOrderService
                 .ThenInclude(i => i.Upload)
             .FirstOrDefaultAsync(o => o.Id == orderId, ct)
             ?? throw new NotFoundException($"Order {orderId} not found.");
+
+        // Fail before writing any response bytes if the ZIP cannot be produced completely. A
+        // Cloud-located original with the cloud tier disabled is unroutable — For(Cloud) would throw
+        // mid-stream, after the headers + earlier entries are already committed to Response.Body,
+        // handing the admin a truncated ZIP with no clean error (F9, review 043-v3).
+        if (!_storageRouter.CloudEnabled &&
+            order.Items.Any(i => i.Upload?.FilePath is not null &&
+                                 i.Upload.StorageLocation == StorageLocation.Cloud))
+        {
+            throw new InvalidOperationException(
+                $"Order {order.OrderNumber} has cloud-stored originals but the cloud tier is disabled " +
+                "(Storage:Provider=local) — cannot build the fulfilment ZIP.");
+        }
 
         response.ContentType = "application/zip";
         response.Headers.ContentDisposition =
@@ -150,7 +197,11 @@ public class AdminOrderService : IAdminOrderService
             var entry = archive.CreateEntry(entryName, CompressionLevel.NoCompression);
 
             await using var entryStream = entry.Open();
-            await using var fileStream = await _storage.GetStreamAsync(item.Upload.FilePath, ct);
+            // Route by the upload's tier — a promoted (Cloud) order's original lives in the
+            // object store, not on local disk, once promotion has run (F1, review 043-v1).
+            await using var fileStream = await _storageRouter
+                .For(item.Upload.StorageLocation)
+                .GetStreamAsync(item.Upload.FilePath, ct);
             await fileStream.CopyToAsync(entryStream, ct);
 
             idx++;
@@ -202,6 +253,28 @@ public class AdminOrderService : IAdminOrderService
             "OrderStatusChanged", orderId, OrderStatus.Cancelled.ToString(), ct);
 
         _orderEmailService.FireOrderCancelledEmail(order, reason);
+
+        // Bolt 052 / F17 (review 043-v1): a cancelled/refunded order's cloud original must be
+        // purged too (owner decision — minimise storage/GDPR exposure). Runs after the refund so
+        // it never delays the money path. Best-effort cleanup: gated on the cloud tier + archive
+        // being on (cancel with cloud off has nothing to purge, and the purger's refusal logs at
+        // Error, which would false-alarm on every cancel in a local-only deployment — unlike the
+        // production-complete hook, where cloud-off IS a misconfiguration worth surfacing), and a
+        // purge hiccup must never fail the already-committed cancel + refund. The periodic
+        // recovery sweep (now including Cancelled) backstops the promotion-in-flight-at-cancel race.
+        if (_archiveSettings.Enabled && _storageRouter.CloudEnabled)
+        {
+            try
+            {
+                await _originalPurger.PurgeOrderOriginalsAsync(order.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "purge-on-cancel failed for order {OrderNumber} — recovery sweep will retry",
+                    order.OrderNumber);
+            }
+        }
 
         return BuildDetailDto(order);
     }

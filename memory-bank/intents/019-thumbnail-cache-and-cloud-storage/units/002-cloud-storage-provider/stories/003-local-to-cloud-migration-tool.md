@@ -2,12 +2,20 @@
 id: 003-local-to-cloud-migration-tool
 unit: 002-cloud-storage-provider
 intent: 019-thumbnail-cache-and-cloud-storage
-status: draft
+status: superseded
 priority: should
 created: 2026-05-25T10:30:00Z
-assigned_bolt: 043-cloud-storage-provider
+assigned_bolt: null
 implemented: false
+superseded_by: 024-order-photo-archive/001-order-photo-promotion/004-backfill-paid-orders
+superseded_on: 2026-05-27T13:10:00Z
 ---
+
+> ⚠️ **SUPERSEDED (2026-05-27).** This story assumed a one-shot migration of *all* local files to
+> the cloud. The two-tier "promote-on-payment" model (intent **024**) makes that premise invalid —
+> only *paid orders* are promoted, automatically. The resumable/idempotent migration concept lives on
+> as intent-024 story **004-backfill-paid-orders** (one-off promotion of pre-existing paid orders).
+> Bolt 050 was retired. The text below is kept for history.
 
 # Story: 003-local-to-cloud-migration-tool
 

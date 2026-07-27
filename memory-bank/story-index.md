@@ -1,13 +1,14 @@
 # Global Story Index
 
 ## Overview
-- **Total stories**: 114 (59 prior + 51 from arch-analysis + 4 from intent 023)
+- **Total stories**: 122 (114 prior + 8 from intent 024; 1 superseded: 019-003)
 - **Generated**: 103
-- **Implemented**: 26 (bolts 033 + 034 + 035 + 040 + 042 + 049 + 041)
-- **Intents complete**: 013, 014, 017, 018, 023
+- **Implemented**: 28 (bolts 033 + 034 + 035 + 040 + 041 + 042 + 043 + 049)
+- **Intents complete**: 013, 014, 017, 018, 019, 023
 - **Planned (not yet story-filed)**: 11
 - **Last updated**: 2026-05-27T11:45:00Z
-- **Note**: intent 019 unit 001 (thumbnail-cache, bolt 042) done; unit 002 (cloud-storage, bolt 043) still open.
+- **Last index change**: 2026-05-29T08:30:00Z
+- **Note**: intent 019 **complete** — unit 001 (bolt 042) + unit 002 (bolt 043, two-tier cloud adapter) shipped. Story 019-003 superseded → backfill is intent 024 / bolt 051. Order-photo lifecycle is intent **024** (bolts 051–053, planned).
 
 ---
 
@@ -846,25 +847,25 @@
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/001-thumbnail-cache/stories/003-imagesharp-max-pixels.md`
 **Bolt**: 042
 
-#### Unit: 002-cloud-storage-provider (3 stories) — Bolt: 043
+#### Unit: 002-cloud-storage-provider (3 stories) — Bolt: 043 (001+002); story 003 superseded → intent 024
 
-### 001-s3-storage-service.md ⬜ NOT STARTED
+### 001-s3-storage-service.md ✅ IMPLEMENTED
 **Title**: `S3StorageService : IStorageService` against AWS SDK
 **Priority**: Must
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/002-cloud-storage-provider/stories/001-s3-storage-service.md`
-**Bolt**: 043
+**Bolt**: 043 ✅ IMPLEMENTED
 
-### 002-preview-redirect-presigned-url.md ⬜ NOT STARTED
+### 002-preview-redirect-presigned-url.md ✅ IMPLEMENTED
 **Title**: 302 redirect to pre-signed URL on cloud provider
 **Priority**: Must
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/002-cloud-storage-provider/stories/002-preview-redirect-presigned-url.md`
-**Bolt**: 043
+**Bolt**: 043 ✅ IMPLEMENTED
 
-### 003-local-to-cloud-migration-tool.md ⬜ NOT STARTED
+### 003-local-to-cloud-migration-tool.md ♻️ SUPERSEDED
 **Title**: Resumable `migrate-storage` console command
 **Priority**: Should
 **Path**: `intents/019-thumbnail-cache-and-cloud-storage/units/002-cloud-storage-provider/stories/003-local-to-cloud-migration-tool.md`
-**Bolt**: 043
+**Bolt**: — *(retired; superseded by intent 024 story 004-backfill-paid-orders)*
 
 ---
 
@@ -1003,3 +1004,63 @@
 **Priority**: Must
 **Path**: `intents/023-test-project-drift-repair/units/001-test-project-drift-repair/stories/004-suite-green-verification.md`
 **Bolt**: 049 ✅ IMPLEMENTED
+
+---
+
+> Intent 024 created mid-construction of bolt 043 — the two-tier "promote-on-payment" model. Depends on intent 019. New bolts: 051–053. Last updated: 2026-05-27T13:10:00Z.
+
+### 024-order-photo-archive
+
+#### Unit: 001-order-photo-promotion (4 stories) — Bolt: 051
+
+### 001-archive-schema.md ✅ COMPLETE
+**Title**: `Upload.LargePreviewPath` + `OriginalPurgedAt` migration
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/001-archive-schema.md`
+**Bolt**: 051
+
+### 002-large-preview-generation.md ✅ COMPLETE
+**Title**: Generate ~2000 px large web preview
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/002-large-preview-generation.md`
+**Bolt**: 051
+
+### 003-promote-on-paid.md ✅ COMPLETE
+**Title**: Async promote-on-Paid worker (+ delete local after confirmed write)
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/003-promote-on-paid.md`
+**Bolt**: 051
+
+### 004-backfill-paid-orders.md ✅ COMPLETE
+**Title**: One-off backfill of pre-existing paid orders (supersedes 019-003)
+**Priority**: Should
+**Path**: `intents/024-order-photo-archive/units/001-order-photo-promotion/stories/004-backfill-paid-orders.md`
+**Bolt**: 051
+
+#### Unit: 002-archive-retention (2 stories) — Bolt: 052
+
+### 001-purge-original-on-shipped.md ✅ COMPLETE
+**Title**: Delete cloud original when order ships (configurable status)
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/002-archive-retention/stories/001-purge-original-on-shipped.md`
+**Bolt**: 052
+
+### 002-retention-cleanup-job.md ✅ COMPLETE
+**Title**: 12-month configurable archive cleanup (large + thumbnail)
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/002-archive-retention/stories/002-retention-cleanup-job.md`
+**Bolt**: 052
+
+#### Unit: 003-order-history-photos (2 stories) — Bolt: 053
+
+### 001-order-photos-endpoint.md ✅ COMPLETE
+**Title**: `GET /api/orders/{id}/photos` → presigned large + thumbnail URLs
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/003-order-history-photos/stories/001-order-photos-endpoint.md`
+**Bolt**: 053
+
+### 002-order-detail-photo-grid.md ✅ COMPLETE
+**Title**: Order-detail thumbnail grid + large-preview lightbox
+**Priority**: Must
+**Path**: `intents/024-order-photo-archive/units/003-order-history-photos/stories/002-order-detail-photo-grid.md`
+**Bolt**: 053

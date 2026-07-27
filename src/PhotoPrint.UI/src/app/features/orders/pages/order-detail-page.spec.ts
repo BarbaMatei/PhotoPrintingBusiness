@@ -39,6 +39,8 @@ const MOCK_DETAIL: OrderDetailDto = {
 function makeOrderService(overrides: Partial<OrderService> = {}): Partial<OrderService> {
   return {
     getOrderDetail: vi.fn().mockReturnValue(of(MOCK_DETAIL)),
+    // Bolt 053: photos endpoint — default empty so legacy tests don't need to know about it.
+    getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
     ...overrides,
   };
 }
@@ -151,5 +153,239 @@ describe('OrderDetailPage', () => {
   it('navigates to /comenzile-mele on 404', async () => {
     const navigateSpy = await setupWithErrorAndNavigateSpy(404);
     expect(navigateSpy).toHaveBeenCalledWith(['/comenzile-mele']);
+  });
+
+  // ── Bolt 053: photo archive grid + lightbox ─────────────────────────────
+
+  // An empty archive only means "purged" once the order could have been purged (shipped /
+  // delivered / cancelled). Before that, photos are still being prepared.
+  for (const status of ['AwaitingPayment', 'Pending', 'Paid', 'Printing'] as const) {
+    it(`shows the "available soon" copy for an empty archive on a ${status} order`, async () => {
+      await setup({
+        getOrderDetail: vi.fn().mockReturnValue(of({ ...MOCK_DETAIL, status: status as OrderDetailDto['status'] })),
+        getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
+      });
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('vor fi disponibile în curând');
+      expect(el.textContent).not.toContain('nu mai sunt disponibile');
+    });
+  }
+
+  for (const status of ['Shipped', 'Delivered', 'Cancelled', 'PaymentFailed'] as const) {
+    it(`keeps the "no longer available" copy for an empty archive on a ${status} order`, async () => {
+      await setup({
+        getOrderDetail: vi.fn().mockReturnValue(of({ ...MOCK_DETAIL, status: status as OrderDetailDto['status'] })),
+        getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
+      });
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('Fotografiile pentru această comandă nu mai sunt disponibile');
+      expect(el.textContent).not.toContain('vor fi disponibile în curând');
+    });
+  }
+
+  it('renders a thumbnail tile per photo returned by the endpoint', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'sunset.jpg', thumbnailUrl: 'https://cdn.test/t1', largeUrl: 'https://cdn.test/l1' },
+          { uploadId: 'u2', fileName: 'beach.jpg',  thumbnailUrl: 'https://cdn.test/t2', largeUrl: 'https://cdn.test/l2' },
+        ],
+      })),
+    });
+    const tiles = (fixture.nativeElement as HTMLElement).querySelectorAll('.photo-tile');
+    expect(tiles.length).toBe(2);
+    const imgs = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLImageElement>('.photo-tile img'));
+    expect(imgs[0].getAttribute('src')).toBe('https://cdn.test/t1');
+    expect(imgs[1].getAttribute('src')).toBe('https://cdn.test/t2');
+  });
+
+  it('uses native lazy-loading on thumbnail images', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' },
+        ],
+      })),
+    });
+    const img = (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.photo-tile img')!;
+    expect(img.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('does not render the lightbox until a thumbnail is clicked', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' },
+        ],
+      })),
+    });
+    // The lightbox renders nothing while [src] is null — its template only emits when src truthy.
+    expect((fixture.nativeElement as HTMLElement).querySelector('.lightbox__backdrop')).toBeNull();
+  });
+
+  it('opens the lightbox with the largeUrl when a thumbnail is clicked', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'https://cdn.test/large-1' },
+        ],
+      })),
+    });
+
+    const tile = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.photo-tile')!;
+    tile.click();
+    fixture.detectChanges();
+
+    const img = (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.lightbox__img')!;
+    expect(img).not.toBeNull();
+    expect(img.getAttribute('src')).toBe('https://cdn.test/large-1');
+  });
+
+  it('closes the lightbox when its close event fires', async () => {
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(of({
+        photos: [
+          { uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' },
+        ],
+      })),
+    });
+
+    // Open then close — the backdrop click handler emits (close).
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.photo-tile')!.click();
+    fixture.detectChanges();
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('.lightbox__backdrop')!.click();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.lightbox__backdrop')).toBeNull();
+  });
+
+  it('shows a photos error + retry (NOT "no longer available") when the photos call fails, without navigating', async () => {
+    // F6/D13 (review 043-v3): a photos-endpoint FAILURE must be distinguished from a genuine empty
+    // result. The old code mapped any error to [] and showed the permanent "no longer available"
+    // copy. It must now show a retryable error, and still not redirect the page.
+    await setup({
+      getOrderPhotos: vi.fn().mockReturnValue(throwError(() => ({ status: 500 }))),
+    });
+    router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Fotografiile nu au putut fi încărcate');
+    expect(el.textContent).not.toContain('nu mai sunt disponibile');
+    expect(el.querySelector('.photos-retry')).not.toBeNull();
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('retries the photos fetch when the retry button is clicked (F6/D13)', async () => {
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(throwError(() => ({ status: 500 })))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'l1' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('.photos-retry')!.click();
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2);
+    expect(el.querySelectorAll('.photo-tile').length).toBe(1);
+    expect(el.querySelector('.photos-retry')).toBeNull();
+  });
+
+  it('shows an inline order error + retry (no redirect) on a transient 500 (F16/D32)', async () => {
+    // The strand-a-logged-out-user Medium was refuted; the residual is that a transient/5xx error
+    // must NOT bounce the user to the orders list with no retry.
+    const navigateSpy = await setupWithErrorAndNavigateSpy(500);
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(el.querySelector('.order-error')).not.toBeNull();
+    expect(el.textContent).toContain('Comanda nu a putut fi încărcată');
+  });
+
+  it('does NOT navigate on a 401 — leaves it to the auth interceptor (F16/D32)', async () => {
+    const navigateSpy = await setupWithErrorAndNavigateSpy(401);
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an expired lightbox URL on image error and re-points the lightbox (F7/D5b)', async () => {
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'https://cdn/stale' }],
+      }))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 't1', largeUrl: 'https://cdn/fresh' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.photo-tile')!.click();
+    fixture.detectChanges();
+    expect(component.lightboxSrc()).toBe('https://cdn/stale');
+
+    // The <img> fails to load the expired URL → the lightbox emits (imgError).
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.lightbox__img')!
+      .dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2);
+    expect(component.lightboxSrc()).toBe('https://cdn/fresh');
+  });
+
+  it('does NOT re-open a closed lightbox when a grid thumbnail errors after close (D36 regression)', async () => {
+    // D36 (review 043-v5): close() cleared lightboxSrc but not lightboxPhotoId, so a later grid
+    // thumbnail (error) → refreshPhotoUrls re-pointed the lightbox from the stale id and the closed
+    // modal spontaneously re-opened. A closed lightbox must stay closed through a URL refresh.
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/stale-t', largeUrl: 'https://cdn/stale-l' }],
+      }))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/fresh-t', largeUrl: 'https://cdn/fresh-l' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Open the lightbox, then close it.
+    el.querySelector<HTMLButtonElement>('.photo-tile')!.click();
+    fixture.detectChanges();
+    expect(component.lightboxSrc()).toBe('https://cdn/stale-l');
+    el.querySelector<HTMLElement>('.lightbox__backdrop')!.click();
+    fixture.detectChanges();
+    expect(component.lightboxSrc()).toBeNull();
+
+    // A stale grid thumbnail now errors → refreshPhotoUrls runs. The lightbox must NOT re-open.
+    el.querySelector<HTMLImageElement>('.photo-tile img')!.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2); // refresh did run (grid URLs updated)
+    expect(component.lightboxSrc()).toBeNull(); // but the closed lightbox stayed closed
+    expect(el.querySelector('.lightbox__backdrop')).toBeNull();
+  });
+
+  it('refreshes photo URLs when a GRID thumbnail image errors (F7/D5b class-sweep)', async () => {
+    const getOrderPhotos = vi
+      .fn()
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/stale-t', largeUrl: 'l1' }],
+      }))
+      .mockReturnValueOnce(of({
+        photos: [{ uploadId: 'u1', fileName: 'a.jpg', thumbnailUrl: 'https://cdn/fresh-t', largeUrl: 'l1' }],
+      }));
+    await setup({ getOrderPhotos });
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLImageElement>('.photo-tile img')!
+      .dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(getOrderPhotos).toHaveBeenCalledTimes(2);
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.photo-tile img')!.getAttribute('src'),
+    ).toBe('https://cdn/fresh-t');
   });
 });

@@ -83,34 +83,28 @@ builder.Services.AddScoped<PhotoPrint.API.Services.PricingService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IProductService, PhotoPrint.API.Services.ProductService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPrint.API.Services.AdminProductService>();
 
-// ── Photo Upload ──────────────────────────────────────────────────────────────
-// Cap ImageSharp's largest single allocation as defence-in-depth against
-// decompression bombs (story 003 AC#1 / REQ-1, review 042-v1). The per-request
-// pixel-area guard (ImageProcessor.ExceedsDecodeLimits) is the primary control;
-// this bounds any decode that slips past it — a 2.5 GB bomb allocation throws
-// InvalidMemoryOperationException instead of OOM-ing the process. 512 MB sits just
-// above a legitimate max-size (100 MP ≈ 400 MB) decode; if the pixel cap
-// (MaxDecodePixels) is raised materially, raise this in step.
+// ── Photo Upload + Storage (bolt 043: two-tier router + S3 adapter) ───────────
+// Cap ImageSharp's largest single allocation as defence-in-depth against decompression
+// bombs (bolt 042, story 003 AC#1 / review 042-v1). The per-image pixel-area guard
+// (ImageProcessor.ExceedsDecodeLimits) is the primary control; this bounds any decode that
+// slips past it — a 2.5 GB bomb allocation throws InvalidMemoryOperationException instead of
+// OOM-ing the process. 512 MB sits just above a legitimate max-size (100 MP ≈ 400 MB) decode.
 SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
     SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
         new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
 
-// Bound concurrent image decodes process-wide (M3, review 042-v4). Each ~100 MP decode is
-// ~400 MB, so an unbounded burst of concurrent first previews can OOM the box even under the
-// per-image caps. The default must bound by memory, not just cores: on a high-core / low-RAM
-// host, ProcessorCount slots × ~400 MB overrun available RAM (F1, review 042-v6). Derive the
-// default from both CPU and the host's available memory; ops can still override via
-// ImageProcessing:MaxConcurrentDecodes.
+// Bound concurrent image decodes process-wide (bolt 042, M3/F1, review 042-v4/v6). Each
+// ~100 MP decode is ~400 MB, so an unbounded burst of concurrent first previews can OOM the
+// box even under the per-image caps. Derive the default from both CPU and host memory; ops can
+// override via ImageProcessing:MaxConcurrentDecodes.
 var maxConcurrentDecodes = builder.Configuration.GetValue<int?>("ImageProcessing:MaxConcurrentDecodes")
     ?? PhotoPrint.API.Services.ImageDecodeLimiter.RecommendedMaxConcurrentDecodes(
            GC.GetGCMemoryInfo().TotalAvailableMemoryBytes,
            Environment.ProcessorCount);
 builder.Services.AddSingleton(new PhotoPrint.API.Services.ImageDecodeLimiter(Math.Max(1, maxConcurrentDecodes)));
 
-builder.Services.Configure<PhotoPrint.API.Configuration.StorageSettings>(
-    builder.Configuration.GetSection(PhotoPrint.API.Configuration.StorageSettings.SectionName));
+builder.Services.AddPhotoStorage(builder.Configuration);
 builder.Services.AddSingleton<PhotoPrint.API.Services.IMimeValidator, PhotoPrint.API.Services.MimeValidator>();
-builder.Services.AddScoped<PhotoPrint.API.Services.IStorageService, PhotoPrint.API.Services.LocalStorageService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IImageProcessor, PhotoPrint.API.Services.ImageProcessor>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IUploadService, PhotoPrint.API.Services.UploadService>();
 
@@ -122,6 +116,9 @@ builder.Services
     .ValidateOnStart();
 
 builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.UploadCleanupJob>();
+
+// ── Order Photo Archive (bolt 051: promote-on-paid + recovery scanner) ────────
+builder.Services.AddPhotoArchive(builder.Configuration);
 
 // ── Cart ──────────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.Services.CartService>();
@@ -232,6 +229,15 @@ if (args.Contains("--seed") || args.Contains("--seed-dev"))
     if (args.Contains("--seed-dev"))
         await PhotoPrint.API.Data.Seed.DevDataSeed.ApplyAsync(db);
     return;
+}
+
+// ── Backfill archive mode (bolt 051 story 004): one-off ops verb ──────────────
+//    dotnet run --project src/PhotoPrint.API -- backfill-archive [--dry-run]
+if (args.Contains(PhotoPrint.API.Cli.BackfillCommand.Verb))
+{
+    var exitCode = await PhotoPrint.API.Cli.BackfillCommand.RunAsync(
+        app.Services, args, CancellationToken.None);
+    Environment.Exit(exitCode);
 }
 
 // ── Promote admin mode: dotnet run -- --promote-admin <email> ─────────────────

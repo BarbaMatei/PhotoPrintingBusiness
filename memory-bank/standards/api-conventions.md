@@ -71,8 +71,23 @@ REST API conventions for FotoTipar's ASP.NET Core 8 backend, consumed by the Ang
 | 404 | Not Found | Resource doesn't exist |
 | 409 | Conflict | Duplicate resource (e.g., email already registered) |
 | 422 | Unprocessable Entity | Validation errors |
-| 429 | Too Many Requests | Rate limit exceeded |
+| 413 | Payload Too Large | Upload exceeds size limits |
+| 415 | Unsupported Media Type | Wrong file type (magic-byte check) |
+| 429 | Too Many Requests | Rate limit exceeded (`Retry-After` header set) |
 | 500 | Internal Server Error | Unexpected server failure |
+| 502 | Bad Gateway | Upstream dependency unreachable (e.g. Google token verification) |
+
+409 vs 422: a structurally-valid request conflicting with persisted state is **409**
+(ADR-004 — e.g. idempotency divergence, carrying `divergentFields`); a malformed/invalid
+request is **422** (ADR-002). Full exception→status map: `Middleware/ExceptionHandlerMiddleware.cs`.
+
+### Idempotency (payments — bolt 035)
+
+`Idempotency-Key` request header (trimmed, ≤80 chars, enforced by `IdempotencyKeyFilter`),
+persisted on `Orders.IdempotencyKey` (globally-unique index), 24-hour replay window. Same key +
+same logical request (ADR-005: processor, delivery type, locker, total — shipping address
+excluded) → replays the cached client secret / redirect URL. Same key + divergent request →
+409 with `divergentFields`.
 
 ## Error Response Format
 
@@ -137,10 +152,16 @@ Frontend can calculate total pages: `Math.ceil(total / size)`
 | Guest user | `X-Guest-Token: <token>` |
 | Public endpoint | No auth header |
 
-- Endpoints accept EITHER Bearer JWT OR X-Guest-Token — never both
-- `JwtInterceptor` (Angular) attaches Bearer header automatically
-- `GuestInterceptor` (Angular) attaches X-Guest-Token when no JWT present
-- 401 response triggers JWT refresh flow (silent refresh via HttpOnly cookie)
+- Endpoints accept EITHER Bearer JWT OR X-Guest-Token — never both; the backend policy is
+  `DualAuth` (Bearer or GuestToken scheme)
+- `jwtInterceptor` (Angular) attaches the Bearer header; `guestInterceptor` attaches
+  X-Guest-Token when unauthenticated — both only for `environment.apiUrl` requests
+- The refresh token lives in an HttpOnly SameSite=Strict cookie scoped to `Path=/api/auth` —
+  but **the SPA has no silent-refresh flow**: on 401 the error interceptor logs out
+  (authenticated) or clears the guest token (guest/anon). Don't design against a refresh flow
+  that doesn't exist.
+- **Ownership convention: 403 for non-owner** (`ForbiddenException`), not 404 — codebase-wide
+  precedent (reviews 043-F10); resource IDs are unguessable GUIDs, enumeration risk accepted.
 
 ## Date/Time Convention
 
@@ -159,9 +180,9 @@ Frontend can calculate total pages: `Math.ceil(total / size)`
 ### File Uploads
 - Endpoint: `POST /api/uploads`
 - Content type: `multipart/form-data`
-- Max files: 30 per request
-- Max file size: 50MB each
-- Accepted MIME types: JPEG, PNG, HEIC (validated by magic bytes, not extension)
+- Max file size: 50MB each; 500MB per batch; 100 uploads per guest session
+- Accepted types: **JPG, PNG** (validated by magic bytes, not extension). HEIC was removed in
+  bolt 042 — no decoder exists and the frontend rejects it.
 
 ## Decision Relationships
 - ProblemDetails (RFC 7807) provides a standard error format recognized by HTTP tooling

@@ -36,8 +36,33 @@ jobs:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           restore-keys: ${{ runner.os }}-nuget-
+      # MinIO — S3-compatible backend for bolt-043 storage tests (ADR-008).
+      # Run as a step rather than a `services:` container because GitHub Actions'
+      # services syntax can't pass a CMD, and the official minio/minio image
+      # requires `server /data` to actually start the server. Started early so
+      # it's healthy by the time the Test step runs.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:RELEASE.2024-12-18T13-15-44Z \
+            server /data
       - run: dotnet restore PhotoPrint.sln
       - run: dotnet build PhotoPrint.sln --no-restore -c Release
+      - name: Wait for MinIO
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:9000/minio/health/live; then
+              echo "MinIO is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MinIO failed to become ready in time. Logs:"
+          docker logs minio
+          exit 1
       - name: Test
         run: >-
           dotnet test PhotoPrint.sln --no-build -c Release
@@ -47,6 +72,13 @@ jobs:
           # Integration tests swap to an InMemory DB; this is here for any test
           # that opts into the real provider in future.
           ConnectionStrings__Default: Host=localhost;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
+          # Bolt 043: enables cloud-tier integration tests against the MinIO service.
+          # Local runs without Docker leave these unset and the [SkippableFact] tests
+          # skip themselves — see bolt-043 ddd-02-technical-design.md §Test Plan.
+          STORAGE_TEST_ENDPOINT: http://localhost:9000
+          STORAGE_TEST_ACCESS_KEY: minioadmin
+          STORAGE_TEST_SECRET_KEY: minioadmin
+          STORAGE_TEST_BUCKET: photoprint-ci
       - uses: actions/upload-artifact@v4
         if: always()
         with:

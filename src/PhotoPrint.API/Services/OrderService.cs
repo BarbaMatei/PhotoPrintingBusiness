@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Orders;
 using PhotoPrint.API.DTOs.Payments;
@@ -12,15 +14,21 @@ public class OrderService : IOrderService
     private readonly PhotoPrintDbContext _db;
     private readonly IOrderNumberService _orderNumberService;
     private readonly IShippingService _shipping;
+    private readonly IStorageRouter _storageRouter;
+    private readonly StorageSettings _storageSettings;
 
     public OrderService(
         PhotoPrintDbContext db,
         IOrderNumberService orderNumberService,
-        IShippingService shipping)
+        IShippingService shipping,
+        IStorageRouter storageRouter,
+        IOptions<StorageSettings> storageSettings)
     {
         _db = db;
         _orderNumberService = orderNumberService;
         _shipping = shipping;
+        _storageRouter = storageRouter;
+        _storageSettings = storageSettings.Value;
     }
 
     // ── Idempotency (bolt 035) ────────────────────────────────────────────────
@@ -444,7 +452,56 @@ public class OrderService : IOrderService
             items);
     }
 
-    // ── Price helper ──────────────────────────────────────────────────────────
+    // ── GetOrderPhotosAsync (bolt 053) ────────────────────────────────────────
+
+    public async Task<OrderPhotosDto> GetOrderPhotosAsync(
+        Guid orderId, Guid userId, CancellationToken ct = default)
+    {
+        var order = await _db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.Upload)
+            .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+        if (order is null)
+            throw new NotFoundException($"Order {orderId} not found.");
+
+        if (order.UserId != userId)
+            throw new ForbiddenException("Access denied.");
+
+        // Cloud tier off (Storage:Provider=Local) — dev / misconfigured deployment.
+        // Return empty rather than 500; the UI's empty-state copy covers it.
+        if (!_storageRouter.CloudEnabled)
+            return new OrderPhotosDto([]);
+
+        var ttl = TimeSpan.FromMinutes(_storageSettings.PresignTtlMinutes);
+
+        // Filter: only live (not soft-deleted), Cloud-promoted uploads with BOTH blob keys
+        // still present. UploadCleanupJob soft-deletes a row but leaves its path fields set,
+        // so without the DeletedAt check this presigned URLs for already-deleted blobs —
+        // broken thumbnails the refresh can't fix (D52, review 043-v7). A row mid-retention
+        // with one key nulled is excluded — the lightbox would otherwise fail on click.
+        var viewable = order.Items
+            .Select(i => i.Upload)
+            .Where(u => u.DeletedAt == null)
+            .Where(u => u.StorageLocation == StorageLocation.Cloud)
+            .Where(u => u.LargePreviewPath is not null && u.ThumbnailPath is not null)
+            .DistinctBy(u => u.Id)
+            .ToList();
+
+        var photos = new List<OrderPhotoDto>(viewable.Count);
+        foreach (var u in viewable)
+        {
+            var thumbUrl = await _storageRouter.Cloud
+                .GetPresignedUrlAsync(u.ThumbnailPath!, ttl, ct);
+            var largeUrl = await _storageRouter.Cloud
+                .GetPresignedUrlAsync(u.LargePreviewPath!, ttl, ct);
+            photos.Add(new OrderPhotoDto(u.Id, u.OriginalFileName, thumbUrl, largeUrl));
+        }
+
+        return new OrderPhotosDto(photos);
+    }
+
+    // ── Price helper (mirrors CartService.ResolveUnitPrice) ───────────────────
 
     // QUAL-2 (review 035-v8): the tier bracket-matching is shared with CartService via
     // PricingTierResolver. This call site keeps its own semantics — the tiers of the item's

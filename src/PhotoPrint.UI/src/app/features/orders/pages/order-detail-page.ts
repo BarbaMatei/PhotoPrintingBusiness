@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  computed,
   inject,
   signal,
   input,
@@ -12,8 +13,9 @@ import { catchError, EMPTY } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
 import { OrderStatusPipe } from '../../../core/pipes/order-status.pipe';
 import { statusClass, isAtLeast } from '../../../core/models/order-status.constants';
-import { OrderDetailDto } from '../../../core/models/order.model';
+import { OrderDetailDto, OrderPhotoDto } from '../../../core/models/order.model';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { PhotoLightboxComponent } from '../../../shared/components/photo-lightbox/photo-lightbox.component';
 
 interface StepDef {
   status: string;
@@ -25,11 +27,18 @@ interface StepDef {
   selector: 'app-order-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, RouterLink, OrderStatusPipe, SpinnerComponent],
+  imports: [DecimalPipe, RouterLink, OrderStatusPipe, SpinnerComponent, PhotoLightboxComponent],
   template: `
     <div class="order-detail-page">
       @if (loading()) {
         <app-spinner label="Se încarcă comanda..." [showLabel]="true" />
+      }
+
+      @if (!loading() && orderError()) {
+        <div class="order-error">
+          <p>Comanda nu a putut fi încărcată.</p>
+          <button type="button" (click)="retryOrder()">Reîncearcă</button>
+        </div>
       }
 
       @if (!loading() && order()) {
@@ -92,6 +101,48 @@ interface StepDef {
             </div>
           </section>
 
+          <!-- Photo archive (bolt 053) -->
+          <section class="order-photos">
+            <h2>Fotografiile tale</h2>
+
+            @if (photosLoading()) {
+              <app-spinner label="Se încarcă fotografiile..." [showLabel]="true" />
+            } @else if (photosError()) {
+              <p class="photos-error">Fotografiile nu au putut fi încărcate.</p>
+              <button type="button" class="photos-retry" (click)="retryPhotos()">
+                Reîncearcă
+              </button>
+            } @else if (photos().length === 0) {
+              @if (photosPendingArchive()) {
+                <p class="photos-empty">
+                  Fotografiile comenzii tale se pregătesc și vor fi disponibile în curând.
+                </p>
+              } @else {
+                <p class="photos-empty">
+                  Fotografiile pentru această comandă nu mai sunt disponibile.
+                </p>
+              }
+            } @else {
+              <div class="photo-grid">
+                @for (photo of photos(); track photo.uploadId) {
+                  <button
+                    type="button"
+                    class="photo-tile"
+                    (click)="openLightbox(photo)"
+                    [attr.aria-label]="'Vezi ' + photo.fileName"
+                  >
+                    <img
+                      [src]="photo.thumbnailUrl"
+                      [alt]="photo.fileName"
+                      loading="lazy"
+                      (error)="onThumbnailError()"
+                    />
+                  </button>
+                }
+              </div>
+            }
+          </section>
+
           <!-- Delivery info -->
           <section class="delivery-info">
             <h2>Livrare</h2>
@@ -110,6 +161,15 @@ interface StepDef {
           </section>
         </div>
       }
+
+      <!-- Lightbox overlay — mounted only when a photo is selected; the browser fetches the
+           large image bytes then. The presigned URL is minted at list-fetch time, so an expired
+           one (>1h TTL) is refreshed on (imgError) rather than shown broken (F7/D5b). -->
+      <app-photo-lightbox
+        [src]="lightboxSrc()"
+        (close)="closeLightbox()"
+        (imgError)="onLightboxError()"
+      />
     </div>
   `,
   styles: [`
@@ -238,6 +298,71 @@ interface StepDef {
       h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; }
       p { margin: 0.25rem 0; font-size: 0.95rem; }
     }
+
+    /* Photo archive section (bolt 053) */
+    .order-photos {
+      margin-bottom: 1.5rem;
+      h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+    }
+
+    .photos-empty {
+      color: #6c757d;
+      font-style: italic;
+      margin: 0;
+    }
+
+    .photos-error { color: #c62828; margin: 0 0 0.5rem; }
+
+    .photos-retry,
+    .order-error button {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4rem 0.9rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .order-error {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #6c757d;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .photo-tile {
+      all: unset;
+      cursor: pointer;
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 1 / 1;
+      background: #f0f0f0;
+      border: 1px solid #dee2e6;
+      transition: transform 0.15s, box-shadow 0.15s;
+
+      &:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      &:focus-visible {
+        outline: 2px solid #1a73e8;
+        outline-offset: 2px;
+      }
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+    }
   `],
 })
 export class OrderDetailPage implements OnInit {
@@ -248,9 +373,29 @@ export class OrderDetailPage implements OnInit {
 
   readonly loading = signal(true);
   readonly order = signal<OrderDetailDto | null>(null);
+  readonly orderError = signal(false);
+
+  // Bolt 053: photo archive + lightbox
+  readonly photosLoading = signal(true);
+  readonly photos = signal<OrderPhotoDto[]>([]);
+  readonly photosError = signal(false);
+  readonly lightboxSrc = signal<string | null>(null);
+  private lightboxPhotoId: string | null = null;
+  // One presigned-URL refresh per grid load / per lightbox open — enough to recover an expired URL
+  // without looping if the refreshed URL also fails (F7/D5b).
+  private urlsRefreshed = false;
 
   readonly badgeClass = statusClass;
   readonly stepDone = isAtLeast;
+
+  // Purge can only have happened at/after production-complete or cancellation; before that,
+  // an empty archive means the photos just haven't been prepared yet.
+  readonly photosPendingArchive = computed(() => {
+    const order = this.order();
+    if (!order) return true;
+    if (order.status === 'Cancelled' || order.status === 'PaymentFailed') return false;
+    return !isAtLeast(order.status, 'Shipped');
+  });
 
   readonly steps: StepDef[] = [
     { status: 'Paid', label: 'Plătită', icon: '✓' },
@@ -260,17 +405,111 @@ export class OrderDetailPage implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.loadOrder();
+    this.loadPhotos();
+  }
+
+  private loadOrder(): void {
+    this.loading.set(true);
+    this.orderError.set(false);
+
     this.orderService
       .getOrderDetail(this.orderId())
       .pipe(
-        catchError(() => {
-          this.router.navigate(['/comenzile-mele']);
+        catchError((err: { status?: number }) => {
+          const status = err?.status ?? 0;
+          if (status === 403 || status === 404) {
+            // Definitive — not the caller's order / doesn't exist; retrying can't help.
+            this.router.navigate(['/comenzile-mele']);
+          } else if (status !== 401) {
+            // Transient (5xx / network / status 0): keep the user on the page with a retry
+            // instead of bouncing them to the orders list (F16/D32, review 043-v3). A 401 is
+            // left to the auth interceptor's logout -> login redirect — don't override it.
+            this.orderError.set(true);
+          }
+          this.loading.set(false);
           return EMPTY;
         })
       )
       .subscribe(order => {
         this.order.set(order);
         this.loading.set(false);
+      });
+  }
+
+  retryOrder(): void {
+    this.loadOrder();
+  }
+
+  private loadPhotos(): void {
+    this.photosLoading.set(true);
+    this.photosError.set(false);
+    this.urlsRefreshed = false;
+
+    // Bolt 053: fetch photos in parallel; a failure here never navigates away. Distinguish a
+    // fetch FAILURE (retryable) from a genuine empty 200 (F6/D13, review 043-v3) — the old code
+    // mapped any error to [] and showed the permanent "no longer available" copy.
+    this.orderService
+      .getOrderPhotos(this.orderId())
+      .pipe(
+        catchError(() => {
+          this.photosError.set(true);
+          this.photosLoading.set(false);
+          return EMPTY;
+        })
+      )
+      .subscribe(result => {
+        this.photos.set(result.photos);
+        this.photosLoading.set(false);
+      });
+  }
+
+  retryPhotos(): void {
+    this.loadPhotos();
+  }
+
+  openLightbox(photo: OrderPhotoDto): void {
+    this.lightboxPhotoId = photo.uploadId;
+    this.urlsRefreshed = false; // allow one refresh for this open
+    this.lightboxSrc.set(photo.largeUrl);
+  }
+
+  closeLightbox(): void {
+    this.lightboxSrc.set(null);
+    // Clear the tracked id too: refreshPhotoUrls re-points the lightbox from lightboxPhotoId, so a
+    // stale id would let a later grid-thumbnail (error) re-open a closed lightbox (D36, review 043-v5).
+    this.lightboxPhotoId = null;
+  }
+
+  // Both the grid thumbnails (thumbnailUrl) and the lightbox (largeUrl) hold presigned URLs with a
+  // ~1h TTL captured at list-fetch; an expired one makes the <img> error. Re-fetch once for fresh
+  // URLs — updating photos() re-points every thumbnail, and the open lightbox too (F7/D5b,
+  // review 043-v3). The guard prevents a refresh loop if the fresh URL also fails.
+  onThumbnailError(): void {
+    this.refreshPhotoUrls();
+  }
+
+  onLightboxError(): void {
+    this.refreshPhotoUrls();
+  }
+
+  private refreshPhotoUrls(): void {
+    if (this.urlsRefreshed) return;
+    this.urlsRefreshed = true;
+
+    this.orderService
+      .getOrderPhotos(this.orderId())
+      .pipe(catchError(() => EMPTY))
+      .subscribe(result => {
+        this.photos.set(result.photos);
+        // Re-read lightboxPhotoId at resolve time, not capture time: if the user closed the
+        // lightbox before OR during this fetch, closeLightbox() nulled it and we must not
+        // re-point (which would re-open the closed modal) (D36, review 043-v5).
+        const openPhotoId = this.lightboxPhotoId;
+        if (openPhotoId !== null) {
+          const fresh = result.photos.find(p => p.uploadId === openPhotoId);
+          if (fresh) this.lightboxSrc.set(fresh.largeUrl);
+        }
       });
   }
 }
