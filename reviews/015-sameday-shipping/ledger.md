@@ -5,8 +5,33 @@ updated: 2026-07-27
 ---
 
 <!-- v1 fix round (resolution-v1, commits edd49f7..835e932): D1–D19 + D32/D34 fixed.
-v2 verification (review-v2, 2026-07-27 @ 727a018): all 21 verified (revert-and-rerun + judgment
-items), 0 reopened. D20–D41 remain backlog; D42 false-positive. -->
+v2 verification (review-v2, 2026-07-27 @ 727a018): all 21 verified, 0 reopened. D20–D41 backlog; D42 false-positive.
+v3 certification pair (review-v3, 2026-07-27 @ 8584572): NOT certified — 3 High blockers (D43–D45)
++ mediums (D46–D54); D31 re-opened+elevated; D21/D23 re-raised (stand). → fix round. -->
+
+## v3 — certification pair (2026-07-27, commit `8584572`, NOT certified)
+
+New defects the two independent blinded passes surfaced (D43–D54); D31 re-opened. `open` = to fix.
+
+| D# | F# (v3) | Sev | Status | Title | Site |
+|----|---------|-----|--------|-------|------|
+| D43 | F1 | 🔴 High | open | Easybox `Continue` never re-enables after typing contact (`canContinue` computed can't see `form.valid`) — regression from v1 F4 | `UI/…/delivery-step.ts:326` |
+| D44 | F2 | 🔴 High | open | Slow-Sameday `OperationCanceledException` treated as shutdown → tracking poll loop exits (pre-existing) | `BackgroundJobs/ShipmentTrackingJob.cs:54` |
+| D45 | F3 | 🔴 High | open | No per-order guard before the vendor AWB call; DB CAS blocks only the 2nd DB write — duplicate-safety rests on unverified vendor dedup (D2 residual; owner decision) | `Services/Sameday/AwbCreator.cs:69` |
+| D46 | F4 | 🟠 Med | open | `isDeliveryComplete()` Easybox gate ignores mandatory contact → stepper skip to payment → 400 (regression from v1 F4) | `UI/…/checkout-state.service.ts:51` |
+| D47 | F5 | 🟠 Med | open | Same OCE-as-shutdown bug drops an AWB dispatch job silently | `BackgroundJobs/AwbDispatcher.cs:69` |
+| D48 | F6 | 🟠 Med | open | `LastTrackingSyncAt=UtcNow` fallback + monotonic guard can strand a Shipped order (never Delivered) | `BackgroundJobs/ShipmentTrackingJob.cs:139` |
+| D49 | F7 | 🟠 Med | open | EuPlatesc webhook→AWB enqueue untested (Stripe-only from v1 F6) | `Tests/…/PaymentControllerIntegrationTests.cs` |
+| D50 | F8 | 🟠 Med | open | `AwbDispatcher` outcome routing + re-enqueue untested | `BackgroundJobs/AwbDispatcher.cs:83` |
+| D51 | F9 | 🟠 Med | open | `Status != Cancelled` persist guard (v1 F12) has no test | `Services/Sameday/AwbCreator.cs:107` |
+| D52 | F10 | 🟠 Med | open | A `429` surviving retries → permanent GiveUp instead of transient | `Services/Sameday/SamedayClient.cs:139` |
+| D53 | F13 | 🟡 Doc | open | ADR-015 + 037 domain model name `awbPayment` (not `clientInternalReference`) as the idempotency key — doc trap (code correct) | `memory-bank/…/adr-015-*.md` |
+| D54 | F11 | 🟠 Med | open | Paid→Cancelled orphan billable AWB — no compensating void/ops-alert (D12 residual) | `Services/Sameday/AwbCreator.cs:141` |
+
+**Re-opened:** D31 (was backlog Low) → **Medium** — stale `GenerateAwbAsync` manual-fallback can cause
+a duplicate label (admin portal + job). **Re-raised, decision stands:** D21 (PII, backlog Low), D23
+(dual-DB parity, backlog Low). **Blockers:** D43, D44, D45.
+
 
 
 # Canonical finding ledger — 015-sameday-shipping
