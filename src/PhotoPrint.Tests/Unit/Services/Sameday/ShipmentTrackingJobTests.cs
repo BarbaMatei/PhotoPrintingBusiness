@@ -107,6 +107,13 @@ public class ShipmentTrackingJobTests : IDisposable
         return db.Orders.AsNoTracking().Single(o => o.Id == id);
     }
 
+    private void AdvanceStatus(Guid id, OrderStatus status)
+    {
+        using var scope = _scopes.Factory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+        db.Orders.Where(o => o.Id == id).ExecuteUpdate(s => s.SetProperty(o => o.Status, status));
+    }
+
     [Fact]
     public async Task Transitions_to_Delivered_on_Sameday_delivered_state()
     {
@@ -133,29 +140,33 @@ public class ShipmentTrackingJobTests : IDisposable
     }
 
     [Fact]
-    public async Task ADR_016_CAS_race_lost_when_order_already_advanced()
+    public async Task ADR_016_CAS_race_lost_when_order_advances_during_the_poll()
     {
-        // Pre-set the order to a state where Status != Shipped. The CAS UPDATE
-        // should affect 0 rows, the email must NOT be fired, and no exception
-        // is thrown.
-        var order = SeedShippedOrder(shippedAt: T0.AddDays(-3), status: OrderStatus.Cancelled);
+        // The order is genuinely Shipped and IN the polling window. A concurrent
+        // writer advances it out of Shipped WHILE the tracking call is in flight,
+        // so the CAS UPDATE (WHERE Status == Shipped) must affect 0 rows, fire no
+        // email, and throw nothing. Removing `&& Status == Shipped` reddens this.
+        var order = SeedShippedOrder(shippedAt: T0.AddDays(-3));
 
         var client = new Mock<ISamedayClient>();
         client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrackingSnapshot(order.AwbNumber!, TrackingState.Delivered, T0, Array.Empty<TrackingEvent>()));
+            .Returns<string, CancellationToken>((_, _) =>
+            {
+                AdvanceStatus(order.Id, OrderStatus.Delivered);   // the racing writer
+                return Task.FromResult(new TrackingSnapshot(
+                    order.AwbNumber!, TrackingState.Delivered, T0, Array.Empty<TrackingEvent>()));
+            });
 
-        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict); // any fire → test fails
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var clock = new FakeTimeProvider(T0);
         var sut = Build(client, emails, new TrackingStopRegistry(cache), clock);
 
         await RunOneTickAsync(sut);
 
-        // Cancelled orders are filtered out by the in-window query, so the CAS
-        // path never executes. The strict mock asserts no email was fired.
         var refreshed = GetOrder(order.Id);
-        refreshed.Status.Should().Be(OrderStatus.Cancelled);
-        refreshed.DeliveredAt.Should().BeNull();
+        refreshed.Status.Should().Be(OrderStatus.Delivered);
+        refreshed.DeliveredAt.Should().BeNull(); // our CAS never ran — the racer only set Status
     }
 
     [Fact]

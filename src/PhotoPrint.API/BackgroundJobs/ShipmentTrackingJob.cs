@@ -62,41 +62,43 @@ public sealed class ShipmentTrackingJob : BackgroundService
 
     private async Task RunOneTickAsync(CancellationToken ct)
     {
-        using var scope = _scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
-        var sameday = scope.ServiceProvider.GetRequiredService<ISamedayClient>();
-        var emails = scope.ServiceProvider.GetRequiredService<IOrderEmailService>();
-
         var now = _clock.GetUtcNow();
         var earliestShipped = now - TimeSpan.FromDays(_settings.TrackingMaxAgeDays);
         var minSinceLastSync = now - TimeSpan.FromMinutes(_settings.TrackingIntervalMinutes);
 
-        // Inside the polling window — fetch full entities so we can pass them
-        // to FireOrderDeliveredEmail (the email service requires nav properties).
-        var inWindow = await db.Orders
-            .Include(o => o.User)
-            .Include(o => o.EasyboxLocker)
-            .Where(o => o.Status == OrderStatus.Shipped
-                        && o.AwbNumber != null
-                        && o.ShippedAt != null
-                        && o.ShippedAt > earliestShipped
-                        && (o.LastTrackingSyncAt == null
-                            || o.LastTrackingSyncAt < minSinceLastSync))
-            .ToListAsync(ct);
+        List<Guid> inWindowIds;
+        List<OutOfWindowRow> outOfWindow;
 
-        var pollTasks = inWindow.Select(order => PollOneAsync(db, sameday, emails, order, ct));
-        await Task.WhenAll(pollTasks);
+        // One short-lived scope for the read queries; each order is then polled on
+        // its OWN scoped DbContext (a shared context can't service parallel tasks).
+        using (var scope = _scopeFactory.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+
+            inWindowIds = await db.Orders
+                .AsNoTracking()
+                .Where(o => o.Status == OrderStatus.Shipped
+                            && o.AwbNumber != null
+                            && o.ShippedAt != null
+                            && o.ShippedAt > earliestShipped
+                            && (o.LastTrackingSyncAt == null
+                                || o.LastTrackingSyncAt < minSinceLastSync))
+                .Select(o => o.Id)
+                .ToListAsync(ct);
+
+            outOfWindow = await db.Orders
+                .AsNoTracking()
+                .Where(o => o.Status == OrderStatus.Shipped
+                            && o.ShippedAt != null
+                            && o.ShippedAt <= earliestShipped
+                            && o.ShippedAt > earliestShipped - TimeSpan.FromDays(60))
+                .Select(o => new OutOfWindowRow(o.Id, o.ShippedAt))
+                .ToListAsync(ct);
+        }
+
+        await Task.WhenAll(inWindowIds.Select(id => PollOneAsync(id, ct)));
 
         // Outside the polling window — one-shot warning per order id.
-        var outOfWindow = await db.Orders
-            .AsNoTracking()
-            .Where(o => o.Status == OrderStatus.Shipped
-                        && o.ShippedAt != null
-                        && o.ShippedAt <= earliestShipped
-                        && o.ShippedAt > earliestShipped - TimeSpan.FromDays(60))
-            .Select(o => new { o.Id, o.ShippedAt })
-            .ToListAsync(ct);
-
         foreach (var row in outOfWindow)
         {
             if (_stop.MarkOnce(row.Id))
@@ -108,26 +110,36 @@ public sealed class ShipmentTrackingJob : BackgroundService
         }
     }
 
-    private async Task PollOneAsync(
-        PhotoPrintDbContext db,
-        ISamedayClient sameday,
-        IOrderEmailService emails,
-        Order order,
-        CancellationToken ct)
+    private sealed record OutOfWindowRow(Guid Id, DateTimeOffset? ShippedAt);
+
+    private async Task PollOneAsync(Guid orderId, CancellationToken ct)
     {
         try { await _gate.WaitAsync(ct); }
         catch (OperationCanceledException) { return; }
 
         try
         {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+            var sameday = scope.ServiceProvider.GetRequiredService<ISamedayClient>();
+            var emails = scope.ServiceProvider.GetRequiredService<IOrderEmailService>();
+
+            var order = await db.Orders
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (order?.AwbNumber is null)
+                return;
+
             TrackingSnapshot snapshot;
             try
             {
-                snapshot = await sameday.GetTrackingAsync(order.AwbNumber!, ct);
+                snapshot = await sameday.GetTrackingAsync(order.AwbNumber, ct);
             }
-            catch (SamedayUnreachableException)
+            catch (SamedayUnreachableException ex)
             {
-                return; // wait for next tick
+                _logger.LogWarning(ex,
+                    "sameday.tracking.unreachable order_id={OrderId} — will retry next tick", order.Id);
+                return;
             }
             catch (SamedayException ex)
             {
@@ -168,13 +180,9 @@ public sealed class ShipmentTrackingJob : BackgroundService
                     "sameday.shipment.delivered order_id={OrderId} awb={Awb}",
                     order.Id, order.AwbNumber);
 
-                // Re-load with nav properties so the email service has what it needs.
-                var freshOrder = await db.Orders
-                    .Include(o => o.User)
-                    .Include(o => o.EasyboxLocker)
-                    .AsNoTracking()
-                    .FirstAsync(o => o.Id == order.Id, ct);
-                emails.FireOrderDeliveredEmail(freshOrder);
+                // The delivered email reads only User / GuestEmail / ShippingAddress
+                // (owned, already loaded) / OrderNumber — none of which the CAS changed.
+                emails.FireOrderDeliveredEmail(order);
                 return;
             }
 
