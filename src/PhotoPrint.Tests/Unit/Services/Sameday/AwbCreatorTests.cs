@@ -222,6 +222,31 @@ public class AwbCreatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Returns_transient_RetryLater_when_the_persist_fails_after_a_successful_create()
+    {
+        var order = SeedOrder();
+
+        // The vendor AWB is created, then the DB write fails (table gone mid-call).
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<AwbCreationRequest, CancellationToken>((_, _) =>
+            {
+                using var cmd = _connection.CreateCommand();
+                cmd.CommandText = "DROP TABLE Orders;";
+                cmd.ExecuteNonQuery();
+                return Task.FromResult(new AwbCreationResult("RO-LOST", "https://x/y.pdf", 1m));
+            });
+
+        using var db = CreateDb();
+        var sut = Build(db, client);
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
+            .Which.IsTransient.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Returns_GiveUp_when_mapper_throws_for_invalid_input()
     {
         var order = SeedOrder(withItems: false);
