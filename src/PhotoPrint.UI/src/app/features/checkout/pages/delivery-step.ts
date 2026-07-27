@@ -9,10 +9,11 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
-import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, startWith, catchError, take } from 'rxjs/operators';
+import { of } from 'rxjs';
 import { ShippingService } from '../../../core/services/shipping.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { LockerMapComponent } from '../components/locker-map';
 import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models/shipping.model';
 
@@ -95,6 +96,23 @@ import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models
           @if (showLockerError()) {
             <div class="field-error">Selectează un easybox pentru a continua.</div>
           }
+
+          <form [formGroup]="easyboxContactForm" class="address-form" novalidate>
+            <div class="form-group">
+              <label for="ebName">Nume destinatar</label>
+              <input id="ebName" type="text" formControlName="recipientName" />
+              @if (easyboxContactForm.get('recipientName')?.touched && easyboxContactForm.get('recipientName')?.invalid) {
+                <span class="field-error">Câmp obligatoriu</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="ebPhone">Telefon</label>
+              <input id="ebPhone" type="tel" formControlName="phone" />
+              @if (easyboxContactForm.get('phone')?.touched && easyboxContactForm.get('phone')?.invalid) {
+                <span class="field-error">Câmp obligatoriu</span>
+              }
+            </div>
+          </form>
         </div>
       }
 
@@ -271,6 +289,7 @@ export class DeliveryStep implements OnInit {
   private readonly router = inject(Router);
   private readonly shippingService = inject(ShippingService);
   readonly checkoutState = inject(CheckoutStateService);
+  private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
 
   readonly counties = ROMANIAN_COUNTIES;
@@ -297,12 +316,17 @@ export class DeliveryStep implements OnInit {
     phone: ['', Validators.required],
   });
 
-  private readonly citySearch$ = new Subject<string>();
+  // Easybox still needs a person + phone for the courier to notify; the locker
+  // supplies the address.
+  readonly easyboxContactForm = this.fb.group({
+    recipientName: ['', Validators.required],
+    phone: ['', Validators.required],
+  });
 
   readonly canContinue = computed(() => {
     const method = this.deliveryMethod();
     if (!method) return false;
-    if (method === 'Easybox') return !!this.selectedLockerId();
+    if (method === 'Easybox') return !!this.selectedLockerId() && this.easyboxContactForm.valid;
     return this.addressForm.valid;
   });
 
@@ -311,28 +335,53 @@ export class DeliveryStep implements OnInit {
     this.shippingService.getShippingCost('Easybox').subscribe(r => this.easyboxCostRon.set(r.costRon));
     this.shippingService.getShippingCost('Courier').subscribe(r => this.courierCostRon.set(r.costRon));
 
-    // Prime the locker map with every active locker so the user sees pins
-    // immediately on arriving at the Easybox step. The city-search switchMap
-    // below replaces this list when they start filtering.
-    this.shippingService.getLockers('').subscribe(r => this.lockers.set(r));
-
-    // Restore address form if previously saved
+    // Restore a previously entered address / contact.
     const saved = this.checkoutState.snapshot.shippingAddress;
-    if (saved) this.addressForm.patchValue(saved);
+    if (saved) {
+      this.addressForm.patchValue(saved);
+      this.easyboxContactForm.patchValue({ recipientName: saved.recipientName, phone: saved.phone });
+    }
 
-    // City search with debounce. An empty / sub-2-char query falls back to
-    // the full list (re-fetched so a stale filter never persists).
+    this.prefillEasyboxContact();
+
+    // Locker search AND the initial full-list prime run through ONE stream, so
+    // switchMap cancels a superseded fetch and a transient error can't tear the
+    // subscription down (catchError keeps it alive).
     this.citySearch.valueChanges
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
+        startWith(this.citySearch.value ?? ''), // immediate prime, bypasses the debounce
         switchMap(city =>
-          city && city.trim().length >= 2
+          (city && city.trim().length >= 2
             ? this.shippingService.getLockers(city.trim())
-            : this.shippingService.getLockers(''),
+            : this.shippingService.getLockers('')
+          ).pipe(catchError(() => of([] as LockerDto[]))),
         ),
       )
       .subscribe(results => this.lockers.set(results));
+  }
+
+  private prefillEasyboxContact(): void {
+    const c = this.easyboxContactForm;
+
+    // Guest checkout keeps contact under the guestSession key (name/phone).
+    try {
+      const raw = localStorage.getItem('guestSession');
+      if (raw) {
+        const g = JSON.parse(raw) as { firstName?: string; lastName?: string; phone?: string };
+        const name = [g.firstName, g.lastName].filter(Boolean).join(' ').trim();
+        if (!c.value.recipientName && name) c.patchValue({ recipientName: name });
+        if (!c.value.phone && g.phone) c.patchValue({ phone: g.phone });
+      }
+    } catch { /* ignore malformed guestSession */ }
+
+    // Signed-in display name (phone isn't exposed on the client-side user).
+    this.auth.currentUser$.pipe(take(1)).subscribe(user => {
+      if (user?.displayName && !c.value.recipientName) {
+        c.patchValue({ recipientName: user.displayName });
+      }
+    });
   }
 
   selectMethod(method: DeliveryType): void {
@@ -350,8 +399,9 @@ export class DeliveryStep implements OnInit {
 
   continue(): void {
     if (!this.canContinue()) {
-      if (this.deliveryMethod() === 'Easybox' && !this.selectedLockerId()) {
-        this.showLockerError.set(true);
+      if (this.deliveryMethod() === 'Easybox') {
+        if (!this.selectedLockerId()) this.showLockerError.set(true);
+        this.easyboxContactForm.markAllAsTouched();
       }
       if (this.deliveryMethod() === 'Courier') {
         this.addressForm.markAllAsTouched();
@@ -370,6 +420,12 @@ export class DeliveryStep implements OnInit {
         postalCode: val['postalCode'] ?? '',
         recipientName: val['recipientName'] ?? '',
         phone: val['phone'] ?? '',
+      });
+    } else if (this.deliveryMethod() === 'Easybox') {
+      const c = this.easyboxContactForm.value;
+      this.checkoutState.setEasyboxContact({
+        recipientName: c.recipientName ?? '',
+        phone: c.phone ?? '',
       });
     }
 

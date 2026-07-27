@@ -40,7 +40,7 @@ import { CartResponseDto } from '../../../core/models/cart.model';
           <span>
             {{ deliveryState().method === 'Easybox' ? '📦 Easybox Sameday' : '🚚 Curier la domiciliu' }}
             @if (deliveryState().lockerName) { <span> — {{ deliveryState().lockerName }}</span> }
-            @if (deliveryState().shippingAddress) {
+            @if (deliveryState().method === 'Courier' && deliveryState().shippingAddress) {
               <span> — {{ deliveryState().shippingAddress!.street }} {{ deliveryState().shippingAddress!.number }}, {{ deliveryState().shippingAddress!.city }}</span>
             }
           </span>

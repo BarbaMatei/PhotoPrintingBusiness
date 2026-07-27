@@ -1,7 +1,8 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { DeliveryStep } from './delivery-step';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
@@ -19,6 +20,7 @@ describe('DeliveryStep', () => {
 
   beforeEach(() => {
     sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       imports: [DeliveryStep],
       providers: [
@@ -83,7 +85,7 @@ describe('DeliveryStep', () => {
     expect(btn.disabled).toBe(true);
   });
 
-  it('Selecting Easybox + locker enables Continue', () => {
+  it('Selecting Easybox + locker but no contact keeps Continue disabled', () => {
     const fixture = createFixture();
     flushShippingCosts();
     fixture.detectChanges();
@@ -96,7 +98,44 @@ describe('DeliveryStep', () => {
     fixture.detectChanges();
 
     const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true); // Sameday needs a recipient name + phone too
+  });
+
+  it('Selecting Easybox + locker + contact enables Continue', () => {
+    const fixture = createFixture();
+    flushShippingCosts();
+    fixture.detectChanges();
+
+    const comp = fixture.componentInstance;
+    comp.selectMethod('Easybox');
+    comp.selectLocker({
+      id: 'l1', samedayId: 'SD1', name: 'Box', address: 'Str 1', city: 'Cluj', lat: 46, lng: 23,
+    });
+    comp.easyboxContactForm.setValue({ recipientName: 'Ana Pop', phone: '0712345678' });
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
+  });
+
+  it('Easybox continue captures the recipient contact into checkout state', () => {
+    const fixture = createFixture();
+    flushShippingCosts();
+    fixture.detectChanges();
+
+    const state = TestBed.inject(CheckoutStateService);
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const comp = fixture.componentInstance;
+    comp.selectMethod('Easybox');
+    comp.selectLocker({
+      id: 'l1', samedayId: 'SD1', name: 'Box', address: 'Str 1', city: 'Cluj', lat: 46, lng: 23,
+    });
+    comp.easyboxContactForm.setValue({ recipientName: 'Ana Pop', phone: '0712345678' });
+    comp.continue();
+
+    expect(state.snapshot.lockerId).toBe('l1');
+    expect(state.snapshot.shippingAddress?.recipientName).toBe('Ana Pop');
+    expect(state.snapshot.shippingAddress?.phone).toBe('0712345678');
   });
 
   it('Selecting Courier shows address form', () => {

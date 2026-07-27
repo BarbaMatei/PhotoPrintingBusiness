@@ -27,11 +27,22 @@ export class CheckoutStateService {
   }
 
   setLocker(locker: LockerDto): void {
-    this.patch({ lockerId: locker.id, lockerName: locker.name, shippingAddress: null });
+    // Keep any Easybox contact already entered — only switching delivery method resets it.
+    this.patch({ lockerId: locker.id, lockerName: locker.name });
   }
 
   setShippingAddress(address: ShippingAddressForm): void {
     this.patch({ shippingAddress: address, lockerId: null, lockerName: null });
+  }
+
+  /** Easybox recipient contact: the locker supplies the address, so the address
+   *  fields are blank, but the locker selection is preserved. */
+  setEasyboxContact(contact: { recipientName: string; phone: string }): void {
+    const address: ShippingAddressForm = {
+      street: '', number: '', block: '', city: '', county: '', postalCode: '',
+      recipientName: contact.recipientName, phone: contact.phone,
+    };
+    this.patch({ shippingAddress: address });
   }
 
   isDeliveryComplete(): boolean {
