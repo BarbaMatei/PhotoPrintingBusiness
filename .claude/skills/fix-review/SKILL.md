@@ -29,11 +29,14 @@ resolution-v<n>.md  (you, the fixer)       — per-finding: status + commit + no
 review-v<n+1>.md    (re-review, IMMUTABLE)  — verifies your fixes, sets "verified"
 ```
 
-The finding IDs (`BUG-1`, `SEC-1`, `QUAL-3`, …) join the three. You write only in the
-resolution file. You hand back for re-review — you do **not** declare anything verified.
+Each pass numbers its findings `F1, F2, …` (older reviews used `BUG-`/`SEC-`-style prefixes —
+grandfathered). The IDs join the three files within a pass; across passes the key is the
+ledger's `D#`. You write only in the resolution file. You hand back for re-review — you do
+**not** declare anything verified.
 
-If `reviews/README.md` exists, skim it first; it is the source of truth for the
-conventions. This skill is the operational checklist.
+`reviews/README.md` owns the loop conventions (router, severities, verdicts, file shapes).
+**This skill is the sole owner of the fixer contract** — how a fix round runs is defined here
+and nowhere else.
 
 ## Inputs — locate the work
 
@@ -110,7 +113,7 @@ be batched):
 6. **Commit** — one focused commit per finding (or per tightly-related cleanup group),
    message referencing the ID and the review version:
    `fix(<area>): <what> (<FINDING-ID>, review <target>-v<n>)`
-   e.g. `fix(payments): scope idempotency lookup to caller (SEC-1, review 035-v1)`.
+   e.g. `fix(storage): route admin ZIP reads via the storage router (F1, review 043-v1)`.
 7. **Record it** in the resolution file (next section).
 
 ## Recording in the resolution file
@@ -133,8 +136,8 @@ tip), and `closed:` date. If you stopped partway, leave `status: in-progress`.
 
 **Example finding entry (frontmatter):**
 ```yaml
-  SEC-1: { status: fixed, commit: a1b2c3d, note: "scoped GetByIdempotencyKeyAsync + stale-free to userId/guestSessionId; added cross-tenant test" }
-  QUAL-2: { status: wont-fix, commit: null, note: "DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now" }
+  F1: { status: fixed, commit: a1b2c3d, note: "scoped GetByIdempotencyKeyAsync + stale-free to userId/guestSessionId; added cross-tenant test" }
+  F2: { status: wont-fix, commit: null, note: "DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now" }
 ```
 
 ## Fix-diff micro-review — before hand-back
@@ -165,6 +168,8 @@ Update `reviews/index.md`'s Status column for the target (`open → in-progress/
 ## Guardrails recap
 
 - Immutable review file — respond in the resolution, never edit the review.
+- Code comments follow the CLAUDE.md hard rule: never narrate a fix in code; no
+  finding-ID/review citations in comments (the history lives in commits and the resolution).
 - Class sweep before every fix; doc drift is fixed token-wide, not file-wide.
 - Design-level AND mechanism-adding fixes get an adversarial approach-check before
   implementation — mandatory on the trigger list (background job/timer/sweep, cache,
