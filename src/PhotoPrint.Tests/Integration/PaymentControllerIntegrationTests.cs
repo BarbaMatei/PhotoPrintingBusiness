@@ -20,7 +20,11 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         PaymentProcessor: PaymentProcessor.Stripe,
         DeliveryType: DeliveryType.Easybox,
         EasyboxLockerId: Guid.NewGuid(),
-        ShippingAddress: null);
+        ShippingAddress: new PhotoPrint.API.Models.ShippingAddressSnapshot
+        {
+            RecipientName = "Test", Phone = "0700000000",
+            Street = "", Number = "", City = "", County = "", PostalCode = "",
+        });
 
     private static readonly CreateOrderRequest EuPlatescRequest = new(
         PaymentProcessor: PaymentProcessor.EuPlatesc,
@@ -312,7 +316,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
               "paymentProcessor": 0,
               "deliveryType": 0,
               "easyboxLockerId": "{{Guid.NewGuid()}}",
-              "shippingAddress": null,
+              "shippingAddress": { "recipientName": "Test", "phone": "0700000000", "street": "", "number": "", "city": "", "county": "", "postalCode": "" },
               "shippingCostRon": -100
             }
             """;
@@ -446,6 +450,40 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains(order.Id, _factory.PhotoPromoter.Enqueued);
+    }
+
+    [Fact]
+    public async Task StripeWebhook_PaymentSucceeded_EnqueuesAwbCreation()
+    {
+        // The webhook→AWB wiring had no test — deleting the NotifyPaidAsync call shipped
+        // green while paid orders silently never got a shipping label.
+        var order = await _factory.SeedOrderAsync(paymentIntentId: "pi_wh_awb", totalRon: 30.00m);
+
+        var eventJson = $$"""
+            {
+              "id": "evt_test_awb",
+              "object": "event",
+              "type": "payment_intent.succeeded",
+              "data": {
+                "object": {
+                  "id": "pi_wh_awb",
+                  "object": "payment_intent",
+                  "amount": 3000,
+                  "currency": "ron",
+                  "client_secret": "pi_wh_awb_secret"
+                }
+              }
+            }
+            """;
+
+        _factory.StripeVerifier.ShouldThrow = false;
+
+        var response = await _client.PostAsync(
+            "/api/webhooks/stripe",
+            new StringContent(eventJson, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(order.Id, _factory.AwbNotifier.Enqueued);
     }
 
     [Fact]

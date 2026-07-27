@@ -67,8 +67,28 @@ public class CreateOrderRequestValidatorTests
               .WithErrorMessage("Locker ID is required for Easybox delivery");
     }
 
+    private static ShippingAddressSnapshot EasyboxContact() => new()
+    {
+        RecipientName = "Alice Pop",
+        Phone = "0700000000",
+        Street = "", Number = "", City = "", County = "", PostalCode = "",
+    };
+
     [Fact]
-    public void Easybox_WithLockerId_Passes()
+    public void Easybox_WithLockerAndContact_Passes()
+    {
+        var request = new CreateOrderRequest(
+            PaymentProcessor: PaymentProcessor.Stripe,
+            DeliveryType: DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(),
+            ShippingAddress: EasyboxContact());
+
+        var result = _sut.TestValidate(request);
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Easybox_WithoutRecipientContact_Fails()
     {
         var request = new CreateOrderRequest(
             PaymentProcessor: PaymentProcessor.Stripe,
@@ -76,8 +96,20 @@ public class CreateOrderRequestValidatorTests
             EasyboxLockerId: Guid.NewGuid(),
             ShippingAddress: null);
 
-        var result = _sut.TestValidate(request);
-        result.IsValid.Should().BeTrue();
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor(x => x.ShippingAddress);
+    }
+
+    [Fact]
+    public void Easybox_WithBlankPhone_FailsOnPhone()
+    {
+        var contact = EasyboxContact();
+        contact.Phone = "";
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Phone");
     }
 
     // ── Courier requires shipping address ─────────────────────────────────────
@@ -156,5 +188,57 @@ public class CreateOrderRequestValidatorTests
 
         var result = _sut.TestValidate(request);
         result.IsValid.Should().BeTrue();
+    }
+
+    // ── Courier recipient fields must be present + sane (else the AWB request
+    //    goes out blank and Sameday rejects it → permanent give-up) ────────────
+
+    [Theory]
+    [InlineData("ShippingAddress.RecipientName")]
+    [InlineData("ShippingAddress.Phone")]
+    [InlineData("ShippingAddress.Street")]
+    [InlineData("ShippingAddress.Number")]
+    public void Courier_WithBlankRecipientField_FailsOnThatField(string field)
+    {
+        var address = ValidAddress();
+        switch (field)
+        {
+            case "ShippingAddress.RecipientName": address.RecipientName = "  "; break;
+            case "ShippingAddress.Phone":         address.Phone = ""; break;
+            case "ShippingAddress.Street":        address.Street = ""; break;
+            case "ShippingAddress.Number":        address.Number = ""; break;
+        }
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor(field);
+    }
+
+    [Fact]
+    public void Courier_WithNonNumericPhone_FailsOnPhone()
+    {
+        var address = ValidAddress();
+        address.Phone = "not-a-phone";
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Phone");
+    }
+
+    [Fact]
+    public void Courier_WithOverlongRecipientName_FailsOnRecipientName()
+    {
+        var address = ValidAddress();
+        address.RecipientName = new string('x', 256);
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.RecipientName");
     }
 }

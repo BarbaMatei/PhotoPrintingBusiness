@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Sameday;
 using StripeEvent = Stripe.Event;
 using StripeException = Stripe.StripeException;
 using StripeClient = Stripe.StripeClient;
@@ -72,6 +73,19 @@ public class RecordingPhotoPromoter : IOrderPhotoPromoter
         => Task.FromResult(PromotionOutcome.Empty);
 }
 
+/// <summary>Records AWB enqueues so tests can assert the webhook→AWB wiring without a
+/// running dispatcher consuming the channel.</summary>
+public class RecordingAwbCreationNotifier : IAwbCreationNotifier
+{
+    public List<Guid> Enqueued { get; } = new();
+
+    public Task NotifyPaidAsync(Guid orderId, CancellationToken ct = default)
+    {
+        Enqueued.Add(orderId);
+        return Task.CompletedTask;
+    }
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -88,6 +102,9 @@ public class PaymentFactory : ShippingFactory
 
     /// <summary>Shared recording promoter — asserts the webhook→promotion wiring (D59).</summary>
     public RecordingPhotoPromoter PhotoPromoter { get; } = new();
+
+    /// <summary>Shared recording AWB notifier — asserts the webhook→AWB-enqueue wiring.</summary>
+    public RecordingAwbCreationNotifier AwbNotifier { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -112,6 +129,7 @@ public class PaymentFactory : ShippingFactory
             services.AddScoped<IStripePaymentGateway>(_ => StripeGateway);
             services.AddScoped<IStripeSignatureVerifier>(_ => StripeVerifier);
             services.AddScoped<IOrderPhotoPromoter>(_ => PhotoPromoter);
+            services.AddSingleton<IAwbCreationNotifier>(_ => AwbNotifier);
         });
     }
 
