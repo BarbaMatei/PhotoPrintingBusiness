@@ -157,13 +157,31 @@ describe('OrderDetailPage', () => {
 
   // ── Bolt 053: photo archive grid + lightbox ─────────────────────────────
 
-  it('shows the "no longer available" copy when the photos endpoint returns empty', async () => {
-    await setup({
-      getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
+  // An empty archive only means "purged" once the order could have been purged (shipped /
+  // delivered / cancelled). Before that, photos are still being prepared.
+  for (const status of ['AwaitingPayment', 'Paid', 'Printing'] as const) {
+    it(`shows the "available soon" copy for an empty archive on a ${status} order`, async () => {
+      await setup({
+        getOrderDetail: vi.fn().mockReturnValue(of({ ...MOCK_DETAIL, status: status as OrderDetailDto['status'] })),
+        getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
+      });
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('vor fi disponibile în curând');
+      expect(el.textContent).not.toContain('nu mai sunt disponibile');
     });
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Fotografiile pentru această comandă nu mai sunt disponibile');
-  });
+  }
+
+  for (const status of ['Shipped', 'Delivered', 'Cancelled'] as const) {
+    it(`keeps the "no longer available" copy for an empty archive on a ${status} order`, async () => {
+      await setup({
+        getOrderDetail: vi.fn().mockReturnValue(of({ ...MOCK_DETAIL, status: status as OrderDetailDto['status'] })),
+        getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
+      });
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('Fotografiile pentru această comandă nu mai sunt disponibile');
+      expect(el.textContent).not.toContain('vor fi disponibile în curând');
+    });
+  }
 
   it('renders a thumbnail tile per photo returned by the endpoint', async () => {
     await setup({

@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  computed,
   inject,
   signal,
   input,
@@ -112,9 +113,15 @@ interface StepDef {
                 Reîncearcă
               </button>
             } @else if (photos().length === 0) {
-              <p class="photos-empty">
-                Fotografiile pentru această comandă nu mai sunt disponibile.
-              </p>
+              @if (photosPendingArchive()) {
+                <p class="photos-empty">
+                  Fotografiile comenzii tale se pregătesc și vor fi disponibile în curând.
+                </p>
+              } @else {
+                <p class="photos-empty">
+                  Fotografiile pentru această comandă nu mai sunt disponibile.
+                </p>
+              }
             } @else {
               <div class="photo-grid">
                 @for (photo of photos(); track photo.uploadId) {
@@ -380,6 +387,14 @@ export class OrderDetailPage implements OnInit {
 
   readonly badgeClass = statusClass;
   readonly stepDone = isAtLeast;
+
+  // Purge can only have happened at/after production-complete or cancellation; before that,
+  // an empty archive means the photos just haven't been prepared yet.
+  readonly photosPendingArchive = computed(() => {
+    const order = this.order();
+    if (!order) return true;
+    return order.status !== 'Cancelled' && !isAtLeast(order.status, 'Shipped');
+  });
 
   readonly steps: StepDef[] = [
     { status: 'Paid', label: 'Plătită', icon: '✓' },
