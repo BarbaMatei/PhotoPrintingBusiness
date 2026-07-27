@@ -326,6 +326,7 @@ public class AdminOrderServiceTests
         dbOrder!.PaidAt.Should().NotBeNull();
         _awbNotifier.Verify(
             n => n.NotifyPaidAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _emailSvc.Verify(e => e.FireOrderConfirmedEmail(It.IsAny<Order>()), Times.Once);
     }
 
     // ── Bolt 052: original-purge hook on production-complete transition ──────

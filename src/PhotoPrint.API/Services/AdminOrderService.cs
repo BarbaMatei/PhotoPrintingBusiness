@@ -142,7 +142,10 @@ public class AdminOrderService : IAdminOrderService
         else if (newStatus == OrderStatus.Delivered)
             _orderEmailService.FireOrderDeliveredEmail(order);
         else if (newStatus == OrderStatus.Paid)
+        {
+            _orderEmailService.FireOrderConfirmedEmail(order);
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+        }
 
         await _hub.Clients.All.SendAsync(
             "OrderStatusChanged", orderId, order.Status.ToString(), ct);
