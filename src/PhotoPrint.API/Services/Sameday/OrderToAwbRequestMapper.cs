@@ -35,8 +35,20 @@ public static class OrderToAwbRequestMapper
                     nameof(order)),
             };
 
+        // A blank recipient name/phone must fail locally as a give-up, not go to
+        // the wire and come back as a vendor 4xx.
+        if (string.IsNullOrWhiteSpace(recipientName))
+            throw new ArgumentException("recipient name is required for AWB creation.", nameof(order));
+        if (string.IsNullOrWhiteSpace(recipientPhone))
+            throw new ArgumentException("recipient phone is required for AWB creation.", nameof(order));
+
+        var isEasybox = order.DeliveryType == DeliveryType.Easybox;
+
         return new AwbCreationRequest(
             PickupPointId:       settings.PickupPointId,
+            OrderNumber:         order.OrderNumber,
+            ServiceId:           isEasybox ? settings.LockerServiceId : settings.CourierServiceId,
+            LockerSamedayId:     isEasybox ? order.EasyboxLocker!.SamedayId : null,
             RecipientName:       recipientName,
             RecipientPhone:      recipientPhone,
             RecipientAddress:    recipientAddress,

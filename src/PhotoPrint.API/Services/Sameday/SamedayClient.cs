@@ -98,10 +98,12 @@ public sealed class SamedayClient : ISamedayClient
         {
             PickupPoint    = request.PickupPointId,
             AwbPayment     = 1,
+            Service        = request.ServiceId,
+            LockerLastMile = request.LockerSamedayId,
             PackageWeight  = request.ParcelWeightKg,
             CashOnDelivery = request.CodAmountRon,
             Observation    = request.Observations,
-            ClientInternalReference = request.PickupPointId, // vendor uses this as our idempotency key (ADR-015)
+            ClientInternalReference = request.OrderNumber, // per-order idempotency key (ADR-015)
             AwbRecipient   = new SamedayWireDtos.AwbRecipient
             {
                 Name        = request.RecipientName,

@@ -90,15 +90,57 @@ public sealed class AwbCreator : IAwbCreator
             return new AwbCreationOutcome.GiveUp(ex.Message);
         }
 
-        order.AwbNumber   = result.AwbNumber;
-        order.AwbLabelUrl = result.LabelUrl;
-        order.UpdatedAt   = _clock.GetUtcNow();
-        await _db.SaveChangesAsync(ct);
-
+        // Log the billable AWB BEFORE persisting so a DB failure leaves it recoverable.
         _logger.LogInformation(
             "sameday.awb.created order_id={OrderId} awb={Awb} attempt={Attempt}",
             order.Id, result.AwbNumber, attempt);
 
-        return new AwbCreationOutcome.Created(result.AwbNumber, result.LabelUrl);
+        // != Cancelled, not == Paid: an admin may advance Paid→Printing mid-call and that
+        // order still needs its label; the retry sweep only re-picks Paid, so a Printing
+        // order that lost the write here would never recover.
+        int affected;
+        try
+        {
+            affected = await _db.Orders
+                .Where(o => o.Id == orderId
+                            && o.AwbNumber == null
+                            && o.Status != OrderStatus.Cancelled)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(o => o.AwbNumber,   result.AwbNumber)
+                    .SetProperty(o => o.AwbLabelUrl, result.LabelUrl)
+                    .SetProperty(o => o.UpdatedAt,   (DateTimeOffset?)_clock.GetUtcNow()),
+                    ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "sameday.awb.persist-failed order_id={OrderId} awb={Awb} — will retry",
+                orderId, result.AwbNumber);
+            return new AwbCreationOutcome.RetryLater("AWB persist failed after vendor create", IsTransient: true);
+        }
+
+        if (affected == 1)
+            return new AwbCreationOutcome.Created(result.AwbNumber, result.LabelUrl);
+
+        // affected == 0: cancelled or already carries an AWB. Read it back to tell a benign
+        // vendor-dedup convergence (same number) from a genuine orphan (different/absent).
+        var persisted = await _db.Orders
+            .AsNoTracking()
+            .Where(o => o.Id == orderId)
+            .Select(o => o.AwbNumber)
+            .FirstOrDefaultAsync(ct);
+
+        if (persisted == result.AwbNumber)
+        {
+            _logger.LogInformation(
+                "sameday.awb.converged order_id={OrderId} awb={Awb} — vendor deduped on order reference",
+                orderId, result.AwbNumber);
+            return new AwbCreationOutcome.Skipped("AWB already persisted with the same number (converged)");
+        }
+
+        _logger.LogWarning(
+            "sameday.awb.orphaned order_id={OrderId} created_awb={Created} persisted_awb={Persisted} — created AWB may need a manual void",
+            orderId, result.AwbNumber, persisted);
+        return new AwbCreationOutcome.Skipped($"order no longer writable; AWB {result.AwbNumber} may be orphaned");
     }
 }

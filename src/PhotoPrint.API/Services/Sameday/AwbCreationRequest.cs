@@ -8,6 +8,9 @@ namespace PhotoPrint.API.Services.Sameday;
 /// </summary>
 public sealed record AwbCreationRequest(
     string PickupPointId,
+    string OrderNumber,
+    int ServiceId,
+    string? LockerSamedayId,
     string RecipientName,
     string RecipientPhone,
     string RecipientAddress,

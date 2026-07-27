@@ -32,7 +32,7 @@ internal static class SamedayWireDtos
         [JsonPropertyName("pickupPoint")]    public string? PickupPoint    { get; set; }
         [JsonPropertyName("awbPayment")]     public int     AwbPayment     { get; set; } = 1;   // paid
         [JsonPropertyName("thirdPartyPickup")] public int   ThirdPartyPickup { get; set; }
-        [JsonPropertyName("service")]        public int     Service        { get; set; } = 7;   // Easybox / locker — vendor-specific code
+        [JsonPropertyName("service")]        public int     Service        { get; set; }   // per-delivery-type, set by the caller
         [JsonPropertyName("packageType")]    public int     PackageType    { get; set; } = 1;   // parcel
         [JsonPropertyName("packageNumber")]  public int     PackageNumber  { get; set; } = 1;
         [JsonPropertyName("packageWeight")]  public decimal PackageWeight  { get; set; }

@@ -21,6 +21,11 @@ public sealed class SamedaySettings
     public string PickupPointId         { get; set; } = string.Empty;
     public int    RequestTimeoutSeconds { get; set; } = 10;
 
+    // Sameday service ids are per-merchant vendor config, not universal constants —
+    // set both to the real ids from your Sameday contract before enabling.
+    public int    LockerServiceId       { get; set; } = 7;
+    public int    CourierServiceId      { get; set; } = 7;
+
     /// <summary>Lifecycle jobs (bolt 037). Orthogonal to <see cref="Enabled"/>: a
     /// deployment can wire credentials and validate them through the typed client
     /// without yet flipping the AWB / tracking workflows on.</summary>

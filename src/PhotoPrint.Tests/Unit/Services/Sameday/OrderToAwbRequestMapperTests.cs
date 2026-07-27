@@ -12,6 +12,8 @@ public class OrderToAwbRequestMapperTests
         Enabled = true,
         PickupPointId = pickup,
         BaseUrl = "https://api.sameday.ro",
+        CourierServiceId = 3,
+        LockerServiceId = 7,
     };
 
     private static ShippingAddressSnapshot Address(string recipient = "Alice Pop") => new()
@@ -123,5 +125,61 @@ public class OrderToAwbRequestMapperTests
         var order = Order(DeliveryType.Courier);
         var req = OrderToAwbRequestMapper.ToRequest(order, Settings());
         req.Observations.Should().Contain("FT-2026-0001");
+    }
+
+    [Fact]
+    public void Carries_order_number_as_the_per_order_vendor_reference()
+    {
+        var order = Order(DeliveryType.Courier);
+        var req = OrderToAwbRequestMapper.ToRequest(order, Settings());
+        req.OrderNumber.Should().Be("FT-2026-0001");
+    }
+
+    [Fact]
+    public void Courier_uses_courier_service_and_no_locker_id()
+    {
+        var order = Order(DeliveryType.Courier);
+        var req = OrderToAwbRequestMapper.ToRequest(order, Settings());
+        req.ServiceId.Should().Be(3);
+        req.LockerSamedayId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Easybox_uses_locker_service_and_carries_the_locker_sameday_id()
+    {
+        var locker = new EasyboxLocker
+        {
+            Id = Guid.NewGuid(), SamedayId = "SMD-001", Name = "x",
+            Address = "A", City = "C", County = "J",
+        };
+        var order = Order(DeliveryType.Easybox, locker);
+
+        var req = OrderToAwbRequestMapper.ToRequest(order, Settings());
+
+        req.ServiceId.Should().Be(7);
+        req.LockerSamedayId.Should().Be("SMD-001");
+    }
+
+    [Fact]
+    public void Throws_when_recipient_name_is_blank()
+    {
+        var order = Order(DeliveryType.Courier);
+        order.ShippingAddress.RecipientName = "  ";
+        var act = () => OrderToAwbRequestMapper.ToRequest(order, Settings());
+        act.Should().Throw<ArgumentException>().WithMessage("*recipient name*");
+    }
+
+    [Fact]
+    public void Throws_when_recipient_phone_is_blank()
+    {
+        var locker = new EasyboxLocker
+        {
+            Id = Guid.NewGuid(), SamedayId = "SMD-001", Name = "x",
+            Address = "A", City = "C", County = "J",
+        };
+        var order = Order(DeliveryType.Easybox, locker);
+        order.ShippingAddress.Phone = "";
+        var act = () => OrderToAwbRequestMapper.ToRequest(order, Settings());
+        act.Should().Throw<ArgumentException>().WithMessage("*recipient phone*");
     }
 }

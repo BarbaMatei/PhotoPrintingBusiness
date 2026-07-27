@@ -179,7 +179,7 @@ public class SamedayClientTests
 
         var sut = Build(script);
         var result = await sut.CreateAwbAsync(new AwbCreationRequest(
-            "1", "name", "phone", "addr", "city", "county", "00000", 0.1m, 1, 0m, null));
+            "1", "FT-1", 7, null, "name", "phone", "addr", "city", "county", "00000", 0.1m, 1, 0m, null));
 
         result.AwbNumber.Should().Be("RO12345678");
         result.LabelUrl.Should().Be("https://sameday.cdn/labels/abc.pdf");

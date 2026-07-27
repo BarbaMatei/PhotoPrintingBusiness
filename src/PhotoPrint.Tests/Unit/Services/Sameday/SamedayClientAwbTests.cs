@@ -21,6 +21,7 @@ public class SamedayClientAwbTests
 
     private static readonly AwbCreationRequest Request = new(
         PickupPointId: "PP1",
+        OrderNumber: "FT-1", ServiceId: 7, LockerSamedayId: null,
         RecipientName: "Alice", RecipientPhone: "+40712345678",
         RecipientAddress: "Str. Test 10", RecipientCity: "Cluj",
         RecipientCounty: "Cluj", RecipientPostalCode: "400000",
@@ -46,6 +47,27 @@ public class SamedayClientAwbTests
             .Should().BeTrue();
         body.Should().Contain("PP1");
         body.Should().Contain("\"packageWeight\":0.2");
+    }
+
+    [Fact]
+    public async Task Uses_the_order_number_as_the_vendor_reference_not_the_pickup_point()
+    {
+        var script = new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(
+                HttpStatusCode.OK,
+                "{\"awbNumber\":\"RO123\",\"awbCost\":1,\"pdfLink\":\"https://x/y.pdf\"}"));
+        var sut = Build(script);
+
+        var req = Request with { OrderNumber = "FT-20260001", ServiceId = 7, LockerSamedayId = "LCK-42" };
+        await sut.CreateAwbAsync(req);
+
+        var body = script.Recorded[0].BodyText();
+        // D1: the idempotency key must be the per-order number, never the shop-wide pickup point.
+        body.Should().Contain("\"clientInternalReference\":\"FT-20260001\"");
+        body.Should().NotContain("\"clientInternalReference\":\"PP1\"");
+        // D5: the delivery-type service id and the locker OOH id are on the wire.
+        body.Should().Contain("\"service\":7");
+        body.Should().Contain("\"lockerLastMile\":\"LCK-42\"");
     }
 
     [Fact]
