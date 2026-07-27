@@ -296,9 +296,9 @@ New / updated identities:
 
 | D# | Sev | Status | Title |
 |----|-----|--------|-------|
-| D83 | 🟠 Med | **open** *(new; [[D13]] follow-up)* | "Fotografiile … nu mai sunt disponibile" shown for a just-paid order before in-process promotion runs, and for pending orders — needs an order-status/backend-state gate (`order-detail-page.ts`) |
-| D84 | 🟠 Med | **open** *(new; [[D59]] coverage sibling)* | EuPlatesc IPN → promotion `EnqueueAsync` wiring never asserted (only the Stripe twin is) (`PaymentControllerIntegrationTests.cs`) |
-| D85 | 🟠 Med | **open** *(new; review-scope)* | Backfill CLI omitted from the review manifest (lighter scrutiny); backfill × live-worker concurrent promotion untested (`BackfillCommand.cs`) |
+| D83 | 🟠 Med | **fixed** `d041295`+`b9af326` *(owner triage 2026-07-27; [[D13]] follow-up)* | "Fotografiile … nu mai sunt disponibile" shown for a just-paid order before in-process promotion runs, and for pending orders — empty-archive copy now gated on order lifecycle (`order-detail-page.ts`) |
+| D84 | 🟠 Med | **wont-fix** *(owner 2026-07-27: EuPlatesc slated for removal — no investment in its coverage; [[D59]] coverage sibling)* | EuPlatesc IPN → promotion `EnqueueAsync` wiring never asserted (only the Stripe twin is) (`PaymentControllerIntegrationTests.cs`) |
+| D85 | 🟠 Med | **deferred** → 3-env *(owner 2026-07-27; ops CLI unused until then; affirmed @d041295; review-scope)* | Backfill CLI omitted from the review manifest (lighter scrutiny); backfill × live-worker concurrent promotion untested (`BackfillCommand.cs`) |
 | D86 | 🟡 Low | **backlog** *(new)* | Retention deletes blobs before persisting key-null → broken-URL window on a concurrent read (`ArchiveRetentionJob.cs:146`) |
 | D87 | 🟡 Low | **backlog** *(new; [[D52]]/[[D56]] class)* | Retention sweep query omits the `DeletedAt` filter → reprocesses soft-deleted rows, re-emits false audit (`ArchiveRetentionJob.cs:96`) |
 | D88 | 🟡 Low | **backlog** *(new)* | Promoter tests assert cloud-write keys but never the bytes written (`OrderPhotoPromoterTests.cs`) |
