@@ -1,10 +1,38 @@
 ---
 bolt: 037-awb-and-tracking-jobs
 created: 2026-06-02T17:10:00Z
-status: accepted
+status: amended
 ---
 
 # ADR-015: Accept Duplicate `CreateAwb` Calls on Multi-Replica (Rely on Vendor Idempotency + DB Re-Check)
+
+## Amendment (2026-07-27, review 015-sameday-shipping v1 + v3)
+
+**This ADR's "accept duplicates" stance is superseded — reviews found the original design did not
+actually enforce the safety it assumed.** The current mechanism, in order of defence:
+
+1. **Per-order vendor reference.** The idempotency key sent to Sameday is
+   `clientInternalReference = Order.OrderNumber` (NOT `awbPayment`, which is a constant payment-type
+   flag = 1). The original text below naming `awbPayment` as the key was wrong.
+2. **Durable per-order claim (D45).** Before the vendor call, `AwbCreator` atomically claims the order
+   (`Orders.AwbClaimedAt`, TTL `Sameday:Jobs:AwbClaimTtlMinutes`, reclaimable after the TTL). A
+   concurrent creator (retry re-enqueue, second replica, duplicate webhook) finds a fresh claim and
+   `Skipped`s **before** billing a second label. This closes the *concurrent* double-call.
+3. **Guarded DB write.** Persist is `ExecuteUpdate WHERE Id AND AwbNumber IS NULL AND Status != Cancelled`;
+   `affected == 0` reads the value back to tell benign vendor-dedup convergence from a genuine orphan
+   (Error-logged for manual reconciliation — there is no vendor void endpoint in the client).
+
+**Honest residual (NOT closed):** the **crash/timeout window** — a worker that bills an AWB then dies
+before persisting — is reclaimed after the TTL and re-created; whether that mints a *second* billable
+label still rests entirely on Sameday deduping on `clientInternalReference`, which is **unverified**.
+There is no client-side close without a vendor "AWB-by-reference" lookup (not implemented). **Verify
+Sameday's create-idempotency before flipping `Sameday:Jobs:Enabled=true`.** The claim TTL must exceed
+one vendor round-trip (`RequestTimeoutSeconds`) with margin and is deliberately decoupled from the
+retry cadence.
+
+The original decision text is kept below for history.
+
+---
 
 ## Context
 
