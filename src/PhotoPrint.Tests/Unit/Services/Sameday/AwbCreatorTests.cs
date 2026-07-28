@@ -386,6 +386,77 @@ public class AwbCreatorTests : IDisposable
         outcome.Should().BeOfType<AwbCreationOutcome.GiveUp>();
     }
 
+    [Fact]
+    public async Task Persists_the_AWB_but_drops_an_over_length_label_url()
+    {
+        // D60: a vendor URL longer than the column must not throw the persist (which would loop the
+        // billable retry); the AWB number is recorded and the label dropped (fetchable by number).
+        var order = SeedOrder();
+        var longUrl = "https://sameday/labels/" + new string('a', Order.MaxAwbLabelUrlLength);
+        using var db = CreateDb();
+        var sut = Build(db, ClientReturning(url: longUrl));
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.Created>();
+        var refreshed = ReadBack(order.Id);
+        refreshed.AwbNumber.Should().Be("RO12345678");
+        refreshed.AwbLabelUrl.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Reclaims_a_stale_claim_and_creates_the_AWB()
+    {
+        // D57: a worker that crashed mid-claim must not strand the order — after the TTL another
+        // creator reclaims it.
+        var order = SeedOrder();
+        SetClaim(order.Id, Now.AddMinutes(-10)); // older than the claim TTL
+
+        using var db = CreateDb();
+        var sut = Build(db, ClientReturning());
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.Created>();
+        ReadBack(order.Id).AwbNumber.Should().Be("RO12345678");
+    }
+
+    [Fact]
+    public async Task Releases_the_claim_after_a_definitive_failure()
+    {
+        // D58: on a non-preserving failure (unreachable) the claim is released so an in-process
+        // retry can re-claim promptly instead of waiting out the TTL.
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new SamedayUnreachableException("/api/awb"));
+        var sut = Build(db, client);
+
+        await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        ReadBack(order.Id).AwbClaimedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Preserves_the_claim_on_a_vendor_timeout()
+    {
+        // D68: a timeout leaves the AWB state unknown (may be billed); the claim is held so the
+        // re-attempt waits out the TTL rather than re-calling the vendor and risking a 2nd label.
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+        var sut = Build(db, client);
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
+            .Which.PreserveClaim.Should().BeTrue();
+        ReadBack(order.Id).AwbClaimedAt.Should().Be(Now);
+    }
+
     private void SetStatus(Guid id, OrderStatus status)
     {
         using var db = CreateDb();

@@ -95,7 +95,7 @@ public sealed class AwbDispatcher : BackgroundService
                 return;
 
             case AwbCreationOutcome.RetryLater { IsTransient: true } transient:
-                await ScheduleReEnqueueAsync(job, transient.Reason, ct);
+                await ScheduleReEnqueueAsync(job, transient.Reason, transient.PreserveClaim, ct);
                 return;
 
             case AwbCreationOutcome.RetryLater { IsTransient: false } nonTransient:
@@ -120,7 +120,7 @@ public sealed class AwbDispatcher : BackgroundService
         return TimeSpan.FromSeconds(backoffSeconds[attempt - 1]);
     }
 
-    private async Task ScheduleReEnqueueAsync(AwbJob job, string reason, CancellationToken ct)
+    private async Task ScheduleReEnqueueAsync(AwbJob job, string reason, bool preserveClaim, CancellationToken ct)
     {
         var delay = NextDispatchDelay(job.Attempt, _settings.DispatchBackoffSeconds);
         if (delay is null)
@@ -129,6 +129,15 @@ public sealed class AwbDispatcher : BackgroundService
                 "sameday.awb.dispatcher-backoff-exhausted order_id={OrderId} attempt={Attempt} — handing off to AwbRetryJob",
                 job.OrderId, job.Attempt);
             return;
+        }
+
+        // A claim-preserving outcome holds the claim through its TTL; re-enqueuing before the TTL
+        // elapses would only hit the fresh-claim skip, so defer past it (+margin) to let the
+        // re-attempt actually re-claim.
+        if (preserveClaim)
+        {
+            var floor = TimeSpan.FromMinutes(_settings.AwbClaimTtlMinutes) + TimeSpan.FromSeconds(30);
+            if (delay.Value < floor) delay = floor;
         }
 
         _logger.LogInformation(

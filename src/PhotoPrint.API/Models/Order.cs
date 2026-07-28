@@ -24,6 +24,11 @@ public class Order
     public string? AwbNumber { get; set; }
     public string? TrackingUrl { get; set; }
 
+    /// <summary>Upper bound for <see cref="AwbLabelUrl"/> (a vendor-controlled signed URL).
+    /// Shared by the column width and the persist-time clamp so an over-length vendor URL is
+    /// dropped rather than throwing on the Postgres column and looping the billable retry.</summary>
+    public const int MaxAwbLabelUrlLength = 2048;
+
     /// <summary>URL to the Sameday-hosted PDF shipping label, populated alongside
     /// <see cref="AwbNumber"/> when the AWB workflow (bolt 037) successfully creates
     /// the AWB. Nullable: existing orders + orders whose AWB creation has not yet

@@ -40,6 +40,7 @@ public sealed class AwbCreator : IAwbCreator
         Guid orderId, int attempt, CancellationToken ct = default)
     {
         var order = await _db.Orders
+            .AsNoTracking()
             .Include(o => o.Items)
             .Include(o => o.EasyboxLocker)
             .FirstOrDefaultAsync(o => o.Id == orderId, ct);
@@ -84,7 +85,11 @@ public sealed class AwbCreator : IAwbCreator
         // Release OUR claim on a failure outcome so an in-process retry re-claims promptly
         // instead of waiting out the TTL. Match the exact claim time so a newer claim is never
         // cleared. Best-effort: a failed release just means the claim expires via the TTL.
-        if (outcome is AwbCreationOutcome.RetryLater or AwbCreationOutcome.GiveUp)
+        // EXCEPT when the outcome may have left a billable AWB at the vendor (timeout / post-create
+        // persist failure): hold the claim through its TTL so the re-attempt is deferred past the
+        // vendor round-trip rather than re-calling in ~30s and risking a duplicate label.
+        var preserveClaim = outcome is AwbCreationOutcome.RetryLater { PreserveClaim: true };
+        if (!preserveClaim && outcome is AwbCreationOutcome.RetryLater or AwbCreationOutcome.GiveUp)
         {
             try
             {
@@ -111,8 +116,9 @@ public sealed class AwbCreator : IAwbCreator
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // HttpClient timeout, not shutdown — transient; the dispatcher re-enqueues.
-            return new AwbCreationOutcome.RetryLater("Sameday call timed out", IsTransient: true);
+            // HttpClient timeout, not shutdown — transient; the AWB may already have been created,
+            // so hold the claim (PreserveClaim) to defer the re-attempt past the vendor round-trip.
+            return new AwbCreationOutcome.RetryLater("Sameday call timed out", IsTransient: true, PreserveClaim: true);
         }
         catch (SamedayUnreachableException ex)
         {
@@ -141,6 +147,18 @@ public sealed class AwbCreator : IAwbCreator
             "sameday.awb.created order_id={OrderId} awb={Awb} attempt={Attempt}",
             order.Id, result.AwbNumber, attempt);
 
+        // A vendor label URL longer than the column bound would throw on the Postgres column AFTER
+        // the AWB is already billed — caught below as transient, so every retry re-calls the vendor
+        // and re-bills. Drop the over-length URL instead; the label stays fetchable by AWB number.
+        var labelUrl = result.LabelUrl;
+        if (labelUrl is { Length: > Order.MaxAwbLabelUrlLength })
+        {
+            _logger.LogWarning(
+                "sameday.awb.label-url-too-long order_id={OrderId} awb={Awb} length={Length} — storing null label",
+                orderId, result.AwbNumber, labelUrl.Length);
+            labelUrl = null;
+        }
+
         // != Cancelled, not == Paid: an admin may advance Paid→Printing mid-call and that
         // order still needs its label; the retry sweep only re-picks Paid, so a Printing
         // order that lost the write here would never recover.
@@ -153,7 +171,7 @@ public sealed class AwbCreator : IAwbCreator
                             && o.Status != OrderStatus.Cancelled)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(o => o.AwbNumber,   result.AwbNumber)
-                    .SetProperty(o => o.AwbLabelUrl, result.LabelUrl)
+                    .SetProperty(o => o.AwbLabelUrl, labelUrl)
                     .SetProperty(o => o.UpdatedAt,   (DateTimeOffset?)_clock.GetUtcNow()),
                     ct);
         }
@@ -162,7 +180,10 @@ public sealed class AwbCreator : IAwbCreator
             _logger.LogError(ex,
                 "sameday.awb.persist-failed order_id={OrderId} awb={Awb} — will retry",
                 orderId, result.AwbNumber);
-            return new AwbCreationOutcome.RetryLater("AWB persist failed after vendor create", IsTransient: true);
+            // The AWB is created+billed but not persisted; hold the claim so the re-attempt waits
+            // out the TTL instead of re-calling the vendor in ~30s and billing a second label.
+            return new AwbCreationOutcome.RetryLater(
+                "AWB persist failed after vendor create", IsTransient: true, PreserveClaim: true);
         }
 
         if (affected == 1)
