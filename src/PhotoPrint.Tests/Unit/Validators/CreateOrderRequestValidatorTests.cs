@@ -241,4 +241,32 @@ public class CreateOrderRequestValidatorTests
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.RecipientName");
     }
+
+    [Theory]
+    [InlineData("1-2-3-4")]
+    [InlineData("()-. ()")]
+    public void WithDigitPoorPhone_FailsOnPhone(string phone)
+    {
+        var contact = EasyboxContact();
+        contact.Phone = phone;
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Phone");
+    }
+
+    [Fact]
+    public void Easybox_WithOversizedAddressField_FailsOnThatField()
+    {
+        var contact = EasyboxContact();
+        contact.Street = new string('x', 300);
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Street");
+    }
 }
