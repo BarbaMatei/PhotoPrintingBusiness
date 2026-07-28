@@ -50,7 +50,7 @@ public sealed class AwbRetryJob : BackgroundService
         // Run once at startup so the recovery sweep happens without waiting
         // for the first tick.
         try { await RunOneTickAsync(stoppingToken); }
-        catch (OperationCanceledException) { return; }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
         catch (Exception ex)
         {
             _logger.LogError(ex, "AwbRetryJob startup tick failed");
@@ -59,7 +59,7 @@ public sealed class AwbRetryJob : BackgroundService
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             try { await RunOneTickAsync(stoppingToken); }
-            catch (OperationCanceledException) { return; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "AwbRetryJob tick failed");
