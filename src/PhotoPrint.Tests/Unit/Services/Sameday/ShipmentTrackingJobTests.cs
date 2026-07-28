@@ -133,8 +133,8 @@ public class ShipmentTrackingJobTests : IDisposable
 
         var refreshed = GetOrder(order.Id);
         refreshed.Status.Should().Be(OrderStatus.Delivered);
-        refreshed.DeliveredAt.Should().Be(observed);
-        refreshed.LastTrackingSyncAt.Should().Be(observed);
+        refreshed.DeliveredAt.Should().Be(observed);   // vendor's observed time
+        refreshed.LastTrackingSyncAt.Should().Be(T0);  // our poll clock
 
         emails.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Once);
     }
@@ -170,6 +170,27 @@ public class ShipmentTrackingJobTests : IDisposable
     }
 
     [Fact]
+    public async Task A_poll_timeout_does_not_fault_the_tick()
+    {
+        // A per-poll HttpClient timeout (OperationCanceledException, not shutdown) must be
+        // caught per order — if it escaped, WhenAll would rethrow and the loop would exit.
+        var order = SeedShippedOrder(shippedAt: T0.AddDays(-3));
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+
+        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = Build(client, emails, new TrackingStopRegistry(cache), new FakeTimeProvider(T0));
+
+        var act = () => RunOneTickAsync(sut);
+        await act.Should().NotThrowAsync();
+
+        GetOrder(order.Id).Status.Should().Be(OrderStatus.Shipped); // untouched
+    }
+
+    [Fact]
     public async Task Updates_LastTrackingSyncAt_only_for_non_terminal_states()
     {
         var order = SeedShippedOrder(shippedAt: T0.AddDays(-3));
@@ -188,7 +209,7 @@ public class ShipmentTrackingJobTests : IDisposable
 
         var refreshed = GetOrder(order.Id);
         refreshed.Status.Should().Be(OrderStatus.Shipped); // unchanged
-        refreshed.LastTrackingSyncAt.Should().Be(observed);
+        refreshed.LastTrackingSyncAt.Should().Be(T0);      // our poll clock, not the vendor time
         refreshed.DeliveredAt.Should().BeNull();
     }
 
@@ -231,29 +252,30 @@ public class ShipmentTrackingJobTests : IDisposable
     }
 
     [Fact]
-    public async Task Refuses_to_move_LastTrackingSyncAt_backwards()
+    public async Task Delivered_is_not_blocked_by_an_earlier_vendor_timestamp()
     {
-        // Stored sync is 2 hours ago; Sameday observes 5 hours ago. The
-        // monotonic-non-decreasing invariant rejects this write.
-        var existingSync = T0.AddHours(-2);
-        var oldObserved = T0.AddHours(-5);
+        // The stored sync is 2h ago (a UtcNow-fallback poll); the real Delivered scan carries
+        // an earlier vendor timestamp. The order must STILL transition — the old monotonic
+        // guard wrongly dropped it (stranding the order Shipped until the 30-day stop).
         var order = SeedShippedOrder(
             shippedAt: T0.AddDays(-3),
-            lastTrackingSyncAt: existingSync);
+            lastTrackingSyncAt: T0.AddHours(-2));
 
+        var deliveredAt = T0.AddHours(-5); // earlier than the stored sync
         var client = new Mock<ISamedayClient>();
         client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TrackingSnapshot(order.AwbNumber!, TrackingState.InTransit, oldObserved, Array.Empty<TrackingEvent>()));
+            .ReturnsAsync(new TrackingSnapshot(order.AwbNumber!, TrackingState.Delivered, deliveredAt, Array.Empty<TrackingEvent>()));
 
-        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        var emails = new Mock<IOrderEmailService>();
         using var cache = new MemoryCache(new MemoryCacheOptions());
-        var clock = new FakeTimeProvider(T0);
-        var sut = Build(client, emails, new TrackingStopRegistry(cache), clock);
+        var sut = Build(client, emails, new TrackingStopRegistry(cache), new FakeTimeProvider(T0));
 
         await RunOneTickAsync(sut);
 
         var refreshed = GetOrder(order.Id);
-        refreshed.LastTrackingSyncAt.Should().Be(existingSync); // unchanged
+        refreshed.Status.Should().Be(OrderStatus.Delivered);
+        refreshed.DeliveredAt.Should().Be(deliveredAt);
+        emails.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Once);
     }
 }
 

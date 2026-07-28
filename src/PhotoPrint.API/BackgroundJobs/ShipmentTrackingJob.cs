@@ -51,8 +51,10 @@ public sealed class ShipmentTrackingJob : BackgroundService
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
+            // Only a real shutdown exits the loop; a per-poll timeout (a non-shutdown
+            // OperationCanceledException) must not kill delivery detection.
             try { await RunOneTickAsync(stoppingToken); }
-            catch (OperationCanceledException) { return; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "ShipmentTrackingJob tick failed");
@@ -147,15 +149,18 @@ public sealed class ShipmentTrackingJob : BackgroundService
                     "sameday.tracking.failed order_id={OrderId}", order.Id);
                 return;
             }
-
-            // Monotonic invariant — refuse to move LastTrackingSyncAt backwards.
-            if (order.LastTrackingSyncAt is { } prev && snapshot.ObservedAt < prev)
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
+                // HttpClient timeout, not shutdown — skip this order, keep polling.
                 _logger.LogWarning(
-                    "sameday.tracking.observed-out-of-order order_id={OrderId} observed={Obs:o} previous={Prev:o} — skipping write",
-                    order.Id, snapshot.ObservedAt, prev);
+                    "sameday.tracking.timeout order_id={OrderId} — will retry next tick", order.Id);
                 return;
             }
+
+            // LastTrackingSyncAt is a poll-throttle timestamp on OUR clock (always forward),
+            // NOT the vendor observed time — so a later Delivered scan carrying an earlier
+            // vendor timestamp is never dropped as "out of order".
+            var now = _clock.GetUtcNow();
 
             if (snapshot.State == TrackingState.Delivered)
             {
@@ -164,8 +169,8 @@ public sealed class ShipmentTrackingJob : BackgroundService
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(o => o.Status,             OrderStatus.Delivered)
                         .SetProperty(o => o.DeliveredAt,        (DateTimeOffset?)snapshot.ObservedAt)
-                        .SetProperty(o => o.LastTrackingSyncAt, (DateTimeOffset?)snapshot.ObservedAt)
-                        .SetProperty(o => o.UpdatedAt,          (DateTimeOffset?)_clock.GetUtcNow()),
+                        .SetProperty(o => o.LastTrackingSyncAt, (DateTimeOffset?)now)
+                        .SetProperty(o => o.UpdatedAt,          (DateTimeOffset?)now),
                         ct);
 
                 if (affected == 0)
@@ -186,11 +191,11 @@ public sealed class ShipmentTrackingJob : BackgroundService
                 return;
             }
 
-            // Any other state: just touch LastTrackingSyncAt.
+            // Any other state: advance the poll-throttle timestamp (our clock).
             await db.Orders
                 .Where(o => o.Id == order.Id)
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(o => o.LastTrackingSyncAt, (DateTimeOffset?)snapshot.ObservedAt),
+                    .SetProperty(o => o.LastTrackingSyncAt, (DateTimeOffset?)now),
                     ct);
         }
         finally
