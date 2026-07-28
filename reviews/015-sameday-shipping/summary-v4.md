@@ -32,7 +32,7 @@ check (a single fresh certification pass) is queued next and runs without you.
 - **D45 residual:** if the server crashes in the ~1-second window between asking Sameday for a label
   and saving it, avoiding a duplicate label depends on Sameday's own duplicate-detection, which we
   haven't confirmed with them. Accepted and alarm-logged; the note to verify it with Sameday before
-  going live is in [ADR-015](../../memory-bank/bolts/037-awb-and-tracking-jobs/adr-015-awb-generation-strategy.md).
+  going live is in [ADR-015](../../memory-bank/bolts/037-awb-and-tracking-jobs/adr-015-accept-duplicate-awb-create-on-multi-replica.md).
 
 ## Filed automatically
 
