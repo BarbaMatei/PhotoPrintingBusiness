@@ -7,7 +7,50 @@ updated: 2026-07-27
 <!-- v1 fix round (resolution-v1, commits edd49f7..835e932): D1–D19 + D32/D34 fixed.
 v2 verification (review-v2, 2026-07-27 @ 727a018): all 21 verified, 0 reopened. D20–D41 backlog; D42 false-positive.
 v3 certification pair (review-v3, 2026-07-27 @ 8584572): NOT certified — 3 High blockers (D43–D45)
-+ mediums (D46–D54); D31 re-opened+elevated; D21/D23 re-raised (stand). → fix round. -->
++ mediums (D46–D54); D31 re-opened+elevated; D21/D23 re-raised (stand). → fix round.
+v3 fix round → v4 verification (review-v4, @ 5fc330b): all held, 0 reopened.
+v5 certification (review-v5, single-pass recorded deviation, @ 5fc330b): CERTIFIED — 0 High, 0
+regression; 17 med / 19 low / 6 cleanup new (D55–D89) → backlog pre-enable checklist; 4 deferrals
+re-affirmed (D50/D23/D29/D39); D45 vendor-idempotency residual re-confirmed (accepted). LOOP DONE. -->
+
+## v5 — certification (2026-07-28, commit `5fc330b`, **CERTIFIED** · approve-with-followups)
+
+One blinded 11-lens full-manifest pass (recorded single-pass deviation). No serious defect survives:
+**0 High, 0 fix-caused regression, 0 reopened.** New findings are the pre-enable checklist — all
+dormant behind the two `false` flags. Detail: [findings-v5.md](findings-v5.md).
+
+**Medium (D55–D66, all confirmed — address before enabling):**
+
+| D# | Sev | Status | Title | Site |
+|----|-----|--------|-------|------|
+| D55 | 🟠 Med | backlog | Easybox address fields uncapped → 28 MB storage-exhaustion DoS | `Validators/…/CreateOrderRequestValidator.cs:26` |
+| D56 | 🟠 Med | backlog | AwbLabelUrl persisted but never surfaced to admin; GetLabelPdfAsync no caller (Must goal undelivered) | `DTOs/Admin/AdminOrderDtos.cs:44` |
+| D57 | 🟠 Med | backlog | Stale-claim (crashed-worker) reclaim path untested | `Tests/…/AwbCreatorTests.cs:250` |
+| D58 | 🟠 Med | backlog | Claim-release-after-failure untested | `Tests/…/AwbCreatorTests.cs:326` |
+| D59 | 🟠 Med | backlog | prefillEasyboxContact guest/signed-in branches untested (guest-state cluster) | `UI/…/delivery-step.spec.ts` |
+| D60 | 🟠 Med | backlog | Vendor pdfLink > 500 overflows Postgres varchar(500) → re-bill loop | `Services/Sameday/AwbCreator.cs:156` |
+| D61 | 🟠 Med | backlog | Phone regex over-accepts digit-poor input → paid AWB call → GiveUp | `Validators/…/CreateOrderRequestValidator.cs:28` |
+| D62 | 🟠 Med | backlog | Vendor rejection ResponseBody captured but never logged on GiveUp | `Services/Sameday/AwbCreator.cs:136` |
+| D63 | 🟠 Med | backlog | Systemic tracking failure logged per-order Warning, never Error | `BackgroundJobs/ShipmentTrackingJob.cs:148` |
+| D64 | 🟠 Med | backlog | selectMethod never resets selectedLockerId → Easybox 400 dead-end | `UI/…/delivery-step.ts:399` |
+| D65 | 🟠 Med | backlog | Enabled=true root never booted; token-provider↔auth-handler DI-cycle risk unverified | `Program.cs:146` |
+| D66 | 🟠 Med | backlog | Local EasyboxLockers.SamedayId freshness assumed, no sync → permanent GiveUp | `Services/Sameday/OrderToAwbRequestMapper.cs:48` |
+
+**Low (D67–D82) & Cleanup (D83–D89):** backlog — poll-throttle every-other-tick (D67); claim released
+on timeout (D68); client phone gate weaker than server (D69); no response-size cap → OOM (D70); Polly
+1/2/4 s not 1/4/16 s + wrong comment (D71); ShippedAt no backfill (D72); FR-4 logging partial (D73);
+prefill re-implements GuestAuthService (D74); status-classification dup 4× (D75); parallel poll untested
+(D76); retry sweep InMemory-only + fresh-claim untested (D77); setLocker/review-step untested (D78);
+signed-in prefill dead code (D79); transient locker error shown as "no easybox" (D80); service-id
+defaults `7` unvalidated when Enabled (D81, parked pre-enable task); dispatcher/sweep double-enqueue
+window untested (D82). Cleanup: bundled locker-map UX undocumented (D83); two jobs track read-only
+(D84/D85); phone rule+regex dup (D86); magic day-count floors (D87); DeliveredAt-timestamptz **refuted**
+(D88, Npgsql handles DateTimeOffset); GetLabelPdfAsync dead code (D89, see D56).
+
+**Re-affirmed deferrals (prior decision attached, stand):** D50, D23, D29, D39.
+**D45 residual re-confirmed + accepted:** AWB-create POST auto-retried; no-double-bill rests on
+unverified vendor dedup on `ClientInternalReference`. Skeptic built no code-only trace. **Verify
+Sameday create-idempotency before enabling** (ADR-015).
 
 ## v3 — certification pair (2026-07-27, commit `8584572`, NOT certified)
 

@@ -1,6 +1,6 @@
 ---
 type: review-index
-updated: 2026-07-27
+updated: 2026-07-28
 ---
 
 # Review Index
@@ -13,7 +13,7 @@ history. Findings = new 🔴/🟠/🟡/⚪. Dormant targets live under `archive/
 
 | Target | State |
 |---|---|
-| 015 sameday shipping | **v4 verification done 2026-07-27** (`5fc330b`) — v3 fix round held: 3 cert blockers (D43/D44/D45) revert-and-rerun non-vacuous, 17 more via the fix-diff micro-review + inspection; 0 reopened; backend 898/frontend 452 green. **Single-pass certification (owner-approved deviation) next.** D50 deferred (dispatcher harness). D45 crash residual: verify Sameday idempotency before enabling. Still dormant behind two false flags |
+| 015 sameday shipping | **Certified 2026-07-28** (`5fc330b`) — single-pass certification: 0 High, 0 regression, 0 reopened → loop complete. 17 med / 19 low / 6 cleanup (D55–D89) → backlog **pre-enable checklist** (headline: DI-cycle risk on first Enabled=true boot, pdfLink>500 Postgres overflow, Easybox address DoS, label not surfaced to admin). D45 vendor-idempotency residual accepted — verify with Sameday before enabling. Still dormant behind two false flags |
 | 043 cloud storage | **Certified 2026-07-22** (no serious defect survives; D83–D90 → backlog) — loop complete |
 | 042 thumbnail cache | Archived. Loop quiet after v9; certification never ran (pre-dates the risk tiers) |
 | 035 payment idempotency | Archived. Fix loop complete at v10; never certified (pre-dates the protocol) |
@@ -22,6 +22,7 @@ history. Findings = new 🔴/🟠/🟡/⚪. Dormant targets live under `archive/
 
 | Date | Target | Pass | Verdict | New H/M/L/C | Outcome | Files |
 |---|---|---|---|---|---|---|
+| 2026-07-28 | 015 | v5 certification (single-pass deviation) | approve-with-followups | 0/17/19/6 | **Certified** — no serious defect survives (0 High, 0 fix-caused regression, 0 reopened); loop closes. New findings all dormant behind two false flags = pre-enable checklist (D55–D89). 30 confirmed / 3 plausible / 4 re-raises re-affirmed (D50/D23/D29/D39) / 1 refuted. D45 vendor-idempotency residual re-confirmed+accepted. Platform 500 wave crippled run 1 (34/64 agents); resumed from cache. ~5.17M tok across both attempts | [review](015-sameday-shipping/review-v5.md) · [findings](015-sameday-shipping/findings-v5.md) · [ledger](015-sameday-shipping/ledger.md) · [summary](015-sameday-shipping/summary-v5.md) |
 | 2026-07-27 | 015 | v4 verification | approve-with-followups | 0/0/0/0 | v3 fix round held: 3 blockers (D43/D44/D45) revert-and-rerun (each reddens exactly its own test, zero collateral); 17 findings via the fix-diff micro-review (2 independent agents, clean incl. no-masked-tests) + inspection; D45 also approach-checked. 0 reopened. D50 deferred. Backend 898 / frontend 452 green. Single-pass certification next | [review](015-sameday-shipping/review-v4.md) · [resolution](015-sameday-shipping/resolution-v3.md) · [ledger](015-sameday-shipping/ledger.md) |
 | 2026-07-27 | 015 | v3 certification pair (2 blinded full passes) | request-changes | 3/8/1/0 | **NOT certified.** 3 High blockers (D43 canContinue dead-ends Easybox; D44 timeout kills tracking; D45 AWB per-order-guard) → **fix round resolved `5fc330b`** (all blockers+mediums+8 backlog; D45 durable claim approach-checked; micro-review clean). D31 re-opened+fixed. Caught a v1 regression the same-session v2 missed. 82 agents / ~4.6M tok | [review](015-sameday-shipping/review-v3.md) · [resolution](015-sameday-shipping/resolution-v3.md) · [ledger](015-sameday-shipping/ledger.md) · [summary](015-sameday-shipping/summary-v3.md) |
 | 2026-07-27 | 015 | v2 verification | approve-with-followups | 0/0/0/0 | 21/21 fixes verified (12 revert-and-rerun, clean attribution + zero collateral; 9 judgment/inspection); 0 reopened. Backend 893 / frontend 451 green. Certification pair owed | [review](015-sameday-shipping/review-v2.md) · [resolution](015-sameday-shipping/resolution-v1.md) · [ledger](015-sameday-shipping/ledger.md) |
