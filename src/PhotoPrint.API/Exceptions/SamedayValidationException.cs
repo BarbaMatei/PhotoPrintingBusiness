@@ -8,13 +8,17 @@ namespace PhotoPrint.API.Exceptions;
 /// </summary>
 public sealed class SamedayValidationException : SamedayException
 {
+    /// <summary>Raw vendor response body, if captured. Kept OFF the exception message
+    /// so recipient PII the vendor echoes back does not reach retained Error logs.</summary>
+    public string? ResponseBody { get; }
+
     public SamedayValidationException(string endpoint, int httpStatus, string? body = null, Exception? inner = null)
         : base(
-            $"Sameday rejected the request at '{endpoint}' with HTTP {httpStatus}" +
-            (body is null ? "." : $": {body}"),
+            $"Sameday rejected the request at '{endpoint}' with HTTP {httpStatus}.",
             endpoint,
             httpStatus,
             inner)
     {
+        ResponseBody = body;
     }
 }

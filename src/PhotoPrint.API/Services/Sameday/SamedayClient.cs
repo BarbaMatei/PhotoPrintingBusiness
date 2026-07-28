@@ -65,7 +65,7 @@ public sealed class SamedayClient : ISamedayClient
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new SamedayAuthException(AuthenticatePath);
 
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new SamedayUnreachableException(AuthenticatePath, httpStatus: (int)response.StatusCode);
 
         if (!response.IsSuccessStatusCode)
@@ -133,7 +133,7 @@ public sealed class SamedayClient : ISamedayClient
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new SamedayAuthException(endpoint);
 
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
 
         if (!response.IsSuccessStatusCode)
@@ -173,7 +173,7 @@ public sealed class SamedayClient : ISamedayClient
             response.Dispose();
             throw new SamedayAuthException(endpoint);
         }
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
         {
             var status = (int)response.StatusCode;
             response.Dispose();
@@ -206,7 +206,7 @@ public sealed class SamedayClient : ISamedayClient
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
             throw new SamedayAuthException(endpoint);
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
+        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
         if (!response.IsSuccessStatusCode)
         {

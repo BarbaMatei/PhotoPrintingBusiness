@@ -102,7 +102,8 @@ public class SamedayClientAwbTests
     [InlineData(HttpStatusCode.InternalServerError)]
     [InlineData(HttpStatusCode.BadGateway)]
     [InlineData(HttpStatusCode.RequestTimeout)]
-    public async Task Throws_SamedayUnreachableException_on_5xx_and_408(HttpStatusCode status)
+    [InlineData(HttpStatusCode.TooManyRequests)] // 429 surviving retries is transient, not a permanent give-up
+    public async Task Throws_SamedayUnreachableException_on_5xx_408_and_429(HttpStatusCode status)
     {
         var script = new ScriptedHttpMessageHandler(
             _ => ScriptedHttpMessageHandler.Empty(status));

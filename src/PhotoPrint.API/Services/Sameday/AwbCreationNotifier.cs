@@ -29,6 +29,6 @@ public sealed class AwbCreationNotifier : IAwbCreationNotifier
     {
         var job = new AwbJob(orderId, Attempt: 1, EnqueuedAt: _clock.GetUtcNow());
         await _queue.EnqueueAsync(job, ct);
-        _logger.LogDebug("sameday.awb.enqueued order_id={OrderId}", orderId);
+        _logger.LogInformation("sameday.awb.enqueued order_id={OrderId}", orderId);
     }
 }
