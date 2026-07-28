@@ -44,16 +44,13 @@ public sealed class SamedayShippingService : IShippingService
 
     public Task<AwbResultDto> GenerateAwbAsync(Guid orderId, CancellationToken ct = default)
     {
-        // Bolt 037 lands the real Order → AwbCreationRequest mapping plus the
-        // background-queue lifecycle. Until then, this implementation must
-        // exist so DI compiles when the flag is on, but the behaviour stays
-        // identical to the manual-fallback path — exactly what the intent
-        // requires when the integration is incomplete.
-        _logger.LogWarning(
-            "SamedayShippingService.GenerateAwbAsync called for order {OrderId} before bolt 037 lands the workflow — returning manual-fallback response.",
-            orderId);
+        // AWB creation is event-driven — the background jobs create it automatically on the
+        // Paid transition. This synchronous endpoint must NOT tell the admin to create one in
+        // the Sameday portal, which would double-book alongside the job.
+        _logger.LogInformation(
+            "sameday.awb.manual-endpoint order_id={OrderId} — AWB is created automatically after payment", orderId);
         return Task.FromResult(new AwbResultDto(
-            Manual: true,
-            Message: "AWB se generează manual în portalul Sameday (integrarea automată este în curs de finalizare)."));
+            Manual: false,
+            Message: "AWB-ul se generează automat după confirmarea plății."));
     }
 }

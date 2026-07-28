@@ -13,6 +13,9 @@ public readonly record struct ParcelWeight(int Grams)
     /// <summary>Minimum grams the formula will ever produce (the +50 g floor).</summary>
     public const int MinimumGrams = 50;
 
+    /// <summary>Grams each print contributes to the parcel weight.</summary>
+    public const int GramsPerPrint = 50;
+
     public decimal Kilograms => Math.Round(Grams / 1000m, 3);
 
     /// <summary>
@@ -32,6 +35,6 @@ public readonly record struct ParcelWeight(int Grams)
         if (totalPrints <= 0)
             throw new ArgumentException("Cannot compute parcel weight: order has zero total prints.", nameof(order));
 
-        return new ParcelWeight(totalPrints * 50 + MinimumGrams);
+        return new ParcelWeight(totalPrints * GramsPerPrint + MinimumGrams);
     }
 }

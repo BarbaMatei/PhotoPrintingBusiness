@@ -68,13 +68,12 @@ public class SamedayShippingServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GenerateAwbAsync_returns_manual_fallback_in_bolt_036()
+    public async Task GenerateAwbAsync_reports_automatic_creation_not_manual()
     {
-        // Bolt 037 will fill in the real workflow. Until then, the integration
-        // returning Manual=true preserves the customer-visible behaviour and the
-        // admin-side workflow exactly as it was before this bolt landed.
+        // AWB creation is event-driven (background jobs) — the synchronous endpoint must not
+        // tell the admin to create one manually, which would double-book alongside the job.
         var result = await _sut.GenerateAwbAsync(Guid.NewGuid());
-        result.Manual.Should().BeTrue();
-        result.Message.Should().Contain("manual");
+        result.Manual.Should().BeFalse();
+        result.Message.Should().Contain("automat");
     }
 }
