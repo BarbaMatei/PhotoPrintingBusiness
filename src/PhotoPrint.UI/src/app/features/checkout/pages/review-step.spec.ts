@@ -122,4 +122,14 @@ describe('ReviewStep', () => {
     expect(grandEl.length).toBeGreaterThan(0);
     expect(grandEl[0].nativeElement.textContent).toContain('40');
   });
+
+  it('does not render a street-address line for an Easybox order (null address)', () => {
+    // makeDeliveryState() is Easybox with shippingAddress = null; the address line is gated on
+    // Courier, so it must not render "undefined undefined," from the null snapshot.
+    const fixture = createFixture();
+    fixture.detectChanges();
+    const summary = fixture.debugElement.query(By.css('.delivery-summary')).nativeElement as HTMLElement;
+    expect(summary.textContent).toContain('Box A'); // locker shown
+    expect(summary.textContent).not.toContain('undefined');
+  });
 });

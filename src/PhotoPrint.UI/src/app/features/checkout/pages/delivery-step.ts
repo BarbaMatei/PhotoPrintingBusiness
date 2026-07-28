@@ -5,18 +5,30 @@ import {
   ChangeDetectionStrategy,
   signal,
   computed,
+  DestroyRef,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { debounceTime, distinctUntilChanged, switchMap, startWith, catchError, take, map } from 'rxjs/operators';
-import { of } from 'rxjs';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, take, map, tap } from 'rxjs/operators';
+import { merge, of, Subject } from 'rxjs';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ShippingService } from '../../../core/services/shipping.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { GuestAuthService } from '../../../core/services/guest-auth.service';
 import { LockerMapComponent } from '../components/locker-map';
 import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models/shipping.model';
+
+// Mirror the server's phone rule (charset + realistic digit count) so a bad phone is caught at the
+// client gate, not only at CreateOrder.
+const PHONE_PATTERN = /^[0-9+\s().\-]{6,20}$/;
+function phoneDigits(control: AbstractControl): ValidationErrors | null {
+  const value = (control.value as string) ?? '';
+  if (!value) return null; // Validators.required owns the empty case
+  const digits = (value.match(/\d/g) ?? []).length;
+  return digits >= 9 && digits <= 15 ? null : { phone: true };
+}
 
 @Component({
   selector: 'app-delivery-step',
@@ -84,8 +96,14 @@ import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models
             </div>
           }
 
-          @if (citySearch.value && lockers().length === 0) {
+          @if (citySearch.value && lockers().length === 0 && !lockerSearchError()) {
             <div class="no-lockers">Niciun easybox găsit pentru acest oraș.</div>
+          }
+
+          @if (lockerSearchError()) {
+            <div class="search-error">
+              Căutarea a eșuat. <button type="button" class="retry-link" (click)="retrySearch()">Reîncearcă</button>
+            </div>
           }
 
           <app-locker-map
@@ -291,7 +309,13 @@ export class DeliveryStep implements OnInit {
   private readonly shippingService = inject(ShippingService);
   readonly checkoutState = inject(CheckoutStateService);
   private readonly auth = inject(AuthService);
+  private readonly guestAuth = inject(GuestAuthService);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
+
+  // Fires the full-locker-list prime through the search stream (so switchMap cancels a superseded
+  // fetch). Only fired when Easybox is active — a courier-only user never triggers a locker fetch.
+  private readonly primeLockers$ = new Subject<void>();
 
   readonly counties = ROMANIAN_COUNTIES;
 
@@ -303,6 +327,7 @@ export class DeliveryStep implements OnInit {
   readonly lockers = signal<LockerDto[]>([]);
   readonly selectedLockerId = signal<string | null>(this.checkoutState.snapshot.lockerId);
   readonly showLockerError = signal(false);
+  readonly lockerSearchError = signal(false);
 
   readonly citySearch = this.fb.control('');
 
@@ -314,14 +339,14 @@ export class DeliveryStep implements OnInit {
     county: ['', Validators.required],
     postalCode: ['', Validators.required],
     recipientName: ['', Validators.required],
-    phone: ['', Validators.required],
+    phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
   });
 
   // Easybox still needs a person + phone for the courier to notify; the locker
   // supplies the address.
   readonly easyboxContactForm = this.fb.group({
     recipientName: ['', Validators.required],
-    phone: ['', Validators.required],
+    phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
   });
 
   // Form validity is not a signal, so mirror it into one — otherwise the computed
@@ -356,37 +381,43 @@ export class DeliveryStep implements OnInit {
 
     this.prefillEasyboxContact();
 
-    // Locker search AND the initial full-list prime run through ONE stream, so
-    // switchMap cancels a superseded fetch and a transient error can't tear the
-    // subscription down (catchError keeps it alive).
-    this.citySearch.valueChanges
+    // Locker search + the full-list prime run through ONE stream so switchMap cancels a superseded
+    // fetch (a debounced search cancels an in-flight prime — never the reverse). The prime leg is
+    // only fired for Easybox, so a courier-only user never triggers a locker fetch.
+    merge(
+      this.citySearch.valueChanges.pipe(debounceTime(300), distinctUntilChanged()),
+      this.primeLockers$.pipe(map(() => this.citySearch.value ?? '')),
+    )
       .pipe(
-        debounceTime(300),
-        distinctUntilChanged(),
-        startWith(this.citySearch.value ?? ''), // immediate prime, bypasses the debounce
+        tap(() => this.lockerSearchError.set(false)), // clear a prior error as the new fetch starts
         switchMap(city =>
           (city && city.trim().length >= 2
             ? this.shippingService.getLockers(city.trim())
             : this.shippingService.getLockers('')
-          ).pipe(catchError(() => of([] as LockerDto[]))),
+          ).pipe(catchError(() => { this.lockerSearchError.set(true); return of([] as LockerDto[]); })),
         ),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(results => this.lockers.set(results));
+
+    // Prime the list only when Easybox is the (restored) active method. Subscribe-then-next: this
+    // runs AFTER the subscription above, so the emission is never dropped.
+    if (this.checkoutState.snapshot.method === 'Easybox') {
+      this.primeLockers$.next();
+    }
   }
 
   private prefillEasyboxContact(): void {
     const c = this.easyboxContactForm;
 
-    // Guest checkout keeps contact under the guestSession key (name/phone).
-    try {
-      const raw = localStorage.getItem('guestSession');
-      if (raw) {
-        const g = JSON.parse(raw) as { firstName?: string; lastName?: string; phone?: string };
-        const name = [g.firstName, g.lastName].filter(Boolean).join(' ').trim();
-        if (!c.value.recipientName && name) c.patchValue({ recipientName: name });
-        if (!c.value.phone && g.phone) c.patchValue({ phone: g.phone });
-      }
-    } catch { /* ignore malformed guestSession */ }
+    // Guest checkout keeps contact under the guestSession key — read it through the service that
+    // owns that key/shape (not an inline localStorage parse that would silently drift).
+    const guest = this.guestAuth.getStoredSession();
+    if (guest) {
+      const name = [guest.firstName, guest.lastName].filter(Boolean).join(' ').trim();
+      if (!c.value.recipientName && name) c.patchValue({ recipientName: name });
+      if (!c.value.phone && guest.phone) c.patchValue({ phone: guest.phone });
+    }
 
     // Signed-in display name (phone isn't exposed on the client-side user).
     this.auth.currentUser$.pipe(take(1)).subscribe(user => {
@@ -397,10 +428,21 @@ export class DeliveryStep implements OnInit {
   }
 
   selectMethod(method: DeliveryType): void {
+    if (this.deliveryMethod() === method) return; // a no-op re-click must not wipe a restored locker
     this.deliveryMethod.set(method);
+    // Mirror the state setMethod clears: without this the stale selectedLockerId leaves canContinue
+    // true and payment posts a null lockerId.
+    this.selectedLockerId.set(null);
     this.showLockerError.set(false);
+    this.lockerSearchError.set(false);
     const cost = method === 'Easybox' ? this.easyboxCostRon() : this.courierCostRon();
     this.checkoutState.setMethod(method, cost);
+    if (method === 'Easybox') this.primeLockers$.next();
+  }
+
+  retrySearch(): void {
+    this.lockerSearchError.set(false);
+    this.primeLockers$.next(); // re-enter the same stream (keeps switchMap cancellation)
   }
 
   selectLocker(locker: LockerDto): void {

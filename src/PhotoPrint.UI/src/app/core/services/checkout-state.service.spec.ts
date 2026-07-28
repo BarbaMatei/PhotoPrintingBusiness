@@ -83,6 +83,15 @@ describe('CheckoutStateService', () => {
     expect(service.isDeliveryComplete()).toBe(true);
   });
 
+  it('setLocker preserves an already-entered Easybox contact', () => {
+    service.setMethod('Easybox', 20);
+    service.setEasyboxContact({ recipientName: 'Ana Pop', phone: '0712345678' });
+    service.setLocker(LOCKER);
+    expect(service.snapshot.lockerId).toBe(LOCKER.id);
+    expect(service.snapshot.shippingAddress?.recipientName).toBe('Ana Pop');
+    expect(service.snapshot.shippingAddress?.phone).toBe('0712345678');
+  });
+
   it('reset clears state', () => {
     service.setMethod('Easybox', 20);
     service.setLocker(LOCKER);

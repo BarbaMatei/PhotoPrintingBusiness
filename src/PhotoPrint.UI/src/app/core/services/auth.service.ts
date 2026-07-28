@@ -52,8 +52,34 @@ export class AuthService {
         payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ??
         payload['role'];
       this.isAdmin$$.next(role === 'Admin');
+      this.currentUser$$.next(this.buildUser(payload));
     } catch {
       sessionStorage.removeItem('access_token');
+    }
+  }
+
+  /** Builds the current-user view from decoded JWT claims (sub / email / name / role). */
+  private buildUser(payload: Record<string, unknown>): CurrentUser | null {
+    const id = payload['sub'] as string | undefined;
+    const email = payload['email'] as string | undefined;
+    if (!id || !email) return null;
+    const role =
+      (payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ?? payload['role']) as
+        | string
+        | undefined;
+    return {
+      id,
+      email,
+      displayName: ((payload['name'] as string | undefined) ?? '').trim(),
+      isAdmin: role === 'Admin',
+    };
+  }
+
+  private decodePayload(token: string): Record<string, unknown> | null {
+    try {
+      return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    } catch {
+      return null;
     }
   }
 
@@ -128,6 +154,8 @@ export class AuthService {
     this.isAuthenticated$$.next(true);
     const isAdmin = this.decodeRole(response.accessToken) === 'Admin';
     this.isAdmin$$.next(isAdmin);
+    const payload = this.decodePayload(response.accessToken);
+    if (payload) this.currentUser$$.next(this.buildUser(payload));
   }
 
   /** Decodes the role claim from a JWT without verifying signature. */
