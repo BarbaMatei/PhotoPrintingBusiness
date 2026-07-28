@@ -48,7 +48,12 @@ export class CheckoutStateService {
   isDeliveryComplete(): boolean {
     const s = this.state$$.value;
     if (!s.method) return false;
-    if (s.method === 'Easybox') return !!s.lockerId;
+    // Easybox needs the locker AND the recipient contact (set by setEasyboxContact
+    // on Continue) — otherwise the stepper would unlock payment before the contact
+    // exists and the order would 400 server-side.
+    if (s.method === 'Easybox') {
+      return !!s.lockerId && !!s.shippingAddress?.recipientName && !!s.shippingAddress?.phone;
+    }
     return !!s.shippingAddress;
   }
 

@@ -101,7 +101,7 @@ describe('DeliveryStep', () => {
     expect(btn.disabled).toBe(true); // Sameday needs a recipient name + phone too
   });
 
-  it('Selecting Easybox + locker + contact enables Continue', () => {
+  it('typing the Easybox contact after selecting a locker re-enables Continue', () => {
     const fixture = createFixture();
     flushShippingCosts();
     fixture.detectChanges();
@@ -111,10 +111,15 @@ describe('DeliveryStep', () => {
     comp.selectLocker({
       id: 'l1', samedayId: 'SD1', name: 'Box', address: 'Str 1', city: 'Cluj', lat: 46, lng: 23,
     });
+    fixture.detectChanges(); // a CD cycle with the contact still empty — button disabled
+    let btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+
+    // Now type the contact. canContinue must react to form validity — a memoized
+    // computed reading form.valid (not a signal) would stay disabled here.
     comp.easyboxContactForm.setValue({ recipientName: 'Ana Pop', phone: '0712345678' });
     fixture.detectChanges();
-
-    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
   });
 

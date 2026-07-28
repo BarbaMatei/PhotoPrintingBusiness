@@ -42,9 +42,17 @@ describe('CheckoutStateService', () => {
     expect(service.isDeliveryComplete()).toBe(false);
   });
 
-  it('isDeliveryComplete is true for Easybox after locker selected', () => {
+  it('isDeliveryComplete is false for Easybox with a locker but no recipient contact', () => {
+    // Otherwise the stepper unlocks payment before the contact exists → 400 server-side.
     service.setMethod('Easybox', 20);
     service.setLocker(LOCKER);
+    expect(service.isDeliveryComplete()).toBe(false);
+  });
+
+  it('isDeliveryComplete is true for Easybox once locker + contact are set', () => {
+    service.setMethod('Easybox', 20);
+    service.setLocker(LOCKER);
+    service.setEasyboxContact({ recipientName: 'Ana Pop', phone: '0712345678' });
     expect(service.isDeliveryComplete()).toBe(true);
   });
 

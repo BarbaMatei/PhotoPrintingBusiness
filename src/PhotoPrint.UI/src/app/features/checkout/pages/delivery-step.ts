@@ -9,8 +9,9 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { debounceTime, distinctUntilChanged, switchMap, startWith, catchError, take } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, switchMap, startWith, catchError, take, map } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ShippingService } from '../../../core/services/shipping.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -323,11 +324,22 @@ export class DeliveryStep implements OnInit {
     phone: ['', Validators.required],
   });
 
+  // Form validity is not a signal, so mirror it into one — otherwise the computed
+  // below memoizes a stale value and the button never re-enables after typing.
+  private readonly easyboxContactValid = toSignal(
+    this.easyboxContactForm.statusChanges.pipe(map(s => s === 'VALID')),
+    { initialValue: this.easyboxContactForm.valid },
+  );
+  private readonly addressValid = toSignal(
+    this.addressForm.statusChanges.pipe(map(s => s === 'VALID')),
+    { initialValue: this.addressForm.valid },
+  );
+
   readonly canContinue = computed(() => {
     const method = this.deliveryMethod();
     if (!method) return false;
-    if (method === 'Easybox') return !!this.selectedLockerId() && this.easyboxContactForm.valid;
-    return this.addressForm.valid;
+    if (method === 'Easybox') return !!this.selectedLockerId() && this.easyboxContactValid();
+    return this.addressValid();
   });
 
   ngOnInit(): void {
