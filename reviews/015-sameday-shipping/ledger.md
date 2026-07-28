@@ -15,26 +15,27 @@ New defects the two independent blinded passes surfaced (D43–D54); D31 re-open
 
 | D# | F# (v3) | Sev | Status | Title | Site |
 |----|---------|-----|--------|-------|------|
-| D43 | F1 | 🔴 High | fixed | Easybox `Continue` never re-enables after typing contact (`canContinue` computed can't see `form.valid`) — regression from v1 F4 | `UI/…/delivery-step.ts:326` |
-| D44 | F2 | 🔴 High | fixed | Slow-Sameday `OperationCanceledException` treated as shutdown → tracking poll loop exits (pre-existing) | `BackgroundJobs/ShipmentTrackingJob.cs:54` |
-| D45 | F3 | 🔴 High | fixed | No per-order guard before the vendor AWB call; DB CAS blocks only the 2nd DB write — duplicate-safety rests on unverified vendor dedup (D2 residual; owner decision) | `Services/Sameday/AwbCreator.cs:69` |
-| D46 | F4 | 🟠 Med | fixed | `isDeliveryComplete()` Easybox gate ignores mandatory contact → stepper skip to payment → 400 (regression from v1 F4) | `UI/…/checkout-state.service.ts:51` |
-| D47 | F5 | 🟠 Med | fixed | Same OCE-as-shutdown bug drops an AWB dispatch job silently | `BackgroundJobs/AwbDispatcher.cs:69` |
-| D48 | F6 | 🟠 Med | fixed | `LastTrackingSyncAt=UtcNow` fallback + monotonic guard can strand a Shipped order (never Delivered) | `BackgroundJobs/ShipmentTrackingJob.cs:139` |
-| D49 | F7 | 🟠 Med | fixed | EuPlatesc webhook→AWB enqueue untested (Stripe-only from v1 F6) | `Tests/…/PaymentControllerIntegrationTests.cs` |
+| D43 | F1 | 🔴 High | verified | Easybox `Continue` never re-enables after typing contact (`canContinue` computed can't see `form.valid`) — regression from v1 F4 | `UI/…/delivery-step.ts:326` |
+| D44 | F2 | 🔴 High | verified | Slow-Sameday `OperationCanceledException` treated as shutdown → tracking poll loop exits (pre-existing) | `BackgroundJobs/ShipmentTrackingJob.cs:54` |
+| D45 | F3 | 🔴 High | verified | No per-order guard before the vendor AWB call; DB CAS blocks only the 2nd DB write — duplicate-safety rests on unverified vendor dedup (D2 residual; owner decision) | `Services/Sameday/AwbCreator.cs:69` |
+| D46 | F4 | 🟠 Med | verified | `isDeliveryComplete()` Easybox gate ignores mandatory contact → stepper skip to payment → 400 (regression from v1 F4) | `UI/…/checkout-state.service.ts:51` |
+| D47 | F5 | 🟠 Med | verified | Same OCE-as-shutdown bug drops an AWB dispatch job silently | `BackgroundJobs/AwbDispatcher.cs:69` |
+| D48 | F6 | 🟠 Med | verified | `LastTrackingSyncAt=UtcNow` fallback + monotonic guard can strand a Shipped order (never Delivered) | `BackgroundJobs/ShipmentTrackingJob.cs:139` |
+| D49 | F7 | 🟠 Med | verified | EuPlatesc webhook→AWB enqueue untested (Stripe-only from v1 F6) | `Tests/…/PaymentControllerIntegrationTests.cs` |
 | D50 | F8 | 🟠 Med | deferred | `AwbDispatcher` outcome routing + re-enqueue untested — needs a background-service harness with injected delay; open coverage gap | `BackgroundJobs/AwbDispatcher.cs:83` |
-| D51 | F9 | 🟠 Med | fixed | `Status != Cancelled` persist guard (v1 F12) has no test | `Services/Sameday/AwbCreator.cs:107` |
-| D52 | F10 | 🟠 Med | fixed | A `429` surviving retries → permanent GiveUp instead of transient | `Services/Sameday/SamedayClient.cs:139` |
-| D53 | F13 | 🟡 Doc | fixed | ADR-015 + 037 domain model name `awbPayment` (not `clientInternalReference`) as the idempotency key — doc trap (code correct) | `memory-bank/…/adr-015-*.md` |
-| D54 | F11 | 🟠 Med | fixed | Paid→Cancelled orphan billable AWB — no compensating void/ops-alert (D12 residual) | `Services/Sameday/AwbCreator.cs:141` |
+| D51 | F9 | 🟠 Med | verified | `Status != Cancelled` persist guard (v1 F12) has no test | `Services/Sameday/AwbCreator.cs:107` |
+| D52 | F10 | 🟠 Med | verified | A `429` surviving retries → permanent GiveUp instead of transient | `Services/Sameday/SamedayClient.cs:139` |
+| D53 | F13 | 🟡 Doc | verified | ADR-015 + 037 domain model name `awbPayment` (not `clientInternalReference`) as the idempotency key — doc trap (code correct) | `memory-bank/…/adr-015-*.md` |
+| D54 | F11 | 🟠 Med | verified | Paid→Cancelled orphan billable AWB — no compensating void/ops-alert (D12 residual) | `Services/Sameday/AwbCreator.cs:141` |
 
 **Re-opened:** D31 (was backlog Low) → Medium, **fixed** (`f3d2508`).
 
-**v3 fix round (resolution-v3, commits aada94b..5fc330b, 2026-07-27):** D43–D54 **fixed** except **D50
-deferred** (dispatcher-runtime test — harness needed). Backlog folded in + fixed: **D21, D22, D24, D26,
-D28, D36, D41**. Still deferred: D20, D23, D25, D27, D29, D30, D33, D35, D37, D38, D39, D40.
-Awaiting re-verification (review-v4). **D45 crash-window residual accepted+alerted (verify vendor
-idempotency before enabling — ADR-015).**
+**v3 fix round (resolution-v3, aada94b..5fc330b) → v4 verification (review-v4, 2026-07-27 @ 5fc330b):**
+D43–D54 **verified** (3 blockers revert-and-rerun; rest via the independent fix-diff micro-review +
+inspection) except **D50 deferred** (dispatcher-runtime test — harness needed). Backlog folded in +
+verified: **D21, D22, D24, D26, D28, D36, D41**. 0 reopened. Still deferred: D20, D23, D25, D27, D29,
+D30, D33, D35, D37, D38, D39, D40. Next: single-pass certification (recorded deviation). **D45
+crash-window residual accepted+alerted (verify vendor idempotency before enabling — ADR-015).**
 
 
 
