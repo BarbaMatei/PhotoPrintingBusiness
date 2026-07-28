@@ -35,6 +35,12 @@ public class Order
     /// on every successful poll; nullable until the first successful poll.</summary>
     public DateTimeOffset? LastTrackingSyncAt { get; set; }
 
+    /// <summary>Durable per-order claim taken by an AWB creator immediately before the
+    /// vendor call, so a concurrent creator (retry re-enqueue, second replica, duplicate
+    /// webhook) backs off instead of billing a second label. Reclaimable after the claim
+    /// TTL so a crashed worker cannot strand the order.</summary>
+    public DateTimeOffset? AwbClaimedAt { get; set; }
+
     // ── Idempotency (bolt 035) ───────────────────────────────────────────────
     /// <summary>Client-supplied Idempotency-Key bound to this order. Set once at
     /// creation, never modified — except nulled when a stale (&gt;24h) row's key is

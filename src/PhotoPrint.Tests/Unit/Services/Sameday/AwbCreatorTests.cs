@@ -247,6 +247,52 @@ public class AwbCreatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Second_creator_skips_without_calling_the_vendor_when_a_fresh_claim_is_held()
+    {
+        // D45: a concurrent creator (retry re-enqueue / second replica) must back off before
+        // the billable vendor call when another worker holds a fresh claim.
+        var order = SeedOrder();
+        SetClaim(order.Id, Now); // another worker just claimed it
+
+        using var db = CreateDb();
+        var client = new Mock<ISamedayClient>(MockBehavior.Strict); // any vendor call fails the test
+        var sut = Build(db, client);
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.Skipped>()
+            .Which.Reason.Should().Contain("claim");
+        client.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Persists_the_AWB_when_the_order_advances_to_Printing_during_the_call()
+    {
+        // D51: the persist guard is `!= Cancelled`, not `== Paid` — an admin advancing the
+        // order Paid→Printing mid-call must still keep its label (else it's lost, since the
+        // retry sweep only re-picks Paid).
+        var order = SeedOrder();
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<AwbCreationRequest, CancellationToken>((_, _) =>
+            {
+                SetStatus(order.Id, OrderStatus.Printing);
+                return Task.FromResult(new AwbCreationResult("RO-PRINT", "https://x/y.pdf", 1m));
+            });
+
+        using var db = CreateDb();
+        var sut = Build(db, client);
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.Created>();
+        var refreshed = ReadBack(order.Id);
+        refreshed.AwbNumber.Should().Be("RO-PRINT");
+        refreshed.Status.Should().Be(OrderStatus.Printing);
+    }
+
+    [Fact]
     public async Task Returns_GiveUp_when_mapper_throws_for_invalid_input()
     {
         var order = SeedOrder(withItems: false);
@@ -259,6 +305,22 @@ public class AwbCreatorTests : IDisposable
         outcome.Should().BeOfType<AwbCreationOutcome.GiveUp>()
             .Which.Reason.Should().Contain("invalid request");
         client.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Returns_transient_RetryLater_on_a_vendor_call_timeout()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException()); // HttpClient timeout, not shutdown
+
+        var sut = Build(db, client);
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
+            .Which.IsTransient.Should().BeTrue();
     }
 
     [Fact]
@@ -334,5 +396,11 @@ public class AwbCreatorTests : IDisposable
     {
         using var db = CreateDb();
         db.Orders.Where(o => o.Id == id).ExecuteUpdate(s => s.SetProperty(o => o.AwbNumber, awb));
+    }
+
+    private void SetClaim(Guid id, DateTimeOffset claimedAt)
+    {
+        using var db = CreateDb();
+        db.Orders.Where(o => o.Id == id).ExecuteUpdate(s => s.SetProperty(o => o.AwbClaimedAt, (DateTimeOffset?)claimedAt));
     }
 }

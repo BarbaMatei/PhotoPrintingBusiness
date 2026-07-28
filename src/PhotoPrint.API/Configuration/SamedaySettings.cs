@@ -47,4 +47,8 @@ public sealed class SamedayJobsSettings
     public int    TrackingMaxAgeDays            { get; set; } = 30;
     public int    MaxConcurrentSamedayCalls     { get; set; } = 5;
     public int[]  DispatchBackoffSeconds        { get; set; } = [30, 120, 300, 900, 3600];
+
+    // How long one AWB-creation attempt owns an order before it's reclaimable. Must exceed
+    // one vendor round-trip (RequestTimeoutSeconds) with margin; NOT tied to the retry cadence.
+    public int    AwbClaimTtlMinutes            { get; set; } = 5;
 }

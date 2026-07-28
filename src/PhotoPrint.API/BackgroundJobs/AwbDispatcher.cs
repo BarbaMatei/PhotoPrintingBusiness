@@ -66,7 +66,7 @@ public sealed class AwbDispatcher : BackgroundService
             var outcome = await creator.CreateForOrderAsync(job.OrderId, job.Attempt, ct);
             await HandleOutcomeAsync(outcome, job, ct);
         }
-        catch (OperationCanceledException) { /* shutdown */ }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { /* shutdown */ }
         catch (Exception ex)
         {
             _logger.LogError(ex,

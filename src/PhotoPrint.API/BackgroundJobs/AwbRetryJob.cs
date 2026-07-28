@@ -75,14 +75,17 @@ public sealed class AwbRetryJob : BackgroundService
         var now = _clock.GetUtcNow();
         var giveUpThreshold = now - TimeSpan.FromHours(_settings.AwbGiveUpHours);
         var queryFloor = giveUpThreshold - TimeSpan.FromDays(30);
+        var claimFloor = now - TimeSpan.FromMinutes(Math.Max(1, _settings.AwbClaimTtlMinutes));
 
-        // Inside the give-up window → re-enqueue.
+        // Inside the give-up window → re-enqueue, but skip orders a worker is actively
+        // creating (a fresh AwbClaimedAt) so the sweep doesn't churn against live attempts.
         var insideWindow = await db.Orders
             .AsNoTracking()
             .Where(o => o.Status == OrderStatus.Paid
                         && o.AwbNumber == null
                         && o.PaidAt != null
-                        && o.PaidAt > giveUpThreshold)
+                        && o.PaidAt > giveUpThreshold
+                        && (o.AwbClaimedAt == null || o.AwbClaimedAt < claimFloor))
             .Select(o => o.Id)
             .ToListAsync(ct);
 

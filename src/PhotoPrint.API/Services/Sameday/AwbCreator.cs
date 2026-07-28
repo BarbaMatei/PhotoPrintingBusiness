@@ -63,10 +63,56 @@ public sealed class AwbCreator : IAwbCreator
             return new AwbCreationOutcome.GiveUp($"invalid request: {ex.Message}");
         }
 
+        // Durable per-order claim: atomically reserve the order before the vendor call so a
+        // concurrent creator (retry re-enqueue, second replica, duplicate webhook) backs off
+        // instead of billing a second label. Reclaimable after the TTL so a crashed worker
+        // cannot strand the order. The vendor idempotency key covers the crash-window residual.
+        var now = _clock.GetUtcNow();
+        var claimTtl = TimeSpan.FromMinutes(Math.Max(1, _samedaySettings.Jobs.AwbClaimTtlMinutes));
+        var claimed = await _db.Orders
+            .Where(o => o.Id == orderId
+                        && o.AwbNumber == null
+                        && o.Status == OrderStatus.Paid
+                        && (o.AwbClaimedAt == null || o.AwbClaimedAt < now - claimTtl))
+            .ExecuteUpdateAsync(s => s.SetProperty(o => o.AwbClaimedAt, (DateTimeOffset?)now), ct);
+
+        if (claimed == 0)
+            return new AwbCreationOutcome.Skipped("another worker holds a fresh AWB claim");
+
+        var outcome = await CreateAndPersistAsync(order, orderId, request, attempt, ct);
+
+        // Release OUR claim on a failure outcome so an in-process retry re-claims promptly
+        // instead of waiting out the TTL. Match the exact claim time so a newer claim is never
+        // cleared. Best-effort: a failed release just means the claim expires via the TTL.
+        if (outcome is AwbCreationOutcome.RetryLater or AwbCreationOutcome.GiveUp)
+        {
+            try
+            {
+                await _db.Orders
+                    .Where(o => o.Id == orderId && o.AwbClaimedAt == now)
+                    .ExecuteUpdateAsync(s => s.SetProperty(o => o.AwbClaimedAt, (DateTimeOffset?)null), ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "sameday.awb.claim-release-failed order_id={OrderId}", orderId);
+            }
+        }
+
+        return outcome;
+    }
+
+    private async Task<AwbCreationOutcome> CreateAndPersistAsync(
+        Order order, Guid orderId, AwbCreationRequest request, int attempt, CancellationToken ct)
+    {
         AwbCreationResult result;
         try
         {
             result = await _sameday.CreateAwbAsync(request, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // HttpClient timeout, not shutdown — transient; the dispatcher re-enqueues.
+            return new AwbCreationOutcome.RetryLater("Sameday call timed out", IsTransient: true);
         }
         catch (SamedayUnreachableException ex)
         {
@@ -138,8 +184,10 @@ public sealed class AwbCreator : IAwbCreator
             return new AwbCreationOutcome.Skipped("AWB already persisted with the same number (converged)");
         }
 
-        _logger.LogWarning(
-            "sameday.awb.orphaned order_id={OrderId} created_awb={Created} persisted_awb={Persisted} — created AWB may need a manual void",
+        // Error-level: a real billable label exists that no order references and the vendor
+        // has no void endpoint here — ops must reconcile it manually.
+        _logger.LogError(
+            "sameday.awb.orphaned order_id={OrderId} created_awb={Created} persisted_awb={Persisted} — created AWB needs a manual void",
             orderId, result.AwbNumber, persisted);
         return new AwbCreationOutcome.Skipped($"order no longer writable; AWB {result.AwbNumber} may be orphaned");
     }
