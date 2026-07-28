@@ -277,6 +277,54 @@ public class ShipmentTrackingJobTests : IDisposable
         refreshed.DeliveredAt.Should().Be(deliveredAt);
         emails.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Polls_an_order_synced_a_full_interval_ago()
+    {
+        // D67: an order polled exactly one interval ago must be eligible THIS tick. The old
+        // full-interval window made `synced < now - interval` false and skipped it to the next tick.
+        var order = SeedShippedOrder(
+            shippedAt: T0.AddDays(-3),
+            lastTrackingSyncAt: T0.AddMinutes(-15)); // exactly one interval ago
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrackingSnapshot(order.AwbNumber!, TrackingState.InTransit, T0.AddHours(-1), Array.Empty<TrackingEvent>()));
+
+        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = Build(client, emails, new TrackingStopRegistry(cache), new FakeTimeProvider(T0));
+
+        await RunOneTickAsync(sut);
+
+        client.Verify(c => c.GetTrackingAsync(order.AwbNumber!, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Polls_multiple_in_window_orders_in_one_tick()
+    {
+        // D76: the tick fans PollOneAsync out over every in-window id (each on its OWN scoped
+        // DbContext). Exercise it with two orders so a per-order scope/isolation regression reddens.
+        var delivered = SeedShippedOrder(shippedAt: T0.AddDays(-3), awbNumber: "RO-DELIV");
+        var inTransit = SeedShippedOrder(shippedAt: T0.AddDays(-3), awbNumber: "RO-TRANSIT");
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.GetTrackingAsync("RO-DELIV", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrackingSnapshot("RO-DELIV", TrackingState.Delivered, T0.AddHours(-1), Array.Empty<TrackingEvent>()));
+        client.Setup(c => c.GetTrackingAsync("RO-TRANSIT", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TrackingSnapshot("RO-TRANSIT", TrackingState.InTransit, T0.AddHours(-1), Array.Empty<TrackingEvent>()));
+
+        var emails = new Mock<IOrderEmailService>();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = Build(client, emails, new TrackingStopRegistry(cache), new FakeTimeProvider(T0));
+
+        await RunOneTickAsync(sut);
+
+        GetOrder(delivered.Id).Status.Should().Be(OrderStatus.Delivered);
+        GetOrder(inTransit.Id).Status.Should().Be(OrderStatus.Shipped);
+        GetOrder(inTransit.Id).LastTrackingSyncAt.Should().Be(T0);
+        emails.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Once);
+    }
 }
 
 /// <summary>

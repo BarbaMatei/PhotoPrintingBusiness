@@ -66,7 +66,13 @@ public sealed class ShipmentTrackingJob : BackgroundService
     {
         var now = _clock.GetUtcNow();
         var earliestShipped = now - TimeSpan.FromDays(_settings.TrackingMaxAgeDays);
-        var minSinceLastSync = now - TimeSpan.FromMinutes(_settings.TrackingIntervalMinutes);
+        // Buffer just below a full interval: an order polled last tick is stamped with THIS tick's
+        // start clock (passed into PollOneAsync), so without the buffer next tick's threshold would
+        // equal the stamp and skip it to every other tick. The buffer stays well under the interval,
+        // so it barely widens the cross-replica re-poll band that LastTrackingSyncAt guards.
+        var pollFloor = TimeSpan.FromMinutes(_settings.TrackingIntervalMinutes) - TimeSpan.FromSeconds(30);
+        if (pollFloor < TimeSpan.FromSeconds(1)) pollFloor = TimeSpan.FromSeconds(1);
+        var minSinceLastSync = now - pollFloor;
 
         List<Guid> inWindowIds;
         List<OutOfWindowRow> outOfWindow;
@@ -98,7 +104,7 @@ public sealed class ShipmentTrackingJob : BackgroundService
                 .ToListAsync(ct);
         }
 
-        await Task.WhenAll(inWindowIds.Select(id => PollOneAsync(id, ct)));
+        await Task.WhenAll(inWindowIds.Select(id => PollOneAsync(id, now, ct)));
 
         // Outside the polling window — one-shot warning per order id.
         foreach (var row in outOfWindow)
@@ -114,7 +120,7 @@ public sealed class ShipmentTrackingJob : BackgroundService
 
     private sealed record OutOfWindowRow(Guid Id, DateTimeOffset? ShippedAt);
 
-    private async Task PollOneAsync(Guid orderId, CancellationToken ct)
+    private async Task PollOneAsync(Guid orderId, DateTimeOffset now, CancellationToken ct)
     {
         try { await _gate.WaitAsync(ct); }
         catch (OperationCanceledException) { return; }
@@ -127,6 +133,7 @@ public sealed class ShipmentTrackingJob : BackgroundService
             var emails = scope.ServiceProvider.GetRequiredService<IOrderEmailService>();
 
             var order = await db.Orders
+                .AsNoTracking()
                 .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.Id == orderId, ct);
             if (order?.AwbNumber is null)
@@ -143,8 +150,29 @@ public sealed class ShipmentTrackingJob : BackgroundService
                     "sameday.tracking.unreachable order_id={OrderId} — will retry next tick", order.Id);
                 return;
             }
+            catch (SamedayAuthException ex)
+            {
+                // Systemic (rotated credentials): every order fails identically each tick. Escalate
+                // to Error but once per outage window so the alert isn't buried under per-order noise.
+                if (_stop.MarkOutageOnce("auth", TimeSpan.FromMinutes(30)))
+                    _logger.LogError(ex,
+                        "sameday.tracking.auth-outage — Sameday credentials rejected; delivery detection stalled");
+                else
+                    _logger.LogDebug(ex, "sameday.tracking.auth-outage order_id={OrderId}", order.Id);
+                return;
+            }
+            catch (SamedayProtocolException ex)
+            {
+                if (_stop.MarkOutageOnce($"protocol::{ex.Endpoint}", TimeSpan.FromMinutes(30)))
+                    _logger.LogError(ex,
+                        "sameday.tracking.protocol-outage endpoint={Endpoint} — vendor contract drift", ex.Endpoint);
+                else
+                    _logger.LogDebug(ex, "sameday.tracking.protocol-outage order_id={OrderId}", order.Id);
+                return;
+            }
             catch (SamedayException ex)
             {
+                // Per-order failures (e.g. a 4xx on one AWB) stay Warning.
                 _logger.LogWarning(ex,
                     "sameday.tracking.failed order_id={OrderId}", order.Id);
                 return;
@@ -157,10 +185,9 @@ public sealed class ShipmentTrackingJob : BackgroundService
                 return;
             }
 
-            // LastTrackingSyncAt is a poll-throttle timestamp on OUR clock (always forward),
-            // NOT the vendor observed time — so a later Delivered scan carrying an earlier
-            // vendor timestamp is never dropped as "out of order".
-            var now = _clock.GetUtcNow();
+            // LastTrackingSyncAt is a poll-throttle timestamp on OUR clock (the tick start, so
+            // eligibility and stamp share a basis), NOT the vendor observed time — so a later
+            // Delivered scan carrying an earlier vendor timestamp is never dropped as "out of order".
 
             if (snapshot.State == TrackingState.Delivered)
             {
@@ -191,9 +218,13 @@ public sealed class ShipmentTrackingJob : BackgroundService
                 return;
             }
 
-            // Any other state: advance the poll-throttle timestamp (our clock).
+            // Any other state: advance the poll-throttle timestamp (our clock). Guarded so a slow
+            // replica can't move the stamp backward, and so it never touches a row another replica
+            // just advanced to Delivered.
             await db.Orders
-                .Where(o => o.Id == order.Id)
+                .Where(o => o.Id == order.Id
+                            && o.Status == OrderStatus.Shipped
+                            && (o.LastTrackingSyncAt == null || o.LastTrackingSyncAt < now))
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(o => o.LastTrackingSyncAt, (DateTimeOffset?)now),
                     ct);
