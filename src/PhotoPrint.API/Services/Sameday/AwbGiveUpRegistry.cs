@@ -10,7 +10,9 @@ namespace PhotoPrint.API.Services.Sameday;
 /// </summary>
 public sealed class AwbGiveUpRegistry
 {
-    private static readonly TimeSpan EntryLifetime = TimeSpan.FromDays(32);
+    /// <summary>Dedup entry lifetime. The retry sweep's outside-window query floor is derived from
+    /// this so a give-up log can never re-fire for an order still within the query window.</summary>
+    public static readonly TimeSpan EntryLifetime = TimeSpan.FromDays(32);
 
     private readonly IMemoryCache _cache;
 

@@ -80,36 +80,38 @@ public sealed class AwbDispatcher : BackgroundService
         }
     }
 
-    private async Task HandleOutcomeAsync(AwbCreationOutcome outcome, AwbJob job, CancellationToken ct)
+    private Task HandleOutcomeAsync(AwbCreationOutcome outcome, AwbJob job, CancellationToken ct)
     {
         switch (outcome)
         {
             case AwbCreationOutcome.Created:
                 // Success log already happened inside the creator.
-                return;
+                break;
 
             case AwbCreationOutcome.Skipped skipped:
                 _logger.LogInformation(
                     "sameday.awb.skipped order_id={OrderId} reason={Reason}",
                     job.OrderId, skipped.Reason);
-                return;
+                break;
 
             case AwbCreationOutcome.RetryLater { IsTransient: true } transient:
-                await ScheduleReEnqueueAsync(job, transient.Reason, transient.PreserveClaim, ct);
-                return;
+                ScheduleReEnqueue(job, transient.Reason, transient.PreserveClaim, ct);
+                break;
 
             case AwbCreationOutcome.RetryLater { IsTransient: false } nonTransient:
                 _logger.LogWarning(
                     "sameday.awb.non-transient-retry-later order_id={OrderId} attempt={Attempt} reason={Reason}",
                     job.OrderId, job.Attempt, nonTransient.Reason);
-                return;
+                break;
 
             case AwbCreationOutcome.GiveUp giveUp:
                 _logger.LogError(
                     "sameday.awb.permanent-fail order_id={OrderId} attempt={Attempt} reason={Reason}",
                     job.OrderId, job.Attempt, giveUp.Reason);
-                return;
+                break;
         }
+
+        return Task.CompletedTask;
     }
 
     // Attempt is 1-based; a schedule of N entries covers attempts 1..N (index attempt-1),
@@ -120,9 +122,26 @@ public sealed class AwbDispatcher : BackgroundService
         return TimeSpan.FromSeconds(backoffSeconds[attempt - 1]);
     }
 
-    private async Task ScheduleReEnqueueAsync(AwbJob job, string reason, bool preserveClaim, CancellationToken ct)
+    /// <summary>Backoff delay for the next attempt. Null once the in-process schedule is exhausted
+    /// (AwbRetryJob takes over). A claim-preserving outcome is floored past the claim TTL so the
+    /// re-attempt lands after the claim expires rather than in the fresh-claim skip window.</summary>
+    public TimeSpan? ComputeReEnqueueDelay(int attempt, bool preserveClaim)
     {
-        var delay = NextDispatchDelay(job.Attempt, _settings.DispatchBackoffSeconds);
+        var delay = NextDispatchDelay(attempt, _settings.DispatchBackoffSeconds);
+        if (delay is null) return null;
+
+        if (preserveClaim)
+        {
+            var floor = TimeSpan.FromMinutes(_settings.AwbClaimTtlMinutes) + TimeSpan.FromSeconds(30);
+            if (delay.Value < floor) delay = floor;
+        }
+
+        return delay;
+    }
+
+    private void ScheduleReEnqueue(AwbJob job, string reason, bool preserveClaim, CancellationToken ct)
+    {
+        var delay = ComputeReEnqueueDelay(job.Attempt, preserveClaim);
         if (delay is null)
         {
             _logger.LogInformation(
@@ -131,37 +150,30 @@ public sealed class AwbDispatcher : BackgroundService
             return;
         }
 
-        // A claim-preserving outcome holds the claim through its TTL; re-enqueuing before the TTL
-        // elapses would only hit the fresh-claim skip, so defer past it (+margin) to let the
-        // re-attempt actually re-claim.
-        if (preserveClaim)
-        {
-            var floor = TimeSpan.FromMinutes(_settings.AwbClaimTtlMinutes) + TimeSpan.FromSeconds(30);
-            if (delay.Value < floor) delay = floor;
-        }
-
         _logger.LogInformation(
             "sameday.awb.retry-scheduled order_id={OrderId} attempt={Attempt} delay={Delay}s reason={Reason}",
             job.OrderId, job.Attempt, (int)delay.Value.TotalSeconds, reason);
 
-        // Fire-and-forget delayed re-enqueue.
-        _ = Task.Run(async () =>
+        _ = DelayedReEnqueueAsync(job, delay.Value, ct);
+    }
+
+    // Delays on the injected clock (deterministic under test) then re-enqueues the next attempt.
+    internal async Task DelayedReEnqueueAsync(AwbJob job, TimeSpan delay, CancellationToken ct)
+    {
+        try
         {
-            try
-            {
-                await Task.Delay(delay.Value, ct);
-                await _queue.EnqueueAsync(
-                    new AwbJob(job.OrderId, job.Attempt + 1, _clock.GetUtcNow()),
-                    ct);
-            }
-            catch (OperationCanceledException) { /* shutdown */ }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "AwbDispatcher: failed to re-enqueue order_id={OrderId}",
-                    job.OrderId);
-            }
-        }, ct);
+            await Task.Delay(delay, _clock, ct);
+            await _queue.EnqueueAsync(
+                new AwbJob(job.OrderId, job.Attempt + 1, _clock.GetUtcNow()),
+                ct);
+        }
+        catch (OperationCanceledException) { /* shutdown */ }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "AwbDispatcher: failed to re-enqueue order_id={OrderId}",
+                job.OrderId);
+        }
     }
 
     public override void Dispose()

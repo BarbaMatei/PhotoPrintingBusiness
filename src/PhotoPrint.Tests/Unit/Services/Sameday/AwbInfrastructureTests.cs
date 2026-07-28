@@ -1,7 +1,11 @@
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PhotoPrint.API.BackgroundJobs;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
@@ -127,5 +131,74 @@ public class AwbInfrastructureTests
         AwbDispatcher.NextDispatchDelay(5, backoffs).Should().Be(TimeSpan.FromSeconds(3600));
         AwbDispatcher.NextDispatchDelay(6, backoffs).Should().BeNull();
         AwbDispatcher.NextDispatchDelay(0, backoffs).Should().BeNull();
+    }
+
+    // ── AwbDispatcher re-enqueue orchestration ───────────────────────────────
+
+    private static readonly DateTimeOffset T0 = new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+
+    private static AwbDispatcher BuildDispatcher(IAwbJobQueue queue, TimeProvider clock, int claimTtlMinutes = 5)
+    {
+        var settings = Options.Create(new SamedaySettings
+        {
+            Jobs = new SamedayJobsSettings
+            {
+                DispatchBackoffSeconds = new[] { 30, 120, 300, 900, 3600 },
+                AwbClaimTtlMinutes = claimTtlMinutes,
+                MaxConcurrentSamedayCalls = 2,
+            },
+        });
+        var scopeFactory = new ServiceCollection().BuildServiceProvider()
+            .GetRequiredService<IServiceScopeFactory>();
+        return new AwbDispatcher(queue, scopeFactory, settings, clock,
+            new LoggerFactory().CreateLogger<AwbDispatcher>());
+    }
+
+    [Fact]
+    public void ComputeReEnqueueDelay_uses_the_backoff_schedule_and_exhausts_past_the_last()
+    {
+        var d = BuildDispatcher(new AwbJobQueue(), new FakeTimeProvider(T0));
+        d.ComputeReEnqueueDelay(1, preserveClaim: false).Should().Be(TimeSpan.FromSeconds(30));
+        d.ComputeReEnqueueDelay(3, preserveClaim: false).Should().Be(TimeSpan.FromSeconds(300));
+        d.ComputeReEnqueueDelay(6, preserveClaim: false).Should().BeNull();
+    }
+
+    [Fact]
+    public void ComputeReEnqueueDelay_floors_a_preserve_claim_outcome_past_the_claim_TTL()
+    {
+        var d = BuildDispatcher(new AwbJobQueue(), new FakeTimeProvider(T0), claimTtlMinutes: 5);
+        // attempt-1 backoff (30s) is inside the 5-min claim window → floored so the re-attempt
+        // re-claims instead of hitting the fresh-claim skip.
+        d.ComputeReEnqueueDelay(1, preserveClaim: true)
+            .Should().Be(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(30));
+        // a backoff already past the TTL is left unchanged.
+        d.ComputeReEnqueueDelay(5, preserveClaim: true).Should().Be(TimeSpan.FromSeconds(3600));
+    }
+
+    [Fact]
+    public async Task DelayedReEnqueueAsync_re_enqueues_the_next_attempt_after_the_delay()
+    {
+        var queue = new AwbJobQueue();
+        var clock = new FakeTimeProvider(T0);
+        var dispatcher = BuildDispatcher(queue, clock);
+        var job = new AwbJob(Guid.NewGuid(), Attempt: 1, EnqueuedAt: T0);
+
+        var method = typeof(AwbDispatcher).GetMethod("DelayedReEnqueueAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        var task = (Task)method!.Invoke(dispatcher,
+            new object[] { job, TimeSpan.FromSeconds(30), CancellationToken.None })!;
+
+        clock.Advance(TimeSpan.FromSeconds(30)); // fire the delay deterministically
+        await task;
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        await foreach (var requeued in queue.DequeueAllAsync(cts.Token))
+        {
+            requeued.OrderId.Should().Be(job.OrderId);
+            requeued.Attempt.Should().Be(2);
+            return;
+        }
+
+        throw new Xunit.Sdk.XunitException("expected a re-enqueued job");
     }
 }

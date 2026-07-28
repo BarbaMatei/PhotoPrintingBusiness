@@ -74,7 +74,9 @@ public sealed class AwbRetryJob : BackgroundService
 
         var now = _clock.GetUtcNow();
         var giveUpThreshold = now - TimeSpan.FromHours(_settings.AwbGiveUpHours);
-        var queryFloor = giveUpThreshold - TimeSpan.FromDays(30);
+        // Floor the outside-window scan at the dedup lifetime so an order can never re-fire its
+        // give-up log after the registry entry ages out (the two must stay coupled).
+        var queryFloor = giveUpThreshold - AwbGiveUpRegistry.EntryLifetime;
         var claimFloor = now - TimeSpan.FromMinutes(Math.Max(1, _settings.AwbClaimTtlMinutes));
 
         // Inside the give-up window → re-enqueue, but skip orders a worker is actively
@@ -92,6 +94,7 @@ public sealed class AwbRetryJob : BackgroundService
         foreach (var id in insideWindow)
         {
             await _queue.EnqueueAsync(new AwbJob(id, Attempt: 1, EnqueuedAt: now), ct);
+            _logger.LogInformation("sameday.awb.retry-enqueue order_id={OrderId}", id);
         }
 
         if (insideWindow.Count > 0)
