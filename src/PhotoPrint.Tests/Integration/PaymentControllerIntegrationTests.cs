@@ -574,6 +574,8 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         var updated = await db.Orders.FindAsync(order.Id);
         Assert.Equal(OrderStatus.Paid, updated!.Status);
         Assert.Equal("EP12345", updated.EuPlatescTransactionId);
+        // The EuPlatesc Paid branch must enqueue the AWB too (mirrors the Stripe path).
+        Assert.Contains(order.Id, _factory.AwbNotifier.Enqueued);
     }
 
     [Fact]
