@@ -11,12 +11,16 @@ namespace PhotoPrint.API.BackgroundJobs;
 
 /// <summary>
 /// Periodic poller for <c>Shipped</c> orders. On Sameday <c>Delivered</c>,
-/// performs the ADR-016 CAS transition (<c>WHERE Status = Shipped</c>) and
+/// performs a compare-and-set transition (<c>WHERE Status = Shipped</c>) and
 /// enqueues the customer delivery email. Skips orders older than
 /// <c>TrackingMaxAgeDays</c> from <c>ShippedAt</c> after a one-shot warning.
 /// </summary>
 public sealed class ShipmentTrackingJob : BackgroundService
 {
+    // A systemic tracking failure (rotated credentials / vendor drift) logs one Error per this
+    // window then Debug, so it alerts without storming one Error per order per tick.
+    private static readonly TimeSpan OutageAlertWindow = TimeSpan.FromMinutes(30);
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly TrackingStopRegistry _stop;
     private readonly SamedayJobsSettings _settings;
@@ -154,7 +158,7 @@ public sealed class ShipmentTrackingJob : BackgroundService
             {
                 // Systemic (rotated credentials): every order fails identically each tick. Escalate
                 // to Error but once per outage window so the alert isn't buried under per-order noise.
-                if (_stop.MarkOutageOnce("auth", TimeSpan.FromMinutes(30)))
+                if (_stop.MarkOutageOnce("auth", OutageAlertWindow))
                     _logger.LogError(ex,
                         "sameday.tracking.auth-outage — Sameday credentials rejected; delivery detection stalled");
                 else
@@ -163,7 +167,7 @@ public sealed class ShipmentTrackingJob : BackgroundService
             }
             catch (SamedayProtocolException ex)
             {
-                if (_stop.MarkOutageOnce($"protocol::{ex.Endpoint}", TimeSpan.FromMinutes(30)))
+                if (_stop.MarkOutageOnce($"protocol::{ex.Endpoint}", OutageAlertWindow))
                     _logger.LogError(ex,
                         "sameday.tracking.protocol-outage endpoint={Endpoint} — vendor contract drift", ex.Endpoint);
                 else

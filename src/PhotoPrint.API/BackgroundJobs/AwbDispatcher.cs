@@ -132,7 +132,9 @@ public sealed class AwbDispatcher : BackgroundService
 
         if (preserveClaim)
         {
-            var floor = TimeSpan.FromMinutes(_settings.AwbClaimTtlMinutes) + TimeSpan.FromSeconds(30);
+            // Match the effective claim TTL (same Math.Max(1, …) clamp the claim uses) so a ≤0
+            // configured TTL can't desync the floor from the actual claim window.
+            var floor = TimeSpan.FromMinutes(Math.Max(1, _settings.AwbClaimTtlMinutes)) + TimeSpan.FromSeconds(30);
             if (delay.Value < floor) delay = floor;
         }
 

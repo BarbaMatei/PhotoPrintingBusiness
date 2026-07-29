@@ -326,6 +326,8 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Returns_RetryLater_transient_on_SamedayUnreachableException()
     {
+        // Transport failure (no HTTP status): the request never reached the vendor, so it's
+        // pre-create — the claim is released for a prompt in-process retry.
         var order = SeedOrder();
         using var db = CreateDb();
         var client = new Mock<ISamedayClient>();
@@ -335,8 +337,30 @@ public class AwbCreatorTests : IDisposable
         var sut = Build(db, client);
         var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
 
-        outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
-            .Which.IsTransient.Should().BeTrue();
+        var retry = outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>().Subject;
+        retry.IsTransient.Should().BeTrue();
+        retry.PreserveClaim.Should().BeFalse();
+        ReadBack(order.Id).AwbClaimedAt.Should().BeNull(); // released
+    }
+
+    [Fact]
+    public async Task Preserves_the_claim_on_a_retryable_status_from_the_create_call()
+    {
+        // A 5xx/408/429 response means the vendor received the request and may have billed the AWB;
+        // hold the claim like the timeout path (unlike a status-less transport failure).
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new SamedayUnreachableException("/api/awb", httpStatus: 503));
+
+        var sut = Build(db, client);
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        var retry = outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>().Subject;
+        retry.IsTransient.Should().BeTrue();
+        retry.PreserveClaim.Should().BeTrue();
+        ReadBack(order.Id).AwbClaimedAt.Should().Be(Now); // held, not released
     }
 
     [Fact]

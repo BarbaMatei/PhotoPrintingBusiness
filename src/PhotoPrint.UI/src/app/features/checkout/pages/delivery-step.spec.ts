@@ -244,7 +244,7 @@ describe('DeliveryStep', () => {
     expect(stateService.snapshot.lockerName).toBe('Box A');
   });
 
-  // ── Guest-session prefill (CLAUDE.md class 11: guest-state parsing) ─────────
+  // ── Guest-session prefill (guest-state parsing) ─────────
 
   it('prefills the Easybox contact from a stored guest session', () => {
     localStorage.setItem('guestSession', JSON.stringify({

@@ -9,7 +9,7 @@ namespace PhotoPrint.API.Services.Sameday;
 
 /// <summary>
 /// Default <see cref="IAwbCreator"/>. Loads the order, performs the
-/// ADR-015 re-check, maps to <see cref="AwbCreationRequest"/>, calls Sameday,
+/// load-bearing status/AWB re-check, maps to <see cref="AwbCreationRequest"/>, calls Sameday,
 /// and persists <c>AwbNumber</c> + <c>AwbLabelUrl</c>. Scoped lifetime — holds
 /// a <see cref="PhotoPrintDbContext"/>; the dispatcher creates a scope per
 /// job.
@@ -48,7 +48,7 @@ public sealed class AwbCreator : IAwbCreator
         if (order is null)
             return new AwbCreationOutcome.Skipped("order not found");
 
-        // ADR-015 load-bearing re-check.
+        // Load-bearing re-check: the order may have changed between enqueue and now.
         if (order.Status != OrderStatus.Paid)
             return new AwbCreationOutcome.Skipped($"status is {order.Status}, not Paid");
         if (!string.IsNullOrWhiteSpace(order.AwbNumber))
@@ -102,6 +102,12 @@ public sealed class AwbCreator : IAwbCreator
                 _logger.LogWarning(ex, "sameday.awb.claim-release-failed order_id={OrderId}", orderId);
             }
         }
+        else if (preserveClaim)
+        {
+            _logger.LogInformation(
+                "sameday.awb.claim-held order_id={OrderId} — outcome may have billed an AWB; deferring the re-attempt past the claim TTL",
+                orderId);
+        }
 
         return outcome;
     }
@@ -125,7 +131,11 @@ public sealed class AwbCreator : IAwbCreator
         }
         catch (SamedayUnreachableException ex)
         {
-            return new AwbCreationOutcome.RetryLater(ex.Message, IsTransient: true);
+            // A retryable status (HttpStatus set) means the vendor received the request and may have
+            // created the AWB — hold the claim like the timeout path. A pure transport failure (no
+            // status: never connected) is pre-create, so release for a prompt in-process retry.
+            var mayHaveBilled = ex.HttpStatus is not null;
+            return new AwbCreationOutcome.RetryLater(ex.Message, IsTransient: true, PreserveClaim: mayHaveBilled);
         }
         catch (SamedayAuthException ex)
         {

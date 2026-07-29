@@ -13,10 +13,6 @@ namespace PhotoPrint.API.Services.Sameday;
 ///   outer:  SamedayAuthHandler        (bearer + 401-retry-once)
 ///   middle: SamedayResilienceHandler  (5xx/408/429 retry via Polly v8)
 ///   inner:  HttpClientHandler          (the real socket)
-///
-/// In bolt 036, only <see cref="AuthenticateAsync"/> is fully implemented;
-/// the AWB / label / tracking methods are declared and throw
-/// <see cref="NotImplementedException"/>, deferred to bolt 037.
 /// </summary>
 public sealed class SamedayClient : ISamedayClient
 {
@@ -95,7 +91,7 @@ public sealed class SamedayClient : ISamedayClient
             PackageWeight  = request.ParcelWeightKg,
             CashOnDelivery = request.CodAmountRon,
             Observation    = request.Observations,
-            ClientInternalReference = request.OrderNumber, // per-order idempotency key (ADR-015)
+            ClientInternalReference = request.OrderNumber, // per-order idempotency key
             AwbRecipient   = new SamedayWireDtos.AwbRecipient
             {
                 Name        = request.RecipientName,

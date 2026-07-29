@@ -9,6 +9,7 @@ using Moq;
 using PhotoPrint.API.BackgroundJobs;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
+using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Sameday;
@@ -324,6 +325,30 @@ public class ShipmentTrackingJobTests : IDisposable
         GetOrder(inTransit.Id).Status.Should().Be(OrderStatus.Shipped);
         GetOrder(inTransit.Id).LastTrackingSyncAt.Should().Be(T0);
         emails.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_systemic_auth_failure_does_not_fault_the_tick_and_is_marked_once()
+    {
+        // Rotated credentials: every order throws SamedayAuthException. The tick must not fault, and
+        // the outage escalation is deduped (one Error per window, not one per order).
+        SeedShippedOrder(shippedAt: T0.AddDays(-3), awbNumber: "RO-A");
+        SeedShippedOrder(shippedAt: T0.AddDays(-3), awbNumber: "RO-B");
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new SamedayAuthException("/api/awb/tracking"));
+
+        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var stop = new TrackingStopRegistry(cache);
+        var sut = Build(client, emails, stop, new FakeTimeProvider(T0));
+
+        var act = () => RunOneTickAsync(sut);
+        await act.Should().NotThrowAsync();
+
+        // The job already claimed the outage key this window, so a fresh mark returns false.
+        stop.MarkOutageOnce("auth", TimeSpan.FromMinutes(30)).Should().BeFalse();
     }
 }
 
