@@ -14,8 +14,51 @@ regression; 17 med / 19 low / 6 cleanup new (D55–D89) → backlog pre-enable c
 re-affirmed (D50/D23/D29/D39); D45 vendor-idempotency residual re-confirmed (accepted).
 v5 fix round (resolution-v5, 3764fa0..1816f5f): 41 fixed / 3 deferred / 2 wont-fix / 2 false-positive.
 v6 verification (review-v6, 2026-07-29 @ 1816f5f): 37 verified, **4 reopened (D27/D39/D71/D79 — no
-test can go red)**, 7 new (D90–D96), 0 regressions. Loop RE-ARMED → fix round, then verification,
-then a fresh certification (full-loop-tier touches). v5's CERTIFIED is provisional. -->
+test can go red)**, 7 new (D90–D96), 0 regressions. Loop RE-ARMED.
+v6 fix round (resolution-v6, 5734021): all 4 reopens + the D68/D78 gaps closed, test-only, each
+revert-proven. **LOOP CLOSED 2026-07-29 by owner sign-off** — no post-fix blinded pass ran; the
+pre-enable checklist is the binding gate (D45 vendor idempotency, D23 Postgres DDL, D81 service ids,
+D90–D96 backlog). -->
+
+## Loop closed — 2026-07-29 (owner sign-off, commit `5734021`)
+
+The owner elected to close after the v6 fix round rather than run another certification. Recorded
+here and in [index.md](../index.md) per [README note ²](../README.md). **What that leaves unproven,
+stated plainly:**
+
+- **No blinded lens has searched the fixed code.** v5 certified `5fc330b`; 47 fixes have landed since
+  across the v5 and v6 rounds. v6 verified each fix individually but ran no search.
+- The 7 findings v6 turned up incidentally (D90–D96) while *not* searching suggest a search would
+  find more. The new-finding trend across full passes (41 → 12 → 42) never decayed.
+- **D45** — no-double-billing still rests on Sameday's own dedup on `ClientInternalReference`,
+  unconfirmed with the vendor. **D23** — migrations and the `timestamptz` CAS have never executed
+  against Postgres, and the v5 round added a migration. **D81** — service ids are still placeholder `7`.
+
+Closure is defensible only because the feature is dormant behind `Sameday:Enabled=false` +
+`Sameday:Jobs:Enabled=false`: nothing here can bite in production. **The pre-enable checklist, not
+this closure, is the gate.** Flipping either flag without working that list re-opens every risk above.
+
+## v6 fix round — test-only (2026-07-29, commit `5734021`)
+
+All 4 reopens closed, plus the two gaps v6 recorded on fixes that held. Detail:
+[resolution-v6.md](resolution-v6.md).
+
+| D# | Status | Test that now guards it |
+|----|--------|-------------------------|
+| D27 | verified | `Does_not_stamp_a_row_another_replica_already_moved_to_Delivered` · `Does_not_move_LastTrackingSyncAt_backwards` |
+| D39 | verified | `Enabled_root_resolves_client_creator_and_jobs_without_a_DI_cycle` now resolves `IShippingService` |
+| D71 | verified | `Retry_backoff_is_1_4_16_seconds_not_Polly_default_base_2` |
+| D79 | verified | `GenerateAccessToken_CarriesTheDisplayNameClaim` + 3 `auth.service.spec` cases |
+| D68 | verified | `Preserves_the_claim_when_the_persist_fails_after_the_vendor_created_the_AWB` (gap closed) |
+| D78 | verified | `does not render a street-address line for an Easybox order` — rewritten; the old assertion could not fail (gap closed) |
+
+Every one was proven to redden when its fix is reverted, with zero collateral (6 backend + 4 frontend
+predicted failures, all matched). **Recorded deviation:** fixer == verifier for this round — the
+evidence is a reproducible measurement, not a self-assessment; see resolution-v6. Expiry: next
+calibration.
+
+Side effect worth keeping: `FakeTimeProvider` now fakes timers, so the D82 dispatcher test no longer
+sleeps 30 real seconds. Backend went from 916 tests in 30 s to **921 in 4 s**.
 
 ## v6 — verification (2026-07-29, commit `1816f5f`, approve-with-followups)
 
@@ -27,18 +70,20 @@ runs, each with its failure set predicted in advance and matched exactly. Detail
 D73, D74, D75, D76, D77, D78, D80, D82, D84, D85, D86, D87, D20, D24, D25, D29, D30, D35, D37, D38,
 D50. Last affirmed at `1816f5f`.
 
-**Reopened (4) — fix present and correct-on-inspection, but deleting it leaves both suites green:**
+**Reopened (4) → all fixed + verified in the v6 fix round (`5734021`).** Fix present and
+correct-on-inspection, but deleting it left both suites green:
 
-| D# | Sev | Status | What is missing | Site |
-|----|-----|--------|-----------------|------|
-| D27 | 🟡 Low | **reopened** | no test pins the monotonic `LastTrackingSyncAt` guard (`Status = Shipped AND stamp < now`) | `BackgroundJobs/ShipmentTrackingJob.cs:228` |
-| D39 | ⚪ | **reopened** | `SamedayCompositionRootTests` never resolves `IShippingService`, so the `AddScoped<StaticShippingService>()` the fix added is unproven — removing it is green | `Extensions/SamedayServiceCollectionExtensions.cs:60` |
-| D71 | 🟡 Low | **reopened** | reverting to Polly base-2 `Exponential` (the original defect) is invisible — the only retry test does a single retry, 1 s under both schedules | `Services/Sameday/SamedayPolicies.cs:54` |
-| D79 | 🟡 Low | **reopened** | nothing asserts the `name` claim or that `currentUser$` emits — the guest/signed-in prefill cluster (CLAUDE.md class 11) | `Services/TokenService.cs:33` · `UI/…/auth.service.ts:55` |
+| D# | Sev | Status | What was missing | Site |
+|----|-----|--------|------------------|------|
+| D27 | 🟡 Low | verified (`5734021`) | no test pinned the monotonic `LastTrackingSyncAt` guard (`Status = Shipped AND stamp < now`) | `BackgroundJobs/ShipmentTrackingJob.cs:228` |
+| D39 | ⚪ | verified (`5734021`) | `SamedayCompositionRootTests` never resolved `IShippingService`, so the `AddScoped<StaticShippingService>()` the fix added was unproven | `Extensions/SamedayServiceCollectionExtensions.cs:60` |
+| D71 | 🟡 Low | verified (`5734021`) | reverting to Polly base-2 `Exponential` (the original defect) was invisible — the only retry test does a single retry, 1 s under both schedules | `Services/Sameday/SamedayPolicies.cs:54` |
+| D79 | 🟡 Low | verified (`5734021`) | nothing asserted the `name` claim or that `currentUser$` emits — the guest/signed-in prefill cluster (CLAUDE.md class 11) | `Services/TokenService.cs:33` · `UI/…/auth.service.ts:55` |
 
-**Recorded gaps on fixes that held:** D68's post-create persist-fail `PreserveClaim` leg is untested
-(the timeout + retryable-status legs redden); D78's review-step assertion
-(`not.toContain('undefined')`) cannot fail in Angular — a safe-navigation gate removal reddens nothing.
+**Recorded gaps on fixes that held → both closed in the v6 fix round (`5734021`):** D68's post-create
+persist-fail `PreserveClaim` leg was untested (the timeout + retryable-status legs reddened); D78's
+review-step assertion (`not.toContain('undefined')`) could not fail in Angular — a safe-navigation
+gate removal reddened nothing, and now does.
 
 **New (D90–D96) — backlog, none re-arms the loop:**
 
