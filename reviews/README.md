@@ -10,7 +10,8 @@ owner: Matei Barba
 
 Parallel isolated review lenses, repeated independent passes, and a severity-based stop rule.
 One reviewer in one sitting catches a *sample* of what's wrong, not all of it — so the system
-samples repeatedly, from designed-in breadth, until the serious-defect population is closed.
+samples repeatedly, from designed-in breadth, until no 🔴 survives and every 🟠 carries a
+recorded owner-visible decision. **Certified means exactly that — not zero defects.**
 
 - **Why it's built this way** (the 035/042/043 evidence and numbers): [rationale.md](rationale.md)
 - **Where it's heading** (autonomy, experiments, tool build order): [self-driving-loop-design.md](self-driving-loop-design.md)
@@ -56,13 +57,16 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 ¹ **Delta-worthy** = the fix round fixed a 🔴, added/converted a mechanism, or changed a
 design. Anything else is patch-grade and exits on verification + the fixer's micro-review.
 
-² **Certification** (full-loop tier): two parallel blinded full-manifest passes against one
-frozen commit, folding in any still-owed manifest lenses (~2× full-pass cost). A **recorded
-single-pass deviation** is acceptable when (a) an equally broad blinded pass ran recently on
-near-identical code and (b) the fix round since was small and independently verified. Lower tiers certify
-with a **single** fresh full-manifest pass; with owner sign-off a quiet loop may close without
-one (recorded in the index). A backlogged minor fixed later needs only normal fix-verification
-— unless the fix touches full-loop-tier code.
+² **Certification** (full-loop tier): the feature's **first** certification attempt is a pair —
+two parallel blinded full-manifest passes against one frozen commit, folding in any still-owed
+manifest lenses (~2× full-pass cost). **Re-certification** after a fix round that was small and
+independently verified is **one** fresh full-manifest pass on the re-frozen commit — the
+standard close, not a deviation (calibration 2026-07-29). A full-loop-tier feature never closes
+without a fresh full-manifest pass after its last fix round. Lower tiers certify with a
+**single** fresh full-manifest pass; with owner sign-off a quiet **lower-tier** loop may close
+without one (recorded in the index). Every certification index row records the 🟠 still open at
+close. A backlogged minor fixed later needs only normal fix-verification — unless the fix
+touches full-loop-tier code.
 
 **What re-arms the loop — exactly three things:** a new 🔴; a fix-caused 🟠 regression; a
 reopened fix. New non-regression 🟠 get fixed and verified but do not re-arm a delta. New
@@ -115,8 +119,8 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 - **Ledger** (`ledger.md`) — one canonical `D#` per real defect, forever; each pass's `F#`
   mapped on *after* the blinded pass. Terminal rows feed the discovery script's
   `decidedFindings`; each deferral row records the commit at which it was last affirmed. A
-  re-raise of a decided item gets the prior decision **attached, never suppressed** — 3 of 5
-  recorded re-raises overturned the prior call.
+  re-raise of a decided item gets the prior decision **attached, never suppressed** — the first
+  5 recorded re-raises overturned 3 prior calls; the ~55 since mostly re-affirmed.
 - Per-finding lifecycle: `open → in-progress → fixed → verified`, or terminal
   `wont-fix | deferred | disputed | false-positive` (rationale required in the resolution).
 - Review artifacts ride with the code branch. This README and the runbooks are the system

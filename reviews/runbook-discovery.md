@@ -20,9 +20,10 @@ anything a lens receives; commit messages and test names are an accepted leak.
 1. **Scope.** Confirm `HEAD == origin/<branch>`. Save diff(s) to temp files — backend
    (`git diff main...HEAD -- 'src/**/*.cs' ':!*Designer.cs'`), frontend separately if touched.
    Delta pass: diff since the last full discovery pass instead. Certification: freeze the
-   commit and run **two** of these passes in parallel against it — or the recorded single-pass
-   deviation ([README router](README.md#the-router), note ²) — folding in any still-owed
-   manifest lenses.
+   commit; a feature's **first** certification attempt runs **two** of these passes in
+   parallel, a re-certification after a small independently-verified fix round runs **one**
+   ([README note ²](README.md#the-router)) — either way folding in any still-owed manifest
+   lenses.
 2. **Pick lenses** from the manifest below. Delta: the lenses owning the fix classes +
    correctness + completeness-critic, **max 5** (script-enforced).
 3. **codePack — optional.** Default is targeted per-lens reading (each lens reads what its

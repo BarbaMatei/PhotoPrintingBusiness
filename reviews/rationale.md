@@ -157,6 +157,14 @@ this way (2.87M tokens, 45 agents): honest scope — it certifies *no serious de
 not *zero defects remain*. Re-run the full pair when there is no recent broad look or the fix
 round was large.
 
+Calibration 2026-07-29 (from `reviews/system/review-v1.md`, SF1/SF2): the single-pass close
+after a recent pair + small verified fix round — exercised by 043-v9 and 015-v5 — became the
+**standard re-certification** rather than a recorded deviation; a full-loop-tier feature now
+always ends with a fresh full-manifest pass after its last fix round (015's sign-off close,
+which skipped that, prompted the rule); and every certification index row records the Mediums
+still open at close, since no target has ever produced a zero-serious full pass and "certified"
+must not read as "saturated".
+
 First frozen-commit overlap measurement
 ([overlap-pair-v7.md](043-cloud-storage-provider/overlap-pair-v7.md), labeled 2026-07-27): the
 v7 passes shared only 4 of 34 new findings (12%); 2 of 12 serious. Pass A alone would have

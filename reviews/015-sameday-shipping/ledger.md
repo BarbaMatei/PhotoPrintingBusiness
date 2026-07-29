@@ -54,8 +54,9 @@ All 4 reopens closed, plus the two gaps v6 recorded on fixes that held. Detail:
 
 Every one was proven to redden when its fix is reverted, with zero collateral (6 backend + 4 frontend
 predicted failures, all matched). **Recorded deviation:** fixer == verifier for this round — the
-evidence is a reproducible measurement, not a self-assessment; see resolution-v6. Expiry: next
-calibration.
+evidence is a reproducible measurement, not a self-assessment; see resolution-v6. Expiry
+resolved at the 2026-07-29 calibration: written into runbook-verification step 1 as the
+test-only exemption.
 
 Side effect worth keeping: `FakeTimeProvider` now fakes timers, so the D82 dispatcher test no longer
 sleeps 30 real seconds. Backend went from 916 tests in 30 s to **921 in 4 s**.
