@@ -42,5 +42,8 @@ public record AdminOrderDetailDto(
     string? EuPlatescTransactionId,
     string? AwbNumber,
     string? TrackingUrl,
+    string? AwbLabelUrl,
+    DateTimeOffset? ShippedAt,
+    DateTimeOffset? DeliveredAt,
     string? InternalNotes,
     IReadOnlyList<AdminOrderItemDto> Items);

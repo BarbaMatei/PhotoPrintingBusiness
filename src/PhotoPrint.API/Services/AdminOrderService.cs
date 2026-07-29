@@ -383,6 +383,9 @@ public class AdminOrderService : IAdminOrderService
             order.EuPlatescTransactionId,
             order.AwbNumber,
             order.TrackingUrl,
+            order.AwbLabelUrl,
+            order.ShippedAt,
+            order.DeliveredAt,
             order.InternalNotes,
             items);
     }

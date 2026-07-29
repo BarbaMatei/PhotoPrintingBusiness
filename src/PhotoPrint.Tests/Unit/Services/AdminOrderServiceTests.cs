@@ -145,6 +145,22 @@ public class AdminOrderServiceTests
     }
 
     [Fact]
+    public async Task GetOrderDetailAsync_surfaces_the_label_url_and_tracking_timestamps()
+    {
+        var order = await SeedOrderAsync();
+        order.AwbLabelUrl = "https://sameday/labels/x.pdf";
+        order.ShippedAt = new DateTimeOffset(2026, 6, 2, 9, 0, 0, TimeSpan.Zero);
+        order.DeliveredAt = new DateTimeOffset(2026, 6, 3, 9, 0, 0, TimeSpan.Zero);
+        await _db.SaveChangesAsync();
+
+        var result = await _sut.GetOrderDetailAsync(order.Id);
+
+        result.AwbLabelUrl.Should().Be("https://sameday/labels/x.pdf");
+        result.ShippedAt.Should().Be(order.ShippedAt);
+        result.DeliveredAt.Should().Be(order.DeliveredAt);
+    }
+
+    [Fact]
     public async Task GetOrderDetailAsync_UnknownId_ThrowsNotFoundException()
     {
         var act = () => _sut.GetOrderDetailAsync(Guid.NewGuid());
