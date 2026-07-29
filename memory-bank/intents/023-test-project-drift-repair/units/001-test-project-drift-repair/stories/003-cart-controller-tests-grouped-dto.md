@@ -2,7 +2,7 @@
 id: 003-cart-controller-tests-grouped-dto
 unit: 001-test-project-drift-repair
 intent: 023-test-project-drift-repair
-status: implemented
+status: complete
 priority: must
 created: 2026-05-25T11:45:00Z
 assigned_bolt: 049-test-project-drift-repair

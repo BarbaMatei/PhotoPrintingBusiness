@@ -2,9 +2,9 @@
 unit: 001-sameday-api-client
 intent: 015-sameday-shipping-integration
 phase: inception
-status: draft
-created: 2026-05-25T10:10:00Z
-updated: 2026-05-25T10:10:00Z
+status: complete
+created: 2026-05-25T10:10:00.000Z
+updated: 2026-05-25T10:10:00.000Z
 ---
 
 # Unit Brief: Sameday API Client

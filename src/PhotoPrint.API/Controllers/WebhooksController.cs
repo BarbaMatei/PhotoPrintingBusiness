@@ -8,6 +8,7 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
 namespace PhotoPrint.API.Controllers;
@@ -22,6 +23,7 @@ public class WebhooksController : ControllerBase
     private readonly PhotoPrintDbContext _db;
     private readonly IOrderEmailService _orderEmailService;
     private readonly IOrderPhotoPromoter _photoPromoter;
+    private readonly IAwbCreationNotifier _awbNotifier;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly StripeSettings _stripeSettings;
     private readonly EuPlatescSettings _euPlatescSettings;
@@ -34,6 +36,7 @@ public class WebhooksController : ControllerBase
         PhotoPrintDbContext db,
         IOrderEmailService orderEmailService,
         IOrderPhotoPromoter photoPromoter,
+        IAwbCreationNotifier awbNotifier,
         IHubContext<AdminOrderHub> hub,
         IOptions<StripeSettings> stripeSettings,
         IOptions<EuPlatescSettings> euPlatescSettings,
@@ -45,6 +48,7 @@ public class WebhooksController : ControllerBase
         _db = db;
         _orderEmailService = orderEmailService;
         _photoPromoter = photoPromoter;
+        _awbNotifier = awbNotifier;
         _hub = hub;
         _stripeSettings = stripeSettings.Value;
         _euPlatescSettings = euPlatescSettings.Value;
@@ -183,6 +187,9 @@ public class WebhooksController : ControllerBase
             // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
             // the worker picks up and uploads asynchronously (ADR-010).
             await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
+            // Bolt 037: enqueue Sameday AWB creation off the hot path.
+            // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
+            await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
         }
         else if (action != "0" && order.Status == OrderStatus.AwaitingPayment)
         {
@@ -225,6 +232,9 @@ public class WebhooksController : ControllerBase
             // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
             // the worker picks up and uploads asynchronously (ADR-010).
             await _photoPromoter.EnqueueAsync(order.Id, ct);
+            // Bolt 037: enqueue Sameday AWB creation off the hot path.
+            // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
+            await _awbNotifier.NotifyPaidAsync(order.Id, ct);
         }
     }
 

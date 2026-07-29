@@ -5,16 +5,30 @@ import {
   ChangeDetectionStrategy,
   signal,
   computed,
+  DestroyRef,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
-import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, take, map, tap } from 'rxjs/operators';
+import { merge, of, Subject } from 'rxjs';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ShippingService } from '../../../core/services/shipping.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { GuestAuthService } from '../../../core/services/guest-auth.service';
 import { LockerMapComponent } from '../components/locker-map';
 import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models/shipping.model';
+
+// Mirror the server's phone rule (charset + realistic digit count) so a bad phone is caught at the
+// client gate, not only at CreateOrder.
+const PHONE_PATTERN = /^[0-9+\s().\-]{6,20}$/;
+function phoneDigits(control: AbstractControl): ValidationErrors | null {
+  const value = (control.value as string) ?? '';
+  if (!value) return null; // Validators.required owns the empty case
+  const digits = (value.match(/\d/g) ?? []).length;
+  return digits >= 9 && digits <= 15 ? null : { phone: true };
+}
 
 @Component({
   selector: 'app-delivery-step',
@@ -82,8 +96,14 @@ import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models
             </div>
           }
 
-          @if (citySearch.value && lockers().length === 0) {
+          @if (citySearch.value && lockers().length === 0 && !lockerSearchError()) {
             <div class="no-lockers">Niciun easybox găsit pentru acest oraș.</div>
+          }
+
+          @if (lockerSearchError()) {
+            <div class="search-error">
+              Căutarea a eșuat. <button type="button" class="retry-link" (click)="retrySearch()">Reîncearcă</button>
+            </div>
           }
 
           <app-locker-map
@@ -95,6 +115,23 @@ import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models
           @if (showLockerError()) {
             <div class="field-error">Selectează un easybox pentru a continua.</div>
           }
+
+          <form [formGroup]="easyboxContactForm" class="address-form" novalidate>
+            <div class="form-group">
+              <label for="ebName">Nume destinatar</label>
+              <input id="ebName" type="text" formControlName="recipientName" />
+              @if (easyboxContactForm.get('recipientName')?.touched && easyboxContactForm.get('recipientName')?.invalid) {
+                <span class="field-error">Câmp obligatoriu</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="ebPhone">Telefon</label>
+              <input id="ebPhone" type="tel" formControlName="phone" />
+              @if (easyboxContactForm.get('phone')?.touched && easyboxContactForm.get('phone')?.invalid) {
+                <span class="field-error">Câmp obligatoriu</span>
+              }
+            </div>
+          </form>
         </div>
       }
 
@@ -271,7 +308,14 @@ export class DeliveryStep implements OnInit {
   private readonly router = inject(Router);
   private readonly shippingService = inject(ShippingService);
   readonly checkoutState = inject(CheckoutStateService);
+  private readonly auth = inject(AuthService);
+  private readonly guestAuth = inject(GuestAuthService);
   private readonly fb = inject(FormBuilder);
+  private readonly destroyRef = inject(DestroyRef);
+
+  // Fires the full-locker-list prime through the search stream (so switchMap cancels a superseded
+  // fetch). Only fired when Easybox is active — a courier-only user never triggers a locker fetch.
+  private readonly primeLockers$ = new Subject<void>();
 
   readonly counties = ROMANIAN_COUNTIES;
 
@@ -283,6 +327,7 @@ export class DeliveryStep implements OnInit {
   readonly lockers = signal<LockerDto[]>([]);
   readonly selectedLockerId = signal<string | null>(this.checkoutState.snapshot.lockerId);
   readonly showLockerError = signal(false);
+  readonly lockerSearchError = signal(false);
 
   readonly citySearch = this.fb.control('');
 
@@ -294,16 +339,32 @@ export class DeliveryStep implements OnInit {
     county: ['', Validators.required],
     postalCode: ['', Validators.required],
     recipientName: ['', Validators.required],
-    phone: ['', Validators.required],
+    phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
   });
 
-  private readonly citySearch$ = new Subject<string>();
+  // Easybox still needs a person + phone for the courier to notify; the locker
+  // supplies the address.
+  readonly easyboxContactForm = this.fb.group({
+    recipientName: ['', Validators.required],
+    phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
+  });
+
+  // Form validity is not a signal, so mirror it into one — otherwise the computed
+  // below memoizes a stale value and the button never re-enables after typing.
+  private readonly easyboxContactValid = toSignal(
+    this.easyboxContactForm.statusChanges.pipe(map(s => s === 'VALID')),
+    { initialValue: this.easyboxContactForm.valid },
+  );
+  private readonly addressValid = toSignal(
+    this.addressForm.statusChanges.pipe(map(s => s === 'VALID')),
+    { initialValue: this.addressForm.valid },
+  );
 
   readonly canContinue = computed(() => {
     const method = this.deliveryMethod();
     if (!method) return false;
-    if (method === 'Easybox') return !!this.selectedLockerId();
-    return this.addressForm.valid;
+    if (method === 'Easybox') return !!this.selectedLockerId() && this.easyboxContactValid();
+    return this.addressValid();
   });
 
   ngOnInit(): void {
@@ -311,29 +372,77 @@ export class DeliveryStep implements OnInit {
     this.shippingService.getShippingCost('Easybox').subscribe(r => this.easyboxCostRon.set(r.costRon));
     this.shippingService.getShippingCost('Courier').subscribe(r => this.courierCostRon.set(r.costRon));
 
-    // Restore address form if previously saved
+    // Restore a previously entered address / contact.
     const saved = this.checkoutState.snapshot.shippingAddress;
-    if (saved) this.addressForm.patchValue(saved);
+    if (saved) {
+      this.addressForm.patchValue(saved);
+      this.easyboxContactForm.patchValue({ recipientName: saved.recipientName, phone: saved.phone });
+    }
 
-    // City search with debounce
-    this.citySearch.valueChanges
+    this.prefillEasyboxContact();
+
+    // Locker search + the full-list prime run through ONE stream so switchMap cancels a superseded
+    // fetch (a debounced search cancels an in-flight prime — never the reverse). The prime leg is
+    // only fired for Easybox, so a courier-only user never triggers a locker fetch.
+    merge(
+      this.citySearch.valueChanges.pipe(debounceTime(300), distinctUntilChanged()),
+      this.primeLockers$.pipe(map(() => this.citySearch.value ?? '')),
+    )
       .pipe(
-        debounceTime(300),
-        distinctUntilChanged(),
+        tap(() => this.lockerSearchError.set(false)), // clear a prior error as the new fetch starts
         switchMap(city =>
-          city && city.trim().length >= 2
+          (city && city.trim().length >= 2
             ? this.shippingService.getLockers(city.trim())
-            : [[]],
+            : this.shippingService.getLockers('')
+          ).pipe(catchError(() => { this.lockerSearchError.set(true); return of([] as LockerDto[]); })),
         ),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(results => this.lockers.set(results));
+
+    // Prime the list only when Easybox is the (restored) active method. Subscribe-then-next: this
+    // runs AFTER the subscription above, so the emission is never dropped.
+    if (this.checkoutState.snapshot.method === 'Easybox') {
+      this.primeLockers$.next();
+    }
+  }
+
+  private prefillEasyboxContact(): void {
+    const c = this.easyboxContactForm;
+
+    // Guest checkout keeps contact under the guestSession key — read it through the service that
+    // owns that key/shape (not an inline localStorage parse that would silently drift).
+    const guest = this.guestAuth.getStoredSession();
+    if (guest) {
+      const name = [guest.firstName, guest.lastName].filter(Boolean).join(' ').trim();
+      if (!c.value.recipientName && name) c.patchValue({ recipientName: name });
+      if (!c.value.phone && guest.phone) c.patchValue({ phone: guest.phone });
+    }
+
+    // Signed-in display name (phone isn't exposed on the client-side user).
+    this.auth.currentUser$.pipe(take(1)).subscribe(user => {
+      if (user?.displayName && !c.value.recipientName) {
+        c.patchValue({ recipientName: user.displayName });
+      }
+    });
   }
 
   selectMethod(method: DeliveryType): void {
+    if (this.deliveryMethod() === method) return; // a no-op re-click must not wipe a restored locker
     this.deliveryMethod.set(method);
+    // Mirror the state setMethod clears: without this the stale selectedLockerId leaves canContinue
+    // true and payment posts a null lockerId.
+    this.selectedLockerId.set(null);
     this.showLockerError.set(false);
+    this.lockerSearchError.set(false);
     const cost = method === 'Easybox' ? this.easyboxCostRon() : this.courierCostRon();
     this.checkoutState.setMethod(method, cost);
+    if (method === 'Easybox') this.primeLockers$.next();
+  }
+
+  retrySearch(): void {
+    this.lockerSearchError.set(false);
+    this.primeLockers$.next(); // re-enter the same stream (keeps switchMap cancellation)
   }
 
   selectLocker(locker: LockerDto): void {
@@ -344,8 +453,9 @@ export class DeliveryStep implements OnInit {
 
   continue(): void {
     if (!this.canContinue()) {
-      if (this.deliveryMethod() === 'Easybox' && !this.selectedLockerId()) {
-        this.showLockerError.set(true);
+      if (this.deliveryMethod() === 'Easybox') {
+        if (!this.selectedLockerId()) this.showLockerError.set(true);
+        this.easyboxContactForm.markAllAsTouched();
       }
       if (this.deliveryMethod() === 'Courier') {
         this.addressForm.markAllAsTouched();
@@ -364,6 +474,12 @@ export class DeliveryStep implements OnInit {
         postalCode: val['postalCode'] ?? '',
         recipientName: val['recipientName'] ?? '',
         phone: val['phone'] ?? '',
+      });
+    } else if (this.deliveryMethod() === 'Easybox') {
+      const c = this.easyboxContactForm.value;
+      this.checkoutState.setEasyboxContact({
+        recipientName: c.recipientName ?? '',
+        phone: c.phone ?? '',
       });
     }
 

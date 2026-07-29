@@ -2,7 +2,7 @@
 id: 003-euplatesc-initiate-idempotency
 unit: 002-payment-idempotency
 intent: 014-payment-hardening
-status: implemented
+status: complete
 priority: must
 created: 2026-05-25T10:05:00Z
 assigned_bolt: 035-payment-idempotency

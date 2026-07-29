@@ -1,14 +1,16 @@
 # Global Story Index
 
 ## Overview
-- **Total stories**: 122 (114 prior + 8 from intent 024; 1 superseded: 019-003)
-- **Generated**: 103
-- **Implemented**: 28 (bolts 033 + 034 + 035 + 040 + 041 + 042 + 043 + 049)
-- **Intents complete**: 013, 014, 017, 018, 019, 023
-- **Planned (not yet story-filed)**: 11
-- **Last updated**: 2026-05-27T11:45:00Z
-- **Last index change**: 2026-05-29T08:30:00Z
-- **Note**: intent 019 **complete** — unit 001 (bolt 042) + unit 002 (bolt 043, two-tier cloud adapter) shipped. Story 019-003 superseded → backfill is intent 024 / bolt 051. Order-photo lifecycle is intent **024** (bolts 051–053, planned).
+- **Total story listings**: 155 (+ 6 intents documented inline without per-story listings)
+- **Story files on disk**: 142
+- **Implemented**: 80 listings (across 44 shipped bolts) + 8 COMPLETE (intent 024) + 46 GENERATED-but-actually-shipped (early intents 001–003, 005)
+- **Intents complete**: 001, 002, 003, 004, 005, 006, 007, 008, 009, 010, 012, 013, 014, 015, 017, 018, 019, 023, 024
+- **Intents planned**: 016 (VAT/e-Factura), 020 (observability), 021 (Redis), 022 (coupons)
+- **Bolts planned**: 038, 039, 044, 045, 046, 047, 048 (7 bolts → 20 stories)
+- **Last updated**: 2026-06-02
+- **Last index change**: 2026-06-02 (drift repair — see notes below)
+- **Note**: intent 024 (order-photo archive) shipped 2026-05-30 → 2026-06-01 (bolts 051, 052, 053). Intent 015 (Sameday shipping integration) shipped 2026-06-02 (bolts 036, 037). Story 019-003 superseded → backfill done via intent 024 bolt 051. Bolt 050 is unallocated (no directory exists).
+- **Drift-repair note (2026-06-02)**: prior to this edit, the index undercounted ~51 stories. Flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED`: all stories under intents 004, 010, 012, 015, 023. Added sections for intents 005–009 + 011 which were missing from the index entirely.
 
 ---
 
@@ -296,37 +298,37 @@
 
 #### Unit: 001-upload-and-cart-backend (6 stories)
 
-### 001-upload-entity-schema.md ⬜ NOT STARTED
+### 001-upload-entity-schema.md ✅ IMPLEMENTED
 **Title**: Upload entity, IStorageService, and storage path convention
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/001-upload-and-cart-backend/stories/001-upload-entity-schema.md`
 **Bolt**: 012 | **Epic story**: US-202
 
-### 002-upload-endpoint.md ⬜ NOT STARTED
+### 002-upload-endpoint.md ✅ IMPLEMENTED
 **Title**: POST /api/uploads with MIME validation, ImageSharp, and rate limiting
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/001-upload-and-cart-backend/stories/002-upload-endpoint.md`
 **Bolt**: 012 | **Epic story**: US-202
 
-### 003-upload-preview-and-cleanup.md ⬜ NOT STARTED
+### 003-upload-preview-and-cleanup.md ✅ IMPLEMENTED
 **Title**: Upload preview endpoint and hourly cleanup background job
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/001-upload-and-cart-backend/stories/003-upload-preview-and-cleanup.md`
 **Bolt**: 012 | **Epic story**: US-202
 
-### 004-cart-item-entity.md ⬜ NOT STARTED
+### 004-cart-item-entity.md ✅ IMPLEMENTED
 **Title**: CartItem EF Core entity and migration
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/001-upload-and-cart-backend/stories/004-cart-item-entity.md`
 **Bolt**: 013 | **Epic story**: US-206
 
-### 005-cart-crud-endpoints.md ⬜ NOT STARTED
+### 005-cart-crud-endpoints.md ✅ IMPLEMENTED
 **Title**: POST/GET/DELETE /api/cart with computed totals
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/001-upload-and-cart-backend/stories/005-cart-crud-endpoints.md`
 **Bolt**: 013 | **Epic story**: US-206
 
-### 006-cart-merge-endpoint.md ⬜ NOT STARTED
+### 006-cart-merge-endpoint.md ✅ IMPLEMENTED
 **Title**: POST /api/cart/merge — transactional guest-to-user cart merge
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/001-upload-and-cart-backend/stories/006-cart-merge-endpoint.md`
@@ -336,31 +338,31 @@
 
 #### Unit: 002-upload-format-cart-ui (5 stories)
 
-### 001-upload-page.md ⬜ NOT STARTED
+### 001-upload-page.md ✅ IMPLEMENTED
 **Title**: Drag-and-drop upload page with progress bars and thumbnail grid
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/002-upload-format-cart-ui/stories/001-upload-page.md`
 **Bolt**: 014 | **Epic story**: US-201
 
-### 002-format-finish-selector.md ⬜ NOT STARTED
+### 002-format-finish-selector.md ✅ IMPLEMENTED
 **Title**: Global format/finish selector with reactive quality badge recalculation
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/002-upload-format-cart-ui/stories/002-format-finish-selector.md`
 **Bolt**: 014 | **Epic story**: US-203
 
-### 003-order-summary-panel.md ⬜ NOT STARTED
+### 003-order-summary-panel.md ✅ IMPLEMENTED
 **Title**: Sticky live order summary panel with quantity steppers and add-to-cart CTA
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/002-upload-format-cart-ui/stories/003-order-summary-panel.md`
 **Bolt**: 014 | **Epic story**: US-203
 
-### 004-cart-page.md ⬜ NOT STARTED
+### 004-cart-page.md ✅ IMPLEMENTED
 **Title**: Cart page /cos with item list, edit controls, and navigation
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/002-upload-format-cart-ui/stories/004-cart-page.md`
 **Bolt**: 014 | **Epic story**: US-205
 
-### 005-cart-service.md ⬜ NOT STARTED
+### 005-cart-service.md ✅ IMPLEMENTED
 **Title**: CartService with localStorage/server sync, merge on login, and item count badge
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/002-upload-format-cart-ui/stories/005-cart-service.md`
@@ -370,25 +372,25 @@
 
 #### Unit: 003-shipping-and-order-core (4 stories)
 
-### 001-easybox-locker-catalog.md ⬜ NOT STARTED
+### 001-easybox-locker-catalog.md ✅ IMPLEMENTED
 **Title**: EasyboxLocker entity and seeded migration with ~200 Romanian lockers
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/003-shipping-and-order-core/stories/001-easybox-locker-catalog.md`
 **Bolt**: 015 | **Epic story**: US-302
 
-### 002-shipping-endpoints.md ⬜ NOT STARTED
+### 002-shipping-endpoints.md ✅ IMPLEMENTED
 **Title**: GET /api/shipping/lockers and /cost endpoints with IShippingService abstraction
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/003-shipping-and-order-core/stories/002-shipping-endpoints.md`
 **Bolt**: 015 | **Epic story**: US-302
 
-### 003-order-entity-schema.md ⬜ NOT STARTED
+### 003-order-entity-schema.md ✅ IMPLEMENTED
 **Title**: Order and OrderItem entities with JSONB fields, enums, and FT-YYYYNNNN order number
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/003-shipping-and-order-core/stories/003-order-entity-schema.md`
 **Bolt**: 015 | **Epic story**: US-305
 
-### 004-order-status-machine.md ⬜ NOT STARTED
+### 004-order-status-machine.md ✅ IMPLEMENTED
 **Title**: OrderStatus enum and OrderStatusMachine valid transition enforcement
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/003-shipping-and-order-core/stories/004-order-status-machine.md`
@@ -398,31 +400,31 @@
 
 #### Unit: 004-payment-backends (5 stories)
 
-### 001-order-service.md ⬜ NOT STARTED
+### 001-order-service.md ✅ IMPLEMENTED
 **Title**: IOrderService — create order from cart with pricing snapshot and order number generation
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/001-order-service.md`
 **Bolt**: 016 | **Epic story**: US-305
 
-### 002-stripe-payment-intent.md ⬜ NOT STARTED
+### 002-stripe-payment-intent.md ✅ IMPLEMENTED
 **Title**: POST /api/payments/stripe/intent — PaymentIntent creation and pending order
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/002-stripe-payment-intent.md`
 **Bolt**: 016 | **Epic story**: US-305
 
-### 003-stripe-webhook-handler.md ⬜ NOT STARTED
+### 003-stripe-webhook-handler.md ✅ IMPLEMENTED
 **Title**: POST /api/webhooks/stripe — signature verification, idempotency, order status transitions
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/003-stripe-webhook-handler.md`
 **Bolt**: 016 | **Epic story**: US-305
 
-### 004-euplatesc-initiate.md ⬜ NOT STARTED
+### 004-euplatesc-initiate.md ✅ IMPLEMENTED
 **Title**: POST /api/payments/euplatesc/initiate — HMAC-MD5 signed redirect URL generation
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/004-euplatesc-initiate.md`
 **Bolt**: 016 | **Epic story**: US-306
 
-### 005-euplatesc-ipn-handler.md ⬜ NOT STARTED
+### 005-euplatesc-ipn-handler.md ✅ IMPLEMENTED
 **Title**: POST /api/webhooks/euplatesc — IPN validation, amount check, EuPlatesc spec response
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/005-euplatesc-ipn-handler.md`
@@ -432,37 +434,37 @@
 
 #### Unit: 005-checkout-ui (6 stories)
 
-### 001-checkout-stepper.md ⬜ NOT STARTED
+### 001-checkout-stepper.md ✅ IMPLEMENTED
 **Title**: Checkout stepper component and CheckoutStateService with sessionStorage persistence
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/001-checkout-stepper.md`
 **Bolt**: 017 | **Epic story**: US-301
 
-### 002-delivery-step.md ⬜ NOT STARTED
+### 002-delivery-step.md ✅ IMPLEMENTED
 **Title**: Delivery method selection step — Easybox cards and home delivery address form
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/002-delivery-step.md`
 **Bolt**: 017 | **Epic story**: US-301
 
-### 003-locker-map-component.md ⬜ NOT STARTED
+### 003-locker-map-component.md ✅ IMPLEMENTED
 **Title**: Leaflet.js locker map with city search, pin rendering, and locker selection
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/003-locker-map-component.md`
 **Bolt**: 017 | **Epic story**: US-301
 
-### 004-order-review-step.md ⬜ NOT STARTED
+### 004-order-review-step.md ✅ IMPLEMENTED
 **Title**: Order review step with read-only summary, grand total, and terms acceptance gate
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/004-order-review-step.md`
 **Bolt**: 017 | **Epic story**: US-303
 
-### 005-payment-step.md ⬜ NOT STARTED
+### 005-payment-step.md ✅ IMPLEMENTED
 **Title**: Payment step with Stripe Elements tab and EuPlatesc redirect tab
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/005-payment-step.md`
 **Bolt**: 017 | **Epic story**: US-304
 
-### 006-order-confirmation-page.md ⬜ NOT STARTED
+### 006-order-confirmation-page.md ✅ IMPLEMENTED
 **Title**: Order confirmation page with status stepper, guest CTA, and cart state reset
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/006-order-confirmation-page.md`
@@ -470,11 +472,85 @@
 
 ---
 
+### 005-order-management
+
+> Bolts: 018 (orders-api) ✅ IMPLEMENTED · 019 (orders-ui) ✅ IMPLEMENTED. Five stories on disk.
+
+#### Unit: 001-orders-api (2 stories) — Bolt: 018
+
+### 001-orders-list-endpoint.md ✅ IMPLEMENTED
+**Title**: Paginated `GET /api/orders` with `X-Total-Count`
+**Priority**: Must
+**Path**: `intents/005-order-management/units/001-orders-api/stories/001-orders-list-endpoint.md`
+**Bolt**: 018
+
+### 002-order-detail-endpoint.md ✅ IMPLEMENTED
+**Title**: Ownership-checked `GET /api/orders/{id}` with full DTOs
+**Priority**: Must
+**Path**: `intents/005-order-management/units/001-orders-api/stories/002-order-detail-endpoint.md`
+**Bolt**: 018
+
+#### Unit: 002-orders-ui (3 stories) — Bolt: 019
+
+### 003-order-status-pipe.md ✅ IMPLEMENTED
+**Title**: `OrderStatusPipe` + `STATUS_ORDER` constants
+**Priority**: Must
+**Path**: `intents/005-order-management/units/002-orders-ui/stories/003-order-status-pipe.md`
+**Bolt**: 019
+
+### 001-order-history-page.md ✅ IMPLEMENTED
+**Title**: Paginated order list at `/comenzi`
+**Priority**: Must
+**Path**: `intents/005-order-management/units/002-orders-ui/stories/001-order-history-page.md`
+**Bolt**: 019
+
+### 002-order-detail-page.md ✅ IMPLEMENTED
+**Title**: Full order detail at `/comenzi/:id`
+**Priority**: Must
+**Path**: `intents/005-order-management/units/002-orders-ui/stories/002-order-detail-page.md`
+**Bolt**: 019
+
+---
+
+### 006-email-notifications
+
+> Bolt: 020 (transactional-emails) ✅ IMPLEMENTED. No story files on disk — bolt was built directly from the intent brief (`intents/006-email-notifications/`). Records 4 transactional flows: registration confirmation, password reset, order confirmation, shipping notification.
+
+---
+
+### 007-admin-panel
+
+> Bolts: 021 (admin-api) ✅ IMPLEMENTED · 022 (admin-ui) ✅ IMPLEMENTED. No story files on disk — bolts built directly from the intent brief (`intents/007-admin-panel/`). Covers admin order management, product CRUD, dashboard metrics.
+
+---
+
+### 008-user-account
+
+> Bolts: 023 (account-api) ✅ IMPLEMENTED · 024 (account-ui) ✅ IMPLEMENTED. No story files on disk — bolts built directly from the intent brief (`intents/008-user-account/`). Covers profile editing, password change, address book.
+
+---
+
+### 009-background-jobs
+
+> Bolt: 025 (background-jobs) ✅ IMPLEMENTED. No story files on disk — bolt built directly from the intent brief (`intents/009-background-jobs/`). Covers guest-session cleanup, expired-upload cleanup, retention sweeps.
+
+---
+
+### 011-web-design-review
+
+> No bolts directly attached — this intent captured findings that fed into intent 012 (ui-polish, bolts 027–032 ✅ all IMPLEMENTED). No story files on disk; the artefact is the review document itself.
+
+---
+
 ## Stories by Status
 
-- **Generated**: 85
-- **In Progress**: 0
-- **Completed**: 17 (all of 001-foundation-infrastructure)
+(counts from the per-story listing lines)
+
+- **✅ IMPLEMENTED**: 80
+- **✅ COMPLETE** (intent 024 specifically): 8
+- **✅ GENERATED**: 46 — these are intent 001/002/003 stories that *are* implemented but the index was authored before that and never reclassified; treat as IMPLEMENTED
+- **⬜ NOT STARTED**: 20 (intents 016, 020, 021, 022 — 7 planned bolts)
+- **♻️ SUPERSEDED**: 1 (story 019-003 → folded into intent 024 bolt 051)
 
 ---
 
@@ -482,13 +558,13 @@
 
 #### Unit: 001-photo-lightbox-ui (2 stories)
 
-### 001-photo-lightbox-component.md ⬜ NOT STARTED
+### 001-photo-lightbox-component.md ✅ IMPLEMENTED
 **Title**: Photo lightbox overlay component
 **Priority**: Must
 **Path**: `intents/010-photo-lightbox/units/001-photo-lightbox-ui/stories/001-photo-lightbox-component.md`
 **Bolt**: 026
 
-### 002-thumbnail-click-integration.md ⬜ NOT STARTED
+### 002-thumbnail-click-integration.md ✅ IMPLEMENTED
 **Title**: Wire thumbnail click to open lightbox in format-selector
 **Priority**: Must
 **Path**: `intents/010-photo-lightbox/units/001-photo-lightbox-ui/stories/002-thumbnail-click-integration.md`
@@ -502,13 +578,13 @@
 
 #### Unit: 001-auth-scss-refactor (2 stories) — Bolt: 027
 
-### 001-extract-auth-shared-styles.md ⬜ NOT STARTED
+### 001-extract-auth-shared-styles.md ✅ IMPLEMENTED
 **Title**: Extract shared auth layout styles into `_auth-forms.scss` partial
 **Priority**: Must
 **Path**: `intents/012-ui-polish/units/001-auth-scss-refactor/stories/001-extract-auth-shared-styles.md`
 **Bolt**: 027
 
-### 002-remove-local-spinner-animation.md ⬜ NOT STARTED
+### 002-remove-local-spinner-animation.md ✅ IMPLEMENTED
 **Title**: Remove local `.spinner` CSS from register page; confirm `<app-spinner>` usage
 **Priority**: Must
 **Path**: `intents/012-ui-polish/units/001-auth-scss-refactor/stories/002-remove-local-spinner-animation.md`
@@ -518,25 +594,25 @@
 
 #### Unit: 002-shared-components-adoption (4 stories) — Bolt: 028
 
-### 001-audit-pages-for-inline-loading.md ⬜ NOT STARTED
+### 001-audit-pages-for-inline-loading.md ✅ IMPLEMENTED
 **Title**: Audit all feature pages for inline loading/empty-state patterns
 **Priority**: Must
 **Path**: `intents/012-ui-polish/units/002-shared-components-adoption/stories/001-audit-pages-for-inline-loading.md`
 **Bolt**: 028
 
-### 002-replace-inline-patterns-admin.md ⬜ NOT STARTED
+### 002-replace-inline-patterns-admin.md ✅ IMPLEMENTED
 **Title**: Replace inline loading/empty patterns in admin pages with shared components
 **Priority**: Must
 **Path**: `intents/012-ui-polish/units/002-shared-components-adoption/stories/002-replace-inline-patterns-admin.md`
 **Bolt**: 028
 
-### 003-replace-inline-patterns-catalog.md ⬜ NOT STARTED
+### 003-replace-inline-patterns-catalog.md ✅ IMPLEMENTED
 **Title**: Replace inline loading/empty patterns in product catalog pages
 **Priority**: Must
 **Path**: `intents/012-ui-polish/units/002-shared-components-adoption/stories/003-replace-inline-patterns-catalog.md`
 **Bolt**: 028
 
-### 004-replace-inline-patterns-profile-cart.md ⬜ NOT STARTED
+### 004-replace-inline-patterns-profile-cart.md ✅ IMPLEMENTED
 **Title**: Replace inline loading/empty patterns in profile and cart pages
 **Priority**: Must
 **Path**: `intents/012-ui-polish/units/002-shared-components-adoption/stories/004-replace-inline-patterns-profile-cart.md`
@@ -546,25 +622,25 @@
 
 #### Unit: 003-global-ui-primitives (4 stories) — Bolts: 029, 030
 
-### 001-create-buttons-partial.md ⬜ NOT STARTED
+### 001-create-buttons-partial.md ✅ IMPLEMENTED
 **Title**: Create `_buttons.scss` global partial with all button variants
 **Priority**: Should
 **Path**: `intents/012-ui-polish/units/003-global-ui-primitives/stories/001-create-buttons-partial.md`
 **Bolt**: 029
 
-### 002-remove-local-btn-definitions.md ⬜ NOT STARTED
+### 002-remove-local-btn-definitions.md ✅ IMPLEMENTED
 **Title**: Remove duplicate `.btn` definitions from all feature SCSS files
 **Priority**: Should
 **Path**: `intents/012-ui-polish/units/003-global-ui-primitives/stories/002-remove-local-btn-definitions.md`
 **Bolt**: 029
 
-### 003-breadcrumb-standalone-component.md ⬜ NOT STARTED
+### 003-breadcrumb-standalone-component.md ✅ IMPLEMENTED
 **Title**: Create reusable `BreadcrumbComponent` with `title` and `backLink` inputs
 **Priority**: Could
 **Path**: `intents/012-ui-polish/units/003-global-ui-primitives/stories/003-breadcrumb-standalone-component.md`
 **Bolt**: 030
 
-### 004-wire-breadcrumb-admin-order-detail.md ⬜ NOT STARTED
+### 004-wire-breadcrumb-admin-order-detail.md ✅ IMPLEMENTED
 **Title**: Replace inline breadcrumb in admin-order-detail-page with `<app-breadcrumb>`
 **Priority**: Could
 **Path**: `intents/012-ui-polish/units/003-global-ui-primitives/stories/004-wire-breadcrumb-admin-order-detail.md`
@@ -574,19 +650,19 @@
 
 #### Unit: 004-responsive-ux-fixes (3 stories) — Bolts: 031, 032
 
-### 001-show-hamburger-at-md-breakpoint.md ⬜ NOT STARTED
+### 001-show-hamburger-at-md-breakpoint.md ✅ IMPLEMENTED
 **Title**: Show header hamburger at 768px so tablet users have navigation
 **Priority**: Should
 **Path**: `intents/012-ui-polish/units/004-responsive-ux-fixes/stories/001-show-hamburger-at-md-breakpoint.md`
 **Bolt**: 031
 
-### 002-extract-password-checklist-component.md ⬜ NOT STARTED
+### 002-extract-password-checklist-component.md ✅ IMPLEMENTED
 **Title**: Extract register page password checklist into shared `PasswordChecklistComponent`
 **Priority**: Could
 **Path**: `intents/012-ui-polish/units/004-responsive-ux-fixes/stories/002-extract-password-checklist-component.md`
 **Bolt**: 032
 
-### 003-wire-checklist-profile-page.md ⬜ NOT STARTED
+### 003-wire-checklist-profile-page.md ✅ IMPLEMENTED
 **Title**: Add `<app-password-checklist>` to profile change-password form
 **Priority**: Could
 **Path**: `intents/012-ui-polish/units/004-responsive-ux-fixes/stories/003-wire-checklist-profile-page.md`
@@ -663,19 +739,19 @@
 
 #### Unit: 001-sameday-api-client (3 stories) — Bolt: 036
 
-### 001-sameday-settings-and-typed-client.md ⬜ NOT STARTED
+### 001-sameday-settings-and-typed-client.md ✅ IMPLEMENTED
 **Title**: SamedaySettings, typed HTTP client, Polly retry + rate-limit policies
 **Priority**: Must
 **Path**: `intents/015-sameday-shipping-integration/units/001-sameday-api-client/stories/001-sameday-settings-and-typed-client.md`
 **Bolt**: 036
 
-### 002-token-auth-and-refresh.md ⬜ NOT STARTED
+### 002-token-auth-and-refresh.md ✅ IMPLEMENTED
 **Title**: Token endpoint authentication + 401-retry-once refresh
 **Priority**: Must
 **Path**: `intents/015-sameday-shipping-integration/units/001-sameday-api-client/stories/002-token-auth-and-refresh.md`
 **Bolt**: 036
 
-### 003-sameday-schema-additions.md ⬜ NOT STARTED
+### 003-sameday-schema-additions.md ✅ IMPLEMENTED
 **Title**: EF migration adding `AwbLabelUrl` + `LastTrackingSyncAt` to Orders
 **Priority**: Must
 **Path**: `intents/015-sameday-shipping-integration/units/001-sameday-api-client/stories/003-sameday-schema-additions.md`
@@ -683,19 +759,19 @@
 
 #### Unit: 002-awb-and-tracking-jobs (3 stories) — Bolt: 037
 
-### 001-awb-creation-on-paid.md ⬜ NOT STARTED
+### 001-awb-creation-on-paid.md ✅ IMPLEMENTED
 **Title**: Auto-create AWB when order transitions to Paid
 **Priority**: Must
 **Path**: `intents/015-sameday-shipping-integration/units/002-awb-and-tracking-jobs/stories/001-awb-creation-on-paid.md`
 **Bolt**: 037
 
-### 002-awb-retry-job.md ⬜ NOT STARTED
+### 002-awb-retry-job.md ✅ IMPLEMENTED
 **Title**: BackgroundService retries failed AWB creations hourly with cap
 **Priority**: Must
 **Path**: `intents/015-sameday-shipping-integration/units/002-awb-and-tracking-jobs/stories/002-awb-retry-job.md`
 **Bolt**: 037
 
-### 003-shipment-tracking-job.md ⬜ NOT STARTED
+### 003-shipment-tracking-job.md ✅ IMPLEMENTED
 **Title**: Background polling auto-transitions Shipped → Delivered
 **Priority**: Should
 **Path**: `intents/015-sameday-shipping-integration/units/002-awb-and-tracking-jobs/stories/003-shipment-tracking-job.md`
@@ -981,25 +1057,25 @@
 
 #### Unit: 001-test-project-drift-repair (4 stories) — Bolt: 049
 
-### 001-uploadservicetests-mock-fileid.md ⬜ NOT STARTED
+### 001-uploadservicetests-mock-fileid.md ✅ IMPLEMENTED
 **Title**: Update Moq setup for the new `IStorageService.SaveAsync` 5-arg overload
 **Priority**: Must
 **Path**: `intents/023-test-project-drift-repair/units/001-test-project-drift-repair/stories/001-uploadservicetests-mock-fileid.md`
 **Bolt**: 049 ✅ IMPLEMENTED
 
-### 002-cartservicetests-grouped-dto.md ⬜ NOT STARTED
+### 002-cartservicetests-grouped-dto.md ✅ IMPLEMENTED
 **Title**: Adapt `CartServiceTests` assertions to grouped `CartResponseDto.Groups[].Items` shape
 **Priority**: Must
 **Path**: `intents/023-test-project-drift-repair/units/001-test-project-drift-repair/stories/002-cartservicetests-grouped-dto.md`
 **Bolt**: 049 ✅ IMPLEMENTED
 
-### 003-cart-controller-tests-grouped-dto.md ⬜ NOT STARTED
+### 003-cart-controller-tests-grouped-dto.md ✅ IMPLEMENTED
 **Title**: Adapt `CartControllerIntegrationTests` + pass `FinishName` on every request
 **Priority**: Must
 **Path**: `intents/023-test-project-drift-repair/units/001-test-project-drift-repair/stories/003-cart-controller-tests-grouped-dto.md`
 **Bolt**: 049 ✅ IMPLEMENTED
 
-### 004-suite-green-verification.md ⬜ NOT STARTED
+### 004-suite-green-verification.md ✅ IMPLEMENTED
 **Title**: Final `dotnet test` runs end-to-end with no file exclusions
 **Priority**: Must
 **Path**: `intents/023-test-project-drift-repair/units/001-test-project-drift-repair/stories/004-suite-green-verification.md`

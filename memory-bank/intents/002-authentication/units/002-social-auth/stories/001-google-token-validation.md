@@ -2,11 +2,11 @@
 id: 001-google-token-validation
 unit: 002-social-auth
 intent: 002-authentication
-status: draft
+status: complete
 priority: must
 created: 2026-05-20T12:56:00Z
 assigned_bolt: 006-social-auth
-implemented: false
+implemented: true
 ---
 
 # Story: 001-google-token-validation

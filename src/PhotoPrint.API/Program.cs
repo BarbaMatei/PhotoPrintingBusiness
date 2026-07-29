@@ -124,7 +124,15 @@ builder.Services.AddPhotoArchive(builder.Configuration);
 builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.Services.CartService>();
 
 // ── Shipping ──────────────────────────────────────────────────────────────────
-builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.StaticShippingService>();
+// Sameday integration (intent 015, bolt 036). The flag is read once at boot:
+//   - Sameday:Enabled = false → StaticShippingService (today's behaviour, default).
+//   - Sameday:Enabled = true  → SamedayShippingService + typed HttpClient + auth
+//                                handler. Flipping back to false produces a
+//                                byte-identical fallback (intent goal).
+builder.Services.AddSingleton<TimeProvider>(_ => TimeProvider.System);
+
+builder.Services.AddSamedayIntegration(builder.Configuration);
+
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderNumberService, PhotoPrint.API.Services.OrderNumberService>();
 
 // ── Payments ──────────────────────────────────────────────────────────────────

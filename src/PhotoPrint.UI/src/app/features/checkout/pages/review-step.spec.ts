@@ -122,4 +122,28 @@ describe('ReviewStep', () => {
     expect(grandEl.length).toBeGreaterThan(0);
     expect(grandEl[0].nativeElement.textContent).toContain('40');
   });
+
+  it('does not render a street-address line for an Easybox order', () => {
+    // The address line is gated on Courier. Seed Easybox WITH a leftover courier address (the real
+    // state after switching method) so the gate is what is under test — asserting on a null address
+    // would prove nothing, since Angular renders a missing value as blank either way.
+    stateSubject.next({
+      method: 'Easybox',
+      lockerId: 'l1',
+      lockerName: 'Box A',
+      shippingAddress: {
+        street: 'Str. Fantoma', number: '99', block: '',
+        city: 'Timișoara', county: 'Timiș', postalCode: '300000',
+        recipientName: 'Ana Pop', phone: '0712345678',
+      },
+      shippingCostRon: 20,
+    });
+    const fixture = createFixture();
+    fixture.detectChanges();
+
+    const summary = fixture.debugElement.query(By.css('.delivery-summary')).nativeElement as HTMLElement;
+    expect(summary.textContent).toContain('Box A');           // locker shown
+    expect(summary.textContent).not.toContain('Str. Fantoma'); // street line suppressed
+    expect(summary.textContent).not.toContain('Timișoara');
+  });
 });

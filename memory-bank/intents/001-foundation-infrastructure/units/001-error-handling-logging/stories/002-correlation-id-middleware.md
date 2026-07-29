@@ -2,11 +2,11 @@
 id: 002-correlation-id-middleware
 unit: 001-error-handling-logging
 intent: 001-foundation-infrastructure
-status: draft
+status: complete
 priority: must
 created: 2026-05-05T15:25:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 002-correlation-id-middleware

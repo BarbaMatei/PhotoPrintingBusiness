@@ -2,11 +2,11 @@
 id: 004-security-headers
 unit: 002-security-baselines
 intent: 001-foundation-infrastructure
-status: draft
+status: complete
 priority: must
 created: 2026-05-05T15:26:00Z
 assigned_bolt: null
-implemented: false
+implemented: true
 ---
 
 # Story: 004-security-headers

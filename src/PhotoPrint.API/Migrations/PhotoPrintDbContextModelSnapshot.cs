@@ -283,11 +283,21 @@ namespace PhotoPrint.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("AwbClaimedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AwbLabelUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("AwbNumber")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("DeliveredAt")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("DeliveryType")
@@ -318,6 +328,9 @@ namespace PhotoPrint.API.Migrations
                     b.Property<string>("InternalNotes")
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("LastTrackingSyncAt")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("OrderNumber")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -333,6 +346,9 @@ namespace PhotoPrint.API.Migrations
                     b.Property<string>("PaymentProcessor")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("ShippedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ShippingAddress")
                         .IsRequired()

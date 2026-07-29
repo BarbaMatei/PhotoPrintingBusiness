@@ -1,3 +1,4 @@
+using System.Linq;
 using FluentValidation;
 using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.Models;
@@ -6,6 +7,8 @@ namespace PhotoPrint.API.Validators.Payments;
 
 public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderRequest>
 {
+    private const string PhoneCharset = @"^[0-9+\s().\-]{6,20}$";
+
     public CreateOrderRequestValidator()
     {
         RuleFor(x => x.PaymentProcessor).IsInEnum();
@@ -15,6 +18,24 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
         {
             RuleFor(x => x.EasyboxLockerId).NotNull()
                 .WithMessage("Locker ID is required for Easybox delivery");
+
+            // The locker supplies the address, but Sameday still needs a person +
+            // phone to notify — captured on the Easybox checkout step.
+            RuleFor(x => x.ShippingAddress).NotNull()
+                .WithMessage("Recipient name and phone are required for Easybox delivery");
+
+            When(x => x.ShippingAddress != null, () =>
+            {
+                AddRecipientRules();
+                // Locker supplies the address; client-sent address text is unused downstream, so
+                // only bound its length to keep the persisted order snapshot small.
+                RuleFor(x => x.ShippingAddress!.Street).MaximumLength(255);
+                RuleFor(x => x.ShippingAddress!.Number).MaximumLength(50);
+                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100);
+                RuleFor(x => x.ShippingAddress!.City).MaximumLength(100);
+                RuleFor(x => x.ShippingAddress!.County).MaximumLength(100);
+                RuleFor(x => x.ShippingAddress!.PostalCode).MaximumLength(20);
+            });
         });
 
         When(x => x.DeliveryType == DeliveryType.Courier, () =>
@@ -24,10 +45,27 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
 
             When(x => x.ShippingAddress != null, () =>
             {
-                RuleFor(x => x.ShippingAddress!.City).NotEmpty();
-                RuleFor(x => x.ShippingAddress!.County).NotEmpty();
-                RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty();
+                AddRecipientRules();
+                RuleFor(x => x.ShippingAddress!.Street).NotEmpty().MaximumLength(255);
+                RuleFor(x => x.ShippingAddress!.Number).NotEmpty().MaximumLength(50);
+                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100);
+                RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(100);
+                RuleFor(x => x.ShippingAddress!.County).NotEmpty().MaximumLength(100);
+                RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty().MaximumLength(20);
             });
         });
     }
+
+    private void AddRecipientRules()
+    {
+        RuleFor(x => x.ShippingAddress!.RecipientName).NotEmpty().MaximumLength(255);
+        RuleFor(x => x.ShippingAddress!.Phone).NotEmpty().MaximumLength(20)
+            .Matches(PhoneCharset).WithMessage("Invalid phone number.")
+            .Must(HasEnoughDigits).WithMessage("Invalid phone number.");
+    }
+
+    // Charset+length alone accepts digit-poor junk ("1-2-3-4") that Sameday later rejects; require
+    // a realistic Romanian phone digit count.
+    private static bool HasEnoughDigits(string? phone) =>
+        phone is not null && phone.Count(char.IsDigit) is >= 9 and <= 15;
 }

@@ -306,6 +306,14 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
 
+            // ── Sameday integration (bolt 036) ─────────────────────────────
+            entity.Property(o => o.AwbLabelUrl).HasMaxLength(Order.MaxAwbLabelUrlLength).IsRequired(false);
+            entity.Property(o => o.LastTrackingSyncAt).IsRequired(false);
+
+            // ── Sameday tracking job (bolt 037) ────────────────────────────
+            entity.Property(o => o.ShippedAt).IsRequired(false);
+            entity.Property(o => o.DeliveredAt).IsRequired(false);
+
             // ── Idempotency (bolt 035) ──────────────────────────────────────
             entity.Property(o => o.IdempotencyKey).HasMaxLength(80);
             // DB-2 (review 035-v5): 512, not Stripe's exact 255-char ID ceiling. Today's

@@ -2,11 +2,11 @@
 id: 005-logout
 unit: 001-auth-core
 intent: 002-authentication
-status: draft
+status: complete
 priority: must
 created: 2026-05-20T12:55:00Z
 assigned_bolt: 005-auth-core
-implemented: false
+implemented: true
 ---
 
 # Story: 005-logout

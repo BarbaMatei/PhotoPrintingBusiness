@@ -3,22 +3,37 @@ id: 036-sameday-api-client
 unit: 001-sameday-api-client
 intent: 015-sameday-shipping-integration
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories:
   - 001-sameday-settings-and-typed-client
   - 002-token-auth-and-refresh
   - 003-sameday-schema-additions
-created: 2026-05-25T10:10:00Z
-started: null
-completed: null
+created: 2026-05-25T10:10:00.000Z
+started: 2026-06-02T09:00:00.000Z
+completed: "2026-06-02T14:29:35Z"
 current_stage: null
-stages_completed: []
-
-requires_bolts: [015-shipping-and-order-core]
-enables_bolts: [037-awb-and-tracking-jobs]
+stages_completed:
+  - name: domain-model
+    completed: 2026-06-02T09:30:00.000Z
+    artifact: ddd-01-domain-model.md
+  - name: technical-design
+    completed: 2026-06-02T10:00:00.000Z
+    artifact: ddd-02-technical-design.md
+  - name: adr-analysis
+    completed: 2026-06-02T10:20:00.000Z
+    artifact: adr-013-in-process-sameday-token-cache.md, adr-014-401-retry-in-auth-handler-not-polly.md
+  - name: implement
+    completed: 2026-06-02T14:40:00.000Z
+    artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-06-02T15:30:00.000Z
+    artifact: ddd-03-test-report.md
+requires_bolts:
+  - 015-shipping-and-order-core
+enables_bolts:
+  - 037-awb-and-tracking-jobs
 requires_units: []
 blocks: false
-
 complexity:
   avg_complexity: 3
   avg_uncertainty: 3

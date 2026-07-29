@@ -10,6 +10,7 @@ using PhotoPrint.API.DTOs.Orders;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
 namespace PhotoPrint.API.Services;
@@ -24,6 +25,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly IOriginalPurger _originalPurger;
     private readonly ArchiveSettings _archiveSettings;
     private readonly IHubContext<AdminOrderHub> _hub;
+    private readonly IAwbCreationNotifier _awbNotifier;
     private readonly ILogger<AdminOrderService> _logger;
 
     public AdminOrderService(
@@ -35,6 +37,7 @@ public class AdminOrderService : IAdminOrderService
         IOriginalPurger originalPurger,
         IOptions<ArchiveSettings> archiveSettings,
         IHubContext<AdminOrderHub> hub,
+        IAwbCreationNotifier awbNotifier,
         ILogger<AdminOrderService> logger)
     {
         _db = db;
@@ -45,6 +48,7 @@ public class AdminOrderService : IAdminOrderService
         _originalPurger = originalPurger;
         _archiveSettings = archiveSettings.Value;
         _hub = hub;
+        _awbNotifier = awbNotifier;
         _logger = logger;
     }
 
@@ -114,8 +118,21 @@ public class AdminOrderService : IAdminOrderService
 
         if (newStatus == OrderStatus.Shipped)
         {
-            order.AwbNumber = awbNumber;
-            order.TrackingUrl = trackingUrl;
+            // Preserve a machine-created AWB/tracking URL when the admin form omits it.
+            if (!string.IsNullOrWhiteSpace(awbNumber)) order.AwbNumber = awbNumber;
+            if (!string.IsNullOrWhiteSpace(trackingUrl)) order.TrackingUrl = trackingUrl;
+            order.ShippedAt = DateTimeOffset.UtcNow;
+        }
+        else if (newStatus == OrderStatus.Delivered && order.DeliveredAt is null)
+        {
+            // Admin-initiated Delivered (legacy or manual override path).
+            order.DeliveredAt = DateTimeOffset.UtcNow;
+        }
+        else if (newStatus == OrderStatus.Paid && order.PaidAt is null)
+        {
+            // Offline / manual reconciliation — PaidAt is what the AWB retry sweep
+            // keys off, so it must be stamped like the webhook Paid path does.
+            order.PaidAt = DateTimeOffset.UtcNow;
         }
 
         await _db.SaveChangesAsync(ct);
@@ -124,6 +141,11 @@ public class AdminOrderService : IAdminOrderService
             _orderEmailService.FireOrderShippedEmail(order);
         else if (newStatus == OrderStatus.Delivered)
             _orderEmailService.FireOrderDeliveredEmail(order);
+        else if (newStatus == OrderStatus.Paid)
+        {
+            _orderEmailService.FireOrderConfirmedEmail(order);
+            await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+        }
 
         await _hub.Clients.All.SendAsync(
             "OrderStatusChanged", orderId, order.Status.ToString(), ct);
@@ -361,6 +383,9 @@ public class AdminOrderService : IAdminOrderService
             order.EuPlatescTransactionId,
             order.AwbNumber,
             order.TrackingUrl,
+            order.AwbLabelUrl,
+            order.ShippedAt,
+            order.DeliveredAt,
             order.InternalNotes,
             items);
     }

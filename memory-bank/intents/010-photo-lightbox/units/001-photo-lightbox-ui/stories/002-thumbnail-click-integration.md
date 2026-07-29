@@ -2,11 +2,11 @@
 id: 002-thumbnail-click-integration
 unit: 001-photo-lightbox-ui
 intent: 010-photo-lightbox
-status: draft
+status: complete
 priority: must
 created: 2026-05-24T15:00:00Z
 assigned_bolt: 026-photo-lightbox
-implemented: false
+implemented: true
 ---
 
 # Story: 002-thumbnail-click-integration

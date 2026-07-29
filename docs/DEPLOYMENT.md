@@ -514,3 +514,296 @@ that public-domain thumbs would be enumerable if keys were guessable, so it requ
 either keeping the per-upload UUID in the key (current shape — fine) or moving
 behind Cloudflare Access. Defer until presigned-URL latency or R2 request counts
 show up as a real cost.
+
+---
+
+## 12. Sameday courier integration (intent 015 / bolts 036 + 037)
+
+The Sameday integration is **off by default**. With both flags unset the
+app behaves exactly as it did pre-bolt: `StaticShippingService` serves
+the locker list + shipping cost endpoints, and AWB generation is the
+manual workflow (`AwbResultDto.Manual = true`). Flipping it on is a
+**deliberate two-stage rollout** — see [§ 12.5](#125-recommended-rollout-sequence).
+
+### 12.1 What the integration does
+
+- **AWB creation**: when an order transitions to `Paid` (payment-webhook
+  hot path), the system enqueues an in-process job. A `BackgroundService`
+  drains the channel, calls Sameday's `POST /api/awb`, and persists
+  `Order.AwbNumber` + `Order.AwbLabelUrl`.
+- **AWB retry safety net**: a 60-min job re-discovers orders that are
+  `Paid AND AwbNumber IS NULL AND PaidAt > now - 24h` and re-enqueues
+  them. After 24 h, gives up with one Error log per order (admin manual
+  fallback). Recovers from process crashes / replica restarts that lost
+  pending channel items.
+- **Tracking poll**: a 15-min job polls `Shipped` orders against
+  Sameday's tracking endpoint. On observed `delivered`, transitions the
+  order to `Delivered`, sets `DeliveredAt`, fires the existing
+  customer "your order has arrived" email.
+
+### 12.2 Two flags, two stages
+
+| Flag | Path | Purpose |
+|---|---|---|
+| `Sameday:Enabled` | `Sameday__Enabled` | Master gate. Off → static fallback registered; on → typed `HttpClient` + token cache + auth handler active. Boot fails fast if any required credential is missing. |
+| `Sameday:Jobs:Enabled` | `Sameday__Jobs__Enabled` | Lifecycle gate. Off → no AWB workflow, no tracking poll, webhook notifier is a no-op. On → three `BackgroundService`s start at boot. |
+
+They are **orthogonal on purpose** (ADRs 013/014). A deployment can
+flip `Sameday:Enabled` first to validate credentials, watch the
+`sameday.token.refreshed` log fire on first auth call, then flip
+`Sameday:Jobs:Enabled` once you're confident the wire is right. There
+is no operational downside to running in stage-1 mode for a while.
+
+### 12.3 Provisioning prerequisites
+
+Before flipping anything on you need:
+
+1. **A Sameday merchant account.**
+   - **Sandbox**: contact Sameday sales to enable sandbox access on
+     your account. Sandbox base URL is `https://sameday-api.demo.sameday.ro`.
+   - **Production**: same credentials, different base URL —
+     `https://api.sameday.ro`.
+2. **A pickup-point ID.** Sameday's "Pickup Point" is the physical
+   address they collect parcels from. The ID is configured per-environment
+   (so dev / sandbox / prod can each have a distinct one — typical for
+   a single warehouse, but the seam exists).
+   - Get it from the Sameday merchant portal → Settings → Pickup
+     Points → copy the numeric ID.
+   - Required even in stage-1 (the validator demands it when
+     `Sameday:Enabled = true`).
+3. **API username + password.** Same merchant portal → API access.
+   Use a **dedicated service user** if Sameday supports it — never
+   share credentials with the human admin login.
+
+### 12.4 Secret management
+
+Aligned with [ADR-006](../memory-bank/bolts/041-secrets-management/adr-006-secret-history-accept-and-rotate.md):
+**credentials never live in source.** `appsettings.json` ships with
+`Username = ""`, `Password = ""`, `PickupPointId = ""` — the validator
+will refuse to boot the app with `Sameday:Enabled = true` if any of
+these are blank. Use one of the two paths below.
+
+**Local dev** — `dotnet user-secrets`:
+
+```powershell
+cd src/PhotoPrint.API
+dotnet user-secrets set "Sameday:Enabled"       "true"
+dotnet user-secrets set "Sameday:Username"      "your-sandbox-username"
+dotnet user-secrets set "Sameday:Password"      "your-sandbox-password"
+dotnet user-secrets set "Sameday:PickupPointId" "12345"
+# Optional — only if you also want to test the jobs locally:
+dotnet user-secrets set "Sameday:Jobs:Enabled"  "true"
+```
+
+User-secrets are gitignored by design (stored in
+`%APPDATA%\Microsoft\UserSecrets\<id>\` on Windows). The
+`UserSecretsId` is already declared in
+[`PhotoPrint.API.csproj`](../src/PhotoPrint.API/PhotoPrint.API.csproj).
+
+**Staging / production** — environment variables. ASP.NET Core binds
+`Sameday__Foo__Bar` (double underscore) to `Sameday:Foo:Bar`:
+
+```bash
+# Stage 1 — credentials only, jobs off
+Sameday__Enabled=true
+Sameday__BaseUrl=https://api.sameday.ro
+Sameday__Username=fototipar-prod
+Sameday__Password=<from-secret-store>
+Sameday__PickupPointId=12345
+Sameday__RequestTimeoutSeconds=10
+Sameday__Jobs__Enabled=false
+
+# Stage 2 — add these when you're ready to flip the jobs on
+Sameday__Jobs__Enabled=true
+Sameday__Jobs__AwbRetryIntervalMinutes=60
+Sameday__Jobs__AwbGiveUpHours=24
+Sameday__Jobs__TrackingIntervalMinutes=15
+Sameday__Jobs__TrackingMaxAgeDays=30
+Sameday__Jobs__MaxConcurrentSamedayCalls=5
+# DispatchBackoffSeconds is an array — bind via indexed env vars:
+Sameday__Jobs__DispatchBackoffSeconds__0=30
+Sameday__Jobs__DispatchBackoffSeconds__1=120
+Sameday__Jobs__DispatchBackoffSeconds__2=300
+Sameday__Jobs__DispatchBackoffSeconds__3=900
+Sameday__Jobs__DispatchBackoffSeconds__4=3600
+```
+
+For systemd-managed deploys, the existing `EnvironmentFile=` pattern in
+the service unit handles all of these — append to your existing
+`/etc/photoprint/photoprint.env`. For Docker, `--env` or an
+`env_file:` in docker-compose. For Azure App Service, App Settings.
+
+### 12.5 Recommended rollout sequence
+
+1. **Run the EF migration.** Bolts 036 + 037 added three columns to
+   `Orders`: `AwbLabelUrl`, `LastTrackingSyncAt`, `ShippedAt`,
+   `DeliveredAt`. The two migrations
+   (`20260602141429_AddSamedayOrderFields`,
+   `20260602190046_AddOrderShippedAtAndDeliveredAt`) are
+   additive-nullable — safe to apply to a live database before the
+   feature flags flip on. The standard deploy flow
+   ([§ 7](#7-database-migrations--read-before-first-deploy)) runs them
+   automatically on Postgres.
+2. **Stage 1 — credentials only.** Set the env vars above with
+   `Sameday__Enabled=true` and `Sameday__Jobs__Enabled=false`.
+   Redeploy. Watch the logs:
+   - `Sameday token refreshed. ExpiresAt=…` should fire the **first
+     time** any code path resolves `ISamedayTokenProvider`. With jobs
+     off, that's "never" by itself, but you can prove auth works by
+     triggering a manual call from a debugging endpoint or just by
+     trusting `ValidateOnStart` succeeded.
+   - If the host fails to boot with a `SamedaySettingsValidator`
+     error, fix the missing/malformed setting before continuing.
+3. **Stage 2 — flip jobs on.** Set `Sameday__Jobs__Enabled=true`.
+   Redeploy. Within ~60 s of boot you should see:
+   - `AwbDispatcher started (maxConcurrent=5)`
+   - `AwbRetryJob started (intervalMinutes=60 giveUpHours=24)`
+   - `ShipmentTrackingJob started (intervalMinutes=15 maxAgeDays=30)`
+   - The `AwbRetryJob` runs once on startup; if any orders are
+     currently in the `Paid` cohort with no AWB, you'll see
+     `sameday.awb.retry-sweep enqueued=N` and then per-order
+     `sameday.awb.created order_id=… awb=…` logs as the dispatcher
+     drains.
+4. **Watch for the first new order.** Make one real (or sandbox)
+   order through the checkout flow. Expected log sequence within
+   ~10–60 s of payment confirmation:
+   ```
+   sameday.awb.enqueued order_id=<id>
+   sameday.awb.created  order_id=<id> awb=RO… attempt=1
+   ```
+   The order's row should now have `AwbNumber` and `AwbLabelUrl`
+   populated. Admin order-detail surfaces this via `Order.AwbNumber`
+   already.
+
+### 12.6 Multi-replica notes (read before scaling out)
+
+The current design is correct under multi-replica but with two
+deliberate trade-offs ([ADR-015](../memory-bank/bolts/037-awb-and-tracking-jobs/adr-015-accept-duplicate-awb-create-on-multi-replica.md),
+[ADR-016](../memory-bank/bolts/037-awb-and-tracking-jobs/adr-016-cas-execute-update-for-multi-replica-status-transitions.md)):
+
+- Each replica runs its own `AwbRetryJob` and `ShipmentTrackingJob`
+  ticks. **Duplicate `CreateAwb` calls are expected** and absorbed by
+  Sameday's `awbPayment` external-reference idempotency + our
+  `Status == Paid AND AwbNumber IS NULL` re-check.
+- `Shipped → Delivered` transitions use a compare-and-swap
+  (`ExecuteUpdateAsync WHERE Status = 'Shipped'`). Two replicas
+  observing `Delivered` from Sameday race; the losing replica logs
+  `sameday.tracking.race-lost` at Info and moves on. **No duplicate
+  emails.**
+- Each replica's `SamedayTokenProvider` cache is independent (ADR-013).
+  N replicas → up to N parallel `/api/authenticate` calls per token
+  cycle. Well within Sameday's documented rate budget for any
+  realistic N; the 5 req/s rate-limit policy applies per-replica, not
+  globally. Plan accordingly if you scale out to ~20+ replicas
+  before bolt 046 lands Redis.
+- The above is fine for single-digit replica counts. If the business
+  decides to scale meaningfully wider, bolt 046 (Redis introduction)
+  is the natural next step; ADR-015 and ADR-016 will be augmented
+  rather than superseded.
+
+### 12.7 Operations playbook
+
+**Pause the integration immediately** (e.g., Sameday outage,
+suspected misconfiguration after a deploy):
+
+```bash
+# Quickest path — flip the lifecycle flag, redeploy.
+Sameday__Jobs__Enabled=false
+```
+
+The hot path (`webhook → notifier`) becomes a `Task.CompletedTask`
+no-op. Existing AWBs are NOT touched. Orders that were in flight at
+flip-time stay in `Paid AND AwbNumber IS NULL`; when you flip the
+flag back on, `AwbRetryJob`'s startup sweep picks them up.
+
+**Pause everything including credential validation** (e.g.,
+credentials rotated and you don't want failing auth calls in the
+log noise):
+
+```bash
+Sameday__Enabled=false
+# (Sameday__Jobs__Enabled is ignored when the master flag is off.)
+```
+
+Boot reverts to `StaticShippingService`. Existing AWBs are preserved;
+the manual fallback workflow takes over for new orders.
+
+**Force-retry a specific order's AWB creation**: today, there's no
+admin endpoint. Two options:
+1. Wait for the next `AwbRetryJob` tick (≤ 60 min).
+2. Set the order's `PaidAt` to "now" via a DB update — the retry job
+   uses `PaidAt > now - 24h` as the inclusion predicate. Use as a
+   last resort; the natural retry cadence is usually fine.
+
+A proper admin "force-retry" button is flagged as a follow-up in
+[story 002](../memory-bank/intents/015-sameday-shipping-integration/units/002-awb-and-tracking-jobs/stories/002-awb-retry-job.md)'s
+"Out of Scope" section.
+
+**Force-stop tracking for a specific order** (e.g., Sameday lost the
+parcel and we've reissued manually):
+- The order's `ShippedAt < now - 30 days` excludes it from polls
+  automatically.
+- Inside the 30-day window, the only escape is to manually transition
+  the order to `Delivered` (or `Cancelled`) via the admin UI. The
+  tracking job filters on `Status == Shipped` exclusively.
+
+**Credentials rotation**:
+- Update the env vars / user-secrets in your deployment target.
+- Restart the API host(s). Each replica re-authenticates on its next
+  outbound Sameday call.
+- The cached in-process token is bound to the process; there is **no
+  hot-reload path** for credentials. Until bolt 046 lands Redis +
+  potentially an admin "invalidate token" button, credential
+  rotation requires a deploy.
+
+### 12.8 What to monitor
+
+Filter Serilog by these structured-log keys:
+
+| Log message | Level | Means |
+|---|---|---|
+| `Sameday token refreshed. ExpiresAt=…` | Info | Healthy. Fires per replica per token cycle (Sameday's tokens are ~24 h). |
+| `sameday.awb.created order_id=… awb=… attempt=N` | Info | Happy path. `attempt=1` is real-time; `attempt>1` means the dispatcher's in-process backoff fired. |
+| `sameday.awb.skipped order_id=…` | Info | Order no longer eligible (cancelled, already has AWB). Healthy. |
+| `sameday.awb.retry-scheduled order_id=… attempt=N delay=Ds` | Info | Transient Sameday failure; in-process retry queued. |
+| `sameday.awb.non-transient-retry-later order_id=… reason=…` | Warning | Sameday is up but returned auth-fail or protocol-fail. Investigate; the retry job will keep trying. |
+| `sameday.awb.permanent-fail order_id=… reason=…` | Error | Our request is malformed (bad postal code, weight over the courier ceiling, …). Admin manual fallback. |
+| `sameday.awb.give-up order_id=… paid_at=…` | Error | 24 h elapsed without success. Admin manual fallback required. Wire admin notifications in a future intent. |
+| `sameday.shipment.delivered order_id=… awb=…` | Info | Tracking transition succeeded; customer email queued. |
+| `sameday.tracking.race-lost order_id=…` | Info | Multi-replica race; another instance won. Expected, not a problem. |
+| `sameday.tracking.polling-stopped order_id=… shipped_at=…` | Warning | Order has been `Shipped` for > 30 days. Admin manual closure required. |
+
+The PR description should call out which alerts you want set up.
+At minimum, page on **`sameday.awb.give-up`** (24-h failure means a
+real order is stuck) and **count(`sameday.awb.permanent-fail`) > 0**
+in any 1-hour window (means our code is producing bad requests).
+
+### 12.9 Cost ceiling
+
+Sameday's rate budget is ~10 req/s; our policy throttles at 5 req/s
+per replica ([SamedayPolicies.cs](../src/PhotoPrint.API/Services/Sameday/SamedayPolicies.cs)).
+For a deployment doing ≤ 200 orders/day with all jobs enabled,
+expected outbound Sameday call volume is roughly:
+
+- AWB creation: 1 call/order × 200/day ≈ 200/day.
+- Tracking poll: 1 call per `Shipped` order per 15 min for up to 30 d
+  = at most ~2880 polls per order. With 200/day shipping and ~3-day
+  delivery, sustained active cohort is ~600 orders × 4 polls/h ≈
+  2400 polls/h ≈ 0.67 req/s. Comfortable.
+
+The rate-limit ceiling is for *bursts* (deploy + startup sweep), not
+sustained traffic.
+
+### 12.10 Future considerations
+
+Two non-implemented items worth tracking:
+
+1. **Live tracking webhooks (Sameday → us push notifications)** —
+   would replace the 15-min poll. Not in this intent; would be a
+   future intent's work. Today's polling is sufficient for current
+   volume.
+2. **Admin notifications on `AwbCreationGivenUp` + `ShipmentPollingStopped`** —
+   today the structured-log Error / Warning is the only signal. A
+   future intent will route these to whatever admin notification
+   surface exists at that point (email, in-app banner, SignalR
+   broadcast).
