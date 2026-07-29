@@ -26,6 +26,8 @@ public class TokenServiceTests
         Id = Guid.NewGuid(),
         Email = "user@example.com",
         NormalizedEmail = "USER@EXAMPLE.COM",
+        FirstName = "Ana",
+        LastName = "Pop",
         Role = UserRole.Customer,
     };
 
@@ -50,6 +52,17 @@ public class TokenServiceTests
         jwt.Subject.Should().Be(user.Id.ToString());
         jwt.Claims.Should()
             .Contain(c => c.Type == JwtRegisteredClaimNames.Email && c.Value == user.Email);
+    }
+
+    [Fact]
+    public void GenerateAccessToken_CarriesTheDisplayNameClaim()
+    {
+        // The SPA builds its current-user view (and the checkout recipient prefill) from this claim;
+        // without it the signed-in prefill is dead code.
+        var rawToken = CreateSut().GenerateAccessToken(TestUser);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(rawToken);
+        jwt.Claims.Should().Contain(c => c.Type == "name" && c.Value == "Ana Pop");
     }
 
     [Fact]

@@ -3,7 +3,9 @@ using System.Threading.RateLimiting;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Polly;
 using Polly.RateLimiting;
+using Polly.Retry;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Services.Sameday;
 
@@ -133,5 +135,33 @@ public class SamedayPoliciesTests
         var limiter = SamedayPolicies.CreateRateLimiter(permits);
         (limiter is not null).Should().Be(expectLimiter);
         limiter?.Dispose();
+    }
+
+    [Fact]
+    public async Task Retry_backoff_is_1_4_16_seconds_not_Polly_default_base_2()
+    {
+        // The delays are asserted on the strategy the pipeline is built from, so the schedule is
+        // pinned without waiting 21 s of real backoff. Polly's DelayBackoffType.Exponential yields
+        // 1/2/4; reverting to it drops DelayGenerator to null and reddens this test.
+        var options = SamedayPolicies.BuildRetryOptions();
+
+        options.MaxRetryAttempts.Should().Be(3);
+        options.UseJitter.Should().BeFalse("a jittered delay could not be asserted exactly");
+        options.DelayGenerator.Should().NotBeNull();
+
+        var delays = new List<TimeSpan?>();
+        for (var attemptNumber = 0; attemptNumber < 3; attemptNumber++)
+        {
+            var args = new RetryDelayGeneratorArguments<HttpResponseMessage>(
+                ResilienceContextPool.Shared.Get(),
+                Outcome.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)),
+                attemptNumber);
+            delays.Add(await options.DelayGenerator!(args));
+        }
+
+        delays.Should().Equal(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(4),
+            TimeSpan.FromSeconds(16));
     }
 }

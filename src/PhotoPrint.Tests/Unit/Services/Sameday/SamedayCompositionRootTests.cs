@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using PhotoPrint.API.BackgroundJobs;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Extensions;
+using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
@@ -57,6 +58,10 @@ public class SamedayCompositionRootTests
         resolveClient.Should().NotThrow();
 
         sp.GetRequiredService<IAwbCreator>().Should().NotBeNull();
+
+        // SamedayShippingService takes the concrete StaticShippingService as its fallback, so that
+        // registration is load-bearing on this path — without it every shipping call would throw.
+        sp.GetRequiredService<IShippingService>().Should().BeOfType<SamedayShippingService>();
 
         var hosted = provider.GetServices<IHostedService>().ToList();
         hosted.Should().Contain(s => s is AwbDispatcher);

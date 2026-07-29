@@ -9,9 +9,15 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 /// Minimal <see cref="TimeProvider"/> implementation for tests. Avoids taking
 /// a NuGet dependency on <c>Microsoft.Extensions.TimeProvider.Testing</c> just
 /// to step time forward in a handful of token-expiry tests.
+///
+/// Timers are faked too, so <c>Task.Delay(delay, thisProvider, ct)</c> completes when
+/// <see cref="Advance"/> passes the due time instead of sleeping for real. Without that a
+/// "deterministic" delay test silently waits out the whole wall-clock delay.
 /// </summary>
 internal sealed class FakeTimeProvider : TimeProvider
 {
+    private readonly object _gate = new();
+    private readonly List<FakeTimer> _timers = new();
     private DateTimeOffset _now;
 
     public FakeTimeProvider(DateTimeOffset start)
@@ -19,9 +25,86 @@ internal sealed class FakeTimeProvider : TimeProvider
         _now = start;
     }
 
-    public override DateTimeOffset GetUtcNow() => _now;
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_gate) return _now;
+    }
 
-    public void Advance(TimeSpan delta) => _now = _now.Add(delta);
+    public void Advance(TimeSpan delta)
+    {
+        List<FakeTimer> due;
+        lock (_gate)
+        {
+            _now = _now.Add(delta);
+            due = _timers.Where(t => t.IsDueAt(_now)).ToList();
+        }
+
+        // Fire outside the lock: a callback may schedule or dispose timers.
+        foreach (var timer in due)
+            timer.Fire();
+    }
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new FakeTimer(this, callback, state);
+        lock (_gate) _timers.Add(timer);
+        timer.Schedule(GetUtcNow(), dueTime, period);
+        return timer;
+    }
+
+    private void Remove(FakeTimer timer)
+    {
+        lock (_gate) _timers.Remove(timer);
+    }
+
+    private sealed class FakeTimer : ITimer
+    {
+        private readonly FakeTimeProvider _owner;
+        private readonly TimerCallback _callback;
+        private readonly object? _state;
+        private DateTimeOffset? _dueAt;
+        private TimeSpan _period = Timeout.InfiniteTimeSpan;
+
+        public FakeTimer(FakeTimeProvider owner, TimerCallback callback, object? state)
+        {
+            _owner = owner;
+            _callback = callback;
+            _state = state;
+        }
+
+        public void Schedule(DateTimeOffset now, TimeSpan dueTime, TimeSpan period)
+        {
+            _period = period;
+            _dueAt = dueTime == Timeout.InfiniteTimeSpan ? null : now.Add(dueTime);
+        }
+
+        public bool IsDueAt(DateTimeOffset now) => _dueAt is not null && now >= _dueAt;
+
+        public void Fire()
+        {
+            if (_dueAt is null) return;
+            _dueAt = _period == Timeout.InfiniteTimeSpan ? null : _dueAt.Value.Add(_period);
+            _callback(_state);
+        }
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            Schedule(_owner.GetUtcNow(), dueTime, period);
+            return true;
+        }
+
+        public void Dispose()
+        {
+            _dueAt = null;
+            _owner.Remove(this);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 }
 
 /// <summary>

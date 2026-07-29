@@ -1,5 +1,26 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { AuthService } from './auth.service';
+import { AuthService, CurrentUser } from './auth.service';
+
+/** Unsigned JWT with a base64url payload — the service decodes without verifying. */
+function makeJwt(claims: Record<string, unknown>): string {
+  const payload = {
+    sub: 'u-1',
+    email: 'ana@example.com',
+    exp: Math.floor(Date.now() / 1000) + 900,
+    ...claims,
+  };
+  const body = btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  return `header.${body}.signature`;
+}
+
+function currentUsers(svc: AuthService): (CurrentUser | null)[] {
+  const seen: (CurrentUser | null)[] = [];
+  svc.currentUser$.subscribe(v => seen.push(v));
+  return seen;
+}
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -110,6 +131,38 @@ describe('AuthService', () => {
     sessionStorage.setItem('access_token', 'tok');
     service.logout();
     expect(sessionStorage.getItem('access_token')).toBeNull();
+  });
+
+  // currentUser$ feeds the checkout recipient prefill. If it never emits, the signed-in prefill
+  // is dead code — so both the login and the page-reload path must populate it from the token.
+  it('setAuthenticated populates currentUser from the token claims', () => {
+    service.setAuthenticated({ accessToken: makeJwt({ name: 'Ana Pop' }), expiresIn: 900 });
+
+    const seen = currentUsers(service);
+    expect(seen.at(-1)).toEqual({
+      id: 'u-1',
+      email: 'ana@example.com',
+      displayName: 'Ana Pop',
+      isAdmin: false,
+    });
+  });
+
+  it('restoring a session on page load populates currentUser', () => {
+    // The service restores in its constructor, so the token must exist before it is created.
+    TestBed.resetTestingModule();
+    sessionStorage.setItem('access_token', makeJwt({ name: 'Ion Popescu', role: 'Admin' }));
+    TestBed.configureTestingModule({});
+    const restored = TestBed.inject(AuthService);
+
+    const seen = currentUsers(restored);
+    expect(seen.at(-1)?.displayName).toBe('Ion Popescu');
+    expect(seen.at(-1)?.isAdmin).toBe(true);
+  });
+
+  it('a token without a name claim yields a user with a blank display name', () => {
+    service.setAuthenticated({ accessToken: makeJwt({}), expiresIn: 900 });
+
+    expect(currentUsers(service).at(-1)?.displayName).toBe('');
   });
 
   it('logout resets returnUrl to /tipareste', () => {

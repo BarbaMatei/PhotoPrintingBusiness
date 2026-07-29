@@ -45,7 +45,15 @@ public static class SamedayPolicies
             });
         }
 
-        builder.AddRetry(new RetryStrategyOptions<HttpResponseMessage>
+        builder.AddRetry(BuildRetryOptions(logger));
+
+        return builder.Build();
+    }
+
+    /// <summary>The transport retry strategy the pipeline is built from. Public so the backoff
+    /// schedule is assertable without waiting out real delays.</summary>
+    public static RetryStrategyOptions<HttpResponseMessage> BuildRetryOptions(ILogger? logger = null)
+        => new()
         {
             MaxRetryAttempts = 3,
             UseJitter = false,
@@ -67,10 +75,7 @@ public static class SamedayPolicies
                         ?? "unknown");
                 return default;
             },
-        });
-
-        return builder.Build();
-    }
+        };
 
     internal static bool IsRetryableStatus(HttpStatusCode status)
     {

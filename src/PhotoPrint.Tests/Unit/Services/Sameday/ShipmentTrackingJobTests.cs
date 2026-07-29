@@ -108,6 +108,17 @@ public class ShipmentTrackingJobTests : IDisposable
         return db.Orders.AsNoTracking().Single(o => o.Id == id);
     }
 
+    /// <summary>Applies a change on its own context — stands in for a second replica writing
+    /// between this poll's order load and its write.</summary>
+    private void MutateOrder(Guid id, Action<Order> mutate)
+    {
+        using var scope = _scopes.Factory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+        var order = db.Orders.Single(o => o.Id == id);
+        mutate(order);
+        db.SaveChanges();
+    }
+
     private void AdvanceStatus(Guid id, OrderStatus status)
     {
         using var scope = _scopes.Factory.CreateScope();
@@ -325,6 +336,65 @@ public class ShipmentTrackingJobTests : IDisposable
         GetOrder(inTransit.Id).Status.Should().Be(OrderStatus.Shipped);
         GetOrder(inTransit.Id).LastTrackingSyncAt.Should().Be(T0);
         emails.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Does_not_stamp_a_row_another_replica_already_moved_to_Delivered()
+    {
+        // The poll reads the order, then a second replica wins the Delivered transition before this
+        // one writes its poll-throttle stamp. The non-delivered write must not touch that row:
+        // without the Status guard it would stamp LastTrackingSyncAt onto a Delivered order.
+        var order = SeedShippedOrder(shippedAt: T0.AddDays(-3));
+        var otherReplicaStamp = T0.AddMinutes(-1);
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                // Interleave: happens after the order load, before the write.
+                MutateOrder(order.Id, o =>
+                {
+                    o.Status = OrderStatus.Delivered;
+                    o.DeliveredAt = T0.AddMinutes(-1);
+                    o.LastTrackingSyncAt = otherReplicaStamp;
+                });
+                return new TrackingSnapshot(order.AwbNumber!, TrackingState.InTransit, T0.AddHours(-2), Array.Empty<TrackingEvent>());
+            });
+
+        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = Build(client, emails, new TrackingStopRegistry(cache), new FakeTimeProvider(T0));
+
+        await RunOneTickAsync(sut);
+
+        var refreshed = GetOrder(order.Id);
+        refreshed.Status.Should().Be(OrderStatus.Delivered);
+        refreshed.LastTrackingSyncAt.Should().Be(otherReplicaStamp, "the Delivered row must be left alone");
+    }
+
+    [Fact]
+    public async Task Does_not_move_LastTrackingSyncAt_backwards()
+    {
+        // A slow replica finishing its poll after a newer one already stamped a later time must not
+        // rewind the poll-throttle timestamp — that would re-open an early re-poll window.
+        var order = SeedShippedOrder(shippedAt: T0.AddDays(-3));
+        var newerStamp = T0.AddMinutes(5);
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.GetTrackingAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                MutateOrder(order.Id, o => o.LastTrackingSyncAt = newerStamp);
+                return new TrackingSnapshot(order.AwbNumber!, TrackingState.InTransit, T0.AddHours(-2), Array.Empty<TrackingEvent>());
+            });
+
+        var emails = new Mock<IOrderEmailService>(MockBehavior.Strict);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = Build(client, emails, new TrackingStopRegistry(cache), new FakeTimeProvider(T0));
+
+        await RunOneTickAsync(sut);
+
+        GetOrder(order.Id).LastTrackingSyncAt.Should().Be(newerStamp, "the later stamp wins");
     }
 
     [Fact]

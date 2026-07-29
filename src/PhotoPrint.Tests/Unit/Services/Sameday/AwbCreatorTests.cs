@@ -463,6 +463,29 @@ public class AwbCreatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Preserves_the_claim_when_the_persist_fails_after_the_vendor_created_the_AWB()
+    {
+        // The AWB is created and billed but the DB write throws: the claim must be held so the
+        // re-attempt waits out the TTL rather than re-calling the vendor in ~30 s for a 2nd label.
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                // Break the DB between the vendor call and the persist.
+                _connection.Close();
+                return new AwbCreationResult("RO12345678", "https://sameday/labels/abc.pdf", 18.50m);
+            });
+        var sut = Build(db, client);
+
+        var outcome = await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
+            .Which.PreserveClaim.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Preserves_the_claim_on_a_vendor_timeout()
     {
         // a timeout leaves the AWB state unknown (may be billed); the claim is held so the
