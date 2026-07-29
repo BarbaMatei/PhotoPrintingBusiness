@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 015-sameday-shipping
-updated: 2026-07-27
+updated: 2026-07-29
 ---
 
 <!-- v1 fix round (resolution-v1, commits edd49f7..835e932): D1–D19 + D32/D34 fixed.
@@ -11,7 +11,52 @@ v3 certification pair (review-v3, 2026-07-27 @ 8584572): NOT certified — 3 Hig
 v3 fix round → v4 verification (review-v4, @ 5fc330b): all held, 0 reopened.
 v5 certification (review-v5, single-pass recorded deviation, @ 5fc330b): CERTIFIED — 0 High, 0
 regression; 17 med / 19 low / 6 cleanup new (D55–D89) → backlog pre-enable checklist; 4 deferrals
-re-affirmed (D50/D23/D29/D39); D45 vendor-idempotency residual re-confirmed (accepted). LOOP DONE. -->
+re-affirmed (D50/D23/D29/D39); D45 vendor-idempotency residual re-confirmed (accepted).
+v5 fix round (resolution-v5, 3764fa0..1816f5f): 41 fixed / 3 deferred / 2 wont-fix / 2 false-positive.
+v6 verification (review-v6, 2026-07-29 @ 1816f5f): 37 verified, **4 reopened (D27/D39/D71/D79 — no
+test can go red)**, 7 new (D90–D96), 0 regressions. Loop RE-ARMED → fix round, then verification,
+then a fresh certification (full-loop-tier touches). v5's CERTIFIED is provisional. -->
+
+## v6 — verification (2026-07-29, commit `1816f5f`, approve-with-followups)
+
+Independent anchored verification of the v5 fix round. 19 backend + 6 frontend revert-and-rerun
+runs, each with its failure set predicted in advance and matched exactly. Detail:
+[review-v6.md](review-v6.md).
+
+**Verified (37):** D55, D56, D57, D58, D59, D60, D61, D62, D63, D64, D65, D66, D67, D68, D69, D70,
+D73, D74, D75, D76, D77, D78, D80, D82, D84, D85, D86, D87, D20, D24, D25, D29, D30, D35, D37, D38,
+D50. Last affirmed at `1816f5f`.
+
+**Reopened (4) — fix present and correct-on-inspection, but deleting it leaves both suites green:**
+
+| D# | Sev | Status | What is missing | Site |
+|----|-----|--------|-----------------|------|
+| D27 | 🟡 Low | **reopened** | no test pins the monotonic `LastTrackingSyncAt` guard (`Status = Shipped AND stamp < now`) | `BackgroundJobs/ShipmentTrackingJob.cs:228` |
+| D39 | ⚪ | **reopened** | `SamedayCompositionRootTests` never resolves `IShippingService`, so the `AddScoped<StaticShippingService>()` the fix added is unproven — removing it is green | `Extensions/SamedayServiceCollectionExtensions.cs:60` |
+| D71 | 🟡 Low | **reopened** | reverting to Polly base-2 `Exponential` (the original defect) is invisible — the only retry test does a single retry, 1 s under both schedules | `Services/Sameday/SamedayPolicies.cs:54` |
+| D79 | 🟡 Low | **reopened** | nothing asserts the `name` claim or that `currentUser$` emits — the guest/signed-in prefill cluster (CLAUDE.md class 11) | `Services/TokenService.cs:33` · `UI/…/auth.service.ts:55` |
+
+**Recorded gaps on fixes that held:** D68's post-create persist-fail `PreserveClaim` leg is untested
+(the timeout + retryable-status legs redden); D78's review-step assertion
+(`not.toContain('undefined')`) cannot fail in Angular — a safe-navigation gate removal reddens nothing.
+
+**New (D90–D96) — backlog, none re-arms the loop:**
+
+| D# | Sev | Status | Title | Site |
+|----|-----|--------|-------|------|
+| D90 | 🟡 Low | backlog | `ISamedayAuthenticator` singleton captures the transient typed `ISamedayClient` → handler never rotated (pre-existing, carried into the new extension) | `Extensions/SamedayServiceCollectionExtensions.cs:37` |
+| D91 | ⚪ | backlog | `ISamedayClient` doc still claims NotImplementedException "until bolt 037" — stale twin of the claim stripped from `SamedayClient.cs` | `Services/Sameday/ISamedayClient.cs:8` |
+| D92 | ⚪ | backlog | `AwbNumber` (varchar(100)) is the unclamped sibling of D60's clamp on the same post-bill persist | `Services/Sameday/AwbCreator.cs:190` |
+| D93 | ⚪ | backlog | `Created` outcome reports the unclamped LabelUrl while the row stores null | `Services/Sameday/AwbCreator.cs:207` |
+| D94 | ⚪ | backlog | `MaxRequestsPerSecond` missing from appsettings.json, the settings validator, and bolt-037 ddd-02 | `Configuration/SamedaySettings.cs:52` |
+| D95 | ⚪ | backlog | D67's 30 s poll buffer is a flat constant, not scaled to the interval | `BackgroundJobs/ShipmentTrackingJob.cs:77` |
+| D96 | ⚪ | backlog | Record accuracy: resolution-v5/index.md say "backend 914" (tip = 916) and "fixed: 30" (frontmatter holds 41); index cites `66c6d50` not the tip `1816f5f` | `reviews/015-sameday-shipping/resolution-v5.md:75` |
+
+**Dispositions upheld, last affirmed `1816f5f`:** D72, D81, D40 (deferred — cited files unchanged
+since `5fc330b`); D83, D89 (wont-fix; D89 with a caveat — its rationale rests on an untracked
+pre-enable label-proxy endpoint); D88, D33 (false-positive, both independently re-checked).
+**D45 residual + D23 unchanged and still accepted** — D23 now covers the new `AlterAwbLabelUrlLength`
+DDL too.
 
 ## v5 — certification (2026-07-28, commit `5fc330b`, **CERTIFIED** · approve-with-followups)
 
@@ -21,20 +66,22 @@ dormant behind the two `false` flags. Detail: [findings-v5.md](findings-v5.md).
 
 **Medium (D55–D66, all confirmed — address before enabling):**
 
+Status column updated by the v5 fix round + v6 verification (`1816f5f`).
+
 | D# | Sev | Status | Title | Site |
 |----|-----|--------|-------|------|
-| D55 | 🟠 Med | backlog | Easybox address fields uncapped → 28 MB storage-exhaustion DoS | `Validators/…/CreateOrderRequestValidator.cs:26` |
-| D56 | 🟠 Med | backlog | AwbLabelUrl persisted but never surfaced to admin; GetLabelPdfAsync no caller (Must goal undelivered) | `DTOs/Admin/AdminOrderDtos.cs:44` |
-| D57 | 🟠 Med | backlog | Stale-claim (crashed-worker) reclaim path untested | `Tests/…/AwbCreatorTests.cs:250` |
-| D58 | 🟠 Med | backlog | Claim-release-after-failure untested | `Tests/…/AwbCreatorTests.cs:326` |
-| D59 | 🟠 Med | backlog | prefillEasyboxContact guest/signed-in branches untested (guest-state cluster) | `UI/…/delivery-step.spec.ts` |
-| D60 | 🟠 Med | backlog | Vendor pdfLink > 500 overflows Postgres varchar(500) → re-bill loop | `Services/Sameday/AwbCreator.cs:156` |
-| D61 | 🟠 Med | backlog | Phone regex over-accepts digit-poor input → paid AWB call → GiveUp | `Validators/…/CreateOrderRequestValidator.cs:28` |
-| D62 | 🟠 Med | backlog | Vendor rejection ResponseBody captured but never logged on GiveUp | `Services/Sameday/AwbCreator.cs:136` |
-| D63 | 🟠 Med | backlog | Systemic tracking failure logged per-order Warning, never Error | `BackgroundJobs/ShipmentTrackingJob.cs:148` |
-| D64 | 🟠 Med | backlog | selectMethod never resets selectedLockerId → Easybox 400 dead-end | `UI/…/delivery-step.ts:399` |
-| D65 | 🟠 Med | backlog | Enabled=true root never booted; token-provider↔auth-handler DI-cycle risk unverified | `Program.cs:146` |
-| D66 | 🟠 Med | backlog | Local EasyboxLockers.SamedayId freshness assumed, no sync → permanent GiveUp | `Services/Sameday/OrderToAwbRequestMapper.cs:48` |
+| D55 | 🟠 Med | verified | Easybox address fields uncapped → 28 MB storage-exhaustion DoS | `Validators/…/CreateOrderRequestValidator.cs:26` |
+| D56 | 🟠 Med | verified | AwbLabelUrl persisted but never surfaced to admin; GetLabelPdfAsync no caller (Must goal undelivered) | `DTOs/Admin/AdminOrderDtos.cs:44` |
+| D57 | 🟠 Med | verified | Stale-claim (crashed-worker) reclaim path untested | `Tests/…/AwbCreatorTests.cs:250` |
+| D58 | 🟠 Med | verified | Claim-release-after-failure untested | `Tests/…/AwbCreatorTests.cs:326` |
+| D59 | 🟠 Med | verified | prefillEasyboxContact guest/signed-in branches untested (guest-state cluster) | `UI/…/delivery-step.spec.ts` |
+| D60 | 🟠 Med | verified | Vendor pdfLink > 500 overflows Postgres varchar(500) → re-bill loop | `Services/Sameday/AwbCreator.cs:156` |
+| D61 | 🟠 Med | verified | Phone regex over-accepts digit-poor input → paid AWB call → GiveUp | `Validators/…/CreateOrderRequestValidator.cs:28` |
+| D62 | 🟠 Med | verified | Vendor rejection ResponseBody captured but never logged on GiveUp | `Services/Sameday/AwbCreator.cs:136` |
+| D63 | 🟠 Med | verified | Systemic tracking failure logged per-order Warning, never Error | `BackgroundJobs/ShipmentTrackingJob.cs:148` |
+| D64 | 🟠 Med | verified | selectMethod never resets selectedLockerId → Easybox 400 dead-end | `UI/…/delivery-step.ts:399` |
+| D65 | 🟠 Med | verified | Enabled=true root never booted; token-provider↔auth-handler DI-cycle risk unverified — **real cycle reproduced at v6** | `Program.cs:146` |
+| D66 | 🟠 Med | verified | Local EasyboxLockers.SamedayId freshness assumed, no sync → permanent GiveUp | `Services/Sameday/OrderToAwbRequestMapper.cs:48` |
 
 **Low (D67–D82) & Cleanup (D83–D89):** backlog — poll-throttle every-other-tick (D67); claim released
 on timeout (D68); client phone gate weaker than server (D69); no response-size cap → OOM (D70); Polly
@@ -47,7 +94,13 @@ window untested (D82). Cleanup: bundled locker-map UX undocumented (D83); two jo
 (D84/D85); phone rule+regex dup (D86); magic day-count floors (D87); DeliveredAt-timestamptz **refuted**
 (D88, Npgsql handles DateTimeOffset); GetLabelPdfAsync dead code (D89, see D56).
 
-**Re-affirmed deferrals (prior decision attached, stand):** D50, D23, D29, D39.
+**Status after the v5 fix round + v6 verification:** all of D67–D87 `verified` **except** D71 and D79
+(**reopened** — no test can go red), D72/D81 (deferred, upheld) and D83 (wont-fix, upheld). D88/D33
+false-positive, upheld. D84–D87 verified by inspection (refactor/cleanup, no behavioral assertion).
+
+**Re-affirmed deferrals (prior decision attached, stand):** D50 → **fixed + verified** at v6 (the
+dispatcher orchestration test landed). D23 stands, and now also covers the new
+`AlterAwbLabelUrlLength` DDL. D29 → **fixed + verified**. D39 → fixed but **reopened** at v6.
 **D45 residual re-confirmed + accepted:** AWB-create POST auto-retried; no-double-bill rests on
 unverified vendor dedup on `ClientInternalReference`. Skeptic built no code-only trace. **Verify
 Sameday create-idempotency before enabling** (ADR-015).
