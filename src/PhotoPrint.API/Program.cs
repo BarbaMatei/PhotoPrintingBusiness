@@ -131,78 +131,7 @@ builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.
 //                                byte-identical fallback (intent goal).
 builder.Services.AddSingleton<TimeProvider>(_ => TimeProvider.System);
 
-builder.Services.Configure<PhotoPrint.API.Configuration.SamedaySettings>(
-    builder.Configuration.GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName));
-builder.Services.AddSingleton<
-    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.SamedaySettings>,
-    PhotoPrint.API.Validators.SamedaySettingsValidator>();
-builder.Services
-    .AddOptions<PhotoPrint.API.Configuration.SamedaySettings>()
-    .ValidateOnStart();
-
-var samedayEnabled = builder.Configuration
-    .GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName)
-    .GetValue<bool>("Enabled");
-
-// Default: no Sameday lifecycle automation. The webhook handlers depend on
-// IAwbCreationNotifier; the Null impl ensures the integration is invisible
-// when Sameday is off or only credentials are wired.
-builder.Services.AddSingleton<
-    PhotoPrint.API.Services.Sameday.IAwbCreationNotifier,
-    PhotoPrint.API.Services.Sameday.NullAwbCreationNotifier>();
-
-if (samedayEnabled)
-{
-    builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.ISamedayTokenProvider, PhotoPrint.API.Services.Sameday.SamedayTokenProvider>();
-    builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.ISamedayAuthenticator>(sp =>
-        sp.GetRequiredService<PhotoPrint.API.Services.Sameday.ISamedayClient>());
-    builder.Services.AddTransient<PhotoPrint.API.Services.Sameday.SamedayAuthHandler>();
-    builder.Services.AddTransient<PhotoPrint.API.Services.Sameday.SamedayResilienceHandler>();
-
-    builder.Services
-        .AddHttpClient<PhotoPrint.API.Services.Sameday.ISamedayClient, PhotoPrint.API.Services.Sameday.SamedayClient>((sp, http) =>
-        {
-            var s = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.SamedaySettings>>().Value;
-            http.BaseAddress = new Uri(s.BaseUrl);
-            http.Timeout     = TimeSpan.FromSeconds(s.RequestTimeoutSeconds);
-        })
-        .AddHttpMessageHandler<PhotoPrint.API.Services.Sameday.SamedayAuthHandler>()
-        .AddHttpMessageHandler<PhotoPrint.API.Services.Sameday.SamedayResilienceHandler>();
-
-    builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.SamedayShippingService>();
-
-    // ── Bolt 037: AWB + tracking lifecycle jobs ───────────────────────────
-    // Orthogonal flag — credentials may be wired (Sameday:Enabled=true) without
-    // yet flipping the lifecycle on. See ADR-015/016.
-    var samedayJobsEnabled = builder.Configuration
-        .GetSection(PhotoPrint.API.Configuration.SamedaySettings.SectionName + ":Jobs")
-        .GetValue<bool>("Enabled");
-
-    if (samedayJobsEnabled)
-    {
-        builder.Services.AddSingleton<
-            PhotoPrint.API.Services.Sameday.IAwbJobQueue,
-            PhotoPrint.API.Services.Sameday.AwbJobQueue>();
-        builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.AwbGiveUpRegistry>();
-        builder.Services.AddSingleton<PhotoPrint.API.Services.Sameday.TrackingStopRegistry>();
-        builder.Services.AddScoped<
-            PhotoPrint.API.Services.Sameday.IAwbCreator,
-            PhotoPrint.API.Services.Sameday.AwbCreator>();
-
-        // Override the default Null notifier with the real enqueuer.
-        builder.Services.AddSingleton<
-            PhotoPrint.API.Services.Sameday.IAwbCreationNotifier,
-            PhotoPrint.API.Services.Sameday.AwbCreationNotifier>();
-
-        builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.AwbDispatcher>();
-        builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.AwbRetryJob>();
-        builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.ShipmentTrackingJob>();
-    }
-}
-else
-{
-    builder.Services.AddScoped<PhotoPrint.API.Services.IShippingService, PhotoPrint.API.Services.StaticShippingService>();
-}
+builder.Services.AddSamedayIntegration(builder.Configuration);
 
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderNumberService, PhotoPrint.API.Services.OrderNumberService>();
 

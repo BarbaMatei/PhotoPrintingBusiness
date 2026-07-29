@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.Exceptions;
 
 namespace PhotoPrint.API.Services.Sameday;
@@ -15,16 +16,22 @@ public sealed class SamedayAuthHandler : DelegatingHandler
 {
     private const string AuthenticatePath = "/api/authenticate";
 
-    private readonly ISamedayTokenProvider _tokenProvider;
+    // Resolved lazily (not ctor-injected): this handler sits in the ISamedayClient pipeline, and the
+    // token provider resolves the client to authenticate — a ctor dependency would close a DI
+    // resolution cycle at pipeline-build time. The token provider is a singleton, so root resolution
+    // is safe.
+    private readonly IServiceProvider _services;
     private readonly ILogger<SamedayAuthHandler> _logger;
 
     public SamedayAuthHandler(
-        ISamedayTokenProvider tokenProvider,
+        IServiceProvider services,
         ILogger<SamedayAuthHandler> logger)
     {
-        _tokenProvider = tokenProvider;
+        _services = services;
         _logger = logger;
     }
+
+    private ISamedayTokenProvider TokenProvider => _services.GetRequiredService<ISamedayTokenProvider>();
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -48,7 +55,7 @@ public sealed class SamedayAuthHandler : DelegatingHandler
             request.Method.Method,
             request.RequestUri?.AbsolutePath ?? "(unknown)");
 
-        _tokenProvider.Invalidate();
+        TokenProvider.Invalidate();
 
         var retryRequest = await CloneAsync(request, cancellationToken);
         await AttachTokenAsync(retryRequest, cancellationToken);
@@ -65,7 +72,7 @@ public sealed class SamedayAuthHandler : DelegatingHandler
 
     private async Task AttachTokenAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        var token = await _tokenProvider.GetTokenAsync(ct);
+        var token = await TokenProvider.GetTokenAsync(ct);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
     }
 

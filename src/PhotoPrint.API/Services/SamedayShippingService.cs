@@ -1,7 +1,4 @@
-using Microsoft.EntityFrameworkCore;
-using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Shipping;
-using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.API.Services;
@@ -27,12 +24,11 @@ public sealed class SamedayShippingService : IShippingService
 
     public SamedayShippingService(
         ISamedayClient client,
-        PhotoPrintDbContext db,
-        IConfiguration config,
+        StaticShippingService staticFallback,
         ILogger<SamedayShippingService> logger)
     {
         _client = client;
-        _staticFallback = new StaticShippingService(db, config);
+        _staticFallback = staticFallback;
         _logger = logger;
     }
 

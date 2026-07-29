@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using PhotoPrint.API.Exceptions;
@@ -22,8 +23,10 @@ public class SamedayAuthHandlerTests
         Mock<ISamedayTokenProvider> tokenProvider,
         ScriptedHttpMessageHandler script)
     {
+        var services = new ServiceCollection();
+        services.AddSingleton(tokenProvider.Object);
         var sut = new SamedayAuthHandler(
-            tokenProvider.Object,
+            services.BuildServiceProvider(),
             new LoggerFactory().CreateLogger<SamedayAuthHandler>())
         {
             InnerHandler = script,

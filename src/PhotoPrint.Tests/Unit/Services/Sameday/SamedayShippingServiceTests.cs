@@ -39,8 +39,7 @@ public class SamedayShippingServiceTests : IDisposable
 
         _sut = new SamedayShippingService(
             Mock.Of<ISamedayClient>(),
-            _db,
-            _config,
+            new StaticShippingService(_db, _config),
             new LoggerFactory().CreateLogger<SamedayShippingService>());
     }
 
