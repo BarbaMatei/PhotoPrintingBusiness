@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Invoicing;
 using StripeEvent = Stripe.Event;
 using StripeException = Stripe.StripeException;
 using StripeClient = Stripe.StripeClient;
@@ -31,6 +32,30 @@ public class FakeStripePaymentGateway : IStripePaymentGateway
         CreateCallCount++;
         LastIdempotencyKey = idempotencyKey;
         return Task.FromResult(("pi_test_secret_fake", "pi_test_fake_id"));
+    }
+}
+
+/// <summary>
+/// In-memory invoice numbering for integration tests. Bolt 039 wires
+/// <see cref="IInvoiceCreationService"/> into the webhook handler, which
+/// calls <see cref="IInvoiceNumberingService"/>. The production Postgres
+/// implementation uses raw SQL <c>nextval()</c> which the InMemory provider
+/// can't execute; this fake walks an in-process counter per (series, year).
+/// </summary>
+public class FakeInvoiceNumberingService : IInvoiceNumberingService
+{
+    private readonly Dictionary<(string Series, int Year), int> _counters = new();
+    private readonly object _lock = new();
+
+    public Task<InvoiceNumber> NextNumberAsync(string series, int year, CancellationToken ct = default)
+    {
+        lock (_lock)
+        {
+            var key = (series, year);
+            _counters.TryGetValue(key, out var current);
+            _counters[key] = current + 1;
+            return Task.FromResult(new InvoiceNumber(series, year, current + 1));
+        }
     }
 }
 
@@ -83,6 +108,17 @@ public class PaymentFactory : ShippingFactory
                 ["EuPlatesc:MerchantId"] = "TEST_MERCH",
                 ["EuPlatesc:SecretKey"]  = "000102030405060708090a0b0c0d0e0f",
                 ["EuPlatesc:GatewayUrl"] = "https://secure.euplatesc.ro/tdsprocess/tranzactd.php",
+                // Bolt 039: Seller fiscal identity is validated at boot when
+                // bolt 038's invoice path is reachable. Populate test values
+                // matching SellerSettingsValidator (Cui matches ^RO\d{2,10}$,
+                // CountryCode is ISO alpha-2).
+                ["Seller:Name"]                  = "Test Seller SRL",
+                ["Seller:Cui"]                   = "RO12345678",
+                ["Seller:RegistrationNumber"]    = "J40/1234/2026",
+                ["Seller:Address:Line1"]         = "Str. Exemplu 1",
+                ["Seller:Address:City"]          = "București",
+                ["Seller:Address:PostalCode"]    = "010101",
+                ["Seller:Address:CountryCode"]   = "RO",
             });
         });
 
@@ -92,6 +128,15 @@ public class PaymentFactory : ShippingFactory
             services.AddSingleton<IStripeClient>(new StripeClient("sk_test_fake"));
             services.AddScoped<IStripePaymentGateway>(_ => StripeGateway);
             services.AddScoped<IStripeSignatureVerifier>(_ => StripeVerifier);
+
+            // Bolt 039: the production Postgres numbering service uses raw SQL
+            // nextval() which InMemory can't execute. Swap in the in-process
+            // counter so the webhook → InvoiceCreationService path works in tests.
+            var numberingDesc = services.SingleOrDefault(
+                d => d.ServiceType == typeof(IInvoiceNumberingService));
+            if (numberingDesc is not null)
+                services.Remove(numberingDesc);
+            services.AddSingleton<IInvoiceNumberingService, FakeInvoiceNumberingService>();
         });
     }
 

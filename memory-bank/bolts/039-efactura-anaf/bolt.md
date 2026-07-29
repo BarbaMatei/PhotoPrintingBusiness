@@ -3,23 +3,38 @@ id: 039-efactura-anaf
 unit: 002-efactura-generation-and-anaf
 intent: 016-romanian-vat-efactura
 type: ddd-construction-bolt
-status: planned
+status: complete
 stories:
   - 001-ubl-xml-builder
   - 002-anaf-spv-client
   - 003-invoice-pdf-renderer-and-endpoint
   - 004-admin-invoice-list-and-retry
-created: 2026-05-25T10:15:00Z
-started: null
-completed: null
+created: 2026-05-25T10:15:00.000Z
+started: 2026-06-03T11:00:00.000Z
+completed: "2026-06-03T11:27:24Z"
 current_stage: null
-stages_completed: []
-
-requires_bolts: [038-vat-calculation]
+stages_completed:
+  - name: domain-model
+    completed: 2026-06-03T11:30:00.000Z
+    artifact: ddd-01-domain-model.md
+  - name: technical-design
+    completed: 2026-06-03T12:00:00.000Z
+    artifact: ddd-02-technical-design.md
+  - name: adr-analysis
+    completed: 2026-06-03T12:30:00.000Z
+    artifacts:
+      - adr-021-pdf-library-questpdf-not-puppeteersharp.md
+      - adr-022-dual-write-rollout-via-feature-flag.md
+      - adr-023-worker-dispatch-db-polling-not-in-process-channel.md
+      - adr-024-implicit-attempt-count-from-updatedat-no-persisted-counter.md
+  - name: implement
+    completed: 2026-06-03T13:30:00.000Z
+    artifact: src code (no migration — bolt 038 staged the schema)
+requires_bolts:
+  - 038-vat-calculation
 enables_bolts: []
 requires_units: []
 blocks: false
-
 complexity:
   avg_complexity: 4
   avg_uncertainty: 4

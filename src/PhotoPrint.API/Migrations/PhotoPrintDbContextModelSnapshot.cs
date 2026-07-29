@@ -277,6 +277,80 @@ namespace PhotoPrint.API.Migrations
                     b.ToTable("GuestSessions");
                 });
 
+            modelBuilder.Entity("PhotoPrint.API.Models.Invoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AnafStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AnafUploadId")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("IssuedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("NetTotalRon")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PdfStoragePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Series")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalRon")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("VatRon")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("XmlPayload")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnafStatus")
+                        .HasDatabaseName("ix_invoices_anaf_status");
+
+                    b.HasIndex("InvoiceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_invoices_invoice_number");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_invoices_order_id");
+
+                    b.ToTable("Invoices");
+                });
+
             modelBuilder.Entity("PhotoPrint.API.Models.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -328,6 +402,9 @@ namespace PhotoPrint.API.Migrations
                     b.Property<long?>("LastTrackingSyncAt")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal>("NetTotalRon")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("OrderNumber")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -376,6 +453,12 @@ namespace PhotoPrint.API.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("VatRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("VatRon")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -872,6 +955,17 @@ namespace PhotoPrint.API.Migrations
                         .WithMany()
                         .HasForeignKey("ClaimedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("PhotoPrint.API.Models.Invoice", b =>
+                {
+                    b.HasOne("PhotoPrint.API.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("PhotoPrint.API.Models.Order", b =>
