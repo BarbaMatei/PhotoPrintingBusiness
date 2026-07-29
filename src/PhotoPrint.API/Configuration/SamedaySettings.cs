@@ -46,6 +46,11 @@ public sealed class SamedayJobsSettings
     public int    TrackingIntervalMinutes       { get; set; } = 15;
     public int    TrackingMaxAgeDays            { get; set; } = 30;
     public int    MaxConcurrentSamedayCalls     { get; set; } = 5;
+
+    // Transport rate limit (req/s), distinct from the concurrency gate above. Null = fall back to
+    // MaxConcurrentSamedayCalls (the historical coupled behaviour).
+    public int?   MaxRequestsPerSecond          { get; set; }
+
     public int[]  DispatchBackoffSeconds        { get; set; } = [30, 120, 300, 900, 3600];
 
     // How long one AWB-creation attempt owns an order before it's reclaimable. Must exceed

@@ -62,17 +62,7 @@ public sealed class SamedayClient : ISamedayClient
 
         using var _ = response;
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-            throw new SamedayAuthException(AuthenticatePath);
-
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
-            throw new SamedayUnreachableException(AuthenticatePath, httpStatus: (int)response.StatusCode);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await SafeReadAsync(response, ct);
-            throw new SamedayValidationException(AuthenticatePath, (int)response.StatusCode, body);
-        }
+        await EnsureSuccessOrThrowAsync(response, AuthenticatePath, ct);
 
         SamedayWireDtos.AuthenticateResponse? payload;
         try
@@ -87,7 +77,9 @@ public sealed class SamedayClient : ISamedayClient
         if (payload is null || string.IsNullOrWhiteSpace(payload.Token) || payload.ExpireAtUtc is null)
             throw new SamedayProtocolException(AuthenticatePath, "response was missing 'token' or 'expire_at_utc'");
 
-        return new SamedayToken(payload.Token, payload.ExpireAtUtc.Value);
+        // Normalize to UTC: the wire value may deserialize with a non-UTC offset on a non-UTC host,
+        // which would shift the cached token's expiry.
+        return new SamedayToken(payload.Token, payload.ExpireAtUtc.Value.ToUniversalTime());
     }
 
     public async Task<AwbCreationResult> CreateAwbAsync(AwbCreationRequest request, CancellationToken ct = default)
@@ -130,17 +122,7 @@ public sealed class SamedayClient : ISamedayClient
 
         using var _ = response;
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-            throw new SamedayAuthException(endpoint);
-
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
-            throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var rawBody = await SafeReadAsync(response, ct);
-            throw new SamedayValidationException(endpoint, (int)response.StatusCode, rawBody);
-        }
+        await EnsureSuccessOrThrowAsync(response, endpoint, ct);
 
         SamedayWireDtos.AwbCreateResponse? payload;
         try { payload = await response.Content.ReadFromJsonAsync<SamedayWireDtos.AwbCreateResponse>(JsonOptions, ct); }
@@ -168,23 +150,16 @@ public sealed class SamedayClient : ISamedayClient
         try { response = await _http.GetAsync(endpoint, HttpCompletionOption.ResponseHeadersRead, ct); }
         catch (HttpRequestException ex) { throw new SamedayUnreachableException(endpoint, inner: ex); }
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        // Not `using`-scoped: on success the caller owns the response + stream, so dispose only
+        // on the throw paths.
+        try
         {
-            response.Dispose();
-            throw new SamedayAuthException(endpoint);
+            await EnsureSuccessOrThrowAsync(response, endpoint, ct);
         }
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
+        catch
         {
-            var status = (int)response.StatusCode;
             response.Dispose();
-            throw new SamedayUnreachableException(endpoint, httpStatus: status);
-        }
-        if (!response.IsSuccessStatusCode)
-        {
-            var status = (int)response.StatusCode;
-            var rawBody = await SafeReadAsync(response, ct);
-            response.Dispose();
-            throw new SamedayValidationException(endpoint, status, rawBody);
+            throw;
         }
 
         // Caller owns the stream + the response disposal.
@@ -204,15 +179,7 @@ public sealed class SamedayClient : ISamedayClient
 
         using var _ = response;
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-            throw new SamedayAuthException(endpoint);
-        if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout || response.StatusCode == HttpStatusCode.TooManyRequests)
-            throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
-        if (!response.IsSuccessStatusCode)
-        {
-            var rawBody = await SafeReadAsync(response, ct);
-            throw new SamedayValidationException(endpoint, (int)response.StatusCode, rawBody);
-        }
+        await EnsureSuccessOrThrowAsync(response, endpoint, ct);
 
         SamedayWireDtos.TrackingResponse? payload;
         try { payload = await response.Content.ReadFromJsonAsync<SamedayWireDtos.TrackingResponse>(JsonOptions, ct); }
@@ -223,15 +190,16 @@ public sealed class SamedayClient : ISamedayClient
 
         var state = MapTrackingState(payload.Status);
 
-        var observedAt = payload.ObservedAt
-            ?? payload.DeliveredAt
-            ?? DateTimeOffset.UtcNow;
+        // Null when the vendor gives no timestamp — the caller supplies its poll clock rather than
+        // this method fabricating a wall-clock "now" that would land in DeliveredAt.
+        var observedAt = payload.ObservedAt ?? payload.DeliveredAt;
 
+        var historyFallback = observedAt ?? DateTimeOffset.UtcNow; // cosmetic history only
         var history = (payload.History ?? Array.Empty<SamedayWireDtos.TrackingHistoryEntry>())
             .Select(h => new TrackingEvent(
                 State: MapTrackingState(h.Status ?? string.Empty),
                 Description: h.Description ?? string.Empty,
-                OccurredAt: h.OccurredAt ?? observedAt))
+                OccurredAt: h.OccurredAt ?? historyFallback))
             .ToList();
 
         return new TrackingSnapshot(awbNumber, state, observedAt, history);
@@ -268,6 +236,22 @@ public sealed class SamedayClient : ISamedayClient
 
             _ => TrackingState.Unknown,
         };
+    }
+
+    // Single status-classification chokepoint, sharing SamedayPolicies.IsRetryableStatus with the
+    // resilience pipeline so the two verdicts can't drift. Does NOT dispose the response.
+    private static async Task EnsureSuccessOrThrowAsync(
+        HttpResponseMessage response, string endpoint, CancellationToken ct)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            throw new SamedayAuthException(endpoint);
+        if (SamedayPolicies.IsRetryableStatus(response.StatusCode))
+            throw new SamedayUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await SafeReadAsync(response, ct);
+            throw new SamedayValidationException(endpoint, (int)response.StatusCode, body);
+        }
     }
 
     private static async Task<string?> SafeReadAsync(HttpResponseMessage response, CancellationToken ct)

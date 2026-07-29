@@ -195,7 +195,7 @@ public sealed class ShipmentTrackingJob : BackgroundService
                     .Where(o => o.Id == order.Id && o.Status == OrderStatus.Shipped)
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(o => o.Status,             OrderStatus.Delivered)
-                        .SetProperty(o => o.DeliveredAt,        (DateTimeOffset?)snapshot.ObservedAt)
+                        .SetProperty(o => o.DeliveredAt,        snapshot.ObservedAt ?? now)
                         .SetProperty(o => o.LastTrackingSyncAt, (DateTimeOffset?)now)
                         .SetProperty(o => o.UpdatedAt,          (DateTimeOffset?)now),
                         ct);

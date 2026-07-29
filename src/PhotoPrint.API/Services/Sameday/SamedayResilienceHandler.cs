@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using Polly;
@@ -23,11 +24,14 @@ public sealed class SamedayResilienceHandler : DelegatingHandler
     private readonly ResiliencePipeline<HttpResponseMessage> _pipeline;
     private readonly System.Threading.RateLimiting.RateLimiter? _rateLimiter;
 
-    public SamedayResilienceHandler(IOptions<SamedaySettings> settings)
+    public SamedayResilienceHandler(IOptions<SamedaySettings> settings, ILogger<SamedayResilienceHandler> logger)
     {
-        var limit = settings.Value.Jobs.MaxConcurrentSamedayCalls;
-        _rateLimiter = SamedayPolicies.CreateRateLimiter(limit > 0 ? limit : 5);
-        _pipeline = SamedayPolicies.BuildPipeline(_rateLimiter);
+        var jobs = settings.Value.Jobs;
+        // Concurrency gate and request rate are distinct concerns; MaxRequestsPerSecond decouples
+        // them (falling back to the concurrency ceiling when unset, preserving prior behaviour).
+        var rate = jobs.MaxRequestsPerSecond ?? jobs.MaxConcurrentSamedayCalls;
+        _rateLimiter = SamedayPolicies.CreateRateLimiter(rate > 0 ? rate : 5);
+        _pipeline = SamedayPolicies.BuildPipeline(_rateLimiter, logger);
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(

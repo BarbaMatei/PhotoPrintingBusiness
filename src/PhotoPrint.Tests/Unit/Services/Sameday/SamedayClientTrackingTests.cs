@@ -75,18 +75,18 @@ public class SamedayClientTrackingTests
     }
 
     [Fact]
-    public async Task GetTrackingAsync_falls_back_to_now_when_observedAt_missing()
+    public async Task GetTrackingAsync_leaves_observedAt_null_when_the_vendor_omits_it()
     {
+        // the client must not fabricate a wall-clock "now" (which would land in DeliveredAt);
+        // the poll caller supplies its own clock as the fallback.
         var script = new ScriptedHttpMessageHandler(
             _ => ScriptedHttpMessageHandler.Json(HttpStatusCode.OK,
                 "{\"awbNumber\":\"RO123\",\"status\":\"in-transit\"}"));
 
         var sut = Build(script);
-        var before = DateTimeOffset.UtcNow.AddSeconds(-5);
         var snapshot = await sut.GetTrackingAsync("RO123");
-        var after = DateTimeOffset.UtcNow.AddSeconds(5);
 
-        snapshot.ObservedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
+        snapshot.ObservedAt.Should().BeNull();
     }
 
     [Fact]

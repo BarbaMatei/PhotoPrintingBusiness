@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Services.Sameday;
 public sealed record TrackingSnapshot(
     string AwbNumber,
     TrackingState State,
-    DateTimeOffset ObservedAt,
+    DateTimeOffset? ObservedAt,
     IReadOnlyList<TrackingEvent> History);
 
 public sealed record TrackingEvent(

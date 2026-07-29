@@ -106,6 +106,9 @@ public sealed class AwbCreator : IAwbCreator
         return outcome;
     }
 
+    private static string Truncate(string? s, int max) =>
+        string.IsNullOrEmpty(s) ? "(none)" : s.Length <= max ? s : s[..max] + "…";
+
     private async Task<AwbCreationOutcome> CreateAndPersistAsync(
         Order order, Guid orderId, AwbCreationRequest request, int attempt, CancellationToken ct)
     {
@@ -138,7 +141,11 @@ public sealed class AwbCreator : IAwbCreator
         }
         catch (SamedayValidationException ex)
         {
-            // Our request is wrong — retrying with the same input is pointless.
+            // Surface the vendor's field-level reason (truncated to limit echoed PII) so ops can
+            // diagnose the permanent failure — ex.Message is generic; retrying the same input is pointless.
+            _logger.LogWarning(
+                "sameday.awb.vendor-rejected order_id={OrderId} status={Status} body={Body}",
+                orderId, ex.HttpStatus, Truncate(ex.ResponseBody, 300));
             return new AwbCreationOutcome.GiveUp(ex.Message);
         }
 

@@ -48,6 +48,10 @@ public static class SamedayServiceCollectionExtensions
                 var s = sp.GetRequiredService<IOptions<SamedaySettings>>().Value;
                 http.BaseAddress = new Uri(s.BaseUrl);
                 http.Timeout = TimeSpan.FromSeconds(s.RequestTimeoutSeconds);
+                // Cap buffered response bodies (auth/awb/tracking JSON are small) so a
+                // hijacked/misbehaving vendor can't OOM the worker. The label PDF is streamed
+                // (ResponseHeadersRead), so this bound doesn't constrain it.
+                http.MaxResponseContentBufferSize = 10 * 1024 * 1024;
             })
             .AddHttpMessageHandler<SamedayAuthHandler>()
             .AddHttpMessageHandler<SamedayResilienceHandler>();
@@ -56,9 +60,8 @@ public static class SamedayServiceCollectionExtensions
         services.AddScoped<StaticShippingService>();
         services.AddScoped<IShippingService, SamedayShippingService>();
 
-        // ── Bolt 037: AWB + tracking lifecycle jobs ───────────────────────────
-        // Orthogonal flag — credentials may be wired (Sameday:Enabled=true) without yet flipping
-        // the lifecycle on. See ADR-015/016.
+        // AWB + tracking lifecycle jobs — an orthogonal flag: credentials can be wired
+        // (Sameday:Enabled=true) without yet flipping the lifecycle automation on.
         var samedayJobsEnabled = configuration
             .GetSection(SamedaySettings.SectionName + ":Jobs")
             .GetValue<bool>("Enabled");

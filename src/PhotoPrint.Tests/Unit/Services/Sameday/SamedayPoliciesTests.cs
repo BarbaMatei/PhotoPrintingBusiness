@@ -1,6 +1,7 @@
 using System.Net;
 using System.Threading.RateLimiting;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Polly.RateLimiting;
 using PhotoPrint.API.Configuration;
@@ -33,7 +34,7 @@ public class SamedayPoliciesTests
         {
             Jobs = new SamedayJobsSettings { MaxConcurrentSamedayCalls = int.MaxValue },
         });
-        var resilience = new SamedayResilienceHandler(settings) { InnerHandler = script };
+        var resilience = new SamedayResilienceHandler(settings, NullLogger<SamedayResilienceHandler>.Instance) { InnerHandler = script };
         var client = new HttpClient(resilience)
         {
             BaseAddress = new Uri("https://sameday-test/"),

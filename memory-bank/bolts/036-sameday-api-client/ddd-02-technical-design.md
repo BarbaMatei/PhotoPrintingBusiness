@@ -294,10 +294,10 @@ surface change is `/health`:
 
 - The existing `/health` endpoint already returns `200 OK` with a
   `status` body (per ADR-001).
-- When `Sameday:Enabled == true`, the response body adds a
-  `"sameday": "enabled"` field. We do **not** call Sameday on every
-  health check — this is a static flag, not a liveness probe. Story
-  001's acceptance criterion explicitly forbids active probing here.
+- NOT IMPLEMENTED: an earlier design added a `"sameday": "enabled"` field to the
+  response when `Sameday:Enabled == true`. The generic health-response writer never
+  carried it and it was dropped as out of scope (the flag is observable from config /
+  the resolved `IShippingService`). No active Sameday probing happens here either way.
 
 ---
 

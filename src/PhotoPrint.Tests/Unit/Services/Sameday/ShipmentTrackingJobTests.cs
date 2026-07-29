@@ -281,7 +281,7 @@ public class ShipmentTrackingJobTests : IDisposable
     [Fact]
     public async Task Polls_an_order_synced_a_full_interval_ago()
     {
-        // D67: an order polled exactly one interval ago must be eligible THIS tick. The old
+        // an order polled exactly one interval ago must be eligible THIS tick. The old
         // full-interval window made `synced < now - interval` false and skipped it to the next tick.
         var order = SeedShippedOrder(
             shippedAt: T0.AddDays(-3),
@@ -303,7 +303,7 @@ public class ShipmentTrackingJobTests : IDisposable
     [Fact]
     public async Task Polls_multiple_in_window_orders_in_one_tick()
     {
-        // D76: the tick fans PollOneAsync out over every in-window id (each on its OWN scoped
+        // the tick fans PollOneAsync out over every in-window id (each on its OWN scoped
         // DbContext). Exercise it with two orders so a per-order scope/isolation regression reddens.
         var delivered = SeedShippedOrder(shippedAt: T0.AddDays(-3), awbNumber: "RO-DELIV");
         var inTransit = SeedShippedOrder(shippedAt: T0.AddDays(-3), awbNumber: "RO-TRANSIT");

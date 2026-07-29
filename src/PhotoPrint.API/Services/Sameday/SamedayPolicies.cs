@@ -1,5 +1,6 @@
 using System.Net;
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.RateLimiting;
 using Polly.Retry;
@@ -31,7 +32,8 @@ public static class SamedayPolicies
     public static ResiliencePipeline<HttpResponseMessage> BuildRetryPipeline()
         => BuildPipeline(rateLimiter: null);
 
-    public static ResiliencePipeline<HttpResponseMessage> BuildPipeline(RateLimiter? rateLimiter)
+    public static ResiliencePipeline<HttpResponseMessage> BuildPipeline(
+        RateLimiter? rateLimiter, ILogger? logger = null)
     {
         var builder = new ResiliencePipelineBuilder<HttpResponseMessage>();
 
@@ -46,18 +48,31 @@ public static class SamedayPolicies
         builder.AddRetry(new RetryStrategyOptions<HttpResponseMessage>
         {
             MaxRetryAttempts = 3,
-            BackoffType = DelayBackoffType.Exponential,
-            Delay = TimeSpan.FromSeconds(1), // 1 s, 4 s, 16 s
             UseJitter = false,
+            // Backoff schedule is 1 s / 4 s / 16 s (base-4). Polly's Exponential backoff is base-2
+            // (1/2/4), so the delays are produced explicitly.
+            DelayGenerator = args =>
+                ValueTask.FromResult<TimeSpan?>(TimeSpan.FromSeconds(Math.Pow(4, args.AttemptNumber))),
             ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                 .Handle<HttpRequestException>()
                 .HandleResult(r => IsRetryableStatus(r.StatusCode)),
+            OnRetry = args =>
+            {
+                logger?.LogWarning(
+                    "sameday.transport.retry attempt={Attempt} delay={Delay}s outcome={Outcome}",
+                    args.AttemptNumber + 1,
+                    (int)args.RetryDelay.TotalSeconds,
+                    args.Outcome.Exception?.GetType().Name
+                        ?? ((int?)args.Outcome.Result?.StatusCode)?.ToString()
+                        ?? "unknown");
+                return default;
+            },
         });
 
         return builder.Build();
     }
 
-    private static bool IsRetryableStatus(HttpStatusCode status)
+    internal static bool IsRetryableStatus(HttpStatusCode status)
     {
         if ((int)status >= 500 && (int)status < 600) return true;
         if (status == HttpStatusCode.RequestTimeout) return true;
