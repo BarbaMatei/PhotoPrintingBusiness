@@ -13,7 +13,7 @@ history. Findings = new 🔴/🟠/🟡/⚪. Dormant targets live under `archive/
 
 | Target | State |
 |---|---|
-| 015 sameday shipping | **Certified 2026-07-28** (`5fc330b`) — single-pass certification: 0 High, 0 regression, 0 reopened → loop complete. 17 med / 19 low / 6 cleanup (D55–D89) → backlog **pre-enable checklist** (headline: DI-cycle risk on first Enabled=true boot, pdfLink>500 Postgres overflow, Easybox address DoS, label not surfaced to admin). D45 vendor-idempotency residual accepted — verify with Sameday before enabling. Still dormant behind two false flags |
+| 015 sameday shipping | **Certified 2026-07-28** (`5fc330b`); **post-cert backlog fix round resolved 2026-07-29** (`66c6d50`, resolution-v5) — owner chose to clear the whole pre-enable checklist: D55–D89 + folded backlog, 30 fixed / 3 deferred (D72/D81/D40) / 2 wont-fix (D83/D89) / 2 false-positive (D88/D33). Real DI-cycle on Enabled=true fixed + regression-tested; backend 914 / frontend 457 green. **Re-verification next.** D45 vendor-idempotency residual still accepted — verify with Sameday before enabling. Still dormant behind two false flags |
 | 043 cloud storage | **Certified 2026-07-22** (no serious defect survives; D83–D90 → backlog) — loop complete |
 | 042 thumbnail cache | Archived. Loop quiet after v9; certification never ran (pre-dates the risk tiers) |
 | 035 payment idempotency | Archived. Fix loop complete at v10; never certified (pre-dates the protocol) |
