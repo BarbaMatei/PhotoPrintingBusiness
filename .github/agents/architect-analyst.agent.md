@@ -57,7 +57,7 @@ Structure your final response exactly like this:
 ### Observability
 ### Missing capabilities
 
-## 10 Improvement proposals
+## 20 Improvement proposals
 [Ranked table + detail for each]
 
 ## Roadmap

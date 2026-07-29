@@ -3,7 +3,7 @@ id: 001-error-handling-logging
 unit: 001-error-handling-logging
 intent: 001-foundation-infrastructure
 type: ddd-construction-bolt
-status: completed
+status: complete
 stories:
   - 001-exception-handler-middleware
   - 002-correlation-id-middleware

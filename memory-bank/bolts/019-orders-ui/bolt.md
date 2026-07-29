@@ -3,7 +3,7 @@ id: 019-orders-ui
 unit: 002-orders-ui
 intent: 005-order-management
 type: simple-construction-bolt
-status: completed
+status: complete
 stories:
   - 003-order-status-pipe
   - 001-order-history-page

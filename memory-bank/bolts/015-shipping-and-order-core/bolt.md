@@ -3,7 +3,7 @@ id: 015-shipping-and-order-core
 unit: 003-shipping-and-order-core
 intent: 004-checkout-payment
 type: ddd
-status: completed
+status: complete
 started: 2026-05-21T22:00:00Z
 completed: 2026-05-21T23:30:00Z
 current_stage: done

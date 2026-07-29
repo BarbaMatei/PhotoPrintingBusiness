@@ -3,7 +3,7 @@ id: 003-email-infrastructure
 unit: 003-email-infrastructure
 intent: 001-foundation-infrastructure
 type: ddd-construction-bolt
-status: completed
+status: complete
 stories:
   - 001-email-service-abstraction
   - 002-razor-template-rendering

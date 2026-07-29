@@ -3,7 +3,7 @@ id: 014-upload-format-cart-ui
 unit: 002-upload-format-cart-ui
 intent: 004-checkout-payment
 type: simple-construction-bolt
-status: completed
+status: complete
 started: 2026-05-21T20:30:00Z
 completed: 2026-05-22T00:00:00Z
 current_stage: done

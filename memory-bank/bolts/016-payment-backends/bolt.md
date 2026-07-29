@@ -3,7 +3,7 @@ id: 016-payment-backends
 unit: 004-payment-backends
 intent: 004-checkout-payment
 type: ddd
-status: completed
+status: complete
 started: 2026-05-21T23:30:00Z
 completed: 2026-05-22T00:00:00Z
 current_stage: done

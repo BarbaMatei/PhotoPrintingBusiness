@@ -3,7 +3,7 @@ id: 013-cart-api
 unit: 001-upload-and-cart-backend
 intent: 004-checkout-payment
 type: ddd-construction-bolt
-status: completed
+status: complete
 started: 2026-05-21T18:30:00Z
 completed: 2026-05-21T20:00:00Z
 current_stage: done
