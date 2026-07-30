@@ -21,7 +21,7 @@ findings:
   SF13: { status: open,           commit: null,    note: "model check + auto-resume fold into the loop-driver — build item 5" }
   SF14: { status: deferred,       commit: null,    note: "owner 2026-07-29: seeded run 2 'not now'; R3 re-scope NOT approved — the design-doc gate stays as written, deliberately visible, as the standing reminder the test is owed" }
   SF15: { status: fixed,          commit: 08e5a3e, note: "R4 — test-only self-verify exemption written into runbook-verification step 1; the 015 ledger's 'expiry: next calibration' marked resolved" }
-  SF16: { status: open,           commit: null,    note: "post-cert-escape marker + track-record file — build item 4; doubly important while SF14 stays deferred (it is the interim measurement)" }
+  SF16: { status: fixed,          commit: 878beb6, note: "track-record.md seeded with both certifications; escape rule in README + reconcile-findings skill (unsure → count it, doubt stated); auditor errors when a certified target is missing from the file" }
 ---
 
 # Resolution v1 — review-system
@@ -36,8 +36,8 @@ tags chosen over branch re-push (remote branches were deleted deliberately post-
 |-----|-----|--------|-----|
 | SF1 | 🟠 | fixed | R1 in README note ², runbook-discovery step 1, rationale calibration entry |
 | SF2 | 🟠 | fixed | R2 in README front page + note ² (🟠-open-at-close index convention, forward-looking) |
-| SF14 | 🟠 | deferred | owner decision recorded above; SF16's marker is the interim measure |
-| SF16 | 🟠 | open | build item 4 (convention + ledger marker) |
+| SF14 | 🟠 | deferred | owner decision recorded above; SF16's scorecard (now live) is the interim measure |
+| SF16 | 🟠 | fixed | track-record.md + README/reconciler rule + auditor enforcement |
 | SF4 | 🟠→🟡 | fixed | `review-evidence/{015,042,043}` tags pushed to origin (verified via ls-remote) |
 | SF3 | 🟡 | fixed | wf.js HINTS + dedup topic list |
 | SF5 | 🟡 | fixed | schema v2 + records auditor @1daedb9 (fixture 12/12, real records 0 errors) |
@@ -52,5 +52,5 @@ tags chosen over branch re-push (remote branches were deleted deliberately post-
 | SF11 | — | false-positive | defense checker verdict, recorded in review-v1 |
 
 Remaining build order (owner-sequenced, from review-v1 recommendations): comment-citation
-sweep → post-cert-escape marker → loop-driver skill. Parked: seeded run 2 (SF14). Verification of this round's fixes = the future re-grade
+sweep → loop-driver skill. Parked: seeded run 2 (SF14). Verification of this round's fixes = the future re-grade
 (`review-v2` of this target), which re-scores the locked baseline scorecard.
