@@ -32,7 +32,8 @@ feature clean?".
 5. Write `review-v<n+1>.md` (`pass-type: verification`; verdict at most
    `approve-with-followups` — a quiet verification means "the fixes held", never "the code is
    clean"). Flip held findings to `verified`, reopen failures, append the
-   [metrics.jsonl](metrics-schema.md) line and the [index.md](index.md) row, and write
+   [metrics.jsonl](metrics-schema.md) line and the [index.md](index.md) row (then run
+   `node reviews/lib/records-auditor.mjs <target>` — must exit clean), and write
    `summary-v<n+1>.md` via the **`owner-summary` skill**.
 
 Cost: scale agent count to the fix size — a 50-line fix doesn't need 8 finders. Give agents

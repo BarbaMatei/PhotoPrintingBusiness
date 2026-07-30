@@ -1,0 +1,243 @@
+#!/usr/bin/env node
+// Records auditor — mechanical checks over reviews/ structured records, per metrics-schema.md v2.
+// Checks: metrics.jsonl parses + validates (strict for lines dated >= 2026-07-30, lenient with
+// grandfathered drift before); new_findings tallies vs findings[]; review-v<n>.md <-> metrics
+// pairing; every cited commit resolves AND is reachable from a pushed ref (tag or remote branch);
+// correction lines reference real passes; index.md mentions each pass; citation-leak count.
+// Prose bodies (ledgers, resolutions) are NOT checked — numbers there stay a human's job.
+//
+// Usage: node reviews/lib/records-auditor.mjs [--root <repoRoot>] [target ...]
+// Exit 0 = no errors (warnings allowed) · 1 = errors.
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { execSync } from 'node:child_process'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const argv = process.argv.slice(2)
+let ROOT = null
+const only = []
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === '--root') ROOT = argv[++i]
+  else only.push(argv[i])
+}
+if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const REVIEWS = join(ROOT, 'reviews')
+
+const V2_CUTOFF = '2026-07-30'
+const TYPES = new Set(['discovery', 'delta-discovery', 'verification'])
+const SUBTYPES = new Set(['certification-pair-A', 'certification-pair-B', 'certification-single'])
+const SEVS = new Set(['high', 'medium', 'low', 'cleanup'])
+const VERDICTS = new Set(['confirmed', 'plausible', 'refuted', 're-raise', 'unverified-cleanup', 'unverified-low', 'unverified-over-budget'])
+const TOP_KEYS = new Set(['target', 'pass', 'type', 'subtype', 'date', 'commit', 'code_tip', 'delta_base', 'lenses', 'verdict', 'outcome', 'mediums_open_at_close', 'new_findings', 'findings', 'refinds_identity', 'reraises_of_decided', 'refuted', 'disputed', 'deferrals_upheld', 'verified', 'reopened', 'tests', 'cost', 'notes'])
+const STAGE_KEYS = new Set(['lenses', 'dedup', 'skeptics_guard', 'skeptics_trace', 'reraise_skipped', 'budget_skipped'])
+const LEGACY_TOP = new Set(['base', 'certified', 'deferred_reaffirmed', 'disputed_upheld'])
+
+const errors = [], warnings = [], infos = []
+const err = m => errors.push(m)
+const warn = m => warnings.push(m)
+const info = m => infos.push(m)
+
+function git(cmd) {
+  return execSync(`git ${cmd}`, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
+}
+const shaCache = new Map()
+function checkSha(sha) {
+  if (shaCache.has(sha)) return shaCache.get(sha)
+  const r = { resolves: false, pushed: false }
+  try { r.resolves = git(`cat-file -t ${sha}`) === 'commit' } catch { }
+  if (r.resolves) {
+    try { if (git(`tag --contains ${sha}`)) r.pushed = true } catch { }
+    if (!r.pushed) { try { if (git(`branch -r --contains ${sha}`)) r.pushed = true } catch { } }
+  }
+  shaCache.set(sha, r)
+  return r
+}
+const SHA_RE = /^[0-9a-f]{7,40}$/
+
+function listTargets() {
+  const out = []
+  for (const e of readdirSync(REVIEWS, { withFileTypes: true })) {
+    if (!e.isDirectory() || ['lib', 'experiments', 'archive'].includes(e.name)) continue
+    out.push({ name: e.name, dir: join(REVIEWS, e.name), archived: false })
+  }
+  const arch = join(REVIEWS, 'archive')
+  if (existsSync(arch)) for (const e of readdirSync(arch, { withFileTypes: true })) {
+    if (e.isDirectory()) out.push({ name: e.name, dir: join(arch, e.name), archived: true })
+  }
+  return only.length ? out.filter(t => only.some(o => t.name.includes(o))) : out
+}
+
+function num(v) { return typeof v === 'number' && Number.isFinite(v) }
+function numOrNull(v) { return v === null || num(v) }
+
+function auditTarget(t) {
+  const tag = t.name + (t.archived ? ' (archive)' : '')
+  const strictTier = t.archived ? warn : err // archives never hard-fail on record shape
+  const reviewVersions = readdirSync(t.dir).map(f => /^review-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
+  const metricsPath = join(t.dir, 'metrics.jsonl')
+  if (!existsSync(metricsPath)) {
+    info(`${tag}: no metrics.jsonl (${reviewVersions.length} review file(s)) — skipped as a non-code target`)
+    return
+  }
+  const legacyDrift = new Map() // key -> count, aggregated per target
+  const drift = k => legacyDrift.set(k, (legacyDrift.get(k) || 0) + 1)
+  const lines = readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim())
+  const passes = new Map() // pass -> [line objects]
+  const shas = new Map()   // sha -> where
+
+  lines.forEach((raw, idx) => {
+    const at = `${tag} metrics line ${idx + 1}`
+    let o
+    try { o = JSON.parse(raw) } catch (e) { err(`${at}: unparseable JSON (${e.message})`); return }
+
+    if (o.correction_for) {
+      if (!o.target || !o.date || !o.note) err(`${at}: correction line missing target/date/note`)
+      if (!num(o.correction_for.pass)) err(`${at}: correction_for.pass must be a pass number`)
+      else if (![...passes.keys()].includes(o.correction_for.pass) && !reviewVersions.includes(o.correction_for.pass))
+        err(`${at}: correction_for.pass ${o.correction_for.pass} matches no known pass`)
+      return
+    }
+
+    const strict = typeof o.date === 'string' && o.date >= V2_CUTOFF
+    const bad = strict ? err : strictTier
+
+    for (const k of ['target', 'pass', 'type', 'date', 'commit']) if (o[k] === undefined) bad(`${at}: missing required field "${k}"`)
+    if (o.target && o.target !== t.name) err(`${at}: target "${o.target}" does not match folder "${t.name}"`)
+    if (num(o.pass)) passes.set(o.pass, [...(passes.get(o.pass) || []), o])
+
+    if (o.type && !TYPES.has(o.type)) {
+      if (!strict && o.type === 'certification') drift('type:"certification" (read as discovery + certification-single)')
+      else bad(`${at}: type "${o.type}" not in ${[...TYPES].join('|')}`)
+    }
+    if (o.subtype !== undefined && !SUBTYPES.has(o.subtype)) bad(`${at}: unknown subtype "${o.subtype}"`)
+
+    for (const k of Object.keys(o)) {
+      if (TOP_KEYS.has(k)) continue
+      if (!strict && LEGACY_TOP.has(k)) { drift(`field "${k}"`); continue }
+      bad(`${at}: unknown field "${k}"`)
+    }
+
+    if (o.lenses !== undefined && o.lenses !== null) {
+      if (!Array.isArray(o.lenses)) bad(`${at}: lenses must be an array or null`)
+      else if (o.lenses.some(l => typeof l !== 'string' || /\s/.test(l))) {
+        if (strict) err(`${at}: lenses must be bare lens keys, not prose`)
+        else drift('prose in lenses[]')
+      }
+    }
+
+    if (o.new_findings) for (const s of SEVS) if (!num(o.new_findings[s])) bad(`${at}: new_findings.${s} missing or non-numeric`)
+    for (const k of ['refinds_identity', 'reraises_of_decided', 'refuted', 'verified', 'reopened']) if (o[k] !== undefined && !num(o[k])) bad(`${at}: ${k} must be a number`)
+
+    if (o.tests !== undefined && o.tests !== null) {
+      if (!num(o.tests.passed) || !num(o.tests.failed)) bad(`${at}: tests must be {passed, failed}`)
+      for (const k of Object.keys(o.tests)) if (!['passed', 'failed'].includes(k)) {
+        if (!strict && k.startsWith('frontend_')) drift('tests.frontend_* (v2 combines suites)')
+        else bad(`${at}: unknown tests key "${k}"`)
+      }
+    }
+
+    if (o.cost !== undefined && o.cost !== null) {
+      for (const k of Object.keys(o.cost)) {
+        if (['agents', 'tokens', 'agents_by_stage'].includes(k)) continue
+        if (!strict && k === 'subagent_tokens') { drift('cost.subagent_tokens (read as cost.tokens)'); continue }
+        bad(`${at}: unknown cost key "${k}"`)
+      }
+      if (o.cost.tokens !== undefined && !numOrNull(o.cost.tokens)) bad(`${at}: cost.tokens must be number|null`)
+      if (o.cost.agents !== undefined && !numOrNull(o.cost.agents)) bad(`${at}: cost.agents must be number|null`)
+      if (strict && o.cost.agents_by_stage) for (const k of Object.keys(o.cost.agents_by_stage))
+        if (!STAGE_KEYS.has(k)) err(`${at}: unknown agents_by_stage key "${k}"`)
+    }
+
+    if (o.outcome !== undefined) {
+      if (!['certified', 'not-certified'].includes(o.outcome)) bad(`${at}: outcome must be certified|not-certified`)
+      if (strict && !o.subtype) err(`${at}: certification line (outcome set) requires subtype`)
+      if (o.outcome === 'certified' && strict && !num(o.mediums_open_at_close)) err(`${at}: outcome certified requires mediums_open_at_close (calibration 2026-07-29)`)
+    }
+
+    if (strict && (o.type === 'discovery' || o.type === 'delta-discovery')) {
+      if (!Array.isArray(o.findings)) err(`${at}: strict ${o.type} line requires findings[]`)
+      else {
+        const tally = { high: 0, medium: 0, low: 0, cleanup: 0 }
+        o.findings.forEach((f, i) => {
+          const fat = `${at} findings[${i}]`
+          if (!/^F\d+$/.test(f.f || '')) err(`${fat}: f must be "F<n>"`)
+          if (!/^D\d+$/.test(f.d || '')) err(`${fat}: d must be "D<n>" (reconcile before appending)`)
+          if (typeof f.new !== 'boolean') err(`${fat}: new must be boolean`)
+          if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
+          if (!Array.isArray(f.lenses) || !f.lenses.length) err(`${fat}: lenses[] required`)
+          if (!num(f.conv) || f.conv < 1) err(`${fat}: conv must be >= 1`)
+          if (typeof f.hinted !== 'boolean') err(`${fat}: hinted must be boolean`)
+          if (!VERDICTS.has(f.verdict)) err(`${fat}: verdict "${f.verdict}" invalid`)
+          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^D\d+$/.test(f.fix_generated)) err(`${fat}: fix_generated must be D<n>|null`)
+          if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
+          if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
+        })
+        if (o.new_findings) for (const s of SEVS) if (num(o.new_findings[s]) && o.new_findings[s] !== tally[s])
+          err(`${at}: new_findings.${s}=${o.new_findings[s]} but findings[] has ${tally[s]} new ${s} entries`)
+      }
+    }
+
+    for (const k of ['commit', 'code_tip', 'delta_base', 'base']) {
+      const v = o[k]
+      if (typeof v === 'string' && SHA_RE.test(v)) shas.set(v, `${at} (${k})`)
+    }
+  })
+
+  // review-v<n>.md <-> metrics pairing (+ frontmatter commit collection)
+  let missingFm = 0
+  for (const v of reviewVersions.sort((a, b) => a - b)) {
+    if (!passes.has(v)) strictTier(`${tag}: review-v${v}.md has no metrics line`)
+    const head = readFileSync(join(t.dir, `review-v${v}.md`), 'utf8').slice(0, 800)
+    const cm = /^commit:\s*([0-9a-f]{7,40})\b/m.exec(head)
+    if (cm) shas.set(cm[1], `${tag} review-v${v}.md frontmatter`)
+    if (!/^pass-type:/m.test(head)) missingFm++
+  }
+  if (missingFm) warn(`${tag}: ${missingFm} review file(s) missing pass-type frontmatter (pre-convention)`)
+  for (const [p, ls] of passes) {
+    if (!reviewVersions.includes(p)) strictTier(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
+    if (ls.length > 1 && !ls.every(l => l.subtype && l.subtype.startsWith('certification-pair'))) warn(`${tag}: ${ls.length} metrics lines share pass ${p} without pair subtypes`)
+  }
+
+  // commit resolvability + reachability from a pushed ref
+  for (const [sha, where] of shas) {
+    const r = checkSha(sha)
+    if (!r.resolves) strictTier(`${where}: commit ${sha} does not resolve in this repo`)
+    else if (!r.pushed) strictTier(`${where}: commit ${sha} is reachable from NO pushed ref (tag or remote branch) — evidence is single-machine`)
+  }
+
+  // index.md mention (warn-level; prose matching is fuzzy; archive rows use ranges — skipped)
+  const short = t.name.split('-')[0]
+  if (INDEX && !t.archived) for (const p of passes.keys()) {
+    const re = new RegExp(`\\|\\s*${short}\\s*\\|[^\\n]*v${p}\\b`)
+    if (!re.test(INDEX)) warn(`${tag}: no index.md row mentions ${short} v${p}`)
+  }
+
+  if (legacyDrift.size) {
+    const parts = [...legacyDrift].map(([k, n]) => `${k} ×${n}`).join(' · ')
+    info(`${tag}: grandfathered v1 drift — ${parts}`)
+  }
+}
+
+const INDEX = existsSync(join(REVIEWS, 'index.md')) ? readFileSync(join(REVIEWS, 'index.md'), 'utf8') : null
+if (!INDEX) warn('reviews/index.md not found — index pairing skipped')
+
+for (const t of listTargets()) auditTarget(t)
+
+// Citation-leak scan (SF9 tracker): finding-ID / review / ADR references in src comments.
+// Uses git grep (tracked files only, so node_modules is excluded for free).
+if (!only.length) {
+  const pat = String.raw`\b(BUG|SEC|OBS|QUAL|REQ|NEW|CLOUD|INPUT|TEST|DOC|DB)-[0-9]+\b|review 0[0-9]{2}-v[0-9]|ADR-0[0-9]{2}|\(D[0-9]{1,3}[,) ]|\(F[0-9]{1,3}[,) ]`
+  try {
+    let rows = []
+    try { rows = git(`grep -P -c "${pat}" -- src`).split('\n') } catch { /* exit 1 = no matches */ }
+    rows = rows.filter(r => /\.(cs|ts):\d+$/.test(r) && !/\.spec\.ts:/.test(r))
+    const total = rows.reduce((s, r) => s + Number(r.slice(r.lastIndexOf(':') + 1) || 0), 0)
+    info(`citation-leak scan: ${total} occurrence(s) in ${rows.length} file(s) — target is 0 (CLAUDE.md comment rule; baseline 371/118 on 2026-07-29)`)
+  } catch { warn('citation scan skipped (git grep -P unavailable)') }
+}
+
+for (const m of errors) console.log(`ERROR   ${m}`)
+for (const m of warnings) console.log(`WARN    ${m}`)
+for (const m of infos) console.log(`note    ${m}`)
+console.log(`\n${errors.length} error(s), ${warnings.length} warning(s).`)
+process.exit(errors.length ? 1 : 0)

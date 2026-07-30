@@ -1,57 +1,128 @@
 ---
 type: review-metrics-schema
-status: active
+status: active — v2
 created: 2026-07-04
+updated: 2026-07-30
 owner: Matei Barba
 ---
 
 # Review metrics — what every pass records, and why
 
-Every review pass (discovery, delta-discovery, *and* verification) appends **one line** to the target's
-`reviews/<target>/metrics.jsonl` at synthesis time — after findings are settled, before the
-review file is finalized. Append-only: never edit a past line; a correction is a note in the
-next line. Unknown values are `null`, never guessed.
+Every review pass (discovery, delta-discovery, *and* verification) appends **one line** to the
+target's `reviews/<target>/metrics.jsonl` at synthesis time — after findings are settled, before
+the review file is finalized. Append-only: never edit a past line; corrections are their own
+appended lines (see *Corrections*). Unknown values are `null`, never guessed.
 
-This data is what eventually answers the open questions in
-[self-driving-loop-design.md](self-driving-loop-design.md): does new-serious-per-pass actually
-decay (the stop rule)? what does a pass cost (the entry policy)? which lenses earn their keep?
-It cannot be reconstructed later — bolt 035's `cost` fields are `null` forever because nobody
-recorded them at the time. (035's rows were backfilled on 2026-07-04 from its review files;
-unstated values are `null`, never guessed.)
+This data answers the open questions in
+[self-driving-loop-design.md](self-driving-loop-design.md): does new-serious-per-pass decay?
+what does a pass cost? which lenses earn their keep? does fixing create new defects at a lower
+rate than before? It cannot be reconstructed later — bolt 035's `cost` fields are `null`
+forever because nobody recorded them at the time.
 
-## Fields (one JSON object per line)
+**Scope note:** this file meters **passes only**. Fix rounds, synthesis, and main-agent
+verification labor are not metered; any roll-up computed from this file is a *pass-cost* figure
+and must be labeled as such.
+
+**After appending, run the auditor** — it validates the new line against this schema and
+cross-checks the target's records; it must exit clean (legacy drift reports as warnings):
+
+```
+node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
+```
+
+## v2 fields (one JSON object per line; lines dated ≥ 2026-07-30 are validated strictly)
 
 | Field | Type | Meaning |
 |---|---|---|
-| `target` | string | the reviewed unit, e.g. `"035-payment-idempotency"` |
-| `pass` | int | review version number (matches `review-v<n>.md`) |
-| `type` | `"discovery"` \| `"delta-discovery"` \| `"verification"` | see the two-loops distinction + *The middle tier* in [README.md](README.md); the saturation/decay curve uses full `"discovery"` passes only |
+| `target` | string | the reviewed unit, e.g. `"043-cloud-storage-provider"` |
+| `pass` | int | review version (matches `review-v<n>.md`); a certification **pair** writes two lines with the same `pass` and subtypes A/B |
+| `type` | `"discovery"` \| `"delta-discovery"` \| `"verification"` | certification passes are `discovery` (they are full-manifest passes and belong on the decay curve) |
+| `subtype` | `"certification-pair-A"` \| `"certification-pair-B"` \| `"certification-single"` \| absent | discovery lines only |
 | `date` | ISO date | when the pass ran |
 | `commit` | string | the commit reviewed |
-| `lenses` | array \| null | lenses/finders actually run |
+| `code_tip` | string, optional | tree tip when it differs from the reviewed commit |
+| `delta_base` | string, delta passes | base commit of the reviewed diff |
+| `lenses` | array of lens keys \| null | keys only (e.g. `"correctness"`), never prose |
 | `verdict` | string \| null | the review's verdict |
+| `outcome` | `"certified"` \| `"not-certified"` \| absent | certification lines only |
+| `mediums_open_at_close` | int | **required when `outcome: "certified"`** — 🟠 count not `fixed`/`verified` at close (mirrors the index-row rule, calibration 2026-07-29) |
 | `new_findings` | `{high, medium, low, cleanup}` | **new** problems this pass named (info items count as `cleanup`, note it) |
-| `refinds_identity` | int | findings that are the *same problem* as an earlier finding (reconciler / hand judgment) |
+| `findings` | array | **required on strict discovery/delta lines** — one entry per canonical finding, see below |
+| `refinds_identity` | int | same problem as an earlier finding (reconciler judgment) |
 | `reraises_of_decided` | int | findings re-raising an accepted wont-fix / deferral / dismissal |
 | `refuted` | int | candidate findings recorded as false positives this pass |
-| `disputed` | int \| null | findings whose two skeptics contradicted each other (a guard found *and* a failing trace built); `null` when not tracked. Historical only — trace-first verification (2026-07-27) can no longer produce it |
+| `deferrals_upheld` | int, optional | prior terminal decisions re-affirmed this pass (canonical name) |
+| `disputed` | historical only | trace-first verification (2026-07-27) can no longer produce it |
 | `verified` | int | findings flipped to `verified` this pass |
 | `reopened` | int | findings reopened this pass |
-| `tests` | `{passed, failed}` \| null | suite result at the reviewed commit |
-| `cost` | `{agents, tokens, agents_by_stage?}` | fan-out size and rough token spend; `null` when not tracked. `agents_by_stage` = `{lenses, dedup, skeptics_guard, skeptics_trace}` — the discovery script reports these counts in its `_canonical` summary line; copy them in. They're what shows whether the skeptic tiering actually saves what it claims |
+| `tests` | `{passed, failed}` \| null | **combined** suites (backend + frontend) at the reviewed commit; per-suite splits go in `notes` |
+| `cost` | `{agents, tokens, agents_by_stage?}` | `tokens` = output tokens the pass's workflow(s) reported (never `subagent_tokens`); `agents_by_stage` keys: `lenses, dedup, skeptics_guard, skeptics_trace, reraise_skipped, budget_skipped` — copy from the discovery script's `_canonical` line |
 | `notes` | string | anything a future analysis will wish it knew |
 
-## Example
+### `findings[]` — the per-finding record (new in v2)
+
+One entry per **canonical** finding of a discovery/delta pass, including re-raises and refuted
+candidates (they carry lens-precision information). Written after reconciliation, so `d` is
+known. Sources: the discovery script's output (`agreeingLenses`, `convergence`, `hinted`,
+`verdict`) and the reconciler (`d`, `new`, `fix_generated`).
+
+| Key | Type | Meaning |
+|---|---|---|
+| `f` | `"F<n>"` | pass-local id |
+| `d` | `"D<n>"` | ledger id after reconciliation |
+| `new` | bool | true when `d` was minted this pass — Σ by `sev` over `new: true` entries must equal `new_findings` |
+| `sev` | high\|medium\|low\|cleanup | final synthesis severity |
+| `lenses` | array | the lenses that independently raised it (`agreeingLenses`) |
+| `conv` | int ≥ 1 | convergence count |
+| `hinted` | bool | topic planted by shared prompt hints |
+| `verdict` | script verdict enum | `confirmed` · `plausible` · `refuted` · `re-raise` · `unverified-*` |
+| `fix_generated` | `"D<n>"` \| null | the earlier finding whose **fix** caused this one (reconciler `residual-of` lineage) |
+| `sev_delta` | `"<lens-max>-><final>"` \| null | only when synthesis changed the severity vs the lens maximum |
+
+What this buys, after 2–3 more targets: per-lens yield ("which lenses earn their keep") by
+grouping on `lenses`; the fix-generativity rate (`fix_generated` non-null / `new`) that tells
+whether the 2026-07-22 fixer rules work; and an audit trail on synthesis severity changes
+(`sev_delta`), the stop rule's pivot.
+
+## Corrections
+
+A past line is never edited. A correction is its own appended line:
 
 ```json
-{"target":"036-example","pass":1,"type":"discovery","date":"2026-07-10","commit":"abc1234","lenses":["correctness","security","quality"],"verdict":"request-changes","new_findings":{"high":1,"medium":2,"low":4,"cleanup":3},"refinds_identity":0,"reraises_of_decided":0,"refuted":2,"verified":0,"reopened":0,"tests":{"passed":480,"failed":0},"cost":{"agents":9,"tokens":null},"notes":"first audit"}
+{"target":"<t>","date":"<iso>","correction_for":{"pass":7,"field":"new_findings"},"note":"what is wrong and what is authoritative"}
 ```
+
+This works for **closed targets** too (the v1 rule "a note in the next line" silently failed
+once a target stopped producing next lines).
+
+## Example (strict v2 discovery line, abbreviated)
+
+```json
+{"target":"044-observability","pass":1,"type":"discovery","date":"2026-08-02","commit":"abc1234","lenses":["correctness","observability","tests-coverage"],"verdict":"request-changes","new_findings":{"high":1,"medium":2,"low":1,"cleanup":0},"findings":[{"f":"F1","d":"D1","new":true,"sev":"high","lenses":["correctness","observability"],"conv":2,"hinted":false,"verdict":"confirmed","fix_generated":null,"sev_delta":null},{"f":"F2","d":"D2","new":true,"sev":"medium","lenses":["tests-coverage"],"conv":1,"hinted":false,"verdict":"plausible","fix_generated":null,"sev_delta":"high->medium"}],"refinds_identity":0,"reraises_of_decided":0,"refuted":1,"verified":0,"reopened":0,"tests":{"passed":1381,"failed":0},"cost":{"agents":18,"tokens":950000,"agents_by_stage":{"lenses":6,"dedup":1,"skeptics_trace":9,"skeptics_guard":2}},"notes":"first pass"}
+```
+
+## Legacy lines (dated before 2026-07-30)
+
+Validated leniently; the auditor reports known v1 drift as aggregated warnings, never errors.
+Readers of old lines need this table:
+
+| Legacy form | Where | Read as |
+|---|---|---|
+| `cost.subagent_tokens` | 042 verification lines | `cost.tokens` |
+| `deferred_reaffirmed` / `disputed_upheld` | 042 | `deferrals_upheld` |
+| `tests.frontend_passed/_failed` | 042 | separate frontend suite (v2 combines) |
+| `base` | 042 | `delta_base`/baseline commit |
+| `type: "certification"` | 015 pass 5 | `discovery` + `subtype: certification-single` |
+| `certified: "serious-clean"` | 043 pass 9 | `outcome: "certified"` |
+| prose in `lenses` | 035 passes 6–8 | composition not recorded |
+| free-form `agents_by_stage` keys | 015 passes 3, 5 | pair/replay stage counts |
 
 ## Rules
 
 - The **synthesis step appends the line** — the fixer never writes here.
-- `refinds_identity` / `reraises_of_decided` use the ledger's judgment
-  (until the reconciler exists: the synthesizing agent's judgment, per the labeling rules in
+- `refinds_identity` / `reraises_of_decided` / `fix_generated` use the **`reconcile-findings`
+  skill's** judgment (labeling rules per
   [archive/035-payment-idempotency/overlap-ground-truth.md](archive/035-payment-idempotency/overlap-ground-truth.md)).
-- No global roll-up file: compute cross-feature summaries on demand from the per-feature files;
-  a hand-maintained roll-up would drift.
+- No global roll-up file: compute cross-feature summaries on demand from the per-feature files
+  (they are labeled pass-cost-only); a hand-maintained roll-up would drift.
+- Run the auditor after every append.

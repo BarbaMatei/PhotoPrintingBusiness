@@ -109,8 +109,9 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
    convergence count) and `findings-v<n>.md` (full per-finding detail).
 3. Map this pass's `F#` onto ledger `D#` rows with the **`reconcile-findings` skill** (scored
    against the 035 ground truth before trust — see its Scores section) and update the ledger.
-4. Append the [metrics.jsonl](metrics-schema.md) line and the one-line [index.md](index.md)
-   row.
+4. Append the [metrics.jsonl](metrics-schema.md) line (v2: include the per-finding
+   `findings[]` array) and the one-line [index.md](index.md) row, then run
+   `node reviews/lib/records-auditor.mjs <target>` — it must exit clean.
 5. Write `summary-v<n>.md` via the **`owner-summary` skill** — the page the owner reads; the
    review file is the record, the summary is the interface.
 6. Feedback edges: a v1 pass's severity-weighted new-finding count is the bolt-process KPI;

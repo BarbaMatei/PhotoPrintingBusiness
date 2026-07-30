@@ -164,7 +164,8 @@ Built and operating:
 | Discovery fan-out script (lenses → in-pass dedup + `hinted` → trace-first skeptics with severity-tiered models, delta budget guard, decided-re-raise skip) | [lib/discovery-review.wf.js](lib/discovery-review.wf.js) |
 | Reconciler (`reconcile-findings` skill — scored vs the 035 ground truth: 0 over-merges) | `.claude/skills/reconcile-findings/SKILL.md` |
 | Owner summary (`owner-summary` skill — one page per pass: decisions · dissent · evidence) | `.claude/skills/owner-summary/SKILL.md` |
-| Metrics recorder (schema + per-pass append) | [metrics-schema.md](metrics-schema.md) |
+| Metrics recorder (schema **v2** 2026-07-30: per-finding lens attribution, fix-lineage, severity-delta) | [metrics-schema.md](metrics-schema.md) |
+| Records auditor (schema validation · tally cross-check · review↔metrics pairing · commit reachability from pushed refs · citation-leak count) | [lib/records-auditor.mjs](lib/records-auditor.mjs) |
 | Verification runbook | [runbook-verification.md](runbook-verification.md) |
 | Fixer contract | `/fix-review` skill |
 | Per-target ledgers (hand-maintained) | `reviews/<target>/ledger.md` |
@@ -176,7 +177,7 @@ bottleneck: finding volume and token cost, not recall):
 |---|------|------|--------------|-------------------|
 | 1 | **Seeded-bug run 2** | workflow script | before trusting any stop rule | Different implanter model + harder seeds; tests all three assumptions |
 | 2 | **Verification-pass script** | small script or `/fix-review` handback stage | after every fix batch | Most-run stage; spec already written (runbook) |
-| 3 | **Blinding auditor** | plain script, pre-pass | before every discovery pass | Mechanical; until built, blinding is best-effort |
+| 3 | **Blinding auditor** | plain script, pre-pass | before every discovery pass | Mechanical; the citation-leak half now lives in the records auditor — remaining: the discovery-workspace reachability check |
 | 4 | **Severity devil's advocate** | subagent stage | after skeptics, before synthesis | Guards the stop rule's weak point |
 | 5 | **Backlog groomer** | skill, every N features | periodic | Backlog is already accumulating; needs the reconciler |
 | 6 | **compress-review + plain-language** | skills | once per finished feature | Uses the owner-summary machinery; least load-bearing standalone |
