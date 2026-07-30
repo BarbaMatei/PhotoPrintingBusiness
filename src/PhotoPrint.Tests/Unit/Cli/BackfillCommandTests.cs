@@ -11,7 +11,7 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Cli;
 
 /// <summary>
-/// Unit tests for <see cref="BackfillCommand"/> (F18, review 043-v1). The exit codes
+/// Unit tests for <see cref="BackfillCommand"/>. The exit codes
 /// (0 ok / 1 any failure / 2 cloud-off) drive ops automation and the order-selection filter is
 /// a hand-copy of <see cref="PhotoPrint.API.BackgroundJobs.PromotionRecoveryScanner"/>, so filter
 /// drift must not ship untested.
@@ -145,7 +145,7 @@ public class BackfillCommandTests
         code.Should().Be(1);
     }
 
-    // ── Filter-parity boundary (F13, review 043-v3) ───────────────────────────
+    // ── Filter-parity boundary ───────────────────────────
     // The prior tests seeded only INCLUDED statuses (Paid/Printing), so filter drift that started
     // promoting excluded statuses shipped green. Pin both sides of the boundary.
 

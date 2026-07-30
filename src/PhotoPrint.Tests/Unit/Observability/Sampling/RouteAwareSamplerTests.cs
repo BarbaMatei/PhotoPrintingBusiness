@@ -8,7 +8,7 @@ namespace PhotoPrint.Tests.Unit.Observability.Sampling;
 
 /// <summary>
 /// Tests for <see cref="RouteAwareSampler"/>. The most important property is
-/// that sampling is deterministic by trace_id (ADR-017) — same trace_id +
+/// that sampling is deterministic by trace_id — same trace_id +
 /// same rate always yields the same decision. Random sampling is explicitly
 /// forbidden in this path; if a future "simplification" introduces it, these
 /// tests fail.
@@ -81,7 +81,7 @@ public class RouteAwareSamplerTests
     [Fact]
     public void Same_trace_id_same_rate_always_yields_same_decision()
     {
-        // This is the ADR-017 invariant. If a future PR replaces the trace_id
+        // This is the invariant. If a future PR replaces the trace_id
         // hash with Random.NextDouble, this test fails on the second iteration.
         var sut = new RouteAwareSampler(new ObservabilitySamplingSettings { Default = 0.5 });
         var traceId = ActivityTraceId.CreateRandom();

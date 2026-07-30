@@ -12,14 +12,14 @@ public class PhotoPrintDbContext : DbContext
     /// Name of the unique index enforcing at-most-one order per non-null Idempotency-Key.
     /// Shared with <c>OrderService.IsIdempotencyKeyViolation</c> (the Postgres
     /// <c>ConstraintName</c> match) so a rename here is a compile break there, not a silent
-    /// detection regression that degrades the canonical double-submit to a 500 (BUG-1, v8).
+    /// detection regression that degrades the canonical double-submit to a 500.
     /// </summary>
     public const string IdempotencyKeyIndexName = "ix_orders_idempotency_key";
 
     /// <summary>
     /// Name of the unique index on <c>OrderNumber</c>. Shared with
     /// <c>OrderService.IsOrderNumberViolation</c> so the order-number collision retry
-    /// (BUG-4, v8) keys off the same literal the index is named with (rename → compile break).
+    ///  keys off the same literal the index is named with (rename → compile break).
     /// </summary>
     public const string OrderNumberIndexName = "ix_orders_order_number";
 
@@ -306,17 +306,17 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
 
-            // ── Sameday integration (bolt 036) ─────────────────────────────
+            // ── Sameday integration ─────────────────────────────
             entity.Property(o => o.AwbLabelUrl).HasMaxLength(Order.MaxAwbLabelUrlLength).IsRequired(false);
             entity.Property(o => o.LastTrackingSyncAt).IsRequired(false);
 
-            // ── Sameday tracking job (bolt 037) ────────────────────────────
+            // ── Sameday tracking job ────────────────────────────
             entity.Property(o => o.ShippedAt).IsRequired(false);
             entity.Property(o => o.DeliveredAt).IsRequired(false);
 
-            // ── Idempotency (bolt 035) ──────────────────────────────────────
+            // ── Idempotency ──────────────────────────────────────
             entity.Property(o => o.IdempotencyKey).HasMaxLength(80);
-            // DB-2 (review 035-v5): 512, not Stripe's exact 255-char ID ceiling. Today's
+            // 512, not Stripe's exact 255-char ID ceiling. Today's
             // client secrets are ~60–90 chars, but a zero-headroom column throws "value
             // too long" on prod Postgres AFTER the Stripe charge exists if Stripe ever
             // lengthens IDs (SQLite/InMemory don't enforce it, so tests wouldn't catch it).
@@ -325,20 +325,20 @@ public class PhotoPrintDbContext : DbContext
 
             // At most one order may carry any given non-null IdempotencyKey.
             // Both Postgres and SQLite permit multiple NULLs in a unique index, so
-            // key-less orders coexist freely (DOC-2). The explicit HasFilter on Postgres
+            // key-less orders coexist freely. The explicit HasFilter on Postgres
             // documents intent and keeps the index small; SQLite gets a plain unique
             // index (multiple NULLs still permitted).
             //
-            // SEC-1 + REQ-1 (review 035-v8, ACCEPTED RESIDUAL — deferred): this uniqueness is
+            // Accepted residual — deferred: this uniqueness is
             // GLOBAL single-column, while the lookup/reclamation are owner-scoped. Consequences:
             //   • a cross-tenant 409-vs-200 is a weak existence oracle + a key-squatting DoS
-            //     vector (SEC-1); and
+            //     vector; and
             //   • a stale key is only reclaimable by its original owner, so cross-caller the
-            //     24h window doesn't actually free it (REQ-1).
+            //     24h window doesn't actually free it.
             // Both dissolve with a per-tenant COMPOSITE unique index — (UserId, IdempotencyKey)
             // / (GuestSessionId, IdempotencyKey) — plus updating IsIdempotencyKeyViolation to
             // that index name. That is a schema/migration change, so it is deferred to the
-            // migration/deploy phase (with DB-1/DB-2), not this bolt. Real-world exploitability
+            // migration/deploy phase (with the snapshot/Postgres gaps), not this bolt. Real-world exploitability
             // is LOW: keys are client-chosen GUIDs (unpredictable) and the 200 probe self-limits
             // (it creates a real charge on the attacker's own account). Accepted for now.
             var idempotencyIndex = entity.HasIndex(o => o.IdempotencyKey)

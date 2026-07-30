@@ -310,7 +310,7 @@ public class ArchiveRetentionJobTests
         cleaned.Should().Be(1);
     }
 
-    // ── D50 (review 043-v7): shared uploads across orders ─────────────────────
+    // ── Shared uploads across orders ─────────────────────
 
     [Fact]
     public async Task SweepAsync_UploadSharedWithInWindowOrder_IsNotExpired()
@@ -340,11 +340,11 @@ public class ArchiveRetentionJobTests
     public async Task SweepAsync_D50Query_TranslatesOnSqlite()
     {
         // The InMemory provider runs LINQ-to-objects and proves nothing about SQL translation
-        // (data-stack parity rule). The D50 fix added a second correlated NOT-EXISTS to the
+        // (data-stack parity rule). The shared-upload fix added a second correlated NOT-EXISTS to the
         // candidate query; an untranslatable shape throws at ToListAsync regardless of rows,
         // so an empty-DB sweep on real SQLite pins translatability. Filtering semantics are
         // covered by SweepAsync_UploadSharedWithInWindowOrder_IsNotExpired (InMemory); the
-        // full relational-graph seeding belongs to the deferred D20 Testcontainers track.
+        // full relational-graph seeding belongs to the deferred Testcontainers track.
         using var conn = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
         conn.Open();
         var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
@@ -360,7 +360,7 @@ public class ArchiveRetentionJobTests
         (cleaned, blobs, failed).Should().Be((0, 0, 0));
     }
 
-    // ── D56 (review 043-v7): ArchiveExpired audit must follow the durable commit ──
+    // ── ArchiveExpired audit must follow the durable commit ──
 
     private sealed class ThrowingSaveDbContext : PhotoPrintDbContext
     {

@@ -14,7 +14,7 @@ namespace PhotoPrint.Tests.Integration;
 
 /// <summary>
 /// Real S3-protocol integration tests for <see cref="S3StorageService"/>, exercised against
-/// a MinIO service container in CI (story 001 / bolt 043 / ADR-008). Skipped locally when the
+/// a MinIO service container in CI. Skipped locally when the
 /// <c>STORAGE_TEST_ENDPOINT</c> env var is unset — see <c>.github/workflows/ci.yml</c>.
 /// </summary>
 public sealed class S3StorageServiceIntegrationTests : IClassFixture<MinioFixture>, IAsyncLifetime
@@ -76,8 +76,7 @@ public sealed class S3StorageServiceIntegrationTests : IClassFixture<MinioFixtur
         Skip.IfNot(_fx.Available, MinioFixture.SkipReason);
 
         // The real S3 protocol returns a typed NotFound; the adapter must translate it to
-        // FileNotFoundException so callers get the uniform missing-object contract (F3,
-        // review 043-v1). Pre-fix this surfaced as AmazonS3Exception → 500 in prod.
+        // FileNotFoundException so callers get the uniform missing-object contract. Pre-fix this surfaced as AmazonS3Exception → 500 in prod.
         var act = () => _fx.Sut.GetStreamAsync($"uploads/2026/05/{Guid.NewGuid():N}.bin");
 
         await act.Should().ThrowAsync<FileNotFoundException>();
@@ -119,7 +118,7 @@ public sealed class S3StorageServiceIntegrationTests : IClassFixture<MinioFixtur
         (await _fx.Sut.ExistsAsync(key)).Should().BeFalse();
     }
 
-    // ── S3BucketVerifier boot probe (F18, review 043-v1) ──────────────────────
+    // ── S3BucketVerifier boot probe ──────────────────────
 
     [SkippableFact]
     public async Task Verifier_ExistingBucket_StartsWithoutThrowing()

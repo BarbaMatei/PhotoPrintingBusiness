@@ -15,7 +15,7 @@ namespace PhotoPrint.Tests.Unit.Filters;
 /// Unit tests for <see cref="IdempotencyKeyFilter"/>. These set the header value directly on
 /// a <see cref="DefaultHttpContext"/> so the exact raw value reaches the filter — the HTTP
 /// transport strips leading/trailing OWS from header values, which would otherwise hide the
-/// SEC-2 padding case at the integration layer.
+/// Padding case at the integration layer.
 /// </summary>
 public class IdempotencyKeyFilterTests
 {
@@ -41,7 +41,7 @@ public class IdempotencyKeyFilterTests
     [InlineData("abc", "abc")]                    // already clean → unchanged
     public void OnActionExecuting_TrimsKeyBeforeStashing(string rawHeader, string expected)
     {
-        // SEC-2 (review 035-v8): the stashed key is the exact unique-index key, so padding
+        // The stashed key is the exact unique-index key, so padding
         // must be trimmed — otherwise a padded resend is a distinct key and bypasses dedupe.
         var ctx = ContextWithHeader(rawHeader);
 
@@ -80,7 +80,7 @@ public class IdempotencyKeyFilterTests
     [Fact]
     public void OnActionExecuting_OverLengthKeyAfterTrim_ThrowsBadRequest()
     {
-        // The length cap applies to the TRIMMED key (SEC-2, review 035-v5): padding must not
+        // The length cap applies to the TRIMMED key: padding must not
         // let an otherwise-valid key slip past, nor an in-bounds key trip the cap on whitespace.
         var overLength = new string('k', IdempotencyKeyFilter.MaxKeyLength + 1);
         var ctx = ContextWithHeader($"  {overLength}  ");

@@ -7,7 +7,7 @@ namespace PhotoPrint.Tests.Unit.Configuration;
 
 /// <summary>
 /// Unit tests for <see cref="ArchiveSettingsValidator"/>. Wired with
-/// <c>.ValidateOnStart()</c> — a failure surface here would crash the API at boot.
+/// <c>.ValidateOnStart</c> — a failure surface here would crash the API at boot.
 /// </summary>
 public class ArchiveSettingsValidatorTests
 {
@@ -94,7 +94,7 @@ public class ArchiveSettingsValidatorTests
     [Fact]
     public void Validate_NonPositivePurgeSweepInterval_Fails()
     {
-        // F12 (review 043-v3): the PurgeSweepIntervalHours <= 0 rule shipped without a test, so
+        // The PurgeSweepIntervalHours <= 0 rule shipped without a test, so
         // dropping it would boot fine and then crash at `new PeriodicTimer(TimeSpan.Zero)` at runtime.
         var s = Defaults();
         s.PurgeSweepIntervalHours = 0;

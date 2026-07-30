@@ -200,10 +200,10 @@ public class WebhooksController : ControllerBase
                 MetricNames.WebhookResultValues.Ok);
             await BroadcastNewOrderAsync(order, cancellationToken);
             await FireOrderConfirmedEmailAsync(order, cancellationToken);
-            // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
-            // the worker picks up and uploads asynchronously (ADR-010).
+            // Enqueue cloud promotion off the hot path. Returns immediately;
+            // the worker picks up and uploads asynchronously.
             await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
-            // Bolt 037: enqueue Sameday AWB creation off the hot path.
+            // Enqueue Sameday AWB creation off the hot path.
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
         }
@@ -263,10 +263,10 @@ public class WebhooksController : ControllerBase
                 MetricNames.WebhookResultValues.Ok);
             await BroadcastNewOrderAsync(order, ct);
             await FireOrderConfirmedEmailAsync(order, ct);
-            // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
-            // the worker picks up and uploads asynchronously (ADR-010).
+            // Enqueue cloud promotion off the hot path. Returns immediately;
+            // the worker picks up and uploads asynchronously.
             await _photoPromoter.EnqueueAsync(order.Id, ct);
-            // Bolt 037: enqueue Sameday AWB creation off the hot path.
+            // Enqueue Sameday AWB creation off the hot path.
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
         }
@@ -291,7 +291,7 @@ public class WebhooksController : ControllerBase
     }
 
     /// <summary>
-    /// Observability (bolt 044): payment_webhook_total{processor,result}. The SLO
+    /// Observability: payment_webhook_total{processor,result}. The SLO
     /// in <c>memory-bank/operations/slos.md</c> §3 sets a 99.9% target on result=ok;
     /// every webhook receipt should produce exactly one increment with a result
     /// from <see cref="MetricNames.WebhookResultValues"/>.

@@ -25,7 +25,7 @@ builder.AddSerilogLogging();
 // ── Error tracking (Sentry, intent 020 bolt 045) ─────────────────────────────
 // Master flag mirrors the Sameday two-stage rollout: Enabled=false → SDK never
 // constructed, boot is byte-identical to baseline. The DSN never lives in
-// appsettings.json (ADR-006) — provide via user-secrets/env vars.
+// appsettings.json — provide via user-secrets/env vars.
 builder.Services.Configure<PhotoPrint.API.Configuration.SentrySettings>(
     builder.Configuration.GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName));
 builder.Services.AddSingleton<
@@ -63,7 +63,7 @@ if (sentryEnabled)
 // ── Observability (OTel traces + Prometheus metrics, intent 020 bolt 044) ────
 // Same two-stage flag posture: Observability:Enabled=false → nothing wired,
 // boot byte-identical to baseline. When on, exposes /metrics gated by an IP
-// allow-list (ADR-018) and pushes traces via OTLP (or stdout if no endpoint).
+// allow-list and pushes traces via OTLP (or stdout if no endpoint).
 builder.Services.AddObservability(builder.Configuration);
 
 var observabilityEnabled = builder.Configuration
@@ -81,7 +81,7 @@ builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
     // Default to split queries so multi-collection Includes don't trigger a cartesian
     // explosion (and silence the MultipleCollectionInclude warning). No effect on the
     // InMemory provider used in tests.
-    // QUAL-5 (review 042-v1): the split-query option is intentionally repeated in both
+    // The split-query option is intentionally repeated in both
     // arms — the UseSqlite/UseNpgsql calls differ, so a shared helper would save only the
     // one option line and obscure the provider branch. Not worth extracting.
     if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
@@ -136,7 +136,7 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPr
 
 // ── Photo Upload + Storage (bolt 043: two-tier router + S3 adapter) ───────────
 // Cap ImageSharp's largest single allocation as defence-in-depth against decompression
-// bombs (bolt 042, story 003 AC#1 / review 042-v1). The per-image pixel-area guard
+// bombs (bolt 042, story 003 AC#1 /). The per-image pixel-area guard
 // (ImageProcessor.ExceedsDecodeLimits) is the primary control; this bounds any decode that
 // slips past it — a 2.5 GB bomb allocation throws InvalidMemoryOperationException instead of
 // OOM-ing the process. 512 MB sits just above a legitimate max-size (100 MP ≈ 400 MB) decode.
@@ -144,7 +144,7 @@ SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
     SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
         new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
 
-// Bound concurrent image decodes process-wide (bolt 042, M3/F1, review 042-v4/v6). Each
+// Bound concurrent image decodes process-wide (bolt 042, M3/F1). Each
 // ~100 MP decode is ~400 MB, so an unbounded burst of concurrent first previews can OOM the
 // box even under the per-image caps. Derive the default from both CPU and host memory; ops can
 // override via ImageProcessing:MaxConcurrentDecodes.
@@ -177,7 +177,7 @@ builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.
 // ── Shipping ──────────────────────────────────────────────────────────────────
 // Sameday integration (intent 015, bolt 036). The flag is read once at boot:
 //   - Sameday:Enabled = false → StaticShippingService (today's behaviour, default).
-//   - Sameday:Enabled = true  → SamedayShippingService + typed HttpClient + auth
+//   - Sameday:Enabled = true → SamedayShippingService + typed HttpClient + auth
 //                                handler. Flipping back to false produces a
 //                                byte-identical fallback (intent goal).
 builder.Services.AddSingleton<TimeProvider>(_ => TimeProvider.System);
@@ -267,7 +267,7 @@ if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
 else
 {
     // ── Postgres (production): apply EF migrations at boot ────────────────────
-    // Guarded by IsNpgsql() so the Testing host (InMemory) and any non-relational
+    // Guarded by IsNpgsql so the Testing host (InMemory) and any non-relational
     // provider are a no-op; only a real PostgreSQL connection triggers migration.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
@@ -279,7 +279,7 @@ else
     }
 }
 
-// ── Seed-only mode: dotnet run --seed  /  dotnet run --seed-dev ──────────────
+// ── Seed-only mode: dotnet run --seed / dotnet run --seed-dev ──────────────
 if (args.Contains("--seed") || args.Contains("--seed-dev"))
 {
     using var scope = app.Services.CreateScope();
@@ -332,7 +332,7 @@ app.UseSecurityBaselines();      // 4th: HSTS, HTTPS, security headers, CORS, ra
 
 app.UseResponseCaching();        // 5th: serve cached responses for catalog endpoints
 
-// ── Static SPA assets (D1: combined image serves the built Angular app) ───────
+// ── Static SPA assets (the combined image serves the built Angular app) ───────
 // Registered only when wwwroot exists (the production image bundles the SPA there);
 // skipped in API-only local dev / tests so StaticFileMiddleware doesn't warn.
 if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot")))
@@ -351,7 +351,7 @@ app.UseAuthorization();
 if (sentryEnabled)
     app.UseSentryScopeEnricher();
 
-// ── /metrics endpoint (bolt 044) — gated by IP allow-list per ADR-018 ──────
+// ── /metrics endpoint — gated by IP allow-list ──────
 // Registered conditionally so the endpoint is absent (not just 403) when
 // Observability:Enabled=false. The allow-list middleware runs before the
 // Prometheus exporter; non-allowed IPs see 403 + empty body.

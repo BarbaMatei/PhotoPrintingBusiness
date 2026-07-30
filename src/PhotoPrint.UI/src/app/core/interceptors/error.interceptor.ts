@@ -28,7 +28,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           } else {
             // Unauthenticated (guest or anonymous): a 401 means the guest session is stale
             // or absent. Clear any stored token so the next attempt re-inits a fresh one;
-            // never bounce a guest to a login page they have no account for (FE-3). This
+            // never bounce a guest to a login page they have no account for. This
             // also covers the no-token/corrupt-token case (clearGuestToken is a safe no-op).
             auth.clearGuestToken();
           }

@@ -6,7 +6,7 @@ using PhotoPrint.API.Configuration;
 namespace PhotoPrint.API.Services;
 
 /// <summary>
-/// Fail-fast probe (ADR-008): on startup, verifies the configured S3 bucket exists and is
+/// Fail-fast probe: on startup, verifies the configured S3 bucket exists and is
 /// reachable with the configured credentials. Throwing from <see cref="StartAsync"/> aborts
 /// the host so a misconfigured bucket is caught at boot, never on the first upload.
 /// </summary>

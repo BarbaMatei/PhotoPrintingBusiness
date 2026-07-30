@@ -139,7 +139,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Returns_Skipped_when_AwbNumber_already_populated()
     {
-        // ADR-015 load-bearing pre-check. Removing the IsNullOrWhiteSpace guard breaks this.
+        // Load-bearing pre-check. Removing the IsNullOrWhiteSpace guard breaks this.
         var order = SeedOrder(awbNumber: "RO12345678");
         using var db = CreateDb();
         var client = new Mock<ISamedayClient>(MockBehavior.Strict);

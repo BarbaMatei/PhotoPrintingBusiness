@@ -4,7 +4,7 @@ using PhotoPrint.API.Configuration;
 namespace PhotoPrint.API.Validators;
 
 /// <summary>
-/// Fails fast at startup (via <c>.ValidateOnStart()</c>) when
+/// Fails fast at startup (via <c>.ValidateOnStart</c>) when
 /// <see cref="SamedaySettings"/> is misconfigured. Every rule is guarded by
 /// <c>options.Enabled</c> so the validator is a no-op when the integration
 /// is switched off — keeping the disabled-by-default path identical to the
@@ -12,7 +12,7 @@ namespace PhotoPrint.API.Validators;
 ///
 /// Follows the project's <c>IValidateOptions&lt;T&gt;</c> pattern for
 /// configuration validation; <c>FluentValidation</c> remains the path for
-/// controller DTOs (ADR-002).
+/// controller DTOs.
 /// </summary>
 public sealed class SamedaySettingsValidator : IValidateOptions<SamedaySettings>
 {

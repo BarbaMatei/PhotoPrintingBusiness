@@ -6,7 +6,7 @@ using PhotoPrint.API.Configuration;
 namespace PhotoPrint.API.Middleware;
 
 /// <summary>
-/// Gates <c>GET /metrics</c> via a configured IP allow-list, per ADR-018.
+/// Gates <c>GET /metrics</c> via a configured IP allow-list.
 /// The endpoint deliberately does NOT participate in JWT bearer auth; the
 /// scrape consumer is a Prometheus scraper, not a user, and network
 /// identity is the right primitive (see the ADR for the reasoning and

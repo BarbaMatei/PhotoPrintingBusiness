@@ -10,12 +10,12 @@ namespace PhotoPrint.API.Extensions;
 /// <list type="bullet">
 ///   <item><b>Bolt 051 (promote-on-paid):</b> <see cref="IPromotionQueue"/> singleton,
 ///         <see cref="IOrderPhotoPromoter"/> scoped, <see cref="PromotionRecoveryScanner"/>
-///         + <see cref="OrderPhotoPromotionWorker"/> hosted (ADR-010).</item>
+///         + <see cref="OrderPhotoPromotionWorker"/> hosted.</item>
 ///   <item><b>Bolt 052 (retention):</b> <see cref="IOriginalPurger"/> scoped,
 ///         <see cref="OriginalPurgeRecoveryScanner"/> + <see cref="ArchiveRetentionJob"/>
-///         hosted. Retention anchor is <c>Order.PaidAt</c> (ADR-012).</item>
+///         hosted. Retention anchor is <c>Order.PaidAt</c>.</item>
 /// </list>
-/// All settings fail fast at startup via <c>.ValidateOnStart()</c>.
+/// All settings fail fast at startup via <c>.ValidateOnStart</c>.
 /// </summary>
 public static class PhotoArchiveExtensions
 {
@@ -34,7 +34,7 @@ public static class PhotoArchiveExtensions
         services.AddSingleton<IPromotionQueue, PromotionQueue>();
 
         // The promoter holds a DbContext, so it must be scoped. The worker resolves it
-        // via IServiceScopeFactory.CreateScope() per job (matches UploadCleanupJob pattern).
+        // via IServiceScopeFactory.CreateScope per job (matches UploadCleanupJob pattern).
         services.AddScoped<IOrderPhotoPromoter, OrderPhotoPromoter>();
 
         // Both are BackgroundServices: StartAsync returns before the boot sweep runs, so
@@ -43,7 +43,7 @@ public static class PhotoArchiveExtensions
         services.AddHostedService<PromotionRecoveryScanner>();
         services.AddHostedService<OrderPhotoPromotionWorker>();
 
-        // ── Bolt 052: retention (ADR-012 anchor = Order.PaidAt) ───────────────────
+        // ── Bolt 052: retention (the anchor = Order.PaidAt) ───────────────────
         services.Configure<ArchiveSettings>(
             configuration.GetSection(ArchiveSettings.SectionName));
         services.AddSingleton<IValidateOptions<ArchiveSettings>, ArchiveSettingsValidator>();
@@ -55,7 +55,7 @@ public static class PhotoArchiveExtensions
 
         // Periodic backstop for the synchronous admin-transition purge: one sweep at boot,
         // then every ArchiveSettings.PurgeSweepIntervalHours. Catches promotions that complete
-        // after the production-complete transition (F4, review 043-v1) plus crash-stuck purges.
+        // after the production-complete transition plus crash-stuck purges.
         services.AddHostedService<OriginalPurgeRecoveryScanner>();
         services.AddHostedService<ArchiveRetentionJob>();
 

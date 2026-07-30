@@ -3,7 +3,7 @@ namespace PhotoPrint.API.Exceptions;
 /// <summary>
 /// Thrown when an <c>Idempotency-Key</c> is already bound to an existing order
 /// whose logical request differs from the current one. Maps to HTTP 409
-/// (see ADR-004 — state conflicts are 409, distinct from validation's 422).
+/// (state conflicts are 409, distinct from validation's 422).
 /// </summary>
 public class IdempotencyConflictException : Exception
 {

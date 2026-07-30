@@ -7,7 +7,7 @@ namespace PhotoPrint.API.Configuration;
 /// never constructed — boot is byte-identical to the pre-bolt baseline.
 ///
 /// The DSN lives in <c>dotnet user-secrets</c> (dev) or environment variables
-/// (staging/prod) — never in <c>appsettings.json</c> (ADR-006).
+/// (staging/prod) — never in <c>appsettings.json</c>.
 /// </summary>
 public sealed class SentrySettings
 {

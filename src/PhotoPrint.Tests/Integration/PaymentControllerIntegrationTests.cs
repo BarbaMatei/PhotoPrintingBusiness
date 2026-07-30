@@ -72,7 +72,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
 
         // Stripe was hit exactly once across the two requests.
         Assert.Equal(callsBefore + 1, _factory.StripeGateway.CreateCallCount);
-        // BUG-4: Stripe is keyed by the order id (stable per order), not the client key.
+        // Stripe is keyed by the order id (stable per order), not the client key.
         Assert.Equal(dto1.OrderId.ToString(), _factory.StripeGateway.LastIdempotencyKey);
 
         // Exactly one order persisted for this key.
@@ -108,7 +108,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         Assert.Equal(HttpStatusCode.OK, respB.StatusCode);
         var dtoB = await respB.Content.ReadFromJsonAsync<StripeIntentResponse>();
 
-        // SEC-1: B must NOT be handed A's order — that order (and its live secret) is A's.
+        // B must NOT be handed A's order — that order (and its live secret) is A's.
         Assert.NotEqual(dtoA!.OrderId, dtoB!.OrderId);
 
         using var scope = _factory.Services.CreateScope();
@@ -140,7 +140,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
 
-        // OBS-1: the 409 body must NAME the divergent field, not just carry the status.
+        // The 409 body must NAME the divergent field, not just carry the status.
         using var body = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
         var divergentFields = body.RootElement.GetProperty("divergentFields")
             .EnumerateArray().Select(e => e.GetString()).ToArray();
@@ -150,7 +150,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     [Fact]
     public async Task CreateStripeIntent_OverLengthIdempotencyKey_Returns400()
     {
-        // SEC-2: a key longer than the documented 80-char ceiling must be rejected at the
+        // A key longer than the documented 80-char ceiling must be rejected at the
         // filter with a 400, not accepted (dev/SQLite) or 500'd (prod Postgres truncation).
         // The cart is seeded so a passing request would otherwise be a 200 — the 400 is
         // attributable to the length check, not an empty cart.
@@ -201,7 +201,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     [Fact]
     public async Task CreateStripeIntent_ReplayWithNullCachedSecret_RecoversByRecallingGateway()
     {
-        // OBS-3 (review 035-v5): an earlier attempt created the order but died before
+        // An earlier attempt created the order but died before
         // persisting the secret. A replay then resolves the same order with a null cached
         // secret and recovers by re-calling the gateway — safe because Stripe is keyed by
         // the stable order id — returning a usable secret without creating a second order.
@@ -243,7 +243,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         Assert.Equal(1, vdb.Orders.Count(o => o.IdempotencyKey == key)); // still exactly one order
     }
 
-    // QUAL-4 (review 035-v5): request building centralized in PaymentRequestHelpers.
+    // Request building centralized in PaymentRequestHelpers.
     private static Task<HttpResponseMessage> SendStripeIntent(
         HttpClient client, CreateOrderRequest body, string idempotencyKey)
         => client.PostStripeIntentAsync(body, idempotencyKey);
@@ -421,7 +421,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     [Fact]
     public async Task StripeWebhook_PaymentSucceeded_EnqueuesPhotoPromotion()
     {
-        // D59 (review 043-v7): the webhook→promotion wiring had no test — deleting the
+        // The webhook→promotion wiring had no test — deleting the
         // EnqueueAsync call shipped green while paid orders silently never promoted to cloud.
         var order = await _factory.SeedOrderAsync(paymentIntentId: "pi_wh_promo", totalRon: 30.00m);
 

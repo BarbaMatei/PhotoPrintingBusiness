@@ -4,7 +4,7 @@ using PhotoPrint.API.Configuration;
 namespace PhotoPrint.API.Services.Sameday;
 
 /// <summary>
-/// Singleton in-process token cache (ADR-013). The <see cref="SemaphoreSlim"/>
+/// Singleton in-process token cache. The <see cref="SemaphoreSlim"/>
 /// makes the "many simultaneous first calls" case fetch exactly one token
 /// across the host. A 60 s safety window in front of the Sameday-supplied
 /// <c>expire_at_utc</c> absorbs clock skew and in-flight latency.

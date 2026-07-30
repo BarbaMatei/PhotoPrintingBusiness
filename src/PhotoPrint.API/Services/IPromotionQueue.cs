@@ -3,7 +3,7 @@ using System.Threading.Channels;
 namespace PhotoPrint.API.Services;
 
 /// <summary>
-/// In-process queue of pending promotion work (ADR-010). The producers are the two webhook
+/// In-process queue of pending promotion work. The producers are the two webhook
 /// branches in <c>WebhooksController</c>, the <see cref="PromotionRecoveryScanner"/> (at startup
 /// and on each periodic sweep), and any future re-enqueue path. The single consumer is
 /// <see cref="OrderPhotoPromotionWorker"/>.

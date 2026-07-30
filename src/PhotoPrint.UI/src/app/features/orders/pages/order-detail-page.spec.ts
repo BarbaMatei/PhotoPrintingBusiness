@@ -39,7 +39,7 @@ const MOCK_DETAIL: OrderDetailDto = {
 function makeOrderService(overrides: Partial<OrderService> = {}): Partial<OrderService> {
   return {
     getOrderDetail: vi.fn().mockReturnValue(of(MOCK_DETAIL)),
-    // Bolt 053: photos endpoint — default empty so legacy tests don't need to know about it.
+    // Photos endpoint — default empty so legacy tests don't need to know about it.
     getOrderPhotos: vi.fn().mockReturnValue(of({ photos: [] })),
     ...overrides,
   };
@@ -260,7 +260,7 @@ describe('OrderDetailPage', () => {
   });
 
   it('shows a photos error + retry (NOT "no longer available") when the photos call fails, without navigating', async () => {
-    // F6/D13 (review 043-v3): a photos-endpoint FAILURE must be distinguished from a genuine empty
+    // A photos-endpoint FAILURE must be distinguished from a genuine empty
     // result. The old code mapped any error to [] and showed the permanent "no longer available"
     // copy. It must now show a retryable error, and still not redirect the page.
     await setup({
@@ -335,7 +335,7 @@ describe('OrderDetailPage', () => {
   });
 
   it('does NOT re-open a closed lightbox when a grid thumbnail errors after close (D36 regression)', async () => {
-    // D36 (review 043-v5): close() cleared lightboxSrc but not lightboxPhotoId, so a later grid
+    // Close cleared lightboxSrc but not lightboxPhotoId, so a later grid
     // thumbnail (error) → refreshPhotoUrls re-pointed the lightbox from the stale id and the closed
     // modal spontaneously re-opened. A closed lightbox must stay closed through a URL refresh.
     const getOrderPhotos = vi

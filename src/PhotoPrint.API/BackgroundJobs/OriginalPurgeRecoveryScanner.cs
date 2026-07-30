@@ -13,7 +13,7 @@ namespace PhotoPrint.API.BackgroundJobs;
 /// the configured production-complete status whose uploads still have a non-null cloud
 /// <c>FilePath</c>, and fires the purger inline for each.
 /// <para>The synchronous purge on the admin status transition is the fast path; this periodic
-/// sweep closes the windows it misses (F4, review 043-v1): a promotion that completes <em>after</em>
+/// sweep closes the windows it misses: a promotion that completes <em>after</em>
 /// the Shipped transition (so the upload was still Local when the synchronous purge ran and got
 /// skipped), and any purge stuck by a crash. Boot-only was insufficient on an always-on server —
 /// a late-completing promotion's original would linger past its retention/GDPR window until the

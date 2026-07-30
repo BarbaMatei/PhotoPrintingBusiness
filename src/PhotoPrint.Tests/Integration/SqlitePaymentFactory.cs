@@ -13,7 +13,7 @@ namespace PhotoPrint.Tests.Integration;
 /// (one shared in-memory connection kept open for the factory's lifetime) instead of
 /// the EF InMemory provider. InMemory does not enforce unique indexes, so it cannot
 /// exercise the cross-tenant idempotency-key collision → 409 path at the HTTP layer
-/// (INFO-1, review 035-v2); SQLite enforces <c>ix_orders_idempotency_key</c>.
+/// SQLite enforces <c>ix_orders_idempotency_key</c>.
 /// </summary>
 public sealed class SqlitePaymentFactory : PaymentFactory
 {
@@ -35,7 +35,7 @@ public sealed class SqlitePaymentFactory : PaymentFactory
                 services.Remove(descriptor);
 
             services.AddDbContext<PhotoPrintDbContext>(options => options.UseSqlite(_connection));
-            // NB: the REAL OrderNumberService runs here — it has a SQLite branch (BUG-6).
+            // NB: the REAL OrderNumberService runs here — it has a SQLite branch.
         });
     }
 

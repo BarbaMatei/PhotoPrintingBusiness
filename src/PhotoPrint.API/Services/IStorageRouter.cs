@@ -3,7 +3,7 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.API.Services;
 
 /// <summary>
-/// Resolves which <see cref="IStorageService"/> owns a given upload's bytes (ADR-008).
+/// Resolves which <see cref="IStorageService"/> owns a given upload's bytes.
 /// The local adapter is always available; the cloud adapter is present only when
 /// <c>Storage:Provider == "S3"</c>.
 /// </summary>

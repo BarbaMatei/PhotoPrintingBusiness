@@ -299,7 +299,7 @@ interface StepDef {
       p { margin: 0.25rem 0; font-size: 0.95rem; }
     }
 
-    /* Photo archive section (bolt 053) */
+    /* Photo archive section */
     .order-photos {
       margin-bottom: 1.5rem;
       h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
@@ -375,7 +375,7 @@ export class OrderDetailPage implements OnInit {
   readonly order = signal<OrderDetailDto | null>(null);
   readonly orderError = signal(false);
 
-  // Bolt 053: photo archive + lightbox
+  // Photo archive + lightbox
   readonly photosLoading = signal(true);
   readonly photos = signal<OrderPhotoDto[]>([]);
   readonly photosError = signal(false);
@@ -423,7 +423,7 @@ export class OrderDetailPage implements OnInit {
             this.router.navigate(['/comenzile-mele']);
           } else if (status !== 401) {
             // Transient (5xx / network / status 0): keep the user on the page with a retry
-            // instead of bouncing them to the orders list (F16/D32, review 043-v3). A 401 is
+            // instead of bouncing them to the orders list. A 401 is
             // left to the auth interceptor's logout -> login redirect — don't override it.
             this.orderError.set(true);
           }
@@ -446,8 +446,8 @@ export class OrderDetailPage implements OnInit {
     this.photosError.set(false);
     this.urlsRefreshed = false;
 
-    // Bolt 053: fetch photos in parallel; a failure here never navigates away. Distinguish a
-    // fetch FAILURE (retryable) from a genuine empty 200 (F6/D13, review 043-v3) — the old code
+    // Fetch photos in parallel; a failure here never navigates away. Distinguish a
+    // fetch FAILURE (retryable) from a genuine empty 200 — the old code
     // mapped any error to [] and showed the permanent "no longer available" copy.
     this.orderService
       .getOrderPhotos(this.orderId())
@@ -477,14 +477,13 @@ export class OrderDetailPage implements OnInit {
   closeLightbox(): void {
     this.lightboxSrc.set(null);
     // Clear the tracked id too: refreshPhotoUrls re-points the lightbox from lightboxPhotoId, so a
-    // stale id would let a later grid-thumbnail (error) re-open a closed lightbox (D36, review 043-v5).
+    // stale id would let a later grid-thumbnail (error) re-open a closed lightbox.
     this.lightboxPhotoId = null;
   }
 
   // Both the grid thumbnails (thumbnailUrl) and the lightbox (largeUrl) hold presigned URLs with a
   // ~1h TTL captured at list-fetch; an expired one makes the <img> error. Re-fetch once for fresh
-  // URLs — updating photos() re-points every thumbnail, and the open lightbox too (F7/D5b,
-  // review 043-v3). The guard prevents a refresh loop if the fresh URL also fails.
+  // URLs — updating photos re-points every thumbnail, and the open lightbox too. The guard prevents a refresh loop if the fresh URL also fails.
   onThumbnailError(): void {
     this.refreshPhotoUrls();
   }
@@ -503,8 +502,8 @@ export class OrderDetailPage implements OnInit {
       .subscribe(result => {
         this.photos.set(result.photos);
         // Re-read lightboxPhotoId at resolve time, not capture time: if the user closed the
-        // lightbox before OR during this fetch, closeLightbox() nulled it and we must not
-        // re-point (which would re-open the closed modal) (D36, review 043-v5).
+        // lightbox before OR during this fetch, closeLightbox nulled it and we must not
+        // re-point (which would re-open the closed modal).
         const openPhotoId = this.lightboxPhotoId;
         if (openPhotoId !== null) {
           const fresh = result.photos.find(p => p.uploadId === openPhotoId);

@@ -6,7 +6,7 @@ namespace PhotoPrint.API.Observability;
 /// <summary>
 /// Span processor that promotes errored spans to "recorded" regardless of
 /// the sampler's earlier decision. Implements the "errors are always
-/// sampled" invariant from ADR-017 and the per-route sampling story.
+/// sampled" invariant and the per-route sampling story.
 ///
 /// The OTel sampler runs at span start, before the request outcome is
 /// known. A 5xx response or an unhandled exception only surfaces at span

@@ -5,12 +5,12 @@ using PhotoPrint.API.Extensions;
 namespace PhotoPrint.API.Filters;
 
 /// <summary>
-/// Owns Idempotency-Key handling for the payment endpoints (QUAL-3, review 035-v1):
+/// Owns Idempotency-Key handling for the payment endpoints:
 /// reads the <c>Idempotency-Key</c> header once, normalizes whitespace-only to null,
 /// stashes it in <see cref="HttpContext.Items"/> for the action (read via
 /// <see cref="HttpContextExtensions.GetIdempotencyKey"/>), and logs the transitional
-/// missing-key event (at Information — OBS-3, review 035-v8) with the correlation id,
-/// instead of each endpoint repeating the extraction + logging. See OPS-1: the missing-key
+/// missing-key event (at Information) with the correlation id,
+/// instead of each endpoint repeating the extraction + logging. The missing-key
 /// log escalates to a 400 (and back to Warning) once the FE always sends a key.
 /// </summary>
 public sealed class IdempotencyKeyFilter : IActionFilter
@@ -29,14 +29,14 @@ public sealed class IdempotencyKeyFilter : IActionFilter
     {
         var raw = context.HttpContext.Request.Headers[HeaderName].ToString();
 
-        // SEC-2 (review 035-v8): trim before storing. The value becomes the EXACT unique-index
+        // Trim before storing. The value becomes the EXACT unique-index
         // key, so an untrimmed key means "abc", " abc" and "abc " are three distinct keys — a
         // client or buggy proxy/retry layer that resends the same logical key once padded would
         // then defeat dedupe and create a second order + second PaymentIntent (double charge).
         // Whitespace-only still normalizes to null (IsNullOrWhiteSpace catches it first).
         var key = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
 
-        // SEC-2 (review 035-v5): enforce the documented 1..80 length here. Without this an
+        // Enforce the documented 1..80 length here. Without this an
         // over-length key passes dev/test (SQLite ignores varchar(80)) and then fails the
         // prod Postgres INSERT with a truncation DbUpdateException → a 500 for what is a
         // client input error. Reject it up front with a 400 instead.
@@ -48,12 +48,12 @@ public sealed class IdempotencyKeyFilter : IActionFilter
 
         if (key is null)
         {
-            // OPS-1 (review 035-v1): transitional. Once the FE always sends an
+            // Transitional. Once the FE always sends an
             // Idempotency-Key, escalate a missing key from this log to a 400 (breaking
             // change). Tracked in memory-bank/bolts/035-payment-idempotency (ddd-02) + the
             // bolt walkthrough. TODO(bolt-035-followup): enforce required key.
             //
-            // OBS-3 (review 035-v8): log at Information, NOT Warning. While the FE hasn't
+            // Log at Information, NOT Warning. While the FE hasn't
             // adopted the header, a missing key is the expected (transitional) state on 100%
             // of payment requests — a Warning here is constant noise that can trip
             // warning-rate alerts. Raise back to Warning only once the key is meant to be

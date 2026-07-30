@@ -11,12 +11,12 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// Exercises the REAL <see cref="ImageProcessor"/> (bolt 042, TEST-2). Every other suite
+/// Exercises the REAL <see cref="ImageProcessor"/>. Every other suite
 /// replaces <see cref="IImageProcessor"/> with a fake, so the actual decompression-bomb
 /// guard, the format-error mapping, and the resize/encode never ran under test. These pin
 /// them against genuine ImageSharp decoding.
 ///
-/// Bolt 043 (ADR-008): the processor no longer touches storage — the caller routes via
+/// The processor no longer touches storage — the caller routes via
 /// <see cref="IStorageRouter"/> and hands it an open source stream — so these feed streams
 /// directly. The thumbnail long edge is 300 px (bolt 043 added a separate 2000 px large-preview
 /// tier, see <see cref="ImageProcessorLargePreviewTests"/>).
@@ -36,7 +36,7 @@ public class ImageProcessorTests
         return ms;
     }
 
-    // ── ExceedsDecodeLimits (BUG-1: total-pixel area cap) ──────────────────────
+    // ── ExceedsDecodeLimits (total-pixel area cap) ──────────────────────
 
     [Fact]
     public void ExceedsDecodeLimits_AtCapAllowed_OverCapAndOverflowRejected()
@@ -69,7 +69,7 @@ public class ImageProcessorTests
     [Fact]
     public async Task GenerateThumbnailAsync_LargeImage_ReturnsJpegThumbnailWithinCap()
     {
-        // Bolt 043: the thumbnail long edge is 300 px; a 2000x1500 source is downscaled to fit.
+        // The thumbnail long edge is 300 px; a 2000x1500 source is downscaled to fit.
         using var source = new Image<Rgba32>(2000, 1500);
         await using var src = PngStream(source);
 
@@ -118,7 +118,7 @@ public class ImageProcessorTests
     public async Task GenerateThumbnailAsync_UnreadableFile_ThrowsUnprocessableEntity()
     {
         // A source that is not a decodable image (corrupted/replaced ops-side). ImageSharp
-        // throws an ImageFormatException; the processor must surface a clean 422, not a 500 (BUG-4).
+        // throws an ImageFormatException; the processor must surface a clean 422, not a 500.
         await using var src = new MemoryStream(new byte[] { 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x11, 0x22, 0x33 });
 
         var act = () => _sut.GenerateThumbnailAsync(src);
@@ -129,7 +129,7 @@ public class ImageProcessorTests
     [Fact]
     public async Task GenerateThumbnailAsync_UnreadableFile_LogsCause()
     {
-        // M7 (review 042-v4): a source corrupted/replaced ops-side is unreadable at preview time.
+        // M7: a source corrupted/replaced ops-side is unreadable at preview time.
         // The catch previously rethrew a bare 422 with no log; it must log the caught exception
         // (mirroring GetInfoAsync) before rethrowing so the incident is visible to ops.
         var logger = new Mock<ILogger<ImageProcessor>>();
@@ -152,7 +152,7 @@ public class ImageProcessorTests
     [Fact]
     public async Task LoadSingleFrameAsync_MultiFrameGif_DecodesOnlyOneFrame()
     {
-        // M11 (review 042-v4): the frame-bomb cap (MaxFrames=1) is invisible in
+        // M11: the frame-bomb cap (MaxFrames=1) is invisible in
         // GenerateThumbnailAsync's JPEG output (JPEG is single-frame regardless), so nothing
         // pinned it — removing it kept the suite green while a thousands-of-frames file again
         // materialised frames x canvas x 4 bytes on decode. A genuine 3-frame GIF must decode to
@@ -178,7 +178,7 @@ public class ImageProcessorTests
     [Fact]
     public async Task LoadSingleFrameAsync_DeepColourSource_DecodesAs32BppNot64()
     {
-        // F7 (review 042-v8): decode is pinned to Rgba32 (4 B/px). The non-generic Image.LoadAsync
+        // Decode is pinned to Rgba32 (4 B/px). The non-generic Image.LoadAsync
         // auto-selects the source pixel type, so a 16-bit (Rgba64) source decodes to 8 B/px and a
         // legitimate ~72 MP deep-colour print trips the 512 MB backstop -> permanently un-previewable.
         // A 16-bit source must decode to 32 bpp; reverting to the non-generic load yields 64 bpp.
@@ -195,7 +195,7 @@ public class ImageProcessorTests
     [Fact]
     public async Task GenerateThumbnailAsync_DeepColourSource_ReturnsValidJpegThumbnail()
     {
-        // F7 (review 042-v8): a legitimate 16-bit deep-colour source must decode -> resize -> encode
+        // A legitimate 16-bit deep-colour source must decode -> resize -> encode
         // end-to-end into a valid JPEG, not fail. Small canvas keeps the test fast; the memory bound
         // (≤400 MB at 100 MP with the 4 B/px pin) is arithmetic, guarded by the sibling loader test.
         using var deep = new Image<Rgba64>(1000, 800);
@@ -216,7 +216,7 @@ public class ImageProcessorTests
     [Fact]
     public async Task GenerateThumbnailAsync_TruncatedButRecognizedImage_ThrowsUnprocessableEntity()
     {
-        // L14 (review 042-v4): the catch handles both UnknownImageFormatException (unrecognised)
+        // L14: the catch handles both UnknownImageFormatException (unrecognised)
         // and InvalidImageContentException (recognised header, broken body), but only the former
         // was tested. A valid PNG signature + IHDR with corrupt image data is RECOGNISED as PNG,
         // so a decode failure raises InvalidImageContentException — narrowing the catch to

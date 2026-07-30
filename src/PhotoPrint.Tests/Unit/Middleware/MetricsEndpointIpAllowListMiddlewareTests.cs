@@ -9,7 +9,7 @@ using PhotoPrint.API.Middleware;
 namespace PhotoPrint.Tests.Unit.Middleware;
 
 /// <summary>
-/// Pins ADR-018: the /metrics endpoint is gated by network identity, not JWT.
+/// Pins the rule that the /metrics endpoint is gated by network identity, not JWT.
 /// </summary>
 public class MetricsEndpointIpAllowListMiddlewareTests
 {

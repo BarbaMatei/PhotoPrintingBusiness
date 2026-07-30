@@ -8,7 +8,7 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.API.Extensions;
 
 /// <summary>
-/// Wires the two-tier storage layer (bolt 043, ADR-008):
+/// Wires the two-tier storage layer:
 /// <list type="bullet">
 ///   <item>Local adapter — always registered, keyed <c>"local"</c>.</item>
 ///   <item>S3 adapter + <see cref="IAmazonS3"/> + <see cref="S3BucketVerifier"/> — only when <c>Storage:Provider=S3</c>, keyed <c>"cloud"</c>.</item>
@@ -65,7 +65,7 @@ public static class StorageExtensions
             services.AddHostedService<S3BucketVerifier>();
         }
 
-        // Per-upload routing front-door (ADR-008).
+        // Per-upload routing front-door.
         services.AddSingleton<IStorageRouter, StorageRouter>();
 
         // Default (non-keyed) registration — resolves to the local adapter. No production

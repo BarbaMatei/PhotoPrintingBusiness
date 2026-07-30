@@ -5,7 +5,7 @@ namespace PhotoPrint.API.Services;
 
 /// <summary>
 /// Resolves the keyed <see cref="IStorageService"/> registrations ("local" / "cloud")
-/// and exposes a per-upload routing API (ADR-008).
+/// and exposes a per-upload routing API.
 /// </summary>
 public class StorageRouter : IStorageRouter
 {

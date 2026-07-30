@@ -21,8 +21,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(UnprocessableEntityException)]  = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         [typeof(DecompressionBombException)]    = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         // A decode that slips the pixel-area check but trips ImageSharp's allocation backstop
-        // (Program.cs) throws this, not an ImageFormatException — map it to 422, not a raw 500
-        // (L13, review 042-v4).
+        // (Program.cs) throws this, not an ImageFormatException — map it to 422, not a raw 500.
         [typeof(SixLabors.ImageSharp.Memory.InvalidMemoryOperationException)] = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         [typeof(UnsupportedMediaTypeException)] = (StatusCodes.Status415UnsupportedMediaType, "Unsupported Media Type"),
         [typeof(RequestEntityTooLargeException)]= (StatusCodes.Status413RequestEntityTooLarge, "Request Entity Too Large"),
@@ -57,7 +56,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
             // reloaded). That's not a server error — the caller is gone, so there's
             // nothing to return. Emit at Information (not Debug): the Serilog minimum level
             // is Information in every environment, so a Debug line is filtered out and the
-            // signal is lost entirely (OBS-2, review 042-v1). Distinct low-cardinality event.
+            // signal is lost entirely. Distinct low-cardinality event.
             _logger.LogInformation(
                 "request.client_aborted path={Path} correlation_id={CorrelationId}",
                 context.Request.Path,
@@ -82,7 +81,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 context.Request.Path,
                 correlationId);
 
-            // OBS-2 (review 035-v5): emit the structured event ddd-01:61 reserves so a
+            // Emit the structured event ddd-01:61 reserves so a
             // conflict is distinctly observable (a signal of client bugs / key-reuse abuse)
             // rather than buried in the generic warning above. Field NAMES only — no values.
             if (exception is IdempotencyConflictException conflict)
@@ -90,7 +89,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                     "payments.idempotency.conflict correlation_id={CorrelationId} divergent_fields={DivergentFields}",
                     correlationId, string.Join(",", conflict.DivergentFields));
 
-            // OBS-1 (review 035-v8): a cross-tenant key collision (a borrowed/guessed key
+            // A cross-tenant key collision (a borrowed/guessed key
             // or a key-squatting probe) also 409s, but via a plain ConflictException that
             // was indistinguishable from any other 409 in the logs — exactly the signal an
             // operator needs to grep during a duplicate-charge incident. Emit it as a
@@ -100,7 +99,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                     "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
                     correlationId);
 
-            // OBS-3 (review 042-v1): a rejected decompression bomb 422s like an ordinary
+            // A rejected decompression bomb 422s like an ordinary
             // "unreadable image" 422, so ops can't alert on a bomb spike. Emit a distinct
             // reserved event carrying the offending dimensions (no file data / no PII).
             if (exception is DecompressionBombException bomb)
@@ -108,7 +107,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                     "uploads.decompression_bomb.rejected correlation_id={CorrelationId} source=pixel_guard width={Width} height={Height}",
                     correlationId, bomb.WidthPx, bomb.HeightPx);
 
-            // F5 (review 042-v6): a bomb that under-reported its dimensions passes the pixel
+            // A bomb that under-reported its dimensions passes the pixel
             // guard but trips the 512 MB allocator backstop, throwing InvalidMemoryOperationException.
             // Emit the SAME reserved bomb event so ops alerting on it catch exactly the bombs that
             // evaded the primary guard — not just a generic "Handled exception" warning. No
@@ -162,7 +161,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
 
-        // OBS-1 (review 035-v5): the documented 409 contract is "names the divergent
+        // The documented 409 contract is "names the divergent
         // fields". Compute it once and surface it in BOTH the Development diagnostic shape
         // and the production ProblemDetails — previously only the prod branch carried it,
         // so a FE built against the dev API never saw the contract field. Field NAMES only,
@@ -171,7 +170,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
         object response;
 
-        // QUAL-6 (review 035-v8): use the injected _environment (this is now an instance
+        // Use the injected _environment (this is now an instance
         // method) instead of re-resolving IHostEnvironment via context.RequestServices — the
         // middleware already holds it, and the service-locator hop was a second, redundant
         // way to answer the same question.

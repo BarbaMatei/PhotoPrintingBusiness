@@ -158,7 +158,7 @@ public class UploadControllerIntegrationTests : IAsyncLifetime
         response.Headers.ETag.Should().NotBeNull();
     }
 
-    // TEST-4 (review 042-v1): the conditional-GET path — a second request echoing the ETag
+    // The conditional-GET path — a second request echoing the ETag
     // in If-None-Match gets 304 Not Modified with no body.
     [Fact]
     public async Task GetPreview_IfNoneMatchMatchesEtag_Returns304()
@@ -177,7 +177,7 @@ public class UploadControllerIntegrationTests : IAsyncLifetime
         second.StatusCode.Should().Be(HttpStatusCode.NotModified);
     }
 
-    // SEC-1 (review 042-v1): the preview is ownership-checked, so its Cache-Control must be
+    // The preview is ownership-checked, so its Cache-Control must be
     // `private` (never `public`/shared). A `public` response would be stored by ResponseCaching
     // — which runs before authentication and keys only on the URL — and served to a different
     // guest/anonymous client, leaking one user's photo. Pin the exact directive.

@@ -9,7 +9,7 @@ namespace PhotoPrint.API.Services.Sameday;
 /// Attaches the bearer token to every outbound Sameday call except
 /// <c>/api/authenticate</c> itself, and implements the "401 → invalidate →
 /// re-auth → retry once → <see cref="SamedayAuthException"/>" rule from
-/// ADR-014. Lives OUTSIDE the resilience pipeline so a session refresh does
+/// Lives OUTSIDE the resilience pipeline so a session refresh does
 /// not burn the transport-retry budget.
 /// </summary>
 public sealed class SamedayAuthHandler : DelegatingHandler

@@ -2,13 +2,12 @@ namespace PhotoPrint.API.Configuration;
 
 /// <summary>
 /// Configuration for the OpenTelemetry observability stack (intent 020, bolt 044).
-/// Mirrors the two-stage rollout posture used elsewhere (ADR-013/014 for Sameday,
-/// bolt 045 for Sentry): <see cref="Enabled"/> is false by default, the SDK is
+/// Mirrors the two-stage rollout posture used elsewhere (as for Sameday and Sentry): <see cref="Enabled"/> is false by default, the SDK is
 /// never wired when off, and boot is byte-identical to the pre-bolt baseline.
 ///
 /// OTLP endpoint and any production allow-list values live in
 /// <c>dotnet user-secrets</c> (dev) or environment variables (staging/prod) —
-/// never in <c>appsettings.json</c> (ADR-006).
+/// never in <c>appsettings.json</c>.
 /// </summary>
 public sealed class ObservabilitySettings
 {
@@ -36,7 +35,7 @@ public sealed class ObservabilityMetricsSettings
     public string PrometheusEndpoint { get; set; } = "/metrics";
 
     /// <summary>
-    /// IPs allowed to scrape <c>/metrics</c>. Per ADR-018 the endpoint is gated by
+    /// IPs allowed to scrape <c>/metrics</c>. Per the endpoint is gated by
     /// network identity, not JWT. Production deployments override this with the
     /// Prometheus scraper's IP or CIDR.
     /// </summary>

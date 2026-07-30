@@ -4,7 +4,7 @@ namespace PhotoPrint.API.Services;
 /// Validates file type by inspecting magic bytes — ignores client-supplied Content-Type.
 /// Supported types: JPEG, PNG.
 /// <para>
-/// HEIC/HEIF is intentionally NOT accepted (M5, review 042-v4): the stack has no HEIF decoder
+/// HEIC/HEIF is intentionally NOT accepted: the stack has no HEIF decoder
 /// (ImageSharp 3.x ships none), so accepting it only buffered+wrote a file that then failed at
 /// decode with a confusing "could not be read as an image" 422. Every ISO-BMFF container
 /// (HEIC as well as MP4/MOV/M4A) starts with an "ftyp" box and is now rejected here by falling

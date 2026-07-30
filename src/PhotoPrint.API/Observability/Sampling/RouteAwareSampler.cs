@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Observability.Sampling;
 /// <summary>
 /// Per-route sampler. Reads <see cref="ObservabilitySamplingSettings"/> at
 /// construction and applies the matching rate via a deterministic hash of
-/// the trace_id (ADR-017): the same trace_id + same rate always yields the
+/// the trace_id: the same trace_id + same rate always yields the
 /// same decision. This guarantees trace completeness — a request that
 /// produces 4 spans is either entirely sampled or entirely dropped, never
 /// partial.
@@ -51,7 +51,7 @@ public sealed class RouteAwareSampler : Sampler
         if (rate <= 0.0) return Drop;
 
         // Lower 63 bits of the trace_id, normalised to [0, 1). Deterministic by
-        // trace_id (ADR-017) — random sampling forbidden in this path.
+        // trace_id — random sampling forbidden in this path.
         Span<byte> bytes = stackalloc byte[16];
         parameters.TraceId.CopyTo(bytes);
         var lower = BinaryPrimitives.ReadUInt64BigEndian(bytes[8..]);

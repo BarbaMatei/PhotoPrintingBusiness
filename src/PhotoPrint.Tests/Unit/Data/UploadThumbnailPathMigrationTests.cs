@@ -7,12 +7,12 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Data;
 
 /// <summary>
-/// M9 (review 042-v4): every upload/preview test uses the InMemory provider (ignores migrations)
+/// M9: every upload/preview test uses the InMemory provider (ignores migrations)
 /// and the SQLite tests use EnsureCreated (the model, not migrations), so the
-/// AddUploadThumbnailPath migration DDL — including a typo in Up() — was exercised by NO test and
+/// AddUploadThumbnailPath migration DDL — including a typo in Up — was exercised by NO test and
 /// could ship green. This applies the REAL migration chain to a SQLite database and asserts the
 /// column lands. The Npgsql "character varying(512)" arm stays deferred to the 3-env/Testcontainers
-/// phase (DB-1) — this covers the SQLite arm and the Up()/Down() DDL running at all.
+/// phase — this covers the SQLite arm and the Up/Down DDL running at all.
 /// </summary>
 public class UploadThumbnailPathMigrationTests : IDisposable
 {
@@ -61,7 +61,7 @@ public class UploadThumbnailPathMigrationTests : IDisposable
     [Fact]
     public void Migrate_OnSqlite_MakesUploadsFilePathNullable()
     {
-        // F7 (review 043-v1): the original-purge (bolt 052) sets FilePath=null then SaveChanges,
+        // The original-purge sets FilePath=null then SaveChanges,
         // which requires the MakeUploadFilePathNullable migration's NOT-NULL drop to have run.
         // Purger tests use the InMemory provider (null always allowed regardless of DDL), so a
         // regression in this migration would surface only as silently-Failed purges in prod.
