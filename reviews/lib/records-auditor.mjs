@@ -84,6 +84,7 @@ function auditTarget(t) {
   const lines = readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim())
   const passes = new Map() // pass -> [line objects]
   const shas = new Map()   // sha -> where
+  let holdsCertification = false
 
   lines.forEach((raw, idx) => {
     const at = `${tag} metrics line ${idx + 1}`
@@ -148,6 +149,7 @@ function auditTarget(t) {
         if (!STAGE_KEYS.has(k)) err(`${at}: unknown agents_by_stage key "${k}"`)
     }
 
+    if (o.outcome === 'certified' || o.certified) holdsCertification = true
     if (o.outcome !== undefined) {
       if (!['certified', 'not-certified'].includes(o.outcome)) bad(`${at}: outcome must be certified|not-certified`)
       if (strict && !o.subtype) err(`${at}: certification line (outcome set) requires subtype`)
@@ -205,6 +207,12 @@ function auditTarget(t) {
     else if (!r.pushed) strictTier(`${where}: commit ${sha} is reachable from NO pushed ref (tag or remote branch) — evidence is single-machine`)
   }
 
+  // certified targets are "under watch" and must be listed in the track record
+  if (holdsCertification) {
+    if (TRACK === null) strictTier(`${tag}: holds a certification but reviews/track-record.md is missing`)
+    else if (!TRACK.includes(t.name)) strictTier(`${tag}: holds a certification but is not listed in reviews/track-record.md`)
+  }
+
   // index.md mention (warn-level; prose matching is fuzzy; archive rows use ranges — skipped)
   const short = t.name.split('-')[0]
   if (INDEX && !t.archived) for (const p of passes.keys()) {
@@ -220,6 +228,7 @@ function auditTarget(t) {
 
 const INDEX = existsSync(join(REVIEWS, 'index.md')) ? readFileSync(join(REVIEWS, 'index.md'), 'utf8') : null
 if (!INDEX) warn('reviews/index.md not found — index pairing skipped')
+const TRACK = existsSync(join(REVIEWS, 'track-record.md')) ? readFileSync(join(REVIEWS, 'track-record.md'), 'utf8') : null
 
 for (const t of listTargets()) auditTarget(t)
 

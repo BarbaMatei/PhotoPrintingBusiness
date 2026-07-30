@@ -152,8 +152,9 @@ severity, lens, verdict, fix commit, ever-reopened. Nearly free at review time, 
 reconstruct later. This is what eventually answers: does the stop rule work? do
 findings-per-pass decay? what does a pass cost? which lenses earn their keep? It also feeds
 the **track record** — the only legitimate basis for autonomy: measured seeded-bug recall,
-plus the count of certified-clean features that later turned out to have a serious bug. Trust
-comes from that record, not from a human reading a summary and nodding.
+plus the count of certified-clean features that later turned out to have a serious bug
+(collector live since 2026-07-30: [track-record.md](track-record.md), enforced by the records
+auditor). Trust comes from that record, not from a human reading a summary and nodding.
 
 ## Tools — status and build order
 

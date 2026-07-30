@@ -95,6 +95,10 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   auto-apply fixes mid-review.
 - Every pass appends its [metrics.jsonl](metrics-schema.md) line and its [index.md](index.md)
   row — at synthesis time, unreconstructable later.
+- A target holding a certification is **under watch** ([track-record.md](track-record.md)): a
+  later serious finding whose defect existed in the certified code is marked
+  `post-cert-escape` and appended there the same day — the reconciler flags it, the
+  synthesizer records it. Escapes ÷ certifications is the system's false-certification rate.
 - **Rule budget:** a calibration **replaces or deletes** a rule, never stacks an exception on
   top of one; any exception states its expiry (a date, or "next calibration"). The router
   table is the single decision surface for pass selection.

@@ -50,6 +50,11 @@ per real defect per target.
 - **When unsure, SPLIT.** A wrong merge inflates overlap → the loop stops early → a bug
   ships. A wrong split only costs another look. Prefer "NEW — possible remainder of D#" over
   a merge; that flag is more useful than either verdict.
+- **Post-cert escape.** Ledger mode, target listed in `reviews/track-record.md`: a new 🔴/🟠
+  whose mechanism already existed at the certified commit (cited site unchanged since it —
+  `git diff <certified>..<reviewed> -- <file>`) is additionally marked `post-cert-escape`,
+  and the synthesizer appends the event to track-record.md. Serious findings introduced by
+  post-certification changes are not escapes. Unsure → record as escape, doubt stated.
 - Severity never blocks a match (severity is mutable); mechanism + site decide.
 
 ## Output
