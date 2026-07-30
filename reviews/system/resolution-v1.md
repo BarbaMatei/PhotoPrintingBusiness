@@ -14,7 +14,7 @@ findings:
   SF6:  { status: fixed,          commit: 1daedb9, note: "fix_generated field in schema v2 findings[]; first data lands on the next discovery pass" }
   SF7:  { status: fixed,          commit: 1daedb9, note: "pass-cost-only scope note written into the schema; per-round metering declined for now" }
   SF8:  { status: fixed,          commit: 08e5a3e, note: "stale '3 of 5' corrected in wf.js, reconcile-findings SKILL, README; blind-first re-judge probe left optional" }
-  SF9:  { status: open,           commit: null,    note: "comment-citation sweep (371/118) still owed; the count is now tracked by the auditor on every full run; workspace-blinding check remains with design-doc tool #3" }
+  SF9:  { status: fixed,          commit: 09173c4, note: "sweep complete: 371 tracked + all bare-ID and short-token leftovers -> 0 across three nets; auditor enforces 0 on every run; backend 1001 green, UI flakes green isolated. Residual: discovery-workspace reachability check = design-doc tool #3, tracked there" }
   SF10: { status: false-positive, commit: null,    note: "refuted by the defense checker (priced-in: design-doc assumption 2 + planned tool #4); residue (severity-delta logging) folded into schema v2" }
   SF11: { status: false-positive, commit: null,    note: "refuted by the defense checker (launching labor is the main agent's; human acts are the designed gates); residue = the loop-driver, already the build plan" }
   SF12: { status: fixed,          commit: 1daedb9, note: "records auditor cross-checks tallies vs findings[], review↔metrics pairing, and cited commits on every append" }
@@ -42,7 +42,7 @@ tags chosen over branch re-push (remote branches were deleted deliberately post-
 | SF3 | 🟡 | fixed | wf.js HINTS + dedup topic list |
 | SF5 | 🟡 | fixed | schema v2 + records auditor @1daedb9 (fixture 12/12, real records 0 errors) |
 | SF6 | 🟡 | fixed | `fix_generated` in schema v2 findings[]; first data next discovery pass |
-| SF9 | 🟡 | open | citation sweep owed; count auditor-tracked; workspace check = tool #3 |
+| SF9 | 🟡 | fixed | sweep @09173c4 (371→0, three nets, suites green); workspace check = tool #3 |
 | SF15 | 🟡 | fixed | R4 in runbook-verification step 1; 015 ledger expiry resolved |
 | SF7 | ⚪ | fixed | pass-cost-only scope note in schema v2 |
 | SF8 | ⚪ | fixed | three stale quotes corrected |
