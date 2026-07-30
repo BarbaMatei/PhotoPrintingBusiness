@@ -232,16 +232,33 @@ const TRACK = existsSync(join(REVIEWS, 'track-record.md')) ? readFileSync(join(R
 
 for (const t of listTargets()) auditTarget(t)
 
-// Citation-leak scan (SF9 tracker): finding-ID / review / ADR references in src comments.
-// Uses git grep (tracked files only, so node_modules is excluded for free).
-if (!only.length) {
-  const pat = String.raw`\b(BUG|SEC|OBS|QUAL|REQ|NEW|CLOUD|INPUT|TEST|DOC|DB)-[0-9]+\b|review 0[0-9]{2}-v[0-9]|ADR-0[0-9]{2}|\(D[0-9]{1,3}[,) ]|\(F[0-9]{1,3}[,) ]`
+// Citation-leak scan (SF9 tracker): finding-ID / review / ADR references in source COMMENTS.
+// v2 scan (2026-07-30): counts comment text only — strings and test names are excluded (test
+// names are the review system's accepted leak channel). Spec-file comments count.
+// `--citations` lists every hit. Uses git grep (tracked files only).
+function commentStart(line) {
+  const t = line.trimStart()
+  if (t.startsWith('*') || t.startsWith('/*')) return line.length - t.length
+  let i = -1
+  while ((i = line.indexOf('//', i + 1)) !== -1) if (i === 0 || line[i - 1] !== ':') return i
+  return -1
+}
+if (!only.length || argv.includes('--citations')) {
+  const pat = String.raw`\b(BUG|SEC|OBS|QUAL|REQ|NEW|CLOUD|INPUT|TEST|DOC|DB|FE|INFO|OPS|PERF)-[0-9]+\b|reviews? 0[0-9]{2}-v[0-9]|ADR-0[0-9]{2}|\(D[0-9]{1,3}[,) ]|\(F[0-9]{1,3}[,) ]`
   try {
     let rows = []
-    try { rows = git(`grep -P -c "${pat}" -- src`).split('\n') } catch { /* exit 1 = no matches */ }
-    rows = rows.filter(r => /\.(cs|ts):\d+$/.test(r) && !/\.spec\.ts:/.test(r))
-    const total = rows.reduce((s, r) => s + Number(r.slice(r.lastIndexOf(':') + 1) || 0), 0)
-    info(`citation-leak scan: ${total} occurrence(s) in ${rows.length} file(s) — target is 0 (CLAUDE.md comment rule; baseline 371/118 on 2026-07-29)`)
+    try { rows = git(`grep -P -n "${pat}" -- "src/**/*.cs" "src/**/*.ts"`).split(/\r?\n/) } catch { /* exit 1 = no matches */ }
+    const re = new RegExp(pat)
+    const hits = []
+    for (const row of rows) {
+      const m = /^(.+?:\d+):(.*)$/.exec(row)
+      if (!m) continue
+      const cs = commentStart(m[2])
+      if (cs !== -1 && re.test(m[2].slice(cs))) hits.push(`${m[1]}: ${m[2].trim()}`)
+    }
+    if (argv.includes('--citations')) for (const h of hits) console.log(`CITE    ${h}`)
+    const files = new Set(hits.map(h => h.slice(0, h.indexOf(':')))).size
+    info(`citation-leak scan (comments only): ${hits.length} occurrence(s) in ${files} file(s) — target is 0 (CLAUDE.md comment rule)`)
   } catch { warn('citation scan skipped (git grep -P unavailable)') }
 }
 
