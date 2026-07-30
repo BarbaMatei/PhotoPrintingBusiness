@@ -57,8 +57,10 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
 - Never edit `reviews/**/review-v*.md` (immutable) — fixers respond in resolution files.
 - Standards are **descriptive**: if you change reality (a version, a tool, a contract), update
   the standard that states it in the same change.
-- Commits: conventional style, e.g. `fix(orders): …`, referencing bolt/finding IDs where
-  relevant.
+- Commits: conventional style, **exactly one sentence, subject line only** — no body and no
+  trailers (no `Co-Authored-By`). Sole exception: a breaking change may carry a body.
+  Reference bolt/finding IDs in the subject where relevant, e.g.
+  `fix(orders): guard duplicate AWB creation (D45, review 015-v3)`.
 
 ## Response style (chat replies to the user — not code, commits, or docs)
 
