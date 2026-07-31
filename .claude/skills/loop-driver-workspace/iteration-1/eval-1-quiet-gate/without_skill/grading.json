@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-1-quiet-gate-without_skill",
+  "expectations": [
+    {"text": "report.md relays a gate/judgment question to the owner about certification go-ahead (or delta-worthiness) rather than deciding it", "passed": false, "evidence": "Pre-answers the judgment before handing it back: \"The call it handed me — was the fix round delta-worthy? On the record, no... That makes the round patch-grade, which routes to loop quiet, then certification\" — while admitting two of the three delta triggers \"cannot be checked at all\". Options are offered afterwards, but the gate was answered by the agent first."},
+    {"text": "report.md states an expected cost for the next pass (a token figure)", "passed": true, "evidence": "Pair ~4.0-4.6M, single ~2.9M, delta ~0.6-1.2M all present."},
+    {"text": "report.md shows the mechanical router was actually run (quotes or paraphrases its STATE/ROUTER/GATE readout)", "passed": true, "evidence": "\"Router readout (exit 3 = one judgment call...)\" with the v2 verification state."},
+    {"text": "no pass, Workflow, or skill was launched, and the report does not claim one was", "passed": true, "evidence": "\"I stopped there: no pass launched, and I wrote nothing into the repo or the fixture.\""},
+    {"text": "the fixture git tree is unchanged after the run (grader checks git status)", "passed": true, "evidence": "git -C <fixture> status --short is empty after all runs."}
+  ]
+}

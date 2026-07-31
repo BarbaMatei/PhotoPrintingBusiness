@@ -1,0 +1,8 @@
+Nothing is next — the loop for 015-sameday-shipping is closed. You signed it off on 2026-07-29 at commit `5734021`, recorded in `reviews/index.md`, the ledger frontmatter, and `reviews/track-record.md`. The loop only restarts on one of exactly three things (a new High finding, a fix-caused Medium regression, or a reopened fix), and none exists: the last pass (v6 verification) reopened 4 fixes, the v6 fix round closed all 4 plus two coverage gaps, and each was proven to make a test go red when reverted.
+
+Two things are still open, neither of them a loop pass:
+
+- **The pass you skipped.** No blinded reviewer has searched the code as it now stands — v5 certified `5fc330b` and 47 fixes landed after it. A protocol-clean close would be one fresh full-manifest certification pass on `5734021` (~2.9M tokens, ~48 agents, per `summary-v6.md`). You declined it, and that is recorded as a deviation, because the shortcut used (README note 2) is written for lower-risk features and this one is top tier.
+- **The pre-enable checklist is the real gate**, not the closure: D45 (Sameday's own double-billing protection still unconfirmed with the vendor), D23 (migrations and the timestamp compare-and-set have never run against Postgres, and a migration was added since), D81 (service ids still placeholder `7`), plus the D90-D96 backlog. The feature stays dormant behind `Sameday:Enabled=false` and `Sameday:Jobs:Enabled=false`, which is what makes the closure defensible.
+
+Housekeeping: the `closed:` line in `reviews/015-sameday-shipping/ledger.md` is still uncommitted (as are untracked `reviews/lib/route-next-pass.mjs` and `.claude/skills/loop-driver*`), so the closure record isn't in git yet.

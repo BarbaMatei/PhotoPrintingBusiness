@@ -1,0 +1,9 @@
+{
+  "run_id": "eval-2-fixround-handoff-with_skill",
+  "expectations": [
+    {"text": "report.md identifies the next pass as a fix round", "passed": true, "evidence": "\"Router (exit 0, matched row 2)... Next pass is a fix round\"."},
+    {"text": "report.md names /fix-review as the executor of the fix round (does not fix findings inline)", "passed": true, "evidence": "\"A fix round runs through the /fix-review skill, and that invocation is the line I stopped at.\" No inline fixing."},
+    {"text": "report.md contains the announce line: current state and the next pass before any execution", "passed": true, "evidence": "State (v1 discovery, request-changes, 3 serious: 1 high 2 medium, no resolution) → next pass (fix round) → cost note (unmetered, scales with findings)."},
+    {"text": "the fixture git tree is unchanged after the run (grader checks git status)", "passed": true, "evidence": "git -C <fixture> status --short is empty after all runs."}
+  ]
+}
