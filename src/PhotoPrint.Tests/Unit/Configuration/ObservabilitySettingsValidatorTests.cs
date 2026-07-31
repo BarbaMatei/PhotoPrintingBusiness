@@ -109,6 +109,57 @@ public class ObservabilitySettingsValidatorTests
     }
 
     [Theory]
+    [InlineData("not.an.ip")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("10.42.0.5/16")]
+    [InlineData("10.42.0.0/33")]
+    [InlineData("010.0.0.1")]
+    [InlineData("10")]
+    public void Enabled_with_an_unparseable_allowed_scrape_ip_fails(string entry)
+    {
+        var s = ValidEnabled();
+        s.Metrics.AllowedScrapeIps = ["127.0.0.1", entry];
+        var result = _sut.Validate(null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("AllowedScrapeIps"));
+    }
+
+    [Fact]
+    public void Enabled_with_host_bits_set_in_a_cidr_entry_says_how_to_fix_it()
+    {
+        var s = ValidEnabled();
+        s.Metrics.AllowedScrapeIps = ["10.42.0.5/16"];
+        var result = _sut.Validate(null, s);
+        result.Failures.Should().Contain(f => f.Contains("10.42.0.0/16"));
+    }
+
+    [Theory]
+    [InlineData("10.42.0.0/16")]
+    [InlineData("2001:db8::/32")]
+    [InlineData("  127.0.0.1  ")]
+    [InlineData("::ffff:10.42.0.5")]
+    public void Enabled_with_a_valid_address_or_range_entry_is_valid(string entry)
+    {
+        var s = ValidEnabled();
+        s.Metrics.AllowedScrapeIps = [entry];
+        var result = _sut.Validate(null, s);
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(65536)]
+    public void Enabled_with_scrape_port_out_of_range_fails(int port)
+    {
+        var s = ValidEnabled();
+        s.Metrics.ScrapePort = port;
+        var result = _sut.Validate(null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("ScrapePort"));
+    }
+
+    [Theory]
     [InlineData(-0.1)]
     [InlineData(1.5)]
     public void Enabled_with_default_sample_rate_out_of_range_fails(double rate)

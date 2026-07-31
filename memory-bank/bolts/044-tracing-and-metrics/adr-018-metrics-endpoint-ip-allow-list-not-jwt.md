@@ -206,9 +206,10 @@ for three reasons:
   visible at the call site.
 - **IP allow-list is brittle to topology changes.** A new
   Prometheus replica needs its IP added to the list. Mitigation:
-  in k8s, use a CIDR (a `/24` for the scraper namespace) rather
-  than individual IPs; the config supports either via
-  `IPAddress.Parse` + range checks.
+  in k8s or Compose, use a CIDR (a `/24` for the scraper namespace,
+  or the Compose network's subnet) rather than individual IPs. The
+  config accepts either — entries are parsed as `IPAddress` or
+  `IPNetwork` and every one of them is validated at boot.
 - **Spoofable in environments without ingress validation.** An
   attacker who can spoof the source IP on a packet (rare on
   modern networks, common on misconfigured ones) could bypass the

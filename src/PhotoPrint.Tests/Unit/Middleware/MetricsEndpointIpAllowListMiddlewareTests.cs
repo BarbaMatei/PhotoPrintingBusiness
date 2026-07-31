@@ -114,6 +114,99 @@ public class MetricsEndpointIpAllowListMiddlewareTests
     }
 
     [Fact]
+    public async Task Ipv4_mapped_ipv6_peer_matches_an_ipv4_allow_list_entry()
+    {
+        // The dual-mode socket Kestrel binds for http://+:8080 delivers IPv4 peers this way.
+        var sut = Build("10.42.0.5");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("::ffff:10.42.0.5");
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Ipv4_mapped_ipv6_peer_outside_the_list_is_still_denied()
+    {
+        var sut = Build("10.42.0.5");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("::ffff:10.42.0.6");
+
+        await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
+
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task Cidr_entry_admits_an_in_range_peer_and_denies_one_outside()
+    {
+        var sut = Build("10.42.0.0/16");
+
+        var inRange  = new DefaultHttpContext { Connection = { RemoteIpAddress = IPAddress.Parse("10.42.7.9") } };
+        var outRange = new DefaultHttpContext { Connection = { RemoteIpAddress = IPAddress.Parse("10.43.0.1") } };
+
+        var inRangeAllowed = false;
+        await sut.InvokeAsync(inRange, _ => { inRangeAllowed = true; return Task.CompletedTask; });
+        await sut.InvokeAsync(outRange, _ => Task.CompletedTask);
+
+        inRangeAllowed.Should().BeTrue();
+        outRange.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task Cidr_entry_admits_an_ipv4_mapped_ipv6_peer_in_range()
+    {
+        var sut = Build("10.42.0.0/16");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("::ffff:10.42.7.9");
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task An_ipv6_range_does_not_admit_an_ipv4_peer()
+    {
+        var sut = Build("2001:db8::/32");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.42.0.5");
+
+        await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
+
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task A_link_local_peer_with_a_scope_id_matches_the_unscoped_entry()
+    {
+        var sut = Build("fe80::1");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("fe80::1%3");
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Whitespace_padded_entry_is_honoured()
+    {
+        var sut = Build("  10.42.0.5  ");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.42.0.5");
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Request_on_a_listener_other_than_the_scrape_port_is_404_even_from_an_allowed_ip()
     {
         var sut = BuildOnPort(9090, "10.0.0.1");

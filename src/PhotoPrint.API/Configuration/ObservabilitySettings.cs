@@ -39,9 +39,9 @@ public sealed class ObservabilityMetricsSettings
     public int ScrapePort { get; set; }
 
     /// <summary>
-    /// IPs allowed to scrape <c>/metrics</c>. Per the endpoint is gated by
-    /// network identity, not JWT. Production deployments override this with the
-    /// Prometheus scraper's IP or CIDR.
+    /// Addresses allowed to scrape <c>/metrics</c>: plain IPv4/IPv6 addresses or CIDR ranges.
+    /// Every entry is validated at boot. Production deployments override this with the
+    /// Prometheus scraper's address or its subnet.
     /// </summary>
     public string[] AllowedScrapeIps { get; set; } = ["127.0.0.1", "::1"];
 }

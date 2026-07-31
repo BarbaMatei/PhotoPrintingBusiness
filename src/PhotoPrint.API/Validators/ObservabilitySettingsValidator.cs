@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Validators;
 
@@ -43,8 +44,16 @@ public sealed class ObservabilitySettingsValidator : IValidateOptions<Observabil
             failures.Add("Observability:Metrics:ScrapePort must be between 0 and 65535 (0 = every listener).");
 
         if (options.Metrics.AllowedScrapeIps is null || options.Metrics.AllowedScrapeIps.Length == 0)
+        {
             failures.Add("Observability:Metrics:AllowedScrapeIps must contain at least one entry " +
-                         "(per ADR-018, network identity is the only access control on /metrics).");
+                         "(per ADR-018, /metrics is gated by network identity, not JWT).");
+        }
+        else
+        {
+            ScrapeIpAllowList.Parse(options.Metrics.AllowedScrapeIps, out var entryErrors);
+            foreach (var error in entryErrors)
+                failures.Add($"Observability:Metrics:AllowedScrapeIps: {error}");
+        }
 
         if (options.Sampling.Default is < 0.0 or > 1.0)
             failures.Add("Observability:Sampling:Default must be between 0.0 and 1.0.");

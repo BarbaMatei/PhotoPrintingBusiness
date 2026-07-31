@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Middleware;
 
@@ -12,7 +13,7 @@ namespace PhotoPrint.API.Middleware;
 // not a user, so network identity is the primitive.
 public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
 {
-    private readonly HashSet<IPAddress> _allowed;
+    private readonly ScrapeIpAllowList _allowed;
     private readonly int _scrapePort;
     private readonly ILogger<MetricsEndpointIpAllowListMiddleware> _logger;
     private readonly ConcurrentDictionary<IPAddress, byte> _loggedDenies = new();
@@ -23,11 +24,8 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
     {
         _logger     = logger;
         _scrapePort = settings.Value.Metrics.ScrapePort;
-        _allowed    = (settings.Value.Metrics.AllowedScrapeIps ?? [])
-            .Select(s => IPAddress.TryParse(s, out var ip) ? ip : null)
-            .Where(ip => ip is not null)
-            .Select(ip => ip!)
-            .ToHashSet();
+        // Parse errors are the validator's job — it fails boot on them, so they cannot reach here.
+        _allowed    = ScrapeIpAllowList.Parse(settings.Value.Metrics.AllowedScrapeIps, out _);
     }
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)

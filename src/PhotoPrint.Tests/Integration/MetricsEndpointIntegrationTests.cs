@@ -201,7 +201,6 @@ internal sealed class ObservabilityEnabledNoLoopbackFactory : ObservabilityFacto
     protected override Dictionary<string, string?> ExtraConfig() => new()
     {
         ["Observability:Metrics:AllowedScrapeIps:0"] = "10.99.99.99",
-        ["Observability:Metrics:AllowedScrapeIps:1"] = string.Empty,
     };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("203.0.113.7");
 }
