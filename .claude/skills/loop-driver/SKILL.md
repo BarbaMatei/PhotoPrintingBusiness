@@ -105,16 +105,3 @@ still stopping at every exit-2/3 gate and before every discovery-scale launch.
 - Edit a `review-v*.md`, skip a record, or hand back with the auditor red.
 - Chain past a gate because the answer "seems obvious" — obvious-looking gates are where
   the recorded deviations clustered.
-
-## Record — trust gate
-
-Iteration 1 (2026-07-30, all runs on Opus): 3 evals × with/without skill — skill 13/13
-assertions vs baseline 12/13 (the miss: baseline pre-answered an owner gate), ~26% fewer
-tokens, ~27% faster; evidence in `.claude/skills/loop-driver-workspace/iteration-1/`. An
-independent fresh-context review then found a real router bug (post-cert resolved fix round
-routed to close instead of verification — fixed same day), unprinted certification costs at
-the gate (fixed), and ambiguous hold semantics (defined above). **Before "until a gate"
-unattended use, iteration 2 is owed:** a gate-stop eval whose prompt does NOT forbid
-launching · an auditor-red repair case · a certified+resolved fixture · a mocked pass that
-must write all four records under strict schema v2 · one supervised real verification pass
-end to end.
