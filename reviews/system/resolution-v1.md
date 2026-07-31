@@ -18,7 +18,7 @@ findings:
   SF10: { status: false-positive, commit: null,    note: "refuted by the defense checker (priced-in: design-doc assumption 2 + planned tool #4); residue (severity-delta logging) folded into schema v2" }
   SF11: { status: false-positive, commit: null,    note: "refuted by the defense checker (launching labor is the main agent's; human acts are the designed gates); residue = the loop-driver, already the build plan" }
   SF12: { status: fixed,          commit: 1daedb9, note: "records auditor cross-checks tallies vs findings[], review↔metrics pairing, and cited commits on every append" }
-  SF13: { status: open,           commit: null,    note: "model check + auto-resume fold into the loop-driver — build item 5" }
+  SF13: { status: fixed,          commit: d72b1aa, note: "loop-driver skill §2: session-model guard in the announce line + resume-from-runId protocol; router+skill eval-tested (13/13 vs baseline 12/13) and independently reviewed by a fresh agent whose ranked fixes (post-cert routing bug, gate costs, hold semantics, README wiring) were applied same day" }
   SF14: { status: deferred,       commit: null,    note: "owner 2026-07-29: seeded run 2 'not now'; R3 re-scope NOT approved — the design-doc gate stays as written, deliberately visible, as the standing reminder the test is owed" }
   SF15: { status: fixed,          commit: 08e5a3e, note: "R4 — test-only self-verify exemption written into runbook-verification step 1; the 015 ledger's 'expiry: next calibration' marked resolved" }
   SF16: { status: fixed,          commit: 878beb6, note: "track-record.md seeded with both certifications; escape rule in README + reconcile-findings skill (unsure → count it, doubt stated); auditor errors when a certified target is missing from the file" }
@@ -47,10 +47,11 @@ tags chosen over branch re-push (remote branches were deleted deliberately post-
 | SF7 | ⚪ | fixed | pass-cost-only scope note in schema v2 |
 | SF8 | ⚪ | fixed | three stale quotes corrected |
 | SF12 | ⚪ | fixed | auditor cross-checks on every append, runbook-gated |
-| SF13 | ⚪ | open | folds into loop-driver |
+| SF13 | ⚪ | fixed | loop-driver §2 (model guard + resume); eval-tested + independently reviewed |
 | SF10 | — | false-positive | defense checker verdict, recorded in review-v1 |
 | SF11 | — | false-positive | defense checker verdict, recorded in review-v1 |
 
-Remaining build order (owner-sequenced, from review-v1 recommendations): comment-citation
-sweep → loop-driver skill. Parked: seeded run 2 (SF14). Verification of this round's fixes = the future re-grade
+Build list complete (auditor, schema v2, escape scorecard, sweep, loop-driver). Owed before
+the loop-driver runs unattended ("until a gate"): its iteration-2 evals, recorded in
+`.claude/skills/loop-driver/evals/evals.json`. Parked: seeded run 2 (SF14). Verification of this round's fixes = the future re-grade
 (`review-v2` of this target), which re-scores the locked baseline scorecard.
