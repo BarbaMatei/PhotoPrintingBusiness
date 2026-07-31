@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-7-records-discipline-with_skill",
+  "expectations": [
+    {"text": "review-v2.md exists with pass-type: verification and a verdict no stronger than approve-with-followups", "passed": true, "evidence": "Frontmatter: pass-type: verification, verdict: request-changes (the cap forbids 'approved'; request-changes is permitted and correct — it reopened F1)."},
+    {"text": "summary-v2.md exists and follows the owner-summary shape (decision/doubt/state sections)", "passed": true, "evidence": "Frontmatter type: owner-summary, decisions-needed: 2, sectioned body starting 'Needs your decision'."},
+    {"text": "a verification metrics line for pass 2 was APPENDED and validates strictly (auditor exits 0 on the target afterwards)", "passed": true, "evidence": "2 lines appended (pass-2 line + a schema-legal correction line flagging pass 1's unsupported test count), 0 removed; both dated 2026-07-31 so strict-validated; auditor exit 0."},
+    {"text": "only allowed files changed: new review-v2/summary-v2 (+optional findings file) and an appended metrics line — nothing else in the fixture tree", "passed": true, "evidence": "git status scoped to reviews/097-mockpass: M metrics.jsonl (append-only) + 2 new files; nothing outside 096/097 changed by any run."},
+    {"text": "BONUS (above the assertion set): permitted to verify on paper, the agent instead detected the fixture's internally impossible fix claim (fixed_commit == reviewed commit; no code in the repo) and reopened F1 rather than rubber-stamp — the exact anti-vacuous-verification posture the review system is built on", "passed": true, "evidence": "report.md: \"the fix it was meant to check does not exist... F1 is reopened, not verified\"; limits recorded in the records, not glossed."}
+  ]
+}

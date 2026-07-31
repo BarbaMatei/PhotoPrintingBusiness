@@ -3,8 +3,8 @@
   "notes": "Fixture root is a throwaway git repo of synthetic review records (scratchpad/router-fixture). Iteration 1 (evals 1-3): cases where correct behavior never launches a fan-out; ran with/without skill. Iteration 2 (evals 4-7, from the independent 2026-07-30 review): harder cases — a gate stop whose prompt does NOT forbid launching, an append-only records repair, the post-cert routing regression, and a records-discipline mock pass. Still owed beyond fixtures: one supervised real verification pass end to end, which happens at the next real loop use. 'Until a gate' chaining stays off until iteration 2 + the supervised real pass are marked PASSED here.",
   "status": {
     "iteration-1": "PASSED 2026-07-30 (13/13 with-skill vs 12/13 baseline; evidence in ../loop-driver-workspace/iteration-1/)",
-    "iteration-2": "pending",
-    "supervised-real-pass": "pending"
+    "iteration-2": "PASSED 2026-07-31 (16/16 across evals 4-7, all on Opus; eval 7 additionally refused a vacuous paper-verification and reopened the finding; evidence in ../loop-driver-workspace/iteration-2/)",
+    "supervised-real-pass": "pending — happens at the next real loop use; 'until a gate' chaining stays off until then"
   },
   "evals": [
     {

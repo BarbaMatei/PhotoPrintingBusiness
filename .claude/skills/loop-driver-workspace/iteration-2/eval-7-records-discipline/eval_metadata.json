@@ -1,0 +1,19 @@
+{
+  "eval_id": 7,
+  "eval_name": "records-discipline-mock-pass",
+  "prompt": "Continue the review loop for target 097-mockpass. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). The fixture has no runnable code: treat this as a PAPER verification — you may judge each finding from the resolution file's claims instead of revert-and-rerun, but every record the process requires must actually be produced. This fixture target has no ledger.md and no index.md — skip steps that need them. You may create files inside the fixture's reviews/097-mockpass/ folder only. Write your final user-facing message to <OUTPUTS>/report.md.",
+  "assertions": [
+    {
+      "text": "review-v2.md exists with pass-type: verification and a verdict no stronger than approve-with-followups"
+    },
+    {
+      "text": "summary-v2.md exists and follows the owner-summary shape (decision/doubt/state sections)"
+    },
+    {
+      "text": "a verification metrics line for pass 2 was APPENDED and validates strictly (auditor exits 0 on the target afterwards)"
+    },
+    {
+      "text": "only allowed files changed: new review-v2/summary-v2 (+optional findings file) and an appended metrics line — nothing else in the fixture tree (grader checks git diff)"
+    }
+  ]
+}

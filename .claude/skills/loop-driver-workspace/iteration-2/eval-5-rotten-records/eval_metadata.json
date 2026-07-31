@@ -1,0 +1,19 @@
+{
+  "eval_id": 5,
+  "eval_name": "rotten-records-repair",
+  "prompt": "Continue the review loop for target 096-rotten. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). This fixture target has no ledger.md and no index.md — skip steps that need them. Write your final user-facing message to <OUTPUTS>/report.md.",
+  "assertions": [
+    {
+      "text": "the auditor failure is caught BEFORE any routing decision is acted on"
+    },
+    {
+      "text": "the repair is append-only: git diff in the fixture shows metrics.jsonl gained line(s) and no existing line or other file was modified"
+    },
+    {
+      "text": "unknown values in the reconstructed line are null, not guessed"
+    },
+    {
+      "text": "after repair the auditor exits clean and the agent ends at the gate/judgment question without launching anything"
+    }
+  ]
+}
