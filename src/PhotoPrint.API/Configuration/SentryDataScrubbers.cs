@@ -253,6 +253,12 @@ public static class SentryDataScrubbers
 
         for (var i = 0; i < pairs.Length; i++)
         {
+            if (pairs[i].Length == 0)
+            {
+                scrubbed[i] = string.Empty;
+                continue;
+            }
+
             var separator = pairs[i].IndexOf('=');
             var name = separator < 0 ? null : pairs[i][..separator];
             scrubbed[i] = name is not null && IsPlainParameterName(name)
@@ -289,7 +295,7 @@ public static class SentryDataScrubbers
 
         var schemeEnd = trimmed.IndexOf("://", StringComparison.Ordinal);
         if (schemeEnd < 0)
-            return trimmed;
+            return trimmed.Contains('@') ? ScrubbedMarker : trimmed;
 
         var authorityStart = schemeEnd + 3;
         var authorityEnd = trimmed.IndexOf('/', authorityStart);

@@ -253,6 +253,33 @@ public class SentryDataScrubbersTests
     {
         SentryDataScrubbers.Scrub((SentryEvent)null!).Should().BeNull();
         SentryDataScrubbers.Scrub((SentryTransaction)null!).Should().BeNull();
+        SentryDataScrubbers.Scrub((Breadcrumb)null!).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("?", "?")]
+    [InlineData("?&&", "?&&")]
+    [InlineData("page=2", "page=<scrubbed>")]
+    public void Scrub_handles_degenerate_query_strings(string queryString, string expected)
+    {
+        var e = new SentryEvent { Request = new SentryRequest { QueryString = queryString } };
+
+        SentryDataScrubbers.Scrub(e);
+
+        e.Request!.QueryString.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Scrub_redacts_a_schemeless_url_value_that_carries_an_address()
+    {
+        var breadcrumb = new Breadcrumb(
+            message: null!,
+            type: "http",
+            data: new Dictionary<string, string> { ["url"] = $"mailto:{CustomerEmail}" });
+
+        var result = SentryDataScrubbers.Scrub(breadcrumb);
+
+        result!.Data!["url"].Should().Be(SentryDataScrubbers.ScrubbedMarker);
     }
 
     [Fact]
