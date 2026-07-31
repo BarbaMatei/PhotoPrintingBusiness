@@ -2,6 +2,7 @@
 type: review-ledger
 target: 043-cloud-storage-provider
 updated: 2026-07-22
+closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 ---
 
 # Canonical finding ledger — 043-cloud-storage-provider

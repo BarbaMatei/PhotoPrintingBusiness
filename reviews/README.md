@@ -21,13 +21,15 @@ recorded owner-visible decision. **Certified means exactly that — not zero def
 
 | Task | Follow |
 |---|---|
+| Any pass — picked and driven end to end | the **`loop-driver` skill** (mechanical router: [lib/route-next-pass.mjs](lib/route-next-pass.mjs)) |
 | Discovery pass (full · delta · certification) | [runbook-discovery.md](runbook-discovery.md) |
 | Verification pass (after a fix round) | [runbook-verification.md](runbook-verification.md) |
 | Fix round | the `/fix-review` skill — **sole owner of the fixer contract** |
 
-Standing instruction: *"Continue the review loop for `<target>`"* → take the first matching
-router row. Before any discovery-scale launch, state the pass type and expected cost in one
-line; **certification always waits for an explicit owner go-ahead**.
+Standing instruction: *"Continue the review loop for `<target>`"* → the **`loop-driver`**
+skill: it audits the records, reads the router mechanically, and states the pass type and
+expected cost in one line before any discovery-scale launch; **certification always waits
+for an explicit owner go-ahead**.
 
 ## Entry tiers — does a change get the loop at all?
 
@@ -101,12 +103,15 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   synthesizer records it. Escapes ÷ certifications is the system's false-certification rate.
 - **Rule budget:** a calibration **replaces or deletes** a rule, never stacks an exception on
   top of one; any exception states its expiry (a date, or "next calibration"). The router
-  table is the single decision surface for pass selection.
+  table is the single decision surface for pass selection — executed mechanically by
+  [lib/route-next-pass.mjs](lib/route-next-pass.mjs), hand-read only when it abstains.
 
 ## Files & conventions
 
 - One folder per target: `reviews/<target>/`. Dormant or closed targets move to
   `reviews/archive/<target>/` unchanged.
+- A closed loop records `closed: <date> — <how>` in the **ledger frontmatter** — the
+  router's machine-read terminal state (the index row carries the story).
 - `review-v<n>.md` — immutable, one per pass; frontmatter: `version`, `supersedes`, `commit`,
   and required `pass-type: discovery | delta-discovery | verification`.
 - `resolution-v<n>.md` — the fixer's answer, living until closed. Frontmatter: `status: open |

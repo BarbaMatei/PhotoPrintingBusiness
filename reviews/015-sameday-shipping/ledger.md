@@ -2,6 +2,7 @@
 type: review-ledger
 target: 015-sameday-shipping
 updated: 2026-07-29
+closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pre-enable checklist is the gate)
 ---
 
 <!-- v1 fix round (resolution-v1, commits edd49f7..835e932): D1–D19 + D32/D34 fixed.

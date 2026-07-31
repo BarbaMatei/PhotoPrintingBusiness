@@ -167,6 +167,7 @@ Built and operating:
 | Owner summary (`owner-summary` skill — one page per pass: decisions · dissent · evidence) | `.claude/skills/owner-summary/SKILL.md` |
 | Metrics recorder (schema **v2** 2026-07-30: per-finding lens attribution, fix-lineage, severity-delta) | [metrics-schema.md](metrics-schema.md) |
 | Records auditor (schema validation · tally cross-check · review↔metrics pairing · commit reachability from pushed refs · citation-leak count) | [lib/records-auditor.mjs](lib/records-auditor.mjs) |
+| Loop driver (audit → route → announce → gate → execute → record; session-model guard + resume protocol; eval-tested + independently reviewed 2026-07-30) | `.claude/skills/loop-driver/SKILL.md` + [lib/route-next-pass.mjs](lib/route-next-pass.mjs) |
 | Verification runbook | [runbook-verification.md](runbook-verification.md) |
 | Fixer contract | `/fix-review` skill |
 | Per-target ledgers (hand-maintained) | `reviews/<target>/ledger.md` |
