@@ -14,10 +14,17 @@ namespace PhotoPrint.Tests.Unit.Middleware;
 public class MetricsEndpointIpAllowListMiddlewareTests
 {
     private static MetricsEndpointIpAllowListMiddleware Build(params string[] allowedIps)
+        => BuildOnPort(0, allowedIps);
+
+    private static MetricsEndpointIpAllowListMiddleware BuildOnPort(int scrapePort, params string[] allowedIps)
     {
         var settings = Options.Create(new ObservabilitySettings
         {
-            Metrics = new ObservabilityMetricsSettings { AllowedScrapeIps = allowedIps },
+            Metrics = new ObservabilityMetricsSettings
+            {
+                AllowedScrapeIps = allowedIps,
+                ScrapePort       = scrapePort,
+            },
         });
         return new MetricsEndpointIpAllowListMiddleware(
             settings, NullLogger<MetricsEndpointIpAllowListMiddleware>.Instance);
@@ -104,5 +111,61 @@ public class MetricsEndpointIpAllowListMiddlewareTests
         await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
 
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task Request_on_a_listener_other_than_the_scrape_port_is_404_even_from_an_allowed_ip()
+    {
+        var sut = BuildOnPort(9090, "10.0.0.1");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.1");
+        ctx.Connection.LocalPort       = 8080;
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeFalse();
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+    }
+
+    [Fact]
+    public async Task Request_on_the_configured_scrape_port_from_an_allowed_ip_passes_through()
+    {
+        var sut = BuildOnPort(9090, "10.0.0.1");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.1");
+        ctx.Connection.LocalPort       = 9090;
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Scrape_port_zero_serves_every_listener()
+    {
+        var sut = BuildOnPort(0, "10.0.0.1");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.1");
+        ctx.Connection.LocalPort       = 8080;
+
+        var nextCalled = false;
+        await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
+
+        nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Wrong_port_wins_over_the_allow_list_so_a_denied_ip_also_sees_404()
+    {
+        var sut = BuildOnPort(9090, "10.0.0.1");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+        ctx.Connection.LocalPort       = 8080;
+
+        await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
+
+        ctx.Response.StatusCode.Should().Be(StatusCodes.Status404NotFound);
     }
 }

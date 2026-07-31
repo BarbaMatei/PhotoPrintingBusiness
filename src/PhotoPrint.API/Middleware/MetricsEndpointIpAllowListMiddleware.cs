@@ -5,22 +5,15 @@ using PhotoPrint.API.Configuration;
 
 namespace PhotoPrint.API.Middleware;
 
-/// <summary>
-/// Gates <c>GET /metrics</c> via a configured IP allow-list.
-/// The endpoint deliberately does NOT participate in JWT bearer auth; the
-/// scrape consumer is a Prometheus scraper, not a user, and network
-/// identity is the right primitive (see the ADR for the reasoning and
-/// alternatives considered).
-///
-/// Configuration: <c>Observability:Metrics:AllowedScrapeIps</c>.
-///
-/// Logging: a single Info entry per distinct denied IP per process. We
-/// deliberately don't log every 403 — a port-scanner would otherwise fill
-/// the logs.
-/// </summary>
+// Two independent gates, because the peer address alone is not trustworthy behind a reverse
+// proxy — every proxied request shares the proxy's IP, so an allow-listed proxy would open the
+// endpoint to the whole internet. The scrape port is a listener the edge does not route.
+// The endpoint deliberately does not participate in JWT bearer auth: the consumer is a scraper,
+// not a user, so network identity is the primitive.
 public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
 {
     private readonly HashSet<IPAddress> _allowed;
+    private readonly int _scrapePort;
     private readonly ILogger<MetricsEndpointIpAllowListMiddleware> _logger;
     private readonly ConcurrentDictionary<IPAddress, byte> _loggedDenies = new();
 
@@ -28,8 +21,9 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
         IOptions<ObservabilitySettings> settings,
         ILogger<MetricsEndpointIpAllowListMiddleware> logger)
     {
-        _logger  = logger;
-        _allowed = (settings.Value.Metrics.AllowedScrapeIps ?? [])
+        _logger     = logger;
+        _scrapePort = settings.Value.Metrics.ScrapePort;
+        _allowed    = (settings.Value.Metrics.AllowedScrapeIps ?? [])
             .Select(s => IPAddress.TryParse(s, out var ip) ? ip : null)
             .Where(ip => ip is not null)
             .Select(ip => ip!)
@@ -38,6 +32,12 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
+        if (_scrapePort != 0 && context.Connection.LocalPort != _scrapePort)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
         var ip = context.Connection.RemoteIpAddress;
         if (ip is null || !_allowed.Contains(ip))
         {

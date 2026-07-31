@@ -39,6 +39,9 @@ public sealed class ObservabilitySettingsValidator : IValidateOptions<Observabil
             failures.Add("Observability:Metrics:PrometheusEndpoint must start with '/'.");
         }
 
+        if (options.Metrics.ScrapePort is < 0 or > 65535)
+            failures.Add("Observability:Metrics:ScrapePort must be between 0 and 65535 (0 = every listener).");
+
         if (options.Metrics.AllowedScrapeIps is null || options.Metrics.AllowedScrapeIps.Length == 0)
             failures.Add("Observability:Metrics:AllowedScrapeIps must contain at least one entry " +
                          "(per ADR-018, network identity is the only access control on /metrics).");

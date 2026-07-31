@@ -40,44 +40,61 @@ with the rest of the API (JWT) or deliberately deviate (IP allow-list).
 ## Decision
 
 **`GET /metrics` is gated by `MetricsEndpointIpAllowListMiddleware`,
-which checks `HttpContext.Connection.RemoteIpAddress` against a
-configured list (`Observability:Metrics:AllowedScrapeIps`). Requests
-from outside the list receive `403 Forbidden` with an empty body.
-The endpoint does NOT participate in the JWT bearer middleware
-chain.**
+which admits a request only when it arrived on the configured scrape
+listener (`Observability:Metrics:ScrapePort`) AND its
+`HttpContext.Connection.RemoteIpAddress` is in the configured
+allow-list (`Observability:Metrics:AllowedScrapeIps`, plain addresses
+or CIDR ranges). A request on any other listener receives `404 Not
+Found`; a request on the scrape listener from an address outside the
+list receives `403 Forbidden`, both with an empty body. The endpoint
+does NOT participate in the JWT bearer middleware chain.**
+
+The two gates are deliberate and independent, because the peer
+address alone is not a trustworthy identity behind a reverse proxy —
+see the amendment below.
 
 Restated as invariants:
 
 - The `/metrics` endpoint MUST NOT be decorated with `[Authorize]`,
   `[Authorize(Roles=...)]`, or any JWT requirement.
+- Any deployment that puts a reverse proxy in front of the API MUST
+  bind a scrape listener the proxy does not route, set
+  `Observability:Metrics:ScrapePort` to it, and refuse the scrape
+  path at the edge. The shipped `Caddyfile` refuses `/metrics*` and
+  `docker-compose.prod.yml` binds `:9090` for it.
+- The proxy's own address MUST NOT be added to
+  `AllowedScrapeIps`. Doing so is what makes the endpoint public;
+  the scrape-port gate is what stops it from working.
 - The `Observability:Metrics:AllowedScrapeIps` setting MUST be
-  non-empty when `Observability:Enabled=true`; an empty list is a
-  configuration error caught by the validator.
+  non-empty when `Observability:Enabled=true`, and every entry MUST
+  parse as an IP address or CIDR range. Both are configuration
+  errors caught by the validator at boot.
 - Production allow-lists MUST be the minimum required IPs (typically
   one Prometheus scraper's IP / pod CIDR). The default
   `["127.0.0.1", "::1"]` is for local dev and Compose sidecar
   topologies — production deployments override.
-- A 403 from this middleware MUST NOT include a response body that
-  would leak the existence-or-shape of the endpoint to a
-  reconnaissance probe. The default ASP.NET 403 (empty body) is
-  what we want.
+- A 403 or 404 from this middleware MUST NOT include a response body
+  that would leak the existence-or-shape of the endpoint to a
+  reconnaissance probe. The default ASP.NET empty body is what we
+  want.
 
 The middleware shape:
 
 ```csharp
 public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
 {
-    private readonly HashSet<IPAddress> _allowed;
-    private readonly ILogger<MetricsEndpointIpAllowListMiddleware> _logger;
-    private readonly ConcurrentDictionary<IPAddress, byte> _loggedDenies = new();
-
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
-        var ip = context.Connection.RemoteIpAddress;
-        if (ip is null || !_allowed.Contains(ip))
+        if (_scrapePort != 0 && context.Connection.LocalPort != _scrapePort)
         {
-            if (ip is not null && _loggedDenies.TryAdd(ip, 0))
-                _logger.LogInformation("metrics.scrape.denied ip={Ip}", ip);
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var ip = context.Connection.RemoteIpAddress;
+        if (!_allowed.Contains(ip))
+        {
+            if (ip is not null) LogDenied(ip);
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
@@ -85,6 +102,42 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
     }
 }
 ```
+
+## Amendment (2026-07-31) — the proxy hop
+
+The decision above originally gated on the peer address alone. That
+is sound only when the scraper is the TCP peer. In this repo's
+shipped production topology it never is: `docker-compose.prod.yml`
+runs Caddy as the TLS edge and the `Caddyfile` proxied every path to
+`api:8080`, so `Connection.RemoteIpAddress` was always the Caddy
+container's address, for internal and internet traffic alike. The
+only way to make scraping work through that edge was to allow-list
+the proxy — which admits every anonymous caller on the internet.
+
+Trusting `X-Forwarded-For` instead was considered and **rejected**:
+a header a client can set is weaker than a peer address, and ASP.NET's
+`ForwardedHeadersMiddleware` *removes* the header once it consumes it,
+so any rule keyed on its presence would silently stop working the day
+that middleware is wired up.
+
+The fix is topological, and now has two layers:
+
+1. **The scrape listener.** The API binds a second Kestrel port that
+   the edge does not proxy, and serves the scrape path only there.
+   This is what a regression test can pin (`LocalPort` on a
+   `DefaultHttpContext`), and it holds even if the edge config drifts.
+2. **The edge refusal.** The `Caddyfile` answers `/metrics*` itself
+   with a `404`, so the path has no route from the internet at all.
+
+This supersedes the "bind the endpoint to a non-default port" row in
+the alternatives table below, which rejected a *published* second
+port as security-by-obscurity. That reasoning conflated two different
+claims: "hard to guess" (worthless) and "no route exists" (the actual
+control here). The scrape port is neither published to the host nor
+proxied, so a port scan from the internet cannot reach it.
+
+The allow-list is retained and still matters — it is what bounds
+which containers on the internal network may scrape.
 
 ## Rationale
 
@@ -121,7 +174,7 @@ for three reasons:
 | **Basic auth (username/password)** | Trivially simple. | Same key-management problem as JWT, without any of JWT's benefits. Credential in plaintext over HTTP unless TLS terminates correctly. Doesn't compose with the rest of the API's auth model. | Worse than JWT in every dimension. |
 | **mTLS** | Strong identity binding to a specific client cert. | Requires a CA, a cert-rotation pipeline, and a cert-validation middleware. Massive overkill for a single-tenant scrape endpoint. | Right answer for multi-tenant / cross-org scrape; wrong scale for ours. |
 | **Don't expose `/metrics` at all; push via OTLP-metrics** | No scrape endpoint to secure. | OTLP-metrics is push-based; requires a collector running somewhere that can receive metrics. Doubles outbound bandwidth (we already push traces via OTLP). The Grafana dashboard from bolt 045 was written for Prometheus scrape, so we'd have to rewrite it. | Out of scope for this bolt. May revisit if scale demands it. |
-| **Bind the endpoint to a non-default port** (security by obscurity) | "Hidden" from the main port. | Adds a deployment artefact (second Kestrel listener). Doesn't actually solve the problem — port-scanners find it. Mixes Kestrel binding with auth concerns. | Doesn't make the endpoint safer, just harder to scrape. |
+| **Bind the endpoint to a non-default port** (security by obscurity) | "Hidden" from the main port. | Adds a deployment artefact (second Kestrel listener). Doesn't actually solve the problem — port-scanners find it. Mixes Kestrel binding with auth concerns. | ~~Doesn't make the endpoint safer, just harder to scrape.~~ **Superseded by the 2026-07-31 amendment**: an unpublished, unproxied listener is a reachability boundary, not obscurity, and it is now the primary control. |
 | **Path-based obscurity** (`/_internal_xyz/metrics`) | Trivial. | Provides no security at all — path is in CI logs, dashboard, scraper config. | Security theatre. |
 
 ## Consequences
@@ -170,6 +223,13 @@ for three reasons:
   Highest-likelihood silent regression. Mitigation: this ADR;
   `MetricsEndpointTests.Allowed_ip_no_auth_header_returns_200`
   pins the no-JWT path with an integration test.
+- **Risk: `ScrapePort` left at `0` behind a reverse proxy.** The
+  endpoint is then served on every listener and the deployment is
+  back to the pre-amendment failure — protected only by whatever the
+  edge refuses. Mitigation: boot logs
+  `observability.metrics.scrape_port_unset` at Warning whenever
+  observability is enabled with no scrape port, and the shipped
+  `docker-compose.prod.yml` sets it.
 - **Risk: production allow-list ships as the default
   `["127.0.0.1", "::1"]` and a remote scraper can't reach it.**
   Same operational failure mode as misconfigured DNS — loud,

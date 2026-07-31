@@ -34,6 +34,10 @@ public sealed class ObservabilityMetricsSettings
     /// <summary>Path the Prometheus exporter binds to.</summary>
     public string PrometheusEndpoint { get; set; } = "/metrics";
 
+    // 0 = served on every Kestrel listener (dev). Production binds a second port that the
+    // TLS edge does not proxy and sets it here, so the scrape path is unreachable from outside.
+    public int ScrapePort { get; set; }
+
     /// <summary>
     /// IPs allowed to scrape <c>/metrics</c>. Per the endpoint is gated by
     /// network identity, not JWT. Production deployments override this with the

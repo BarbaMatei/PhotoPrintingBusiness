@@ -60,25 +60,54 @@ public class MetricsEndpointIntegrationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task Scrape_port_configured_makes_metrics_absent_on_the_public_listener()
+    {
+        using var factory = new ObservabilityEnabledWrongListenerFactory();
+        using var client  = factory.CreateClient();
+        var response = await client.GetAsync("/metrics");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync()).Should().NotContain("# HELP");
+    }
+
+    [Fact]
+    public async Task Scrape_port_configured_serves_metrics_on_the_scrape_listener()
+    {
+        using var factory = new ObservabilityEnabledScrapeListenerFactory();
+        using var client  = factory.CreateClient();
+        var response = await client.GetAsync("/metrics");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("# HELP");
+    }
 }
 
 /// <summary>
 /// TestServer reports <c>HttpContext.Connection.RemoteIpAddress</c> as null
-/// by default. The metrics IP allow-list middleware treats null as
+/// and <c>LocalPort</c> as 0 by default. The metrics gate treats null as
 /// disallowed (correct in production), so tests that need a specific source
-/// IP must stamp it onto the connection before the allow-list runs. A
-/// startup filter is the cleanest seam for this.
+/// IP or listener port must stamp them onto the connection before the gate
+/// runs. A startup filter is the cleanest seam for this.
 /// </summary>
-internal sealed class SetRemoteIpStartupFilter : IStartupFilter
+internal sealed class SetConnectionStartupFilter : IStartupFilter
 {
-    private readonly IPAddress _ip;
-    public SetRemoteIpStartupFilter(IPAddress ip) => _ip = ip;
+    private readonly IPAddress? _ip;
+    private readonly int _localPort;
+
+    public SetConnectionStartupFilter(IPAddress? ip, int localPort)
+    {
+        _ip        = ip;
+        _localPort = localPort;
+    }
 
     public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
     {
         app.Use(async (ctx, n) =>
         {
-            ctx.Connection.RemoteIpAddress = _ip;
+            if (_ip is not null) ctx.Connection.RemoteIpAddress = _ip;
+            if (_localPort != 0) ctx.Connection.LocalPort = _localPort;
             await n();
         });
         next(app);
@@ -89,6 +118,7 @@ internal abstract class ObservabilityFactoryBase : WebApplicationFactory<Program
 {
     protected abstract Dictionary<string, string?> ExtraConfig();
     protected abstract IPAddress? SimulatedRemoteIp();
+    protected virtual int SimulatedLocalPort() => 0;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -130,9 +160,10 @@ internal abstract class ObservabilityFactoryBase : WebApplicationFactory<Program
             services.AddDbContext<PhotoPrintDbContext>(o =>
                 o.UseInMemoryDatabase($"MetricsTests_{Guid.NewGuid()}"));
 
-            var simulatedIp = SimulatedRemoteIp();
-            if (simulatedIp is not null)
-                services.AddSingleton<IStartupFilter>(new SetRemoteIpStartupFilter(simulatedIp));
+            var simulatedIp   = SimulatedRemoteIp();
+            var simulatedPort = SimulatedLocalPort();
+            if (simulatedIp is not null || simulatedPort != 0)
+                services.AddSingleton<IStartupFilter>(new SetConnectionStartupFilter(simulatedIp, simulatedPort));
         });
     }
 }
@@ -173,4 +204,39 @@ internal sealed class ObservabilityEnabledNoLoopbackFactory : ObservabilityFacto
         ["Observability:Metrics:AllowedScrapeIps:1"] = string.Empty,
     };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("203.0.113.7");
+}
+
+/// <summary>
+/// A scrape port is configured and the request arrives on the public listener —
+/// the shape of a request proxied in from the TLS edge. Even with the peer IP
+/// allow-listed, the metric store must not be served.
+/// </summary>
+internal sealed class ObservabilityEnabledWrongListenerFactory : ObservabilityFactoryBase
+{
+    static ObservabilityEnabledWrongListenerFactory()
+    {
+        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
+    }
+    protected override Dictionary<string, string?> ExtraConfig() => new()
+    {
+        ["Observability:Metrics:ScrapePort"]          = "9090",
+        ["Observability:Metrics:AllowedScrapeIps:0"]  = "10.42.0.5",
+    };
+    protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("10.42.0.5");
+    protected override int SimulatedLocalPort() => 8080;
+}
+
+internal sealed class ObservabilityEnabledScrapeListenerFactory : ObservabilityFactoryBase
+{
+    static ObservabilityEnabledScrapeListenerFactory()
+    {
+        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
+    }
+    protected override Dictionary<string, string?> ExtraConfig() => new()
+    {
+        ["Observability:Metrics:ScrapePort"]          = "9090",
+        ["Observability:Metrics:AllowedScrapeIps:0"]  = "10.42.0.5",
+    };
+    protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("10.42.0.5");
+    protected override int SimulatedLocalPort() => 9090;
 }

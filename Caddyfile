@@ -10,7 +10,18 @@
 
 {$SITE_ADDRESS} {
 	encode gzip zstd
-	reverse_proxy api:8080
+
+	# The Prometheus scrape path is served on the API's internal scrape port only.
+	# The edge must never route it: proxied requests all share this container's IP,
+	# so the API-side allow-list cannot tell an operator from the public internet.
+	# Keep in sync with Observability:Metrics:PrometheusEndpoint if that is changed.
+	handle /metrics* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy api:8080
+	}
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

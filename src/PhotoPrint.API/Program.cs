@@ -351,12 +351,24 @@ app.UseAuthorization();
 if (sentryEnabled)
     app.UseSentryScopeEnricher();
 
-// ── /metrics endpoint — gated by IP allow-list ──────
+// ── /metrics endpoint — gated by scrape port + IP allow-list ──────
 // Registered conditionally so the endpoint is absent (not just 403) when
-// Observability:Enabled=false. The allow-list middleware runs before the
-// Prometheus exporter; non-allowed IPs see 403 + empty body.
+// Observability:Enabled=false. The gate middleware runs before the Prometheus
+// exporter; wrong listener sees 404, non-allowed IPs see 403 + empty body.
 if (observabilityEnabled)
 {
+    var metricsSettings = app.Services
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.ObservabilitySettings>>()
+        .Value.Metrics;
+
+    if (metricsSettings.ScrapePort == 0)
+    {
+        app.Logger.LogWarning(
+            "observability.metrics.scrape_port_unset path={Path} — served on every listener; behind a "
+            + "reverse proxy set Observability:Metrics:ScrapePort to a port the edge does not route",
+            metricsPath);
+    }
+
     app.UseWhen(
         ctx => ctx.Request.Path.StartsWithSegments(metricsPath, StringComparison.OrdinalIgnoreCase),
         branch => branch.UseMiddleware<PhotoPrint.API.Middleware.MetricsEndpointIpAllowListMiddleware>());
