@@ -47,7 +47,7 @@ public static class ObservabilityExtensions
             .GetSection(ObservabilitySettings.SectionName)
             .Get<ObservabilitySettings>()!;
 
-        services.AddScoped<MetricsEndpointIpAllowListMiddleware>();
+        services.AddSingleton<MetricsEndpointIpAllowListMiddleware>();
 
         services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(

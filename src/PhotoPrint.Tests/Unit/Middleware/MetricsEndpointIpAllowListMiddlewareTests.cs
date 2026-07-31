@@ -1,10 +1,12 @@
 using System.Net;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Middleware;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Middleware;
 
@@ -111,6 +113,30 @@ public class MetricsEndpointIpAllowListMiddlewareTests
         await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
 
         ctx.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task Deny_logging_stops_at_the_cap_and_warns_once()
+    {
+        var capture  = new LogCapture();
+        var settings = Options.Create(new ObservabilitySettings
+        {
+            Metrics = new ObservabilityMetricsSettings { AllowedScrapeIps = ["10.0.0.1"] },
+        });
+        var sut = new MetricsEndpointIpAllowListMiddleware(
+            settings, capture.LoggerFor<MetricsEndpointIpAllowListMiddleware>());
+
+        for (var i = 0; i < 600; i++)
+        {
+            var ctx = new DefaultHttpContext();
+            ctx.Connection.RemoteIpAddress = new IPAddress(new byte[] { 203, 0, (byte)(i / 256), (byte)(i % 256) });
+            await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
+        }
+
+        capture.CountStartingWith("metrics.scrape.denied ip=", LogLevel.Information)
+            .Should().BeLessThanOrEqualTo(512);
+        capture.CountStartingWith("metrics.scrape.denied.log_cap_reached", LogLevel.Warning)
+            .Should().Be(1);
     }
 
     [Fact]
