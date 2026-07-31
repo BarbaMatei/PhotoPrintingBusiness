@@ -16,6 +16,10 @@ Contents:
 8. [Post-deploy verification checklist](#8-post-deploy-verification-checklist)
 9. [Rollback](#9-rollback)
 10. [Troubleshooting](#10-troubleshooting)
+11. [Cloud Storage](#11-cloud-storage-bolt-043--intent-024)
+12. [Sameday courier integration](#12-sameday-courier-integration-intent-015--bolts-036--037)
+13. [Error tracking with Sentry](#13-error-tracking-with-sentry-intent-020--bolt-045)
+14. [Tracing and metrics](#14-tracing-and-metrics-intent-020--bolt-044)
 
 ---
 
@@ -66,7 +70,7 @@ are on you**.
 | `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
 | `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
-| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs. |
+| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
 | `.env.example` | Every environment variable, documented. Copy to `.env`. |
 | `.github/workflows/ci.yml` | Build + test API and UI on every PR / non-main push. |
 | `.github/workflows/deploy.yml` | On green CI on `main`: build + push image to GHCR, then deploy (SSH step self-skips until a host is set). |
@@ -936,10 +940,257 @@ This bolt also ships a written SLO record + a starter Grafana dashboard:
 - **[`memory-bank/operations/slos.md`](../memory-bank/operations/slos.md)** — 5 SLOs: availability, checkout latency, payment-webhook success, AWB auto-creation success, ANAF submission success.
 - **[`ops/dashboards/fototipar-overview.json`](../ops/dashboards/fototipar-overview.json)** — Grafana dashboard JSON, 8 panels mapping to the SLOs.
 
-**Caveat**: the dashboard panels reference metrics that ship with bolt 044 (OTel + Prometheus business counters). Until bolt 044 lands, the panels show "No Data". The SLOs themselves still hold as commitments — they just aren't continuously measured yet. The SLO doc has the long-form explanation.
+**Caveat**: the dashboard panels reference metrics that ship with bolt 044 (OTel + Prometheus business counters), so they need the scrape stack of §14 running. A panel still reading "No Data" once Prometheus shows the target UP is a metric-name mismatch, not a missing feature — check [`metrics.md`](../memory-bank/operations/metrics.md). The SLO doc has the long-form explanation.
 
 ### 13.11 Not implemented (future considerations)
 
 1. **Frontend Sentry SDK (Angular)** — UI errors today surface only through the existing toast service. A separate intent would wire `@sentry/angular`.
 2. **Burn-rate alerts on SLOs** — Sentry alerts on individual events; SLO burn-rate alerts (e.g. "we're consuming error budget too fast") need a Prometheus + AlertManager stack that bolt 044 starts.
 3. **PagerDuty / OpsGenie integration** — Sentry's built-in Slack + email is enough until on-call rotations exist.
+
+---
+
+## 14. Tracing and metrics (intent 020 / bolt 044)
+
+OpenTelemetry traces pushed over OTLP, plus a Prometheus scrape endpoint carrying runtime and
+business metrics. Same two-stage flag posture as Sentry (§13.2) and Sameday (§12.2): with the
+master flag off, nothing is wired and `/metrics` does not exist.
+
+**Read 14.3 before you enable anything.** The scrape endpoint has no login — the whole of its
+access control is *where the request came from*, and getting that wrong publishes your order
+volumes, error rates and deploy health to anyone who asks.
+
+### 14.1 What the stack does
+
+| Signal | Where it goes | Default |
+|---|---|---|
+| Traces (ASP.NET, HttpClient, EF Core spans) | OTLP push to a collector you provision | off |
+| Metrics (runtime + business counters/histograms) | Prometheus **pull** from `GET /metrics` | off |
+
+Metric names, labels and emission sites: [`memory-bank/operations/metrics.md`](../memory-bank/operations/metrics.md).
+The SLOs these feed: [`memory-bank/operations/slos.md`](../memory-bank/operations/slos.md).
+Starter dashboard: [`ops/dashboards/fototipar-overview.json`](../ops/dashboards/fototipar-overview.json).
+
+### 14.2 Master flag — `Observability:Enabled`
+
+`Observability__Enabled` (default `false`). When false the OTel SDK is never wired, no
+middleware is registered, and `/metrics` returns the SPA fallback like any unknown path — boot
+is byte-identical to baseline. Everything below only matters once it is `true`.
+
+### 14.3 How `/metrics` is protected — read this first
+
+Two independent gates, both enforced by `MetricsEndpointIpAllowListMiddleware`
+(see [ADR-018](../memory-bank/bolts/044-tracing-and-metrics/adr-018-metrics-endpoint-ip-allow-list-not-jwt.md)):
+
+1. **The scrape listener.** The API binds a second Kestrel port (`9090` in the shipped
+   `docker-compose.prod.yml`) and `Observability__Metrics__ScrapePort` names it. A request for
+   the scrape path arriving on any *other* listener gets `404`. Caddy proxies `:8080` only, so
+   the endpoint has no route from the internet even if the allow-list is wrong.
+2. **The IP allow-list.** On the scrape listener, the peer address must be in
+   `Observability__Metrics__AllowedScrapeIps`, or the request gets `403` with an empty body.
+
+The shipped `Caddyfile` also answers `/metrics*` itself with a `404`, so the path is refused at
+the edge as well. Three things that follow, in order of how badly they bite:
+
+> **Never put Caddy's address in `AllowedScrapeIps`.** Every request Caddy forwards arrives at
+> the API from Caddy's own container IP — an internal scraper and an anonymous visitor look
+> identical at that point. Allow-listing it is the one configuration that would make the metric
+> store public. The scrape-port gate is what stops it from working, and that is deliberate.
+
+> **`X-Forwarded-For` is not a fix.** It is a header any client can set. It is used nowhere in
+> this decision, and it must not be introduced here.
+
+> **If you change `Observability__Metrics__PrometheusEndpoint`, update the `Caddyfile` matcher
+> to the new path** in the same change. The scrape-port gate still holds if you forget, but the
+> edge refusal will be pointing at nothing.
+
+### 14.4 Provisioning Prometheus
+
+The scraper must be able to reach the API's scrape port, which is on the Compose network and is
+not published to the host. That means the scraper runs **on that network**. Add to
+`docker-compose.prod.yml`:
+
+```yaml
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    # No `ports:` — reach the UI over an SSH tunnel:
+    #   ssh -L 9091:localhost:9091 user@HOST   (add `ports: ["127.0.0.1:9091:9090"]` first)
+```
+
+…and a `prometheus.yml` next to the compose file:
+
+```yaml
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: fototipar-api
+    static_configs:
+      - targets: ['api:9090']
+```
+
+Then add the `prom_data:` volume to the `volumes:` block, and put the Prometheus container's
+address in the allow-list (14.5).
+
+**Hosted Prometheus (Grafana Cloud, AMP, …) is pull-based and lives off-box, so it cannot reach
+an unpublished port — and the answer is *not* to publish one or to allow-list Caddy.** Run an
+in-network agent that scrapes locally and pushes out: Grafana Alloy or the OTel Collector's
+Prometheus receiver, with `remote_write` to the hosted endpoint. The agent is just another
+container on the Compose network, so it is allow-listed exactly like Prometheus above.
+
+### 14.5 The allow-list
+
+`Observability__Metrics__AllowedScrapeIps` accepts plain IPv4/IPv6 addresses **and CIDR ranges**.
+Every entry is parsed at boot; a single unparseable entry aborts startup with an
+`OptionsValidationException` naming it, so a typo can never silently disable scraping.
+
+| Entry | Meaning |
+|---|---|
+| `127.0.0.1`, `::1` | The shipped default. Local dev and same-host scrapers only. |
+| `172.20.0.0/16` | A Compose network subnet — use this, because Compose assigns container IPs dynamically and a fixed address for the Prometheus container is not guaranteed. |
+| `10.244.0.0/16` | A k8s pod CIDR for the monitoring namespace. |
+
+Find your Compose network's subnet with:
+
+```sh
+docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+Rules the validator enforces: at least one entry; every entry parses; CIDR base addresses have
+all host bits zero (it will tell you to write `10.42.0.0/16`, not `10.42.0.5/16`); no
+whitespace-only entries. Note that `0.0.0.0/0` is accepted — it means "any IPv4 source", is
+almost never what you want, and is only safe if the scrape port is firewalled elsewhere.
+
+Env-var syntax for arrays is indexed:
+
+```sh
+Observability__Metrics__AllowedScrapeIps__0=172.20.0.0/16
+Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
+```
+
+### 14.6 Provisioning the OTLP collector
+
+`Observability__Otlp__Endpoint` must be an absolute `http(s)` URL; `Observability__Otlp__Protocol`
+is `Grpc` (default, port 4317) or `HttpProtobuf` (port 4318). Any OTLP-compatible backend works —
+a self-hosted OTel Collector, Jaeger, Tempo, or a vendor endpoint.
+
+> **Always set `Otlp__Endpoint` in production.** With observability enabled and the endpoint
+> blank, the API falls back to the **console** span exporter: full spans, including SQL text,
+> written to container stdout on the request thread. That is a dev convenience, not a
+> production mode.
+
+Spans carry EF Core SQL command text. `EnableSensitiveDataLogging` is off, so parameter values
+are not included — but treat the collector as a system that sees your query shapes, and keep it
+inside your own network.
+
+### 14.7 Sampling and cost
+
+| Key | Default | Meaning |
+|---|---|---|
+| `Observability__Sampling__Default` | `1.0` | Fraction of traces kept for routes with no override. |
+| `Observability__Sampling__Routes__<key>` | — | Per-route override; key is `"{METHOD} {route-template}"`, e.g. `GET /api/products`. |
+
+Sampling is deterministic on the trace id ([ADR-017](../memory-bank/bolts/044-tracing-and-metrics/adr-017-deterministic-trace-id-sampling.md)),
+so a request's spans are all kept or all dropped — never a partial trace.
+
+Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
+is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,
+`Default=1.0` is affordable. Drop it to `0.1` before you drop individual routes.
+
+### 14.8 Rollout sequence
+
+1. **Pre-flight.** Deploy with `Observability__Enabled=false`. Confirm `/metrics` is not served
+   and the API boots clean — proves the disabled path.
+2. **Stage 1 — metrics only, staging.** Set `Enabled=true`, `ScrapePort=9090`, the allow-list,
+   and leave `Otlp__Endpoint` blank *only if* you accept console spans in staging; otherwise
+   provision the collector first. Run the 14.9 checks. Watch for a week.
+3. **Stage 2 — traces.** Point `Otlp__Endpoint` at the collector. Confirm spans arrive and the
+   volume matches what `Sampling__Default` implies.
+4. **Stage 3 — production.** Same flags, production allow-list. Re-run 14.9 against the live
+   host, including the "must not be reachable from the internet" checks.
+
+### 14.9 Post-deploy verification
+
+From **outside** — every one of these must fail. Any that returns Prometheus text (lines
+starting `# HELP`) is a live exposure, so treat it as an incident and turn `Enabled` back off:
+
+```sh
+for p in /metrics /METRICS /metrics/ '/metrics?x=1' /%6Detrics //metrics /x/../metrics; do
+  echo "== $p"; curl -sS -o /dev/null -w '%{http_code}\n' "https://SITE_ADDRESS$p"
+done
+# Repeat with --http1.1 and --http2: a proxy and its backend can disagree about
+# path normalization, and that disagreement is what a bypass looks like.
+```
+
+From **inside** the Compose network — this must succeed:
+
+```sh
+docker compose -f docker-compose.prod.yml exec prometheus \
+  wget -qO- http://api:9090/metrics | head -5      # expect "# HELP …"
+```
+
+And confirm the gates actually deny:
+
+```sh
+docker compose -f docker-compose.prod.yml exec api \
+  wget -S -qO- http://localhost:8080/metrics       # expect 404 — wrong listener
+```
+
+- [ ] Boot logs contain no `observability.metrics.scrape_port_unset` warning.
+- [ ] Boot logs contain no `OptionsValidationException` mentioning `AllowedScrapeIps`.
+- [ ] Prometheus's own Targets page shows `fototipar-api` as **UP**.
+- [ ] The Grafana dashboard's panels resolve (a panel reading "No Data" means a metric name
+      mismatch, not a scrape failure — check `metrics.md`).
+
+### 14.10 Operations playbook
+
+**Turn it all off without a deploy** — `Observability__Enabled=false`, restart the container.
+The endpoint disappears and no spans are exported.
+
+**Scraper suddenly gets 403** — its address changed (container reschedule, new replica). The
+API logs one line per distinct denied source: `metrics.scrape.denied ip=…`. Grep for it, then
+widen the allow-list to the subnet rather than chasing individual addresses. Only the first
+512 distinct sources are logged; past that you get one
+`metrics.scrape.denied.log_cap_reached` warning and silence until restart, which in practice
+means you are being scanned, not misconfigured.
+
+**Scraper gets 404** — it is talking to the wrong listener. Check `ScrapePort` against
+`ASPNETCORE_URLS`; the port must appear in both, and the scrape target must use it.
+
+**API won't boot after a config change** — read the `OptionsValidationException`; it names the
+offending key and, for allow-list entries, the exact entry and how to write it.
+
+**Dashboards go dark** — check Prometheus Targets first (scrape-side), then `/metrics` from
+inside the network (API-side). A dark dashboard with a healthy target is a metric-name problem.
+
+**Cardinality alarm** — every label value in this app is a compile-time constant. If a series
+count grows without bound, a new call site introduced a free-form label; `metrics.md` lists the
+legal values.
+
+### 14.11 Environment variable reference
+
+| Env var | Type | Default | Purpose |
+|---|---|---|---|
+| `Observability__Enabled` | bool | `false` | Master flag |
+| `Observability__ServiceName` | string | `PhotoPrint.API` | `service.name` on every span |
+| `Observability__Otlp__Endpoint` | string | `""` | OTLP target; blank ⇒ console span exporter |
+| `Observability__Otlp__Protocol` | string | `Grpc` | `Grpc` or `HttpProtobuf` |
+| `Observability__Metrics__PrometheusEndpoint` | string | `/metrics` | Scrape path; keep the `Caddyfile` matcher in sync |
+| `Observability__Metrics__ScrapePort` | int | `0` | Listener that may serve the scrape path; `0` = every listener (dev only) |
+| `Observability__Metrics__AllowedScrapeIps__<n>` | string | `127.0.0.1`, `::1` | Allowed scrape sources: addresses or CIDR |
+| `Observability__Sampling__Default` | double | `1.0` | Default trace sample rate |
+| `Observability__Sampling__Routes__<route>` | double | — | Per-route trace sample rate |
+
+### 14.12 Not implemented (future considerations)
+
+1. **AlertManager / burn-rate alerts.** Prometheus scrapes; nothing alerts on the SLO burn rate
+   yet. That needs an AlertManager and rules derived from `slos.md`.
+2. **mTLS on the scrape endpoint.** Right now the internal network is the trust boundary. A
+   multi-tenant or cross-org scrape consumer would need client certificates — a new ADR
+   superseding ADR-018 for that topology.
+3. **Log export.** Serilog writes to stdout only; the OTel logs signal is not wired.

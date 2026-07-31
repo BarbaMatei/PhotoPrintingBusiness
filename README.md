@@ -12,6 +12,8 @@ Romanian photo-printing e-commerce platform — ASP.NET Core 8 API + Angular 21 
 
 - **Service Level Objectives**: [memory-bank/operations/slos.md](memory-bank/operations/slos.md) — what "healthy" looks like
 - **Grafana overview dashboard**: [ops/dashboards/fototipar-overview.json](ops/dashboards/fototipar-overview.json)
+- **Metrics reference**: [memory-bank/operations/metrics.md](memory-bank/operations/metrics.md) — every metric, label and emission site
+- **Tracing + metrics rollout**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §14 — read §14.3 before exposing `/metrics`
 - **Sentry rollout + monitoring**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §13
 - **Sameday courier rollout**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §12
 

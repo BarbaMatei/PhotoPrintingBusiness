@@ -10,8 +10,12 @@ The Grafana dashboard in
 queries these names verbatim — renames need both files.
 
 The Prometheus exporter binds at `GET /metrics` (configurable via
-`Observability:Metrics:PrometheusEndpoint`), gated by an IP allow-list per
-ADR-018. With `Observability:Enabled=false` the endpoint is absent.
+`Observability:Metrics:PrometheusEndpoint`), gated per ADR-018 by the scrape
+listener (`Observability:Metrics:ScrapePort`, other listeners get 404) and an IP
+allow-list (`Observability:Metrics:AllowedScrapeIps`, addresses or CIDR, 403
+otherwise). With `Observability:Enabled=false` the endpoint is absent. Operator
+setup — including why the reverse proxy's address must never be allow-listed —
+is [`DEPLOYMENT.md` §14](../../docs/DEPLOYMENT.md#14-tracing-and-metrics-intent-020--bolt-044).
 
 ## Business metrics
 
