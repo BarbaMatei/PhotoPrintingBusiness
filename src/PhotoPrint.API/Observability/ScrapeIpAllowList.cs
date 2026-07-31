@@ -31,10 +31,13 @@ public sealed class ScrapeIpAllowList
             }
             else if (entry.Contains('/'))
             {
-                if (IPNetwork.TryParse(entry, out var network) && RoundTrips(entry, network.ToString()))
-                    networks.Add(network);
-                else
+                if (!IPNetwork.TryParse(entry, out var network) || !RoundTrips(entry, network.ToString()))
                     failures.Add(CidrFailure(entry));
+                else if (network.BaseAddress.IsIPv4MappedToIPv6)
+                    failures.Add($"'{entry}' is an IPv4-mapped IPv6 range; peers are compared in "
+                                 + "their IPv4 form, so it would match nothing — write it as an IPv4 range.");
+                else
+                    networks.Add(network);
             }
             else if (IPAddress.TryParse(entry, out var address) && RoundTrips(entry, address.ToString()))
             {
@@ -100,6 +103,9 @@ public sealed class ScrapeIpAllowList
         var slash = entry.IndexOf('/');
         if (slash < 0
             || !IPAddress.TryParse(entry[..slash], out var address)
+            // Without this the octal reading of "010.0.0.0" would suggest "8.0.0.0/16" — a real,
+            // public network the operator never meant.
+            || !RoundTrips(entry[..slash], address.ToString())
             || !int.TryParse(entry[(slash + 1)..], out var prefix))
         {
             return null;

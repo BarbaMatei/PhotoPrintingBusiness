@@ -13,14 +13,15 @@ namespace PhotoPrint.API.Middleware;
 // not a user, so network identity is the primitive.
 public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
 {
-    // Denials are logged once per distinct peer, so a port scan costs one line each rather than
-    // one per probe. The cap bounds what a scan can retain; a /24 of scanners still fits.
+    // Denials are logged once per distinct peer and reason, so a port scan costs one line each
+    // rather than one per probe. A real deployment has a handful of scrapers, so 512 leaves
+    // ample room for legitimate churn while bounding what a scan can make the map retain.
     private const int LoggedDenyCap = 512;
 
     private readonly ScrapeIpAllowList _allowed;
     private readonly int _scrapePort;
     private readonly ILogger<MetricsEndpointIpAllowListMiddleware> _logger;
-    private readonly ConcurrentDictionary<IPAddress, byte> _loggedDenies = new();
+    private readonly ConcurrentDictionary<(IPAddress Peer, string Reason), byte> _loggedDenies = new();
     private int _loggedDenyCount;
     private int _capWarned;
 
@@ -38,6 +39,15 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
     {
         if (_scrapePort != 0 && context.Connection.LocalPort != _scrapePort)
         {
+            if (context.Connection.RemoteIpAddress is { } peer)
+            {
+                var localPort = context.Connection.LocalPort;
+                LogDenied(peer, "wrong_listener", p => _logger.LogInformation(
+                    "metrics.scrape.wrong_listener ip={Ip} port={Port} — the scrape path is served "
+                    + "only on Observability:Metrics:ScrapePort={ScrapePort}",
+                    p, localPort, _scrapePort));
+            }
+
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
@@ -46,7 +56,11 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
         if (!_allowed.Contains(ip))
         {
             if (ip is not null)
-                LogDenied(ip);
+            {
+                LogDenied(ip, "not_allowed", p => _logger.LogInformation(
+                    "metrics.scrape.denied ip={Ip} — not in Observability:Metrics:AllowedScrapeIps",
+                    p));
+            }
 
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
@@ -55,7 +69,7 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
         await next(context);
     }
 
-    private void LogDenied(IPAddress ip)
+    private void LogDenied(IPAddress ip, string reason, Action<IPAddress> log)
     {
         if (Volatile.Read(ref _loggedDenyCount) >= LoggedDenyCap)
         {
@@ -72,12 +86,10 @@ public sealed class MetricsEndpointIpAllowListMiddleware : IMiddleware
         // Log the canonical form: a mapped or scoped peer would otherwise read as a different
         // address from the one the allow-list was compared against.
         var peer = ScrapeIpAllowList.Canonicalize(ip);
-        if (!_loggedDenies.TryAdd(peer, 0))
+        if (!_loggedDenies.TryAdd((peer, reason), 0))
             return;
 
         Interlocked.Increment(ref _loggedDenyCount);
-        _logger.LogInformation(
-            "metrics.scrape.denied ip={Ip} — not in Observability:Metrics:AllowedScrapeIps",
-            peer);
+        log(peer);
     }
 }

@@ -116,6 +116,8 @@ public class ObservabilitySettingsValidatorTests
     [InlineData("10.42.0.0/33")]
     [InlineData("010.0.0.1")]
     [InlineData("10")]
+    [InlineData("010.0.0.0/16")]
+    [InlineData("::ffff:10.42.0.0/112")]
     public void Enabled_with_an_unparseable_allowed_scrape_ip_fails(string entry)
     {
         var s = ValidEnabled();
@@ -132,6 +134,30 @@ public class ObservabilitySettingsValidatorTests
         s.Metrics.AllowedScrapeIps = ["10.42.0.5/16"];
         var result = _sut.Validate(null, s);
         result.Failures.Should().Contain(f => f.Contains("10.42.0.0/16"));
+    }
+
+    [Fact]
+    public void An_octal_cidr_entry_is_rejected_without_suggesting_the_octal_network()
+    {
+        // IPAddress reads "010." as octal 8, so a naive suggestion would send the operator to
+        // 8.0.0.0/16 — a real, public network they never meant to allow.
+        var s = ValidEnabled();
+        s.Metrics.AllowedScrapeIps = ["010.0.0.0/16"];
+        var result = _sut.Validate(null, s);
+
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().NotContain(f => f.Contains("8.0.0.0"));
+    }
+
+    [Fact]
+    public void An_ipv4_mapped_ipv6_range_is_rejected_because_it_would_match_nothing()
+    {
+        var s = ValidEnabled();
+        s.Metrics.AllowedScrapeIps = ["::ffff:10.42.0.0/112"];
+        var result = _sut.Validate(null, s);
+
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("IPv4 range"));
     }
 
     [Theory]

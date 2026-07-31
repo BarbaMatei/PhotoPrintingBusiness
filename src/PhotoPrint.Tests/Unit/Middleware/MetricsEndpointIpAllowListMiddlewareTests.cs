@@ -88,9 +88,10 @@ public class MetricsEndpointIpAllowListMiddlewareTests
     }
 
     [Fact]
-    public async Task Invalid_ip_strings_in_config_are_ignored_not_thrown()
+    public async Task Unparseable_entries_never_throw_here_because_the_validator_is_the_gate()
     {
-        // "not.an.ip" + "" + a valid IP — must not throw, must use the valid one.
+        // Boot aborts on these (see ObservabilitySettingsValidatorTests), so the middleware can
+        // only meet them under direct construction — where it must degrade, not crash.
         var sut = Build("not.an.ip", "", "127.0.0.1");
 
         var allowedCtx = new DefaultHttpContext { Connection = { RemoteIpAddress = IPAddress.Loopback } };
@@ -273,6 +274,33 @@ public class MetricsEndpointIpAllowListMiddlewareTests
         await sut.InvokeAsync(ctx, _ => { nextCalled = true; return Task.CompletedTask; });
 
         nextCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_wrong_listener_request_logs_once_so_the_404_is_diagnosable()
+    {
+        var capture  = new LogCapture();
+        var settings = Options.Create(new ObservabilitySettings
+        {
+            Metrics = new ObservabilityMetricsSettings
+            {
+                AllowedScrapeIps = ["10.0.0.1"],
+                ScrapePort       = 9090,
+            },
+        });
+        var sut = new MetricsEndpointIpAllowListMiddleware(
+            settings, capture.LoggerFor<MetricsEndpointIpAllowListMiddleware>());
+
+        for (var i = 0; i < 3; i++)
+        {
+            var ctx = new DefaultHttpContext();
+            ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.1");
+            ctx.Connection.LocalPort       = 8080;
+            await sut.InvokeAsync(ctx, _ => Task.CompletedTask);
+        }
+
+        capture.CountStartingWith("metrics.scrape.wrong_listener ip=", LogLevel.Information)
+            .Should().Be(1);
     }
 
     [Fact]

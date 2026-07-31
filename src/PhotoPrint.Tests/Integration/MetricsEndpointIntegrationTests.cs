@@ -62,6 +62,19 @@ public class MetricsEndpointIntegrationTests
     }
 
     [Fact]
+    public void An_unparseable_allow_list_entry_aborts_boot()
+    {
+        // The runbook promises a typo can never silently disable scraping. That promise rests on
+        // ValidateOnStart wiring, so it is proven against a real host boot, not the validator.
+        using var factory = new ObservabilityInvalidAllowListFactory();
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<Exception>()
+            .Which.ToString().Should().Contain("AllowedScrapeIps").And.Contain("not.an.ip");
+    }
+
+    [Fact]
     public async Task Scrape_port_configured_makes_metrics_absent_on_the_public_listener()
     {
         using var factory = new ObservabilityEnabledWrongListenerFactory();
@@ -223,6 +236,19 @@ internal sealed class ObservabilityEnabledWrongListenerFactory : ObservabilityFa
     };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("10.42.0.5");
     protected override int SimulatedLocalPort() => 8080;
+}
+
+internal sealed class ObservabilityInvalidAllowListFactory : ObservabilityFactoryBase
+{
+    static ObservabilityInvalidAllowListFactory()
+    {
+        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
+    }
+    protected override Dictionary<string, string?> ExtraConfig() => new()
+    {
+        ["Observability:Metrics:AllowedScrapeIps:0"] = "not.an.ip",
+    };
+    protected override IPAddress? SimulatedRemoteIp() => null;
 }
 
 internal sealed class ObservabilityEnabledScrapeListenerFactory : ObservabilityFactoryBase

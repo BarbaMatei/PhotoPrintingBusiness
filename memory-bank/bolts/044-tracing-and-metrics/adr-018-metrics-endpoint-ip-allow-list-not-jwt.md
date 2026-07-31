@@ -65,6 +65,11 @@ Restated as invariants:
 - The proxy's own address MUST NOT be added to
   `AllowedScrapeIps`. Doing so is what makes the endpoint public;
   the scrape-port gate is what stops it from working.
+- Changing `Observability:Metrics:PrometheusEndpoint` MUST be
+  accompanied by the matching change to the edge's refusal rule
+  (`Caddyfile`), in the same commit. Nothing enforces this pairing
+  mechanically; the scrape-port gate is what keeps a missed one from
+  being an exposure.
 - The `Observability:Metrics:AllowedScrapeIps` setting MUST be
   non-empty when `Observability:Enabled=true`, and every entry MUST
   parse as an IP address or CIDR range. Both are configuration

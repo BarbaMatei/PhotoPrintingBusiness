@@ -31,7 +31,10 @@ public sealed class ObservabilityOtlpSettings
 
 public sealed class ObservabilityMetricsSettings
 {
-    /// <summary>Path the Prometheus exporter binds to.</summary>
+    /// <summary>
+    /// Path the Prometheus exporter binds to. Changing it means changing the edge's refusal
+    /// matcher too — the shipped <c>Caddyfile</c> hard-codes <c>/metrics*</c>.
+    /// </summary>
     public string PrometheusEndpoint { get; set; } = "/metrics";
 
     // 0 = served on every Kestrel listener (dev). Production binds a second port that the

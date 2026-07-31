@@ -1037,6 +1037,11 @@ scrape_configs:
 Then add the `prom_data:` volume to the `volumes:` block, and put the Prometheus container's
 address in the allow-list (14.5).
 
+> **Do not add `ports:` to the `api` service for 9090.** The scrape listener is a *second full
+> API pipeline*, not a metrics-only port — it serves every route, over plain HTTP, without the
+> TLS, HSTS and security headers Caddy adds. Publishing it puts the unprotected API on the
+> internet. Reach it from another container on the Compose network, never from the host.
+
 **Hosted Prometheus (Grafana Cloud, AMP, …) is pull-based and lives off-box, so it cannot reach
 an unpublished port — and the answer is *not* to publish one or to allow-list Caddy.** Run an
 in-network agent that scrapes locally and pushes out: Grafana Alloy or the OTel Collector's
@@ -1063,8 +1068,11 @@ docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.Subnet}}{{
 
 Rules the validator enforces: at least one entry; every entry parses; CIDR base addresses have
 all host bits zero (it will tell you to write `10.42.0.0/16`, not `10.42.0.5/16`); no
-whitespace-only entries. Note that `0.0.0.0/0` is accepted — it means "any IPv4 source", is
-almost never what you want, and is only safe if the scrape port is firewalled elsewhere.
+whitespace-only entries; no leading-zero forms (`010.0.0.1` is read as octal by .NET and is
+rejected rather than silently becoming `8.0.0.1`); no IPv4-mapped IPv6 ranges like
+`::ffff:10.42.0.0/112`, which would match nothing. Note that `0.0.0.0/0` **is** accepted — it
+means "any IPv4 source", is almost never what you want, and is only safe if the scrape port is
+firewalled elsewhere.
 
 Env-var syntax for arrays is indexed:
 
@@ -1072,6 +1080,10 @@ Env-var syntax for arrays is indexed:
 Observability__Metrics__AllowedScrapeIps__0=172.20.0.0/16
 Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
 ```
+
+> **Indexed env vars merge with the defaults, they do not replace them.** `appsettings.json`
+> ships `["127.0.0.1", "::1"]`, so setting only index `0` leaves `::1` in place at index 1. To
+> get exactly the list you want, set every index you intend to keep.
 
 ### 14.6 Provisioning the OTLP collector
 
@@ -1159,8 +1171,10 @@ widen the allow-list to the subnet rather than chasing individual addresses. Onl
 `metrics.scrape.denied.log_cap_reached` warning and silence until restart, which in practice
 means you are being scanned, not misconfigured.
 
-**Scraper gets 404** — it is talking to the wrong listener. Check `ScrapePort` against
-`ASPNETCORE_URLS`; the port must appear in both, and the scrape target must use it.
+**Scraper gets 404** — it is talking to the wrong listener. The API logs one
+`metrics.scrape.wrong_listener ip=… port=…` line per distinct source, naming the port it
+arrived on and the port that would work. Check `ScrapePort` against `ASPNETCORE_URLS`; the port
+must appear in both, and the scrape target must use it.
 
 **API won't boot after a config change** — read the `OptionsValidationException`; it names the
 offending key and, for allow-list entries, the exact entry and how to write it.
