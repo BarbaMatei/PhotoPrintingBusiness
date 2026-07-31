@@ -67,6 +67,9 @@ Option 2 is cleaner because it has direct access to `HttpContext` (already-stamp
 
 **PII scrubber list.**
 
+The list below is what this bolt shipped. It was a deny-list at one SDK hook and leaked; the
+shipped contract is now deny-by-default across all three hooks — see `docs/DEPLOYMENT.md` §13.6.
+
 - Request body — **always dropped**. We send ProblemDetails which already contains a sanitized detail message; the raw body is replaced with `<scrubbed:request-body>`.
 - Request headers — `Authorization`, `Cookie`, `X-Guest-Token` dropped.
 - Form fields — `email`, `phone`, `password`, `confirmPassword` keys dropped.

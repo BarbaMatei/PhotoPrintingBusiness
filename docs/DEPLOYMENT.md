@@ -874,16 +874,27 @@ Same two-stage posture as the Sameday rollout (§12.5):
 
 ### 13.6 PII scrubbing
 
-The integration is **PII-careful by default**:
+The scrubber is **deny-by-default**: a value leaves the process only if its key is on an allow-list. Adding a field to Sentry's payload therefore cannot leak by omission — a new header, query parameter, extra or span tag arrives redacted until someone allow-lists it deliberately.
 
-- **Full request body** — always replaced with `<scrubbed:request-body>`. The ProblemDetails response in our error path already contains the useful sanitized info; the raw body is never needed.
-- **Sensitive headers** — `Authorization`, `Cookie`, `Set-Cookie`, `X-Guest-Token` are replaced with `<scrubbed>`.
-- **Sensitive extras** — any extra/header key containing `email`, `phone`, `password`, `confirmPassword`, `currentPassword`, `newPassword` (case-insensitive substring) is scrubbed.
-- **Stack traces** — kept (no PII).
-- **Tags** (correlation_id, user_id, release, environment) — kept.
-- **Query string** — kept (verify no PII is in your query strings; extend the scrubber if not).
+It runs on all three SDK egress hooks — `BeforeSend` (error events), `BeforeSendTransaction` (performance transactions, which `BeforeSend` does **not** cover) and `BeforeBreadcrumb`.
 
-The scrubber list lives in [`Configuration/SentryDataScrubbers.cs`](../src/PhotoPrint.API/Configuration/SentryDataScrubbers.cs). Adding a new sensitive key is a 1-line change.
+**Scrubbed:**
+
+- **Request and response bodies** — always replaced with `<scrubbed:request-body>`. The ProblemDetails response in our error path already contains the useful sanitized info; the raw body is never needed.
+- **Query string** — every value replaced with `<scrubbed>`; parameter names are kept (`?search=<scrubbed>&page=<scrubbed>`). A segment that is not a plain `name=value` pair is dropped whole. Admin order search and email confirmation both carry PII/credentials here.
+- **URLs** — query string, fragment and any embedded credentials stripped, in `Request.Url`, span descriptions and breadcrumb data.
+- **Headers** (request and response) — everything except `Accept`, `Accept-Encoding`, `Accept-Language`, `Content-Length`, `Content-Type`, `Host`, `User-Agent`, `X-Correlation-Id`. Matching is case-insensitive, so HTTP/2's lowercase field names are covered.
+- **Cookies**, **`Request.Env`** except `SERVER_NAME`/`SERVER_PORT`, and **`Request.Other`**.
+- **Every `Extra` value**, and every span tag/extra and breadcrumb data value outside the diagnostic allow-list (HTTP method, status code, `db.system`).
+- **User** — only `Id` survives; email, username, IP address and custom fields are dropped.
+- **Log-message parameters** and the rendered message text (the template is kept).
+- **Exception `Mechanism.Data`** — this is where a CLR exception's `Data` dictionary lands.
+
+**Kept:** stack traces, exception type and message, tags (`correlation_id`, `user_id`, `release`, `environment`), transaction/route names, HTTP status codes, and the SDK's own device/OS/runtime contexts.
+
+**If the scrubber throws, the payload is dropped, not sent.** This is deliberate: Sentry 4.13 sends the *original, unscrubbed* payload when a `BeforeSend`-family callback throws, so the scrubber catches everything, logs at `Error`, and returns null.
+
+The allow-lists live in [`Configuration/SentryDataScrubbers.cs`](../src/PhotoPrint.API/Configuration/SentryDataScrubbers.cs). Widening one is a 1-line change plus a test — and a deliberate privacy decision.
 
 ### 13.7 Operations playbook
 

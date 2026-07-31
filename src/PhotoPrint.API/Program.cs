@@ -54,7 +54,7 @@ if (sentryEnabled)
         o.TracesSampleRate = sentryConfig.TracesSampleRate;
         o.SendDefaultPii   = false;
         o.Debug            = sentryConfig.Debug;
-        o.SetBeforeSend((evt, _) => PhotoPrint.API.Configuration.SentryDataScrubbers.Scrub(evt));
+        PhotoPrint.API.Configuration.SentryDataScrubbers.Register(o);
     });
 
     builder.Services.AddScoped<PhotoPrint.API.Middleware.SentryScopeEnricherMiddleware>();
