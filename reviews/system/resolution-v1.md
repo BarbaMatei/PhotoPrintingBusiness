@@ -2,8 +2,9 @@
 type: resolution
 target: review-system
 review: review-v1.md
-status: in-progress
-fixed_commit: 1daedb9
+status: resolved
+fixed_commit: 5cac465
+closed: 2026-07-31
 date: 2026-07-29
 findings:
   SF1:  { status: fixed,          commit: 08e5a3e, note: "R1 calibration — first cert attempt = pair; re-certification after small verified fix round = one fresh full pass (standard, not deviation); full-loop tier never closes without a fresh full pass after the last fix round. README note ² + runbook-discovery + rationale entry" }
