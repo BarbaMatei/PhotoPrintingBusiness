@@ -28,6 +28,27 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
   `STORAGE_TEST_*` env vars) · run API: `dotnet run --project src/PhotoPrint.API`
 - UI (from `src/PhotoPrint.UI`): `npm test -- --watch=false` · `npm start` · `npm run build`
 
+## Running tests (hard rule — full runs overload this machine)
+
+A full test run saturates this machine and blocks everything else on it. **Never run the
+whole suite by default.**
+
+- Run only what the change can affect, in this order: tests you added or modified → tests
+  covering the code you modified (same feature/namespace/component) → nothing more.
+- Untouched side = untouched tests: a frontend-only change never triggers `dotnet test`; a
+  backend-only change never triggers `npm test`. Tests for functionality nobody touched
+  don't run at all.
+- Scope with:
+  - API: `dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~<Namespace.OrClass>"`
+    (namespaces mirror folders, e.g. `PhotoPrint.Tests.Unit.Controllers`)
+  - UI: `npm test -- --watch=false --include='**/<name>*.spec.ts'`
+- A full run is a **last resort**, only when genuinely unavoidable (cross-cutting change to
+  shared infrastructure whose blast radius can't be traced, or the user explicitly asks).
+  Even then, run it in **sequential batches** — API by namespace
+  (`…~PhotoPrint.Tests.Unit.<Area>`, then `…~PhotoPrint.Tests.Integration`), UI by feature
+  folder via `--include` — one batch at a time, never both suites at once, never batches in
+  parallel.
+
 ## The map (read-when routing)
 
 | Working on… | Read first |
