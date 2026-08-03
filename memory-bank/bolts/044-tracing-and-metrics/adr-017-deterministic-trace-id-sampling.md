@@ -14,6 +14,12 @@ parent span exists). For the root span — an incoming HTTP request with no
 parent — the inner sampler decides "record this trace, or drop it" based
 on the route's configured rate (e.g. `GET /api/products` → 0.05).
 
+> The per-route part of that premise turned out to be impossible at
+> sampling time, and the class is now `DeterministicTraceIdSampler` with
+> a single rate — see the 2026-08-03 amendments. The decision function
+> below is unchanged and still binding; the two route-lookup lines in
+> the snippet are historical.
+
 The decision function has to map `(trace_id, rate) → bool`. The naive
 choice is `Random.Shared.NextDouble() < rate`. The non-obvious choice is
 to derive the decision from a deterministic hash of the `trace_id` so the
@@ -38,7 +44,8 @@ We had to decide what function the inner sampler uses to convert
 
 ## Decision
 
-**`RouteAwareSampler` derives its sampling decision from a deterministic
+**`DeterministicTraceIdSampler` (`RouteAwareSampler` as originally
+named) derives its sampling decision from a deterministic
 hash of the `trace_id`. The same trace_id always yields the same
 decision for the same configured rate. Random number generation
 (`Random.Shared.NextDouble`, `System.Security.Cryptography.RandomNumberGenerator`,
@@ -73,8 +80,8 @@ Restated as invariants:
   SIG](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/tracestate-probability-sampling.md)).
 - **The sampling path MUST NOT call `Random.*`, `Guid.NewGuid`, or any
   other entropy source per evaluation.** PR reviewers should flag any
-  such call inside `RouteAwareSampler` or any future sampler in this
-  codebase.
+  such call inside `DeterministicTraceIdSampler` or any future sampler
+  in this codebase.
 - The `ErrorOverride` post-decision processor (5xx → force-sampled) is a
   separate concern and does NOT make the decision function non-deterministic;
   it's a span-completion fix-up, not a sampling decision.
@@ -159,22 +166,58 @@ random sampling would create:
 
 - **Risk: someone "simplifies" the sampler to `Random.NextDouble`.**
   Highest-likelihood silent regression. Mitigation: this ADR; a unit
-  test (`RouteAwareSamplerTests.Same_trace_id_same_rate_same_decision`)
+  test (`DeterministicTraceIdSamplerTests.Same_trace_id_same_rate_always_yields_same_decision`)
   that re-evaluates the same trace_id 100 times and asserts the
   decision is constant; PR review on any change to the sampling
   path.
 - **Risk: someone adds a second custom sampler for a different
   reason and uses `Random` in it.** Pattern leak — the rule "no
   randomness in the sampling path" applies to ALL samplers in this
-  codebase, not just `RouteAwareSampler`. Mitigation: documented in
-  this ADR's "Decision" section and in the sampler's namespace-level
-  doc comment.
+  codebase, not just `DeterministicTraceIdSampler`. Mitigation:
+  documented in this ADR's "Decision" section and pinned by the unit
+  test above.
 - **Risk: a future contributor reads the lower 63 bits and decides
   it's "obviously wrong, should use all 128 bits."** Switching to
   128 bits is fine as long as the function stays deterministic, but
   changes which traces are sampled — i.e. invalidates existing
   Tempo queries that filter on trace_id presence. Mitigation: this
   ADR pins the specific function shape.
+
+## Amendment (2026-08-03) — per-route rates leave the sampler
+
+The decision above assumed the inner sampler could resolve a route
+(`"GET /api/products" → 0.05`) and pick that route's rate. It cannot,
+and never could. The sampler runs while ASP.NET Core is *creating* the
+server span, before routing has matched an endpoint. Measured against
+the running stack (.NET 8, `OpenTelemetry.Instrumentation.AspNetCore`
+1.11.1), the sampler is handed `name =
+"Microsoft.AspNetCore.Hosting.HttpRequestIn"`, `kind = Server`, and
+**`Tags = null`** — no `http.route`, and no `url.path` either. Every
+lookup missed, every route silently took `Default`, and with the
+shipped `Default = 1.0` the routes configured at `0.05` were traced at
+100%.
+
+**`RouteAwareSampler` is therefore replaced by
+`DeterministicTraceIdSampler`, and `Observability:Sampling:Routes` is
+gone.** One service-wide rate, same pinned hash function. The
+class name no longer promises a capability the position in the
+pipeline forbids.
+
+Per-route rates move to the collector, where the decision is taken
+after the trace completes and the real route template is on the span.
+That is the same place whole-trace error sampling has to happen, so
+one mechanism covers both.
+
+Rejected alternative: read the method and path from
+`IHttpContextAccessor` inside the sampler. It works — the accessor is
+populated by then — but it buys an approximation (raw path, not the
+route template, so `{id}` segments need a matcher with its own
+case/trailing-slash/`HEAD`/catch-all edge cases, each one a silent
+miss of exactly the kind this amendment exists to remove) and it costs
+the whole application: registering `IHttpContextAccessor` makes the
+hosting layer stop pooling `DefaultHttpContext`, so every request in
+the process pays for a telemetry feature. Not a trade worth making
+in-process.
 
 ## Amendment (2026-08-03) — out-of-rate spans are recorded, not dropped
 

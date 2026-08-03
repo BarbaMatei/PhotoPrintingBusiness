@@ -58,15 +58,6 @@ public sealed class ObservabilitySettingsValidator : IValidateOptions<Observabil
         if (options.Sampling.Default is < 0.0 or > 1.0)
             failures.Add("Observability:Sampling:Default must be between 0.0 and 1.0.");
 
-        if (options.Sampling.Routes is not null)
-        {
-            foreach (var (route, rate) in options.Sampling.Routes)
-            {
-                if (rate is < 0.0 or > 1.0)
-                    failures.Add($"Observability:Sampling:Routes['{route}'] must be between 0.0 and 1.0.");
-            }
-        }
-
         return failures.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);

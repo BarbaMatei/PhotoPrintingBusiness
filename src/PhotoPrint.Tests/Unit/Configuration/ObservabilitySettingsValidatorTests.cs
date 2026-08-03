@@ -198,19 +198,6 @@ public class ObservabilitySettingsValidatorTests
     }
 
     [Fact]
-    public void Enabled_with_route_rate_out_of_range_fails()
-    {
-        var s = ValidEnabled();
-        s.Sampling.Routes = new Dictionary<string, double>
-        {
-            { "GET /api/products", 1.5 },
-        };
-        var result = _sut.Validate(null, s);
-        result.Failed.Should().BeTrue();
-        result.Failures.Should().Contain(f => f.Contains("Routes['GET /api/products']"));
-    }
-
-    [Fact]
     public void Disabled_skips_all_rules_even_with_garbage()
     {
         var s = new ObservabilitySettings

@@ -1104,11 +1104,19 @@ inside your own network.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Observability__Sampling__Default` | `1.0` | Fraction of traces kept for routes with no override. |
-| `Observability__Sampling__Routes__<key>` | — | Per-route override; key is `"{METHOD} {route-template}"`, e.g. `GET /api/products`. |
+| `Observability__Sampling__Default` | `1.0` | Fraction of traces exported. One rate for the whole service. `0.0` exports errored spans only. |
 
 Sampling is deterministic on the trace id ([ADR-017](../memory-bank/bolts/044-tracing-and-metrics/adr-017-deterministic-trace-id-sampling.md)),
 so a request's spans are all kept or all dropped — never a partial trace.
+
+**There is no per-route rate.** The sampler decides while the server span is being
+created, before routing has matched an endpoint, so no route is available to key on;
+`Observability__Sampling__Routes__<key>` existed until 2026-08-03, silently matched
+nothing, and has been removed. If you need one route cheaper than another, do it in the
+collector with tail sampling — that is also the only way to get a *complete* errored
+trace, since the in-app override can only rescue the span that failed, not the children
+already dropped when it started. A rescued span is tagged
+`fototipar.sampling.error_override`.
 
 Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
 is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,
@@ -1197,8 +1205,7 @@ legal values.
 | `Observability__Metrics__PrometheusEndpoint` | string | `/metrics` | Scrape path; keep the `Caddyfile` matcher in sync |
 | `Observability__Metrics__ScrapePort` | int | `0` | Listener that may serve the scrape path; `0` = every listener (dev only) |
 | `Observability__Metrics__AllowedScrapeIps__<n>` | string | `127.0.0.1`, `::1` | Allowed scrape sources: addresses or CIDR |
-| `Observability__Sampling__Default` | double | `1.0` | Default trace sample rate |
-| `Observability__Sampling__Routes__<route>` | double | — | Per-route trace sample rate |
+| `Observability__Sampling__Default` | double | `1.0` | Service-wide trace sample rate; `0.0` = errored spans only |
 
 ### 14.12 Not implemented (future considerations)
 

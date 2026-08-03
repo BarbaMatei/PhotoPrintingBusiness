@@ -51,12 +51,11 @@ public sealed class ObservabilityMetricsSettings
 
 public sealed class ObservabilitySamplingSettings
 {
-    /// <summary>Default sample rate for routes not listed in <see cref="Routes"/>.</summary>
-    public double Default { get; set; } = 1.0;
-
     /// <summary>
-    /// Per-route sample-rate overrides. Key shape: <c>"{METHOD} {route-template}"</c>
-    /// (e.g. <c>"GET /api/products"</c>). Values in [0.0, 1.0].
+    /// Fraction of traces exported, in [0.0, 1.0]. One rate for the whole service:
+    /// the sampler runs before routing resolves an endpoint, so it cannot tell routes
+    /// apart. Per-route rates are a collector-side (tail sampling) concern.
+    /// <c>0.0</c> exports errored spans only; the off switch is <c>Enabled = false</c>.
     /// </summary>
-    public Dictionary<string, double> Routes { get; set; } = new();
+    public double Default { get; set; } = 1.0;
 }

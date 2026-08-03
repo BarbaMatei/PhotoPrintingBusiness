@@ -30,7 +30,7 @@ public class SamplingPipelineTests : IDisposable
         _providers.Add(Sdk.CreateTracerProviderBuilder()
             .AddSource(name)
             .SetSampler(new ParentBasedSampler(
-                new RouteAwareSampler(new ObservabilitySamplingSettings { Default = rate })))
+                new DeterministicTraceIdSampler(new ObservabilitySamplingSettings { Default = rate })))
             .AddProcessor(new ErrorOverrideProcessor())
             .AddProcessor(new SimpleActivityExportProcessor(exporter))
             .Build()!);

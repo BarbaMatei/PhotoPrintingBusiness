@@ -20,7 +20,7 @@ namespace PhotoPrint.API.Extensions;
 ///
 /// Layering (per <c>ddd-02-technical-design.md</c>):
 ///   Tracing:  ASP.NET / HttpClient / EF Core auto-instrumentation
-///             → ParentBased(RouteAwareSampler) → ErrorOverrideProcessor
+///             → ParentBased(DeterministicTraceIdSampler) → ErrorOverrideProcessor
 ///             → OTLP exporter (if endpoint set) or console exporter (dev)
 ///   Metrics:  AddMeter(FotoMetrics.Meter) + runtime + ASP.NET / HttpClient
 ///             → Prometheus exporter (always when enabled)
@@ -55,7 +55,7 @@ public static class ObservabilityExtensions
                 serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0"))
             .WithTracing(t =>
             {
-                t.SetSampler(new ParentBasedSampler(new RouteAwareSampler(settings.Sampling)));
+                t.SetSampler(new ParentBasedSampler(new DeterministicTraceIdSampler(settings.Sampling)));
                 t.AddProcessor(new ErrorOverrideProcessor());
                 t.AddAspNetCoreInstrumentation(o => o.RecordException = true);
                 t.AddHttpClientInstrumentation();
