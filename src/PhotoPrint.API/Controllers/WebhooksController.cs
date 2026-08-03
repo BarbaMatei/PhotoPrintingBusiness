@@ -220,6 +220,20 @@ public class WebhooksController : ControllerBase
             RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
                 MetricNames.WebhookResultValues.Failed);
         }
+        else
+        {
+            if (action == "0")
+                _logger.LogError(
+                    "EuPlatesc IPN: paid notification for order {OrderId} in status {Status} — customer charged, order not Paid, manual reconciliation required",
+                    orderId, order.Status);
+            else
+                _logger.LogWarning(
+                    "EuPlatesc IPN: action {Action} for order {OrderId} in status {Status} — no transition applied",
+                    action, orderId, order.Status);
+
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Failed);
+        }
 
         return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
     }
@@ -270,32 +284,52 @@ public class WebhooksController : ControllerBase
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
         }
-    }
-
-    private async Task HandleStripePaymentFailedAsync(string? paymentIntentId, CancellationToken ct)
-    {
-        if (string.IsNullOrEmpty(paymentIntentId))
-            return;
-
-        var order = await _orderService.GetByPaymentIntentIdAsync(paymentIntentId, ct);
-        if (order == null)
-            return;
-
-        if (order.Status == OrderStatus.AwaitingPayment)
+        else
         {
-            OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
-            await _db.SaveChangesAsync(ct);
+            _logger.LogError(
+                "Stripe webhook: payment_intent.succeeded for order {OrderId} in status {Status} — customer charged, order not Paid, manual reconciliation required",
+                order.Id, order.Status);
             RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
                 MetricNames.WebhookResultValues.Failed);
         }
     }
 
-    /// <summary>
-    /// Observability: payment_webhook_total{processor,result}. The SLO
-    /// in <c>memory-bank/operations/slos.md</c> §3 sets a 99.9% target on result=ok;
-    /// every webhook receipt should produce exactly one increment with a result
-    /// from <see cref="MetricNames.WebhookResultValues"/>.
-    /// </summary>
+    private async Task HandleStripePaymentFailedAsync(string? paymentIntentId, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(paymentIntentId))
+        {
+            _logger.LogWarning("Stripe webhook: payment_intent.payment_failed but no PaymentIntent ID found");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
+            return;
+        }
+
+        var order = await _orderService.GetByPaymentIntentIdAsync(paymentIntentId, ct);
+        if (order == null)
+        {
+            _logger.LogWarning(
+                "Stripe webhook: PaymentIntent {Id} not linked to any order", paymentIntentId);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.OrderNotFound);
+            return;
+        }
+
+        if (order.Status == OrderStatus.AwaitingPayment)
+        {
+            OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
+            await _db.SaveChangesAsync(ct);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Stripe webhook: payment_intent.payment_failed for order {OrderId} in status {Status} — no transition applied",
+                order.Id, order.Status);
+        }
+
+        RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+            MetricNames.WebhookResultValues.Failed);
+    }
+
     private static void RecordPaymentWebhook(string processor, string result)
     {
         FotoMetrics.PaymentWebhook.Add(1,

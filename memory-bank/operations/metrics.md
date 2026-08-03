@@ -22,7 +22,7 @@ is [`DEPLOYMENT.md` §14](../../docs/DEPLOYMENT.md#14-tracing-and-metrics-intent
 | Name | Type | Unit | Labels (cardinality) | Where incremented |
 |---|---|---|---|---|
 | `orders_created_total` | counter | `1` | `processor` (2) × `status` (3) = 6 | [`OrderService.CreateFromCartAsync`](../../src/PhotoPrint.API/Services/OrderService.cs) after order persist |
-| `payment_webhook_total` | counter | `1` | `processor` (2) × `result` (6) = 12 | [`WebhooksController`](../../src/PhotoPrint.API/Controllers/WebhooksController.cs) — every webhook receipt records exactly one |
+| `payment_webhook_total` | counter | `1` | `processor` (2) × `result` (6) = 12 | [`WebhooksController`](../../src/PhotoPrint.API/Controllers/WebhooksController.cs) — every receipt that reaches a terminal decision records exactly one; unhandled Stripe event types and requests that throw before the decision record none |
 | `upload_size_bytes` | histogram | `By` | none | [`UploadService.UploadAsync`](../../src/PhotoPrint.API/Services/UploadService.cs) after upload persist |
 | `order_processing_duration_seconds` | histogram | `s` | none | [`AdminOrderService.UpdateStatusAsync`](../../src/PhotoPrint.API/Services/AdminOrderService.cs) on Paid→Shipped transition (`ShippedAt - PaidAt`) |
 | `awb_creation_total` | counter | `1` | `result` (4) | [`AwbCreator.CreateForOrderAsync`](../../src/PhotoPrint.API/Services/Sameday/AwbCreator.cs) — one increment per invocation, label mapped from the discriminated outcome |
@@ -53,7 +53,7 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | `order_not_found` | Webhook referred to an order that doesn't exist |
 | `amount_mismatch` | Vendor-reported amount differs from `Order.TotalRon` |
 | `duplicate` | Idempotent receipt — order already in `Paid` |
-| `failed` | Vendor reported the payment failed, or unparseable payload |
+| `failed` | Vendor reported the payment failed, unparseable payload, or a receipt the order's state could not accept (including a paid notification for an order that can no longer become `Paid` — logged at `Error`, the customer is charged and needs manual reconciliation) |
 
 #### `result` (`awb_creation_total`)
 | Value | When |
