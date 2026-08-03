@@ -10,26 +10,25 @@ using PhotoPrint.API.Extensions;
 
 namespace PhotoPrint.Tests.Unit.Observability;
 
-/// <summary>
-/// The console span exporter prints whole spans — EF SQL text and request paths — to
-/// stdout, synchronously on the request thread. It is a Development convenience, and
-/// an empty <c>Otlp:Endpoint</c> is the only thing that selects it, so these pin which
-/// environments may reach it.
-/// </summary>
+// An empty Otlp:Endpoint is the only thing that selects the console span exporter, which
+// prints EF SQL text to stdout on the request thread — so pin which environments reach it.
 public class TracingExporterSelectionTests
 {
-    private static ServiceProvider Build(string environmentName, string otlpEndpoint)
+    private static ServiceProvider Build(
+        string environmentName, string otlpEndpoint, string? staleRouteKey = null)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Observability:Enabled"]                    = "true",
-                ["Observability:ServiceName"]                = "PhotoPrint.API",
-                ["Observability:Otlp:Endpoint"]              = otlpEndpoint,
-                ["Observability:Metrics:PrometheusEndpoint"] = "/metrics",
-                ["Observability:Metrics:AllowedScrapeIps:0"] = "127.0.0.1",
-            })
-            .Build();
+        var values = new Dictionary<string, string?>
+        {
+            ["Observability:Enabled"]                    = "true",
+            ["Observability:ServiceName"]                = "PhotoPrint.API",
+            ["Observability:Otlp:Endpoint"]              = otlpEndpoint,
+            ["Observability:Metrics:PrometheusEndpoint"] = "/metrics",
+            ["Observability:Metrics:AllowedScrapeIps:0"] = "127.0.0.1",
+        };
+        if (staleRouteKey is not null)
+            values[$"Observability:Sampling:Routes:{staleRouteKey}"] = "0.05";
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
         var services = new ServiceCollection();
         services.AddLogging(lb => lb.ClearProviders());
@@ -79,5 +78,14 @@ public class TracingExporterSelectionTests
         using var provider = Build(environmentName, otlpEndpoint: "http://collector:4317");
 
         provider.GetService<TracerProvider>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void A_leftover_per_route_rate_aborts_boot_instead_of_being_ignored()
+    {
+        var act = () => Build("Production", "http://collector:4317", staleRouteKey: "GET /api/products");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Sampling:Routes*no longer supported*");
     }
 }

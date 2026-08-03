@@ -7,15 +7,13 @@ public sealed class ErrorOverrideProcessor : BaseProcessor<Activity>
 {
     public const string PromotedTag = "fototipar.sampling.error_override";
 
+    // Reached only for spans the sampler held: the SDK skips OnEnd for dropped ones.
     public override void OnEnd(Activity data)
     {
-        // Only reachable because the sampler returns RecordOnly rather than Drop —
-        // the SDK never calls OnEnd for a span it dropped at start.
         if (data.Status != ActivityStatusCode.Error || data.Recorded)
             return;
 
-        // Children of a non-recorded parent are dropped at start, so a promoted span
-        // arrives alone; the tag says why the trace has no children.
+        // The tag says why a promoted trace has no children: they were dropped at start.
         data.SetTag(PromotedTag, true);
         data.ActivityTraceFlags |= ActivityTraceFlags.Recorded;
     }

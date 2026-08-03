@@ -6,21 +6,16 @@ using PhotoPrint.API.Observability.Sampling;
 
 namespace PhotoPrint.Tests.Unit.Observability.Sampling;
 
-/// <summary>
-/// The property that matters is determinism by trace_id — same trace_id + same rate
-/// always yields the same decision. Random sampling is forbidden in this path; if a
-/// future "simplification" introduces it, these tests fail.
-///
-/// What the sampler can actually see is pinned in <see cref="SamplingPipelineTests"/>,
-/// which runs the real SDK. Parameters built by hand here cannot prove that.
-/// </summary>
+// Hand-built parameters can only pin the decision function; what the sampler is actually
+// handed at span start is pinned in SamplingPipelineTests against the real SDK.
 public class DeterministicTraceIdSamplerTests
 {
-    private static SamplingParameters BuildParams(ActivityTraceId traceId) =>
+    private static SamplingParameters BuildParams(
+        ActivityTraceId traceId, ActivityKind kind = ActivityKind.Server) =>
         new(parentContext: default,
             traceId:       traceId,
             name:          "Microsoft.AspNetCore.Hosting.HttpRequestIn",
-            kind:          ActivityKind.Server,
+            kind:          kind,
             tags:          null);
 
     [Fact]
@@ -45,6 +40,18 @@ public class DeterministicTraceIdSamplerTests
             var result = sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom()));
             result.Decision.Should().Be(SamplingDecision.RecordOnly);
         }
+    }
+
+    [Theory]
+    [InlineData(ActivityKind.Client)]
+    [InlineData(ActivityKind.Internal)]
+    [InlineData(ActivityKind.Consumer)]
+    public void Out_of_rate_roots_that_are_not_inbound_requests_are_dropped(ActivityKind kind)
+    {
+        var sut = new DeterministicTraceIdSampler(new ObservabilitySamplingSettings { Default = 0.0 });
+
+        sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom(), kind))
+            .Decision.Should().Be(SamplingDecision.Drop);
     }
 
     [Fact]
@@ -94,8 +101,6 @@ public class DeterministicTraceIdSamplerTests
     [Fact]
     public void Nothing_about_the_span_identity_can_steer_the_rate()
     {
-        // The removed per-route table keyed off a route the sampler could never see, so
-        // every request silently took the default while the config implied otherwise.
         var sut = new DeterministicTraceIdSampler(new ObservabilitySamplingSettings { Default = 0.0 });
 
         var withRouteTag = new SamplingParameters(

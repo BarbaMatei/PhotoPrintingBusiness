@@ -1095,9 +1095,10 @@ a self-hosted OTel Collector, Jaeger, Tempo, or a vendor endpoint.
 > spans, SQL text included, written to container stdout on the request thread — is a dev
 > convenience, not a production mode, so it is reachable **only** when
 > `ASPNETCORE_ENVIRONMENT=Development`. Anywhere else, a blank endpoint means the trace
-> pipeline is not built at all: metrics still export, traces are silently absent, and the
-> API logs `observability.tracing.disabled` once at boot. Grep for that line if spans never
-> arrive.
+> pipeline is not built at all: metrics still export, traces are absent, and the API writes
+> `observability.tracing.disabled` once at boot to whatever sink Serilog is configured with
+> (in production that is the rolling file, not stdout). Grep the API log for that line if
+> spans never arrive.
 
 Spans carry EF Core SQL command text. `EnableSensitiveDataLogging` is off, so parameter values
 are not included — but treat the collector as a system that sees your query shapes, and keep it
@@ -1110,7 +1111,10 @@ inside your own network.
 | `Observability__Sampling__Default` | `1.0` | Fraction of traces exported. One rate for the whole service. `0.0` exports errored spans only. |
 
 Sampling is deterministic on the trace id ([ADR-017](../memory-bank/bolts/044-tracing-and-metrics/adr-017-deterministic-trace-id-sampling.md)),
-so a request's spans are all kept or all dropped — never a partial trace.
+so a rate-sampled request's spans are all kept or all dropped — never a partial trace. The one
+exception is an errored request the rate would have dropped: its server span is exported alone,
+tagged `fototipar.sampling.error_override`, because its children were already gone by the time
+the failure was known.
 
 **There is no per-route rate.** The sampler decides while the server span is being
 created, before routing has matched an endpoint, so no route is available to key on;
@@ -1123,7 +1127,8 @@ already dropped when it started. A rescued span is tagged
 
 Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
 is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,
-`Default=1.0` is affordable. Drop it to `0.1` before you drop individual routes.
+`Default=1.0` is affordable. `0.1` is the next stop; below that, add the collector's tail
+sampling rather than reaching for a smaller number.
 
 ### 14.8 Rollout sequence
 

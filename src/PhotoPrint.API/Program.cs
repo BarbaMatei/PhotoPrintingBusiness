@@ -60,10 +60,9 @@ if (sentryEnabled)
     builder.Services.AddScoped<PhotoPrint.API.Middleware.SentryScopeEnricherMiddleware>();
 }
 
-// ── Observability (OTel traces + Prometheus metrics, intent 020 bolt 044) ────
-// Same two-stage flag posture: Observability:Enabled=false → nothing wired,
-// boot byte-identical to baseline. When on, exposes /metrics gated by an IP
-// allow-list and pushes traces via OTLP (or stdout if no endpoint).
+// ── Observability (OTel traces + Prometheus metrics) ─────────────────────────
+// Enabled=false wires nothing. When on, /metrics is gated by an IP allow-list and
+// traces go to OTLP; without an endpoint they go nowhere outside Development.
 builder.Services.AddObservability(builder.Configuration, builder.Environment);
 
 var observabilityEnabled = builder.Configuration

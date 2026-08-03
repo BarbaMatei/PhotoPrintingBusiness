@@ -12,24 +12,11 @@ using PhotoPrint.API.Validators;
 
 namespace PhotoPrint.API.Extensions;
 
-/// <summary>
-/// Wires the OpenTelemetry tracing + metrics pipeline behind the
-/// <c>Observability:Enabled</c> master flag. With the flag off, this method
-/// returns without registering anything — boot is byte-identical to the
-/// pre-bolt baseline.
-///
-/// Layering (per <c>ddd-02-technical-design.md</c>):
-///   Tracing:  ASP.NET / HttpClient / EF Core auto-instrumentation
-///             → ParentBased(DeterministicTraceIdSampler) → ErrorOverrideProcessor
-///             → OTLP exporter; console exporter in Development only, and no trace
-///               pipeline at all when neither applies
-///   Metrics:  AddMeter(FotoMetrics.Meter) + runtime + ASP.NET / HttpClient
-///             → Prometheus exporter (always when enabled)
-/// </summary>
+// Observability:Enabled=false registers nothing at all — boot stays identical to a build
+// without the stack, which is what makes the flag safe to ship off.
 public static class ObservabilityExtensions
 {
-    // With no OTLP endpoint the only exporter left is the console one, which writes whole
-    // spans — EF SQL text included — to stdout on the request thread: a dev convenience.
+    // Without an endpoint the only exporter left prints spans — EF SQL included — to stdout.
     public static bool TracingWired(ObservabilitySettings settings, IHostEnvironment environment) =>
         !string.IsNullOrWhiteSpace(settings.Otlp.Endpoint) || environment.IsDevelopment();
 
@@ -49,6 +36,17 @@ public static class ObservabilityExtensions
 
         if (!enabled)
             return services;
+
+        // Binding ignores keys with no property, so a deployment still carrying the removed
+        // per-route table would get the default rate everywhere and never be told.
+        if (configuration.GetSection($"{ObservabilitySettings.SectionName}:Sampling:Routes").Exists())
+        {
+            throw new InvalidOperationException(
+                "Observability:Sampling:Routes is no longer supported — the sampler runs before "
+                + "routing resolves an endpoint, so a per-route rate could never match. Remove the "
+                + "key and set Observability:Sampling:Default, or move the per-route rate to the "
+                + "collector's tail sampling.");
+        }
 
         var settings = configuration
             .GetSection(ObservabilitySettings.SectionName)

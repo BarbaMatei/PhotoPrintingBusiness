@@ -240,11 +240,16 @@ status is `Error`, the override sets that flag and the span exports.
 
 What this costs and what it does not give:
 
-- **Cost is one root span per out-of-rate request.** Child spans are
-  unaffected: `ParentBasedSampler` sends children of a non-recorded
-  local parent to `AlwaysOff`, so no EF or HttpClient span is created
-  and no SQL text is materialised. Nothing is enqueued for export, so
-  memory does not grow.
+- **Cost is one root span per out-of-rate request, and only for
+  inbound requests.** Child spans are unaffected: `ParentBasedSampler`
+  sends children of a non-recorded local parent to `AlwaysOff`, so
+  within a held request no EF or HttpClient span is created and no SQL
+  text is materialised. Nothing is enqueued for export, so memory does
+  not grow. Holding is restricted to `ActivityKind.Server` for a
+  second reason: every EF command a `BackgroundService` issues is a
+  **root** span of its own, with no request to belong to, so holding
+  those would record `db.statement` for spans no rate will ever
+  export. Non-server roots keep the old `Drop`.
 - **A promoted error trace is a single root span.** Its children were
   already dropped at start, and no head sampler can know at start that
   a request will fail. Promoted spans carry

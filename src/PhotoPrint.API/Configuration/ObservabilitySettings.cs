@@ -22,10 +22,7 @@ public sealed class ObservabilitySettings
 
 public sealed class ObservabilityOtlpSettings
 {
-    /// <summary>
-    /// OTLP exporter target. Empty → console span exporter in Development; in any other
-    /// environment the trace pipeline is not built at all (metrics are unaffected).
-    /// </summary>
+    /// <summary>OTLP target. Empty → console spans in Development, no tracing elsewhere.</summary>
     public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>OTLP protocol: <c>Grpc</c> or <c>HttpProtobuf</c>.</summary>
@@ -55,10 +52,8 @@ public sealed class ObservabilityMetricsSettings
 public sealed class ObservabilitySamplingSettings
 {
     /// <summary>
-    /// Fraction of traces exported, in [0.0, 1.0]. One rate for the whole service:
-    /// the sampler runs before routing resolves an endpoint, so it cannot tell routes
-    /// apart. Per-route rates are a collector-side (tail sampling) concern.
-    /// <c>0.0</c> exports errored spans only; the off switch is <c>Enabled = false</c>.
+    /// Fraction of traces exported, in [0.0, 1.0], service-wide — the sampler cannot tell
+    /// routes apart. <c>0.0</c> keeps errored spans only; the off switch is <c>Enabled</c>.
     /// </summary>
     public double Default { get; set; } = 1.0;
 }

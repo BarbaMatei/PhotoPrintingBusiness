@@ -8,16 +8,9 @@ using PhotoPrint.API.Observability.Sampling;
 
 namespace PhotoPrint.Tests.Unit.Observability.Sampling;
 
-/// <summary>
-/// Runs the real OTel SDK — real sampler, real processors, real export processor —
-/// because the defect these cover lives in the SDK's contract, not in our arithmetic:
-/// a span the sampler drops never reaches <c>OnEnd</c>, so a processor cannot rescue
-/// it. Calling the sampler directly cannot see that.
-///
-/// Each pipeline listens to a unique <see cref="ActivitySource"/>: an
-/// <c>ActivitySource</c> is sampled by every listener in the process at once, so a
-/// shared source would let another test's provider decide this one's spans.
-/// </summary>
+// What a sampling decision costs and exports is an SDK contract, so these run the real
+// SDK. Each pipeline needs a unique ActivitySource: every listener in the process samples
+// a source, so a shared one lets another test's provider decide these spans.
 public class SamplingPipelineTests : IDisposable
 {
     private readonly List<TracerProvider> _providers = [];
@@ -73,6 +66,24 @@ public class SamplingPipelineTests : IDisposable
 
         exporter.Spans.Should().ContainSingle();
         exporter.Spans[0].Promoted.Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_errored_background_root_span_is_dropped_rather_than_held()
+    {
+        // Every EF command a background job issues is a root span of its own. Holding those
+        // would record their SQL text for spans no rate will ever export.
+        var (source, exporter) = Pipeline(rate: 0.0);
+
+        using (var span = source.StartActivity("db.query", ActivityKind.Client))
+        {
+            // The SDK still creates a root activity to carry trace context, but nothing is
+            // collected on it — which is what keeps SQL text out of memory.
+            span!.IsAllDataRequested.Should().BeFalse();
+            span.SetStatus(ActivityStatusCode.Error);
+        }
+
+        exporter.Spans.Should().BeEmpty();
     }
 
     [Fact]
