@@ -117,6 +117,8 @@ public class AdminOrderService : IAdminOrderService
 
         OrderStatusMachine.Transition(order, newStatus);
 
+        double? processingSeconds = null;
+
         if (newStatus == OrderStatus.Shipped)
         {
             // Preserve a machine-created AWB/tracking URL when the admin form omits it.
@@ -124,14 +126,10 @@ public class AdminOrderService : IAdminOrderService
             if (!string.IsNullOrWhiteSpace(trackingUrl)) order.TrackingUrl = trackingUrl;
             order.ShippedAt = DateTimeOffset.UtcNow;
 
-            // Observability: order_processing_duration_seconds histogram.
             // PaidAt should always be set for an order reaching Shipped, but guard
             // anyway — the admin's manual force-Shipped path is a rare edge case.
             if (order.PaidAt is not null)
-            {
-                var seconds = (order.ShippedAt.Value - order.PaidAt.Value).TotalSeconds;
-                FotoMetrics.OrderProcessingDuration.Record(seconds);
-            }
+                processingSeconds = (order.ShippedAt.Value - order.PaidAt.Value).TotalSeconds;
         }
         else if (newStatus == OrderStatus.Delivered && order.DeliveredAt is null)
         {
@@ -146,6 +144,10 @@ public class AdminOrderService : IAdminOrderService
         }
 
         await _db.SaveChangesAsync(ct);
+
+        // Cumulative histogram: a shipment that never committed can never be un-observed.
+        if (processingSeconds is { } seconds)
+            FotoMetrics.OrderProcessingDuration.Record(seconds);
 
         if (newStatus == OrderStatus.Shipped)
             _orderEmailService.FireOrderShippedEmail(order);

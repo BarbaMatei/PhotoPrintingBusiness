@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -11,8 +12,10 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Sameday;
+using PhotoPrint.Tests.Helpers;
 using Stripe;
 
 namespace PhotoPrint.Tests.Unit.Services;
@@ -34,10 +37,12 @@ public class AdminOrderServiceTests
 
     private readonly AdminOrderService _sut;
 
+    private readonly string _dbName = $"AdminOrderSvc_{Guid.NewGuid():N}";
+
     public AdminOrderServiceTests()
     {
         var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseInMemoryDatabase($"AdminOrderSvc_{Guid.NewGuid():N}")
+            .UseInMemoryDatabase(_dbName)
             .Options;
         _db = new PhotoPrintDbContext(options);
 
@@ -63,8 +68,11 @@ public class AdminOrderServiceTests
         _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
 
-        _sut = new AdminOrderService(
-            _db,
+        _sut = BuildService(_db);
+    }
+
+    private AdminOrderService BuildService(PhotoPrintDbContext db) =>
+        new(db,
             _emailSvc.Object,
             _euPlatesc.Object,
             _stripeClient.Object,
@@ -74,7 +82,6 @@ public class AdminOrderServiceTests
             _hub.Object,
             _awbNotifier.Object,
             NullLogger<AdminOrderService>.Instance);
-    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -262,6 +269,51 @@ public class AdminOrderServiceTests
 
         _emailSvc.Verify(e => e.FireOrderShippedEmail(It.IsAny<Order>()), Times.Once);
         _emailSvc.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_PrintingToShipped_RecordsProcessingDurationOnce()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+        order.PaidAt = DateTimeOffset.UtcNow.AddHours(-2);
+        await _db.SaveChangesAsync();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrderProcessingDurationSeconds);
+
+        await _sut.UpdateStatusAsync(order.Id, "Shipped", null, null);
+
+        metrics.Measurements.Should().HaveCount(1);
+        metrics.Measurements[0].Value.Should().BeApproximately(7200, 120);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_Shipped_RecordsNoDurationWhenTheCommitFails()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+        order.PaidAt = DateTimeOffset.UtcNow.AddHours(-2);
+        await _db.SaveChangesAsync();
+
+        using var failingDb = new PhotoPrintDbContext(
+            new DbContextOptionsBuilder<PhotoPrintDbContext>()
+                .UseInMemoryDatabase(_dbName)
+                .AddInterceptors(new ThrowOnSaveInterceptor())
+                .Options);
+        var sut = BuildService(failingDb);
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrderProcessingDurationSeconds);
+
+        var act = () => sut.UpdateStatusAsync(order.Id, "Shipped", null, null);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        metrics.Measurements.Should().BeEmpty(
+            "a shipment that never committed must not sit in a cumulative histogram forever");
+    }
+
+    private sealed class ThrowOnSaveInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+            => throw new OperationCanceledException();
     }
 
     [Fact]
