@@ -25,7 +25,7 @@ is [`DEPLOYMENT.md` §14](../../docs/DEPLOYMENT.md#14-tracing-and-metrics-intent
 | `payment_webhook_total` | counter | `1` | `processor` (2) × `result` (6) = 12 | [`WebhooksController`](../../src/PhotoPrint.API/Controllers/WebhooksController.cs) — every receipt that reaches a terminal decision records exactly one; unhandled Stripe event types and requests that throw before the decision record none |
 | `upload_size_bytes` | histogram | `By` | none | [`UploadService.UploadAsync`](../../src/PhotoPrint.API/Services/UploadService.cs) after upload persist |
 | `order_processing_duration_seconds` | histogram | `s` | none | [`AdminOrderService.UpdateStatusAsync`](../../src/PhotoPrint.API/Services/AdminOrderService.cs) on Paid→Shipped transition (`ShippedAt - PaidAt`) |
-| `awb_creation_total` | counter | `1` | `result` (4) | [`AwbCreator.CreateForOrderAsync`](../../src/PhotoPrint.API/Services/Sameday/AwbCreator.cs) — one increment per invocation, label mapped from the discriminated outcome |
+| `awb_creation_total` | counter | `1` | `result` (5) | [`AwbCreator.CreateForOrderAsync`](../../src/PhotoPrint.API/Services/Sameday/AwbCreator.cs) — one increment per invocation, label mapped from the discriminated outcome (or `error` when the call throws) |
 | `invoice_anaf_status_total` | counter | `1` | `status` (4) | Meter defined here; increment sites ship with bolt 039 (intent 016). |
 
 ### Label value enumerations
@@ -62,6 +62,7 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | `skipped` | Order missing, not in `Paid`, or already has an `AwbNumber` |
 | `retry_later` | Transient failure (network, Sameday auth / protocol drift) — retry job will pick this up |
 | `give_up` | Permanent failure (invalid request, vendor validation error) — no retry, ops attention needed |
+| `error` | The creation attempt threw before producing an outcome (database unreachable, unexpected fault). Host-shutdown cancellation is deliberately excluded so a deploy does not depress the SLO |
 
 #### `status` (`invoice_anaf_status_total`, future)
 | Value | When |
@@ -110,7 +111,7 @@ enumerate the label combinations and assert the budget.
 | `payment_webhook_total` | 12 | 88 |
 | `upload_size_bytes` | 1 (no labels) | 99 |
 | `order_processing_duration_seconds` | 1 (no labels) | 99 |
-| `awb_creation_total` | 4 | 96 |
+| `awb_creation_total` | 5 | 95 |
 | `invoice_anaf_status_total` | 4 | 96 |
 
 Plenty of headroom; the budget exists to prevent free-form label leaks,

@@ -8,7 +8,9 @@ using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services.Sameday;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
@@ -502,6 +504,60 @@ public class AwbCreatorTests : IDisposable
         outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
             .Which.PreserveClaim.Should().BeTrue();
         ReadBack(order.Id).AwbClaimedAt.Should().Be(Now);
+    }
+
+    // ── Outcome metric ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Records_an_ok_outcome_on_the_awb_counter()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var sut = Build(db, ClientReturning());
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Ok))
+            .Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task A_thrown_db_failure_records_an_error_outcome_and_rethrows()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        // Kills the :memory: database under the creator, standing in for an unreachable Postgres.
+        _connection.Close();
+
+        var act = () => sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        await act.Should().ThrowAsync<Exception>();
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Error))
+            .Should().HaveCount(1,
+                "an outage that produces no outcome must still reach the SLO denominator");
+    }
+
+    [Fact]
+    public async Task Shutdown_cancellation_records_no_outcome()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        var act = () => sut.CreateForOrderAsync(order.Id, attempt: 1, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        metrics.Measurements.Should().BeEmpty(
+            "draining in-flight jobs on every deploy would permanently depress the AWB SLO");
     }
 
     private void SetStatus(Guid id, OrderStatus status)

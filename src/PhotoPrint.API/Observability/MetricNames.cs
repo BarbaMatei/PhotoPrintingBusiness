@@ -67,8 +67,9 @@ public static class MetricNames
         public const string Skipped     = "skipped";
         public const string RetryLater  = "retry_later";
         public const string GiveUp      = "give_up";
+        public const string Error       = "error";
 
-        public static readonly string[] All = [Ok, Skipped, RetryLater, GiveUp];
+        public static readonly string[] All = [Ok, Skipped, RetryLater, GiveUp, Error];
     }
 
     public static class AnafStatusValues

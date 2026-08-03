@@ -39,7 +39,7 @@ public class MetricsCardinalityTests
     {
         var series = MetricNames.AwbResultValues.All.Length;
 
-        series.Should().Be(4);
+        series.Should().Be(5);
         series.Should().BeLessThanOrEqualTo(100);
     }
 

@@ -41,16 +41,27 @@ public sealed class AwbCreator : IAwbCreator
     public async Task<AwbCreationOutcome> CreateForOrderAsync(
         Guid orderId, int attempt, CancellationToken ct = default)
     {
-        var outcome = await CreateForOrderInternalAsync(orderId, attempt, ct);
+        AwbCreationOutcome outcome;
+        try
+        {
+            outcome = await CreateForOrderInternalAsync(orderId, attempt, ct);
+        }
+        // Shutdown cancellation is not an AWB failure; any other throw must still be counted.
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            FotoMetrics.AwbCreation.Add(1,
+                new TagList { { MetricNames.Labels.Result, MetricNames.AwbResultValues.Error } });
+            throw;
+        }
+
         RecordOutcome(outcome);
         return outcome;
     }
 
-    /// <summary>
-    /// Observability (bolt 044): awb_creation_total{result}. Mapped from
-    /// the discriminated <see cref="AwbCreationOutcome"/> union — one
-    /// increment per CreateForOrderAsync invocation.
-    /// </summary>
     private static void RecordOutcome(AwbCreationOutcome outcome)
     {
         var result = outcome switch
