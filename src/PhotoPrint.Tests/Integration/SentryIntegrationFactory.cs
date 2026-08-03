@@ -10,30 +10,9 @@ using Sentry;
 
 namespace PhotoPrint.Tests.Integration;
 
-/// <summary>
-/// WebApplicationFactory wired for the Sentry integration test. Boots the API
-/// with <c>Sentry:Enabled=true</c> so the scope-enricher middleware registers,
-/// then REPLACES the DI registration of <see cref="IHub"/> with a Moq fake
-/// that captures every <c>CaptureEvent</c> call.
-///
-/// Why a mock instead of a real SDK + custom transport: Sentry's static SDK
-/// is process-global; other test factories in the same run pollute it.
-/// Our production middleware resolves <see cref="IHub"/> from
-/// <c>context.RequestServices</c>, so a per-factory replacement isolates this
-/// test from anyone else's Sentry state.
-/// </summary>
 public class SentryIntegrationFactory : WebApplicationFactory<Program>
 {
-    /// <summary>
-    /// Program.cs reads <c>Sentry:Enabled</c> from <c>builder.Configuration</c>
-    /// during host setup, BEFORE WAF's <c>ConfigureAppConfiguration</c>
-    /// callback fires. Environment variables ARE visible at that point.
-    /// </summary>
-    static SentryIntegrationFactory()
-    {
-        Environment.SetEnvironmentVariable("Sentry__Enabled", "true");
-        Environment.SetEnvironmentVariable("Sentry__Dsn", "https://dummy@sentry.invalid/0");
-    }
+    public const string Dsn = "https://dummy@sentry.invalid/0";
 
     public List<SentryEvent> CapturedEvents { get; } = new();
     public Dictionary<string, string> CapturedTags { get; } = new();
@@ -41,6 +20,13 @@ public class SentryIntegrationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Program.cs reads Sentry:Enabled from builder.Configuration before the host is built,
+        // which is earlier than ConfigureAppConfiguration runs. UseSetting travels as a
+        // command-line argument to the entry point, so it arrives in time — and unlike an
+        // environment variable it belongs to this host alone.
+        builder.UseSetting("Sentry:Enabled", "true");
+        builder.UseSetting("Sentry:Dsn", Dsn);
 
         builder.ConfigureAppConfiguration((_, cfg) =>
         {
@@ -78,17 +64,11 @@ public class SentryIntegrationFactory : WebApplicationFactory<Program>
             services.AddDbContext<PhotoPrintDbContext>(o =>
                 o.UseInMemoryDatabase($"SentryTests_{Guid.NewGuid()}"));
 
-            // Replace Sentry's IHub with a Moq fake that records every captured event.
-            // Both ExceptionHandlerMiddleware (CaptureException) and the scope enricher
-            // (ConfigureScope) resolve IHub from per-request DI, so this fake captures
-            // exactly what the production code sends.
             var hubMock = new Mock<IHub>();
             hubMock.SetupGet(h => h.IsEnabled).Returns(true);
 
-            // CaptureException(Exception) is an extension method that calls
-            // ISentryClient.CaptureEvent(SentryEvent, Scope?, SentryHint?). All
-            // three parameters must be specified explicitly in the Moq expression
-            // because optional arguments aren't allowed in expression trees (CS0854).
+            // Optional arguments are not allowed in expression trees (CS0854), so every
+            // CaptureEvent parameter has to be named here.
             hubMock.Setup(h => h.CaptureEvent(
                     It.IsAny<SentryEvent>(),
                     It.IsAny<Scope?>(),
@@ -96,14 +76,10 @@ public class SentryIntegrationFactory : WebApplicationFactory<Program>
                 .Callback<SentryEvent, Scope?, SentryHint?>((evt, _, _) => CapturedEvents.Add(evt))
                 .Returns(SentryId.Empty);
 
-            // ConfigureScope: capture tag writes from SentryScopeEnricherMiddleware.
             hubMock.Setup(h => h.ConfigureScope(It.IsAny<Action<Scope>>()))
                 .Callback<Action<Scope>>(action =>
                 {
-                    // Run the action against a real Scope so it executes its SetTag
-                    // calls — then mirror those tags into our captured dict.
-                    var opts = new SentryOptions { Dsn = "https://x@x.invalid/0" };
-                    var scope = new Scope(opts);
+                    var scope = new Scope(new SentryOptions { Dsn = Dsn });
                     action(scope);
                     foreach (var (k, v) in scope.Tags)
                         CapturedTags[k] = v;

@@ -12,18 +12,7 @@ using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Integration;
 
-/// <summary>
-/// End-to-end checks on the <c>/metrics</c> endpoint:
-///   - With <c>Observability:Enabled=false</c> the endpoint is absent (404).
-///   - With it enabled and the loopback in the allow-list, the response is
-///     Prometheus text format.
-///   - With it enabled but the remote IP NOT in the allow-list, 403.
-///
-/// The factories below use env vars (set in static ctors) because Program.cs
-/// reads <c>Observability:Enabled</c> from <c>builder.Configuration</c>
-/// before WAF's <c>ConfigureAppConfiguration</c> callback fires — the same
-/// pattern as <c>SentryIntegrationFactory</c>.
-/// </summary>
+[Collection(ObservabilityHostCollection.Name)]
 public class MetricsEndpointIntegrationTests
 {
     [Fact]
@@ -137,6 +126,13 @@ internal abstract class ObservabilityFactoryBase : WebApplicationFactory<Program
     {
         builder.UseEnvironment("Testing");
 
+        // Program.cs reads Observability:Enabled and Sentry:Enabled from builder.Configuration
+        // before the host is built, which is earlier than ConfigureAppConfiguration runs.
+        // UseSetting travels as a command-line argument to the entry point, so it arrives in
+        // time — and unlike an environment variable it belongs to this host alone.
+        foreach (var (key, value) in ExtraConfig())
+            builder.UseSetting(key, value);
+
         builder.ConfigureAppConfiguration((_, cfg) =>
         {
             var dict = new Dictionary<string, string?>
@@ -183,36 +179,28 @@ internal abstract class ObservabilityFactoryBase : WebApplicationFactory<Program
 
 internal sealed class ObservabilityDisabledFactory : ObservabilityFactoryBase
 {
-    static ObservabilityDisabledFactory()
+    protected override Dictionary<string, string?> ExtraConfig() => new()
     {
-        Environment.SetEnvironmentVariable("Observability__Enabled", "false");
-    }
-    protected override Dictionary<string, string?> ExtraConfig() => new();
+        ["Observability:Enabled"] = "false",
+    };
     protected override IPAddress? SimulatedRemoteIp() => null;   // not needed
 }
 
 internal sealed class ObservabilityEnabledLoopbackFactory : ObservabilityFactoryBase
 {
-    static ObservabilityEnabledLoopbackFactory()
+    protected override Dictionary<string, string?> ExtraConfig() => new()
     {
-        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
-        Environment.SetEnvironmentVariable("Observability__Metrics__AllowedScrapeIps__0", "127.0.0.1");
-    }
-    protected override Dictionary<string, string?> ExtraConfig() => new();
+        ["Observability:Enabled"]                    = "true",
+        ["Observability:Metrics:AllowedScrapeIps:0"] = "127.0.0.1",
+    };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Loopback;
 }
 
 internal sealed class ObservabilityEnabledNoLoopbackFactory : ObservabilityFactoryBase
 {
-    static ObservabilityEnabledNoLoopbackFactory()
-    {
-        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
-    }
-    // Override the env-var-supplied list (which the loopback factory's static
-    // ctor populated process-wide) so this factory's allow-list excludes the
-    // simulated remote IP entirely.
     protected override Dictionary<string, string?> ExtraConfig() => new()
     {
+        ["Observability:Enabled"]                    = "true",
         ["Observability:Metrics:AllowedScrapeIps:0"] = "10.99.99.99",
     };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("203.0.113.7");
@@ -225,12 +213,9 @@ internal sealed class ObservabilityEnabledNoLoopbackFactory : ObservabilityFacto
 /// </summary>
 internal sealed class ObservabilityEnabledWrongListenerFactory : ObservabilityFactoryBase
 {
-    static ObservabilityEnabledWrongListenerFactory()
-    {
-        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
-    }
     protected override Dictionary<string, string?> ExtraConfig() => new()
     {
+        ["Observability:Enabled"]                     = "true",
         ["Observability:Metrics:ScrapePort"]          = "9090",
         ["Observability:Metrics:AllowedScrapeIps:0"]  = "10.42.0.5",
     };
@@ -240,12 +225,9 @@ internal sealed class ObservabilityEnabledWrongListenerFactory : ObservabilityFa
 
 internal sealed class ObservabilityInvalidAllowListFactory : ObservabilityFactoryBase
 {
-    static ObservabilityInvalidAllowListFactory()
-    {
-        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
-    }
     protected override Dictionary<string, string?> ExtraConfig() => new()
     {
+        ["Observability:Enabled"]                    = "true",
         ["Observability:Metrics:AllowedScrapeIps:0"] = "not.an.ip",
     };
     protected override IPAddress? SimulatedRemoteIp() => null;
@@ -253,15 +235,18 @@ internal sealed class ObservabilityInvalidAllowListFactory : ObservabilityFactor
 
 internal sealed class ObservabilityEnabledScrapeListenerFactory : ObservabilityFactoryBase
 {
-    static ObservabilityEnabledScrapeListenerFactory()
-    {
-        Environment.SetEnvironmentVariable("Observability__Enabled", "true");
-    }
     protected override Dictionary<string, string?> ExtraConfig() => new()
     {
+        ["Observability:Enabled"]                     = "true",
         ["Observability:Metrics:ScrapePort"]          = "9090",
         ["Observability:Metrics:AllowedScrapeIps:0"]  = "10.42.0.5",
     };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("10.42.0.5");
     protected override int SimulatedLocalPort() => 9090;
+}
+
+internal sealed class ObservabilityDefaultFactory : ObservabilityFactoryBase
+{
+    protected override Dictionary<string, string?> ExtraConfig() => new();
+    protected override IPAddress? SimulatedRemoteIp() => IPAddress.Loopback;
 }

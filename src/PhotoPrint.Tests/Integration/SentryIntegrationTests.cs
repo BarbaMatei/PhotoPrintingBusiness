@@ -9,6 +9,7 @@ namespace PhotoPrint.Tests.Integration;
 /// Sentry IHub seam, and that <c>SentryScopeEnricherMiddleware</c> stamped
 /// the <c>correlation_id</c> tag on the request scope.
 /// </summary>
+[Collection(ObservabilityHostCollection.Name)]
 public class SentryIntegrationTests : IClassFixture<SentryIntegrationFactory>
 {
     private readonly SentryIntegrationFactory _factory;
