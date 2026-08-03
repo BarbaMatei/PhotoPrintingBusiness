@@ -1,13 +1,11 @@
-using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.Tests.Helpers;
 using Sentry;
 using Sentry.AspNetCore;
-using Sentry.Extensibility;
 using Sentry.Protocol;
-using Sentry.Protocol.Envelopes;
 
 namespace PhotoPrint.Tests.Unit.Configuration;
 
@@ -347,7 +345,7 @@ public class SentryDataScrubbersTests
     [Fact]
     public async Task Register_scrubs_both_events_and_transactions_before_they_leave_the_sdk()
     {
-        var transport = new CapturingTransport();
+        var transport = new CapturingSentryTransport();
         var options = new SentryOptions
         {
             Dsn = "https://key@o0.ingest.sentry.io/0",
@@ -428,18 +426,5 @@ public class SentryDataScrubbersTests
 
         using var document = JsonDocument.Parse(json);
         return SentryTransaction.FromJson(document.RootElement);
-    }
-
-    private sealed class CapturingTransport : ITransport
-    {
-        public List<string> Payloads { get; } = new();
-
-        public Task SendEnvelopeAsync(Envelope envelope, CancellationToken cancellationToken = default)
-        {
-            using var buffer = new MemoryStream();
-            envelope.Serialize(buffer, null);
-            Payloads.Add(Encoding.UTF8.GetString(buffer.ToArray()));
-            return Task.CompletedTask;
-        }
     }
 }
