@@ -6,7 +6,9 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Uploads;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services;
 
@@ -265,6 +267,37 @@ public class UploadServiceTests
         _storageMock.Verify(
             s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    // ── upload_size_bytes emission ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task UploadAsync_RecordsTheStoredByteCountOnUploadSizeBytes()
+    {
+        using var metrics = new MetricCapture(MetricNames.Instruments.UploadSizeBytes);
+
+        await _sut.UploadAsync(
+            JpegStream(), "photo.jpg", declaredLength: (long)JpegMagic.Length,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        var recorded = metrics.Measurements.Should().ContainSingle().Subject;
+        recorded.Instrument.Should().Be(MetricNames.Instruments.UploadSizeBytes);
+        recorded.Value.Should().Be(JpegMagic.Length);
+        recorded.Tags.Should().BeEmpty("a size histogram with labels would multiply series");
+    }
+
+    [Fact]
+    public async Task UploadAsync_RejectedUpload_RecordsNoUploadSize()
+    {
+        using var metrics = new MetricCapture(MetricNames.Instruments.UploadSizeBytes);
+        using var pdfStream = new MemoryStream([0x25, 0x50, 0x44, 0x46]);
+
+        var act = () => _sut.UploadAsync(
+            pdfStream, "doc.pdf", declaredLength: 4L,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        await act.Should().ThrowAsync<UnsupportedMediaTypeException>();
+        metrics.Measurements.Should().BeEmpty();
     }
 
     // ── GetPreviewAsync ───────────────────────────────────────────────────────

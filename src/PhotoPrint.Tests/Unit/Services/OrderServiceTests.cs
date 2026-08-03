@@ -7,7 +7,9 @@ using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.DTOs.Shipping;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services;
 
@@ -653,5 +655,53 @@ public class OrderServiceTests : IDisposable
             It.IsAny<string>(),
             It.Is<TimeSpan>(t => t == TimeSpan.FromMinutes(90)),
             It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    // ── orders_created_total emission ─────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateFromCartAsync_RecordsOrdersCreatedWithTheRequestedProcessor()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        await _service.CreateFromCartAsync(
+            userId, null, MakeRequest(PaymentProcessor.EuPlatesc));
+
+        var recorded = metrics.For(
+            MetricNames.Instruments.OrdersCreatedTotal,
+            (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
+            (MetricNames.Labels.Status, MetricNames.OrderStatusValues.Created));
+        Assert.Single(recorded);
+        Assert.Equal(1, recorded[0].Value);
+        Assert.Equal(
+            new[] { MetricNames.Labels.Processor, MetricNames.Labels.Status },
+            recorded[0].Tags.Keys.OrderBy(k => k, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task CreateFromCartAsync_IdempotentReplay_DoesNotDoubleCountOrdersCreated()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        var request = MakeRequest();
+        var key = Guid.NewGuid().ToString();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        await _service.CreateFromCartAsync(userId, null, request, key);
+        await _service.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.Single(metrics.Measurements);
+    }
+
+    [Fact]
+    public async Task CreateFromCartAsync_EmptyCart_RecordsNoOrdersCreated()
+    {
+        var userId = Guid.NewGuid();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _service.CreateFromCartAsync(userId, null, MakeRequest(), default));
+
+        Assert.Empty(metrics.Measurements);
     }
 }

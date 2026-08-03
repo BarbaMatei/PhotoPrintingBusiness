@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.Data;
+using PhotoPrint.API.Observability;
 using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Integration;
@@ -83,6 +85,26 @@ public class MetricsEndpointIntegrationTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync()).Should().Contain("# HELP");
+    }
+
+    [Fact]
+    public async Task A_business_metric_reaches_the_exposition()
+    {
+        // # HELP / # TYPE alone are emitted by the runtime and ASP.NET instrumentation, so they
+        // prove nothing about FotoMetrics being wired into the exporter's meter list.
+        using var factory = new ObservabilityEnabledLoopbackFactory();
+        using var client  = factory.CreateClient();
+
+        FotoMetrics.OrdersCreated.Add(1,
+            new TagList
+            {
+                { MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe },
+                { MetricNames.Labels.Status,    MetricNames.OrderStatusValues.Created },
+            });
+
+        var body = await (await client.GetAsync("/metrics")).Content.ReadAsStringAsync();
+
+        body.Should().Contain(MetricNames.Instruments.OrdersCreatedTotal);
     }
 }
 
