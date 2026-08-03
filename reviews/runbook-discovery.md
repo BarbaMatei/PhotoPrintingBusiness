@@ -106,11 +106,28 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
    Drop `refuted` with a stated reason; sanity-check `plausible` and high-convergence calls;
    rank by severity.
 2. Write `review-v<n>.md` (immutable; frontmatter `pass-type`; record each finding's
-   convergence count) and `findings-v<n>.md` (full per-finding detail).
+   convergence count) and `findings-v<n>.md` (full per-finding detail). Since 2026-08-03
+   every **serious** findings-v entry also carries what the fix round would otherwise
+   re-derive:
+   - **Fix brief** — files:lines (the trace skeptic's `filesTouched`, or your own recheck
+     for convergence-confirmed findings), the traced failing path, a suggested
+     regression-test shape (`testShape`), and whether the suggested fix is
+     **trigger-list-shaped** (the list lives in the `/fix-review` skill).
+   - **Approach pre-check** — for trigger-list-shaped suggested fixes, dispatch the
+     adversarial approach-check NOW, in parallel, in the background (~20–30k output-token
+     cap each, same posture as skeptics: this pass's findings + the code, nothing from
+     `reviews/`) and keep writing records while they run. Record the verdict in the entry:
+     `Approach pre-check: cleared | revised (how) | refuted (why)`. The fix round consumes
+     `cleared`/`revised` and only re-checks deviations. A wrong suggested fix dies here
+     instead of anchoring the fixer (F5 on 044-045 recommended a fix that was impossible
+     on .NET 8 — this step exists because of it). Delta passes run these inside their
+     existing token budget; when skipped, say so in the entry.
 3. Map this pass's `F#` onto ledger `D#` rows with the **`reconcile-findings` skill** (scored
    against the 035 ground truth before trust — see its Scores section) and update the ledger.
-4. Append the [metrics.jsonl](metrics-schema.md) line (v2: include the per-finding
-   `findings[]` array) and the one-line [index.md](index.md) row, then run
+4. Append the [metrics.jsonl](metrics-schema.md) line (v3: include the per-finding
+   `findings[]` array, `runtime: {started, ended}` from the loop-driver's worklog stamps,
+   and count the pre-checks under `cost.agents_by_stage.approach_checks`) and the one-line
+   [index.md](index.md) row, then run
    `node reviews/lib/records-auditor.mjs <target>` — it must exit clean.
 5. Write `summary-v<n>.md` via the **`owner-summary` skill** — the page the owner reads; the
    review file is the record, the summary is the interface.

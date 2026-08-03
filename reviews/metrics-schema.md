@@ -1,16 +1,17 @@
 ---
 type: review-metrics-schema
-status: active — v2
+status: active — v3
 created: 2026-07-04
-updated: 2026-07-30
+updated: 2026-08-03
 owner: Matei Barba
 ---
 
-# Review metrics — what every pass records, and why
+# Review metrics — what every pass and fix round records, and why
 
 Every review pass (discovery, delta-discovery, *and* verification) appends **one line** to the
 target's `reviews/<target>/metrics.jsonl` at synthesis time — after findings are settled, before
-the review file is finalized. Append-only: never edit a past line; corrections are their own
+the review file is finalized. Since v3 (2026-08-03), every **fix round** appends a line too, at
+hand-back. Append-only: never edit a past line; corrections are their own
 appended lines (see *Corrections*). Unknown values are `null`, never guessed.
 
 This data answers the open questions in
@@ -19,9 +20,11 @@ what does a pass cost? which lenses earn their keep? does fixing create new defe
 rate than before? It cannot be reconstructed later — bolt 035's `cost` fields are `null`
 forever because nobody recorded them at the time.
 
-**Scope note:** this file meters **passes only**. Fix rounds, synthesis, and main-agent
-verification labor are not metered; any roll-up computed from this file is a *pass-cost* figure
-and must be labeled as such.
+**Scope note (v3, replaces the v2 "passes only" note — owner decision 2026-08-03):** this file
+meters **passes and fix rounds**. Synthesis and main-agent verification labor are still not
+metered; roll-ups must say which line types they summed. Fix-round lines exist for the speed
+question the v2 scope could not answer: where does the wall-clock time go, and is it active
+work, waiting on the owner, or nobody at the wheel.
 
 **After appending, run the auditor** — it validates the new line against this schema and
 cross-checks the target's records; it must exit clean (legacy drift reports as warnings):
@@ -56,7 +59,8 @@ node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 | `verified` | int | findings flipped to `verified` this pass |
 | `reopened` | int | findings reopened this pass |
 | `tests` | `{passed, failed}` \| null | **combined** suites (backend + frontend) at the reviewed commit; per-suite splits go in `notes` |
-| `cost` | `{agents, tokens, agents_by_stage?}` | `tokens` = output tokens the pass's workflow(s) reported (never `subagent_tokens`); `agents_by_stage` keys: `lenses, dedup, skeptics_guard, skeptics_trace, reraise_skipped, budget_skipped` — copy from the discovery script's `_canonical` line |
+| `cost` | `{agents, tokens, agents_by_stage?}` | `tokens` = output tokens the pass's workflow(s) reported (never `subagent_tokens`); `agents_by_stage` keys: `lenses, dedup, skeptics_guard, skeptics_trace, reraise_skipped, budget_skipped, approach_checks` — copy from the discovery script's `_canonical` line; `approach_checks` counts the synthesis-time pre-checks (v3) |
+| `runtime` | `{started, ended}`, v3 | ISO timestamps from the loop-driver's `pass-launch` / `pass-records-done` worklog stamps |
 | `notes` | string | anything a future analysis will wish it knew |
 
 ### `findings[]` — the per-finding record (new in v2)
@@ -83,6 +87,44 @@ What this buys, after 2–3 more targets: per-lens yield ("which lenses earn the
 grouping on `lenses`; the fix-generativity rate (`fix_generated` non-null / `new`) that tells
 whether the 2026-07-22 fixer rules work; and an audit trail on synthesis severity changes
 (`sev_delta`), the stop rule's pivot.
+
+## v3 (2026-08-03): the fix-round line and the worklog
+
+Two additions; everything above still holds for pass lines. Lines dated on/after 2026-08-03
+are validated strictly against v3.
+
+**The worklog** — `reviews/<target>/worklog.jsonl`, append-only, one JSON event per line,
+each with `t` (ISO timestamp) and `ev`. Written **at the moment events happen** by whoever
+drives them: the `/fix-review` skill during fix rounds (`round-start`, `triage-done`,
+`gate-open`/`gate-closed`, `check-dispatched`/`check-returned`, `test-run`, `finding`,
+`micro-review-dispatched`/`-returned`, `round-end`), the loop-driver around passes
+(`pass-launch`, `pass-records-done`) and owner gates. It is the crash-safe evidence trail
+and the input `reviews/lib/render-records.mjs` computes runtime from.
+
+**The fix-round line** — appended by `render-records.mjs` at hand-back (one per round;
+a wrong line is corrected by a correction line, never edited):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `target` / `type` / `date` | string / `"fix-round"` / ISO date | as for passes |
+| `round` | int | matches `resolution-v<n>.md` (fix rounds have no `pass`) |
+| `base_commit` | string | the reviewed commit the round answers (review frontmatter) |
+| `fixed_commit` | string \| null | the resolution's `fixed_commit` (null while `in-progress`) |
+| `findings` | `{fixed, wont_fix, deferred, disputed, false_positive, open}` | counts from the resolution frontmatter map (`in-progress` counts as `open`) |
+| `tests` | `{invocations, red_runs, green_runs, final: {passed, failed}}` | from `test-run` events; `final` from the last `kind:final` event, null if none |
+| `approach_checks` | `{pre_cleared_consumed, run, tokens}` | review-time verdicts used vs checks this round ran (`check-*` events); `tokens` null if unreported |
+| `micro_reviews` | `{count, follow_up_fixes}` | per-cluster micro-reviews and the extra fixes they caused |
+| `cost` | `{agents, tokens}` | subagents this round dispatched; tokens null unless known |
+| `runtime` | `{started, ended, active_s, blocked_s, idle_s, blocked: [{reason, s}]}` | see derivation below |
+| `notes` | string | e.g. `pilot`, deviations, what broke |
+
+**Runtime derivation (declared convention, not precision):** `blocked_s` = Σ
+`gate-open`→`gate-closed` spans (each listed in `blocked[]` with its reason — a question the
+owner saw an hour later is an hour of `blocked_s`). `active_s` = Σ gaps between consecutive
+non-gate events **≤ 30 minutes**; a longer unexplained gap means nobody was at the wheel.
+`idle_s` = (`ended` − `started`) − `active_s` − `blocked_s`. The cap deliberately errs
+toward **over**-counting active time — a speed metric must not look better by under-counting
+work (long silent stretches count as work; only clear absences count as idle).
 
 ## Corrections
 
@@ -119,7 +161,8 @@ Readers of old lines need this table:
 
 ## Rules
 
-- The **synthesis step appends the line** — the fixer never writes here.
+- **Pass lines**: the synthesis step appends them. **Fix-round lines** (v3): the renderer
+  appends them at hand-back — the fixer never hand-writes a metrics line.
 - `refinds_identity` / `reraises_of_decided` / `fix_generated` use the **`reconcile-findings`
   skill's** judgment (labeling rules per
   [archive/035-payment-idempotency/overlap-ground-truth.md](archive/035-payment-idempotency/overlap-ground-truth.md)).

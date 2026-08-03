@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// Records auditor — mechanical checks over reviews/ structured records, per metrics-schema.md v2.
-// Checks: metrics.jsonl parses + validates (strict for lines dated >= 2026-07-30, lenient with
-// grandfathered drift before); new_findings tallies vs findings[]; review-v<n>.md <-> metrics
-// pairing; every cited commit resolves AND is reachable from a pushed ref (tag or remote branch);
-// correction lines reference real passes; index.md mentions each pass; citation-leak count.
+// Records auditor — mechanical checks over reviews/ structured records, per metrics-schema.md v3.
+// Checks: metrics.jsonl parses + validates (strict for lines dated >= 2026-07-30, v3 fix-round
+// lines strict from 2026-08-03, lenient with grandfathered drift before); new_findings tallies
+// vs findings[]; fix-round findings tallies vs the resolution frontmatter; review-v<n>.md <->
+// metrics pairing; worklog.jsonl event shape; every cited commit resolves AND is reachable from
+// a pushed ref (tag or remote branch); correction lines reference real passes; index.md mentions
+// each pass; citation-leak count.
 // Prose bodies (ledgers, resolutions) are NOT checked — numbers there stay a human's job.
 //
 // Usage: node reviews/lib/records-auditor.mjs [--root <repoRoot>] [target ...]
@@ -24,13 +26,17 @@ if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const REVIEWS = join(ROOT, 'reviews')
 
 const V2_CUTOFF = '2026-07-30'
+const V3_CUTOFF = '2026-08-03' // fix-round lines + runtime fields exist only from here
 const TYPES = new Set(['discovery', 'delta-discovery', 'verification'])
 const SUBTYPES = new Set(['certification-pair-A', 'certification-pair-B', 'certification-single'])
 const SEVS = new Set(['high', 'medium', 'low', 'cleanup'])
 const VERDICTS = new Set(['confirmed', 'plausible', 'refuted', 're-raise', 'unverified-cleanup', 'unverified-low', 'unverified-over-budget'])
-const TOP_KEYS = new Set(['target', 'pass', 'type', 'subtype', 'date', 'commit', 'code_tip', 'delta_base', 'lenses', 'verdict', 'outcome', 'mediums_open_at_close', 'new_findings', 'findings', 'refinds_identity', 'reraises_of_decided', 'refuted', 'disputed', 'deferrals_upheld', 'verified', 'reopened', 'tests', 'cost', 'notes'])
-const STAGE_KEYS = new Set(['lenses', 'dedup', 'skeptics_guard', 'skeptics_trace', 'reraise_skipped', 'budget_skipped'])
+const TOP_KEYS = new Set(['target', 'pass', 'type', 'subtype', 'date', 'commit', 'code_tip', 'delta_base', 'lenses', 'verdict', 'outcome', 'mediums_open_at_close', 'new_findings', 'findings', 'refinds_identity', 'reraises_of_decided', 'refuted', 'disputed', 'deferrals_upheld', 'verified', 'reopened', 'tests', 'cost', 'runtime', 'notes'])
+const STAGE_KEYS = new Set(['lenses', 'dedup', 'skeptics_guard', 'skeptics_trace', 'reraise_skipped', 'budget_skipped', 'approach_checks'])
 const LEGACY_TOP = new Set(['base', 'certified', 'deferred_reaffirmed', 'disputed_upheld'])
+const FIX_KEYS = new Set(['target', 'round', 'type', 'date', 'base_commit', 'fixed_commit', 'findings', 'tests', 'approach_checks', 'micro_reviews', 'cost', 'runtime', 'notes'])
+const FIX_TALLY_KEYS = ['fixed', 'wont_fix', 'deferred', 'disputed', 'false_positive', 'open']
+const RUNTIME_KEYS = new Set(['started', 'ended', 'active_s', 'blocked_s', 'idle_s', 'blocked'])
 
 const errors = [], warnings = [], infos = []
 const err = m => errors.push(m)
@@ -70,6 +76,25 @@ function listTargets() {
 function num(v) { return typeof v === 'number' && Number.isFinite(v) }
 function numOrNull(v) { return v === null || num(v) }
 
+// Counts statuses in a resolution file's frontmatter findings map; null if no map found.
+function resolutionTallies(text) {
+  const t = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
+  const end = text.indexOf('\n---', 3)
+  const fm = text.startsWith('---') && end !== -1 ? text.slice(3, end) : ''
+  let found = false
+  for (const m of fm.matchAll(/^ {2}[A-Za-z]+-?\d+:\s*\{\s*status:\s*([a-z-]+)/gm)) {
+    found = true
+    const s = m[1]
+    if (s === 'fixed') t.fixed++
+    else if (s === 'wont-fix') t.wont_fix++
+    else if (s === 'deferred') t.deferred++
+    else if (s === 'disputed') t.disputed++
+    else if (s === 'false-positive') t.false_positive++
+    else t.open++ // open, in-progress, anything non-terminal
+  }
+  return found ? t : null
+}
+
 function auditTarget(t) {
   const tag = t.name + (t.archived ? ' (archive)' : '')
   const strictTier = t.archived ? warn : err // archives never hard-fail on record shape
@@ -83,6 +108,7 @@ function auditTarget(t) {
   const drift = k => legacyDrift.set(k, (legacyDrift.get(k) || 0) + 1)
   const lines = readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim())
   const passes = new Map() // pass -> [line objects]
+  const fixRounds = new Set() // round numbers with a fix-round line
   const shas = new Map()   // sha -> where
   let holdsCertification = false
 
@@ -96,6 +122,52 @@ function auditTarget(t) {
       if (!num(o.correction_for.pass)) err(`${at}: correction_for.pass must be a pass number`)
       else if (![...passes.keys()].includes(o.correction_for.pass) && !reviewVersions.includes(o.correction_for.pass))
         err(`${at}: correction_for.pass ${o.correction_for.pass} matches no known pass`)
+      return
+    }
+
+    if (o.type === 'fix-round') {
+      const badFr = (typeof o.date === 'string' && o.date >= V3_CUTOFF) ? err : strictTier
+      for (const k of ['target', 'round', 'type', 'date', 'base_commit', 'findings', 'runtime']) if (o[k] === undefined) badFr(`${at}: fix-round line missing required field "${k}"`)
+      if (o.target && o.target !== t.name) err(`${at}: target "${o.target}" does not match folder "${t.name}"`)
+      for (const k of Object.keys(o)) if (!FIX_KEYS.has(k)) badFr(`${at}: unknown fix-round field "${k}"`)
+      if (o.findings) {
+        for (const k of Object.keys(o.findings)) if (!FIX_TALLY_KEYS.includes(k)) badFr(`${at}: unknown findings key "${k}"`)
+        for (const k of FIX_TALLY_KEYS) if (!num(o.findings[k])) badFr(`${at}: findings.${k} missing or non-numeric`)
+      }
+      if (o.tests !== undefined && o.tests !== null) {
+        for (const k of Object.keys(o.tests)) if (!['invocations', 'red_runs', 'green_runs', 'final'].includes(k)) badFr(`${at}: unknown tests key "${k}"`)
+        for (const k of ['invocations', 'red_runs', 'green_runs']) if (o.tests[k] !== undefined && !num(o.tests[k])) badFr(`${at}: tests.${k} must be a number`)
+        if (o.tests.final !== undefined && o.tests.final !== null && (!num(o.tests.final.passed) || !num(o.tests.final.failed))) badFr(`${at}: tests.final must be {passed, failed}|null`)
+      }
+      if (o.runtime) {
+        for (const k of Object.keys(o.runtime)) if (!RUNTIME_KEYS.has(k)) badFr(`${at}: unknown runtime key "${k}"`)
+        for (const k of ['active_s', 'blocked_s', 'idle_s']) if (o.runtime[k] !== undefined && !num(o.runtime[k])) badFr(`${at}: runtime.${k} must be a number`)
+        if (o.runtime.blocked !== undefined && (!Array.isArray(o.runtime.blocked) || o.runtime.blocked.some(b => typeof b?.reason !== 'string' || !num(b?.s)))) badFr(`${at}: runtime.blocked must be [{reason, s}]`)
+      }
+      if (o.approach_checks) for (const k of Object.keys(o.approach_checks)) {
+        if (!['pre_cleared_consumed', 'run', 'tokens'].includes(k)) badFr(`${at}: unknown approach_checks key "${k}"`)
+        else if (k === 'tokens' ? !numOrNull(o.approach_checks[k]) : !num(o.approach_checks[k])) badFr(`${at}: approach_checks.${k} malformed`)
+      }
+      if (o.micro_reviews) for (const k of Object.keys(o.micro_reviews)) if (!['count', 'follow_up_fixes'].includes(k) || !num(o.micro_reviews[k])) badFr(`${at}: micro_reviews.${k} malformed`)
+      if (o.cost) for (const k of Object.keys(o.cost)) {
+        if (!['agents', 'tokens'].includes(k)) badFr(`${at}: unknown fix-round cost key "${k}"`)
+        else if (!numOrNull(o.cost[k])) badFr(`${at}: cost.${k} must be number|null`)
+      }
+      if (num(o.round)) {
+        fixRounds.add(o.round)
+        const resPath = join(t.dir, `resolution-v${o.round}.md`)
+        if (!existsSync(resPath)) badFr(`${at}: fix-round line for round ${o.round} but no resolution-v${o.round}.md`)
+        else if (o.findings) {
+          const tallies = resolutionTallies(readFileSync(resPath, 'utf8'))
+          if (!tallies) warn(`${at}: resolution-v${o.round}.md frontmatter has no findings map — tally cross-check skipped`)
+          else for (const k of FIX_TALLY_KEYS) if (num(o.findings[k]) && o.findings[k] !== tallies[k])
+            err(`${at}: findings.${k}=${o.findings[k]} but resolution-v${o.round}.md frontmatter counts ${tallies[k]}`)
+        }
+      }
+      for (const k of ['base_commit', 'fixed_commit']) {
+        const v = o[k]
+        if (typeof v === 'string' && SHA_RE.test(v)) shas.set(v, `${at} (${k})`)
+      }
       return
     }
 
@@ -149,6 +221,12 @@ function auditTarget(t) {
         if (!STAGE_KEYS.has(k)) err(`${at}: unknown agents_by_stage key "${k}"`)
     }
 
+    if (o.runtime !== undefined && o.runtime !== null) {
+      if (typeof o.date === 'string' && o.date < V3_CUTOFF) bad(`${at}: runtime predates v3 (${V3_CUTOFF})`)
+      for (const k of Object.keys(o.runtime)) if (!['started', 'ended'].includes(k))
+        bad(`${at}: pass runtime allows only {started, ended} — the full split belongs to fix-round lines`)
+    }
+
     if (o.outcome === 'certified' || o.certified) holdsCertification = true
     if (o.outcome !== undefined) {
       if (!['certified', 'not-certified'].includes(o.outcome)) bad(`${at}: outcome must be certified|not-certified`)
@@ -198,6 +276,19 @@ function auditTarget(t) {
   for (const [p, ls] of passes) {
     if (!reviewVersions.includes(p)) strictTier(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
     if (ls.length > 1 && !ls.every(l => l.subtype && l.subtype.startsWith('certification-pair'))) warn(`${tag}: ${ls.length} metrics lines share pass ${p} without pair subtypes`)
+  }
+
+  // worklog: every event line must parse and carry t + ev; fix-round lines want event backing
+  const worklogPath = join(t.dir, 'worklog.jsonl')
+  if (existsSync(worklogPath)) {
+    readFileSync(worklogPath, 'utf8').split('\n').filter(l => l.trim()).forEach((raw, i) => {
+      try {
+        const e = JSON.parse(raw)
+        if (typeof e.t !== 'string' || typeof e.ev !== 'string') err(`${tag} worklog line ${i + 1}: every event needs string "t" and "ev"`)
+      } catch (e) { err(`${tag} worklog line ${i + 1}: unparseable JSON (${e.message})`) }
+    })
+  } else if (fixRounds.size) {
+    warn(`${tag}: ${fixRounds.size} fix-round metrics line(s) but no worklog.jsonl — runtime is not backed by events`)
   }
 
   // commit resolvability + reachability from a pushed ref

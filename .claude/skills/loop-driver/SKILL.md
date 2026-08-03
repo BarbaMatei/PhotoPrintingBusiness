@@ -37,6 +37,10 @@ node reviews/lib/route-next-pass.mjs <target>     # state → next pass → cost
   a plain question and **stop this invocation**. Never pre-answer a gate. Certification
   always waits for an explicit go-ahead, even when it looks inevitable — a certification is
   the owner deciding to spend millions of tokens, not a step that happens to them.
+  Stamp the wait: append `gate-open` (with the question as `reason`) to
+  `reviews/<target>/worklog.jsonl` when relaying, and the invocation that consumes the
+  answer appends `gate-closed` first thing — that span is the loop's measured
+  blocked-on-owner time.
 - If the router prints "no row matched", route by hand from
   [reviews/README.md](../../../reviews/README.md)'s router table using the facts it printed,
   and say in the report that this pass was hand-routed.
@@ -78,11 +82,18 @@ run journal (not guesswork) explains an empty result.
 
 ## 4 · Records — the pass didn't happen until they exist
 
+**Stamp the pass's runtime:** append `pass-launch` (`{pass, type}`) to
+`reviews/<target>/worklog.jsonl` immediately before executing step 3, and
+`pass-records-done` after the auditor exits clean below — the metrics line's
+`runtime: {started, ended}` copies these two timestamps. Fix rounds stamp themselves
+(the `/fix-review` skill owns its own worklog events).
+
 In the runbooks' order: ledger update via **reconcile-findings** (discovery-type passes;
-verification updates statuses per its own runbook) · metrics.jsonl line (schema v2 —
-discovery lines carry the per-finding `findings[]` array) · index.md row · summary page via
-**owner-summary**. These are written at synthesis time because they are
-unreconstructable later — that is the metrics schema's founding lesson. Then:
+verification updates statuses per its own runbook) · metrics.jsonl line (schema v3 —
+discovery lines carry the per-finding `findings[]` array and every pass line carries
+`runtime`) · index.md row · summary page via **owner-summary**. These are written at
+synthesis time because they are unreconstructable later — that is the metrics schema's
+founding lesson. Then:
 
 ```
 node reviews/lib/records-auditor.mjs <target>     # must exit clean before hand-back

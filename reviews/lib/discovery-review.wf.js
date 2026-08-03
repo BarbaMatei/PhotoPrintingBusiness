@@ -242,9 +242,15 @@ const GUARD_SCHEMA = {
   properties: { guardExists: { type: 'boolean' }, evidence: { type: 'string', description: '<= 80 words: the guard (file:line) or why none' } },
   required: ['guardExists', 'evidence'],
 }
+// filesTouched + testShape feed the findings file's Fix brief (fix rounds start warm from it).
 const TRACE_SCHEMA = {
   type: 'object', additionalProperties: false,
-  properties: { traceConstructible: { type: 'boolean' }, trace: { type: 'string', description: '<= 80 words: the concrete failing steps, or why impossible' } },
+  properties: {
+    traceConstructible: { type: 'boolean' },
+    trace: { type: 'string', description: '<= 80 words: the concrete failing steps, or why impossible' },
+    filesTouched: { type: 'array', items: { type: 'string' }, description: 'the file:line sites the trace walked, <= 6' },
+    testShape: { type: 'string', description: '<= 40 words, only when constructible: the regression test that would redden (name + arrange/act/assert)' },
+  },
   required: ['traceConstructible', 'trace'],
 }
 
@@ -267,7 +273,7 @@ const guardAgent = (f, i) => {
 }
 const traceAgent = (f, i) => {
   traceRuns++
-  return agent(findingCtx(f) + `\n\nROLE: skeptic — try to CONSTRUCT a concrete failing execution from the real code (inputs/state/timing -> the claimed wrong result). traceConstructible=true with the steps if you can; false with the reason if impossible.`,
+  return agent(findingCtx(f) + `\n\nROLE: skeptic — try to CONSTRUCT a concrete failing execution from the real code (inputs/state/timing -> the claimed wrong result). traceConstructible=true with the steps if you can; false with the reason if impossible. Also return filesTouched (the file:line sites you walked, <= 6) and, when constructible, testShape (<= 40 words: the regression test that would redden).`,
     { label: `trace#${i}`, phase: 'Verify', schema: TRACE_SCHEMA, ...skepticOpts(f) })
 }
 
@@ -300,9 +306,9 @@ async function verifyFinding(f, i) {
   // Trace-first: a built trace settles it; the guard-hunt runs only when no trace builds,
   // so the two can never contradict.
   const trace = await traceAgent(f, i)
-  if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(guard-hunt skipped; trace built)', traceEvidence: trace.trace }
+  if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(guard-hunt skipped; trace built)', traceEvidence: trace.trace, filesTouched: trace.filesTouched, testShape: trace.testShape }
   const guard = await guardAgent(f, i)
-  return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
+  return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)', filesTouched: trace?.filesTouched, testShape: trace?.testShape }
 }
 
 const SEV_RANK = { high: 3, medium: 2, low: 1, cleanup: 0 }

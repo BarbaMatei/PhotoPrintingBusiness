@@ -101,7 +101,9 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 - A review produces findings; fixing is a separate explicit step, verification a third. Never
   auto-apply fixes mid-review.
 - Every pass appends its [metrics.jsonl](metrics-schema.md) line and its [index.md](index.md)
-  row — at synthesis time, unreconstructable later.
+  row — at synthesis time, unreconstructable later. **Fix rounds append theirs too** (schema
+  v3, 2026-08-03) — at hand-back, via `reviews/lib/render-records.mjs`, computed from the
+  target's worklog.
 - A target holding a certification is **under watch** ([track-record.md](track-record.md)): a
   later serious finding whose defect existed in the certified code is marked
   `post-cert-escape` and appended there the same day — the reconciler flags it, the
@@ -119,6 +121,11 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   (evidence + suggested target per row), untriaged. Rows move into a ledger when the owner
   opens that loop. Distinct from a ledger row's `backlog` status, which is a triaged minor
   deferred within its target.
+- `worklog.jsonl` — per-target, append-only, one timestamped JSON event per line: fix-round
+  events written by the `/fix-review` skill as work happens, `pass-launch`/`pass-records-done`
+  and owner-gate stamps written by the loop-driver. The crash-safe evidence trail; every
+  metrics `runtime` value is computed from it, never estimated
+  ([schema v3](metrics-schema.md)).
 - A closed loop records `closed: <date> — <how>` in the **ledger frontmatter** — the
   router's machine-read terminal state (the index row carries the story).
 - `review-v<n>.md` — immutable, one per pass; frontmatter: `version`, `supersedes`, `commit`,

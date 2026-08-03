@@ -108,9 +108,11 @@ becomes impossible); (b) the **source of truth** for rendered records and runtim
 are one `echo >>` — no tooling needed to write it.
 
 **Runtime derivation (stated convention):** `blocked_s` = Σ gate-open→gate-closed spans.
-`active_s` = Σ gaps between consecutive non-gate events **≤ 15 min** (larger gaps with no
-open gate = nobody at the wheel). `idle_s` = round span − active − blocked. The 15-min cap is
-a declared convention, not a claim of precision.
+`active_s` = Σ gaps between consecutive non-gate events **≤ 30 min** (larger gaps with no
+open gate = nobody at the wheel). `idle_s` = round span − active − blocked. The 30-min cap is
+a declared convention, not a claim of precision — set high so the speed metric over-counts
+work rather than flattering itself (raised from 15 during implementation: the fixture showed
+a real 20-min implementation stretch classifying as idle).
 
 ## 4 · Records rendering + metrics schema v3
 
