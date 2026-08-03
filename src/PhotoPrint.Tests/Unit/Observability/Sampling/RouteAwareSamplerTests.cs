@@ -39,14 +39,14 @@ public class RouteAwareSamplerTests
     }
 
     [Fact]
-    public void Rate_zero_always_drops()
+    public void Rate_zero_records_without_exporting_so_errors_stay_rescuable()
     {
         var sut = new RouteAwareSampler(new ObservabilitySamplingSettings { Default = 0.0 });
 
         for (var i = 0; i < 100; i++)
         {
             var result = sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom(), "GET /api/x"));
-            result.Decision.Should().Be(SamplingDecision.Drop);
+            result.Decision.Should().Be(SamplingDecision.RecordOnly);
         }
     }
 
@@ -60,7 +60,7 @@ public class RouteAwareSamplerTests
         });
 
         sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom(), "GET /api/hot"))
-            .Decision.Should().Be(SamplingDecision.Drop);
+            .Decision.Should().Be(SamplingDecision.RecordOnly);
         sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom(), "GET /api/normal"))
             .Decision.Should().Be(SamplingDecision.RecordAndSample);
     }
@@ -75,7 +75,7 @@ public class RouteAwareSamplerTests
         });
 
         sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom(), "GET /api/unknown"))
-            .Decision.Should().Be(SamplingDecision.Drop);
+            .Decision.Should().Be(SamplingDecision.RecordOnly);
     }
 
     [Fact]
@@ -107,8 +107,8 @@ public class RouteAwareSamplerTests
         for (var i = 0; i < 10_000; i++)
         {
             var d = sut.ShouldSample(BuildParams(ActivityTraceId.CreateRandom(), route)).Decision;
-            if (d == SamplingDecision.RecordAndSample) sampled++;
-            else if (d == SamplingDecision.Drop)       dropped++;
+            if (d == SamplingDecision.RecordAndSample)   sampled++;
+            else if (d == SamplingDecision.RecordOnly)   dropped++;
         }
 
         // Expected ~50/50 with binomial noise; budget ±10% for headroom.

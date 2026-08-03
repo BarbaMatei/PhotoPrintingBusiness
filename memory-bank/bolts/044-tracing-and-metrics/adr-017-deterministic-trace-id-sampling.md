@@ -123,7 +123,9 @@ random sampling would create:
 - **No partial traces.** When a trace is recorded, every span in it
   is recorded (modulo the SDK's bounded buffer overflow, which is a
   separate concern). When a trace is dropped, every span is dropped.
-  Clean signal for the operator.
+  Clean signal for the operator. (Amended 2026-08-03: still true for
+  rate-sampled traces; an **error-promoted** trace is the one
+  documented exception — see the amendment below.)
 - **Cross-service trace consistency for free.** Any downstream
   service that follows the OTel spec's recommended trace-state
   probability sampling (the same algorithm) makes the same
@@ -173,6 +175,52 @@ random sampling would create:
   changes which traces are sampled — i.e. invalidates existing
   Tempo queries that filter on trace_id presence. Mitigation: this
   ADR pins the specific function shape.
+
+## Amendment (2026-08-03) — out-of-rate spans are recorded, not dropped
+
+The decision above said nothing about *which* `SamplingDecision` an
+out-of-rate trace gets, and the implementation chose `Drop`. That
+made the companion promise — errors are always sampled, whatever the
+rate — unimplementable, and silently so.
+
+The OTel SDK calls a processor's `OnEnd` only for activities with
+`IsAllDataRequested = true`. A `Drop` decision produces either no
+`Activity` at all or a propagation-only one, so `ErrorOverrideProcessor.OnEnd`
+never ran for exactly the spans it existed to rescue: a 500 on an
+out-of-rate request was invisible. Verified against the running
+pipeline, not read off the docs.
+
+**The sampler now returns `RecordOnly` where it returned `Drop`.** The
+span is materialised and offered to the processors; export processors
+skip it because its `Recorded` flag is clear. At span end, if the
+status is `Error`, the override sets that flag and the span exports.
+
+What this costs and what it does not give:
+
+- **Cost is one root span per out-of-rate request.** Child spans are
+  unaffected: `ParentBasedSampler` sends children of a non-recorded
+  local parent to `AlwaysOff`, so no EF or HttpClient span is created
+  and no SQL text is materialised. Nothing is enqueued for export, so
+  memory does not grow.
+- **A promoted error trace is a single root span.** Its children were
+  already dropped at start, and no head sampler can know at start that
+  a request will fail. Promoted spans carry
+  `fototipar.sampling.error_override = true` so an operator can tell a
+  legitimately childless trace from a lossy one. The
+  no-partial-traces guarantee is intact for every rate-sampled trace;
+  this is the one exception, and it is labelled.
+- **The promoted span carries no exception.** `ExceptionHandlerMiddleware`
+  catches everything, so the hosting layer never reports an unhandled
+  exception and the instrumentation's `RecordException` path never
+  fires. The span carries route, status code and duration; stack
+  traces come from Serilog and Sentry.
+- **`Sampling:Default = 0.0` now means "export errors only"**, not "do
+  no work". The off switch is `Observability:Enabled = false`.
+
+Whole-trace error sampling — the error span *with* its children —
+needs a decision taken after the trace completes, i.e. tail sampling
+in the collector. That remains out of scope here, and this amendment
+does not pretend head sampling can substitute for it.
 
 ## Related
 
