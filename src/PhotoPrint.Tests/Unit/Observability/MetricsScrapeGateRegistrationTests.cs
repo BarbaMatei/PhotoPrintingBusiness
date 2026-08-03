@@ -3,7 +3,9 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Moq;
 using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Middleware;
 using PhotoPrint.Tests.Helpers;
@@ -33,7 +35,7 @@ public class MetricsScrapeGateRegistrationTests
 
         var services = new ServiceCollection();
         services.AddLogging(lb => lb.AddProvider(new LogCaptureProvider(capture)));
-        services.AddObservability(configuration);
+        services.AddObservability(configuration, Mock.Of<IHostEnvironment>(e => e.EnvironmentName == "Testing"));
         return services.BuildServiceProvider();
     }
 

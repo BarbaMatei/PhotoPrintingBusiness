@@ -22,7 +22,10 @@ public sealed class ObservabilitySettings
 
 public sealed class ObservabilityOtlpSettings
 {
-    /// <summary>OTLP exporter target. Empty → console exporter used for traces (dev).</summary>
+    /// <summary>
+    /// OTLP exporter target. Empty → console span exporter in Development; in any other
+    /// environment the trace pipeline is not built at all (metrics are unaffected).
+    /// </summary>
     public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>OTLP protocol: <c>Grpc</c> or <c>HttpProtobuf</c>.</summary>

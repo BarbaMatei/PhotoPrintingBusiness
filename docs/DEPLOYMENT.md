@@ -1091,10 +1091,13 @@ Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
 is `Grpc` (default, port 4317) or `HttpProtobuf` (port 4318). Any OTLP-compatible backend works —
 a self-hosted OTel Collector, Jaeger, Tempo, or a vendor endpoint.
 
-> **Always set `Otlp__Endpoint` in production.** With observability enabled and the endpoint
-> blank, the API falls back to the **console** span exporter: full spans, including SQL text,
-> written to container stdout on the request thread. That is a dev convenience, not a
-> production mode.
+> **Always set `Otlp__Endpoint` outside Development.** The console span exporter — full
+> spans, SQL text included, written to container stdout on the request thread — is a dev
+> convenience, not a production mode, so it is reachable **only** when
+> `ASPNETCORE_ENVIRONMENT=Development`. Anywhere else, a blank endpoint means the trace
+> pipeline is not built at all: metrics still export, traces are silently absent, and the
+> API logs `observability.tracing.disabled` once at boot. Grep for that line if spans never
+> arrive.
 
 Spans carry EF Core SQL command text. `EnableSensitiveDataLogging` is off, so parameter values
 are not included — but treat the collector as a system that sees your query shapes, and keep it
@@ -1127,8 +1130,9 @@ is a constant (see `metrics.md`). Traces are the line item: at a few hundred req
 1. **Pre-flight.** Deploy with `Observability__Enabled=false`. Confirm `/metrics` is not served
    and the API boots clean — proves the disabled path.
 2. **Stage 1 — metrics only, staging.** Set `Enabled=true`, `ScrapePort=9090`, the allow-list,
-   and leave `Otlp__Endpoint` blank *only if* you accept console spans in staging; otherwise
-   provision the collector first. Run the 14.9 checks. Watch for a week.
+   and leave `Otlp__Endpoint` blank. Outside Development that means no trace pipeline is
+   built — metrics only, nothing on stdout — and the boot log says so. Run the 14.9 checks.
+   Watch for a week.
 3. **Stage 2 — traces.** Point `Otlp__Endpoint` at the collector. Confirm spans arrive and the
    volume matches what `Sampling__Default` implies.
 4. **Stage 3 — production.** Same flags, production allow-list. Re-run 14.9 against the live
@@ -1200,7 +1204,7 @@ legal values.
 |---|---|---|---|
 | `Observability__Enabled` | bool | `false` | Master flag |
 | `Observability__ServiceName` | string | `PhotoPrint.API` | `service.name` on every span |
-| `Observability__Otlp__Endpoint` | string | `""` | OTLP target; blank ⇒ console span exporter |
+| `Observability__Otlp__Endpoint` | string | `""` | OTLP target; blank ⇒ console span exporter in Development, no tracing anywhere else |
 | `Observability__Otlp__Protocol` | string | `Grpc` | `Grpc` or `HttpProtobuf` |
 | `Observability__Metrics__PrometheusEndpoint` | string | `/metrics` | Scrape path; keep the `Caddyfile` matcher in sync |
 | `Observability__Metrics__ScrapePort` | int | `0` | Listener that may serve the scrape path; `0` = every listener (dev only) |

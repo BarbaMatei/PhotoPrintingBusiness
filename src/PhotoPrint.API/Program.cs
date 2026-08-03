@@ -64,7 +64,7 @@ if (sentryEnabled)
 // Same two-stage flag posture: Observability:Enabled=false → nothing wired,
 // boot byte-identical to baseline. When on, exposes /metrics gated by an IP
 // allow-list and pushes traces via OTLP (or stdout if no endpoint).
-builder.Services.AddObservability(builder.Configuration);
+builder.Services.AddObservability(builder.Configuration, builder.Environment);
 
 var observabilityEnabled = builder.Configuration
     .GetSection(PhotoPrint.API.Configuration.ObservabilitySettings.SectionName)
@@ -357,9 +357,18 @@ if (sentryEnabled)
 // exporter; wrong listener sees 404, non-allowed IPs see 403 + empty body.
 if (observabilityEnabled)
 {
-    var metricsSettings = app.Services
+    var observabilitySettings = app.Services
         .GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.ObservabilitySettings>>()
-        .Value.Metrics;
+        .Value;
+    var metricsSettings = observabilitySettings.Metrics;
+
+    if (!ObservabilityExtensions.TracingWired(observabilitySettings, app.Environment))
+    {
+        app.Logger.LogWarning(
+            "observability.tracing.disabled environment={Environment} — no Observability:Otlp:Endpoint, "
+            + "so metrics are exported and traces are not; console spans are a Development-only fallback",
+            app.Environment.EnvironmentName);
+    }
 
     if (metricsSettings.ScrapePort == 0)
     {

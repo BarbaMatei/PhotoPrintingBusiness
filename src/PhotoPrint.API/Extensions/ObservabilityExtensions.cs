@@ -21,15 +21,22 @@ namespace PhotoPrint.API.Extensions;
 /// Layering (per <c>ddd-02-technical-design.md</c>):
 ///   Tracing:  ASP.NET / HttpClient / EF Core auto-instrumentation
 ///             → ParentBased(DeterministicTraceIdSampler) → ErrorOverrideProcessor
-///             → OTLP exporter (if endpoint set) or console exporter (dev)
+///             → OTLP exporter; console exporter in Development only, and no trace
+///               pipeline at all when neither applies
 ///   Metrics:  AddMeter(FotoMetrics.Meter) + runtime + ASP.NET / HttpClient
 ///             → Prometheus exporter (always when enabled)
 /// </summary>
 public static class ObservabilityExtensions
 {
+    // With no OTLP endpoint the only exporter left is the console one, which writes whole
+    // spans — EF SQL text included — to stdout on the request thread: a dev convenience.
+    public static bool TracingWired(ObservabilitySettings settings, IHostEnvironment environment) =>
+        !string.IsNullOrWhiteSpace(settings.Otlp.Endpoint) || environment.IsDevelopment();
+
     public static IServiceCollection AddObservability(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.Configure<ObservabilitySettings>(
             configuration.GetSection(ObservabilitySettings.SectionName));
@@ -49,11 +56,14 @@ public static class ObservabilityExtensions
 
         services.AddSingleton<MetricsEndpointIpAllowListMiddleware>();
 
-        services.AddOpenTelemetry()
+        var builder = services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(
                 serviceName:    settings.ServiceName,
-                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0"))
-            .WithTracing(t =>
+                serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0"));
+
+        if (TracingWired(settings, environment))
+        {
+            builder.WithTracing(t =>
             {
                 t.SetSampler(new ParentBasedSampler(new DeterministicTraceIdSampler(settings.Sampling)));
                 t.AddProcessor(new ErrorOverrideProcessor());
@@ -73,11 +83,12 @@ public static class ObservabilityExtensions
                 }
                 else
                 {
-                    // Dev fallback — visible spans in stdout when no collector
-                    // is wired. Production deployments always set Otlp:Endpoint.
                     t.AddConsoleExporter();
                 }
-            })
+            });
+        }
+
+        builder
             .WithMetrics(m =>
             {
                 m.AddMeter(MetricNames.Meter);
