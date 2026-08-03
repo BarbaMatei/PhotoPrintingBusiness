@@ -2,7 +2,7 @@
 type: review-system
 status: active
 created: 2026-06-18
-updated: 2026-07-24
+updated: 2026-08-03
 owner: Matei Barba
 ---
 
@@ -90,6 +90,11 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 ## Hard rules
 
 - `review-v<n>.md` is **immutable**; fixers respond in `resolution-v<n>.md`.
+- **Only the owner opens a target.** A `reviews/<target>/` folder is created solely by
+  executing a pass the owner explicitly requested for that target. A defect noticed outside
+  any open pass — by a fixer, a driver, anyone — is recorded with its evidence in
+  [inbox.md](inbox.md), never in a new folder; it seeds the target's ledger if and when
+  the owner opens that loop.
 - The fixer never sets `verified` — only a re-review can.
 - Discovery is **blinded** (best-effort: enforced by prompts, unverified until the blinding
   auditor exists); verification is **anchored** on purpose. Never mix the postures in a pass.
@@ -110,6 +115,10 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 
 - One folder per target: `reviews/<target>/`. Dormant or closed targets move to
   `reviews/archive/<target>/` unchanged.
+- `inbox.md` — the single holding pen for findings recorded outside any open target
+  (evidence + suggested target per row), untriaged. Rows move into a ledger when the owner
+  opens that loop. Distinct from a ledger row's `backlog` status, which is a triaged minor
+  deferred within its target.
 - A closed loop records `closed: <date> — <how>` in the **ledger frontmatter** — the
   router's machine-read terminal state (the index row carries the story).
 - `review-v<n>.md` — immutable, one per pass; frontmatter: `version`, `supersedes`, `commit`,

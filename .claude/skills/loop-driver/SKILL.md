@@ -103,5 +103,8 @@ still stopping at every exit-2/3 gate and before every discovery-scale launch.
   word, and the index row records how it closed.
 - Mark anything `verified` while being the fixer, outside the written test-only exemption.
 - Edit a `review-v*.md`, skip a record, or hand back with the auditor red.
+- Create a `reviews/<target>/` folder except by executing a pass the owner requested for
+  that target — findings noticed along the way go to `reviews/inbox.md`, and no owner
+  decision is ever recorded that the owner did not state in so many words.
 - Chain past a gate because the answer "seems obvious" — obvious-looking gates are where
   the recorded deviations clustered.

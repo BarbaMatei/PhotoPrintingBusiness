@@ -64,6 +64,9 @@ file.
 - mark any finding `verified` (that status belongs to the re-review — a fixer vouching
   for its own fix is exactly the bias the loop exists to prevent);
 - change unrelated behavior, or fix things outside the finding set without recording why;
+- create a `reviews/<target>/` folder or ledger for anything — a defect you notice outside
+  the finding set is recorded with its evidence in `reviews/inbox.md` (only an
+  owner-opened loop creates a target folder);
 - close a non-trivial bug/security finding without a regression test (see below).
 
 ## Workflow
