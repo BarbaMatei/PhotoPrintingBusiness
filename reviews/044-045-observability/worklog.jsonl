@@ -1,0 +1,8 @@
+{"t":"2026-08-03T15:40:00+03:00","ev":"round-start","round":1,"note":"backfilled: this round began under the v1 fixer contract, before worklog.jsonl existed. Events up to F15 are anchored to real commit/agent timestamps; the runtime split therefore understates the round."}
+{"t":"2026-08-03T15:45:00+03:00","ev":"triage-done","round":1,"clusters":["E-test-vacuity(F8,F9,F20)","F-error-signal-routing(F14,F15,F18)"],"checks_needed":1,"pre_cleared":0,"gates":0,"note":"backfilled; 17 of 23 serious findings were already terminal from earlier rounds, leaving F8,F9 (blockers) + F14,F15,F18,F20"}
+{"t":"2026-08-03T15:53:50+03:00","ev":"finding","id":"F8","status":"fixed","commit":"295a51c"}
+{"t":"2026-08-03T16:01:18+03:00","ev":"finding","id":"F9","status":"fixed","commit":"fbaf9f4"}
+{"t":"2026-08-04T15:20:00+03:00","ev":"check-dispatched","round":1,"cluster":"F-error-signal-routing","note":"adversarial approach-check on the F15 mapped-5xx capture and the F18 DiagnosticLogger design"}
+{"t":"2026-08-04T15:58:00+03:00","ev":"check-returned","round":1,"cluster":"F-error-signal-routing","verdict":"F15 sound-with-corrections; F18 REFUTED (SentryOptions.DiagnosticLogger getter returns null whenever Debug==false, verified empirically in-repo)","tokens":145765}
+{"t":"2026-08-04T16:02:00+03:00","ev":"test-run","round":1,"kind":"red","filter":"MappedServerErrorSentryTests","passed":1,"failed":1,"duration_s":1}
+{"t":"2026-08-04T16:05:00+03:00","ev":"test-run","round":1,"kind":"green","filter":"MappedServerErrorSentryTests|SentryIntegrationTests|ExceptionHandlerMiddleware|Middleware","passed":57,"failed":0,"duration_s":1}

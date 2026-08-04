@@ -389,6 +389,10 @@ if (app.Environment.IsEnvironment("Testing"))
 {
     app.MapGet("/__test/throw",
         () => { throw new InvalidOperationException("synthetic-test-exception"); });
+    app.MapGet("/__test/throw-mapped-502",
+        () => { throw new PhotoPrint.API.Exceptions.BadGatewayException("synthetic-mapped-502"); });
+    app.MapGet("/__test/throw-mapped-404",
+        () => { throw new PhotoPrint.API.Exceptions.NotFoundException("synthetic-mapped-404"); });
 }
 
 app.MapControllers();

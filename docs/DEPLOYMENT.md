@@ -824,7 +824,13 @@ When an unhandled exception escapes any controller or middleware, the API:
 2. **Captures it to Sentry** with full context — stack trace, correlation id, user id (when authenticated), environment, release SHA, scrubbed request metadata.
 3. Sentry pages / Slacks / emails per your project's alert rules (configured in the Sentry UI, not here).
 
-Domain exceptions (`NotFoundException`, `ConflictException`, `UnprocessableEntityException`, etc.) are **NOT** captured — they're expected business outcomes, not server errors. Only unhandled exceptions (the `else` branch in `ExceptionHandlerMiddleware`) reach Sentry.
+What reaches Sentry is decided by **status code, not by whether the exception is mapped**:
+
+- Unhandled exceptions (the `else` branch in `ExceptionHandlerMiddleware`) → 500 → captured.
+- Mapped exceptions whose status is **≥ 500** (today only `BadGatewayException` → 502) → captured, and logged at `Error` rather than `Warning`. A mapped 5xx is a dependency failure that burns SLO 1, so it is not an expected business outcome.
+- Mapped exceptions below 500 (`NotFoundException`, `ConflictException`, `UnprocessableEntityException`, …) → **NOT** captured. They are expected business outcomes, and capturing them would exhaust the quota the alert rules in §13.8 depend on.
+
+Standalone `LogError` calls that throw no exception (`sameday.awb.orphaned`, for example) do **not** reach Sentry — they land in the Serilog file sink only. `UseSerilog` is wired with `writeToProviders` left at its default `false` (`SerilogExtensions.cs`), which disables the SDK's MEL-provider auto-capture. Do not flip that flag to "fix" this: it would double-capture every exception the middleware already reports explicitly, and auto-ship every `LogError` in the repo. Cross-check `Error`-level logs against Sentry per §13.8 instead.
 
 ### 13.2 Master flag — `Sentry:Enabled`
 
@@ -922,7 +928,7 @@ Configure in the Sentry UI, not in code. Suggested baseline:
 | Issue regression (resolved issue happens again) | **Page** | Slack |
 | Issue volume > 10× baseline in 5 min | **Page** | Slack + email — likely an incident |
 | Issue tagged `correlation_id` (any) on `/api/webhooks/*` path | **Page** | Slack — payment webhooks are SLA-critical, see [`slos.md`](../memory-bank/operations/slos.md) §3 |
-| Any 5xx not captured by Sentry (gap in coverage) | — | Cross-check Serilog `Error`-level logs against Sentry events monthly |
+| `Error`-level log with no matching Sentry event | — | Every 5xx exception is captured (§13.1), so a mismatch means a standalone `LogError` — cross-check the Serilog file sink against Sentry monthly |
 
 ### 13.9 Cost envelope
 

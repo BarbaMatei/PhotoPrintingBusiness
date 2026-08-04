@@ -74,12 +74,26 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
         if (_exceptionMappings.TryGetValue(exception.GetType(), out var mapping))
         {
-            _logger.LogWarning(
-                "Handled exception {ExceptionType}: {Message} | Path: {Path} | CorrelationId: {CorrelationId}",
-                exception.GetType().Name,
-                exception.Message,
-                context.Request.Path,
-                correlationId);
+            // A mapped status is not the same as an expected outcome: a mapped 5xx is a
+            // dependency failure that burns the availability SLO, so it is keyed on the status
+            // code rather than an exception list — a mapping added later cannot skip capture.
+            var serverError = mapping.StatusCode >= StatusCodes.Status500InternalServerError;
+
+            if (serverError)
+                _logger.LogError(
+                    exception,
+                    "Handled server-side exception {ExceptionType}: {Message} | Path: {Path} | CorrelationId: {CorrelationId}",
+                    exception.GetType().Name,
+                    exception.Message,
+                    context.Request.Path,
+                    correlationId);
+            else
+                _logger.LogWarning(
+                    "Handled exception {ExceptionType}: {Message} | Path: {Path} | CorrelationId: {CorrelationId}",
+                    exception.GetType().Name,
+                    exception.Message,
+                    context.Request.Path,
+                    correlationId);
 
             // Emit the structured event ddd-01:61 reserves so a
             // conflict is distinctly observable (a signal of client bugs / key-reuse abuse)
@@ -116,6 +130,9 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 _logger.LogWarning(
                     "uploads.decompression_bomb.rejected correlation_id={CorrelationId} source=allocator_backstop",
                     correlationId);
+
+            if (serverError)
+                context.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(exception);
 
             await WriteProblemDetailsAsync(context, mapping.StatusCode, mapping.Title,
                 exception.Message, correlationId, exception);

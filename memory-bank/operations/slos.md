@@ -127,10 +127,18 @@ quality-of-service issue. Escalate immediately.
 | SLO | Primary owner | Notification channel |
 |---|---|---|
 | Availability | Platform / oncall | Sentry + ops Slack |
-| Checkout latency | Backend lead | Sentry + ops Slack |
+| Checkout latency | Backend lead | Ops Slack (latency is metric-only — Sentry sees no event) |
 | Payment-webhook success | Backend lead | **Sentry pages immediately** (do not wait for SLO) |
 | AWB auto-creation | Backend lead | Ops Slack |
 | ANAF submission | Backend lead + Finance | **Email + Slack** (regulatory) |
+
+**What Sentry actually sees.** Only *exceptions* surfacing as a 5xx reach Sentry —
+unhandled ones and mapped ones whose status is ≥ 500. A breach that produces no
+exception (slow checkout, a webhook branch that returns a non-`ok` result, an AWB
+outcome recorded as `retry_later`) reaches the metric pipeline and the Grafana
+dashboard, never Sentry. Alerting for those SLOs must be built on the Prometheus
+metrics, not on Sentry issues. Standalone `LogError` lines go to the Serilog file
+sink only — see `docs/DEPLOYMENT.md` §13.1.
 
 ## Review cadence
 
