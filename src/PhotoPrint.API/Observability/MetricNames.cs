@@ -81,4 +81,33 @@ public static class MetricNames
 
         public static readonly string[] All = [Accepted, Rejected, Pending, Failed];
     }
+
+    // The label contract every instrument is held to. A cardinality budget computed from the
+    // value arrays alone says nothing about what a call site actually attaches, so this is what
+    // the emission tests assert observed tags against — an undeclared label is a test failure,
+    // not a silent series explosion.
+    public static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string[]>> LabelContract =
+        new Dictionary<string, IReadOnlyDictionary<string, string[]>>
+        {
+            [Instruments.OrdersCreatedTotal] = new Dictionary<string, string[]>
+            {
+                [Labels.Processor] = ProcessorValues.All,
+                [Labels.Status]    = OrderStatusValues.All,
+            },
+            [Instruments.PaymentWebhookTotal] = new Dictionary<string, string[]>
+            {
+                [Labels.Processor] = ProcessorValues.All,
+                [Labels.Result]    = WebhookResultValues.All,
+            },
+            [Instruments.AwbCreationTotal] = new Dictionary<string, string[]>
+            {
+                [Labels.Result] = AwbResultValues.All,
+            },
+            [Instruments.InvoiceAnafStatusTotal] = new Dictionary<string, string[]>
+            {
+                [Labels.Status] = AnafStatusValues.All,
+            },
+            [Instruments.UploadSizeBytes] = new Dictionary<string, string[]>(),
+            [Instruments.OrderProcessingDurationSeconds] = new Dictionary<string, string[]>(),
+        };
 }

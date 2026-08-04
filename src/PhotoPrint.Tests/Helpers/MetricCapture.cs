@@ -39,6 +39,43 @@ public sealed class MetricCapture : IDisposable
             m.Instrument == instrument &&
             tags.All(t => m.Tags.TryGetValue(t.Key, out var v) && v == t.Value))];
 
+    /// <summary>
+    /// Every way the captured observations breach <see cref="MetricNames.LabelContract"/>:
+    /// an undeclared instrument, a tag the instrument does not declare, a declared tag that
+    /// is missing, or a value outside the enumerated set. Empty means the emissions are
+    /// within the cardinality budget the contract describes.
+    /// </summary>
+    public IReadOnlyList<string> ContractViolations()
+    {
+        var violations = new List<string>();
+
+        foreach (var m in Measurements)
+        {
+            if (!MetricNames.LabelContract.TryGetValue(m.Instrument, out var declared))
+            {
+                violations.Add($"{m.Instrument}: not declared in MetricNames.LabelContract");
+                continue;
+            }
+
+            foreach (var (key, value) in m.Tags)
+            {
+                if (!declared.TryGetValue(key, out var allowed))
+                {
+                    violations.Add($"{m.Instrument}: undeclared label '{key}'");
+                    continue;
+                }
+                if (!allowed.Contains(value, StringComparer.Ordinal))
+                    violations.Add(
+                        $"{m.Instrument}.{key}: value '{value}' is outside the enumerated set");
+            }
+
+            foreach (var key in declared.Keys.Where(k => !m.Tags.ContainsKey(k)))
+                violations.Add($"{m.Instrument}: declared label '{key}' was not emitted");
+        }
+
+        return violations;
+    }
+
     public void Dispose() => _listener.Dispose();
 
     private void Capture(

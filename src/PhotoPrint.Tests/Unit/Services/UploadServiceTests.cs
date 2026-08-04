@@ -284,6 +284,7 @@ public class UploadServiceTests
         recorded.Instrument.Should().Be(MetricNames.Instruments.UploadSizeBytes);
         recorded.Value.Should().Be(JpegMagic.Length);
         recorded.Tags.Should().BeEmpty("a size histogram with labels would multiply series");
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]

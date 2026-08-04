@@ -283,6 +283,7 @@ public class AdminOrderServiceTests
 
         metrics.Measurements.Should().HaveCount(1);
         metrics.Measurements[0].Value.Should().BeApproximately(7200, 120);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]

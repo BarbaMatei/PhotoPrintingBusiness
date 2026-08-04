@@ -521,6 +521,7 @@ public class AwbCreatorTests : IDisposable
         metrics.For(MetricNames.Instruments.AwbCreationTotal,
                 (MetricNames.Labels.Result, MetricNames.AwbResultValues.Ok))
             .Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]

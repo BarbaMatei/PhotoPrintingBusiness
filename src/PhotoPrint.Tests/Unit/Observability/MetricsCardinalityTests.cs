@@ -1,55 +1,64 @@
+using System.Diagnostics.Metrics;
+using System.Reflection;
 using FluentAssertions;
 using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.Tests.Unit.Observability;
 
 /// <summary>
-/// Cardinality budget: each labelled instrument is capped at ≤ 100 distinct
-/// series (per the technical design's NFR section). The budget exists to
-/// catch free-form label leaks — a single counter with a user-id label would
-/// blow this immediately.
-///
-/// The series count is the product of the cardinalities of each label's
-/// enumerated value set, listed in <see cref="MetricNames"/>.
+/// Cardinality budget: each labelled instrument is capped at ≤ 100 distinct series (per the
+/// technical design's NFR section). Multiplying the value arrays proves only that the arrays
+/// are short — it cannot see a call site attaching an unbounded label. So the budget here is
+/// derived from <see cref="MetricNames.LabelContract"/>, and the emission tests beside each
+/// call site assert their observed tags against that same contract
+/// (<c>MetricCapture.ContractViolations</c>). Both halves are needed: this file bounds what is
+/// declared, those tests bound what is emitted.
 /// </summary>
 public class MetricsCardinalityTests
 {
-    [Fact]
-    public void Orders_created_total_cardinality_is_bounded()
-    {
-        var series = MetricNames.ProcessorValues.All.Length
-                   * MetricNames.OrderStatusValues.All.Length;
+    private const int Budget = 100;
 
-        series.Should().Be(6);
-        series.Should().BeLessThanOrEqualTo(100);
+    public static TheoryData<string> DeclaredInstruments()
+    {
+        var data = new TheoryData<string>();
+        foreach (var name in MetricNames.LabelContract.Keys) data.Add(name);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(DeclaredInstruments))]
+    public void Every_declared_instrument_is_within_the_cardinality_budget(string instrument)
+    {
+        var labels = MetricNames.LabelContract[instrument];
+
+        var series = labels.Values.Aggregate(1, (acc, values) => acc * values.Length);
+
+        series.Should().BeLessThanOrEqualTo(Budget,
+            because: $"{instrument} has labels {string.Join(", ", labels.Keys)}");
     }
 
     [Fact]
-    public void Payment_webhook_total_cardinality_is_bounded()
+    public void Every_instrument_FotoMetrics_defines_is_declared_in_the_label_contract()
     {
-        var series = MetricNames.ProcessorValues.All.Length
-                   * MetricNames.WebhookResultValues.All.Length;
+        // A new instrument that skips the contract would also skip the budget and the emission
+        // tests' tag assertions, which is exactly how an unbounded label ships unnoticed.
+        var defined = typeof(FotoMetrics)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => typeof(Instrument).IsAssignableFrom(f.FieldType))
+            .Select(f => ((Instrument)f.GetValue(null)!).Name);
 
-        series.Should().Be(12);
-        series.Should().BeLessThanOrEqualTo(100);
+        defined.Should().BeSubsetOf(MetricNames.LabelContract.Keys);
     }
 
     [Fact]
-    public void Awb_creation_total_cardinality_is_bounded()
+    public void The_label_contract_declares_no_instrument_that_does_not_exist()
     {
-        var series = MetricNames.AwbResultValues.All.Length;
+        var defined = typeof(FotoMetrics)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(f => typeof(Instrument).IsAssignableFrom(f.FieldType))
+            .Select(f => ((Instrument)f.GetValue(null)!).Name);
 
-        series.Should().Be(5);
-        series.Should().BeLessThanOrEqualTo(100);
-    }
-
-    [Fact]
-    public void Invoice_anaf_status_total_cardinality_is_bounded()
-    {
-        var series = MetricNames.AnafStatusValues.All.Length;
-
-        series.Should().Be(4);
-        series.Should().BeLessThanOrEqualTo(100);
+        MetricNames.LabelContract.Keys.Should().BeSubsetOf(defined);
     }
 
     [Fact]
@@ -69,11 +78,9 @@ public class MetricsCardinalityTests
     {
         // Prometheus best practice: label values are lowercase, snake_case if
         // multi-word. Catches accidental "OrderNotFound" PascalCase leaks.
-        var all = MetricNames.ProcessorValues.All
-            .Concat(MetricNames.OrderStatusValues.All)
-            .Concat(MetricNames.WebhookResultValues.All)
-            .Concat(MetricNames.AwbResultValues.All)
-            .Concat(MetricNames.AnafStatusValues.All);
+        var all = MetricNames.LabelContract.Values
+            .SelectMany(labels => labels.Values)
+            .SelectMany(values => values);
 
         all.Should().AllSatisfy(v =>
         {
@@ -81,5 +88,13 @@ public class MetricsCardinalityTests
             v.Should().MatchRegex("^[a-z][a-z0-9_]*$",
                 because: $"label value '{v}' must be lowercase snake_case");
         });
+    }
+
+    [Fact]
+    public void Label_names_are_snake_case()
+    {
+        MetricNames.LabelContract.Values
+            .SelectMany(labels => labels.Keys)
+            .Should().AllSatisfy(k => k.Should().MatchRegex("^[a-z][a-z0-9_]*$"));
     }
 }

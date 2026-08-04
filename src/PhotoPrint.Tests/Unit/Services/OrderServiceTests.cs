@@ -677,6 +677,7 @@ public class OrderServiceTests : IDisposable
         Assert.Equal(
             new[] { MetricNames.Labels.Processor, MetricNames.Labels.Status },
             recorded[0].Tags.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.Empty(metrics.ContractViolations());
     }
 
     [Fact]

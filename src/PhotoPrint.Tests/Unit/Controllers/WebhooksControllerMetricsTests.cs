@@ -157,6 +157,7 @@ public class WebhooksControllerMetricsTests
                 (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Failed))
             .Should().HaveCount(1, "a customer charged for an order that cannot become Paid must enter the SLO denominator");
+        metrics.ContractViolations().Should().BeEmpty();
 
         _logs.Records.Should().Contain(r =>
             r.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
