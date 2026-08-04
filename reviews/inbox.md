@@ -45,3 +45,29 @@ code; the third is unverified. The owner declined to open a target for this (202
 The application is not deployed, so nothing is exploitable today. Rows 1 and 2 are
 **pre-deployment blockers**: both are trivially triggerable denial-of-service against all
 users, and neither has a test.
+
+---
+
+## From the 044-045-observability v1 fix round (2026-08-04)
+
+Found by the cluster F fix-diff micro-review while fixing F15 (mapped 5xx bypassing Sentry).
+Same defect class one layer out, but outside the review's finding set, so nothing was changed.
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟠 | 2026-08-04 | Background jobs are wholly outside Sentry's reach: all 13 `BackgroundJobs/` files catch their own exceptions and only log, never pass through `ExceptionHandlerMiddleware`, and none touch `IHub` — so a total AWB-retry or email-retry outage produces no Sentry issue at all | `BackgroundJobs/AwbRetryJob.cs:56,65`, `EmailRetryJob.cs:85`, `ArchiveRetentionJob.cs:63`, `OriginalPurgeRecoveryScanner.cs:81`, `PromotionRecoveryScanner.cs:85` |
+
+### Evidence held
+
+- Grepped `src/PhotoPrint.API/BackgroundJobs/` for `Sentry.|IHub|CaptureException|SentrySdk`:
+  zero matches across 13 files. Each job's tick is wrapped in its own `catch` that calls
+  `LogError` and swallows, so nothing propagates to the middleware that does capture.
+- **Not strictly a doc contradiction:** `docs/DEPLOYMENT.md:821` scopes its Sentry claim to
+  exceptions escaping "any controller or middleware", which these never do. The only net under
+  them is the monthly manual log-vs-Sentry cross-check in §13.8.
+- `Hubs/AdminOrderHub.cs` has no methods yet, so SignalR hub exceptions are not a live gap.
+
+### Note on urgency
+
+Not exploitable — this is a blind spot, not a vulnerability. It matters at the moment Sentry is
+switched on and someone reads "no new Sentry issues" as "the retry jobs are healthy".
