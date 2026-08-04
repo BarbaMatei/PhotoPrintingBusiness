@@ -96,6 +96,17 @@ public class SentryOptionsWiringTests
         options.DiagnosticLogger.IsEnabled(SentryLevel.Error).Should().BeTrue();
     }
 
+    [Fact]
+    public void Sentry_debug_on_lowers_the_diagnostic_level_rather_than_switching_logging_on()
+    {
+        using var factory = new SentryDebugRequestedFactory();
+
+        var options = BootedOptions(factory);
+
+        options.DiagnosticLevel.Should().Be(SentryLevel.Debug);
+        options.DiagnosticLogger.Should().NotBeNull();
+    }
+
     private static SentryTransaction PiiTransaction()
     {
         const string TraceId = "75302ac48a024bde9a3b3734a82e36c8";
@@ -127,5 +138,14 @@ internal sealed class SentryPiiRequestedFactory : SentryIntegrationFactory
         base.ConfigureWebHost(builder);
         builder.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Sentry:SendDefaultPii"] = "true" }));
+    }
+}
+
+internal sealed class SentryDebugRequestedFactory : SentryIntegrationFactory
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.UseSetting("Sentry:Debug", "true");
     }
 }

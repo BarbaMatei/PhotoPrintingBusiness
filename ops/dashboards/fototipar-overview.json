@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "FotoTipar — overview dashboard pairing with memory-bank/operations/slos.md (bolt 045). Metrics referenced here ship in bolt 044; panels render 'No Data' until then.",
+  "description": "FotoTipar — overview dashboard pairing with memory-bank/operations/slos.md. Every query here is held against a real /metrics exposition by DashboardMetricNamesTests. Panel 8 (ANAF) renders 'No Data' until intent 016 adds the increments; the rest are live.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
