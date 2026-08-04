@@ -18,23 +18,39 @@ public class MetricsCardinalityTests
 {
     private const int Budget = 100;
 
-    public static TheoryData<string> DeclaredInstruments()
+    // The exact count per instrument, not just the ceiling: silent growth from 6 series to 9
+    // stays under any sane budget, so a bare "<= 100" would let cardinality creep unnoticed.
+    // Changing a number here is the acknowledgement that a label set grew.
+    public static TheoryData<string, int> DeclaredInstruments() => new()
     {
-        var data = new TheoryData<string>();
-        foreach (var name in MetricNames.LabelContract.Keys) data.Add(name);
-        return data;
-    }
+        { MetricNames.Instruments.OrdersCreatedTotal, 6 },
+        { MetricNames.Instruments.PaymentWebhookTotal, 12 },
+        { MetricNames.Instruments.AwbCreationTotal, 5 },
+        { MetricNames.Instruments.InvoiceAnafStatusTotal, 4 },
+        { MetricNames.Instruments.UploadSizeBytes, 1 },
+        { MetricNames.Instruments.OrderProcessingDurationSeconds, 1 },
+    };
 
     [Theory]
     [MemberData(nameof(DeclaredInstruments))]
-    public void Every_declared_instrument_is_within_the_cardinality_budget(string instrument)
+    public void Every_declared_instrument_is_within_the_cardinality_budget(
+        string instrument, int expectedSeries)
     {
         var labels = MetricNames.LabelContract[instrument];
 
         var series = labels.Values.Aggregate(1, (acc, values) => acc * values.Length);
 
-        series.Should().BeLessThanOrEqualTo(Budget,
+        series.Should().Be(expectedSeries,
             because: $"{instrument} has labels {string.Join(", ", labels.Keys)}");
+        series.Should().BeLessThanOrEqualTo(Budget);
+    }
+
+    [Fact]
+    public void Every_declared_instrument_has_an_expected_series_count()
+    {
+        // Otherwise a new instrument could be added to the contract and skip the count above.
+        DeclaredInstruments().Select(row => (string)row[0])
+            .Should().BeEquivalentTo(MetricNames.LabelContract.Keys);
     }
 
     [Fact]

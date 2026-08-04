@@ -91,13 +91,20 @@ These cover availability + latency without any application code changes.
 1. Add the constant for the metric name to [`MetricNames.Instruments`](../../src/PhotoPrint.API/Observability/MetricNames.cs).
 2. If it has labels, add the label key constant to `MetricNames.Labels` and the enumerated value constants to a nested class (e.g. `MetricNames.NewResultValues`).
 3. Add the `Counter<long>` / `Histogram<long>` / `Histogram<double>` static property to [`FotoMetrics`](../../src/PhotoPrint.API/Observability/FotoMetrics.cs).
-4. Increment at the call site using `TagList` (stack-allocated, no GC pressure).
-5. Add a test in `PhotoPrint.Tests/Unit/Observability/FotoMetricsTests.cs` that the new instrument has the expected name + type.
-6. Update this document.
-7. If the metric drives a dashboard panel, edit [`ops/dashboards/fototipar-overview.json`](../../ops/dashboards/fototipar-overview.json) and update the SLO doc.
+4. Add the instrument to `MetricNames.LabelContract` — its labels and each label's allowed
+   value set (an empty dictionary for an unlabelled instrument). Two tests fail until you do:
+   the contract and `FotoMetrics` must declare exactly the same instruments.
+5. Increment at the call site using `TagList` (stack-allocated, no GC pressure).
+6. Add a test in `PhotoPrint.Tests/Unit/Observability/FotoMetricsTests.cs` that the new instrument has the expected name + type.
+7. Add an emission test beside the call site that observes it through `MetricCapture` and
+   asserts `ContractViolations()` is empty — a reflection-only test cannot tell whether the
+   call site fires or what tags it attaches.
+8. Add the instrument's exact expected series count to `MetricsCardinalityTests.DeclaredInstruments`.
+9. Update this document.
+10. If the metric drives a dashboard panel, edit [`ops/dashboards/fototipar-overview.json`](../../ops/dashboards/fototipar-overview.json) and update the SLO doc. `DashboardMetricNamesTests` holds every dashboard and SLO query against a real `/metrics` exposition, so a name that nothing emits fails the build rather than rendering "No Data".
 
-Adding a label or label value is the same flow, plus an entry in
-`MetricsCardinalityTests` to keep cardinality bounded.
+Adding a label or a label value is the same flow: extend the nested value class, extend the
+instrument's `LabelContract` entry, and update its expected series count.
 
 ## Cardinality budget
 

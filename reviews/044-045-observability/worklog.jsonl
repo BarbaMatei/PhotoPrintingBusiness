@@ -15,3 +15,9 @@
 {"t":"2026-08-04T21:09:44+03:00","ev":"test-run","round":1,"kind":"red","filter":"DashboardMetricNamesTests","passed":0,"failed":2,"duration_s":1}
 {"t":"2026-08-04T21:09:44+03:00","ev":"test-run","round":1,"kind":"green","filter":"DashboardMetricNamesTests|MetricsEndpointIntegrationTests","passed":9,"failed":0,"duration_s":1}
 {"t":"2026-08-04T21:09:44+03:00","ev":"finding","id":"F20","status":"fixed","commit":"0ef6cf0"}
+{"t":"2026-08-04T21:14:03+03:00","ev":"finding","id":"F14","status":"fixed","commit":"4fb0386"}
+{"t":"2026-08-04T21:14:03+03:00","ev":"micro-review-dispatched","round":1,"cluster":"E-test-vacuity"}
+{"t":"2026-08-04T21:14:04+03:00","ev":"micro-review-dispatched","round":1,"cluster":"F-error-signal-routing"}
+{"t":"2026-08-04T21:14:04+03:00","ev":"test-run","round":1,"kind":"final","filter":"Integration|Unit.Observability|Unit.Services|Unit.Controllers|Unit.Middleware|Unit.Configuration","passed":1059,"failed":0,"duration_s":6}
+{"t":"2026-08-04T21:17:02+03:00","ev":"micro-review-returned","round":1,"cluster":"E-test-vacuity","found":3}
+{"t":"2026-08-04T21:17:02+03:00","ev":"test-run","round":1,"kind":"green","filter":"MetricsCardinalityTests|WebhooksControllerMetricsTests|AwbCreatorTests","passed":44,"failed":0,"duration_s":1}

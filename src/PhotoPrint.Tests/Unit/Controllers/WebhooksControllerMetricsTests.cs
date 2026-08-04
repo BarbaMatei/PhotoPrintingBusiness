@@ -173,6 +173,7 @@ public class WebhooksControllerMetricsTests
         await _sut.EuPlatescIpnAsync(SignedIpn(order.Id, action: "1", order.TotalRon), default);
 
         metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]
@@ -186,6 +187,7 @@ public class WebhooksControllerMetricsTests
         metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Ok))
             .Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     // ── Stripe succeeded: fall-through past the AwaitingPayment guard ─────────
@@ -206,6 +208,7 @@ public class WebhooksControllerMetricsTests
                 (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Failed))
             .Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
 
         _logs.Records.Should().Contain(r =>
             r.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
@@ -233,6 +236,7 @@ public class WebhooksControllerMetricsTests
                 (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Failed))
             .Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]
@@ -250,6 +254,7 @@ public class WebhooksControllerMetricsTests
                 (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.OrderNotFound))
             .Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]
@@ -265,6 +270,7 @@ public class WebhooksControllerMetricsTests
         await _sut.StripeWebhookAsync(default);
 
         metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     // ── The deliberate exception: routine Stripe event types stay out ─────────

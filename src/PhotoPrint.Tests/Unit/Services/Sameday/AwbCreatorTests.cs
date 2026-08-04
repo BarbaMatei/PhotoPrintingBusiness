@@ -542,6 +542,7 @@ public class AwbCreatorTests : IDisposable
                 (MetricNames.Labels.Result, MetricNames.AwbResultValues.Error))
             .Should().HaveCount(1,
                 "an outage that produces no outcome must still reach the SLO denominator");
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]
