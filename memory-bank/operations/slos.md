@@ -1,9 +1,10 @@
 # Service Level Objectives (SLOs)
 
-> **Status:** authored 2026-06-02 alongside bolt 045. Several metric names referenced
-> below ship in bolt 044 (OTel + Prometheus). Until bolt 044 lands, the dashboard
-> panels will show "No Data" — the SLOs themselves still hold as commitments,
-> they just aren't continuously measured yet.
+> **Status:** authored 2026-06-02 alongside bolt 045; queries corrected against the
+> emitted names once bolt 044 landed. SLO 5's instrument exists but nothing increments
+> it yet, so that panel reads "No Data" until intent 016 ships. SLOs 1–4 are measured.
+> A test holds every query below against a real `/metrics` exposition
+> (`DashboardMetricNamesTests`), so a rename that breaks a panel fails the build.
 
 This document records the operational commitments FotoTipar makes to itself.
 Each SLO is a measurable target the team is expected to keep over a defined
@@ -22,9 +23,11 @@ return a non-5xx response.
 
 **Allowed downtime:** ≈ 3 hours 36 minutes per month.
 
-**Source metric** (bolt 044 will emit):
+**Source metric** — the ASP.NET Core instrumentation's request histogram; there is
+no separate request counter, so its `_count` series is the request tally:
 ```
-http_request_total{status_class!="5xx"} / http_request_total
+sum(rate(http_server_request_duration_seconds_count{http_response_status_code!~"5.."}[30d]))
+  / sum(rate(http_server_request_duration_seconds_count[30d]))
 ```
 
 **Why this target:** consumer e-commerce industry baseline; below this the
@@ -43,10 +46,11 @@ producing a Stripe PaymentIntent on the live checkout path.
 **Why this target:** anything over 2 seconds noticeably reduces conversion.
 1.5s leaves headroom for transient network noise.
 
-**Source metric** (bolt 044 will emit):
+**Source metric** — the route label is `http_route`, and it carries the ASP.NET route
+template without a leading slash or the HTTP method:
 ```
-histogram_quantile(0.95,
-  rate(http_request_duration_seconds_bucket{route="POST /api/payments/stripe/intent"}[5m]))
+histogram_quantile(0.95, sum by (le) (rate(
+  http_server_request_duration_seconds_bucket{http_route="api/payments/stripe/intent",http_request_method="POST"}[5m])))
 ```
 
 **Excluded:** time the user spends inside the Stripe Elements iframe — that's
@@ -68,7 +72,7 @@ duplicate/idempotency cases).
 paid but their order is stuck in Pending. The cost of a single miss is
 disproportionate — customer service work, refund handling, lost trust.
 
-**Source metric** (bolt 044 will emit):
+**Source metric:**
 ```
 payment_webhook_total{result="ok"} / payment_webhook_total
 ```
@@ -90,7 +94,7 @@ validation errors (e.g., locker temporarily full) that legitimately can't
 be auto-resolved. 2% gives operations room for manual intervention without
 flagging the bolt 037 retry loop as broken.
 
-**Source metric** (bolt 044 will emit):
+**Source metric:**
 ```
 awb_creation_total{result="ok"} / awb_creation_total
 ```
@@ -112,9 +116,10 @@ by ANAF SPV on first or retried submission within 5 business days
 This SLO is set against the deadline window we have legal obligation to
 meet, not the SDK's immediate response.
 
-**Source metric** (bolt 039 + bolt 044 will emit):
+**Source metric** — the instrument exists but nothing increments it yet; the
+increments ship with intent 016:
 ```
-anaf_submission_total{result="accepted"} / anaf_submission_total
+invoice_anaf_status_total{status="accepted"} / invoice_anaf_status_total
 ```
 
 **Action on breach:** this is a **regulatory compliance issue**, not a

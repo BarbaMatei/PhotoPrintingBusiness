@@ -51,7 +51,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(http_request_total{status_class!=\"5xx\"}[30d])) / sum(rate(http_request_total[30d]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code!~\"5..\"}[30d])) / sum(rate(http_server_request_duration_seconds_count[30d]))",
           "legendFormat": "30d",
           "range": true,
           "refId": "A"
@@ -80,7 +80,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p50",
           "range": true,
           "refId": "A"
@@ -88,7 +88,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p95",
           "range": true,
           "refId": "B"
@@ -96,7 +96,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p99",
           "range": true,
           "refId": "C"
@@ -124,7 +124,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(http_request_total[1m]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count[1m]))",
           "legendFormat": "RPS",
           "range": true,
           "refId": "A"
@@ -162,7 +162,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(http_request_total{status_class=\"5xx\"}[5m])) / sum(rate(http_request_total[5m]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))",
           "legendFormat": "5xx rate (5m)",
           "range": true,
           "refId": "A"
@@ -306,7 +306,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(anaf_submission_total{result=\"accepted\"}[30d])) / sum(rate(anaf_submission_total[30d]))",
+          "expr": "sum(rate(invoice_anaf_status_total{status=\"accepted\"}[30d])) / sum(rate(invoice_anaf_status_total[30d]))",
           "legendFormat": "ANAF submission success",
           "range": true,
           "refId": "A"

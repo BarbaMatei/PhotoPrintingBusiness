@@ -12,3 +12,6 @@
 {"t":"2026-08-04T16:46:27+03:00","ev":"test-run","round":1,"kind":"green","filter":"MetricsCardinalityTests|OrderServiceTests|UploadServiceTests|AwbCreatorTests|WebhooksControllerMetricsTests|AdminOrderServiceTests","passed":135,"failed":0,"duration_s":2}
 {"t":"2026-08-04T16:46:28+03:00","ev":"finding","id":"F15","status":"fixed","commit":"c7b6a75"}
 {"t":"2026-08-04T16:46:28+03:00","ev":"finding","id":"F18","status":"fixed","commit":"98a5671"}
+{"t":"2026-08-04T21:09:44+03:00","ev":"test-run","round":1,"kind":"red","filter":"DashboardMetricNamesTests","passed":0,"failed":2,"duration_s":1}
+{"t":"2026-08-04T21:09:44+03:00","ev":"test-run","round":1,"kind":"green","filter":"DashboardMetricNamesTests|MetricsEndpointIntegrationTests","passed":9,"failed":0,"duration_s":1}
+{"t":"2026-08-04T21:09:44+03:00","ev":"finding","id":"F20","status":"fixed","commit":"0ef6cf0"}
