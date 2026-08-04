@@ -6,3 +6,5 @@
 {"t":"2026-08-04T15:58:00+03:00","ev":"check-returned","round":1,"cluster":"F-error-signal-routing","verdict":"F15 sound-with-corrections; F18 REFUTED (SentryOptions.DiagnosticLogger getter returns null whenever Debug==false, verified empirically in-repo)","tokens":145765}
 {"t":"2026-08-04T16:02:00+03:00","ev":"test-run","round":1,"kind":"red","filter":"MappedServerErrorSentryTests","passed":1,"failed":1,"duration_s":1}
 {"t":"2026-08-04T16:05:00+03:00","ev":"test-run","round":1,"kind":"green","filter":"MappedServerErrorSentryTests|SentryIntegrationTests|ExceptionHandlerMiddleware|Middleware","passed":57,"failed":0,"duration_s":1}
+{"t":"2026-08-04T16:34:20+03:00","ev":"test-run","round":1,"kind":"red","filter":"SentryOptionsWiringTests","passed":3,"failed":1,"duration_s":4}
+{"t":"2026-08-04T16:34:20+03:00","ev":"test-run","round":1,"kind":"green","filter":"SentryOptionsWiringTests|SentryIntegrationTests|SentrySettingsValidator","passed":17,"failed":0,"duration_s":3}

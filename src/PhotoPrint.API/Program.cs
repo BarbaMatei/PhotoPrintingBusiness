@@ -53,7 +53,13 @@ if (sentryEnabled)
         o.SampleRate       = (float)sentryConfig.SampleRate;
         o.TracesSampleRate = sentryConfig.TracesSampleRate;
         o.SendDefaultPii   = false;
-        o.Debug            = sentryConfig.Debug;
+
+        // The SDK discards its diagnostic logger when Debug is false, silently dropping every
+        // event on a 429; the configured flag picks the level below instead of switching it off.
+        o.Debug            = true;
+        o.DiagnosticLevel  = sentryConfig.Debug
+            ? Sentry.SentryLevel.Debug
+            : Sentry.SentryLevel.Warning;
         PhotoPrint.API.Configuration.SentryDataScrubbers.Register(o);
     });
 

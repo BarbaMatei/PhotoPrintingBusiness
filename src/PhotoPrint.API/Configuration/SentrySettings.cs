@@ -19,5 +19,7 @@ public sealed class SentrySettings
     public string? Environment      { get; set; }
     public double  SampleRate       { get; set; } = 1.0;
     public double  TracesSampleRate { get; set; } = 0.1;
+
+    // Verbosity of the SDK's own diagnostics (Warning vs Debug), not an on/off switch.
     public bool    Debug            { get; set; }
 }

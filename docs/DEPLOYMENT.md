@@ -870,7 +870,19 @@ Full env-var reference for Sentry:
 | `Sentry__Environment` | string | ASP.NET env name | Override the environment tag |
 | `Sentry__SampleRate` | double | `1.0` | Fraction of error events to send (1.0 = all) |
 | `Sentry__TracesSampleRate` | double | `0.1` | Fraction of transactions to send for performance tracing |
-| `Sentry__Debug` | bool | `false` | Enable SDK internal logs (noisy; only for diagnosing wiring) |
+| `Sentry__Debug` | bool | `false` | **Verbosity**, not on/off. SDK internal logging is always on (see below); `true` drops it from `Warning` to `Debug` level (noisy; only for diagnosing wiring) |
+
+**SDK-internal failures are always logged.** Sentry's `SentryOptions.DiagnosticLogger`
+property returns `null` whenever `Debug` is `false` — so with `Debug=false` the SDK is not
+merely quiet, it is deaf: an exhausted monthly quota returns 429 and every event is dropped
+inside the SDK with nothing in the application log. `Program.cs` therefore sets `Debug=true`
+unconditionally and uses `Sentry__Debug` to pick `DiagnosticLevel` (`Warning` normally,
+`Debug` when the flag is on). Transport failures, rate limits and rejected envelopes reach
+the Serilog file sink through the SDK's own MEL logger.
+
+**What this still does not give you:** no metric counts dropped events and no health check
+covers Sentry reachability, so "no new Sentry issues" is only trustworthy as far as the log
+grep in §13.8 goes. Grep the log for `Sentry` at `Warning` or above when validating a rollout.
 
 ### 13.5 Recommended rollout sequence
 

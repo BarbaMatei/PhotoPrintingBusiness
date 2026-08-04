@@ -79,6 +79,23 @@ public class SentryOptionsWiringTests
         BootedOptions(factory).SendDefaultPii.Should().BeFalse();
     }
 
+    [Fact]
+    public void The_booted_host_reports_sdk_failures_even_with_sentry_debug_off()
+    {
+        // SentryOptions.DiagnosticLogger's getter returns null whenever Debug is false, so a
+        // reachable logger here is the only thing standing between a 429 quota exhaustion and
+        // silence. SentryIntegrationFactory never sets Sentry:Debug, so this is the shipped default.
+        using var factory = new SentryIntegrationFactory();
+
+        var options = BootedOptions(factory);
+
+        options.DiagnosticLogger.Should().NotBeNull(
+            "a dropped-event report that nothing can log is the failure mode this guards");
+        options.DiagnosticLevel.Should().Be(SentryLevel.Warning);
+        options.DiagnosticLogger!.IsEnabled(SentryLevel.Warning).Should().BeTrue();
+        options.DiagnosticLogger.IsEnabled(SentryLevel.Error).Should().BeTrue();
+    }
+
     private static SentryTransaction PiiTransaction()
     {
         const string TraceId = "75302ac48a024bde9a3b3734a82e36c8";
