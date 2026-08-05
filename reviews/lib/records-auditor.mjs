@@ -112,6 +112,17 @@ function auditTarget(t) {
   const shas = new Map()   // sha -> where
   let holdsCertification = false
 
+  // A fix-round disposition can change after the line was rendered (an owner parks a finding at
+  // hand-back). The line is never edited, so a later correction supersedes the cross-check.
+  const correctedRoundFields = new Map()
+  for (const raw of lines) {
+    let c
+    try { c = JSON.parse(raw) } catch { continue }
+    if (!c?.correction_for || !num(c.correction_for.round)) continue
+    if (!correctedRoundFields.has(c.correction_for.round)) correctedRoundFields.set(c.correction_for.round, new Set())
+    correctedRoundFields.get(c.correction_for.round).add(c.correction_for.field)
+  }
+
   lines.forEach((raw, idx) => {
     const at = `${tag} metrics line ${idx + 1}`
     let o
@@ -119,9 +130,12 @@ function auditTarget(t) {
 
     if (o.correction_for) {
       if (!o.target || !o.date || !o.note) err(`${at}: correction line missing target/date/note`)
-      if (!num(o.correction_for.pass)) err(`${at}: correction_for.pass must be a pass number`)
-      else if (![...passes.keys()].includes(o.correction_for.pass) && !reviewVersions.includes(o.correction_for.pass))
-        err(`${at}: correction_for.pass ${o.correction_for.pass} matches no known pass`)
+      const { pass, round } = o.correction_for
+      if (!num(pass) && !num(round)) err(`${at}: correction_for needs a pass number (pass lines) or a round number (fix-round lines)`)
+      else if (num(pass) && ![...passes.keys()].includes(pass) && !reviewVersions.includes(pass))
+        err(`${at}: correction_for.pass ${pass} matches no known pass`)
+      else if (num(round) && !existsSync(join(t.dir, `resolution-v${round}.md`)))
+        err(`${at}: correction_for.round ${round} matches no resolution-v${round}.md`)
       return
     }
 
@@ -157,6 +171,9 @@ function auditTarget(t) {
         fixRounds.add(o.round)
         const resPath = join(t.dir, `resolution-v${o.round}.md`)
         if (!existsSync(resPath)) badFr(`${at}: fix-round line for round ${o.round} but no resolution-v${o.round}.md`)
+        else if (o.findings && correctedRoundFields.get(o.round)?.has('findings')) {
+          warn(`${at}: findings tallies superseded by a later correction line — cross-check skipped`)
+        }
         else if (o.findings) {
           const tallies = resolutionTallies(readFileSync(resPath, 'utf8'))
           if (!tallies) warn(`${at}: resolution-v${o.round}.md frontmatter has no findings map — tally cross-check skipped`)

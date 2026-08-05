@@ -3,9 +3,9 @@ type: resolution
 target: 044-045-observability
 version: 2
 answers: review-v2.md
-status: in-progress
-fixed_commit: null
-fixes_at: 7e28317
+status: resolved
+fixed_commit: 7e28317
+closed: 2026-08-05
 findings:
   F1:  { status: fixed, commit: 22bede9, note: "new OrderStatusMachine.HasBeenPaid (Paid/Printing/Shipped/Delivered — an explicit set, not an enum comparison: PaymentFailed and Cancelled sort after Delivered) replaces the `== Paid` duplicate guard in BOTH webhook handlers, so a redelivery for a fulfilled order records `duplicate` and logs nothing. Cancelled deliberately still alarms — a paid-then-cancelled order needs a refund. Red proof: 10 tests, incl. 6 new theory cases and a test that every status reachable from Paid except Cancelled is covered, so a future status cannot silently read as unpaid. New surface: HasBeenPaid" }
   F2:  { status: fixed, commit: d932343, note: "ParentBasedSampler REMOVED rather than re-parameterised — with all arms delegating to the same sampler it is a no-op wrapper that keeps the one-arg regression one keystroke away. New ObservabilityExtensions.BuildSampler seam so the pipeline tests build the sampler production uses; the approach-check caught that the planned test could not have reddened, because SamplingPipelineTests built its own copy. 3 new tests at the ActivitySource seam with a remote parent. NOT CLOSED by this fix: the trace id is still caller-supplied and brute-forceable — see decisions. New surface: BuildSampler" }
@@ -13,7 +13,7 @@ findings:
   F4:  { status: fixed, commit: 60c5866, note: "GoogleTokenValidator rethrows a caller's cancellation instead of translating it to BadGatewayException. DEVIATES from my own first draft: the approach-check showed `ct.IsCancellationRequested` alone loses a real Google outage to a late client abort, and I then measured that HttpClient NESTS the exception (TaskCanceledException -> TaskCanceledException -> TimeoutException), so a one-level inner check misses it too — the discriminator is `ex.GetBaseException() is not TimeoutException`. Same class fixed at the body-read catch, which was turning a client abort into a 401 (a forced SPA logout). 2 tests; the timeout-then-abort one reddens under the naive filter, demonstrated. New surface: the catch filter" }
   F5:  { status: fixed, commit: ba1c182, note: "DashboardMetricNamesTests now holds queried label NAMES against the real exposition and literal label VALUES against MetricNames.LabelContract; the panel walker recurses into Grafana row panels (which also closes the deferred D57). Both of the finding's own one-line edits — Labels.Result and WebhookResultValues.Ok — now redden, demonstrated. slos.md's promise rewritten to state exactly what is checked. New surface: LabelUsagesIn + ExposedSeriesLabelsAsync" }
   F6:  { status: fixed, commit: 67b0be7, note: "APPROACH REFUTED AND REPLACED by the adversarial check, which measured that a throw from ApplicationStarted is swallowed by the host and that IHostedService.StartAsync runs before Kestrel binds — my original design would have shipped a check that logs and shrugs. Now IHostedLifecycleService.StartedAsync, the only hook that both sees bound addresses and aborts. Pure decision function ScrapeListenerCheck.Verdict (12 unit tests) refuses boot when ScrapePort is unbound or is the only listener; parses with BindingAddress (Uri rejects '+'/'*' and gives unix sockets port 80) and skips when no addresses are reported, which is what keeps TestServer hosts booting. DEPLOYMENT §14.10 playbook updated incl. the restart-loop presentation. New surface: the guard, the verdict function, the Critical log line" }
-  F7:  { status: open, commit: null, note: "BLOCKED ON THE OWNER — the option chosen at the gate (exclude /metrics and /health at the instrumentation) is NOT AVAILABLE on this stack: IHttpMetricsTagsFeature.MetricsDisabled is .NET 9, and OTel 1.11's metrics AddAspNetCoreInstrumentation takes no options at all, so there is no Filter. Verified by compiling the attempt and by reading the package's XML docs. Needs a re-decision — see decisions" }
+  F7:  { status: deferred, commit: null, note: "PARKED BY THE OWNER 2026-08-05. The option chosen at the gate (exclude /metrics and /health at the instrumentation) is NOT AVAILABLE on this stack: IHttpMetricsTagsFeature.MetricsDisabled is .NET 9, and OTel 1.11's metrics AddAspNetCoreInstrumentation takes no options at all, so there is no Filter — verified by compiling the attempt and reading the package's XML docs. The two remaining routes both change meaning or duplicate per query, so the owner parked it rather than decide under a false premise. SLO 1 therefore still counts ~5,760 self-monitoring requests a day and cannot read below ~99.7%; D46 stays in the ledger as deferred, not fixed" }
   F8:  { status: fixed, commit: d96d6f4, note: "MetricCapture now scopes captures to the emitting test's execution context (AsyncLocal token), because FotoMetrics.Meter is one process-wide static and the old ReferenceEquals meter filter therefore excluded nothing. Chosen over serialising the tests into one non-parallel collection: the set that EMITS business metrics is far wider than the set that captures them, so a collection could not have closed it. 3 tests incl. an ExecutionContext.SuppressFlow case standing in for an unrelated test; removing the gate reddens it, demonstrated. New surface: the AsyncLocal token" }
   F9:  { status: fixed, commit: 82342dd, note: "a breadcrumb carrying a token-bearing URL is pushed through the booted host's real SentryClient and the serialized envelope asserted. Deleting SetBeforeBreadcrumb now reddens exactly this one test — measured; before it left 358 green" }
   F10: { status: fixed, commit: 2c92655, note: "two tests: a mapped 5xx logs at Error WITH the exception attached, and a mapped 4xx stays off Error. Reverting LogError to LogWarning reddens the first — measured; before it left 24 green" }
@@ -49,10 +49,9 @@ Fixer's answer to [review-v2.md](review-v2.md) (immutable). The review named 34 
 **the 11 🟠 (F1–F11, ledger D40–D50) are this fix round**. The 23 🟡/⚪ (F12–F34, D51–D73) are
 deferred to the [ledger](ledger.md) backlog per the README router.
 
-**Status is `in-progress`, not `resolved`: 10 of the 11 are fixed at `7e28317`; F7 (D46) is still
-`open` and needs a second owner decision** because the option chosen at the gate does not exist on
-.NET 8 (see decisions). `fixed_commit` stays null until the round closes; `fixes_at` records the
-tip the finished work sits at.
+**10 of the 11 are fixed at `7e28317`. F7 (D46) is `deferred` — the owner parked it** rather than
+re-decide under a premise that turned out false (see decisions). That makes every finding terminal,
+so the round is `resolved` and a re-review is owed; it does **not** mean SLO 1 is fixed.
 
 **Nothing here is `verified`.** Only `review-v3.md` — a re-review by someone who did not fix —
 can set that status.
@@ -130,7 +129,16 @@ excluding it means excluding *unrouted* requests (`http_route=""`), which also d
 paths. That may be the right definition of "requests to the site", but it is a change in meaning,
 not just a filter. `/health` is a real endpoint and excludes cleanly.
 
-I did not substitute my own judgement here. `D46` stays `open`.
+I did not substitute my own judgement here.
+
+**Owner decision (2026-08-05): parked.** Shown the constraint and the two remaining routes with
+their trade-offs, the owner chose to defer rather than pick one now. `D46` is `deferred` in the
+ledger, not fixed and not silently dropped. **What that leaves standing:** SLO 1's availability
+ratio still includes roughly 5,760 always-200 self-monitoring requests a day, so it cannot read
+below about 99.7% however broken the site is, and the p50/p95/p99 latency panels and the RPS panel
+are diluted the same way. Anyone reading that dashboard before this is drained should know the
+availability number is not yet trustworthy. A re-review may re-raise it; the prior decision is
+attached rather than suppressed, per the README.
 
 ### Cluster A — webhook classification (F1)
 

@@ -137,6 +137,19 @@ A past line is never edited. A correction is its own appended line:
 This works for **closed targets** too (the v1 rule "a note in the next line" silently failed
 once a target stopped producing next lines).
 
+**Correcting a fix-round line** (added 2026-08-05): fix rounds have a `round`, not a `pass`, so
+the key is `correction_for.round`:
+
+```json
+{"target":"<t>","date":"<iso>","correction_for":{"round":2,"field":"findings"},"note":"…"}
+```
+
+This exists because a disposition can change *after* the renderer has written the line — an owner
+parking a finding at hand-back is the case that found it. When a correction targets a round's
+`findings`, the auditor stops cross-checking that line's tallies against the resolution
+frontmatter (they are legitimately out of step) and reports the skip as a warning, so the
+supersession stays visible rather than silent.
+
 ## Example (strict v2 discovery line, abbreviated)
 
 ```json

@@ -79,7 +79,7 @@ by a v1 fix (with the parent `D#`) or pre-dates the fix round. Detail per row is
 | D43 | 🟠 | v2 (F4) | A client abort mid Google sign-in becomes a mapped 502 → Error log + Sentry issue | `Services/GoogleTokenValidator.cs:40` | fix-caused (D15) | open |
 | D44 | 🟠 | v2 (F5) | Metric-name test strips `{…}`, so no label is checked, while `slos.md` promises it is | `Tests/Integration/DashboardMetricNamesTests.cs:144` | fix-caused (D14) | open |
 | D45 | 🟠 | v2 (F6) | Nothing checks `ScrapePort` against a bound listener — silent scrape blackout, or silent return of D1 | `Program.cs:378` | fix-caused (D1) | open |
-| D46 | 🟠 | v2 (F7) | SLO 1 counts `/metrics` scrapes though its prose scopes it to site traffic | `memory-bank/operations/slos.md:29` | pre-existing | open |
+| D46 | 🟠 | v2 (F7) | SLO 1 counts `/metrics` scrapes though its prose scopes it to site traffic | `memory-bank/operations/slos.md:29` | pre-existing | **deferred** — owner parked 2026-08-05: the approved fix (exclude at the instrumentation) needs .NET 9; the two remaining routes each change what SLO 1 measures. Availability still cannot read below ~99.7% |
 | D47 | 🟠 | v2 (F8) | `MetricCapture`'s meter filter is a no-op; the isolation its comment claims does not exist | `Tests/Helpers/MetricCapture.cs:22` | fix-caused (D9/D20) | open |
 | D48 | 🟠 | v2 (F9) | The breadcrumb egress hook has no wiring test — deleting it leaves the suite green | `Configuration/SentryDataScrubbers.cs:59` | fix-caused (D2) | open |
 | D49 | 🟠 | v2 (F10) | The `LogWarning → LogError` half of the D15 fix has no test | `Middleware/ExceptionHandlerMiddleware.cs:82` | fix-caused (D15) | open |
