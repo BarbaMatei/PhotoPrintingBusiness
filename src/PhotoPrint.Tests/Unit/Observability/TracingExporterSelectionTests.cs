@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,7 @@ using Moq;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using PhotoPrint.API.Extensions;
+using PhotoPrint.API.Observability.Sampling;
 
 namespace PhotoPrint.Tests.Unit.Observability;
 
@@ -78,6 +80,37 @@ public class TracingExporterSelectionTests
         using var provider = Build(environmentName, otlpEndpoint: "http://collector:4317");
 
         provider.GetService<TracerProvider>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void The_production_pipeline_installs_our_sampler_without_a_parent_based_wrapper()
+    {
+        using var provider = Build("Production", "http://collector:4317");
+
+        var sampler = InstalledSampler(provider.GetRequiredService<TracerProvider>());
+
+        sampler.Should().BeOfType<DeterministicTraceIdSampler>(
+            "re-wrapping the call site as new ParentBasedSampler(BuildSampler(...)) hands an "
+                + "inbound traceparent the sampling decision again, and the pipeline tests build "
+                + "through the seam so they cannot see it");
+    }
+
+    private static object? InstalledSampler(TracerProvider tracerProvider)
+    {
+        var type = tracerProvider.GetType();
+        const BindingFlags Flags =
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+        var member = (MemberInfo?)type.GetProperty("Sampler", Flags)
+                     ?? type.GetField("Sampler", Flags);
+
+        member.Should().NotBeNull(
+            $"this pin reads the installed sampler off {type.Name}; if the SDK renames it the "
+                + "test has to be rewritten rather than quietly stop checking");
+
+        return member is PropertyInfo property
+            ? property.GetValue(tracerProvider)
+            : ((FieldInfo)member!).GetValue(tracerProvider);
     }
 
     [Fact]
