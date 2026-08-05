@@ -26,6 +26,29 @@ public class SentryOptionsWiringTests
     }
 
     [Fact]
+    public void The_booted_host_decides_its_own_trace_sampling_whatever_the_caller_sent()
+    {
+        using var factory = new SentryIntegrationFactory();
+        var options = BootedOptions(factory);
+
+        options.TracesSampler.Should().NotBeNull(
+            "TracesSampleRate is only consulted when nothing else decided, and an inbound "
+                + "sentry-trace counts as deciding — so a sampler has to answer every time");
+
+        var inboundSaysSampled = new TransactionSamplingContext(
+            new TransactionContext(
+                "GET /api/products",
+                "http.server",
+                isSampled: true,
+                isParentSampled: true),
+            new Dictionary<string, object?>());
+
+        options.TracesSampler!(inboundSaysSampled).Should().Be(
+            options.TracesSampleRate,
+            "a caller must not be able to buy full transaction sampling past our own rate");
+    }
+
+    [Fact]
     public async Task The_booted_host_scrubs_pii_before_the_sdk_sends_an_event()
     {
         using var factory = new SentryIntegrationFactory();

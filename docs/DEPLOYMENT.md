@@ -1153,6 +1153,16 @@ sampling and is the documented way to force a trace on for debugging — send a 
 rather than restarting with a higher rate. It also means the rate is not a hard cap against a
 caller who wants to be traced.
 
+**Sentry's own sampling was a separate door and is closed separately.** `TracesSampleRate` is only
+consulted for a transaction nothing else has already decided, and an inbound `sentry-trace` header
+counts as deciding — so until 2026-08-05 `curl -H 'sentry-trace: <id>-<span>-1'` made every request
+a fully-sampled Sentry transaction regardless of the rate, and `-0` blinded performance monitoring.
+A `TracesSampler` now answers with our configured rate on every call, and Caddy strips `sentry-trace`
+and `baggage` from proxied requests (`traceparent` is deliberately **not** stripped — see above).
+Two limits worth knowing: the edge strip only covers traffic that goes through Caddy, and an inbound
+`sentry-trace` can still supply the trace and parent-span ids, which is trace continuity, not a
+sampling or quota decision.
+
 Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
 is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,
 `Default=1.0` is affordable. `0.1` is the next stop; below that, add the collector's tail

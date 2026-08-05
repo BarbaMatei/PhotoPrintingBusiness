@@ -20,7 +20,12 @@
 	}
 
 	handle {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			# A caller must not choose our Sentry sampling, nor seed the baggage we send onward.
+			# traceparent is deliberately kept: §14.7 documents it as the way to force a trace.
+			header_up -sentry-trace
+			header_up -baggage
+		}
 	}
 
 	header {

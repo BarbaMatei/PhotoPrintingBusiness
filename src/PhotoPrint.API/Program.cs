@@ -54,6 +54,11 @@ if (sentryEnabled)
         o.TracesSampleRate = sentryConfig.TracesSampleRate;
         o.SendDefaultPii   = false;
 
+        // TracesSampleRate alone is only consulted when nothing else decided, and an inbound
+        // sentry-trace counts as deciding — so this must return a value on every call.
+        o.TracesSampler    = _ => sentryConfig.TracesSampleRate;
+
+
         // The SDK discards its diagnostic logger when Debug is false, silently dropping every
         // event on a 429; the configured flag picks the level below instead of switching it off.
         o.Debug            = true;
