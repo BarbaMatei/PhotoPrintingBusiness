@@ -207,7 +207,7 @@ public class WebhooksController : ControllerBase
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
         }
-        else if (action == "0" && order.Status == OrderStatus.Paid)
+        else if (action == "0" && OrderStatusMachine.HasBeenPaid(order.Status))
         {
             // Duplicate IPN for an already-paid order — Stripe-equivalent duplicate path.
             RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
@@ -261,7 +261,7 @@ public class WebhooksController : ControllerBase
         }
 
         // Idempotency: silently ignore if already paid
-        if (order.Status == OrderStatus.Paid)
+        if (OrderStatusMachine.HasBeenPaid(order.Status))
         {
             RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
                 MetricNames.WebhookResultValues.Duplicate);

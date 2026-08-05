@@ -273,6 +273,58 @@ public class WebhooksControllerMetricsTests
         metrics.ContractViolations().Should().BeEmpty();
     }
 
+    // ── A paid order that has moved on is a duplicate, not a lost payment ─────
+
+    [Theory]
+    [InlineData(OrderStatus.Printing)]
+    [InlineData(OrderStatus.Shipped)]
+    [InlineData(OrderStatus.Delivered)]
+    public async Task Stripe_succeeded_for_an_order_past_paid_records_duplicate(OrderStatus status)
+    {
+        var order = SeedOrder(status);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_dup", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_dup");
+        using var metrics = Capture();
+
+        await _sut.StripeWebhookAsync(default);
+
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
+                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Duplicate))
+            .Should().HaveCount(1, "the order was paid and has simply moved on, so a redelivery is a duplicate");
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
+
+        _logs.Records.Should().NotContain(r =>
+            r.Level == Microsoft.Extensions.Logging.LogLevel.Error,
+            "a healthy fulfilled order must not raise a reconciliation alert");
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Printing)]
+    [InlineData(OrderStatus.Shipped)]
+    [InlineData(OrderStatus.Delivered)]
+    public async Task EuPlatesc_paid_notification_for_an_order_past_paid_records_duplicate(OrderStatus status)
+    {
+        var order = SeedOrder(status);
+        using var metrics = Capture();
+
+        await _sut.EuPlatescIpnAsync(SignedIpn(order.Id, action: "0", order.TotalRon), default);
+
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
+                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Duplicate))
+            .Should().HaveCount(1, "the order was paid and has simply moved on, so a redelivery is a duplicate");
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
+
+        _logs.Records.Should().NotContain(r =>
+            r.Level == Microsoft.Extensions.Logging.LogLevel.Error,
+            "a healthy fulfilled order must not raise a reconciliation alert");
+    }
+
     // ── The deliberate exception: routine Stripe event types stay out ─────────
 
     [Fact]

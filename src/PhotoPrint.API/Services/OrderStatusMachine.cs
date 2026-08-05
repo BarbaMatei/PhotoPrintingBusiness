@@ -26,9 +26,22 @@ public static class OrderStatusMachine
         (OrderStatus.Shipped,         OrderStatus.Delivered),
     ];
 
+    // Not an enum comparison: PaymentFailed and Cancelled sort after Delivered but mean the
+    // money is not settled, so ordering by enum value would read them as paid.
+    private static readonly HashSet<OrderStatus> PaidStatuses =
+    [
+        OrderStatus.Paid,
+        OrderStatus.Printing,
+        OrderStatus.Shipped,
+        OrderStatus.Delivered,
+    ];
+
     /// <summary>Returns true if transitioning from <paramref name="from"/> to <paramref name="to"/> is allowed.</summary>
     public static bool CanTransition(OrderStatus from, OrderStatus to)
         => ValidTransitions.Contains((from, to));
+
+    /// <summary>Whether the customer's money is settled for an order in this status.</summary>
+    public static bool HasBeenPaid(OrderStatus status) => PaidStatuses.Contains(status);
 
     /// <summary>
     /// Validates and applies a status transition.
