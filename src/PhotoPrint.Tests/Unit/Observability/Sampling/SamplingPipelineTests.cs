@@ -3,6 +3,7 @@ using FluentAssertions;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Observability;
 using PhotoPrint.API.Observability.Sampling;
 
@@ -22,8 +23,8 @@ public class SamplingPipelineTests : IDisposable
 
         _providers.Add(Sdk.CreateTracerProviderBuilder()
             .AddSource(name)
-            .SetSampler(new ParentBasedSampler(
-                new DeterministicTraceIdSampler(new ObservabilitySamplingSettings { Default = rate })))
+            .SetSampler(ObservabilityExtensions.BuildSampler(
+                new ObservabilitySamplingSettings { Default = rate }))
             .AddProcessor(new ErrorOverrideProcessor())
             .AddProcessor(new SimpleActivityExportProcessor(exporter))
             .Build()!);
@@ -99,6 +100,51 @@ public class SamplingPipelineTests : IDisposable
         }
 
         exporter.Spans.Should().ContainSingle();
+    }
+
+    // ── A caller's traceparent must not decide our sampling ───────────────────
+
+    private static ActivityContext RemoteParent(ActivityTraceFlags flags) =>
+        new(ActivityTraceId.CreateRandom(), ActivitySpanId.CreateRandom(), flags, isRemote: true);
+
+    [Fact]
+    public void An_inbound_unsampled_traceparent_cannot_suppress_a_span_we_would_keep()
+    {
+        var (source, exporter) = Pipeline(rate: 1.0);
+
+        using (source.StartActivity(
+            "GET /api/orders", ActivityKind.Server, RemoteParent(ActivityTraceFlags.None))) { }
+
+        exporter.Spans.Should().ContainSingle("our configured rate decides, not the caller's flag");
+    }
+
+    [Fact]
+    public void An_inbound_sampled_traceparent_cannot_force_a_span_we_would_drop()
+    {
+        var (source, exporter) = Pipeline(rate: 0.0);
+
+        using (source.StartActivity(
+            "GET /api/orders", ActivityKind.Server, RemoteParent(ActivityTraceFlags.Recorded))) { }
+
+        exporter.Spans.Should().BeEmpty("a caller must not be able to buy full tracing past our rate");
+    }
+
+    [Fact]
+    public void An_errored_span_under_an_unsampled_traceparent_is_still_promoted()
+    {
+        // The finding's payload: with the caller's flag honoured, a 500 on this request was
+        // invisible at every rate because the span was dropped before OnEnd could run.
+        var (source, exporter) = Pipeline(rate: 0.0);
+
+        using (var span = source.StartActivity(
+            "GET /api/orders", ActivityKind.Server, RemoteParent(ActivityTraceFlags.None)))
+        {
+            span.Should().NotBeNull();
+            span!.SetStatus(ActivityStatusCode.Error);
+        }
+
+        exporter.Spans.Should().ContainSingle();
+        exporter.Spans[0].Promoted.Should().BeTrue();
     }
 
     public void Dispose()

@@ -19,6 +19,13 @@ on the route's configured rate (e.g. `GET /api/products` → 0.05).
 > a single rate — see the 2026-08-03 amendments. The decision function
 > below is unchanged and still binding; the two route-lookup lines in
 > the snippet are historical.
+>
+> **`ParentBasedSampler` is also gone (2026-08-05 amendment).** Its
+> remote-parent arms are `AlwaysOnSampler`/`AlwaysOffSampler`, so an
+> inbound `traceparent` decided our sampling: `…-00` dropped the span
+> before `OnEnd` could run, which made a 500 on that request invisible
+> at every rate including `1.0`. The sampler is now installed directly
+> and applies the configured rate to every span regardless of parent.
 
 The decision function has to map `(trace_id, rate) → bool`. The naive
 choice is `Random.Shared.NextDouble() < rate`. The non-obvious choice is
@@ -240,12 +247,21 @@ status is `Error`, the override sets that flag and the span exports.
 
 What this costs and what it does not give:
 
-- **Cost is one root span per out-of-rate request, and only for
-  inbound requests.** Child spans are unaffected: `ParentBasedSampler`
-  sends children of a non-recorded local parent to `AlwaysOff`, so
-  within a held request no EF or HttpClient span is created and no SQL
-  text is materialised. Nothing is enqueued for export, so memory does
-  not grow. Holding is restricted to `ActivityKind.Server` for a
+- **Cost is one server span per out-of-rate inbound request** (root or
+  remote-parented — since the 2026-08-05 amendment these are no longer
+  necessarily roots). Child spans are unaffected: an out-of-rate child
+  returns `Drop`, and because its parent trace id is non-default the SDK
+  maps that to "no activity at all", so within a held request no EF or
+  HttpClient span is created and no SQL text is materialised. Nothing is
+  enqueued for export, so memory does not grow.
+  **What that bound does not cover (2026-08-05):** `RecordOnly` maps to
+  `ActivitySamplingResult.AllData`, which sets `IsAllDataRequested` — the
+  flag the ASP.NET Core instrumentation gates all of its work on. So a
+  held request still pays the tag writes, the display-name rewrite and
+  status resolution that `Drop` skipped entirely. Lowering
+  `Sampling:Default` therefore saves child spans and network egress, not
+  the per-request span work; it is an egress lever, not a CPU lever.
+  Holding is restricted to `ActivityKind.Server` for a
   second reason: every EF command a `BackgroundService` issues is a
   **root** span of its own, with no request to belong to, so holding
   those would record `db.statement` for spans no rate will ever

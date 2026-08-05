@@ -20,6 +20,12 @@ public static class ObservabilityExtensions
     public static bool TracingWired(ObservabilitySettings settings, IHostEnvironment environment) =>
         !string.IsNullOrWhiteSpace(settings.Otlp.Endpoint) || environment.IsDevelopment();
 
+    // No ParentBasedSampler: its remote-parent arms are AlwaysOn/AlwaysOff, so an inbound
+    // traceparent would let any caller suppress or force our tracing. The composition tests build
+    // the pipeline through this, so the sampler they exercise is the one production uses.
+    public static Sampler BuildSampler(ObservabilitySamplingSettings settings) =>
+        new DeterministicTraceIdSampler(settings);
+
     public static IServiceCollection AddObservability(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -63,7 +69,7 @@ public static class ObservabilityExtensions
         {
             builder.WithTracing(t =>
             {
-                t.SetSampler(new ParentBasedSampler(new DeterministicTraceIdSampler(settings.Sampling)));
+                t.SetSampler(BuildSampler(settings.Sampling));
                 t.AddProcessor(new ErrorOverrideProcessor());
                 t.AddAspNetCoreInstrumentation(o => o.RecordException = true);
                 t.AddHttpClientInstrumentation();

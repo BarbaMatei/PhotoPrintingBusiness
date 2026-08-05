@@ -1143,10 +1143,23 @@ trace, since the in-app override can only rescue the span that failed, not the c
 already dropped when it started. A rescued span is tagged
 `fototipar.sampling.error_override`.
 
+**A caller's `traceparent` does not change any of this.** The inbound trace id is kept so traces
+join up across services, but the sampled flag on it is ignored: the rate above decides every span.
+Until 2026-08-05 the flag won, which meant `curl -H 'traceparent: 00-…-00'` made a request
+untraceable — including its 500s — at any rate. Forcing a trace on with `…-01` no longer works
+either; to trace one request, raise the rate or use the collector.
+
 Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
 is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,
 `Default=1.0` is affordable. `0.1` is the next stop; below that, add the collector's tail
 sampling rather than reaching for a smaller number.
+
+**What lowering the rate actually saves.** Child spans and network egress — not the per-request
+span work. An out-of-rate inbound request is *held* rather than dropped (that is what lets an
+errored one still export), and a held span has `IsAllDataRequested` set, so the ASP.NET Core
+instrumentation still writes its tags and resolves its status. Treat `Default` as an egress and
+storage lever, not a CPU one; if per-request tracing overhead is the problem, the switch is
+`Observability__Enabled=false`, which also turns off metrics.
 
 ### 14.8 Rollout sequence
 
