@@ -52,7 +52,115 @@ public class DashboardMetricNamesTests
         queried.Should().OnlyContain(name => exposed.Contains(name));
     }
 
+    [Fact]
+    public async Task Every_queried_label_exists_on_the_series_it_filters()
+    {
+        // Checking only metric names lets a renamed label or label value empty a panel while the
+        // build stays green, which is the same silent drift the name check exists to stop.
+        var exposedLabels = await ExposedSeriesLabelsAsync();
+
+        var usages = DashboardQueries().Concat(SloQueries())
+            .SelectMany(LabelUsagesIn)
+            .Distinct()
+            .ToList();
+
+        usages.Should().NotBeEmpty("the queries filter on labels, so there is something to check");
+
+        foreach (var (metric, label, value) in usages)
+        {
+            exposedLabels.Should().ContainKey(metric);
+            exposedLabels[metric].Should().Contain(
+                label,
+                $"'{metric}' is queried with a '{label}' matcher but the exposition carries "
+                    + $"[{string.Join(", ", exposedLabels[metric].Order())}]");
+
+            if (value is null) continue;
+            if (!MetricNames.LabelContract.TryGetValue(metric, out var declared)) continue;
+            if (!declared.TryGetValue(label, out var allowed)) continue;
+
+            allowed.Should().Contain(
+                value,
+                $"'{metric}{{{label}=\"{value}\"}}' is queried but MetricNames declares only "
+                    + $"[{string.Join(", ", allowed)}]");
+        }
+    }
+
+    private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
+    {
+        foreach (Match m in Regex.Matches(expr, @"([a-zA-Z_][a-zA-Z0-9_]*)\s*\{([^}]*)\}"))
+        {
+            var metric = m.Groups[1].Value;
+            if (PromQlKeywords.Contains(metric)) continue;
+
+            foreach (Match matcher in Regex.Matches(
+                m.Groups[2].Value, "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=~|!~|!=|=)\\s*\"([^\"]*)\""))
+            {
+                var op    = matcher.Groups[2].Value;
+                var value = matcher.Groups[3].Value;
+
+                // A negative or regex matcher does not have to name a value that exists.
+                yield return (metric, matcher.Groups[1].Value,
+                    op == "=" ? value : null);
+            }
+        }
+    }
+
+    private static async Task<Dictionary<string, HashSet<string>>> ExposedSeriesLabelsAsync()
+    {
+        var body = await ScrapeAsync();
+        var labels = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var line in body.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed[0] == '#') continue;
+
+            var brace = trimmed.IndexOf('{');
+            if (brace < 0) continue;
+
+            var close = trimmed.IndexOf('}', brace);
+            if (close < 0) continue;
+
+            var series = trimmed[..brace];
+            var bag    = labels.TryGetValue(series, out var existing)
+                ? existing
+                : labels[series] = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (Match pair in Regex.Matches(
+                trimmed[(brace + 1)..close], "([a-zA-Z_][a-zA-Z0-9_]*)\\s*="))
+            {
+                bag.Add(pair.Groups[1].Value);
+            }
+        }
+
+        return labels;
+    }
+
     private static async Task<HashSet<string>> ExposedSeriesNamesAsync()
+    {
+        var body  = await ScrapeAsync();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var line in body.Split('\n'))
+        {
+            if (!line.StartsWith("# TYPE ", StringComparison.Ordinal)) continue;
+            var parts = line.Trim().Split(' ');
+            if (parts.Length < 4) continue;
+
+            var (family, type) = (parts[2], parts[3]);
+            names.Add(family);
+            if (type is "histogram" or "summary")
+            {
+                names.Add($"{family}_bucket");
+                names.Add($"{family}_count");
+                names.Add($"{family}_sum");
+            }
+        }
+
+        return names;
+    }
+
+    private static async Task<string> ScrapeAsync()
     {
         using var factory = new ObservabilityEnabledLoopbackFactory();
         using var client = factory.CreateClient();
@@ -83,58 +191,52 @@ public class DashboardMetricNamesTests
         // A handled request is what populates the ASP.NET Core instrumentation's histogram.
         await client.GetAsync("/health");
 
-        var body = await (await client.GetAsync("/metrics")).Content.ReadAsStringAsync();
-
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var line in body.Split('\n'))
-        {
-            if (!line.StartsWith("# TYPE ", StringComparison.Ordinal)) continue;
-            var parts = line.Trim().Split(' ');
-            if (parts.Length < 4) continue;
-
-            var (family, type) = (parts[2], parts[3]);
-            names.Add(family);
-            if (type is "histogram" or "summary")
-            {
-                names.Add($"{family}_bucket");
-                names.Add($"{family}_count");
-                names.Add($"{family}_sum");
-            }
-        }
-
-        return names;
+        return await (await client.GetAsync("/metrics")).Content.ReadAsStringAsync();
     }
 
-    private static List<string> DashboardMetricNames()
+    private static List<string> DashboardMetricNames() =>
+        DashboardQueries().SelectMany(MetricNamesIn).Distinct(StringComparer.Ordinal).ToList();
+
+    private static List<string> DashboardQueries()
     {
         var json = File.ReadAllText(
             Path.Combine(RepoRoot(), "ops", "dashboards", "fototipar-overview.json"));
         using var document = JsonDocument.Parse(json);
 
-        var names = new List<string>();
-        foreach (var panel in document.RootElement.GetProperty("panels").EnumerateArray())
+        var queries = new List<string>();
+        CollectPanelQueries(document.RootElement.GetProperty("panels"), queries);
+        return queries;
+    }
+
+    // Grafana nests a row's children under the row panel, so a dashboard grouped into rows would
+    // otherwise present no queries at all and still satisfy a non-empty check.
+    private static void CollectPanelQueries(JsonElement panels, List<string> queries)
+    {
+        foreach (var panel in panels.EnumerateArray())
         {
+            if (panel.TryGetProperty("panels", out var nested))
+                CollectPanelQueries(nested, queries);
+
             if (!panel.TryGetProperty("targets", out var targets)) continue;
             foreach (var target in targets.EnumerateArray())
             {
-                if (!target.TryGetProperty("expr", out var expr)) continue;
-                names.AddRange(MetricNamesIn(expr.GetString()!));
+                if (target.TryGetProperty("expr", out var expr) && expr.GetString() is { } q)
+                    queries.Add(q);
             }
         }
-
-        return names.Distinct(StringComparer.Ordinal).ToList();
     }
 
-    private static List<string> SloMetricNames()
+    private static List<string> SloMetricNames() =>
+        SloQueries().SelectMany(MetricNamesIn).Distinct(StringComparer.Ordinal).ToList();
+
+    private static List<string> SloQueries()
     {
         var text = File.ReadAllText(
             Path.Combine(RepoRoot(), "memory-bank", "operations", "slos.md"));
 
-        var names = new List<string>();
-        foreach (Match block in Regex.Matches(text, "```\\r?\\n(.*?)```", RegexOptions.Singleline))
-            names.AddRange(MetricNamesIn(block.Groups[1].Value));
-
-        return names.Distinct(StringComparer.Ordinal).ToList();
+        return Regex.Matches(text, "```\\r?\\n(.*?)```", RegexOptions.Singleline)
+            .Select(block => block.Groups[1].Value)
+            .ToList();
     }
 
     private static IEnumerable<string> MetricNamesIn(string expr)

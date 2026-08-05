@@ -2,9 +2,12 @@
 
 > **Status:** authored 2026-06-02 alongside bolt 045; queries corrected against the
 > emitted names once bolt 044 landed. SLO 5's instrument exists but nothing increments
-> it yet, so that panel reads "No Data" until intent 016 ships. SLOs 1–4 are measured.
-> A test holds every query below against a real `/metrics` exposition
-> (`DashboardMetricNamesTests`), so a rename that breaks a panel fails the build.
+> it yet, so that panel reads "No Data" until intent 016 ships. SLOs 1–4 are measured,
+> with one caveat that matters: **SLO 3 cannot see a total outage** — see the note under
+> it. A test (`DashboardMetricNamesTests`) holds every metric name below against a real
+> `/metrics` exposition, every label name against the labels that exposition carries, and
+> every literal label value against `MetricNames` — so renaming any of the three fails the
+> build rather than quietly emptying a panel.
 
 This document records the operational commitments FotoTipar makes to itself.
 Each SLO is a measurable target the team is expected to keep over a defined
@@ -77,7 +80,14 @@ disproportionate — customer service work, refund handling, lost trust.
 payment_webhook_total{result="ok"} / payment_webhook_total
 ```
 
-**Action on breach:** any single failed webhook that didn't recover via the
+**This ratio cannot detect a total outage.** The counter is incremented inside the
+handler, once a terminal branch is reached. A request that throws before any branch —
+the database being down is the realistic case — increments *nothing*, so both sides of
+the fraction stop moving together and the ratio holds at whatever it last read while
+customers are charged and their orders stay in `AwaitingPayment`. Watch it alongside
+the webhook request rate and the 5xx rate on those two routes, not on its own; the
+throw itself surfaces as a 5xx in SLO 1 and as a Sentry issue. Recorded in
+[`metrics.md`](metrics.md) as a property of the instrument.
 provider's automatic retry should produce an alert. We do not wait for the
 SLO to breach — webhook failures are immediate red flags.
 
