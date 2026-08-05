@@ -20,12 +20,13 @@ public class GoogleTokenValidatorTests
         Func<HttpRequestMessage, HttpResponseMessage> httpHandler) =>
         CreateValidator(new StubHttpHandler(httpHandler));
 
-    private static IGoogleTokenValidator CreateValidator(HttpMessageHandler handler)
+    private static IGoogleTokenValidator CreateValidator(
+        HttpMessageHandler handler, TimeSpan? deadline = null)
     {
         var httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("https://oauth2.googleapis.com/"),
-            Timeout = TimeSpan.FromSeconds(5),
+            Timeout = GoogleTokenValidator.HttpBackstop,
         };
 
         var factory = new Mock<IHttpClientFactory>();
@@ -34,7 +35,7 @@ public class GoogleTokenValidatorTests
         var settings = Options.Create(new GoogleAuthSettings { ClientId = TestClientId });
         var logger = Mock.Of<ILogger<GoogleTokenValidator>>();
 
-        return new GoogleTokenValidator(factory.Object, settings, logger);
+        return new GoogleTokenValidator(factory.Object, settings, logger, deadline);
     }
 
     private static string ValidTokenInfoJson(string? aud = null) => $$"""
@@ -132,14 +133,28 @@ public class GoogleTokenValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAsync_TimeoutThenCallerCancelled_StillThrowsBadGatewayException()
+    public async Task ValidateAsync_GoogleExceedsOurDeadline_ThrowsBadGatewayException()
+    {
+        var validator = CreateValidator(
+            new HangingHttpHandler(), deadline: TimeSpan.FromMilliseconds(50));
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", CancellationToken.None))
+            .Should().ThrowAsync<BadGatewayException>(
+                "a dependency that never answers is an outage, not a cancellation");
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DeadlineElapsedThenTheCallerAborted_StillThrowsBadGatewayException()
     {
         using var caller = new CancellationTokenSource();
-        var validator = CreateValidator(new TimedOutThenAbortedHttpHandler(caller));
+        var validator = CreateValidator(
+            new AbortsTheCallerOnCancellationHttpHandler(caller),
+            deadline: TimeSpan.FromMilliseconds(50));
 
         await validator.Invoking(v => v.ValidateAsync("any-token", caller.Token))
             .Should().ThrowAsync<BadGatewayException>(
-                "the dependency really did fail, so it must still reach the error channel");
+                "Google had already failed, so a user who then gives up must not hide the outage "
+                    + "from Sentry and the 5xx numerator");
     }
 
     private sealed class StubHttpHandler : HttpMessageHandler
@@ -164,18 +179,29 @@ public class GoogleTokenValidatorTests
         }
     }
 
-    // The shape .NET produces when a request times out and only afterwards does the caller cancel.
-    private sealed class TimedOutThenAbortedHttpHandler : HttpMessageHandler
+    // Cancels the caller only once the deadline has already tripped, so both are set by the time
+    // the catch filter runs — the ordering the real world only reaches as a race.
+    private sealed class AbortsTheCallerOnCancellationHttpHandler : HttpMessageHandler
     {
         private readonly CancellationTokenSource _caller;
 
-        public TimedOutThenAbortedHttpHandler(CancellationTokenSource caller) => _caller = caller;
+        public AbortsTheCallerOnCancellationHttpHandler(CancellationTokenSource caller) =>
+            _caller = caller;
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            _caller.Cancel();
-            throw new TaskCanceledException("timeout", new TimeoutException());
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                await _caller.CancelAsync();
+                throw;
+            }
+
+            throw new UnreachableException();
         }
     }
 }
