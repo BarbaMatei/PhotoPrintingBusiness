@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -16,9 +17,11 @@ public class GoogleTokenValidatorTests
     private const string TestClientId = "test-client-id.apps.googleusercontent.com";
 
     private static IGoogleTokenValidator CreateValidator(
-        Func<HttpRequestMessage, HttpResponseMessage> httpHandler)
+        Func<HttpRequestMessage, HttpResponseMessage> httpHandler) =>
+        CreateValidator(new StubHttpHandler(httpHandler));
+
+    private static IGoogleTokenValidator CreateValidator(HttpMessageHandler handler)
     {
-        var handler = new StubHttpHandler(httpHandler);
         var httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("https://oauth2.googleapis.com/"),
@@ -116,6 +119,34 @@ public class GoogleTokenValidatorTests
             .Should().ThrowAsync<UnauthorizedException>();
     }
 
+    // ── A caller who went away is not a Google outage ─────────────────────────
+
+    [Fact]
+    public async Task ValidateAsync_CallerCancelled_PropagatesCancellationInsteadOfBadGateway()
+    {
+        using var caller = new CancellationTokenSource();
+        var validator = CreateValidator(new HangingHttpHandler());
+        await caller.CancelAsync();
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", caller.Token))
+            .Should().ThrowAsync<OperationCanceledException>(
+                "a client abort must reach the middleware's own guard, not become a 502 and a Sentry issue");
+    }
+
+    // The ordering that matters: HttpClient decides timeout-vs-cancellation at throw time, so a
+    // genuine timeout followed by the user closing the tab still carries a TimeoutException inner
+    // while the caller token now reads cancelled. Keying only on the token loses the outage.
+    [Fact]
+    public async Task ValidateAsync_TimeoutThenCallerCancelled_StillThrowsBadGatewayException()
+    {
+        using var caller = new CancellationTokenSource();
+        var validator = CreateValidator(new TimedOutThenAbortedHttpHandler(caller));
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", caller.Token))
+            .Should().ThrowAsync<BadGatewayException>(
+                "the dependency really did fail, so it must still reach the error channel");
+    }
+
     private sealed class StubHttpHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
@@ -126,5 +157,31 @@ public class GoogleTokenValidatorTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(_handler(request));
+    }
+
+    private sealed class HangingHttpHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new UnreachableException();
+        }
+    }
+
+    // Reproduces the shape .NET produces when the request timed out and only afterwards did the
+    // caller cancel: TaskCanceledException with a TimeoutException inner, caller token cancelled.
+    private sealed class TimedOutThenAbortedHttpHandler : HttpMessageHandler
+    {
+        private readonly CancellationTokenSource _caller;
+
+        public TimedOutThenAbortedHttpHandler(CancellationTokenSource caller) => _caller = caller;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            _caller.Cancel();
+            throw new TaskCanceledException("timeout", new TimeoutException());
+        }
     }
 }

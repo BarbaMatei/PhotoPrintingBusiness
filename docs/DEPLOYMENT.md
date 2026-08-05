@@ -827,7 +827,7 @@ When an unhandled exception escapes any controller or middleware, the API:
 What reaches Sentry is decided by **status code, not by whether the exception is mapped**:
 
 - Unhandled exceptions (the `else` branch in `ExceptionHandlerMiddleware`) → 500 → captured.
-- Mapped exceptions whose status is **≥ 500** (today only `BadGatewayException` → 502) → captured, and logged at `Error` rather than `Warning`. A mapped 5xx is a dependency failure that burns SLO 1, so it is not an expected business outcome.
+- Mapped exceptions whose status is **≥ 500** (today only `BadGatewayException` → 502) → captured, and logged at `Error` rather than `Warning`. A mapped 5xx is a dependency failure that burns SLO 1, so it is not an expected business outcome. A caller who disconnects mid-request is **not** one of these: the cancellation is rethrown at the call site rather than translated into a 502, so it reaches the client-abort guard and never becomes a Sentry issue.
 - Mapped exceptions below 500 (`NotFoundException`, `ConflictException`, `UnprocessableEntityException`, …) → **NOT** captured. They are expected business outcomes, and capturing them would exhaust the quota the alert rules in §13.8 depend on.
 
 Standalone `LogError` calls that throw no exception (`sameday.awb.orphaned`, for example) do **not** reach Sentry — they land in the Serilog file sink only. `UseSerilog` is wired with `writeToProviders` left at its default `false` (`SerilogExtensions.cs`), which disables the SDK's MEL-provider auto-capture. Do not flip that flag to "fix" this: it would double-capture every exception the middleware already reports explicitly, and auto-ship every `LogError` in the repo. Cross-check `Error`-level logs against Sentry per §13.8 instead.

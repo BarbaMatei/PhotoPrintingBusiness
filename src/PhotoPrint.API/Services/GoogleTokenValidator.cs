@@ -37,6 +37,14 @@ public class GoogleTokenValidator : IGoogleTokenValidator
             response = await client.GetAsync(
                 $"tokeninfo?id_token={Uri.EscapeDataString(idToken)}", ct);
         }
+        // HttpClient decides timeout-vs-cancellation when it throws and buries a TimeoutException
+        // at the base of the chain, so a request that timed out stays distinguishable even if the
+        // caller cancels a moment later; the token alone would book a real outage as a caller who left.
+        catch (OperationCanceledException ex)
+            when (ct.IsCancellationRequested && ex.GetBaseException() is not TimeoutException)
+        {
+            throw;
+        }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             _logger.LogWarning(ex, "Google tokeninfo endpoint unreachable");
@@ -54,6 +62,10 @@ public class GoogleTokenValidator : IGoogleTokenValidator
         {
             var json = await response.Content.ReadAsStringAsync(ct);
             info = JsonSerializer.Deserialize<GoogleTokenInfoResponse>(json, _jsonOptions);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
