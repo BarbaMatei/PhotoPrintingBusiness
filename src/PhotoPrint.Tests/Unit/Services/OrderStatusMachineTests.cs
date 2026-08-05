@@ -23,8 +23,6 @@ public class OrderStatusMachineTests
     public void HasBeenPaid_IsFalse_ForEveryStatusThatNeedsAHuman(OrderStatus status) =>
         Assert.False(OrderStatusMachine.HasBeenPaid(status));
 
-    // A status added after Delivered must not silently read as "never paid" — that is what
-    // turned a redelivered success webhook into a false reconciliation alarm.
     [Fact]
     public void HasBeenPaid_CoversEveryStatusReachableFromPaid_ExceptCancelled()
     {

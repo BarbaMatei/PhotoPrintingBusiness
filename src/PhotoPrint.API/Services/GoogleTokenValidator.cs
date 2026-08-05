@@ -37,9 +37,7 @@ public class GoogleTokenValidator : IGoogleTokenValidator
             response = await client.GetAsync(
                 $"tokeninfo?id_token={Uri.EscapeDataString(idToken)}", ct);
         }
-        // HttpClient decides timeout-vs-cancellation when it throws and buries a TimeoutException
-        // at the base of the chain, so a request that timed out stays distinguishable even if the
-        // caller cancels a moment later; the token alone would book a real outage as a caller who left.
+        // A timeout keeps a TimeoutException at the base of the chain even once the caller cancels too.
         catch (OperationCanceledException ex)
             when (ct.IsCancellationRequested && ex.GetBaseException() is not TimeoutException)
         {

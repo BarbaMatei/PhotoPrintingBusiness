@@ -20,9 +20,7 @@ public static class ObservabilityExtensions
     public static bool TracingWired(ObservabilitySettings settings, IHostEnvironment environment) =>
         !string.IsNullOrWhiteSpace(settings.Otlp.Endpoint) || environment.IsDevelopment();
 
-    // No ParentBasedSampler: its remote-parent arms are AlwaysOn/AlwaysOff, so an inbound
-    // traceparent would let any caller suppress or force our tracing. The composition tests build
-    // the pipeline through this, so the sampler they exercise is the one production uses.
+    // ParentBasedSampler's remote arms are AlwaysOn/AlwaysOff, so a caller's traceparent would decide.
     public static Sampler BuildSampler(ObservabilitySamplingSettings settings) =>
         new DeterministicTraceIdSampler(settings);
 

@@ -102,8 +102,6 @@ public class SamplingPipelineTests : IDisposable
         exporter.Spans.Should().ContainSingle();
     }
 
-    // ── A caller's traceparent must not decide our sampling ───────────────────
-
     private static ActivityContext RemoteParent(ActivityTraceFlags flags) =>
         new(ActivityTraceId.CreateRandom(), ActivitySpanId.CreateRandom(), flags, isRemote: true);
 
@@ -132,8 +130,6 @@ public class SamplingPipelineTests : IDisposable
     [Fact]
     public void An_errored_span_under_an_unsampled_traceparent_is_still_promoted()
     {
-        // The finding's payload: with the caller's flag honoured, a 500 on this request was
-        // invisible at every rate because the span was dropped before OnEnd could run.
         var (source, exporter) = Pipeline(rate: 0.0);
 
         using (var span = source.StartActivity(
