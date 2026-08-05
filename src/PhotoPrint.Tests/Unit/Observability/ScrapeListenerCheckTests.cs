@@ -86,6 +86,28 @@ public class ScrapeListenerCheckTests
             .Should().NotBeNull().And.Subject.ToString()
             .Should().Contain("only port this process listens on");
 
+    // BindingAddress strips one char less off-Windows: the same unix path throws here, ports 0 on Linux.
+    [Theory]
+    [InlineData("http://unix:/tmp/kestrel.sock")]
+    [InlineData("http://unix:/C:/tmp/app.sock")]
+    [InlineData("http://pipe:/metrics")]
+    public void A_socket_or_pipe_address_is_never_counted_as_a_listener(string portless) =>
+        ScrapeListenerCheck.Verdict([portless, "http://+:9090"], 9090)
+            .Should().NotBeNull().And.Subject.ToString()
+            .Should().Contain("only port this process listens on");
+
+    [Fact]
+    public void A_host_serving_no_tcp_port_at_all_refuses_a_scrape_port() =>
+        ScrapeListenerCheck.Verdict(["http://unix:/C:/tmp/app.sock"], 9090)
+            .Should().NotBeNull().And.Subject.ToString()
+            .Should().Contain("listens on no TCP port");
+
+    [Fact]
+    public void A_dynamic_port_is_not_counted_as_a_listener() =>
+        ScrapeListenerCheck.Verdict(["http://+:0", "http://+:9090"], 9090)
+            .Should().NotBeNull().And.Subject.ToString()
+            .Should().Contain("only port this process listens on");
+
     [Fact]
     public void The_message_names_the_bound_ports_so_an_operator_can_act() =>
         ScrapeListenerCheck.Verdict(TwoListeners, 9191)

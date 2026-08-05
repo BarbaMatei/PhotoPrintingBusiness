@@ -8,30 +8,44 @@ namespace PhotoPrint.API.Observability;
 
 public static class ScrapeListenerCheck
 {
-    // Kestrel reports display names post-bind (http://[::]:8080) but a TestServer host reports the
-    // raw wildcard forms, and Uri rejects both '+' and '*' while silently giving unix sockets port 80.
+    // BindingAddress (Uri rejects '+'/'*') strips one char less off-Windows: one unix path, two answers.
     public static string? Verdict(IReadOnlyCollection<string> boundAddresses, int scrapePort)
     {
         if (scrapePort == 0)
             return null;
 
+        // A host reporting nothing bound is not serving sockets (TestServer) — no topology to be wrong.
+        if (boundAddresses.Count == 0)
+            return null;
+
         var ports = new HashSet<int>();
         foreach (var address in boundAddresses)
         {
+            if (IsSocketOrPipe(address))
+                continue;
+
+            int port;
             try
             {
-                ports.Add(BindingAddress.Parse(address).Port);
+                port = BindingAddress.Parse(address).Port;
             }
             catch (FormatException)
             {
-                // A socket or pipe address carries no port and cannot serve the scrape listener.
+                continue;
             }
+
+            // Port 0 is a dynamic-bind placeholder, not something a scrape can reach.
+            if (port != 0)
+                ports.Add(port);
         }
 
-        // A host that reports nothing bound is not serving sockets at all (TestServer), so there
-        // is no listener topology to be wrong about.
         if (ports.Count == 0)
-            return null;
+        {
+            return $"Observability:Metrics:ScrapePort={scrapePort} is set, but this process "
+                 + $"listens on no TCP port (bound: {string.Join(", ", boundAddresses)}), so no "
+                 + $"scrape can reach it. Add http://+:{scrapePort} to ASPNETCORE_URLS, or set "
+                 + "ScrapePort to 0 and gate at the edge.";
+        }
 
         if (!ports.Contains(scrapePort))
         {
@@ -49,6 +63,17 @@ public static class ScrapeListenerCheck
         }
 
         return null;
+    }
+
+    private static bool IsSocketOrPipe(string address)
+    {
+        var schemeEnd = address.IndexOf("://", StringComparison.Ordinal);
+        if (schemeEnd < 0)
+            return false;
+
+        var host = address.AsSpan(schemeEnd + "://".Length);
+        return host.StartsWith("unix:/", StringComparison.Ordinal)
+            || host.StartsWith("pipe:/", StringComparison.Ordinal);
     }
 
     private static string Describe(IEnumerable<int> ports) => string.Join(", ", ports.Order());
