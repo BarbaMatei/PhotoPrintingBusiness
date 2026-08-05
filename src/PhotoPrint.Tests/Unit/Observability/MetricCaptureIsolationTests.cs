@@ -45,6 +45,21 @@ public class MetricCaptureIsolationTests
     }
 
     [Fact]
+    public void A_second_capture_in_the_same_test_fails_loudly()
+    {
+        using var outer = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        var nested = () =>
+        {
+            using var inner = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+        };
+
+        nested.Should().Throw<InvalidOperationException>(
+            "a nested capture takes the context, so the outer one would record nothing and its "
+                + "'no measurement' assertions would pass vacuously");
+    }
+
+    [Fact]
     public async Task Work_the_test_awaits_is_still_captured()
     {
         using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
