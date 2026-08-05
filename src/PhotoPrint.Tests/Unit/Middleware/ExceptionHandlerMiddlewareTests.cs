@@ -109,6 +109,46 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_MappedServerError_LogsAtErrorWithTheException()
+    {
+        var sut = CreateSut();
+        var context = CreateContext();
+        var boom = new BadGatewayException("upstream is down");
+        RequestDelegate next = _ => throw boom;
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("BadGatewayException")),
+                boom,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_MappedClientError_StaysAtWarning()
+    {
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new NotFoundException("no such order");
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never,
+            "a 404 is an expected business outcome, not a server error");
+    }
+
+    [Fact]
     public async Task InvokeAsync_ImageAllocationBackstopTripped_EmitsReservedBombEvent()
     {
         // A bomb that under-reports its dimensions passes the pixel guard but
