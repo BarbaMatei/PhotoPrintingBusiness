@@ -72,6 +72,38 @@ public class SentryOptionsWiringTests
     }
 
     [Fact]
+    public async Task The_booted_host_scrubs_pii_before_the_sdk_sends_a_breadcrumb()
+    {
+        // Sentry's HttpClient integration copies the outbound URL into a breadcrumb verbatim, and
+        // GoogleTokenValidator puts a live id_token in that query string.
+        using var factory = new SentryIntegrationFactory();
+        var options = BootedOptions(factory);
+
+        var transport = new CapturingSentryTransport();
+        options.Transport = transport;
+        options.AutoSessionTracking = false;
+
+        using (var client = new SentryClient(options))
+        {
+            var scope = new Scope(options);
+            scope.AddBreadcrumb(new Breadcrumb(
+                message: "GET https://oauth2.googleapis.com/tokeninfo",
+                type: "http",
+                data: new Dictionary<string, string>
+                {
+                    ["url"] = $"https://oauth2.googleapis.com/tokeninfo?id_token={GuestToken}",
+                },
+                category: "http"));
+
+            client.CaptureEvent(new SentryEvent(new InvalidOperationException("boom")), scope);
+            await client.FlushAsync(TimeSpan.FromSeconds(10));
+        }
+
+        transport.Payloads.Should().ContainSingle();
+        transport.Payloads[0].Should().NotContain(GuestToken);
+    }
+
+    [Fact]
     public void The_booted_host_keeps_send_default_pii_off_even_when_configuration_asks_for_it()
     {
         using var factory = new SentryPiiRequestedFactory();
