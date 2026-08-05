@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
@@ -104,6 +105,19 @@ public class DashboardMetricNamesTests
                 + "hold them against the app — a new one has to be a deliberate choice, not a silent gap");
     }
 
+    [Fact]
+    public void A_route_template_label_value_is_not_read_as_a_metric_name()
+    {
+        var names = MetricNamesIn(
+            "sum(rate(http_server_request_duration_seconds_bucket"
+            + "{http_route=\"api/orders/{id}/payments\",http_request_method=\"POST\"}[5m]))");
+
+        names.Should().Equal(
+            ["http_server_request_duration_seconds_bucket"],
+            "a label value is not a metric reference, however many braces it contains — reading "
+                + "one as a name fails the build against a metric called 'payments'");
+    }
+
     private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
     {
         // A label value may contain braces (a route template), so stop at the first '}' outside quotes.
@@ -155,6 +169,32 @@ public class DashboardMetricNamesTests
         }
 
         return labels;
+    }
+
+    private static string StripBraceGroups(string expr)
+    {
+        var stripped = new StringBuilder();
+
+        for (var i = 0; i < expr.Length; i++)
+        {
+            if (expr[i] != '{')
+            {
+                stripped.Append(expr[i]);
+                continue;
+            }
+
+            var close = ClosingBrace(expr, i);
+            if (close < 0)
+            {
+                stripped.Append(expr[i..]);
+                break;
+            }
+
+            stripped.Append(' ');
+            i = close;
+        }
+
+        return stripped.ToString();
     }
 
     private static int ClosingBrace(string line, int open)
@@ -276,7 +316,7 @@ public class DashboardMetricNamesTests
     {
         // Label matchers, durations and strings all carry identifiers that are not metric
         // names, so they go before the identifiers are read.
-        var stripped = Regex.Replace(expr, "\\{[^}]*\\}", " ");
+        var stripped = StripBraceGroups(expr);
         stripped = Regex.Replace(stripped, "\\[[^\\]]*\\]", " ");
         stripped = Regex.Replace(stripped, "\"[^\"]*\"", " ");
 
