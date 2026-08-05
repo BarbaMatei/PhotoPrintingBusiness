@@ -66,28 +66,49 @@ public class DashboardMetricNamesTests
 
         usages.Should().NotBeEmpty("the queries filter on labels, so there is something to check");
 
+        var unverifiable = new List<string>();
+
         foreach (var (metric, label, value) in usages)
         {
-            exposedLabels.Should().ContainKey(metric);
+            exposedLabels.Should().ContainKey(
+                metric,
+                $"'{metric}' is queried with a label matcher but the exposition carries no labelled "
+                    + "series for it — either nothing emitted it or the scrape came back empty");
             exposedLabels[metric].Should().Contain(
                 label,
                 $"'{metric}' is queried with a '{label}' matcher but the exposition carries "
                     + $"[{string.Join(", ", exposedLabels[metric].Order())}]");
 
             if (value is null) continue;
-            if (!MetricNames.LabelContract.TryGetValue(metric, out var declared)) continue;
-            if (!declared.TryGetValue(label, out var allowed)) continue;
+
+            // Framework instruments have no declared value set, so theirs are named below instead.
+            if (!MetricNames.LabelContract.TryGetValue(metric, out var declared)
+                || !declared.TryGetValue(label, out var allowed))
+            {
+                unverifiable.Add($"{metric}.{label}=\"{value}\"");
+                continue;
+            }
 
             allowed.Should().Contain(
                 value,
                 $"'{metric}{{{label}=\"{value}\"}}' is queried but MetricNames declares only "
                     + $"[{string.Join(", ", allowed)}]");
         }
+
+        unverifiable.Distinct().Order().Should().Equal(
+            [
+                "http_server_request_duration_seconds_bucket.http_request_method=\"POST\"",
+                "http_server_request_duration_seconds_bucket.http_route=\"api/payments/stripe/intent\"",
+            ],
+            "these literal values name framework labels with no declared value set, so nothing can "
+                + "hold them against the app — a new one has to be a deliberate choice, not a silent gap");
     }
 
     private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
     {
-        foreach (Match m in Regex.Matches(expr, @"([a-zA-Z_][a-zA-Z0-9_]*)\s*\{([^}]*)\}"))
+        // A label value may contain braces (a route template), so stop at the first '}' outside quotes.
+        foreach (Match m in Regex.Matches(
+            expr, @"([a-zA-Z_][a-zA-Z0-9_]*)\s*\{((?:[^{}""]|""[^""]*"")*)\}"))
         {
             var metric = m.Groups[1].Value;
             if (PromQlKeywords.Contains(metric)) continue;
@@ -118,7 +139,7 @@ public class DashboardMetricNamesTests
             var brace = trimmed.IndexOf('{');
             if (brace < 0) continue;
 
-            var close = trimmed.IndexOf('}', brace);
+            var close = ClosingBrace(trimmed, brace);
             if (close < 0) continue;
 
             var series = trimmed[..brace];
@@ -134,6 +155,18 @@ public class DashboardMetricNamesTests
         }
 
         return labels;
+    }
+
+    private static int ClosingBrace(string line, int open)
+    {
+        var quoted = false;
+        for (var i = open + 1; i < line.Length; i++)
+        {
+            if (line[i] == '"' && line[i - 1] != '\\') quoted = !quoted;
+            else if (line[i] == '}' && !quoted) return i;
+        }
+
+        return -1;
     }
 
     private static async Task<HashSet<string>> ExposedSeriesNamesAsync()

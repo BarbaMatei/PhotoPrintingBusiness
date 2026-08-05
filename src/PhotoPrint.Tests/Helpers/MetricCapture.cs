@@ -26,6 +26,14 @@ public sealed class MetricCapture : IDisposable
         var wanted = new HashSet<string>(instrumentNames, StringComparer.Ordinal);
         var meter = FotoMetrics.Meter;
 
+        // A nested capture would take the context and silently blind the outer one.
+        if (Active.Value is not null)
+        {
+            throw new InvalidOperationException(
+                "A MetricCapture is already active in this test. Capture every instrument you need "
+                + "in one MetricCapture — a nested one would stop the outer from recording.");
+        }
+
         _outer = Active.Value;
         Active.Value = _token;
 

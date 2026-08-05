@@ -1146,8 +1146,12 @@ already dropped when it started. A rescued span is tagged
 **A caller's `traceparent` does not change any of this.** The inbound trace id is kept so traces
 join up across services, but the sampled flag on it is ignored: the rate above decides every span.
 Until 2026-08-05 the flag won, which meant `curl -H 'traceparent: 00-…-00'` made a request
-untraceable — including its 500s — at any rate. Forcing a trace on with `…-01` no longer works
-either; to trace one request, raise the rate or use the collector.
+untraceable — including its 500s — at any rate. **The trace id itself still steers the decision**,
+because sampling is a hash of it: a caller who picks an id that hashes below the rate is sampled at
+any rate above zero, and one who picks an id above it is not. That is inherent to deterministic
+sampling and is the documented way to force a trace on for debugging — send a chosen `traceparent`
+rather than restarting with a higher rate. It also means the rate is not a hard cap against a
+caller who wants to be traced.
 
 Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
 is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,

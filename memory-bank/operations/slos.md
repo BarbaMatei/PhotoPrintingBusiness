@@ -6,8 +6,11 @@
 > with one caveat that matters: **SLO 3 cannot see a total outage** — see the note under
 > it. A test (`DashboardMetricNamesTests`) holds every metric name below against a real
 > `/metrics` exposition, every label name against the labels that exposition carries, and
-> every literal label value against `MetricNames` — so renaming any of the three fails the
-> build rather than quietly emptying a panel.
+> every literal label value **on an instrument this app declares** against `MetricNames`, so
+> renaming any of those fails the build. Two matchers are outside that net and the test names
+> them explicitly rather than skipping them: SLO 2's `http_route` and `http_request_method`
+> values sit on the framework's histogram, which has no declared value set — renaming that
+> controller route still empties SLO 2's panel with a green build.
 
 This document records the operational commitments FotoTipar makes to itself.
 Each SLO is a measurable target the team is expected to keep over a defined
@@ -88,6 +91,8 @@ customers are charged and their orders stay in `AwaitingPayment`. Watch it along
 the webhook request rate and the 5xx rate on those two routes, not on its own; the
 throw itself surfaces as a 5xx in SLO 1 and as a Sentry issue. Recorded in
 [`metrics.md`](metrics.md) as a property of the instrument.
+
+**Action on breach:** any single failed webhook that didn't recover via the
 provider's automatic retry should produce an alert. We do not wait for the
 SLO to breach — webhook failures are immediate red flags.
 

@@ -1,10 +1,44 @@
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Moq;
+using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.Tests.Unit.Observability;
 
 public class ScrapeListenerCheckTests
 {
+    [Fact]
+    public void The_guard_is_registered_and_runs_on_a_hook_that_can_abort_the_host()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Observability:Enabled"]                    = "true",
+                ["Observability:ServiceName"]                = "PhotoPrint.API",
+                ["Observability:Metrics:PrometheusEndpoint"] = "/metrics",
+                ["Observability:Metrics:AllowedScrapeIps:0"] = "10.42.0.5",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddObservability(
+            configuration, Mock.Of<IHostEnvironment>(e => e.EnvironmentName == "Testing"));
+
+        var guard = services
+            .Where(d => d.ServiceType == typeof(IHostedService))
+            .Select(d => d.ImplementationType)
+            .SingleOrDefault(t => t?.Name == "ScrapeListenerGuard");
+
+        guard.Should().NotBeNull("AddObservability must register the scrape-listener guard");
+        typeof(IHostedLifecycleService).IsAssignableFrom(guard).Should().BeTrue(
+            "only IHostedLifecycleService.StartedAsync both sees the bound addresses and aborts "
+            + "the host — a plain IHostedService would log and shrug");
+    }
+
     // The display names Kestrel reports post-bind, and the raw forms a host reports before binding.
     private static readonly string[] TwoListeners = ["http://[::]:8080", "http://[::]:9090"];
 

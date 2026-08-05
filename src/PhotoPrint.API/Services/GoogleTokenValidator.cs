@@ -61,7 +61,8 @@ public class GoogleTokenValidator : IGoogleTokenValidator
             var json = await response.Content.ReadAsStringAsync(ct);
             info = JsonSerializer.Deserialize<GoogleTokenInfoResponse>(json, _jsonOptions);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException ex)
+            when (ct.IsCancellationRequested && ex.GetBaseException() is not TimeoutException)
         {
             throw;
         }
