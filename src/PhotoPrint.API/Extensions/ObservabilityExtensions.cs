@@ -57,6 +57,7 @@ public static class ObservabilityExtensions
             .Get<ObservabilitySettings>()!;
 
         services.AddSingleton<MetricsEndpointIpAllowListMiddleware>();
+        services.AddSingleton<IHostedService, ScrapeListenerGuard>();
 
         var builder = services.AddOpenTelemetry()
             .ConfigureResource(r => r.AddService(

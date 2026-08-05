@@ -1222,10 +1222,17 @@ means you are being scanned, not misconfigured.
 **Scraper gets 404** — it is talking to the wrong listener. The API logs one
 `metrics.scrape.wrong_listener ip=… port=…` line per distinct source, naming the port it
 arrived on and the port that would work. Check `ScrapePort` against `ASPNETCORE_URLS`; the port
-must appear in both, and the scrape target must use it.
+must appear in both, and the scrape target must use it. A `ScrapePort` missing from
+`ASPNETCORE_URLS` entirely now refuses to boot rather than 404ing forever, so if the API is
+running you are looking at a scrape target pointed at the wrong port, not a config mismatch.
 
 **API won't boot after a config change** — read the `OptionsValidationException`; it names the
-offending key and, for allow-list entries, the exact entry and how to write it.
+offending key and, for allow-list entries, the exact entry and how to write it. A boot failure
+carrying `observability.metrics.scrape_listener_invalid` at `Critical` is a different check and
+is **not** an `OptionsValidationException`: the scrape port is either not bound at all, or it is
+the process's only listener, so the gate would protect nothing. The message names the configured
+port and the ports actually bound. Under `restart: unless-stopped` this presents as a restart
+loop, so read the Critical line rather than the resulting Caddy 502s.
 
 **Dashboards go dark** — check Prometheus Targets first (scrape-side), then `/metrics` from
 inside the network (API-side). A dark dashboard with a healthy target is a metric-name problem.
