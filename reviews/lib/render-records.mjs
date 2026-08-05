@@ -118,7 +118,7 @@ const baseCommit = existsSync(revPath) ? (/^commit:\s*([0-9a-f]{7,40})\b/m.exec(
 if (!baseCommit) note(`review-v${round}.md commit not found — base_commit will be null`)
 
 const line = {
-  target, round, type: 'fix-round', date: (endIdx === -1 ? new Date(ts(slice[slice.length - 1])) : new Date(ts(slice[endIdx]))).toISOString().slice(0, 10),
+  target, round, type: 'fix-round', date: new Date(ts(slice[slice.length - 1])).toISOString().slice(0, 10),
   base_commit: baseCommit, fixed_commit: fixedCommit,
   findings: tallies,
   tests: { invocations: testRuns.length, red_runs: testRuns.filter(e => e.kind === 'red').length, green_runs: testRuns.filter(e => e.kind === 'green').length, final: finals.length ? { passed: finals[finals.length - 1].passed ?? null, failed: finals[finals.length - 1].failed ?? null } : null },

@@ -97,3 +97,34 @@ different endpoint and a different bolt, so it is not in this target's ledger.
 
 Low. Worth folding into whichever loop next touches health checks or the edge configuration,
 rather than opening a target.
+
+---
+
+## From the 044-045-observability v2 fix round (2026-08-05)
+
+Found by the fix-diff micro-review while checking whether D40's defect class survived elsewhere.
+It does — but in the AWB retry subsystem, not in observability, so it is outside this target's
+finding set and nothing was changed. **The fixer's own class sweep got this wrong**: I inspected
+these sites, judged that they meant strictly `Paid`, and said so in the resolution. The
+micro-review supplied the scenario that shows otherwise.
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟠 | 2026-08-05 | An order advanced to `Printing` while its AWB is still pending falls out of the retry sweep permanently and silently: the sweep, the creator's re-check and the give-up log all match `Status == Paid`, so the order ships with no shipping label and nothing reports it | `BackgroundJobs/AwbRetryJob.cs:86,109`, `Services/Sameday/AwbCreator.cs:92,116` |
+
+### Evidence held
+
+- Read directly: all four sites test `Status == OrderStatus.Paid`. `AwbCreator.cs:92` returns
+  `Skipped("status is Printing, not Paid")`, which is not an error path — nothing alerts on it.
+- `AdminOrderService.UpdateStatusAsync` (`:150-160`) has no AWB guard on the `Paid → Printing`
+  transition, so an admin working the queue during a Sameday outage can trigger this with a normal
+  action.
+- `OrderStatusMachine.HasBeenPaid` (added this round) is the wrong predicate for these sites — they
+  need "paid and not yet shipped", a third notion. Fixing them is an AWB-subsystem behaviour change
+  with its own blast radius, which is why it was recorded rather than folded into an observability
+  round.
+
+### Note on urgency
+
+Not exploitable, and it needs a vendor outage plus an admin action to trigger. But the outcome is a
+parcel shipped with no label and no signal, and the AWB SLO would read healthy throughout.

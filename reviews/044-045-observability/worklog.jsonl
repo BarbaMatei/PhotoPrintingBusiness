@@ -26,3 +26,40 @@
 {"t":"2026-08-04T21:26:29+03:00","ev":"round-end","round":1}
 {"t":"2026-08-05T10:34:58+03:00","ev":"pass-launch","pass":2,"type":"verification"}
 {"t":"2026-08-05T12:24:13+03:00","ev":"pass-records-done","pass":2,"type":"verification"}
+{"t":"2026-08-05T12:38:08+03:00","ev":"round-start","round":2}
+{"t":"2026-08-05T12:39:10+03:00","ev":"triage-done","round":2,"clusters":["A-webhook-classification(F1)","B-sampling-posture(F2,F3)","C-sentry-capture-scope(F4)","D-unenforced-guarantees(F5,F9,F10)","E-scrape-port-boot-check(F6)","F-slo-claims(F7,F11)","G-test-harness-isolation(F8)"],"checks_needed":3,"pre_cleared":0,"gates":4}
+{"t":"2026-08-05T12:39:10+03:00","ev":"gate-open","round":2,"reason":"4 implementation-shape decisions batched: D41 traceparent posture, D46 exclude /metrics from instrumentation vs correct the query+prose, D42 measure the RecordOnly overhead vs correct the claim, D45 abort boot vs warn on a ScrapePort/listener mismatch"}
+{"t":"2026-08-05T12:44:32+03:00","ev":"gate-closed","round":2,"reason":"owner took all 4 recommendations: D41 ignore the caller's sampling decision (keep trace id); D46 exclude /metrics and /health from instrumentation; D42 correct the claim without a benchmark; D45 refuse to start on a ScrapePort/listener mismatch"}
+{"t":"2026-08-05T12:44:32+03:00","ev":"check-dispatched","round":2,"cluster":"B-sampling-posture"}
+{"t":"2026-08-05T12:44:32+03:00","ev":"check-dispatched","round":2,"cluster":"C-sentry-capture-scope"}
+{"t":"2026-08-05T12:44:32+03:00","ev":"check-dispatched","round":2,"cluster":"E-scrape-port-boot-check"}
+{"t":"2026-08-05T12:49:42+03:00","ev":"test-run","round":2,"kind":"red","filter":"WebhooksController|OrderStatusMachineTests","passed":27,"failed":10,"duration_s":1}
+{"t":"2026-08-05T12:51:07+03:00","ev":"test-run","round":2,"kind":"green","filter":"WebhooksController|OrderStatusMachineTests|AdminOrderServiceTests|OrderServiceTests|Unit.Services.Sameday","passed":289,"failed":0,"duration_s":2}
+{"t":"2026-08-05T12:51:07+03:00","ev":"check-returned","round":2,"cluster":"C-sentry-capture-scope","verdict":"sound-with-corrections; the ct.IsCancellationRequested discriminator loses a real Google outage to a late client abort - must also test ex.InnerException is not TimeoutException; both proposed tests were unexercisable (the stub ignores the token); found the same class at GoogleTokenValidator.cs:53 turning a client abort into a 401","tokens":68642}
+{"t":"2026-08-05T12:52:06+03:00","ev":"finding","id":"F1","status":"fixed","commit":"22bede9"}
+{"t":"2026-08-05T12:54:58+03:00","ev":"test-run","round":2,"kind":"red","filter":"GoogleTokenValidatorTests","passed":7,"failed":1,"duration_s":1,"note":"naive ct-only filter reddens the timeout-then-abort test"}
+{"t":"2026-08-05T12:54:58+03:00","ev":"check-returned","round":2,"cluster":"B-sampling-posture","verdict":"sound-with-corrections; the proposed regression test could NOT redden because SamplingPipelineTests builds its own sampler - needs a BuildSampler seam; drop ParentBasedSampler entirely rather than re-parameterise it; test at the ActivitySource seam with a remote parent; and the attack is only half-closed (trace ids are caller-supplied and brute-forceable)","tokens":73820}
+{"t":"2026-08-05T12:59:06+03:00","ev":"test-run","round":2,"kind":"green","filter":"GoogleTokenValidatorTests|SocialAuth|MappedServerErrorSentryTests|ExceptionHandlerMiddleware|AuthController","passed":61,"failed":0,"duration_s":4}
+{"t":"2026-08-05T12:59:06+03:00","ev":"finding","id":"F4","status":"fixed","commit":"60c5866"}
+{"t":"2026-08-05T13:03:13+03:00","ev":"check-returned","round":2,"cluster":"E-scrape-port-boot-check","verdict":"REFUTED - measured: a throw from ApplicationStarted is swallowed by ApplicationLifetime.NotifyStarted and the app keeps serving; plain IHostedService.StartAsync runs before Kestrel binds (address list empty); only IHostedLifecycleService.StartedAsync both sees the addresses and aborts. Also: use BindingAddress.Parse not new Uri; carve out on an empty address list (TestServer) not on environment; compare distinct PORTS not address count","tokens":96091}
+{"t":"2026-08-05T13:03:55+03:00","ev":"test-run","round":2,"kind":"green","filter":"Unit.Observability|TracingExporterSelectionTests","passed":55,"failed":0,"duration_s":1}
+{"t":"2026-08-05T13:03:55+03:00","ev":"finding","id":"F2","status":"fixed","commit":"d932343"}
+{"t":"2026-08-05T13:03:55+03:00","ev":"finding","id":"F3","status":"fixed","commit":"d932343"}
+{"t":"2026-08-05T13:10:48+03:00","ev":"test-run","round":2,"kind":"red","filter":"ExceptionHandlerMiddleware","passed":17,"failed":1,"duration_s":1}
+{"t":"2026-08-05T13:10:48+03:00","ev":"finding","id":"F10","status":"fixed","commit":"2c92655"}
+{"t":"2026-08-05T13:13:22+03:00","ev":"test-run","round":2,"kind":"red","filter":"SentryOptionsWiringTests|SentryDataScrubbersTests","passed":42,"failed":1,"duration_s":2}
+{"t":"2026-08-05T13:13:22+03:00","ev":"finding","id":"F9","status":"fixed","commit":"82342dd"}
+{"t":"2026-08-05T13:26:42+03:00","ev":"test-run","round":2,"kind":"green","filter":"DashboardMetricNamesTests|MetricsEndpointIntegrationTests|MetricsCardinalityTests","passed":22,"failed":0,"duration_s":3}
+{"t":"2026-08-05T13:26:42+03:00","ev":"finding","id":"F5","status":"fixed","commit":"ba1c182"}
+{"t":"2026-08-05T13:26:42+03:00","ev":"finding","id":"F11","status":"fixed","commit":"ba1c182"}
+{"t":"2026-08-05T13:32:10+03:00","ev":"test-run","round":2,"kind":"green","filter":"MetricCaptureIsolationTests|WebhooksControllerMetricsTests|AwbCreatorTests|OrderServiceTests|UploadServiceTests|AdminOrderServiceTests|MetricsEndpointIntegrationTests|DashboardMetricNamesTests","passed":143,"failed":0,"duration_s":9}
+{"t":"2026-08-05T13:32:10+03:00","ev":"finding","id":"F8","status":"fixed","commit":"d96d6f4"}
+{"t":"2026-08-05T13:35:55+03:00","ev":"test-run","round":2,"kind":"green","filter":"Integration|Unit.Observability","passed":269,"failed":0,"duration_s":12}
+{"t":"2026-08-05T13:35:55+03:00","ev":"finding","id":"F6","status":"fixed","commit":"67b0be7"}
+{"t":"2026-08-05T13:36:18+03:00","ev":"micro-review-dispatched","round":2,"cluster":"behaviour-changes(F1,F2,F4,F6)"}
+{"t":"2026-08-05T13:36:18+03:00","ev":"micro-review-dispatched","round":2,"cluster":"contract-and-tests(F3,F5,F8,F9,F10,F11)"}
+{"t":"2026-08-05T13:49:45+03:00","ev":"micro-review-returned","round":2,"cluster":"contract-and-tests(F3,F5,F8,F9,F10,F11)","found":7}
+{"t":"2026-08-05T13:49:45+03:00","ev":"test-run","round":2,"kind":"green","filter":"DashboardMetricNamesTests|MetricCaptureIsolationTests|WebhooksControllerMetricsTests|AwbCreatorTests|OrderServiceTests|UploadServiceTests|AdminOrderServiceTests","passed":136,"failed":0,"duration_s":4}
+{"t":"2026-08-05T13:54:03+03:00","ev":"micro-review-returned","round":2,"cluster":"behaviour-changes(F1,F2,F4,F6)","found":8}
+{"t":"2026-08-05T13:54:52+03:00","ev":"test-run","round":2,"kind":"final","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers","passed":1120,"failed":0,"duration_s":15}
+{"t":"2026-08-05T13:54:52+03:00","ev":"round-end","round":2}
