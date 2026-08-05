@@ -14,6 +14,19 @@ triaged minor deferred *within* its target; this file is what nobody has triaged
 
 Severities are the recorder's first read, not a pass verdict.
 
+## test suite — a flaky test, no loop opened
+
+🟡 `src/PhotoPrint.Tests/Unit/Services/EmailRetryJobTests.cs` —
+`Processing_SuccessfulSend_MarksEmailAsSent` fails intermittently under parallel load and passes
+in isolation. Noticed during the 044-045-observability v3 fix round
+([resolution](044-045-observability/resolution-v3.md)) as unexplained collateral in a mutation run.
+
+**Evidence, both measured 2026-08-05 at `cd99cdb`:** in a 1139-test scoped run it failed after
+3 s; re-run alone (`--filter FullyQualifiedName~EmailRetryJobTests`) it passed 4/4 in 1 s. It was
+green in the same broad filter before and after, so it is not caused by that round's changes.
+Not investigated further — it was outside the finding set, and a flaky test is exactly the kind of
+thing that gets blamed on whatever change is in flight when it fires.
+
 ## auth / rate limiting — no loop opened
 
 Found incidentally during the 044-045-observability v1 fix round

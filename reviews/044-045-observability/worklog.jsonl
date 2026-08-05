@@ -65,3 +65,32 @@
 {"t":"2026-08-05T13:54:52+03:00","ev":"round-end","round":2}
 {"t":"2026-08-05T14:24:58+03:00","ev":"pass-launch","pass":3,"type":"verification"}
 {"t":"2026-08-05T15:37:42+03:00","ev":"pass-records-done","pass":3,"type":"verification"}
+{"t":"2026-08-05T15:43:45+03:00","ev":"round-start","round":3}
+{"t":"2026-08-05T15:45:26+03:00","ev":"triage-done","round":3,"clusters":9,"checks_needed":4,"pre_cleared":0,"gates":4}
+{"t":"2026-08-05T15:45:26+03:00","ev":"gate-open","round":3,"reason":"4 batched decisions: F4 Sentry sentry-trace posture now vs defer while Sentry is off, F7 what SLO 3 should measure, F9 re-enqueue vs alarm-only for an order past Paid with no AWB, F2 accept a 502 for an outage the caller abandoned"}
+{"t":"2026-08-05T15:49:28+03:00","ev":"gate-closed","round":3,"reason":"all four answered as recommended: D41 posture for sentry-trace + edge strip; SLO 3 numerator ok+duplicate and signature_invalid out of the denominator; widen the give-up alarm query only; make the timeout carve-out work via a chain walk"}
+{"t":"2026-08-05T15:49:28+03:00","ev":"check-dispatched","round":3,"cluster":"A-scrape-port-parsing"}
+{"t":"2026-08-05T15:49:28+03:00","ev":"check-dispatched","round":3,"cluster":"B-cancellation-discriminator"}
+{"t":"2026-08-05T15:49:28+03:00","ev":"check-dispatched","round":3,"cluster":"D-sentry-trace-sampler"}
+{"t":"2026-08-05T15:49:28+03:00","ev":"check-dispatched","round":3,"cluster":"I-awb-sweep"}
+{"t":"2026-08-05T16:03:50+03:00","ev":"check-returned","round":3,"cluster":"A-scrape-port-parsing","verdict":"needs-revision","tokens":53298}
+{"t":"2026-08-05T16:03:50+03:00","ev":"check-returned","round":3,"cluster":"B-cancellation-discriminator","verdict":"needs-revision","tokens":50963}
+{"t":"2026-08-05T16:03:50+03:00","ev":"check-returned","round":3,"cluster":"I-awb-sweep","verdict":"needs-revision","tokens":58184}
+{"t":"2026-08-05T16:03:50+03:00","ev":"check-returned","round":3,"cluster":"D-sentry-trace-sampler","verdict":"needs-revision","tokens":83935}
+{"t":"2026-08-05T16:03:50+03:00","ev":"test-run","round":3,"kind":"red","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers","passed":1120,"failed":9,"duration_s":50}
+{"t":"2026-08-05T16:03:50+03:00","ev":"test-run","round":3,"kind":"green","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers","passed":1129,"failed":0,"duration_s":14}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F1","status":"fixed","commit":"c363b7a"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F3","status":"fixed","commit":"feb5636"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F5","status":"fixed","commit":"2a82f01"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F6","status":"fixed","commit":"163f912"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F11","status":"fixed","commit":"cdb5554"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F2","status":"fixed","commit":"7c002a0"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F9","status":"fixed","commit":"55f6441"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F7","status":"fixed","commit":"caeb866"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F8","status":"fixed","commit":"caeb866"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F10","status":"fixed","commit":"f81626f"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"finding","round":3,"id":"F4","status":"fixed","commit":"f2a7ef9"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"micro-review-dispatched","round":3,"cluster":"A,C,E,F,H-first-five"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"micro-review-returned","round":3,"cluster":"A,C,E,F,H-first-five","found":7}
+{"t":"2026-08-05T16:33:19+03:00","ev":"micro-review-dispatched","round":3,"cluster":"B,D,G,I-behaviour-and-docs"}
+{"t":"2026-08-05T16:33:19+03:00","ev":"test-run","round":3,"kind":"final","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers|Unit.BackgroundJobs","passed":1133,"failed":0,"duration_s":13}
