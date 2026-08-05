@@ -101,7 +101,7 @@ These cover availability + latency without any application code changes.
    call site fires or what tags it attaches.
 8. Add the instrument's exact expected series count to `MetricsCardinalityTests.DeclaredInstruments`.
 9. Update this document.
-10. If the metric drives a dashboard panel, edit [`ops/dashboards/fototipar-overview.json`](../../ops/dashboards/fototipar-overview.json) and update the SLO doc. `DashboardMetricNamesTests` holds every dashboard and SLO query against a real `/metrics` exposition, so a name that nothing emits fails the build rather than rendering "No Data".
+10. If the metric drives a dashboard panel, edit [`ops/dashboards/fototipar-overview.json`](../../ops/dashboards/fototipar-overview.json) and update the SLO doc. `DashboardMetricNamesTests` holds every dashboard and SLO query against a real `/metrics` exposition, so **a queried name this repo does not declare** fails the build rather than rendering "No Data". It does **not** prove production emits it: the exposition is seeded by the test itself, one observation per declared instrument, so a panel on a declared-but-never-incremented metric (`invoice_anaf_status_total` today) stays green. The test also expects every queried metric to appear in that seeded exposition, so a panel on an instrument the test does not emit needs a seed added there.
 
 Adding a label or a label value is the same flow: extend the nested value class, extend the
 instrument's `LabelContract` entry, and update its expected series count.
