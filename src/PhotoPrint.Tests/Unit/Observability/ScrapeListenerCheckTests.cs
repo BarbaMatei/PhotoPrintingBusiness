@@ -1,10 +1,14 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Moq;
 using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Observability;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Observability;
 
@@ -85,6 +89,35 @@ public class ScrapeListenerCheckTests
         ScrapeListenerCheck.Verdict(["http://unix:/tmp/kestrel.sock", "http://+:9090"], 9090)
             .Should().NotBeNull().And.Subject.ToString()
             .Should().Contain("only port this process listens on");
+
+    [Fact]
+    public async Task A_real_host_refuses_to_start_and_names_the_reason_at_critical()
+    {
+        var logs = new LogCapture();
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(new LogCaptureProvider(logs));
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Observability:Enabled"]                    = "true",
+            ["Observability:ServiceName"]                = "PhotoPrint.API",
+            ["Observability:Metrics:PrometheusEndpoint"] = "/metrics",
+            ["Observability:Metrics:ScrapePort"]         = "9090",
+            ["Observability:Metrics:AllowedScrapeIps:0"] = "127.0.0.1",
+        });
+        builder.Services.AddObservability(builder.Configuration, builder.Environment);
+
+        await using var app = builder.Build();
+
+        await app.Invoking(a => a.StartAsync())
+            .Should().ThrowAsync<InvalidOperationException>(
+                "TestServer reports no addresses, so only a real Kestrel boot proves the abort")
+            .WithMessage("*not a port this process listens on*");
+
+        logs.CountStartingWith("observability.metrics.scrape_listener_invalid", LogLevel.Critical)
+            .Should().Be(1, "DEPLOYMENT 14.10 tells operators to grep for exactly this line");
+    }
 
     // BindingAddress strips one char less off-Windows: the same unix path throws here, ports 0 on Linux.
     [Theory]

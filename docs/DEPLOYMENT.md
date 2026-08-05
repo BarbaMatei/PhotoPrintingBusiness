@@ -1170,9 +1170,11 @@ storage lever, not a CPU one; if per-request tracing overhead is the problem, th
 1. **Pre-flight.** Deploy with `Observability__Enabled=false`. Confirm `/metrics` is not served
    and the API boots clean — proves the disabled path.
 2. **Stage 1 — metrics only, staging.** Set `Enabled=true`, `ScrapePort=9090`, the allow-list,
-   and leave `Otlp__Endpoint` blank. Outside Development that means no trace pipeline is
-   built — metrics only, nothing on stdout — and the boot log says so. Run the 14.9 checks.
-   Watch for a week.
+   and leave `Otlp__Endpoint` blank. `ASPNETCORE_URLS` must already carry `http://+:9090`
+   alongside the API port — a `ScrapePort` the process does not listen on refuses to boot (14.10),
+   so a host that has only the API port will restart-loop rather than 404. Outside Development
+   that means no trace pipeline is built — metrics only, nothing on stdout — and the boot log says
+   so. Run the 14.9 checks. Watch for a week.
 3. **Stage 2 — traces.** Point `Otlp__Endpoint` at the collector. Confirm spans arrive and the
    volume matches what `Sampling__Default` implies.
 4. **Stage 3 — production.** Same flags, production allow-list. Re-run 14.9 against the live
@@ -1233,10 +1235,12 @@ running you are looking at a scrape target pointed at the wrong port, not a conf
 **API won't boot after a config change** — read the `OptionsValidationException`; it names the
 offending key and, for allow-list entries, the exact entry and how to write it. A boot failure
 carrying `observability.metrics.scrape_listener_invalid` at `Critical` is a different check and
-is **not** an `OptionsValidationException`: the scrape port is either not bound at all, or it is
-the process's only listener, so the gate would protect nothing. The message names the configured
-port and the ports actually bound. Under `restart: unless-stopped` this presents as a restart
-loop, so read the Critical line rather than the resulting Caddy 502s.
+is **not** an `OptionsValidationException`. It fires for one of three reasons: the scrape port is
+not bound at all; it is the process's only listener, so the gate would protect nothing; or the
+process listens on no TCP port at all (only a unix socket or a named pipe), so nothing could
+scrape it. The message names the configured port, and either the ports actually bound or — in the
+third case — the addresses. Under `restart: unless-stopped` this presents as a restart loop, so
+read the Critical line rather than the resulting Caddy 502s.
 
 **Dashboards go dark** — check Prometheus Targets first (scrape-side), then `/metrics` from
 inside the network (API-side). A dark dashboard with a healthy target is a metric-name problem.
