@@ -573,6 +573,20 @@ observed live — the active total therefore understates the work; (2) the sessi
 overnight by the owner, which the schema's 30-minute gap cap correctly books as ~28h of `idle`.
 Neither is a property of the round's speed.
 
+## Owner decisions (recorded by the loop driver, 2026-08-04)
+
+- **F18's production posture change is ACCEPTED.** The owner was shown that Sentry's SDK
+  `Debug` flag is now on permanently in production — the only way its diagnostic logger exists
+  at all, since the getter returns null when `Debug` is false — and that `Sentry:Debug` has
+  been demoted to a verbosity selector (`Warning` normally, `Debug` when set). Accepted
+  2026-08-04. The re-review should judge the fix as delivered, not reopen the posture.
+- **The background-job Sentry gap stays in the inbox.** The owner declined to open a review
+  target for it (2026-08-04), consistent with the 2026-08-03 ruling on the rate-limiter
+  siblings. It is recorded with its evidence in [`reviews/inbox.md`](../inbox.md); it does not
+  enter this ledger and does not re-arm this loop.
+- **The branch was pushed** (2026-08-04), so `e965c99` is reachable from `origin` and the
+  records auditor exits clean — the pushed-evidence check that was the round's one red item.
+
 ## Owner decisions (recorded by the loop driver, 2026-08-03)
 
 - **F5 — deleting per-route sampling is ACCEPTED.** The owner reviewed the trade-off (the
