@@ -129,6 +129,29 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_UnmappedServerError_LogsAtErrorWithTheException()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        var boom = new InvalidOperationException("Secret internal detail");
+        RequestDelegate next = _ => throw boom;
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("InvalidOperationException")),
+                boom,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once,
+            "every unmapped exception becomes a 500, and §13.8 reconciles Error-level logs "
+                + "against Sentry — this is the branch most 500s take");
+    }
+
+    [Fact]
     public async Task InvokeAsync_MappedClientError_StaysAtWarning()
     {
         var sut = CreateSut();
