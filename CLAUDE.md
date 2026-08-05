@@ -75,6 +75,10 @@ whole suite by default.**
   discussion where it was decided (that history lives in commits/resolution files); (b) a short
   behaviour description on an **interface** member (`///`, JSDoc) — never on concrete classes.
   When you edit a file, delete non-essential comments you pass through.
+  Enforced at commit time: `.githooks/pre-commit` blocks any commit adding comment lines
+  (`//` and `///` alike) and lists them. Delete the narration and recommit; only if every
+  listed line is genuinely allowed, re-run the same commit with `COMMENTS_OK=1`.
+  Never `--no-verify`.
 - Never edit `reviews/**/review-v*.md` (immutable) — fixers respond in resolution files.
 - Standards are **descriptive**: if you change reality (a version, a tool, a contract), update
   the standard that states it in the same change.
