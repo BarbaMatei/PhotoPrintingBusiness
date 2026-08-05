@@ -11,16 +11,24 @@ public sealed record MetricMeasurement(
 
 public sealed class MetricCapture : IDisposable
 {
+    // FotoMetrics.Meter is one process-wide static, so a MeterListener sees every test's
+    // measurements. The execution context is what separates them: it flows into the code this
+    // test calls and into nothing another test calls.
+    private static readonly AsyncLocal<Guid?> Active = new();
+
     private readonly MeterListener _listener = new();
     private readonly ConcurrentQueue<MetricMeasurement> _measurements = new();
+    private readonly Guid _token = Guid.NewGuid();
+    private readonly Guid? _outer;
 
     public MetricCapture(params string[] instrumentNames)
     {
         var wanted = new HashSet<string>(instrumentNames, StringComparer.Ordinal);
         var meter = FotoMetrics.Meter;
 
-        // FotoMetrics.Meter is a process-wide static and xUnit runs test classes in parallel,
-        // so match the meter instance too — a same-named instrument from elsewhere is not ours.
+        _outer = Active.Value;
+        Active.Value = _token;
+
         _listener.InstrumentPublished = (instrument, listener) =>
         {
             if (ReferenceEquals(instrument.Meter, meter) && wanted.Contains(instrument.Name))
@@ -76,11 +84,18 @@ public sealed class MetricCapture : IDisposable
         return violations;
     }
 
-    public void Dispose() => _listener.Dispose();
+    public void Dispose()
+    {
+        Active.Value = _outer;
+        _listener.Dispose();
+    }
 
     private void Capture(
         Instrument instrument, double value, ReadOnlySpan<KeyValuePair<string, object?>> tags)
     {
+        if (Active.Value != _token)
+            return;
+
         var map = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (var tag in tags)
             map[tag.Key] = tag.Value?.ToString();
