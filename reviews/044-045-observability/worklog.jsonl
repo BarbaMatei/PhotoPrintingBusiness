@@ -63,3 +63,5 @@
 {"t":"2026-08-05T13:54:03+03:00","ev":"micro-review-returned","round":2,"cluster":"behaviour-changes(F1,F2,F4,F6)","found":8}
 {"t":"2026-08-05T13:54:52+03:00","ev":"test-run","round":2,"kind":"final","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers","passed":1120,"failed":0,"duration_s":15}
 {"t":"2026-08-05T13:54:52+03:00","ev":"round-end","round":2}
+{"t":"2026-08-05T14:24:58+03:00","ev":"pass-launch","pass":3,"type":"verification"}
+{"t":"2026-08-05T15:37:42+03:00","ev":"pass-records-done","pass":3,"type":"verification"}
