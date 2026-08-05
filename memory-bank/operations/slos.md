@@ -2,15 +2,25 @@
 
 > **Status:** authored 2026-06-02 alongside bolt 045; queries corrected against the
 > emitted names once bolt 044 landed. SLO 5's instrument exists but nothing increments
-> it yet, so that panel reads "No Data" until intent 016 ships. SLOs 1–4 are measured,
-> with one caveat that matters: **SLO 3 cannot see a total outage** — see the note under
-> it. A test (`DashboardMetricNamesTests`) holds every metric name below against a real
+> it yet, so that panel reads "No Data" until intent 016 ships. SLOs 2–4 are measured.
+> **Two caveats that matter:**
+>
+> - **SLO 1's denominator is not customer traffic.** It counts every instrumented request,
+>   including roughly 5,760 always-200 `/health` and `/metrics` self-monitoring requests a
+>   day, so the ratio cannot read below about 99.7% however broken the site is — and the
+>   latency and RPS panels are diluted the same way. Do not read the availability number as
+>   availability until this is drained; watch the 5xx rate on customer routes instead.
+> - **SLO 3 cannot see a total outage** — see the note under it.
+>
+> A test (`DashboardMetricNamesTests`) holds every metric name below against a real
 > `/metrics` exposition, every label name against the labels that exposition carries, and
 > every literal label value **on an instrument this app declares** against `MetricNames`, so
 > renaming any of those fails the build. Two matchers are outside that net and the test names
 > them explicitly rather than skipping them: SLO 2's `http_route` and `http_request_method`
 > values sit on the framework's histogram, which has no declared value set — renaming that
-> controller route still empties SLO 2's panel with a green build.
+> controller route still empties SLO 2's panel with a green build. A value named by a negative
+> or regex matcher (`!=`, `=~`) is outside the net for the same reason: its label name is
+> checked, its value is not.
 
 This document records the operational commitments FotoTipar makes to itself.
 Each SLO is a measurable target the team is expected to keep over a defined
@@ -78,9 +88,12 @@ duplicate/idempotency cases).
 paid but their order is stuck in Pending. The cost of a single miss is
 disproportionate — customer service work, refund handling, lost trust.
 
-**Source metric:**
+**Source metric** — a duplicate receipt correctly answered with a `200` is a success by the
+definition above, so it belongs in the numerator; an invalid signature is not a request this app
+failed (the endpoint is anonymous, so anyone can post one), so it belongs in neither side:
 ```
-payment_webhook_total{result="ok"} / payment_webhook_total
+(sum(payment_webhook_total{result="ok"}) + sum(payment_webhook_total{result="duplicate"}))
+  / sum(payment_webhook_total{result!="signature_invalid"})
 ```
 
 **This ratio cannot detect a total outage.** The counter is incremented inside the
@@ -88,8 +101,9 @@ handler, once a terminal branch is reached. A request that throws before any bra
 the database being down is the realistic case — increments *nothing*, so both sides of
 the fraction stop moving together and the ratio holds at whatever it last read while
 customers are charged and their orders stay in `AwaitingPayment`. Watch it alongside
-the webhook request rate and the 5xx rate on those two routes, not on its own; the
-throw itself surfaces as a 5xx in SLO 1 and as a Sentry issue. Recorded in
+the webhook request rate and the 5xx rate on those two routes, not on its own; the throw
+surfaces as a 5xx **on those routes** and as a Sentry issue — not dependably in SLO 1, whose
+denominator is diluted by self-monitoring traffic (see the status note). Recorded in
 [`metrics.md`](metrics.md) as a property of the instrument.
 
 **Action on breach:** any single failed webhook that didn't recover via the

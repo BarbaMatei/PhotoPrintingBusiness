@@ -228,7 +228,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(payment_webhook_total{result=\"ok\"}[7d])) / sum(rate(payment_webhook_total[7d]))",
+          "expr": "(sum(rate(payment_webhook_total{result=\"ok\"}[7d])) + sum(rate(payment_webhook_total{result=\"duplicate\"}[7d]))) / sum(rate(payment_webhook_total{result!=\"signature_invalid\"}[7d]))",
           "legendFormat": "Payment webhook success",
           "range": true,
           "refId": "A"
