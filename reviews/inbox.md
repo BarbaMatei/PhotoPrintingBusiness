@@ -1,6 +1,6 @@
 ---
 type: review-inbox
-updated: 2026-08-03
+updated: 2026-08-05
 ---
 
 # Inbox — findings without a target
@@ -71,3 +71,29 @@ Same defect class one layer out, but outside the review's finding set, so nothin
 
 Not exploitable — this is a blind spot, not a vulnerability. It matters at the moment Sentry is
 switched on and someone reads "no new Sentry issues" as "the retry jobs are healthy".
+
+---
+
+## From the 044-045-observability v2 verification pass (2026-08-05)
+
+Noticed by the cluster A lens while reviewing the `/metrics` gate. Adjacent to that fix but a
+different endpoint and a different bolt, so it is not in this target's ledger.
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟡 | 2026-08-05 | `/health` is proxied by Caddy with no gate and echoes each health check's `Data` bag verbatim to any anonymous caller — the gating question `/metrics` just spent a whole cluster on, unasked for the sibling endpoint | `HealthChecks/HealthCheckResponseWriter.cs:28-31`, mapped at `Program.cs:406` |
+
+### Evidence held
+
+- Read directly: `WriteAsync` copies every `entry.Value.Data` key into the JSON response
+  (`HealthCheckResponseWriter.cs:28-31`). `Caddyfile` has no `/health` rule, so it falls to the
+  catch-all `reverse_proxy api:8080` and is publicly reachable.
+- **Today the exposure is small and should not be overstated:** the only populated bag is
+  `DiskHealthCheck`'s `freeGb` (`DiskHealthCheck.cs:32`); `DbHealthCheck` adds none. The finding is
+  the shape — any future check that attaches connection strings, hostnames or version data to its
+  `Data` publishes them — not a live leak.
+
+### Note on urgency
+
+Low. Worth folding into whichever loop next touches health checks or the edge configuration,
+rather than opening a target.
