@@ -95,7 +95,8 @@ if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty o
 const L = lines[lines.length - 1]
 // Corrections are authoritative but not machine-applied here — surface them instead.
 for (const c of allLines.filter(l => l.correction_for && l.correction_for.pass === L.pass)) {
-  say(`NOTE: a correction line is on file for pass ${L.pass} ("${c.correction_for.field}") — read it before acting on this state.`)
+  const target = Number.isFinite(c.correction_for.pass) ? `pass ${c.correction_for.pass}` : `fix round ${c.correction_for.round}`
+  say(`NOTE: a correction line is on file for ${target} ("${c.correction_for.field}") — read it before acting on this state.`)
 }
 
 const resolutions = readdirSync(t.dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
