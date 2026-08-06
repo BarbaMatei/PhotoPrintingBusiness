@@ -118,6 +118,31 @@ public class DashboardMetricNamesTests
                 + "one as a name fails the build against a metric called 'payments'");
     }
 
+    [Fact]
+    public void An_added_sum_term_always_carries_an_absent_series_guard()
+    {
+        var unguarded = new List<string>();
+
+        foreach (var query in DashboardQueries().Concat(SloQueries()))
+        {
+            // Label values carry slashes of their own, so brace groups go before the division split.
+            var numerator = StripBraceGroups(query).Split('/')[0];
+            if (!numerator.Contains('+')) continue;
+
+            var sums = Regex.Matches(numerator, "sum\\s*\\(").Count;
+            var guards = Regex.Matches(numerator, "or\\s+vector\\(0\\)").Count;
+
+            if (guards < sums)
+                unguarded.Add(query.Trim());
+        }
+
+        unguarded.Should().BeEmpty(
+            "a `sum()` over a selector that matches nothing returns an EMPTY vector, and empty plus "
+                + "anything is empty — so an added term whose series does not exist yet blanks the "
+                + "whole panel in exactly the healthy case. Every summed term on the left of the "
+                + "division needs `or vector(0)`");
+    }
+
     private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
     {
         // A label value may contain braces (a route template), so stop at the first '}' outside quotes.
