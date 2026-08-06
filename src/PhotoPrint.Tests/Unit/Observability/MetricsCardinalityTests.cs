@@ -25,7 +25,7 @@ public class MetricsCardinalityTests
     {
         { MetricNames.Instruments.OrdersCreatedTotal, 6 },
         { MetricNames.Instruments.PaymentWebhookTotal, 12 },
-        { MetricNames.Instruments.AwbCreationTotal, 5 },
+        { MetricNames.Instruments.AwbCreationTotal, 6 },
         { MetricNames.Instruments.InvoiceAnafStatusTotal, 4 },
         { MetricNames.Instruments.UploadSizeBytes, 1 },
         { MetricNames.Instruments.OrderProcessingDurationSeconds, 1 },

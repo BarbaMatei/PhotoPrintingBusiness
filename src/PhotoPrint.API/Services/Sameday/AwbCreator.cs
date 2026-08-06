@@ -67,6 +67,8 @@ public sealed class AwbCreator : IAwbCreator
         var result = outcome switch
         {
             AwbCreationOutcome.Created    => MetricNames.AwbResultValues.Ok,
+            AwbCreationOutcome.Skipped { Orphaned: true }
+                                          => MetricNames.AwbResultValues.Orphaned,
             AwbCreationOutcome.Skipped    => MetricNames.AwbResultValues.Skipped,
             AwbCreationOutcome.RetryLater => MetricNames.AwbResultValues.RetryLater,
             AwbCreationOutcome.GiveUp     => MetricNames.AwbResultValues.GiveUp,
@@ -267,6 +269,7 @@ public sealed class AwbCreator : IAwbCreator
         _logger.LogError(
             "sameday.awb.orphaned order_id={OrderId} created_awb={Created} persisted_awb={Persisted} — created AWB needs a manual void",
             orderId, result.AwbNumber, persisted);
-        return new AwbCreationOutcome.Skipped($"order no longer writable; AWB {result.AwbNumber} may be orphaned");
+        return new AwbCreationOutcome.Skipped(
+            $"order no longer writable; AWB {result.AwbNumber} may be orphaned", Orphaned: true);
     }
 }

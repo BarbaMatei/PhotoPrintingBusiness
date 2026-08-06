@@ -268,7 +268,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "(sum(rate(awb_creation_total{result=\"ok\"}[7d])) or vector(0)) / sum(rate(awb_creation_total{result!=\"skipped\"}[7d]))",
+          "expr": "(sum(rate(awb_creation_total{result=\"ok\"}[7d])) or vector(0)) / sum(rate(awb_creation_total{result!=\"skipped\",result!=\"retry_later\"}[7d]))",
           "legendFormat": "AWB auto-creation success",
           "range": true,
           "refId": "A"

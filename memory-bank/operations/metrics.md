@@ -59,7 +59,8 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | Value | When |
 |---|---|
 | `ok` | Sameday created the AWB, persisted `AwbNumber` + `AwbLabelUrl` |
-| `skipped` | Order missing, not in `Paid`, or already has an `AwbNumber` |
+| `skipped` | No label was needed: order missing, not in `Paid`, already has an `AwbNumber`, another worker holds a fresh claim, or the vendor deduped onto the number already persisted. Excluded from SLO 4 on both sides — counting these would flag the retry loop rather than a failure |
+| `orphaned` | A billable label was created but the order was no longer writable, so nothing references it and the vendor has no void endpoint here — logged at `Error`, and counted as a **failure** in SLO 4 rather than lumped in with `skipped` |
 | `retry_later` | Transient failure (network, Sameday auth / protocol drift) — retry job will pick this up |
 | `give_up` | Permanent failure (invalid request, vendor validation error) — no retry, ops attention needed |
 | `error` | The creation attempt threw before producing an outcome (database unreachable, unexpected fault). Host-shutdown cancellation is deliberately excluded so a deploy does not depress the SLO |

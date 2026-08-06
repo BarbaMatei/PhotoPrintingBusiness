@@ -525,6 +525,37 @@ public class AwbCreatorTests : IDisposable
     }
 
     [Fact]
+    public async Task An_orphaned_label_records_its_own_outcome_rather_than_skipped()
+    {
+        var order = SeedOrder();
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<AwbCreationRequest, CancellationToken>((_, _) =>
+            {
+                SetStatus(order.Id, OrderStatus.Cancelled);
+                return Task.FromResult(new AwbCreationResult("RO-ORPHAN", "https://x/y.pdf", 1m));
+            });
+
+        using var db = CreateDb();
+        var sut = Build(db, client);
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Orphaned))
+            .Should().HaveCount(1,
+                "a billable label nothing references is a real failure SLO 4 has to see, and "
+                    + "`skipped` is excluded from both sides of that ratio — recording it there "
+                    + "would make ops' worst AWB outcome the one the panel cannot show");
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Skipped))
+            .Should().BeEmpty();
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_thrown_db_failure_records_an_error_outcome_and_rethrows()
     {
         var order = SeedOrder();

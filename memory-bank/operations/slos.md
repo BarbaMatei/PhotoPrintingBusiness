@@ -130,12 +130,17 @@ validation errors (e.g., locker temporarily full) that legitimately can't
 be auto-resolved. 2% gives operations room for manual intervention without
 flagging the bolt 037 retry loop as broken.
 
-**Source metric** — `skipped` is not a failure and does not belong in the denominator: `AwbCreator`
-returns it when no label was needed at all (the order is not `Paid`, or it already carries an AWB),
-so counting those drags the ratio down while every order that needed a label got one:
+**Source metric** — two values sit outside the denominator, both because they are not failures.
+`skipped` means no label was needed at all: the order is missing, not `Paid`, already carries an
+`AwbNumber`, another worker holds a fresh claim, or the vendor deduped onto the number already
+persisted. `retry_later` is a transient failure the retry job usually resolves to `ok`, and this
+counter records **one row per attempt** — so counting it would score an order that succeeded on its
+third try as 1 out of 3, flagging exactly the retry loop the 2% budget exists to protect. The one
+`skipped`-shaped case that *is* a failure has its own value, `orphaned` (a billable label nothing
+references), and deliberately stays in the denominator:
 ```
 (sum(awb_creation_total{result="ok"}) or vector(0))
-  / sum(awb_creation_total{result!="skipped"})
+  / sum(awb_creation_total{result!="skipped",result!="retry_later"})
 ```
 
 The numerator's `or vector(0)` is the same guard SLO 3 carries, and for the same reason: a series
