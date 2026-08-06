@@ -134,8 +134,15 @@ flagging the bolt 037 retry loop as broken.
 returns it when no label was needed at all (the order is not `Paid`, or it already carries an AWB),
 so counting those drags the ratio down while every order that needed a label got one:
 ```
-sum(awb_creation_total{result="ok"}) / sum(awb_creation_total{result!="skipped"})
+(sum(awb_creation_total{result="ok"}) or vector(0))
+  / sum(awb_creation_total{result!="skipped"})
 ```
+
+The numerator's `or vector(0)` is the same guard SLO 3 carries, and for the same reason: a series
+only exists once its tag set has been observed, so on a fresh process where **no** AWB has succeeded
+— expired Sameday credentials being the realistic case — `{result="ok"}` matches nothing and the
+panel would read "No Data" instead of a red 0%. The denominator is deliberately left unguarded: an
+empty denominator means no attempt was recorded at all, and "No Data" is the honest reading of that.
 
 **Action on breach:** check Sameday's status page, check the
 `AwbCreationGiveUp` structured-log markers — the cluster of give-up reasons
@@ -158,7 +165,8 @@ meet, not the SDK's immediate response.
 increments ship with intent 016. A `pending` submission is still in flight, so it is not yet a
 failure and belongs on neither side until it resolves:
 ```
-sum(invoice_anaf_status_total{status="accepted"}) / sum(invoice_anaf_status_total{status!="pending"})
+(sum(invoice_anaf_status_total{status="accepted"}) or vector(0))
+  / sum(invoice_anaf_status_total{status!="pending"})
 ```
 
 **Action on breach:** this is a **regulatory compliance issue**, not a

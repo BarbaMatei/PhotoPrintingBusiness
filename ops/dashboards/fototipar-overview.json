@@ -268,7 +268,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(awb_creation_total{result=\"ok\"}[7d])) / sum(rate(awb_creation_total{result!=\"skipped\"}[7d]))",
+          "expr": "(sum(rate(awb_creation_total{result=\"ok\"}[7d])) or vector(0)) / sum(rate(awb_creation_total{result!=\"skipped\"}[7d]))",
           "legendFormat": "AWB auto-creation success",
           "range": true,
           "refId": "A"
@@ -307,7 +307,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(rate(invoice_anaf_status_total{status=\"accepted\"}[30d])) / sum(rate(invoice_anaf_status_total{status!=\"pending\"}[30d]))",
+          "expr": "(sum(rate(invoice_anaf_status_total{status=\"accepted\"}[30d])) or vector(0)) / sum(rate(invoice_anaf_status_total{status!=\"pending\"}[30d]))",
           "legendFormat": "ANAF submission success",
           "range": true,
           "refId": "A"

@@ -25,8 +25,11 @@ implemented: true
   - Payment-webhook success ≥ 99.9% (`ok` + `duplicate` over all results except `signature_invalid`
     — amended 2026-08-05: a correctly-answered duplicate is a success by the SLO's own definition,
     and an anonymous bad signature is not a request this app failed)
-  - AWB auto-creation ≥ 98% (intent 015)
-  - ANAF submission success ≥ 99% (intent 016)
+  - AWB auto-creation ≥ 98% (`ok` over all results except `skipped` — amended 2026-08-06: a
+    `skipped` outcome means no label was needed, so counting it would flag the retry loop the 2%
+    budget exists to protect)
+  - ANAF submission success ≥ 99% (`accepted` over all statuses except `pending` — amended
+    2026-08-06: a submission still in flight is not yet a failure)
 - [ ] `ops/dashboards/fototipar-overview.json` provides a Grafana dashboard JSON with: RPS, latency p50/p95/p99, error rate, orders/day, payment-webhook success, AWB success, ANAF status.
 - [ ] README link added under Operations section.
 
