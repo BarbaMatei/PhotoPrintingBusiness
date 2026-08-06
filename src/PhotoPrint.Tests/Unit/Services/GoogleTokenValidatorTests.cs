@@ -182,7 +182,7 @@ public class GoogleTokenValidatorTests
                 "the validator takes an optional deadline, and a container that cannot fill it "
                     + "would fail on the first real sign-in with the whole suite green");
 
-        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("Google");
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("Google");
 
         client.Timeout.Should().BeGreaterThan(
             GoogleTokenValidator.RequestDeadline,
@@ -203,10 +203,13 @@ public class GoogleTokenValidatorTests
             .Should().ThrowAsync<BadGatewayException>();
 
         elapsed.Elapsed.Should().BeLessThan(
-            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(3),
             "the 50 ms deadline is what must end this call; a deadline that never reaches GetAsync "
                 + "lets the request run to the 15 s backstop and throw the very same type, so only "
-                + "the wall clock can tell the two apart");
+                + "the wall clock can tell the two apart. The bar sits at 3 s deliberately: below "
+                + $"{nameof(GoogleTokenValidator.RequestDeadline)} (5 s), which is what a dropped "
+                + "deadline argument would produce, but far enough above 50 ms to absorb first-call "
+                + "handler setup");
     }
 
     private sealed class StubHttpHandler : HttpMessageHandler
