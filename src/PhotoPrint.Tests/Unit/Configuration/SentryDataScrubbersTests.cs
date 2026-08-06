@@ -11,7 +11,7 @@ namespace PhotoPrint.Tests.Unit.Configuration;
 
 public class SentryDataScrubbersTests
 {
-    private const string GuestToken = "5f0c-live-guest-guid";
+    private const string GuestToken = "guest-token-placeholder";
     private const string CustomerEmail = "ion.popescu@gmail.com";
 
     [Fact]

@@ -16,7 +16,7 @@ namespace PhotoPrint.Tests.Integration;
 [Collection(ObservabilityHostCollection.Name)]
 public class SentryOptionsWiringTests
 {
-    private const string GuestToken = "5f0c-live-guest-guid";
+    private const string GuestToken = "guest-token-placeholder";
     private const string CustomerEmail = "ion.popescu@gmail.com";
 
     private static SentryAspNetCoreOptions BootedOptions(SentryIntegrationFactory factory)
