@@ -97,3 +97,5 @@
 {"t":"2026-08-06T10:38:08+03:00","ev":"micro-review-returned","round":3,"cluster":"B,D,G,I-behaviour-and-docs","found":11}
 {"t":"2026-08-06T10:38:08+03:00","ev":"test-run","round":3,"kind":"final","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers","passed":1133,"failed":0,"duration_s":13}
 {"t":"2026-08-06T10:38:08+03:00","ev":"round-end","round":3}
+{"t":"2026-08-06T11:00:00+03:00","ev":"pass-launch","pass":4,"type":"verification"}
+{"t":"2026-08-06T11:54:33+03:00","ev":"pass-records-done","pass":4,"type":"verification","note":"pass-launch at 11:00:00 was hand-stamped without reading the clock; the pass actually began ~10:52 (right after f0aadd7 at 10:51:16), so runtime.started understates the span by about 8 minutes"}

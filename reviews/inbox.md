@@ -153,3 +153,22 @@ micro-review supplied the scenario that shows otherwise.
 
 Not exploitable, and it needs a vendor outage plus an admin action to trigger. But the outcome is a
 parcel shipped with no label and no signal, and the AWB SLO would read healthy throughout.
+
+---
+
+## Flake: `ReliableEmailServiceTests.SendAsync_FailedSend_QueuesEmailToDatabase`
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟡 | 2026-08-06 | Second flake in the email area: fails intermittently under parallel load, passes in isolation. Surfaced as unexplained collateral in a v4 mutation run whose mutation (a typo in `slos.md`) cannot reach it | `Tests/Unit/Services/ReliableEmailServiceTests.cs` |
+
+### Evidence held
+
+- Failed once during v4 mutation 14 (mutating `memory-bank/operations/slos.md` only), alongside the
+  one intended failure. A markdown edit cannot affect this test.
+- Passed in the three subsequent wide runs (1133 green each) and passed in a scoped run of
+  `FullyQualifiedName~ReliableEmailServiceTests`.
+- Not caused by the 044/045 work — recorded here because it is the **second** email-area flake found
+  the same way, after `EmailRetryJobTests.Processing_SuccessfulSend_MarksEmailAsSent`
+  (filed 2026-08-06 by the v3 fix round). Two flakes in one area under parallel load suggests shared
+  state rather than two coincidences.
