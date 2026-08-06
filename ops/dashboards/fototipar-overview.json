@@ -57,6 +57,7 @@
           "refId": "A"
         }
       ],
+      "description": "NOT trustworthy as availability yet: the denominator counts every instrumented request, including the always-200 /health and /metrics self-monitoring traffic (~5,760/day), so this cannot read below about 99.7% however broken the site is. Watch the 5xx rate on customer routes instead. Tracked as D46.",
       "title": "Availability (30d)",
       "type": "stat"
     },
@@ -228,7 +229,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "(sum(rate(payment_webhook_total{result=\"ok\"}[7d])) + sum(rate(payment_webhook_total{result=\"duplicate\"}[7d]))) / sum(rate(payment_webhook_total{result!=\"signature_invalid\"}[7d]))",
+          "expr": "((sum(rate(payment_webhook_total{result=\"ok\"}[7d])) or vector(0)) + (sum(rate(payment_webhook_total{result=\"duplicate\"}[7d])) or vector(0))) / sum(rate(payment_webhook_total{result!=\"signature_invalid\"}[7d]))",
           "legendFormat": "Payment webhook success",
           "range": true,
           "refId": "A"

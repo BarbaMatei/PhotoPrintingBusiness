@@ -14,6 +14,18 @@ triaged minor deferred *within* its target; this file is what nobody has triaged
 
 Severities are the recorder's first read, not a pass verdict.
 
+## CI — `secret-scan` fails on every pull_request event, no loop opened
+
+🟡 `.github/workflows/secret-scan.yml` — the job succeeds on `push` and fails on `pull_request`
+for the same commit, so every PR carries a permanently red check. Noticed while confirming the
+044-045-observability v3 fix round's CI result.
+
+**Evidence (2026-08-05):** at commit `9884ca2`, `secret-scan` was `success` on the push-triggered
+run (31010907839, 23 s) and `failure` on the pull_request-triggered run (31010911613, 16 s). The
+same split appears on runs at 10:58Z, 11:06Z and 11:12Z, i.e. before that round's changes, so it is
+pre-existing. Not investigated — likely a shallow-clone or base-ref difference between the two
+trigger types rather than a real secret. A check that is always red teaches everyone to ignore it.
+
 ## test suite — a flaky test, no loop opened
 
 🟡 `src/PhotoPrint.Tests/Unit/Services/EmailRetryJobTests.cs` —

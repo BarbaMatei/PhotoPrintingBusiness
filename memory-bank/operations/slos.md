@@ -92,9 +92,16 @@ disproportionate — customer service work, refund handling, lost trust.
 definition above, so it belongs in the numerator; an invalid signature is not a request this app
 failed (the endpoint is anonymous, so anyone can post one), so it belongs in neither side:
 ```
-(sum(payment_webhook_total{result="ok"}) + sum(payment_webhook_total{result="duplicate"}))
+((sum(payment_webhook_total{result="ok"}) or vector(0))
+  + (sum(payment_webhook_total{result="duplicate"}) or vector(0)))
   / sum(payment_webhook_total{result!="signature_invalid"})
 ```
+
+Each `or vector(0)` is load-bearing, not decoration: `sum()` over a selector that matches nothing
+returns an *empty* vector, and empty + anything is empty. A series only exists once its tag set has
+been observed, so without the guards this panel would read "No Data" for as long as no duplicate had
+ever been recorded — blind in exactly the healthy case. Written as two literal `=` matchers rather
+than one `result=~"ok|duplicate"` so both values stay inside the build-check net described above.
 
 **This ratio cannot detect a total outage.** The counter is incremented inside the
 handler, once a terminal branch is reached. A request that throws before any branch —

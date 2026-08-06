@@ -22,7 +22,9 @@ implemented: true
 - [ ] `memory-bank/operations/slos.md` documents:
   - Availability ≥ 99.5% (rolling 30 d)
   - p95 checkout latency ≤ 1.5 s on `POST /api/payments/stripe/intent`
-  - Payment-webhook success ≥ 99.9% (`payment_webhook_total{result="ok"}` / total)
+  - Payment-webhook success ≥ 99.9% (`ok` + `duplicate` over all results except `signature_invalid`
+    — amended 2026-08-05: a correctly-answered duplicate is a success by the SLO's own definition,
+    and an anonymous bad signature is not a request this app failed)
   - AWB auto-creation ≥ 98% (intent 015)
   - ANAF submission success ≥ 99% (intent 016)
 - [ ] `ops/dashboards/fototipar-overview.json` provides a Grafana dashboard JSON with: RPS, latency p50/p95/p99, error rate, orders/day, payment-webhook success, AWB success, ANAF status.
