@@ -99,3 +99,25 @@
 {"t":"2026-08-06T10:38:08+03:00","ev":"round-end","round":3}
 {"t":"2026-08-06T11:00:00+03:00","ev":"pass-launch","pass":4,"type":"verification"}
 {"t":"2026-08-06T11:54:33+03:00","ev":"pass-records-done","pass":4,"type":"verification","note":"pass-launch at 11:00:00 was hand-stamped without reading the clock; the pass actually began ~10:52 (right after f0aadd7 at 10:51:16), so runtime.started understates the span by about 8 minutes"}
+{"t":"2026-08-06T15:12:45+03:00","ev":"round-start","round":4}
+{"t":"2026-08-06T15:14:57+03:00","ev":"triage-done","round":4,"clusters":3,"checks_needed":0,"pre_cleared":0,"gates":2}
+{"t":"2026-08-06T15:20:38+03:00","ev":"test-run","round":4,"kind":"red","filter":"Unit.Services.GoogleTokenValidatorTests","passed":9,"failed":2,"duration_s":45}
+{"t":"2026-08-06T15:34:02+03:00","ev":"test-run","round":4,"kind":"red","filter":"Integration.DashboardMetricNamesTests","passed":4,"failed":1,"duration_s":3}
+{"t":"2026-08-06T15:37:16+03:00","ev":"test-run","round":4,"kind":"green","filter":"Unit.Services|Integration","passed":852,"failed":0,"duration_s":14}
+{"t":"2026-08-06T15:57:52+03:00","ev":"finding","round":4,"id":"F1","status":"fixed","commit":"d899559"}
+{"t":"2026-08-06T15:57:53+03:00","ev":"finding","round":4,"id":"F2","status":"fixed","commit":"770f852"}
+{"t":"2026-08-06T15:59:47+03:00","ev":"gate-open","round":4,"reason":"F3/D105 - whether skipped (SLO 4) and pending (SLO 5) belong in the denominator, the same definitional call the owner made for SLO 3; and F4/D113 - how to clear the gitleaks false positive (rename the test constant vs allowlist the path vs record the fingerprint)"}
+{"t":"2026-08-06T16:06:39+03:00","ev":"gate-closed","round":4,"reason":"both answered as recommended: SLO 4/5 match the prose (drop skipped/pending from the denominator); gitleaks cleared by renaming the test constant"}
+{"t":"2026-08-06T16:10:51+03:00","ev":"micro-review-returned","round":4,"cluster":"A-F1,B-F2","found":7}
+{"t":"2026-08-06T16:23:14+03:00","ev":"test-run","round":4,"kind":"red","filter":"Integration.DashboardMetricNamesTests","passed":4,"failed":1,"duration_s":1}
+{"t":"2026-08-06T16:23:15+03:00","ev":"test-run","round":4,"kind":"green","filter":"Integration|Unit.Services|Unit.Configuration","passed":959,"failed":0,"duration_s":17}
+{"t":"2026-08-06T16:42:30+03:00","ev":"micro-review-returned","round":4,"cluster":"A-F3,C-F4","found":10}
+{"t":"2026-08-06T16:42:31+03:00","ev":"finding","round":4,"id":"F3","status":"fixed","commit":"b0718d8"}
+{"t":"2026-08-06T16:42:32+03:00","ev":"finding","round":4,"id":"F4","status":"open","commit":"ab7860f"}
+{"t":"2026-08-06T16:42:32+03:00","ev":"test-run","round":4,"kind":"final","filter":"Integration|Unit.Services|Unit.Configuration","passed":959,"failed":0,"duration_s":13}
+{"t":"2026-08-06T16:46:37+03:00","ev":"gate-open","round":4,"reason":"re-gate after the second micro-review: F4 cannot be fixed by the rename (the PR scan reads branch-only commits), so the owner must pick .gitleaksignore vs allowlist vs history rewrite; and F3 has two verified residuals - retry_later counted per attempt, and skipped overloaded onto a genuine orphaned-label failure"}
+{"t":"2026-08-06T17:00:28+03:00","ev":"gate-closed","round":4,"reason":"both re-gate answers as recommended: .gitleaksignore for F4; F3 fixes both residuals (retry_later excluded, orphaned split out of skipped)"}
+{"t":"2026-08-06T17:00:28+03:00","ev":"test-run","round":4,"kind":"red","filter":"Unit.Services.Sameday.AwbCreatorTests","passed":24,"failed":1,"duration_s":6}
+{"t":"2026-08-06T17:00:30+03:00","ev":"finding","round":4,"id":"F4","status":"fixed","commit":"243625c"}
+{"t":"2026-08-06T17:01:38+03:00","ev":"test-run","round":4,"kind":"final","filter":"Integration|Unit.Services|Unit.Configuration|Unit.Observability|Unit.Middleware","passed":1096,"failed":0,"duration_s":15}
+{"t":"2026-08-06T17:01:38+03:00","ev":"round-end","round":4}

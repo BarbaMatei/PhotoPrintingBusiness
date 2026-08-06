@@ -172,3 +172,30 @@ parcel shipped with no label and no signal, and the AWB SLO would read healthy t
   the same way, after `EmailRetryJobTests.Processing_SuccessfulSend_MarksEmailAsSent`
   (filed 2026-08-06 by the v3 fix round). Two flakes in one area under parallel load suggests shared
   state rather than two coincidences.
+
+---
+
+## Sameday HTTP client timeout is shorter than its own retry ladder
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟠 | 2026-08-06 | The registered Sameday `HttpClient.Timeout` (10 s default) bounds the whole handler chain *including* the resilience handler's 1 s + 4 s + 16 s backoff schedule, so `MaxRetryAttempts = 3` is silently 2 and a vendor outage surfaces as a cancellation rather than the vendor's status | `Extensions/SamedayServiceCollectionExtensions.cs:50`, `Services/Sameday/SamedayResilienceHandler.cs:22,41`, `Services/Sameday/SamedayPolicies.cs:55-63` |
+
+### Evidence held
+
+- `SamedayResilienceHandler` is a `DelegatingHandler` registered *inside* the named client, so
+  `HttpClient.Timeout` wraps the entire retry pipeline rather than each attempt.
+- The backoff schedule totals ~21 s against a default `RequestTimeoutSeconds` of 10 s
+  (validator range 1–60), so the client timeout cancels partway through the third backoff.
+- Consequence: the third retry never runs, and the failure the AWB give-up logic reasons about is
+  a `TaskCanceledException` instead of the vendor's own status.
+- **Unproven by execution** — read from the handler chain and the delay generator; no test was run
+  against it.
+
+### Why it is here and not in the 044-045 fix round
+
+It is the true class sibling of finding F2/D104 (a registered `HttpClient` timeout ordered against a
+separately-owned time budget) and was found by that finding's micro-review. Fixing it changes a
+**resource budget and retry semantics** on the AWB path, which is trigger-list work needing its own
+adversarial approach-check — not something to fold into an observability round. The 044-045 round
+recorded the class as swept-and-open rather than fixing it here.
