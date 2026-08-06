@@ -122,25 +122,35 @@ public class DashboardMetricNamesTests
     public void An_added_sum_term_always_carries_an_absent_series_guard()
     {
         var unguarded = new List<string>();
+        var addedTermsSeen = 0;
 
         foreach (var query in DashboardQueries().Concat(SloQueries()))
         {
             // Label values carry slashes of their own, so brace groups go before the division split.
-            var numerator = StripBraceGroups(query).Split('/')[0];
-            if (!numerator.Contains('+')) continue;
+            foreach (var side in StripBraceGroups(query).Split('/'))
+            {
+                var terms = side.Count(c => c == '+') + 1;
+                if (terms == 1) continue;
 
-            var sums = Regex.Matches(numerator, "sum\\s*\\(").Count;
-            var guards = Regex.Matches(numerator, "or\\s+vector\\(0\\)").Count;
-
-            if (guards < sums)
-                unguarded.Add(query.Trim());
+                addedTermsSeen += terms;
+                if (Regex.Matches(side, "or\\s+vector\\(0\\)").Count < terms)
+                    unguarded.Add(query.Trim());
+            }
         }
 
         unguarded.Should().BeEmpty(
-            "a `sum()` over a selector that matches nothing returns an EMPTY vector, and empty plus "
-                + "anything is empty — so an added term whose series does not exist yet blanks the "
-                + "whole panel in exactly the healthy case. Every summed term on the left of the "
-                + "division needs `or vector(0)`");
+            "a selector that matches nothing yields an EMPTY vector, and empty plus anything is "
+                + "empty — so an added term whose series does not exist yet blanks the whole panel "
+                + "in exactly the healthy case. Every added term needs its own `or vector(0)`, on "
+                + "either side of the division: an empty denominator blanks a panel just as an "
+                + "empty numerator does");
+
+        addedTermsSeen.Should().BeGreaterThanOrEqualTo(
+            4,
+            "both the slos.md block and the dashboard panel carry SLO 3's two-term numerator. If "
+                + "no added term is found any more — someone collapsed them to one `=~` matcher, or "
+                + "the collector stopped reaching the query — then this test has quietly stopped "
+                + "checking rather than started passing");
     }
 
     private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
