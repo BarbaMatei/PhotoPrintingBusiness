@@ -1,0 +1,9 @@
+# Fingerprints gitleaks must not report. One per line: <commit>:<path>:<rule>:<line>.
+# Only add a line when the finding is provably not a secret AND the value cannot be removed,
+# because these entries are pinned to a commit and never expire.
+#
+# Both entries below are the same fabricated guest-token fixture used to prove the Sentry
+# scrubber replaces the header. The value was renamed at HEAD, but a pull_request scan reads
+# the PR's own commits, so the historical ones still trip generic-api-key on entropy.
+44c3e2de82b937ef53ac9a5b04a689f71e20a9e9:src/PhotoPrint.Tests/Unit/Configuration/SentryDataScrubbersTests.cs:generic-api-key:16
+295a51ccccc622a470bfa2f040559d5596111102:src/PhotoPrint.Tests/Integration/SentryOptionsWiringTests.cs:generic-api-key:19
