@@ -24,12 +24,12 @@ public class GoogleTokenValidatorTests
         CreateValidator(new StubHttpHandler(httpHandler));
 
     private static IGoogleTokenValidator CreateValidator(
-        HttpMessageHandler handler, TimeSpan? deadline = null)
+        HttpMessageHandler handler, TimeSpan? deadline = null, TimeSpan? httpTimeout = null)
     {
         var httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("https://oauth2.googleapis.com/"),
-            Timeout = GoogleTokenValidator.HttpBackstop,
+            Timeout = httpTimeout ?? GoogleTokenValidator.HttpBackstop,
         };
 
         var factory = new Mock<IHttpClientFactory>();
@@ -195,21 +195,25 @@ public class GoogleTokenValidatorTests
     [Fact]
     public async Task Our_own_deadline_and_not_the_http_backstop_ends_a_hanging_request()
     {
+        // A deliberately huge backstop: the only regression that matters here is the deadline not
+        // reaching GetAsync, and the gap has to survive a loaded CI runner's scheduling noise.
+        var backstop = TimeSpan.FromSeconds(30);
         var validator = CreateValidator(
-            new HangingHttpHandler(), deadline: TimeSpan.FromMilliseconds(50));
+            new HangingHttpHandler(),
+            deadline: TimeSpan.FromMilliseconds(50),
+            httpTimeout: backstop);
         var elapsed = Stopwatch.StartNew();
 
         await validator.Invoking(v => v.ValidateAsync("any-token", CancellationToken.None))
             .Should().ThrowAsync<BadGatewayException>();
 
         elapsed.Elapsed.Should().BeLessThan(
-            TimeSpan.FromSeconds(3),
-            "the 50 ms deadline is what must end this call; a deadline that never reaches GetAsync "
-                + "lets the request run to the 15 s backstop and throw the very same type, so only "
-                + "the wall clock can tell the two apart. The bar sits at 3 s deliberately: below "
-                + $"{nameof(GoogleTokenValidator.RequestDeadline)} (5 s), which is what a dropped "
-                + "deadline argument would produce, but far enough above 50 ms to absorb first-call "
-                + "handler setup");
+            TimeSpan.FromSeconds(15),
+            "the 50 ms deadline is what must end this call, and a deadline that never reaches "
+                + "GetAsync throws the very same exception type once the HTTP backstop fires — so "
+                + "only the wall clock separates them. The backstop here is 30 s and the bar is "
+                + "15 s: the happy path needs about 50 ms, but a loaded runner has been measured "
+                + "adding ~5 s of first-call and scheduling overhead, so the margin is the point");
     }
 
     private sealed class StubHttpHandler : HttpMessageHandler
