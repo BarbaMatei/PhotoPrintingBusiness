@@ -130,9 +130,11 @@ validation errors (e.g., locker temporarily full) that legitimately can't
 be auto-resolved. 2% gives operations room for manual intervention without
 flagging the bolt 037 retry loop as broken.
 
-**Source metric:**
+**Source metric** — `skipped` is not a failure and does not belong in the denominator: `AwbCreator`
+returns it when no label was needed at all (the order is not `Paid`, or it already carries an AWB),
+so counting those drags the ratio down while every order that needed a label got one:
 ```
-awb_creation_total{result="ok"} / awb_creation_total
+sum(awb_creation_total{result="ok"}) / sum(awb_creation_total{result!="skipped"})
 ```
 
 **Action on breach:** check Sameday's status page, check the
@@ -153,9 +155,10 @@ This SLO is set against the deadline window we have legal obligation to
 meet, not the SDK's immediate response.
 
 **Source metric** — the instrument exists but nothing increments it yet; the
-increments ship with intent 016:
+increments ship with intent 016. A `pending` submission is still in flight, so it is not yet a
+failure and belongs on neither side until it resolves:
 ```
-invoice_anaf_status_total{status="accepted"} / invoice_anaf_status_total
+sum(invoice_anaf_status_total{status="accepted"}) / sum(invoice_anaf_status_total{status!="pending"})
 ```
 
 **Action on breach:** this is a **regulatory compliance issue**, not a
