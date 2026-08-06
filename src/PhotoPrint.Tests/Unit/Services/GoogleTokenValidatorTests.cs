@@ -3,11 +3,14 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Services;
 
 namespace PhotoPrint.Tests.Unit.Services;
@@ -155,6 +158,55 @@ public class GoogleTokenValidatorTests
             .Should().ThrowAsync<BadGatewayException>(
                 "Google had already failed, so a user who then gives up must not hide the outage "
                     + "from Sentry and the 5xx numerator");
+    }
+
+    [Fact]
+    public void The_registered_google_client_keeps_its_backstop_behind_our_own_deadline()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["GoogleAuth:ClientId"] = TestClientId,
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSocialAuth(configuration);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<IGoogleTokenValidator>()
+            .Should().BeOfType<GoogleTokenValidator>(
+                "the validator takes an optional deadline, and a container that cannot fill it "
+                    + "would fail on the first real sign-in with the whole suite green");
+
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("Google");
+
+        client.Timeout.Should().BeGreaterThan(
+            GoogleTokenValidator.RequestDeadline,
+            "our own deadline has to fire first: if HttpClient's timeout wins the race then "
+                + "deadline.IsCancellationRequested is false, and a dependency outage the caller "
+                + "then abandons is misread as a client abort and reaches neither Sentry nor the "
+                + "5xx numerator");
+    }
+
+    [Fact]
+    public async Task Our_own_deadline_and_not_the_http_backstop_ends_a_hanging_request()
+    {
+        var validator = CreateValidator(
+            new HangingHttpHandler(), deadline: TimeSpan.FromMilliseconds(50));
+        var elapsed = Stopwatch.StartNew();
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", CancellationToken.None))
+            .Should().ThrowAsync<BadGatewayException>();
+
+        elapsed.Elapsed.Should().BeLessThan(
+            TimeSpan.FromSeconds(5),
+            "the 50 ms deadline is what must end this call; a deadline that never reaches GetAsync "
+                + "lets the request run to the 15 s backstop and throw the very same type, so only "
+                + "the wall clock can tell the two apart");
     }
 
     private sealed class StubHttpHandler : HttpMessageHandler
