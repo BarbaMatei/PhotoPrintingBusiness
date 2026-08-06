@@ -94,3 +94,6 @@
 {"t":"2026-08-05T16:33:19+03:00","ev":"micro-review-returned","round":3,"cluster":"A,C,E,F,H-first-five","found":7}
 {"t":"2026-08-05T16:33:19+03:00","ev":"micro-review-dispatched","round":3,"cluster":"B,D,G,I-behaviour-and-docs"}
 {"t":"2026-08-05T16:33:19+03:00","ev":"test-run","round":3,"kind":"final","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers|Unit.BackgroundJobs","passed":1133,"failed":0,"duration_s":13}
+{"t":"2026-08-06T10:38:08+03:00","ev":"micro-review-returned","round":3,"cluster":"B,D,G,I-behaviour-and-docs","found":11}
+{"t":"2026-08-06T10:38:08+03:00","ev":"test-run","round":3,"kind":"final","filter":"Integration|Unit.Observability|Unit.Middleware|Unit.Configuration|Unit.Validators|Unit.Services|Unit.Controllers","passed":1133,"failed":0,"duration_s":13}
+{"t":"2026-08-06T10:38:08+03:00","ev":"round-end","round":3}

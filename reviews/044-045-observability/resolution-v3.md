@@ -3,8 +3,9 @@ type: resolution
 target: 044-045-observability
 version: 3
 answers: review-v3.md
-status: in-progress
-fixed_commit: null
+status: resolved
+fixed_commit: dc203c7
+closed: 2026-08-06
 findings:
   F1:  { status: fixed, commit: c363b7a, note: "Verdict now classifies a socket/pipe address by PREFIX before parsing, so the same string no longer takes a throw path on Windows and a Port=0 path on Linux; port 0 is excluded as a dynamic-bind placeholder. APPROACH REVISED by the adversarial check: my first draft skipped pipes but left the `ports.Count == 0` carve-out, which would have turned today's correct abort for a socket-only host into a SILENT BOOT — so 'addresses present but no TCP port' is now its own refuse verdict, and the TestServer carve-out keys on an empty address list instead. Red proof: the pipe case, the Windows-side unix case, the dynamic-port case and the no-TCP-port case all reddened; the Linux leg's proof is CI itself (6 red runs, green again once this lands). New surface: IsSocketOrPipe + the no-TCP-port verdict" }
   F2:  { status: fixed, commit: 7c002a0, note: "APPROACH REFUTED AND REPLACED by the adversarial check. My draft walked the exception chain for a TimeoutException; the check showed that is still sniffing an undocumented internal shape AND still loses a timeout the caller races by microseconds, because HttpClient decides whether to wrap only at failure time. The validator now OWNS the deadline — CancellationTokenSource(_deadline) linked with the caller's token, linked token passed to GetAsync — so the discriminator is a flag we set: `ct.IsCancellationRequested && !deadline.IsCancellationRequested`. HttpClient.Timeout became a 15s backstop behind the 5s deadline. The fabricated handler is gone; its replacement cancels the caller FROM INSIDE the handler once the deadline has already tripped, reaching the both-fired ordering deterministically instead of as a race. Red proof: restoring the GetBaseException filter reddens exactly the both-fired test. DEVIATION from the check: it proposed FakeTimeProvider; handler-driven ordering is deterministic without a clock and adds no TimeProvider dependency to production. New surface: RequestDeadline + HttpBackstop + the owned deadline" }
@@ -79,6 +80,37 @@ test-only clusters C, E, F, H while the checks fly, then B, then G and I once th
 ## Findings
 
 <!-- rendered:findings-table:start -->
+| ID | Sev | Title | Status | Commit | How |
+|---|---|---|---|---|---|
+| F1 |  |  | fixed | `c363b7a` | Verdict now classifies a socket/pipe address by PREFIX before parsing, so the same string no longer takes a… |
+| F2 |  |  | fixed | `7c002a0` | APPROACH REFUTED AND REPLACED by the adversarial check. My draft walked the exception chain for a TimeoutEx… |
+| F3 |  |  | fixed | `feb5636` | test-only. InvokeAsync_UnmappedServerError_LogsAtErrorWithTheException pins the level AND the attached exce… |
+| F4 |  |  | fixed | `f2a7ef9` | o.TracesSampler now answers with the configured rate on EVERY call. The check settled the load-bearing ques… |
+| F5 |  |  | fixed | `2a82f01` | test-only. A_second_capture_in_the_same_test_fails_loudly; deleting the nested-capture throw reddens it — m… |
+| F6 |  |  | fixed | `163f912` | test-only. The pin reads the installed sampler off the booted TracerProvider by reflection, chosen over a b… |
+| F7 |  |  | fixed | `caeb866` | owner chose 'match the prose': numerator ok+duplicate, signature_invalid out of the denominator. Applied in… |
+| F8 |  |  | fixed | `caeb866` | the status block no longer claims SLO 1 is measured — it names the dilution (~5,760 always-200 /health and… |
+| F9 |  |  | fixed | `55f6441` | give-up query widened to Paid||Printing ONLY. APPROACH REVISED by the check: my draft exposed OrderStatusMa… |
+| F10 |  |  | fixed | `f81626f` | metrics.md step 10 no longer promises 'a name that nothing emits fails the build'. It now states what the t… |
+| F11 |  |  | fixed | `cdb5554` | StripBraceGroups replaces the first-'}' regex in MetricNamesIn, reusing the quote-aware ClosingBrace the ex… |
+| F12 |  |  | deferred | — | 🟡 — ledger backlog (D85) per the README router |
+| F13 |  |  | deferred | — | 🟡 — ledger backlog (D86) per the README router |
+| F14 |  |  | deferred | — | 🟡 — ledger backlog (D87) per the README router |
+| F15 |  |  | deferred | — | 🟡 — ledger backlog (D88) per the README router |
+| F16 |  |  | deferred | — | 🟡 — ledger backlog (D89) per the README router |
+| F17 |  |  | deferred | — | 🟡 — ledger backlog (D90) per the README router |
+| F18 |  |  | deferred | — | 🟡 — ledger backlog (D91) per the README router |
+| F19 |  |  | deferred | — | 🟡 — ledger backlog (D92) per the README router |
+| F20 |  |  | deferred | — | 🟡 — ledger backlog (D93) per the README router |
+| F21 |  |  | deferred | — | 🟡 — ledger backlog (D94) per the README router |
+| F22 |  |  | deferred | — | 🟡 — ledger backlog (D95) per the README router |
+| F23 |  |  | deferred | — | 🟡 — ledger backlog (D96) per the README router |
+| F24 |  |  | deferred | — | 🟡 — ledger backlog (D97); flagged to the owner in summary-v3 as the one minor worth their eye |
+| F25 |  |  | deferred | — | 🟡 — ledger backlog (D98) per the README router |
+| F26 |  |  | deferred | — | ⚪ — ledger backlog (D99) per the README router |
+| F27 |  |  | deferred | — | ⚪ — ledger backlog (D100) per the README router |
+| F28 |  |  | deferred | — | ⚪ — ledger backlog (D101) per the README router |
+| F29 |  |  | deferred | — | ⚪ — ledger backlog (D102) per the README router |
 <!-- rendered:findings-table:end -->
 
 ## Triage — confirmation that each finding still exists
@@ -158,6 +190,54 @@ than a re-enqueue — and it is also the boundary below.
   check is the point — a case-insensitive test here would classify addresses the parser does not,
   which is a *new* divergence rather than a fix. Those forms still fall to the retained
   `FormatException` catch, which now only ever means "malformed".
+
+### Fix-diff micro-reviews — the second one caught a defect I shipped
+
+Two fresh-eyes agents over the round's diff, split by risk: one over the five test-and-parser
+fixes, one over the behaviour and document fixes. **18 findings between them.** Repaired in
+`d1ffee7` and `dc203c7`:
+
+1. **My F7 fix would have blinded SLO 3 in the healthy case.** `sum(A) + sum(B)` is *empty* when
+   `B` matches no series, and `payment_webhook_total{result="duplicate"}` does not exist until the
+   first duplicate is recorded. So the panel I "fixed" would have read **"No Data"** for as long as
+   nothing was wrong — on the one SLO whose prose says a single miss is disproportionately costly.
+   Both terms now carry `or vector(0)`, and `slos.md` explains why the guard is load-bearing.
+2. **F8 fixed the document and not the wall.** The Availability panel still presented the diluted
+   ratio with no caveat, and the operator looks at the panel, not `slos.md`. The panel now carries
+   a `description` naming the dilution and D46.
+3. **The `status=` field never reached the log catalogue**, and §12.8 still said the give-up alarm
+   means "24 h elapsed" without the `Printing` case that is the entire point of F9. Both fixed.
+4. **My F2 fix falsified §13.1.** It states a disconnecting caller is never a Sentry issue; that is
+   now conditional — if our deadline had already elapsed, it is a real outage and is captured. The
+   section now says so, and says why the trade is one-sided on purpose.
+5. **The story doc still carried the retired SLO 3 criterion**, so the next verification pass would
+   have re-derived the definition F7 just replaced. Amended in place.
+6. **First micro-review, on cluster A:** the `Critical` line §14.10 tells operators to grep for had
+   no test, and I had just routed a third refusal reason through it. Closed with a real-Kestrel
+   boot test (`d1ffee7`) that pins the abort *and* the log line; downgrading it to `Warning`
+   reddens that test — measured.
+
+**Checks that came back clean, recorded so they are not re-litigated:** the exception filter runs
+in pass one, before the enclosing `using` disposes, so `deadline.IsCancellationRequested` is read
+on a live CTS (and `IsCancellationRequested` never throws `ObjectDisposedException`); MS.DI honours
+the constructor's default parameter, so `AddScoped<IGoogleTokenValidator, GoogleTokenValidator>`
+still resolves; `(Paid || Printing)` over a `HasConversion<string>()` column becomes two
+parameterised string comparisons on both SQLite and Npgsql, with no client evaluation; `MarkOnce`
+stays one-shot across a status change; `header_up -X` is valid Caddy v2 and strips the *upstream
+request* header.
+
+### Genuinely new, outside the finding set — NOT fixed
+
+- **SLO 4 and SLO 5 carry the exact defect F7 fixed.** `awb_creation_total{result="ok"} / total`
+  puts `skipped` in the denominator — and `AwbCreator` returns `Skipped` for benign cases including
+  "another worker holds a fresh claim", which the retry sweep manufactures on every interval. SLO 5
+  counts `pending` the same way. I did **not** fix them: F7's numerator was an owner decision about
+  what SLO 3 should mean, and each of these is the same kind of definitional call, not a mechanical
+  sweep. They need the same one-line question the owner answered for SLO 3.
+- **Nothing tests the Caddyfile.** The two `header_up` strips can be deleted silently; the document
+  is their only guard.
+- **`tracestate` is still honoured and forwarded** — the remaining attacker-seedable member of the
+  trace-header family. Low impact (`DeterministicTraceIdSampler` ignores it), unswept.
 
 ### Remaining boundaries — not fixed, for the re-reviewer
 
