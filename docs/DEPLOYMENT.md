@@ -768,7 +768,8 @@ Filter Serilog by these structured-log keys:
 |---|---|---|
 | `Sameday token refreshed. ExpiresAt=…` | Info | Healthy. Fires per replica per token cycle (Sameday's tokens are ~24 h). |
 | `sameday.awb.created order_id=… awb=… attempt=N` | Info | Happy path. `attempt=1` is real-time; `attempt>1` means the dispatcher's in-process backoff fired. |
-| `sameday.awb.skipped order_id=…` | Info | Order no longer eligible (cancelled, already has AWB). Healthy. |
+| `sameday.awb.skipped order_id=…` | Info | No label was needed: order missing, not `Paid`, already has an AWB, another worker holds a fresh claim, or Sameday deduped onto the number already stored. Healthy, and excluded from the AWB SLO on both sides. |
+| `sameday.awb.orphaned order_id=… created_awb=… persisted_awb=…` | Error | A billable label was created but the order was no longer writable, so nothing references it and Sameday has no void endpoint here. **Void it manually at the courier**, then reconcile the order. Counted as an AWB SLO failure, not as a skip. |
 | `sameday.awb.retry-scheduled order_id=… attempt=N delay=Ds` | Info | Transient Sameday failure; in-process retry queued. |
 | `sameday.awb.non-transient-retry-later order_id=… reason=…` | Warning | Sameday is up but returned auth-fail or protocol-fail. Investigate; the retry job will keep trying. |
 | `sameday.awb.permanent-fail order_id=… reason=…` | Error | Our request is malformed (bad postal code, weight over the courier ceiling, …). Admin manual fallback. |
