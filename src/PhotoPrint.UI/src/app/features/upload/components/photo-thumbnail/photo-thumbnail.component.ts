@@ -63,10 +63,10 @@ export class PhotoThumbnailComponent implements OnDestroy {
   @Output() removed = new EventEmitter<string>();
   @Output() preview = new EventEmitter<string>();
 
-  // Object URL is minted ONCE per File and cached. localUrl() is called from the template on
+  // Object URL is minted ONCE per File and cached. localUrl is called from the template on
   // every change-detection cycle (each upload-progress event rebuilds `state`), so calling
   // URL.createObjectURL there directly leaked a fresh, unrevoked blob URL every tick and churned
-  // the <img> (F8, review 043-v3). Revoked when the File changes or the component is destroyed.
+  // the <img>. Revoked when the File changes or the component is destroyed.
   private objectUrl: string | null = null;
   private objectUrlFile: File | null = null;
 

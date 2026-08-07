@@ -20,7 +20,7 @@ public class UploadsController : ControllerBase
     private const long MaxBatchSizeBytes = 524_288_000L;       // 500 MB total batch
 
     // A preview is an ownership-checked, per-user resource, so it must never be shared-cacheable
-    // (SEC-1 + QUAL-4, review 042-v1). `private` keeps it out of any shared proxy/CDN while still
+    // `private` keeps it out of any shared proxy/CDN while still
     // allowing a per-user browser cache. `immutable` is intentionally dropped: a thumbnail can be
     // regenerated after an ops-side deletion, so the response is not immutable.
     private static readonly string PreviewCacheControl =
@@ -43,7 +43,7 @@ public class UploadsController : ControllerBase
         _logger = logger;
     }
 
-    // Client-controlled filenames must be neutralised before logging (L6, review 042-v4):
+    // Client-controlled filenames must be neutralised before logging:
     // strip control chars (a newline forges a fake log line in plain-text sinks) and cap length
     // (an unbounded name is a log-volume amplification vector).
     private static string SanitizeForLog(string? name)
@@ -69,7 +69,7 @@ public class UploadsController : ControllerBase
         var guestSessionId = User.GetGuestSessionIdOrNull();
 
         // Buffer the form file into a seekable MemoryStream.
-        // IFormFile.OpenReadStream() may return a non-seekable stream in some
+        // IFormFile.OpenReadStream may return a non-seekable stream in some
         // hosting contexts; MimeValidator and IStorageService both require seeking.
         using var buffer = new MemoryStream();
         await file.CopyToAsync(buffer, cancellationToken);
@@ -134,12 +134,11 @@ public class UploadsController : ControllerBase
             {
                 // A batch rejection is swallowed into a per-item result (200 overall), so it never
                 // reaches ExceptionHandlerMiddleware. Log it here or bulk abuse is invisible to ops
-                // (OBS-1, review 042-v1).
                 var safeName = SanitizeForLog(file.FileName);
                 if (ex is DecompressionBombException bomb)
                     // DecompressionBombException subclasses UnprocessableEntityException, so without
                     // this branch the reserved bomb event (with dimensions) that ops alerts key on
-                    // would never fire for the /batch vector (M4, review 042-v4).
+                    // would never fire for the /batch vector.
                     _logger.LogWarning(
                         "uploads.decompression_bomb.rejected file={File} width={Width} height={Height}",
                         safeName, bomb.WidthPx, bomb.HeightPx);
@@ -157,9 +156,9 @@ public class UploadsController : ControllerBase
 
     // GET /api/uploads/{id}/preview
     //
-    // Bolt 043 (ADR-008): the response shape depends on which tier owns the upload's bytes.
-    //   Local upload  -> 200 image/jpeg + private 30-day cache (bolt 042 SEC-1 behaviour).
-    //   Cloud upload  -> 302 Found to a presigned URL + Cache-Control: private, max-age =
+    // The response shape depends on which tier owns the upload's bytes.
+    //   Local upload -> 200 image/jpeg + private 30-day cache (private-cache behaviour).
+    //   Cloud upload -> 302 Found to a presigned URL + Cache-Control: private, max-age =
     //                    the presign TTL (so a cached redirect never outlives its URL, and
     //                    shared caches never leak a user's signed URL).
     // Authorization runs in the service BEFORE any presigned URL is generated.
@@ -185,7 +184,7 @@ public class UploadsController : ControllerBase
         }
         catch (FileNotFoundException)
         {
-            // TOCTOU (F8, review 043-v1): GetPreviewAsync resolved Local, then a concurrent
+            // TOCTOU: GetPreviewAsync resolved Local, then a concurrent
             // promotion best-effort-deleted the local thumb before we opened it. Re-resolve
             // once — the upload is now Cloud (→ 302) or the thumb regenerated — rather than
             // letting the unmapped FileNotFoundException surface as a 500.
@@ -216,7 +215,7 @@ public class UploadsController : ControllerBase
         var url = await _storageRouter.Cloud.GetPresignedUrlAsync(loc.ThumbnailKey, ttl, ct);
 
         // Cap the browser cache at the presigned-URL lifetime, so a still-fresh cached redirect
-        // can never replay to an already-expired URL (F5, review 043-v1). Hardcoding max-age=3600
+        // can never replay to an already-expired URL. Hardcoding max-age=3600
         // broke thumbnails whenever an operator set PresignTtlMinutes < 60. 'private' keeps a
         // user's signed URL out of any shared cache.
         Response.Headers.CacheControl = $"private, max-age={(int)ttl.TotalSeconds}";

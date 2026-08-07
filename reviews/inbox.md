@@ -1,0 +1,201 @@
+---
+type: review-inbox
+updated: 2026-08-05
+---
+
+# Inbox — findings without a target
+
+Findings noticed **outside any open review pass** — by a fixer sweeping a defect class, a
+driver reading code, anyone — land here with their evidence, untriaged. A new
+`reviews/<target>/` folder is never created for them: only an owner-opened loop creates a
+target folder, and when that happens the relevant rows below seed its ledger and are
+struck from this file. Not to be confused with a ledger row's `backlog` status — that is a
+triaged minor deferred *within* its target; this file is what nobody has triaged yet.
+
+Severities are the recorder's first read, not a pass verdict.
+
+## CI — `secret-scan` fails on every pull_request event, no loop opened
+
+🟡 `.github/workflows/secret-scan.yml` — the job succeeds on `push` and fails on `pull_request`
+for the same commit, so every PR carries a permanently red check. Noticed while confirming the
+044-045-observability v3 fix round's CI result.
+
+**Evidence (2026-08-05):** at commit `9884ca2`, `secret-scan` was `success` on the push-triggered
+run (31010907839, 23 s) and `failure` on the pull_request-triggered run (31010911613, 16 s). The
+same split appears on runs at 10:58Z, 11:06Z and 11:12Z, i.e. before that round's changes, so it is
+pre-existing. Not investigated — likely a shallow-clone or base-ref difference between the two
+trigger types rather than a real secret. A check that is always red teaches everyone to ignore it.
+
+## test suite — a flaky test, no loop opened
+
+🟡 `src/PhotoPrint.Tests/Unit/Services/EmailRetryJobTests.cs` —
+`Processing_SuccessfulSend_MarksEmailAsSent` fails intermittently under parallel load and passes
+in isolation. Noticed during the 044-045-observability v3 fix round
+([resolution](044-045-observability/resolution-v3.md)) as unexplained collateral in a mutation run.
+
+**Evidence, both measured 2026-08-05 at `cd99cdb`:** in a 1139-test scoped run it failed after
+3 s; re-run alone (`--filter FullyQualifiedName~EmailRetryJobTests`) it passed 4/4 in 1 s. It was
+green in the same broad filter before and after, so it is not caused by that round's changes.
+Not investigated further — it was outside the finding set, and a flaky test is exactly the kind of
+thing that gets blamed on whatever change is in flight when it fires.
+
+## auth / rate limiting — no loop opened
+
+Found incidentally during the 044-045-observability v1 fix round
+([resolution](044-045-observability/resolution-v1.md)): that review's D1 was "the
+`/metrics` allow-list trusts the TCP peer address, which behind the Caddy edge is the
+proxy for every caller", and the fixer noticed the same defect class in the rate limiters
+and the security-audit log. The loop driver verified the first two rows by reading the
+code; the third is unverified. The owner declined to open a target for this (2026-08-03).
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🔴 | 2026-08-03 | Global rate limiter partitions on `Connection.RemoteIpAddress`, which behind Caddy is one value for all traffic — the documented "100/min per IP" is 100/min for the whole internet, so one client at ~2 rps can 429 the entire site | `Extensions/SecurityExtensions.cs:60` |
+| 🔴 | 2026-08-03 | Auth limiters are unpartitioned `AddFixedWindowLimiter` calls, not per-IP as their comments claim: registration 5/hour, resend-confirmation 3/hour and forgot-password 3/hour are **site-wide** budgets, so one actor can lock every user out of signup and password reset | `Extensions/AuthExtensions.cs:84-106` |
+| 🟠 | 2026-08-03 | Security-audit log entries record Caddy's address as the client IP, so the audit trail cannot attribute an action to a caller | `Controllers/AuthController.cs:54, 72, 160` |
+
+### Evidence held
+
+- **Row 1** — read directly: `partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown"`,
+  with the inline comment claiming "100/min per IP". No `UseForwardedHeaders` exists anywhere in
+  `src/` (grepped), and `Caddyfile` reverse-proxies every path to `api:8080`, which is exposed
+  internally only.
+- **Row 2** — read directly: the three policies are plain `options.AddFixedWindowLimiter(...)` with
+  no partition function, so the permit budget is process-global.
+- **Row 3** — reported by the fixer, **not independently checked by the loop driver**. Treat as
+  unverified until a pass looks at it.
+
+### Note on urgency
+
+The application is not deployed, so nothing is exploitable today. Rows 1 and 2 are
+**pre-deployment blockers**: both are trivially triggerable denial-of-service against all
+users, and neither has a test.
+
+---
+
+## From the 044-045-observability v1 fix round (2026-08-04)
+
+Found by the cluster F fix-diff micro-review while fixing F15 (mapped 5xx bypassing Sentry).
+Same defect class one layer out, but outside the review's finding set, so nothing was changed.
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟠 | 2026-08-04 | Background jobs are wholly outside Sentry's reach: all 13 `BackgroundJobs/` files catch their own exceptions and only log, never pass through `ExceptionHandlerMiddleware`, and none touch `IHub` — so a total AWB-retry or email-retry outage produces no Sentry issue at all | `BackgroundJobs/AwbRetryJob.cs:56,65`, `EmailRetryJob.cs:85`, `ArchiveRetentionJob.cs:63`, `OriginalPurgeRecoveryScanner.cs:81`, `PromotionRecoveryScanner.cs:85` |
+
+### Evidence held
+
+- Grepped `src/PhotoPrint.API/BackgroundJobs/` for `Sentry.|IHub|CaptureException|SentrySdk`:
+  zero matches across 13 files. Each job's tick is wrapped in its own `catch` that calls
+  `LogError` and swallows, so nothing propagates to the middleware that does capture.
+- **Not strictly a doc contradiction:** `docs/DEPLOYMENT.md:821` scopes its Sentry claim to
+  exceptions escaping "any controller or middleware", which these never do. The only net under
+  them is the monthly manual log-vs-Sentry cross-check in §13.8.
+- `Hubs/AdminOrderHub.cs` has no methods yet, so SignalR hub exceptions are not a live gap.
+
+### Note on urgency
+
+Not exploitable — this is a blind spot, not a vulnerability. It matters at the moment Sentry is
+switched on and someone reads "no new Sentry issues" as "the retry jobs are healthy".
+
+---
+
+## From the 044-045-observability v2 verification pass (2026-08-05)
+
+Noticed by the cluster A lens while reviewing the `/metrics` gate. Adjacent to that fix but a
+different endpoint and a different bolt, so it is not in this target's ledger.
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟡 | 2026-08-05 | `/health` is proxied by Caddy with no gate and echoes each health check's `Data` bag verbatim to any anonymous caller — the gating question `/metrics` just spent a whole cluster on, unasked for the sibling endpoint | `HealthChecks/HealthCheckResponseWriter.cs:28-31`, mapped at `Program.cs:406` |
+
+### Evidence held
+
+- Read directly: `WriteAsync` copies every `entry.Value.Data` key into the JSON response
+  (`HealthCheckResponseWriter.cs:28-31`). `Caddyfile` has no `/health` rule, so it falls to the
+  catch-all `reverse_proxy api:8080` and is publicly reachable.
+- **Today the exposure is small and should not be overstated:** the only populated bag is
+  `DiskHealthCheck`'s `freeGb` (`DiskHealthCheck.cs:32`); `DbHealthCheck` adds none. The finding is
+  the shape — any future check that attaches connection strings, hostnames or version data to its
+  `Data` publishes them — not a live leak.
+
+### Note on urgency
+
+Low. Worth folding into whichever loop next touches health checks or the edge configuration,
+rather than opening a target.
+
+---
+
+## From the 044-045-observability v2 fix round (2026-08-05)
+
+Found by the fix-diff micro-review while checking whether D40's defect class survived elsewhere.
+It does — but in the AWB retry subsystem, not in observability, so it is outside this target's
+finding set and nothing was changed. **The fixer's own class sweep got this wrong**: I inspected
+these sites, judged that they meant strictly `Paid`, and said so in the resolution. The
+micro-review supplied the scenario that shows otherwise.
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟠 | 2026-08-05 | An order advanced to `Printing` while its AWB is still pending falls out of the retry sweep permanently and silently: the sweep, the creator's re-check and the give-up log all match `Status == Paid`, so the order ships with no shipping label and nothing reports it | `BackgroundJobs/AwbRetryJob.cs:86,109`, `Services/Sameday/AwbCreator.cs:92,116` |
+
+### Evidence held
+
+- Read directly: all four sites test `Status == OrderStatus.Paid`. `AwbCreator.cs:92` returns
+  `Skipped("status is Printing, not Paid")`, which is not an error path — nothing alerts on it.
+- `AdminOrderService.UpdateStatusAsync` (`:150-160`) has no AWB guard on the `Paid → Printing`
+  transition, so an admin working the queue during a Sameday outage can trigger this with a normal
+  action.
+- `OrderStatusMachine.HasBeenPaid` (added this round) is the wrong predicate for these sites — they
+  need "paid and not yet shipped", a third notion. Fixing them is an AWB-subsystem behaviour change
+  with its own blast radius, which is why it was recorded rather than folded into an observability
+  round.
+
+### Note on urgency
+
+Not exploitable, and it needs a vendor outage plus an admin action to trigger. But the outcome is a
+parcel shipped with no label and no signal, and the AWB SLO would read healthy throughout.
+
+---
+
+## Flake: `ReliableEmailServiceTests.SendAsync_FailedSend_QueuesEmailToDatabase`
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟡 | 2026-08-06 | Second flake in the email area: fails intermittently under parallel load, passes in isolation. Surfaced as unexplained collateral in a v4 mutation run whose mutation (a typo in `slos.md`) cannot reach it | `Tests/Unit/Services/ReliableEmailServiceTests.cs` |
+
+### Evidence held
+
+- Failed once during v4 mutation 14 (mutating `memory-bank/operations/slos.md` only), alongside the
+  one intended failure. A markdown edit cannot affect this test.
+- Passed in the three subsequent wide runs (1133 green each) and passed in a scoped run of
+  `FullyQualifiedName~ReliableEmailServiceTests`.
+- Not caused by the 044/045 work — recorded here because it is the **second** email-area flake found
+  the same way, after `EmailRetryJobTests.Processing_SuccessfulSend_MarksEmailAsSent`
+  (filed 2026-08-06 by the v3 fix round). Two flakes in one area under parallel load suggests shared
+  state rather than two coincidences.
+
+---
+
+## Sameday HTTP client timeout is shorter than its own retry ladder
+
+| Sev | Recorded | Title | File |
+|---|---|---|---|
+| 🟠 | 2026-08-06 | The registered Sameday `HttpClient.Timeout` (10 s default) bounds the whole handler chain *including* the resilience handler's 1 s + 4 s + 16 s backoff schedule, so `MaxRetryAttempts = 3` is silently 2 and a vendor outage surfaces as a cancellation rather than the vendor's status | `Extensions/SamedayServiceCollectionExtensions.cs:50`, `Services/Sameday/SamedayResilienceHandler.cs:22,41`, `Services/Sameday/SamedayPolicies.cs:55-63` |
+
+### Evidence held
+
+- `SamedayResilienceHandler` is a `DelegatingHandler` registered *inside* the named client, so
+  `HttpClient.Timeout` wraps the entire retry pipeline rather than each attempt.
+- The backoff schedule totals ~21 s against a default `RequestTimeoutSeconds` of 10 s
+  (validator range 1–60), so the client timeout cancels partway through the third backoff.
+- Consequence: the third retry never runs, and the failure the AWB give-up logic reasons about is
+  a `TaskCanceledException` instead of the vendor's own status.
+- **Unproven by execution** — read from the handler chain and the delay generator; no test was run
+  against it.
+
+### Why it is here and not in the 044-045 fix round
+
+It is the true class sibling of finding F2/D104 (a registered `HttpClient` timeout ordered against a
+separately-owned time budget) and was found by that finding's micro-review. Fixing it changes a
+**resource budget and retry semantics** on the AWB path, which is trigger-list work needing its own
+adversarial approach-check — not something to fold into an observability round. The 044-045 round
+recorded the class as swept-and-open rather than fixing it here.

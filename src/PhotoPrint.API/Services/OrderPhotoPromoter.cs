@@ -9,7 +9,7 @@ namespace PhotoPrint.API.Services;
 /// <summary>
 /// Default <see cref="IOrderPhotoPromoter"/> — the orchestrator described in
 /// <c>memory-bank/bolts/051-order-photo-promotion/ddd-02-technical-design.md</c>.
-/// Per-upload atomic, Confirmed-Write-Then-Delete (ADR-011).
+/// Per-upload atomic, Confirmed-Write-Then-Delete.
 /// </summary>
 public class OrderPhotoPromoter : IOrderPhotoPromoter
 {
@@ -38,7 +38,7 @@ public class OrderPhotoPromoter : IOrderPhotoPromoter
 
     public async ValueTask EnqueueAsync(Guid orderId, CancellationToken ct = default)
     {
-        // ADR-008 §"fail loudly": refuse to enqueue when the cloud tier is off. A paid
+        // The §"fail loudly": refuse to enqueue when the cloud tier is off. A paid
         // order whose photos can't be archived is the silent-data-loss case we want to
         // catch in the log dashboard before a customer asks for their photos in 6 months.
         if (!_settings.Enabled)
@@ -93,7 +93,7 @@ public class OrderPhotoPromoter : IOrderPhotoPromoter
             return PromotionOutcome.Empty;
         }
 
-        // Distinct() in case a future order shape duplicates the same upload across line items.
+        // Distinct in case a future order shape duplicates the same upload across line items.
         var uploads = order.Items.Select(i => i.Upload).Distinct().ToList();
         var outcome = PromotionOutcome.Empty;
 
@@ -114,7 +114,7 @@ public class OrderPhotoPromoter : IOrderPhotoPromoter
 
     private async Task<PromotionOutcome> PromoteUploadAsync(Upload upload, CancellationToken ct)
     {
-        // ADR-011 §"Idempotent per-upload": short-circuit on already-promoted rows.
+        // The §"Idempotent per-upload": short-circuit on already-promoted rows.
         if (upload.StorageLocation == StorageLocation.Cloud)
         {
             _logger.LogDebug(

@@ -14,23 +14,23 @@ public class UploadConfiguration : IEntityTypeConfiguration<Upload>
 
         // FilePath was non-nullable through bolt 042; bolt 052 makes it nullable so the
         // original-purge can flip it to null without losing other Upload metadata. The
-        // single-source-of-truth rule (ADR-011, mirror direction) treats FilePath == null
+        // single-source-of-truth rule (mirror direction) treats FilePath == null
         // as "original blob no longer exists."
         builder.Property(u => u.FilePath)
             .HasMaxLength(512);
 
-        // Nullable cached-thumbnail path (bolt 042) — same length budget as FilePath.
+        // Nullable cached-thumbnail path — same length budget as FilePath.
         builder.Property(u => u.ThumbnailPath)
             .HasMaxLength(512);
 
-        // Nullable large-preview path (bolt 051) — populated post-promotion; same length budget.
+        // Nullable large-preview path — populated post-promotion; same length budget.
         builder.Property(u => u.LargePreviewPath)
             .HasMaxLength(512);
 
         // Nullable purge timestamp (bolt 051; written by unit-002 purge job).
         builder.Property(u => u.OriginalPurgedAt);
 
-        // Two-tier storage location (bolt 043). Stored as int; defaults to 0 (Local).
+        // Two-tier storage location. Stored as int; defaults to 0 (Local).
         builder.Property(u => u.StorageLocation)
             .IsRequired()
             .HasDefaultValue(StorageLocation.Local);

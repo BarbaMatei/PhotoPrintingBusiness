@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "quiet-gate-stop",
+  "prompt": "Continue the review loop for target 094-quiet (fixture root via --root). Routing exercise: drive the loop as far as the process allows without launching any pass/Workflow/skill; stop at the first owner decision or pass-execution point.",
+  "assertions": [
+    {"text": "report.md relays a gate/judgment question to the owner about certification go-ahead (or delta-worthiness) rather than deciding it"},
+    {"text": "report.md states an expected cost for the next pass (a token figure)"},
+    {"text": "report.md shows the mechanical router was actually run (quotes or paraphrases its STATE/ROUTER/GATE readout)"},
+    {"text": "no pass, Workflow, or skill was launched, and the report does not claim one was"},
+    {"text": "the fixture git tree is unchanged after the run (grader checks git status)"}
+  ]
+}

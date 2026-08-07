@@ -11,7 +11,10 @@ codePack, no workflow script. The question is "did each specific fix hold?", nev
 feature clean?".
 
 1. Read the latest `review-v<n>.md` + `resolution-v<n>.md`; check out the resolution's
-   `fixed_commit`. You must not be the fixer.
+   `fixed_commit`. You must not be the fixer — sole exception (calibration 2026-07-29): a
+   **test-only** fix round (zero production-code changes) may be self-verified when every fix
+   carries a revert-and-rerun proof whose failing-test set was predicted before the revert and
+   matched exactly, recorded in the resolution. Any production-code change voids the exception.
 2. **Revert-and-rerun every `fixed` finding:** revert the fix (source only), its regression
    test must go red with clean attribution and zero collateral; restore, green. A fix whose
    test cannot go red is not verified — reopen it.
@@ -29,7 +32,8 @@ feature clean?".
 5. Write `review-v<n+1>.md` (`pass-type: verification`; verdict at most
    `approve-with-followups` — a quiet verification means "the fixes held", never "the code is
    clean"). Flip held findings to `verified`, reopen failures, append the
-   [metrics.jsonl](metrics-schema.md) line and the [index.md](index.md) row, and write
+   [metrics.jsonl](metrics-schema.md) line and the [index.md](index.md) row (then run
+   `node reviews/lib/records-auditor.mjs <target>` — must exit clean), and write
    `summary-v<n+1>.md` via the **`owner-summary` skill**.
 
 Cost: scale agent count to the fix size — a 50-line fix doesn't need 8 finders. Give agents

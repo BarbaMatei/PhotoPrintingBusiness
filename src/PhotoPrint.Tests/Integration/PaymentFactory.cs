@@ -58,7 +58,7 @@ public class FakeStripeSignatureVerifier : IStripeSignatureVerifier
 }
 
 /// <summary>Records promotion enqueues so tests can assert the webhook→promotion wiring
-/// (D59, review 043-v7) without a running worker consuming the channel.</summary>
+///  without a running worker consuming the channel.</summary>
 public class RecordingPhotoPromoter : IOrderPhotoPromoter
 {
     public List<Guid> Enqueued { get; } = new();
@@ -100,7 +100,7 @@ public class PaymentFactory : ShippingFactory
     /// across multiple requests (bolt 035 idempotency).</summary>
     public FakeStripePaymentGateway StripeGateway { get; } = new();
 
-    /// <summary>Shared recording promoter — asserts the webhook→promotion wiring (D59).</summary>
+    /// <summary>Shared recording promoter — asserts the webhook→promotion wiring.</summary>
     public RecordingPhotoPromoter PhotoPromoter { get; } = new();
 
     /// <summary>Shared recording AWB notifier — asserts the webhook→AWB-enqueue wiring.</summary>
@@ -148,7 +148,7 @@ public class PaymentFactory : ShippingFactory
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
 
-        // QUAL-3 (review 035-v8): shared canonical cart graph — see TestCartSeed.
+        // Shared canonical cart graph — see TestCartSeed.
         var graph = TestCartSeed.Build(userId, guestSessionId, unitPrice, quantity);
         graph.AddTo(db);
         await db.SaveChangesAsync();

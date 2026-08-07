@@ -1,0 +1,9 @@
+{
+  "run_id": "eval-3-closed-terminal-with_skill",
+  "expectations": [
+    {"text": "report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)", "passed": true, "evidence": "\"Nothing is next — the review loop for 015-sameday-shipping is closed... closed 2026-07-29, owner sign-off, commit 5734021\". A fresh certification is mentioned only as an owner option with its ~5M cost."},
+    {"text": "report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings", "passed": true, "evidence": "\"The target stays under watch: a new blocker, a fix-caused regression, or a reopened fix re-arms the loop.\""},
+    {"text": "report.md mentions the pre-enable checklist as the binding gate for the dormant feature", "passed": true, "evidence": "\"The binding gate is the pre-enable checklist, not the closure: D45... D23... D81... plus D90–D96.\""},
+    {"text": "the main repo git tree is unchanged after the run (grader checks git status)", "passed": true, "evidence": "Repo status shows only the driver's own pre-existing uncommitted edits (the two ledger closed: lines); nothing added by the eval agents."}
+  ]
+}

@@ -2,7 +2,7 @@
 type: review-system
 status: active
 created: 2026-06-18
-updated: 2026-07-24
+updated: 2026-08-03
 owner: Matei Barba
 ---
 
@@ -10,7 +10,8 @@ owner: Matei Barba
 
 Parallel isolated review lenses, repeated independent passes, and a severity-based stop rule.
 One reviewer in one sitting catches a *sample* of what's wrong, not all of it — so the system
-samples repeatedly, from designed-in breadth, until the serious-defect population is closed.
+samples repeatedly, from designed-in breadth, until no 🔴 survives and every 🟠 carries a
+recorded owner-visible decision. **Certified means exactly that — not zero defects.**
 
 - **Why it's built this way** (the 035/042/043 evidence and numbers): [rationale.md](rationale.md)
 - **Where it's heading** (autonomy, experiments, tool build order): [self-driving-loop-design.md](self-driving-loop-design.md)
@@ -20,13 +21,15 @@ samples repeatedly, from designed-in breadth, until the serious-defect populatio
 
 | Task | Follow |
 |---|---|
+| Any pass — picked and driven end to end | the **`loop-driver` skill** (mechanical router: [lib/route-next-pass.mjs](lib/route-next-pass.mjs)) |
 | Discovery pass (full · delta · certification) | [runbook-discovery.md](runbook-discovery.md) |
 | Verification pass (after a fix round) | [runbook-verification.md](runbook-verification.md) |
 | Fix round | the `/fix-review` skill — **sole owner of the fixer contract** |
 
-Standing instruction: *"Continue the review loop for `<target>`"* → take the first matching
-router row. Before any discovery-scale launch, state the pass type and expected cost in one
-line; **certification always waits for an explicit owner go-ahead**.
+Standing instruction: *"Continue the review loop for `<target>`"* → the **`loop-driver`**
+skill: it audits the records, reads the router mechanically, and states the pass type and
+expected cost in one line before any discovery-scale launch; **certification always waits
+for an explicit owner go-ahead**.
 
 ## Entry tiers — does a change get the loop at all?
 
@@ -56,13 +59,16 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 ¹ **Delta-worthy** = the fix round fixed a 🔴, added/converted a mechanism, or changed a
 design. Anything else is patch-grade and exits on verification + the fixer's micro-review.
 
-² **Certification** (full-loop tier): two parallel blinded full-manifest passes against one
-frozen commit, folding in any still-owed manifest lenses (~2× full-pass cost). A **recorded
-single-pass deviation** is acceptable when (a) an equally broad blinded pass ran recently on
-near-identical code and (b) the fix round since was small and independently verified. Lower tiers certify
-with a **single** fresh full-manifest pass; with owner sign-off a quiet loop may close without
-one (recorded in the index). A backlogged minor fixed later needs only normal fix-verification
-— unless the fix touches full-loop-tier code.
+² **Certification** (full-loop tier): the feature's **first** certification attempt is a pair —
+two parallel blinded full-manifest passes against one frozen commit, folding in any still-owed
+manifest lenses (~2× full-pass cost). **Re-certification** after a fix round that was small and
+independently verified is **one** fresh full-manifest pass on the re-frozen commit — the
+standard close, not a deviation (calibration 2026-07-29). A full-loop-tier feature never closes
+without a fresh full-manifest pass after its last fix round. Lower tiers certify with a
+**single** fresh full-manifest pass; with owner sign-off a quiet **lower-tier** loop may close
+without one (recorded in the index). Every certification index row records the 🟠 still open at
+close. A backlogged minor fixed later needs only normal fix-verification — unless the fix
+touches full-loop-tier code.
 
 **What re-arms the loop — exactly three things:** a new 🔴; a fix-caused 🟠 regression; a
 reopened fix. New non-regression 🟠 get fixed and verified but do not re-arm a delta. New
@@ -84,21 +90,44 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 ## Hard rules
 
 - `review-v<n>.md` is **immutable**; fixers respond in `resolution-v<n>.md`.
+- **Only the owner opens a target.** A `reviews/<target>/` folder is created solely by
+  executing a pass the owner explicitly requested for that target. A defect noticed outside
+  any open pass — by a fixer, a driver, anyone — is recorded with its evidence in
+  [inbox.md](inbox.md), never in a new folder; it seeds the target's ledger if and when
+  the owner opens that loop.
 - The fixer never sets `verified` — only a re-review can.
 - Discovery is **blinded** (best-effort: enforced by prompts, unverified until the blinding
   auditor exists); verification is **anchored** on purpose. Never mix the postures in a pass.
 - A review produces findings; fixing is a separate explicit step, verification a third. Never
   auto-apply fixes mid-review.
 - Every pass appends its [metrics.jsonl](metrics-schema.md) line and its [index.md](index.md)
-  row — at synthesis time, unreconstructable later.
+  row — at synthesis time, unreconstructable later. **Fix rounds append theirs too** (schema
+  v3, 2026-08-03) — at hand-back, via `reviews/lib/render-records.mjs`, computed from the
+  target's worklog.
+- A target holding a certification is **under watch** ([track-record.md](track-record.md)): a
+  later serious finding whose defect existed in the certified code is marked
+  `post-cert-escape` and appended there the same day — the reconciler flags it, the
+  synthesizer records it. Escapes ÷ certifications is the system's false-certification rate.
 - **Rule budget:** a calibration **replaces or deletes** a rule, never stacks an exception on
   top of one; any exception states its expiry (a date, or "next calibration"). The router
-  table is the single decision surface for pass selection.
+  table is the single decision surface for pass selection — executed mechanically by
+  [lib/route-next-pass.mjs](lib/route-next-pass.mjs), hand-read only when it abstains.
 
 ## Files & conventions
 
 - One folder per target: `reviews/<target>/`. Dormant or closed targets move to
   `reviews/archive/<target>/` unchanged.
+- `inbox.md` — the single holding pen for findings recorded outside any open target
+  (evidence + suggested target per row), untriaged. Rows move into a ledger when the owner
+  opens that loop. Distinct from a ledger row's `backlog` status, which is a triaged minor
+  deferred within its target.
+- `worklog.jsonl` — per-target, append-only, one timestamped JSON event per line: fix-round
+  events written by the `/fix-review` skill as work happens, `pass-launch`/`pass-records-done`
+  and owner-gate stamps written by the loop-driver. The crash-safe evidence trail; every
+  metrics `runtime` value is computed from it, never estimated
+  ([schema v3](metrics-schema.md)).
+- A closed loop records `closed: <date> — <how>` in the **ledger frontmatter** — the
+  router's machine-read terminal state (the index row carries the story).
 - `review-v<n>.md` — immutable, one per pass; frontmatter: `version`, `supersedes`, `commit`,
   and required `pass-type: discovery | delta-discovery | verification`.
 - `resolution-v<n>.md` — the fixer's answer, living until closed. Frontmatter: `status: open |
@@ -115,8 +144,8 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 - **Ledger** (`ledger.md`) — one canonical `D#` per real defect, forever; each pass's `F#`
   mapped on *after* the blinded pass. Terminal rows feed the discovery script's
   `decidedFindings`; each deferral row records the commit at which it was last affirmed. A
-  re-raise of a decided item gets the prior decision **attached, never suppressed** — 3 of 5
-  recorded re-raises overturned the prior call.
+  re-raise of a decided item gets the prior decision **attached, never suppressed** — the first
+  5 recorded re-raises overturned 3 prior calls; the ~55 since mostly re-affirmed.
 - Per-finding lifecycle: `open → in-progress → fixed → verified`, or terminal
   `wont-fix | deferred | disputed | false-positive` (rationale required in the resolution).
 - Review artifacts ride with the code branch. This README and the runbooks are the system

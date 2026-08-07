@@ -10,7 +10,7 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// Shutdown-drain behaviour of <see cref="OrderPhotoPromotionWorker"/> (F6, review 043-v1).
+/// Shutdown-drain behaviour of <see cref="OrderPhotoPromotionWorker"/>.
 /// </summary>
 public class OrderPhotoPromotionWorkerTests
 {
@@ -28,7 +28,7 @@ public class OrderPhotoPromotionWorkerTests
         // The worker launches ProcessAsync fire-and-forget; on shutdown it must await the
         // in-flight tasks BEFORE the `using` disposes the SemaphoreSlim. Pre-fix, ExecuteAsync
         // returned on cancellation and disposed the semaphore under an in-flight task, whose
-        // finally { Release() } then threw ObjectDisposedException (unobserved) and abandoned
+        // finally { Release } then threw ObjectDisposedException (unobserved) and abandoned
         // the promotion mid-write.
         var queue = new PromotionQueue();
         var promoter = new GatedPromoter();
@@ -69,7 +69,7 @@ public class OrderPhotoPromotionWorkerTests
     [Fact]
     public async Task FailedJobInBackoff_DoesNotHoldTheConcurrencySlot()
     {
-        // D51 (review 043-v7): the retry backoff was awaited INSIDE the semaphore-guarded
+        // The retry backoff was awaited INSIDE the semaphore-guarded
         // region, so all MaxConcurrentOrders slots could park in Task.Delay (up to 1h) during
         // a cloud blip — fresh promotions starved until the backoff elapsed. With a 1h backoff
         // and a single slot, a healthy job behind a failed one must still process promptly.
@@ -104,7 +104,7 @@ public class OrderPhotoPromotionWorkerTests
     [Fact]
     public async Task FailedJob_IsReenqueuedAfterBackoff_AndSucceedsOnRetry()
     {
-        // D58 (review 043-v7): the retry/backoff/re-enqueue path had no test — deleting the
+        // The retry/backoff/re-enqueue path had no test — deleting the
         // re-enqueue shipped green. With a zero backoff, a failed job must come back through
         // the channel and complete on its second attempt.
         var queue = new PromotionQueue();

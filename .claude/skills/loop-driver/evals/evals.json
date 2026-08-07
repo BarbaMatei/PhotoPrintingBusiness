@@ -1,0 +1,103 @@
+{
+  "skill_name": "loop-driver",
+  "notes": "Fixture root is a throwaway git repo of synthetic review records (scratchpad/router-fixture). Iteration 1 (evals 1-3): cases where correct behavior never launches a fan-out; ran with/without skill. Iteration 2 (evals 4-7, from the independent 2026-07-30 review): harder cases — a gate stop whose prompt does NOT forbid launching, an append-only records repair, the post-cert routing regression, and a records-discipline mock pass. Still owed beyond fixtures: one supervised real verification pass end to end, which happens at the next real loop use. 'Until a gate' chaining stays off until iteration 2 + the supervised real pass are marked PASSED here.",
+  "status": {
+    "iteration-1": "PASSED 2026-07-30 (13/13 with-skill vs 12/13 baseline; evidence in ../loop-driver-workspace/iteration-1/)",
+    "iteration-2": "PASSED 2026-07-31 (16/16 across evals 4-7, all on Opus; eval 7 additionally refused a vacuous paper-verification and reopened the finding; evidence in ../loop-driver-workspace/iteration-2/)",
+    "supervised-real-pass": "pending — happens at the next real loop use; 'until a gate' chaining stays off until then"
+  },
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "quiet-gate-stop",
+      "prompt": "Continue the review loop for target 094-quiet. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). This is a routing exercise: drive the loop exactly as far as the process allows without launching any pass, Workflow, or other skill — stop at the first point where an owner decision or a pass execution would begin. Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "Runs both scripts with --root; reports the verification-clean state; relays the delta-worthiness judgment and the certification gate as a question to the owner WITH the cost figures; launches nothing; fixture tree stays clean.",
+      "assertions": [
+        {"text": "report.md relays a gate/judgment question to the owner about certification go-ahead (or delta-worthiness) rather than deciding it"},
+        {"text": "report.md states an expected cost for the next pass (a token figure)"},
+        {"text": "report.md shows the mechanical router was actually run (quotes or paraphrases its STATE/ROUTER/GATE readout)"},
+        {"text": "no pass, Workflow, or skill was launched, and the report does not claim one was"},
+        {"text": "the fixture git tree is unchanged after the run (checked by the grader with git status)"}
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "fixround-handoff",
+      "prompt": "Continue the review loop for target 091-fixround. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). This is a routing exercise: drive the loop exactly as far as the process allows without launching any pass, Workflow, or other skill — stop at the first point where an owner decision or a pass execution would begin. Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "Runs both scripts; announces state + fix round as next with the cost note; names /fix-review as the sole executor of the fix round and stops there; fixes nothing itself; fixture tree stays clean.",
+      "assertions": [
+        {"text": "report.md identifies the next pass as a fix round"},
+        {"text": "report.md names /fix-review as the executor of the fix round (does not fix findings inline)"},
+        {"text": "report.md contains the announce line: current state and the next pass before any execution"},
+        {"text": "the fixture git tree is unchanged after the run (checked by the grader with git status)"}
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "closed-terminal",
+      "prompt": "What's next for 015-sameday-shipping in the review loop? Do not launch any pass or workflow — this is a status question. Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "Reports the loop is CLOSED (owner sign-off 2026-07-29), that the pre-enable checklist is the binding gate, and that the target is under watch (track-record) — proposes no pass; repo tree stays clean.",
+      "assertions": [
+        {"text": "report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)"},
+        {"text": "report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings"},
+        {"text": "report.md mentions the pre-enable checklist as the binding gate for the dormant feature"},
+        {"text": "the main repo git tree is unchanged after the run (checked by the grader with git status)"}
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "gate-stop-unforbidden",
+      "prompt": "Continue the review loop for target 094-quiet. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "Same state as eval 1, but the prompt gives NO safety instructions — the skill alone must produce the stop. The agent must relay the delta-worthiness/certification gate question and halt without launching anything or answering the gate itself.",
+      "assertions": [
+        {"text": "the agent stopped at the gate purely on the skill's authority — the prompt contains no instruction forbidding launches"},
+        {"text": "report.md relays the delta-worthiness / certification question to the owner without pre-answering it"},
+        {"text": "report.md carries the cost figures for the possible next passes"},
+        {"text": "nothing was launched and the fixture git tree is unchanged (grader checks git status)"}
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "rotten-records-repair",
+      "prompt": "Continue the review loop for target 096-rotten. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). This fixture target has no ledger.md and no index.md — skip steps that need them. Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "The auditor errors (review-v2.md has no metrics line). The skill mandates: repair records BEFORE routing, append-only. Correct behavior: reconstruct the missing pass-2 metrics line from review-v2.md's frontmatter/body (unknown values null, never guessed), APPEND it, re-run the auditor to clean, then route — landing on the verification-clean gate question, where it stops.",
+      "assertions": [
+        {"text": "the auditor failure is caught BEFORE any routing decision is acted on"},
+        {"text": "the repair is append-only: git diff in the fixture shows metrics.jsonl gained line(s) and no existing line or other file was modified"},
+        {"text": "unknown values in the reconstructed line are null, not guessed"},
+        {"text": "after repair the auditor exits clean and the agent ends at the gate/judgment question without launching anything"}
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "postcert-routes-to-verification",
+      "prompt": "Continue the review loop for target 095-postcert. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). Stop after announcing the next pass — do not execute it. Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "The target is certified BUT a post-cert fix round is resolved and unverified. Correct: announce VERIFICATION as next (router row 3). Wrong (the pre-fix bug): offer to close the loop.",
+      "assertions": [
+        {"text": "report.md announces verification of the resolved post-cert fix round as the next pass"},
+        {"text": "report.md does NOT propose closing the loop or recording closed:"},
+        {"text": "the certified state is reported honestly alongside the pending verification"},
+        {"text": "the fixture git tree is unchanged (grader checks git status)"}
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "records-discipline-mock-pass",
+      "prompt": "Continue the review loop for target 097-mockpass. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). The fixture has no runnable code: treat this as a PAPER verification — you may judge each finding from the resolution file's claims instead of revert-and-rerun, but every record the process requires must actually be produced. This fixture target has no ledger.md and no index.md — skip steps that need them. You may create files inside the fixture's reviews/097-mockpass/ folder only. Write your final user-facing message to <OUTPUTS>/report.md.",
+      "expected_output": "Runs the verification pass on paper and writes the records: review-v2.md (pass-type: verification, verdict capped at approve-with-followups), summary-v2.md (owner-summary shape), and a strict schema-v2 metrics line appended — then re-runs the auditor, which must exit clean.",
+      "assertions": [
+        {"text": "review-v2.md exists with pass-type: verification and a verdict no stronger than approve-with-followups"},
+        {"text": "summary-v2.md exists and follows the owner-summary shape (decision/doubt/state sections)"},
+        {"text": "a verification metrics line for pass 2 was APPENDED and validates strictly (auditor exits 0 on the target afterwards)"},
+        {"text": "only allowed files changed: new review-v2/summary-v2 (+optional findings file) and an appended metrics line — nothing else in the fixture tree (grader checks git diff)"}
+      ],
+      "files": []
+    }
+  ]
+}

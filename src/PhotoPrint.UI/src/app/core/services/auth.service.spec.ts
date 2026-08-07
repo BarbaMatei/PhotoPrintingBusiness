@@ -74,7 +74,7 @@ describe('AuthService', () => {
     expect(service.getGuestToken()).toBe('guest-abc');
   });
 
-  // F2 (review 042-v6): a self-heal on any unauthenticated 401 clears the guest token, but the
+  // A self-heal on any unauthenticated 401 clears the guest token, but the
   // token shares the `guestSession` key with checkout contact info. Clearing must drop the token
   // WITHOUT wiping name/email/phone the user entered at checkout.
   it('clearGuestToken preserves checkout contact info while dropping the token', () => {

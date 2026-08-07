@@ -45,7 +45,7 @@ public class ImageDecodeLimiterTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
-    // F1 (review 042-v6): the default slot count must bound by memory, not just cores. On a
+    // The default slot count must bound by memory, not just cores. On a
     // high-core / low-RAM host, ProcessorCount slots × ~400-512 MB per decode overruns RAM and
     // re-opens the M3 OOM DoS. The default is now min(cores, availableRAM / perDecodeBudget).
 

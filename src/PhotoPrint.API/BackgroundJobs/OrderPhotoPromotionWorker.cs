@@ -44,7 +44,7 @@ public class OrderPhotoPromotionWorker : BackgroundService
         using var concurrency = new SemaphoreSlim(_settings.MaxConcurrentOrders);
 
         // Tracked out here (not inside the try) so the finally can drain it before the
-        // semaphore is disposed (F6, review 043-v1).
+        // semaphore is disposed.
         var inFlight = new List<Task>();
 
         try
@@ -68,7 +68,7 @@ public class OrderPhotoPromotionWorker : BackgroundService
         finally
         {
             // Drain in-flight promotions BEFORE `concurrency` is disposed. Otherwise a task
-            // still mid-PromoteOrderAsync reaches its finally { Release() } on a disposed
+            // still mid-PromoteOrderAsync reaches its finally { Release } on a disposed
             // semaphore → ObjectDisposedException (unobserved), abandoning the promotion
             // mid-write — the exact defect this drain closes. This is bounded by the host
             // shutdown timeout; PromoteOrderAsync honours stoppingToken so in-flight work
@@ -135,7 +135,7 @@ public class OrderPhotoPromotionWorker : BackgroundService
 
     // Backoff must not hold a concurrency slot: awaiting the delay inside ProcessAsync parked
     // every slot in Task.Delay during a cloud blip, starving fresh promotions until the backoff
-    // elapsed (D51, review 043-v7). The detached retry never touches the semaphore (safe past
+    // elapsed. The detached retry never touches the semaphore (safe past
     // the shutdown drain; a post-shutdown enqueue lands in the dead channel and is dropped —
     // the recovery sweep re-enqueues stuck orders). Parked retries are bounded: past the cap
     // the retry is dropped to the sweep instead of accumulating unbounded tasks under a

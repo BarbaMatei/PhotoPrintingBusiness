@@ -2,11 +2,11 @@
 id: 003-per-route-sampling
 unit: 001-tracing-and-metrics
 intent: 020-observability-stack
-status: draft
+status: complete
 priority: should
-created: 2026-05-25T10:35:00Z
+created: 2026-05-25T10:35:00.000Z
 assigned_bolt: 044-tracing-and-metrics
-implemented: false
+implemented: true
 ---
 
 # Story: 003-per-route-sampling

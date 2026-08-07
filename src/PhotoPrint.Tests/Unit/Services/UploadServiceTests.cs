@@ -6,7 +6,9 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Uploads;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services;
 
@@ -32,7 +34,7 @@ public class UploadServiceTests
             .Options;
         _db = new PhotoPrintDbContext(_options);
 
-        // Bolt 043: storage adapter contract is now caller-supplied key. The router
+        // Storage adapter contract is now caller-supplied key. The router
         // returns the same mock for both Local and the per-location lookup, so tests
         // exercise the routing layer without needing two adapters.
         _storageMock = new Mock<IStorageService>();
@@ -93,8 +95,8 @@ public class UploadServiceTests
             pdfStream, "file.pdf", declaredLength: 100L,
             userId: Guid.NewGuid(), guestSessionId: null);
 
-        // The copy must not advertise HEIC — dropped end-to-end in bolt 042 (M5); the stale
-        // promise was reintroduced here (D54, review 043-v7).
+        // The copy must not advertise HEIC — dropped end-to-end; the stale
+        // promise was reintroduced here.
         await act.Should().ThrowAsync<UnsupportedMediaTypeException>()
             .WithMessage("Only JPEG and PNG files are accepted.");
     }
@@ -102,7 +104,7 @@ public class UploadServiceTests
     [Fact]
     public async Task UploadAsync_OverlongFileName_IsTruncatedToColumnLength()
     {
-        // D55 (review 043-v7): HasMaxLength(260) sizes the column but never truncates — an
+        // HasMaxLength(260) sizes the column but never truncates — an
         // over-length client filename passed InMemory/SQLite tests yet failed on prod
         // Postgres with a 22001 string-truncation -> 500. Truncate at the service boundary.
         var longName = new string('a', 300) + ".jpg";
@@ -155,7 +157,7 @@ public class UploadServiceTests
     [Fact]
     public async Task UploadAsync_ImageProcessorReturnsNull_ThrowsWithoutSavingToStorage()
     {
-        // Bolt 043 (ADR-007): validation runs BEFORE storage — invalid images never
+        // Validation runs BEFORE storage — invalid images never
         // reach the adapter, so there's nothing to clean up.
         _imageProcessorMock
             .Setup(p => p.GetInfoAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
@@ -195,7 +197,7 @@ public class UploadServiceTests
     [Fact]
     public async Task UploadAsync_ValidJpeg_WritesToLocalTierWithCallerSuppliedKey()
     {
-        // Bolt 043 (ADR-007 + ADR-008): new uploads start on the Local tier and the
+        // New uploads start on the Local tier and the
         // storage key follows the StorageKeys.Original scheme.
         await _sut.UploadAsync(
             JpegStream(), "photo.jpg", declaredLength: (long)JpegMagic.Length,
@@ -265,6 +267,38 @@ public class UploadServiceTests
         _storageMock.Verify(
             s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    // ── upload_size_bytes emission ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task UploadAsync_RecordsTheStoredByteCountOnUploadSizeBytes()
+    {
+        using var metrics = new MetricCapture(MetricNames.Instruments.UploadSizeBytes);
+
+        await _sut.UploadAsync(
+            JpegStream(), "photo.jpg", declaredLength: (long)JpegMagic.Length,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        var recorded = metrics.Measurements.Should().ContainSingle().Subject;
+        recorded.Instrument.Should().Be(MetricNames.Instruments.UploadSizeBytes);
+        recorded.Value.Should().Be(JpegMagic.Length);
+        recorded.Tags.Should().BeEmpty("a size histogram with labels would multiply series");
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UploadAsync_RejectedUpload_RecordsNoUploadSize()
+    {
+        using var metrics = new MetricCapture(MetricNames.Instruments.UploadSizeBytes);
+        using var pdfStream = new MemoryStream([0x25, 0x50, 0x44, 0x46]);
+
+        var act = () => _sut.UploadAsync(
+            pdfStream, "doc.pdf", declaredLength: 4L,
+            userId: Guid.NewGuid(), guestSessionId: null);
+
+        await act.Should().ThrowAsync<UnsupportedMediaTypeException>();
+        metrics.Measurements.Should().BeEmpty();
     }
 
     // ── GetPreviewAsync ───────────────────────────────────────────────────────
@@ -365,7 +399,7 @@ public class UploadServiceTests
     [Fact]
     public async Task GetPreviewAsync_CloudUploadWithCloudDisabled_ThrowsNotFound()
     {
-        // F2/F9 class-sweep (review 043-v3): a Cloud-located upload with the cloud tier disabled
+        // Class-sweep: a Cloud-located upload with the cloud tier disabled
         // (Storage:Provider reverted to local) is unroutable — For(Cloud) would throw
         // InvalidOperationException, unmapped -> 500 on the customer preview. Degrade to a clean 404.
         // The shared setup already has CloudEnabled = false.
@@ -378,7 +412,7 @@ public class UploadServiceTests
             .Should().ThrowAsync<NotFoundException>();
     }
 
-    // ── GetPreviewAsync — thumbnail caching (bolt 042) ────────────────────────
+    // ── GetPreviewAsync — thumbnail caching ────────────────────────
 
     [Fact]
     public async Task GetPreviewAsync_SecondCall_StreamsCacheWithoutRegenerating()
@@ -428,7 +462,7 @@ public class UploadServiceTests
     [Fact]
     public async Task GetPreviewAsync_OriginalBlobGone_ThrowsNotFoundAndSignals()
     {
-        // M6/F5 (review 042-v4/v8): FilePath is recorded but the blob is physically gone (ops-side
+        // M6/F5: FilePath is recorded but the blob is physically gone (ops-side
         // deletion / cleanup race). Unmapped, GetStreamAsync's FileNotFoundException would surface
         // as a 500; it must be a clean 404 + a reserved signal so the storage-integrity incident
         // is not lost in ordinary 404 noise.
@@ -451,7 +485,7 @@ public class UploadServiceTests
     [Fact]
     public async Task GetPreviewAsync_RowSoftDeletedDuringGeneration_DeletesOrphanAndSignals()
     {
-        // M1/F6 (review 042-v4/v8): the cleanup job can soft-delete the row between the live read
+        // M1/F6: the cleanup job can soft-delete the row between the live read
         // and the ThumbnailPath write (which keys only on Id — no DeletedAt guard). A thumbnail
         // written onto a now-dead row is never revisited by cleanup, so the write must detect the
         // row is gone and delete the just-written orphan.
@@ -487,7 +521,7 @@ public class UploadServiceTests
     [Fact]
     public async Task GetPreviewAsync_PersistFailsAfterThumbnailWritten_DeletesOrphanAndSignals()
     {
-        // L4 (review 042-v4): on cache-miss the thumbnail is written to storage, then the
+        // L4: on cache-miss the thumbnail is written to storage, then the
         // ThumbnailPath persist runs. If that commit throws, the file is on disk but the row never
         // references it, so the cleanup job (which keys on ThumbnailPath) can never reclaim it —
         // a silent orphan. Signal + best-effort delete before rethrowing.
@@ -531,7 +565,7 @@ public class UploadServiceTests
             Times.Once);
 
     // A DbContext whose SaveChangesAsync always throws — models a transient commit fault after the
-    // thumbnail bytes are already written to storage (L4).
+    // thumbnail bytes are already written to storage.
     private sealed class SaveThrowingDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : PhotoPrintDbContext(options)
     {

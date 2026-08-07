@@ -119,7 +119,7 @@ export class AuthService {
    *  app re-inits a fresh session on the next request. Preserves any checkout contact info
    *  held under the same `guestSession` key (name/email/phone) instead of wiping it — a
    *  self-heal on an unrelated 401 must not silently discard what the user typed at checkout
-   *  (F2, review 042-v6). Removes the whole entry only when it holds nothing but the token. */
+   *  Removes the whole entry only when it holds nothing but the token. */
   clearGuestToken(): void {
     const raw = localStorage.getItem('guestSession');
     if (!raw) return;

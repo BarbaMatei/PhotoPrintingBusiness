@@ -14,7 +14,7 @@ namespace PhotoPrint.API.Services.Sameday;
 public abstract record AwbCreationOutcome
 {
     public sealed record Created(string AwbNumber, string LabelUrl) : AwbCreationOutcome;
-    public sealed record Skipped(string Reason)                       : AwbCreationOutcome;
+    public sealed record Skipped(string Reason, bool Orphaned = false) : AwbCreationOutcome;
     public sealed record RetryLater(string Reason, bool IsTransient, bool PreserveClaim = false) : AwbCreationOutcome;
     public sealed record GiveUp(string Reason)                        : AwbCreationOutcome;
 }

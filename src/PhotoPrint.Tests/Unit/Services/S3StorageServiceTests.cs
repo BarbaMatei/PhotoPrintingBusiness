@@ -14,7 +14,7 @@ namespace PhotoPrint.Tests.Unit.Services;
 /// <summary>
 /// Fast unit tests for <see cref="S3StorageService"/> with a mocked <see cref="IAmazonS3"/>.
 /// The real S3-protocol round-trip is covered by the MinIO integration tests; this file pins
-/// the exception-translation contract (F3, review 043-v1) without needing a running server, so
+/// the exception-translation contract without needing a running server, so
 /// a regression reddens on every developer machine, not only in CI.
 /// </summary>
 public class S3StorageServiceTests
@@ -34,7 +34,7 @@ public class S3StorageServiceTests
     {
         // A missing cloud object throws AmazonS3Exception(NotFound). Callers such as
         // UploadService.GetPreviewAsync catch FileNotFoundException to return a clean 404;
-        // without translation the AmazonS3Exception escaped as a 500 (F3, review 043-v1).
+        // without translation the AmazonS3Exception escaped as a 500.
         var s3 = new Mock<IAmazonS3>();
         s3.Setup(x => x.GetObjectAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -75,7 +75,7 @@ public class S3StorageServiceTests
     [Fact]
     public async Task SaveAsync_TransientFailureThenRetry_ReuploadsFullContent()
     {
-        // D49 (review 043-v7): the stream rewind sat OUTSIDE the Polly retry loop, so a retry
+        // The stream rewind sat OUTSIDE the Polly retry loop, so a retry
         // after a transient 5xx re-uploaded from EOF — a truncated/empty object that "succeeds",
         // after which promotion deletes the local original (silent data loss). Every attempt
         // must re-send the full payload.
@@ -114,7 +114,7 @@ public class S3StorageServiceTests
     [Fact]
     public async Task SaveAsync_NonSeekableStream_FailsLoudlyOnRetryInsteadOfUploadingTruncated()
     {
-        // D49 companion: a non-seekable stream cannot be rewound for a retry. That must surface
+        // Companion: a non-seekable stream cannot be rewound for a retry. That must surface
         // as an error, never as a silent truncated re-upload.
         // A non-seekable stream routes through the SDK's multipart path; failing its first call
         // simulates a transient error after the stream was (partially) consumed.

@@ -28,6 +28,27 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
   `STORAGE_TEST_*` env vars) · run API: `dotnet run --project src/PhotoPrint.API`
 - UI (from `src/PhotoPrint.UI`): `npm test -- --watch=false` · `npm start` · `npm run build`
 
+## Running tests (hard rule — full runs overload this machine)
+
+A full test run saturates this machine and blocks everything else on it. **Never run the
+whole suite by default.**
+
+- Run only what the change can affect, in this order: tests you added or modified → tests
+  covering the code you modified (same feature/namespace/component) → nothing more.
+- Untouched side = untouched tests: a frontend-only change never triggers `dotnet test`; a
+  backend-only change never triggers `npm test`. Tests for functionality nobody touched
+  don't run at all.
+- Scope with:
+  - API: `dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~<Namespace.OrClass>"`
+    (namespaces mirror folders, e.g. `PhotoPrint.Tests.Unit.Controllers`)
+  - UI: `npm test -- --watch=false --include='**/<name>*.spec.ts'`
+- A full run is a **last resort**, only when genuinely unavoidable (cross-cutting change to
+  shared infrastructure whose blast radius can't be traced, or the user explicitly asks).
+  Even then, run it in **sequential batches** — API by namespace
+  (`…~PhotoPrint.Tests.Unit.<Area>`, then `…~PhotoPrint.Tests.Integration`), UI by feature
+  folder via `--include` — one batch at a time, never both suites at once, never batches in
+  parallel.
+
 ## The map (read-when routing)
 
 | Working on… | Read first |
@@ -54,11 +75,17 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
   discussion where it was decided (that history lives in commits/resolution files); (b) a short
   behaviour description on an **interface** member (`///`, JSDoc) — never on concrete classes.
   When you edit a file, delete non-essential comments you pass through.
+  Enforced at commit time: `.githooks/pre-commit` blocks any commit adding comment lines
+  (`//` and `///` alike) and lists them. Delete the narration and recommit; only if every
+  listed line is genuinely allowed, re-run the same commit with `COMMENTS_OK=1`.
+  Never `--no-verify`.
 - Never edit `reviews/**/review-v*.md` (immutable) — fixers respond in resolution files.
 - Standards are **descriptive**: if you change reality (a version, a tool, a contract), update
   the standard that states it in the same change.
-- Commits: conventional style, e.g. `fix(orders): …`, referencing bolt/finding IDs where
-  relevant.
+- Commits: conventional style, **exactly one sentence, subject line only** — no body and no
+  trailers (no `Co-Authored-By`). Sole exception: a breaking change may carry a body.
+  Reference bolt/finding IDs in the subject where relevant, e.g.
+  `fix(orders): guard duplicate AWB creation (D45, review 015-v3)`.
 
 ## Response style (chat replies to the user — not code, commits, or docs)
 

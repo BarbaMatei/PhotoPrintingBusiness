@@ -17,7 +17,7 @@ using PhotoPrint.API.Services.Sameday;
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
-/// Tests for <see cref="ShipmentTrackingJob"/>. ADR-016's CAS race-lost
+/// Tests for <see cref="ShipmentTrackingJob"/>. The CAS race-lost
 /// invariant is explicitly pinned: pre-set the order to Cancelled, observe
 /// Delivered from Sameday, assert the UPDATE has no effect AND the email
 /// is NOT enqueued.
@@ -425,7 +425,7 @@ public class ShipmentTrackingJobTests : IDisposable
 /// <summary>
 /// Wraps a SQLite in-memory database + a scope factory. SQLite is required
 /// (not the EF InMemory provider) because <c>ShipmentTrackingJob</c> calls
-/// <c>ExecuteUpdateAsync</c> for the ADR-016 CAS transition, which isn't
+/// <c>ExecuteUpdateAsync</c> for the CAS transition, which isn't
 /// supported by the InMemory provider.
 /// </summary>
 internal sealed class SqliteScopeFactory : IDisposable

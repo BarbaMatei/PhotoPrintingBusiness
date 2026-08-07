@@ -4,12 +4,12 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.API.Configuration;
 
 /// <summary>
-/// Configuration for the intent-024 retention lifecycle (bolt 052).
+/// Configuration for the intent-024 retention lifecycle.
 /// <para>The master <see cref="Enabled"/> switch can disable both the original-purge
 /// hook and the retention sweep independently of the cloud tier — useful for incident
 /// response (drain status changes without firing destructive operations) or a deploy
 /// that intentionally skips the retention worker.</para>
-/// <para>Retention is measured from <c>Order.PaidAt</c> — see ADR-012.</para>
+/// <para>Retention is measured from <c>Order.PaidAt</c>.</para>
 /// </summary>
 public class ArchiveSettings
 {
@@ -55,7 +55,7 @@ public class ArchiveSettings
     /// <summary>
     /// Statuses whose cloud original is no longer retained and is therefore eligible for the
     /// purge-recovery sweep: the production-complete floor (fulfilled) plus <c>Cancelled</c>
-    /// (refunded/aborted — the original is purged on cancel; F17, review 043-v1). PaymentFailed
+    /// (refunded/aborted — the original is purged on cancel). PaymentFailed
     /// never promoted, so it has no cloud original to sweep.
     /// </summary>
     public OrderStatus[] OriginalPurgeSweepStatuses()
@@ -63,7 +63,7 @@ public class ArchiveSettings
 }
 
 /// <summary>
-/// Fails fast at startup (via <c>.ValidateOnStart()</c>) when the retention settings
+/// Fails fast at startup (via <c>.ValidateOnStart</c>) when the retention settings
 /// are malformed. Bad values would otherwise lurk until the first sweep / first
 /// production-complete transition.
 /// </summary>

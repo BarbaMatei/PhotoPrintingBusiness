@@ -47,8 +47,7 @@ export class GuestAuthService {
   /** Persists the guest session. Contact fields (name/email/phone) are MERGED, not blindly
    *  overwritten: an incoming empty value preserves any existing non-empty value, so the anonymous
    *  re-init self-heal — which carries only a fresh token and empty contact — can't wipe the
-   *  checkout contact info clearGuestToken was fixed to preserve (F3, review 042-v8; counterpart to
-   *  F2). A caller setting real contact info still overwrites, since those incoming values are
+   *  checkout contact info clearGuestToken was fixed to preserve. A caller setting real contact info still overwrites, since those incoming values are
    *  non-empty. The fresh guestToken always wins. */
   storeSession(data: GuestSessionData): void {
     const existing = this.getStoredSession();

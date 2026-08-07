@@ -159,14 +159,14 @@ public class OrdersControllerIntegrationTests : IClassFixture<OrdersFactory>
         Assert.Null(dto.ShippingAddress);
     }
 
-    // ── GET /api/orders/{id}/photos (bolt 053) ────────────────────────────────
+    // ── GET /api/orders/{id}/photos ────────────────────────────────
 
     [Fact]
     public async Task GetOrderPhotos_OwnOrder_Returns200WithPrivateNoStore()
     {
-        // F11 (review 043-v1): the payload carries per-user presigned URLs, so the response
+        // The payload carries per-user presigned URLs, so the response
         // must be Cache-Control: private, no-store (matching the preview endpoint), never
-        // shared-cacheable. F15: this also pins the owner → 200 auth path.
+        // shared-cacheable. This also pins the owner → 200 auth path.
         var (userId, token) = await _factory.SeedUserWithJwtAsync();
         var order = await _factory.SeedOrderAsync(userId);
 
@@ -181,7 +181,7 @@ public class OrdersControllerIntegrationTests : IClassFixture<OrdersFactory>
     [Fact]
     public async Task GetOrderPhotos_Unauthenticated_Returns401()
     {
-        // F15 (review 043-v1): the HTTP auth pipeline was untested — dropping [Authorize]
+        // The HTTP auth pipeline was untested — dropping [Authorize]
         // would redden nothing. This pins no-Bearer → 401.
         var response = await _anonClient.GetAsync($"/api/orders/{Guid.NewGuid()}/photos");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -190,7 +190,7 @@ public class OrdersControllerIntegrationTests : IClassFixture<OrdersFactory>
     [Fact]
     public async Task GetOrderPhotos_OtherUsersOrder_Returns403()
     {
-        // F15: cross-user access must be forbidden (the service's UserId==userId gate, wired
+        // Cross-user access must be forbidden (the service's UserId==userId gate, wired
         // through the endpoint).
         var (ownerUserId, _) = await _factory.SeedUserWithJwtAsync();
         var (_, attackerToken) = await _factory.SeedUserWithJwtAsync();
@@ -211,7 +211,7 @@ public class OrdersControllerIntegrationTests : IClassFixture<OrdersFactory>
     [Fact]
     public async Task GetOrderPhotos_GuestTokenOnly_Returns401()
     {
-        // F12 (review 043-v1): the endpoint is intentionally user-only (no DualAuth policy),
+        // The endpoint is intentionally user-only (no DualAuth policy),
         // so a guest-token-only request is rejected — guests cannot reach order-history photos.
         // This pins the owner's "keep user-only" decision.
         var guestClient = _factory.CreateClient(

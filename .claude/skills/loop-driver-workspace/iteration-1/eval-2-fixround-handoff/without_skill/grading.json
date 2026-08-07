@@ -1,0 +1,9 @@
+{
+  "run_id": "eval-2-fixround-handoff-without_skill",
+  "expectations": [
+    {"text": "report.md identifies the next pass as a fix round", "passed": true, "evidence": "\"The router puts 091-fixround at a fix round, and that is where I stopped\"."},
+    {"text": "report.md names /fix-review as the executor of the fix round (does not fix findings inline)", "passed": true, "evidence": "\"running it means launching the /fix-review skill, which this exercise forbids\"."},
+    {"text": "report.md contains the announce line: current state and the next pass before any execution", "passed": true, "evidence": "Full router readout quoted (v1 request-changes, 1 high + 2 medium, row 2 → fix round, cost note). Bonus: flagged that the fixture review is a stub a real fix round couldn't consume."},
+    {"text": "the fixture git tree is unchanged after the run (grader checks git status)", "passed": true, "evidence": "git -C <fixture> status --short is empty after all runs."}
+  ]
+}

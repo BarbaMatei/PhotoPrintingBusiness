@@ -9,8 +9,8 @@ using Polly.Retry;
 namespace PhotoPrint.API.Services;
 
 /// <summary>
-/// S3-compatible storage adapter (ADR-008). One implementation serves AWS S3, Cloudflare R2,
-/// or MinIO — vendor differences are pure config. Recommended production target: R2 (ADR-009).
+/// S3-compatible storage adapter. One implementation serves AWS S3, Cloudflare R2,
+/// or MinIO — vendor differences are pure config. Recommended production target: R2.
 /// Wrapped in a Polly resilience pipeline that retries transient S3 errors.
 /// </summary>
 public class S3StorageService : IStorageService
@@ -67,7 +67,7 @@ public class S3StorageService : IStorageService
             // Rewind on EVERY attempt — the SDK consumes the stream, so a retry after a
             // transient failure would otherwise upload the leftovers of a spent stream: a
             // truncated/empty object that "succeeds" and lets promotion delete the local
-            // original (D49, review 043-v7). A non-seekable stream can't be rewound, so a
+            // original. A non-seekable stream can't be rewound, so a
             // retry of one must fail loudly instead of re-sending garbage.
             if (content.CanSeek)
                 content.Position = 0;
@@ -111,7 +111,7 @@ public class S3StorageService : IStorageService
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            // Uniform missing-object contract across adapters (F3, review 043-v1). The local
+            // Uniform missing-object contract across adapters. The local
             // adapter throws FileNotFoundException for an absent key; callers such as
             // UploadService.GetPreviewAsync catch exactly that to return a clean 404. Translate
             // S3's typed 404 so a missing cloud object is a 404, not an unmapped 500. ExistsAsync

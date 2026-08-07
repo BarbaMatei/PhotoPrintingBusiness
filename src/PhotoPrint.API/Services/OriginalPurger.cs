@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Services;
 
 /// <summary>
 /// Default <see cref="IOriginalPurger"/>. Confirmed-Delete-Then-Update per upload —
-/// mirror of ADR-011's write rule, applied to deletes. <c>Cloud.DeleteAsync</c> succeeds,
+/// mirror 's write rule, applied to deletes. <c>Cloud.DeleteAsync</c> succeeds,
 /// then the row is updated atomically (per upload, not batched).
 /// </summary>
 public class OriginalPurger : IOriginalPurger
@@ -97,7 +97,7 @@ public class OriginalPurger : IOriginalPurger
         // A cart-reused upload can be referenced by MULTIPLE orders (checkout does not clear
         // the cart, so a payment-fail retry / double-checkout shares the Upload row). Deleting
         // the original because THIS order completed would truncate the other order's fulfilment
-        // ZIP (D50, review 043-v7). Skip while any other order still needs the bytes
+        // ZIP. Skip while any other order still needs the bytes
         // ({Paid, Printing} = pre-fulfilment); liveness holds because the recovery sweep keys
         // on FilePath != null and re-attempts once the blocking order resolves.
         var blockingOrderId = await _db.OrderItems

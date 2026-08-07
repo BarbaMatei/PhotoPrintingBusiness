@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Exceptions;
 /// <i>same</i> caller resubmitting a divergent payload). Both map to HTTP 409; this one
 /// carries no field detail (the caller owns no order to describe) but is logged as the
 /// reserved <c>payments.idempotency.cross-tenant-conflict</c> event so the abuse signal
-/// is distinguishable in incident triage (OBS-1, review 035-v8).
+/// is distinguishable in incident triage.
 /// </summary>
 public sealed class IdempotencyKeyTakenException : ConflictException
 {

@@ -16,6 +16,11 @@ public static class MiddlewareExtensions
         return app.UseMiddleware<ExceptionHandlerMiddleware>();
     }
 
+    public static IApplicationBuilder UseSentryScopeEnricher(this IApplicationBuilder app)
+    {
+        return app.UseMiddleware<SentryScopeEnricherMiddleware>();
+    }
+
     public static IEndpointRouteBuilder MapHealthEndpoint(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapHealthChecks("/health", new HealthCheckOptions

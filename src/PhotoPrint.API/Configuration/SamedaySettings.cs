@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Configuration;
 /// on <see cref="Enabled"/>; see <c>SamedaySettingsValidator</c>.
 ///
 /// Credentials live in <c>dotnet user-secrets</c> (dev) or environment
-/// variables (staging/prod) — never in <c>appsettings.json</c> (ADR-006).
+/// variables (staging/prod) — never in <c>appsettings.json</c>.
 /// </summary>
 public sealed class SamedaySettings
 {
@@ -26,14 +26,14 @@ public sealed class SamedaySettings
     public int    LockerServiceId       { get; set; } = 7;
     public int    CourierServiceId      { get; set; } = 7;
 
-    /// <summary>Lifecycle jobs (bolt 037). Orthogonal to <see cref="Enabled"/>: a
+    /// <summary>Lifecycle jobs. Orthogonal to <see cref="Enabled"/>: a
     /// deployment can wire credentials and validate them through the typed client
     /// without yet flipping the AWB / tracking workflows on.</summary>
     public SamedayJobsSettings Jobs { get; set; } = new();
 }
 
 /// <summary>
-/// Settings for the AWB creation + tracking background jobs (bolt 037).
+/// Settings for the AWB creation + tracking background jobs.
 /// Gated separately from <see cref="SamedaySettings.Enabled"/> so a deployment
 /// can run "credentials wired but no lifecycle automation yet" as a deliberate
 /// rollout step.

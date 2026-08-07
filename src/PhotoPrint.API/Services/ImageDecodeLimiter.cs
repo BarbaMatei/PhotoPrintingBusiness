@@ -4,7 +4,7 @@ namespace PhotoPrint.API.Services;
 /// Process-wide bound on how many image decodes may run concurrently. A single 100 MP image
 /// decodes to ~400 MB, and the per-image caps (pixel-area + allocator backstop) are per
 /// decode — so a burst of concurrent first-preview requests can still exhaust memory and OOM
-/// the process even though every individual image is within limits (M3, review 042-v4). This
+/// the process even though every individual image is within limits. This
 /// caps total in-flight decode memory regardless of request rate or source IP.
 /// </summary>
 public sealed class ImageDecodeLimiter : IDisposable
@@ -13,7 +13,7 @@ public sealed class ImageDecodeLimiter : IDisposable
     /// Worst-case memory a single decode may hold: the ImageSharp allocation backstop
     /// (Program.cs, 512 MB). A ~100 MP RGBA decode is ~400 MB and sits under this. Sizing the
     /// default slot count off this value keeps <c>slots × 512 MB ≤ available RAM</c>, so the
-    /// summed in-flight decode memory can't exceed what the host has (F1, review 042-v6).
+    /// summed in-flight decode memory can't exceed what the host has.
     /// </summary>
     public const long PerDecodeMemoryBudgetBytes = 512L * 1024 * 1024;
 
@@ -29,8 +29,7 @@ public sealed class ImageDecodeLimiter : IDisposable
     /// Default concurrent-decode ceiling when no explicit config is supplied. Bounds by *both*
     /// CPU (decode is CPU-bound) *and* memory (<see cref="PerDecodeMemoryBudgetBytes"/> per slot),
     /// taking the smaller — so a high-core / low-RAM host (e.g. 8 cores, 2 GB) no longer defaults
-    /// to ProcessorCount slots whose summed decode memory OOM-kills the process (F1, review
-    /// 042-v6, residual of M3). Always at least 1.
+    /// to ProcessorCount slots whose summed decode memory OOM-kills the process. Always at least 1.
     /// </summary>
     public static int RecommendedMaxConcurrentDecodes(
         long availableMemoryBytes,

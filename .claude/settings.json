@@ -1,0 +1,19 @@
+{
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "PowerShell(dotnet test:*)",
+      "PowerShell(dotnet build:*)",
+      "PowerShell(dotnet run:*)",
+      "PowerShell(Select-String:*)",
+      "PowerShell(Get-Content:*)",
+      "PowerShell(git log:*)",
+      "PowerShell(git status:*)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git show:*)",
+      "PowerShell(node reviews/lib/*)"
+    ]
+  }
+}

@@ -1,12 +1,16 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Exceptions;
+using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Services;
 
 namespace PhotoPrint.Tests.Unit.Services;
@@ -16,13 +20,16 @@ public class GoogleTokenValidatorTests
     private const string TestClientId = "test-client-id.apps.googleusercontent.com";
 
     private static IGoogleTokenValidator CreateValidator(
-        Func<HttpRequestMessage, HttpResponseMessage> httpHandler)
+        Func<HttpRequestMessage, HttpResponseMessage> httpHandler) =>
+        CreateValidator(new StubHttpHandler(httpHandler));
+
+    private static IGoogleTokenValidator CreateValidator(
+        HttpMessageHandler handler, TimeSpan? deadline = null, TimeSpan? httpTimeout = null)
     {
-        var handler = new StubHttpHandler(httpHandler);
         var httpClient = new HttpClient(handler)
         {
             BaseAddress = new Uri("https://oauth2.googleapis.com/"),
-            Timeout = TimeSpan.FromSeconds(5),
+            Timeout = httpTimeout ?? GoogleTokenValidator.HttpBackstop,
         };
 
         var factory = new Mock<IHttpClientFactory>();
@@ -31,7 +38,7 @@ public class GoogleTokenValidatorTests
         var settings = Options.Create(new GoogleAuthSettings { ClientId = TestClientId });
         var logger = Mock.Of<ILogger<GoogleTokenValidator>>();
 
-        return new GoogleTokenValidator(factory.Object, settings, logger);
+        return new GoogleTokenValidator(factory.Object, settings, logger, deadline);
     }
 
     private static string ValidTokenInfoJson(string? aud = null) => $$"""
@@ -116,6 +123,99 @@ public class GoogleTokenValidatorTests
             .Should().ThrowAsync<UnauthorizedException>();
     }
 
+    [Fact]
+    public async Task ValidateAsync_CallerCancelled_PropagatesCancellationInsteadOfBadGateway()
+    {
+        using var caller = new CancellationTokenSource();
+        var validator = CreateValidator(new HangingHttpHandler());
+        await caller.CancelAsync();
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", caller.Token))
+            .Should().ThrowAsync<OperationCanceledException>(
+                "a client abort must reach the middleware's own guard, not become a 502 and a Sentry issue");
+    }
+
+    [Fact]
+    public async Task ValidateAsync_GoogleExceedsOurDeadline_ThrowsBadGatewayException()
+    {
+        var validator = CreateValidator(
+            new HangingHttpHandler(), deadline: TimeSpan.FromMilliseconds(50));
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", CancellationToken.None))
+            .Should().ThrowAsync<BadGatewayException>(
+                "a dependency that never answers is an outage, not a cancellation");
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DeadlineElapsedThenTheCallerAborted_StillThrowsBadGatewayException()
+    {
+        using var caller = new CancellationTokenSource();
+        var validator = CreateValidator(
+            new AbortsTheCallerOnCancellationHttpHandler(caller),
+            deadline: TimeSpan.FromMilliseconds(50));
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", caller.Token))
+            .Should().ThrowAsync<BadGatewayException>(
+                "Google had already failed, so a user who then gives up must not hide the outage "
+                    + "from Sentry and the 5xx numerator");
+    }
+
+    [Fact]
+    public void The_registered_google_client_keeps_its_backstop_behind_our_own_deadline()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["GoogleAuth:ClientId"] = TestClientId,
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSocialAuth(configuration);
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<IGoogleTokenValidator>()
+            .Should().BeOfType<GoogleTokenValidator>(
+                "the validator takes an optional deadline, and a container that cannot fill it "
+                    + "would fail on the first real sign-in with the whole suite green");
+
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("Google");
+
+        client.Timeout.Should().BeGreaterThan(
+            GoogleTokenValidator.RequestDeadline,
+            "our own deadline has to fire first: if HttpClient's timeout wins the race then "
+                + "deadline.IsCancellationRequested is false, and a dependency outage the caller "
+                + "then abandons is misread as a client abort and reaches neither Sentry nor the "
+                + "5xx numerator");
+    }
+
+    [Fact]
+    public async Task Our_own_deadline_and_not_the_http_backstop_ends_a_hanging_request()
+    {
+        // A deliberately huge backstop: the only regression that matters here is the deadline not
+        // reaching GetAsync, and the gap has to survive a loaded CI runner's scheduling noise.
+        var backstop = TimeSpan.FromSeconds(30);
+        var validator = CreateValidator(
+            new HangingHttpHandler(),
+            deadline: TimeSpan.FromMilliseconds(50),
+            httpTimeout: backstop);
+        var elapsed = Stopwatch.StartNew();
+
+        await validator.Invoking(v => v.ValidateAsync("any-token", CancellationToken.None))
+            .Should().ThrowAsync<BadGatewayException>();
+
+        elapsed.Elapsed.Should().BeLessThan(
+            TimeSpan.FromSeconds(15),
+            "the 50 ms deadline is what must end this call, and a deadline that never reaches "
+                + "GetAsync throws the very same exception type once the HTTP backstop fires — so "
+                + "only the wall clock separates them. The backstop here is 30 s and the bar is "
+                + "15 s: the happy path needs about 50 ms, but a loaded runner has been measured "
+                + "adding ~5 s of first-call and scheduling overhead, so the margin is the point");
+    }
+
     private sealed class StubHttpHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
@@ -126,5 +226,41 @@ public class GoogleTokenValidatorTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromResult(_handler(request));
+    }
+
+    private sealed class HangingHttpHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new UnreachableException();
+        }
+    }
+
+    // Cancels the caller only once the deadline has already tripped, so both are set by the time
+    // the catch filter runs — the ordering the real world only reaches as a race.
+    private sealed class AbortsTheCallerOnCancellationHttpHandler : HttpMessageHandler
+    {
+        private readonly CancellationTokenSource _caller;
+
+        public AbortsTheCallerOnCancellationHttpHandler(CancellationTokenSource caller) =>
+            _caller = caller;
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                await _caller.CancelAsync();
+                throw;
+            }
+
+            throw new UnreachableException();
+        }
     }
 }

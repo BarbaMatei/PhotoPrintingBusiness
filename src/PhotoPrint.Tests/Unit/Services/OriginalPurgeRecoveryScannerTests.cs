@@ -16,8 +16,8 @@ namespace PhotoPrint.Tests.Unit.Services;
 /// <summary>
 /// Unit tests for <see cref="OriginalPurgeRecoveryScanner"/> (bolt 052 backstop). Targets the
 /// <c>RunSweepAsync</c> tick directly via reflection (matching <see cref="ArchiveRetentionJob"/>'s
-/// pattern) plus the <c>ExecuteAsync</c> refusal guards. The scanner is periodic since F4
-/// (review 043-v1) — the sweep catches promotions that complete after the Shipped transition.
+/// pattern) plus the <c>ExecuteAsync</c> refusal guards. The scanner is periodic
+///  — the sweep catches promotions that complete after the Shipped transition.
 /// </summary>
 public class OriginalPurgeRecoveryScannerTests
 {
@@ -144,7 +144,7 @@ public class OriginalPurgeRecoveryScannerTests
     [Fact]
     public async Task ExecuteAsync_EnabledCloudOn_BootSweepFiresPurger()
     {
-        // F3 (review 043-v3): the RunSweep tests all reach the sweep via reflection, and the two
+        // The RunSweep tests all reach the sweep via reflection, and the two
         // guard tests short-circuit before it — so nothing drove ExecuteAsync's boot sweep. Deleting
         // the boot-sweep line (or breaking the periodic loop) left the suite green. This test drives
         // the real ExecuteAsync path: a stuck order must be purged by the boot sweep, or it times out.
@@ -195,7 +195,7 @@ public class OriginalPurgeRecoveryScannerTests
     [InlineData(OrderStatus.Delivered)]
     public async Task RunSweep_StuckOrderAtOrPastShipped_FiresPurger(OrderStatus status)
     {
-        // F4 (review 043-v1): a promotion that completed after Shipped leaves the upload Cloud
+        // A promotion that completed after Shipped leaves the upload Cloud
         // with FilePath still set. The periodic sweep must catch it — the one-shot Shipped purge
         // skipped it while it was still Local.
         using var db = CreateDb();
@@ -240,7 +240,7 @@ public class OriginalPurgeRecoveryScannerTests
     [Fact]
     public async Task RunSweep_CancelledStuckOrder_FiresPurger()
     {
-        // F17 (review 043-v1): a paid-then-cancelled order whose promotion completed leaves a
+        // A paid-then-cancelled order whose promotion completed leaves a
         // Cloud original with FilePath set. Cancel fires purge synchronously, but a promotion
         // still in flight at cancel time is skipped there — the sweep must backstop it.
         using var db = CreateDb();

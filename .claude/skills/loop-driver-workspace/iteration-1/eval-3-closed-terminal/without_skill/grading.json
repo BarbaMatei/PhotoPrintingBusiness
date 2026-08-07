@@ -1,0 +1,9 @@
+{
+  "run_id": "eval-3-closed-terminal-without_skill",
+  "expectations": [
+    {"text": "report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)", "passed": true, "evidence": "\"Nothing is next — the loop for 015-sameday-shipping is closed. You signed it off on 2026-07-29 at commit 5734021\"."},
+    {"text": "report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings", "passed": true, "evidence": "Cites track-record.md and the exactly-three re-arm triggers."},
+    {"text": "report.md mentions the pre-enable checklist as the binding gate for the dormant feature", "passed": true, "evidence": "\"The pre-enable checklist is the real gate... D45, D23, D81, plus the D90-D96 backlog.\""},
+    {"text": "the main repo git tree is unchanged after the run (grader checks git status)", "passed": true, "evidence": "Repo status shows only the driver's own pre-existing uncommitted edits. Note: the agent reported the Write tool refused the report path and used a Bash heredoc instead — report.md exists and nothing else changed."}
+  ]
+}

@@ -2,9 +2,9 @@
 unit: 001-tracing-and-metrics
 intent: 020-observability-stack
 phase: inception
-status: draft
-created: 2026-05-25T10:35:00Z
-updated: 2026-05-25T10:35:00Z
+status: complete
+created: 2026-05-25T10:35:00.000Z
+updated: 2026-05-25T10:35:00.000Z
 ---
 
 # Unit Brief: Tracing & Metrics

@@ -1,0 +1,32 @@
+#!/bin/sh
+# Lists every // comment line this commit adds so the CLAUDE.md comment rule
+# gets a deliberate check at commit time. COMMENTS_OK=1 acknowledges and passes.
+[ -n "$COMMENTS_OK" ] && exit 0
+
+hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
+  /^\+\+\+ b\// { file = substr($0, 7); next }
+  /^\+/ {
+    line = substr($0, 2)
+    if (line ~ /^[[:space:]]*\/\// || line ~ /[[:space:]]\/\/([[:space:]]|$)/)
+      print file ": " line
+  }
+')
+
+[ -z "$hits" ] && exit 0
+
+n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+{
+  echo "COMMENT GATE: this commit adds $n comment line(s):"
+  echo
+  printf '%s\n' "$hits"
+  cat <<'EOF'
+
+CLAUDE.md allows only (a) one short line stating a non-obvious constraint or
+gotcha - never narrating a change, and never citing a bolt/review/finding ID -
+or (b) a SHORT /// doc on an interface member (never on concrete classes, and
+trim any bloat). Delete or shrink every line above that fails this, restage,
+and commit again. Only if every listed line is genuinely allowed,
+re-run the exact same commit prefixed with COMMENTS_OK=1 (never --no-verify).
+EOF
+} >&2
+exit 1

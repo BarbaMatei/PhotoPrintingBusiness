@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services.Sameday;
 
@@ -38,6 +40,46 @@ public sealed class AwbCreator : IAwbCreator
 
     public async Task<AwbCreationOutcome> CreateForOrderAsync(
         Guid orderId, int attempt, CancellationToken ct = default)
+    {
+        AwbCreationOutcome outcome;
+        try
+        {
+            outcome = await CreateForOrderInternalAsync(orderId, attempt, ct);
+        }
+        // Shutdown cancellation is not an AWB failure; any other throw must still be counted.
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            FotoMetrics.AwbCreation.Add(1,
+                new TagList { { MetricNames.Labels.Result, MetricNames.AwbResultValues.Error } });
+            throw;
+        }
+
+        RecordOutcome(outcome);
+        return outcome;
+    }
+
+    private static void RecordOutcome(AwbCreationOutcome outcome)
+    {
+        var result = outcome switch
+        {
+            AwbCreationOutcome.Created    => MetricNames.AwbResultValues.Ok,
+            AwbCreationOutcome.Skipped { Orphaned: true }
+                                          => MetricNames.AwbResultValues.Orphaned,
+            AwbCreationOutcome.Skipped    => MetricNames.AwbResultValues.Skipped,
+            AwbCreationOutcome.RetryLater => MetricNames.AwbResultValues.RetryLater,
+            AwbCreationOutcome.GiveUp     => MetricNames.AwbResultValues.GiveUp,
+            _                             => "unknown",
+        };
+        FotoMetrics.AwbCreation.Add(1,
+            new TagList { { MetricNames.Labels.Result, result } });
+    }
+
+    private async Task<AwbCreationOutcome> CreateForOrderInternalAsync(
+        Guid orderId, int attempt, CancellationToken ct)
     {
         var order = await _db.Orders
             .AsNoTracking()
@@ -227,6 +269,7 @@ public sealed class AwbCreator : IAwbCreator
         _logger.LogError(
             "sameday.awb.orphaned order_id={OrderId} created_awb={Created} persisted_awb={Persisted} — created AWB needs a manual void",
             orderId, result.AwbNumber, persisted);
-        return new AwbCreationOutcome.Skipped($"order no longer writable; AWB {result.AwbNumber} may be orphaned");
+        return new AwbCreationOutcome.Skipped(
+            $"order no longer writable; AWB {result.AwbNumber} may be orphaned", Orphaned: true);
     }
 }

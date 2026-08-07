@@ -5,6 +5,6 @@ namespace PhotoPrint.API.Services.Sameday;
 /// so a failed item can be re-enqueued with a back-off (mirror of bolt 051's
 /// <c>PromotionJob</c>). The order id is the only durable handle — every other
 /// piece of state is re-read from <c>Orders</c> at the moment of dispatch
-/// (ADR-015's load-bearing re-check).
+/// (the load-bearing re-check).
 /// </summary>
 public sealed record AwbJob(Guid OrderId, int Attempt, DateTimeOffset EnqueuedAt);

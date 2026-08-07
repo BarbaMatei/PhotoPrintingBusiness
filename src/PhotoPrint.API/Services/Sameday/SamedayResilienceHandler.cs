@@ -11,7 +11,7 @@ namespace PhotoPrint.API.Services.Sameday;
 /// instance — <see cref="IHttpClientFactory"/> rebuilds the handler chain
 /// every <c>HandlerLifetime</c> (default 2 min), which is acceptable since
 /// retry / rate-limit state is per-call. 401 is explicitly outside this
-/// pipeline (ADR-014).
+/// pipeline.
 ///
 /// <para>The rate-limit ceiling is taken from
 /// <c>Sameday:Jobs:MaxConcurrentSamedayCalls</c> when the bolt-037 jobs

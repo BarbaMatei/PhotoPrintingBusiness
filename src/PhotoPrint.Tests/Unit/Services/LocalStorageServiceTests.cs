@@ -101,7 +101,7 @@ public class LocalStorageServiceTests : IDisposable
             .WithMessage("*LocalStorageService*");
     }
 
-    // ── Path-traversal guards (ADR-007 / StorageKeys.Validate) ────────────────
+    // ── Path-traversal guards (StorageKeys.Validate) ────────────────
 
     [Theory]
     [InlineData("../etc/passwd")]

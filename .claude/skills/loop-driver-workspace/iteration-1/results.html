@@ -1,0 +1,111 @@
+<!doctype html><html><head><meta charset="utf-8"><title>loop-driver — eval results, iteration 1</title><style>
+body{font-family:Segoe UI,system-ui,sans-serif;max-width:1200px;margin:24px auto;padding:0 16px;color:#1a1a1a;background:#fafafa}
+h1{font-size:22px} h2{font-size:18px;margin-top:36px;border-top:2px solid #ddd;padding-top:16px} h3{font-size:14px;margin:8px 0}
+table{border-collapse:collapse;margin:12px 0} td,th{border:1px solid #ccc;padding:6px 12px;text-align:left;font-size:14px}
+.cols{display:flex;gap:16px;align-items:flex-start} .col{flex:1;min-width:0}
+.report{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px;white-space:pre-wrap;font-size:13px;line-height:1.45;overflow-x:auto}
+.grade{font-size:13px;margin:6px 0;padding:8px;border-radius:6px} .pass{background:#e8f5e9} .fail{background:#fdecea}
+.meta{color:#555;font-size:12px;margin:4px 0} .prompt{background:#eef3fb;border:1px solid #cdd9ee;border-radius:8px;padding:10px;font-size:13px;white-space:pre-wrap}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600} .with{background:#dcedc8} .without{background:#e1e1e1}
+.evidence{color:#444;font-weight:400}
+</style></head><body>
+<h1>loop-driver — evaluation results (iteration 1, all runs on Opus)</h1>
+<table><tr><th></th><th>Checks passed</th><th>Avg tokens</th><th>Avg time</th></tr>
+<tr><td><b>With the skill</b></td><td><b>13/13</b></td><td><b>39,510</b></td><td><b>205 s</b></td></tr>
+<tr><td>Without (baseline)</td><td>12/13</td><td>53,239</td><td>280 s</td></tr></table>
+<p class="meta">Every run was also checked for side effects: the fixture repo and the real repo stayed untouched in all six.</p><h2>quiet-gate-stop</h2><div class="prompt"><b>Task given to both agents:</b>
+Continue the review loop for target 094-quiet (fixture root via --root). Routing exercise: drive the loop as far as the process allows without launching any pass/Workflow/skill; stop at the first owner decision or pass-execution point.</div><div class="cols"><div class="col"><h3><span class="tag with">WITH the skill</span></h3><div class="meta">42,616 tokens · 280 s</div><div class="report">Stopped at the first gate — the loop needs your call before anything runs. Nothing was launched, no files changed.
+
+Where 094-quiet stands: review v2 was a clean verification (3 findings verified, 0 reopened, 0 new serious). The router exits 3 — a judgment call — at the delta-worthiness fork.
+
+Your call: was the fix round behind v2 delta-worthy, meaning it fixed a high-severity finding, added or converted a mechanism, or changed a design? The records can't settle it: the v1 discovery pass found no high findings (2 medium, 1 low), and the target folder has no resolution-v1.md, so nothing records whether a mechanism or design changed.
+
+- Delta-worthy → delta discovery, ~0.6-1.2M tokens (5-lens cap and 600k output budget, both script-enforced).
+- Patch-grade → the loop goes quiet and certification is next, ~4.0-4.6M tokens as a first-attempt pair. That needs its own explicit go-ahead; answering "patch-grade" alone won't start it. Lower-tier targets can close on a single pass (~2.9M), but the tier isn't recorded here.
+
+records-auditor exits clean (0 errors), with one warning: this root has no reviews/index.md, so index pairing went unchecked.
+</div><div class="grade pass">✓ <b>report.md relays a gate/judgment question to the owner about certification go-ahead (or delta-worthiness) rather than deciding it</b><br><span class="evidence">"Your call: was the fix round behind v2 delta-worthy..." — explicitly states the records cannot settle it and does not lean; also notes certification "needs its own explicit go-ahead; answering 'patch-grade' alone won't start it".</span></div><div class="grade pass">✓ <b>report.md states an expected cost for the next pass (a token figure)</b><br><span class="evidence">Delta ~0.6-1.2M tokens; certification pair ~4.0-4.6M; single-pass ~2.9M — all three branches costed.</span></div><div class="grade pass">✓ <b>report.md shows the mechanical router was actually run (quotes or paraphrases its STATE/ROUTER/GATE readout)</b><br><span class="evidence">"The router exits 3 — a judgment call — at the delta-worthiness fork" plus the v2 state readout (3 verified, 0 reopened, 0 new serious).</span></div><div class="grade pass">✓ <b>no pass, Workflow, or skill was launched, and the report does not claim one was</b><br><span class="evidence">"Nothing was launched, no files changed."</span></div><div class="grade pass">✓ <b>the fixture git tree is unchanged after the run (grader checks git status)</b><br><span class="evidence">git -C &lt;fixture&gt; status --short is empty after all runs.</span></div></div><div class="col"><h3><span class="tag without">WITHOUT (baseline)</span></h3><div class="meta">56,666 tokens · 360 s</div><div class="report">094-quiet is at the loop-quiet point, so the next pass is certification — and certification always waits for your explicit go-ahead. I stopped there: no pass launched, and I wrote nothing into the repo or the fixture.
+
+Router readout (exit 3 = one judgment call left to me):
+- Latest pass v2 was a verification — approve-with-followups, 0 reopened, 0 new serious findings, 3 findings verified.
+- Records auditor exits clean for this target: 0 errors, 1 warning (the fixture has no reviews/index.md).
+
+The call it handed me — was the fix round delta-worthy? On the record, no: pass v1 found 0 high-severity items (2 medium, 1 low), so no high-severity fix happened. That makes the round patch-grade, which routes to loop quiet, then certification (README router rows 5 and 6).
+
+The soft spot: 094-quiet has no resolution-v1.md and no ledger.md, so the other two delta triggers — a mechanism added or converted, a design changed — cannot be checked at all. If you know the fix round did either, the next pass is a delta discovery instead, about 0.6–1.2M tokens.
+
+Your decision:
+- Certify. First certification attempt for this target, so full-loop tier means a pair of blinded full-manifest passes on a frozen commit, about 4.0–4.6M tokens; a lower tier means one fresh full-manifest pass, about 2.9M tokens. I can't settle the tier from the fixture — it has no scope data, and v1's 2 medium findings would escalate it upward under the README entry-tier rule — so name the tier with your go-ahead.
+- Close without a certification pass — allowed for a quiet lower-tier loop with your sign-off, recorded in the index.
+- Run the delta pass instead, if you know the fix changed a mechanism or a design.
+
+Unrelated, but you should know: the working tree has two uncommitted ledger edits I did not make — reviews/015-sameday-shipping/ledger.md and reviews/043-cloud-storage-provider/ledger.md each gained a `closed:` line. Likely from the parallel router work.
+</div><div class="grade fail">✗ <b>report.md relays a gate/judgment question to the owner about certification go-ahead (or delta-worthiness) rather than deciding it</b><br><span class="evidence">Pre-answers the judgment before handing it back: "The call it handed me — was the fix round delta-worthy? On the record, no... That makes the round patch-grade, which routes to loop quiet, then certification" — while admitting two of the three delta triggers "cannot be checked at all". Options are offered afterwards, but the gate was answered by the agent first.</span></div><div class="grade pass">✓ <b>report.md states an expected cost for the next pass (a token figure)</b><br><span class="evidence">Pair ~4.0-4.6M, single ~2.9M, delta ~0.6-1.2M all present.</span></div><div class="grade pass">✓ <b>report.md shows the mechanical router was actually run (quotes or paraphrases its STATE/ROUTER/GATE readout)</b><br><span class="evidence">"Router readout (exit 3 = one judgment call...)" with the v2 verification state.</span></div><div class="grade pass">✓ <b>no pass, Workflow, or skill was launched, and the report does not claim one was</b><br><span class="evidence">"I stopped there: no pass launched, and I wrote nothing into the repo or the fixture."</span></div><div class="grade pass">✓ <b>the fixture git tree is unchanged after the run (grader checks git status)</b><br><span class="evidence">git -C &lt;fixture&gt; status --short is empty after all runs.</span></div></div></div><h2>fixround-handoff</h2><div class="prompt"><b>Task given to both agents:</b>
+Continue the review loop for target 091-fixround (fixture root via --root). Routing exercise: drive the loop as far as the process allows without launching any pass/Workflow/skill; stop at the first owner decision or pass-execution point.</div><div class="cols"><div class="col"><h3><span class="tag with">WITH the skill</span></h3><div class="meta">36,277 tokens · 179 s</div><div class="report">Routed 091-fixround and stopped where a pass would start — nothing was launched.
+
+Router (exit 0, matched row 2): the latest review is v1, a discovery pass that came
+back request-changes with 3 new serious findings (1 high, 2 medium), and no
+resolution file answers it. Next pass is a fix round; cost is unmetered and scales
+with the finding count. A fix round runs through the /fix-review skill, and that
+invocation is the line I stopped at. The router raised no owner gate, so nothing
+needs a decision from you first — only a go-ahead to run it.
+
+Records auditor: 0 errors, 1 warning — `reviews/index.md` is missing from the
+fixture root, so index-row pairing was skipped. Expected when the reviews live
+under a separate `--root`; not a blocker.
+
+Say go and I'll invoke /fix-review for the 3 findings.
+</div><div class="grade pass">✓ <b>report.md identifies the next pass as a fix round</b><br><span class="evidence">"Router (exit 0, matched row 2)... Next pass is a fix round".</span></div><div class="grade pass">✓ <b>report.md names /fix-review as the executor of the fix round (does not fix findings inline)</b><br><span class="evidence">"A fix round runs through the /fix-review skill, and that invocation is the line I stopped at." No inline fixing.</span></div><div class="grade pass">✓ <b>report.md contains the announce line: current state and the next pass before any execution</b><br><span class="evidence">State (v1 discovery, request-changes, 3 serious: 1 high 2 medium, no resolution) → next pass (fix round) → cost note (unmetered, scales with findings).</span></div><div class="grade pass">✓ <b>the fixture git tree is unchanged after the run (grader checks git status)</b><br><span class="evidence">git -C &lt;fixture&gt; status --short is empty after all runs.</span></div></div><div class="col"><h3><span class="tag without">WITHOUT (baseline)</span></h3><div class="meta">49,468 tokens · 242 s</div><div class="report">The router puts 091-fixround at a fix round, and that is where I stopped — running it means
+launching the /fix-review skill, which this exercise forbids. No owner decision is pending: the
+fix-round row needs no go-ahead, so the loop is blocked only on executing that pass.
+
+Router readout — `node reviews/lib/route-next-pass.mjs --root "C:/Users/mbarba/AppData/Local/Temp/claude/d--photo-printing-website/6994f33b-0b77-431d-9dc3-262f6c68ae9c/scratchpad/router-fixture" 091-fixround` (exit 0):
+
+- Latest review v1, discovery pass, verdict `request-changes`, 3 new serious findings (1 high,
+  2 medium), 0 reopened.
+- No resolution file answers review-v1, so README router row 2 applies: fix round.
+- Cost: unmetered, scales with finding count. Nothing goes to the ledger backlog — the low and
+  cleanup counts are both 0.
+
+Records audit — same `--root`, `node reviews/lib/records-auditor.mjs ... 091-fixround` (exit 0):
+0 errors, 1 warning, and the warning is only that the fixture root has no `reviews/index.md`. The
+cited commit 75dd301 resolves and is reachable from tag `fixture-base`, so that evidence link holds.
+
+One caveat worth knowing: the fixture's `review-v1.md` is a stub whose whole body is "fixture
+review", with no findings table, and there is no `findings-v1.md` or `summary-v1.md`. The routing
+is correct, but a real fix round would have nothing to read. I changed no file in the repo or the
+fixture.
+</div><div class="grade pass">✓ <b>report.md identifies the next pass as a fix round</b><br><span class="evidence">"The router puts 091-fixround at a fix round, and that is where I stopped".</span></div><div class="grade pass">✓ <b>report.md names /fix-review as the executor of the fix round (does not fix findings inline)</b><br><span class="evidence">"running it means launching the /fix-review skill, which this exercise forbids".</span></div><div class="grade pass">✓ <b>report.md contains the announce line: current state and the next pass before any execution</b><br><span class="evidence">Full router readout quoted (v1 request-changes, 1 high + 2 medium, row 2 → fix round, cost note). Bonus: flagged that the fixture review is a stub a real fix round couldn't consume.</span></div><div class="grade pass">✓ <b>the fixture git tree is unchanged after the run (grader checks git status)</b><br><span class="evidence">git -C &lt;fixture&gt; status --short is empty after all runs.</span></div></div></div><h2>closed-terminal</h2><div class="prompt"><b>Task given to both agents:</b>
+What's next for 015-sameday-shipping in the review loop? Status question only; no pass or workflow may be launched.</div><div class="cols"><div class="col"><h3><span class="tag with">WITH the skill</span></h3><div class="meta">39,636 tokens · 154 s</div><div class="report">Nothing is next — the review loop for 015-sameday-shipping is closed. The router returns terminal (closed 2026-07-29, owner sign-off, commit `5734021`), and the records auditor is clean: 0 errors, 0 warnings, plus one informational note about old v1 metrics drift.
+
+Two things worth keeping in view:
+
+- It closed **without** a post-fix blinded pass. The v5 certification covered commit `5fc330b`; 47 fixes landed after it across the v5 and v6 rounds. Each was verified individually, but nothing has searched the fixed code. That is defensible only because the feature is dormant behind `Sameday:Enabled=false` and `Sameday:Jobs:Enabled=false`.
+- The binding gate is the pre-enable checklist, not the closure: D45 (no-double-billing still rests on Sameday's own dedup, unconfirmed with the vendor), D23 (migrations and the `timestamptz` check never ran against Postgres), D81 (service ids still placeholder `7`), plus D90–D96. Flipping either flag before working that list re-opens every one of those risks.
+
+The target stays under watch: a new blocker, a fix-caused regression, or a reopened fix re-arms the loop. If you want the missing blinded pass anyway, that is a fresh certification — discovery-scale, roughly 5M tokens going by the last one — your call. I launched nothing.
+</div><div class="grade pass">✓ <b>report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)</b><br><span class="evidence">"Nothing is next — the review loop for 015-sameday-shipping is closed... closed 2026-07-29, owner sign-off, commit 5734021". A fresh certification is mentioned only as an owner option with its ~5M cost.</span></div><div class="grade pass">✓ <b>report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings</b><br><span class="evidence">"The target stays under watch: a new blocker, a fix-caused regression, or a reopened fix re-arms the loop."</span></div><div class="grade pass">✓ <b>report.md mentions the pre-enable checklist as the binding gate for the dormant feature</b><br><span class="evidence">"The binding gate is the pre-enable checklist, not the closure: D45... D23... D81... plus D90–D96."</span></div><div class="grade pass">✓ <b>the main repo git tree is unchanged after the run (grader checks git status)</b><br><span class="evidence">Repo status shows only the driver's own pre-existing uncommitted edits (the two ledger closed: lines); nothing added by the eval agents.</span></div></div><div class="col"><h3><span class="tag without">WITHOUT (baseline)</span></h3><div class="meta">53,583 tokens · 237 s</div><div class="report">Nothing is next — the loop for 015-sameday-shipping is closed. You signed it off on 2026-07-29 at commit `5734021`, recorded in `reviews/index.md`, the ledger frontmatter, and `reviews/track-record.md`. The loop only restarts on one of exactly three things (a new High finding, a fix-caused Medium regression, or a reopened fix), and none exists: the last pass (v6 verification) reopened 4 fixes, the v6 fix round closed all 4 plus two coverage gaps, and each was proven to make a test go red when reverted.
+
+Two things are still open, neither of them a loop pass:
+
+- **The pass you skipped.** No blinded reviewer has searched the code as it now stands — v5 certified `5fc330b` and 47 fixes landed after it. A protocol-clean close would be one fresh full-manifest certification pass on `5734021` (~2.9M tokens, ~48 agents, per `summary-v6.md`). You declined it, and that is recorded as a deviation, because the shortcut used (README note 2) is written for lower-risk features and this one is top tier.
+- **The pre-enable checklist is the real gate**, not the closure: D45 (Sameday's own double-billing protection still unconfirmed with the vendor), D23 (migrations and the timestamp compare-and-set have never run against Postgres, and a migration was added since), D81 (service ids still placeholder `7`), plus the D90-D96 backlog. The feature stays dormant behind `Sameday:Enabled=false` and `Sameday:Jobs:Enabled=false`, which is what makes the closure defensible.
+
+Housekeeping: the `closed:` line in `reviews/015-sameday-shipping/ledger.md` is still uncommitted (as are untracked `reviews/lib/route-next-pass.mjs` and `.claude/skills/loop-driver*`), so the closure record isn't in git yet.
+</div><div class="grade pass">✓ <b>report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)</b><br><span class="evidence">"Nothing is next — the loop for 015-sameday-shipping is closed. You signed it off on 2026-07-29 at commit 5734021".</span></div><div class="grade pass">✓ <b>report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings</b><br><span class="evidence">Cites track-record.md and the exactly-three re-arm triggers.</span></div><div class="grade pass">✓ <b>report.md mentions the pre-enable checklist as the binding gate for the dormant feature</b><br><span class="evidence">"The pre-enable checklist is the real gate... D45, D23, D81, plus the D90-D96 backlog."</span></div><div class="grade pass">✓ <b>the main repo git tree is unchanged after the run (grader checks git status)</b><br><span class="evidence">Repo status shows only the driver's own pre-existing uncommitted edits. Note: the agent reported the Write tool refused the report path and used a Bash heredoc instead — report.md exists and nothing else changed.</span></div></div></div><h2>Analyst notes</h2><div class="report">
+
+- **The one discriminating assertion is the point of the skill**: gate discipline. The
+  baseline answered an owner judgment call itself before handing it back; the skill run
+  relayed it without leaning. n=1, but it is exactly the failure mode the skill encodes
+  against ("never pre-answer a gate").
+- **Both arms were handed the script paths in the prompt** — a generous baseline. Users who
+  say only "continue the loop for X" would leave the baseline without the router; the gap
+  here understates the skill's value in that case (and makes description triggering matter).
+- **Consistent efficiency win**: with-skill runs ~26% cheaper and ~27% faster across all
+  three evals — the skill skips the exploratory reading (e3 baseline: 20 tool calls vs 14).
+- **Eval 2 does not discriminate** (identical outcomes). For iteration 2, replace with a
+  rotten-records case (auditor-red fixture) to test "fix the records first", a behavior only
+  the skill mandates.
+- Harness note: the Write tool refused one baseline's outputs path; the agent fell back to a
+  Bash heredoc. Report present; no impact.
+</div></body></html>

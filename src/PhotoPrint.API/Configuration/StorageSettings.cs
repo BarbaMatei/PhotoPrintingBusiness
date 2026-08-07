@@ -3,11 +3,11 @@ using Microsoft.Extensions.Options;
 namespace PhotoPrint.API.Configuration;
 
 /// <summary>
-/// Storage layer configuration (bolt 043).
+/// Storage layer configuration.
 /// <para><b>Provider</b> selects the cloud tier (<c>Local</c> = disabled, <c>S3</c> = enabled).
-/// The local tier is always available. See ADR-008 for the two-tier model.</para>
-/// <para>For Cloudflare R2 (recommended — ADR-009): <c>Provider=S3</c>, <c>Region="auto"</c>,
-/// <c>ForcePathStyle=true</c>, <c>EndpointUrl=https://&lt;account-id&gt;.r2.cloudflarestorage.com</c>.</para>
+/// The local tier is always available. </para>
+/// <para>For Cloudflare R2 (recommended): <c>Provider=S3</c>, <c>Region="auto"</c>,
+/// <c>ForcePathStyle=true</c>, <c>EndpointUrl=https://&lt;account-id&gt.r2.cloudflarestorage.com</c>.</para>
 /// </summary>
 public class StorageSettings
 {
@@ -35,10 +35,10 @@ public class StorageSettings
     /// <summary>Required true for R2 / MinIO; leave false for AWS native.</summary>
     public bool ForcePathStyle { get; set; }
 
-    /// <summary>S3 access key (R2 API token id). Loaded from secret store — never committed (ADR-006).</summary>
+    /// <summary>S3 access key (R2 API token id). Loaded from secret store — never committed.</summary>
     public string? AccessKey { get; set; }
 
-    /// <summary>S3 secret key (R2 API token secret). Loaded from secret store — never committed (ADR-006).</summary>
+    /// <summary>S3 secret key (R2 API token secret). Loaded from secret store — never committed.</summary>
     public string? SecretKey { get; set; }
 
     /// <summary>Presigned-URL lifetime for previews (minutes).</summary>
@@ -49,7 +49,7 @@ public class StorageSettings
 }
 
 /// <summary>
-/// Fails fast at startup (via <c>.ValidateOnStart()</c>) when the cloud tier is on but
+/// Fails fast at startup (via <c>.ValidateOnStart</c>) when the cloud tier is on but
 /// required S3 settings are missing — keeps misconfiguration off the request hot path.
 /// </summary>
 public class StorageSettingsValidator : IValidateOptions<StorageSettings>

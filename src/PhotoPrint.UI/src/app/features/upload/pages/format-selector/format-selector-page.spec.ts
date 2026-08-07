@@ -197,7 +197,7 @@ describe('FormatSelectorPage', () => {
   });
 });
 
-// ── Guest-session self-heal (bolt 042: FE-1, FE-2, FE-4) ──────────────────────
+// ── Guest-session self-heal ──────────────────────
 // These drive the component with mocked auth/upload services so the guest-session
 // dedup and 401 retry paths can be exercised deterministically. ngOnInit is NOT run
 // (no detectChanges), so each test invokes the target method directly.
@@ -253,7 +253,7 @@ describe('FormatSelectorPage — guest-session self-heal', () => {
   });
 
   it('re-inits after a settled init when the token is still absent (L9)', async () => {
-    // FE-1 dedups concurrent inits via a shared in-flight observable; the finalize() reset must
+    // Dedups concurrent inits via a shared in-flight observable; the finalize reset must
     // let a LATER expiry re-init. With a COMPLETING init and the token still null, a second
     // ensureGuestSession must fire a second init (removing finalize would replay the stale one).
     const auth = { isAuthenticated: () => false, getGuestToken: () => null, clearGuestToken: vi.fn() };

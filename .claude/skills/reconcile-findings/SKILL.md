@@ -44,11 +44,17 @@ per real defect per target.
 - **A defect inside code an earlier pass explicitly cleared or judged benign** is distinct,
   and the match note must say it re-opens that judgment.
 - **A re-find of a decided item** (wont-fix / deferred / disputed / false-positive): match it
-  and attach the prior decision verbatim — never suppress it. The record shows re-raises
-  overturn the prior call more often than not (3 of 5).
+  and attach the prior decision verbatim — never suppress it. Re-raises have overturned prior
+  calls (3 of the first 5 recorded); the ~55 since mostly re-affirmed — attach the decision and
+  let the synthesizer re-judge either way.
 - **When unsure, SPLIT.** A wrong merge inflates overlap → the loop stops early → a bug
   ships. A wrong split only costs another look. Prefer "NEW — possible remainder of D#" over
   a merge; that flag is more useful than either verdict.
+- **Post-cert escape.** Ledger mode, target listed in `reviews/track-record.md`: a new 🔴/🟠
+  whose mechanism already existed at the certified commit (cited site unchanged since it —
+  `git diff <certified>..<reviewed> -- <file>`) is additionally marked `post-cert-escape`,
+  and the synthesizer appends the event to track-record.md. Serious findings introduced by
+  post-certification changes are not escapes. Unsure → record as escape, doubt stated.
 - Severity never blocks a match (severity is mutable); mechanism + site decide.
 
 ## Output

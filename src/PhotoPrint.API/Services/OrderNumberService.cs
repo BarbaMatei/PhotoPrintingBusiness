@@ -19,7 +19,7 @@ public class OrderNumberService : IOrderNumberService
         // Non-Postgres providers have no per-year sequence: InMemory (tests) and SQLite
         // (local/dev — appsettings.Development.json sets DatabaseProvider=Sqlite) both use
         // a simple count-based number. The unique index on OrderNumber is the backstop;
-        // these providers don't carry production write-concurrency. (BUG-6, review 035-v3.)
+        // these providers don't carry production write-concurrency.
         if (_db.Database.ProviderName is DbProviders.InMemory or DbProviders.Sqlite)
         {
             var count = await _db.Orders.CountAsync(ct);
@@ -29,7 +29,7 @@ public class OrderNumberService : IOrderNumberService
         // PostgreSQL: use a per-year sequence to guarantee uniqueness under concurrency.
         var seqName = $"order_number_seq_{year}";
 
-        // QUAL-5 (review 035-v5): EF1002 flags the interpolation, but `seqName` is built
+        // EF1002 flags the interpolation, but `seqName` is built
         // ONLY from `DateTime.UtcNow.Year` (a server-side int) — no client/user input
         // reaches it, so there is no injection vector. The interpolation also targets a
         // DDL identifier (CREATE SEQUENCE "<name>"), which cannot be a SQL parameter, so

@@ -6,7 +6,7 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Data;
 
 /// <summary>
-/// DB-2 (review 035-v5) regression guard for the <c>Order.StripeClientSecret</c> column
+/// Regression guard for the <c>Order.StripeClientSecret</c> column
 /// width. The column was sized at exactly Stripe's documented 255-char ceiling — zero
 /// headroom. On SQLite/InMemory (dev/test) <c>HasMaxLength</c> is not enforced, so an
 /// over-length secret stores silently and every idempotency test stays green; only prod

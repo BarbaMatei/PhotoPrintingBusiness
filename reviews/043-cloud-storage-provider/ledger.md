@@ -2,6 +2,7 @@
 type: review-ledger
 target: 043-cloud-storage-provider
 updated: 2026-07-22
+closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 ---
 
 # Canonical finding ledger — 043-cloud-storage-provider
@@ -302,7 +303,7 @@ New / updated identities:
 | D86 | 🟡 Low | **backlog** *(new)* | Retention deletes blobs before persisting key-null → broken-URL window on a concurrent read (`ArchiveRetentionJob.cs:146`) |
 | D87 | 🟡 Low | **backlog** *(new; [[D52]]/[[D56]] class)* | Retention sweep query omits the `DeletedAt` filter → reprocesses soft-deleted rows, re-emits false audit (`ArchiveRetentionJob.cs:96`) |
 | D88 | 🟡 Low | **backlog** *(new)* | Promoter tests assert cloud-write keys but never the bytes written (`OrderPhotoPromoterTests.cs`) |
-| D89 | ⚪ Cleanup | **backlog** *(new; codebase-wide)* | Fix comments cite finding/decision/ADR IDs — CLAUDE.md hard-rule violation, 67 occurrences / 27 files (mostly pre-existing; this session added to it). Dedicated comment-hygiene sweep |
+| D89 | ⚪ Cleanup | **fixed** `09173c4` *(sweep 2026-07-30; the records auditor now enforces 0)* | Fix comments cite finding/decision/ADR IDs — CLAUDE.md hard-rule violation, 67 occurrences / 27 files (mostly pre-existing). Swept codebase-wide: 371 tracked occurrences in 118 files removed; both suites green |
 | D90 | 🟡 Low | **backlog** *(new; [[D36]] coverage)* | D36 close-*during*-refresh resolve-time re-read has no spec (only close-before-error is tested) (`order-detail-page.spec.ts`) |
 | D62 | 🟡 Low | **backlog** *(widened v9)* | ZIP mid-loop `GetStream` truncation — v9 adds the concurrent-**promotion** trigger (Local→Cloud+delete) alongside the original concurrent-purge one (`AdminOrderService.cs`) |
 

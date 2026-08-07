@@ -14,8 +14,8 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// Unit tests for <see cref="PromotionRecoveryScanner"/> (periodic since F1, review 043-v3 — the
-/// class sibling of F4's purge-sweep fix). The selection logic is driven through <c>RunSweepAsync</c>
+/// Unit tests for <see cref="PromotionRecoveryScanner"/> (periodic — the
+/// class sibling of the purge-sweep fix). The selection logic is driven through <c>RunSweepAsync</c>
 /// via reflection (matching <see cref="OriginalPurgeRecoveryScanner"/>'s pattern); a separate
 /// <c>ExecuteAsync</c> boot-sweep test proves the periodic wiring actually invokes the sweep, and the
 /// two refusal-guard tests cover archive-disabled / cloud-off.
@@ -139,7 +139,7 @@ public class PromotionRecoveryScannerTests
     public async Task ExecuteAsync_StuckOrder_BootSweepEnqueues()
     {
         // Guards the ExecuteAsync → boot-sweep → RunSweepAsync wiring: delete the boot sweep and
-        // this test times out (the enqueue never fires). Mirrors the F3 fix for the purge sibling.
+        // this test times out (the enqueue never fires). Mirrors the purge sibling's fix.
         using var db = CreateDb();
         var u = SeedUpload(db, StorageLocation.Local);
         var order = SeedOrder(db, OrderStatus.Paid, u);

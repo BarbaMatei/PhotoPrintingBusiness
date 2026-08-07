@@ -2,8 +2,8 @@ namespace PhotoPrint.API.Services;
 
 /// <summary>
 /// Byte-persistence contract for upload storage adapters. Naming policy lives in
-/// <see cref="StorageKeys"/> (ADR-007); the adapter persists bytes at a caller-supplied key.
-/// Two implementations are wired by <see cref="IStorageRouter"/> per upload (ADR-008):
+/// <see cref="StorageKeys"/>; the adapter persists bytes at a caller-supplied key.
+/// Two implementations are wired by <see cref="IStorageRouter"/> per upload:
 /// <see cref="LocalStorageService"/> (disk) and <see cref="S3StorageService"/> (cloud).
 /// </summary>
 public interface IStorageService
@@ -20,7 +20,7 @@ public interface IStorageService
     /// <summary>
     /// Opens a read stream for a stored file. Callers must dispose. Every adapter throws
     /// <see cref="FileNotFoundException"/> when the key is absent (the S3 adapter translates its
-    /// typed <c>NotFound</c> — F3, review 043-v1) so callers can catch one exception type across
+    /// typed <c>NotFound</c>) so callers can catch one exception type across
     /// tiers to map a missing object to a 404.
     /// </summary>
     Task<Stream> GetStreamAsync(string key, CancellationToken ct = default);

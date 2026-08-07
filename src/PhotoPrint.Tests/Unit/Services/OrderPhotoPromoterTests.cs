@@ -13,7 +13,7 @@ namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
 /// Unit tests for <see cref="OrderPhotoPromoter"/> — the intent-024 orchestrator.
-/// Exercises the per-upload atomicity + Confirmed-Write-Then-Delete contract (ADR-011),
+/// Exercises the per-upload atomicity + Confirmed-Write-Then-Delete contract,
 /// the idempotency rule (already-Cloud uploads are skipped), and the cloud-off safety
 /// (refuse + log Error).
 /// </summary>
@@ -316,7 +316,7 @@ public class OrderPhotoPromoterTests
     [Fact]
     public async Task PromoteOrderAsync_RowUpdateFails_LeavesRowLocal_CountsFailed()
     {
-        // F16 (review 043-v1): the Step-3 SaveChanges catch was never exercised — InMemory
+        // The Step-3 SaveChanges catch was never exercised — InMemory
         // SaveChanges doesn't throw. A regression there (Failed mis-counted as Promoted, or the
         // row left flipped after a failed write) would ship green. Use a context whose
         // SaveChangesAsync throws AFTER the cloud writes succeed.
@@ -354,7 +354,7 @@ public class OrderPhotoPromoterTests
     [Fact]
     public async Task PromoteOrderAsync_LargePreviewGenerationThrows_LeavesRowLocal_CountsFailed()
     {
-        // F16 (review 043-v1): GenerateLargePreviewAsync was always mocked to succeed, so the
+        // GenerateLargePreviewAsync was always mocked to succeed, so the
         // corrupt-image → cloud-write-error path was unverified.
         using var db = CreateDb();
         var upload = SeedUpload(db, StorageLocation.Local);

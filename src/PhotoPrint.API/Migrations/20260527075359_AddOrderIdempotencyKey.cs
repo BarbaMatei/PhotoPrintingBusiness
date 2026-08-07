@@ -10,13 +10,13 @@ namespace PhotoPrint.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // BUG-5 (review 035-v1): provider-aware so the production Postgres schema is
+            // Provider-aware so the production Postgres schema is
             // correct, while SQLite (dev/test) output is unchanged. On Postgres, "TEXT"
             // is unbounded (ignores maxLength) and the index needs an explicit NULL
             // filter to match the runtime model (PhotoPrintDbContext); on SQLite, plain
             // TEXT + a plain unique index (NULLs are distinct) is exactly what we had.
             //
-            // DB-1 (review 035-v5) — breadcrumb for the NEXT author. The model snapshot
+            // Breadcrumb for the NEXT author. The model snapshot
             // (PhotoPrintDbContextModelSnapshot.cs) is SQLite-flavored: it records these
             // columns as TEXT and the idempotency index as UNFILTERED. The runtime Npgsql
             // model is character varying(N) + a filtered index. EF diffs the next migration
@@ -25,12 +25,12 @@ namespace PhotoPrint.API.Migrations
             // Drop/CreateIndex (to add `"IdempotencyKey" IS NOT NULL`). For an already-correct
             // deployed schema that diff is spurious: review it and discard the idempotency-
             // column operations. Fully eliminating the drift needs per-provider migration
-            // assemblies — a deferred follow-up, not done here (see resolution-v5 DB-1).
+            // assemblies — a deferred follow-up, not done here.
             //
-            // DB-1 + DB-2 (review 035-v8) — re-affirmed deferred. Two related gaps, same home:
-            //   • DB-2: the SQLite-flavored snapshot phantom diff described above.
-            //   • DB-1: NO test exercises the Postgres arm at all — every fixture uses
-            //     EnsureCreated() (schema from the model), never Migrate(), so this migration's
+            // Re-affirmed deferred. Two related gaps, same home:
+            //   • The SQLite-flavored snapshot phantom diff described above.
+            //   • NO test exercises the Postgres arm at all — every fixture uses
+            //     EnsureCreated (schema from the model), never Migrate, so this migration's
             //     DDL, the filtered index, and the Npgsql `IsIdempotencyKeyViolation` branch run
             //     in tests NOWHERE. A Testcontainers-Postgres regression that applies this
             //     migration and drives the concurrent double-submit is the durable fix.
@@ -55,7 +55,7 @@ namespace PhotoPrint.API.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "StripeClientSecret",
                 table: "Orders",
-                // DB-2 (review 035-v5): 512, not Stripe's exact 255 ceiling — headroom so a
+                // 512, not Stripe's exact 255 ceiling — headroom so a
                 // longer client secret can't throw "value too long" on prod Postgres after
                 // the charge already exists. Safe to widen this not-yet-deployed migration
                 // in place (no Postgres DB has applied it; SQLite is unaffected by maxLength).

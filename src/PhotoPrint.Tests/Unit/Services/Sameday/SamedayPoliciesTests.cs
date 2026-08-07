@@ -13,7 +13,7 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
 /// Regression suite for the retry resilience pipeline. The critical invariant
-/// (ADR-014) is that 401 is NOT retried by Polly — session-expiry handling
+///  is that 401 is NOT retried by Polly — session-expiry handling
 /// lives in <c>SamedayAuthHandler</c>. If a future PR tries to "fix" 401
 /// handling by adding it to Polly's retryable set, these tests fail.
 ///
@@ -28,7 +28,7 @@ public class SamedayPoliciesTests
         params Func<HttpRequestMessage, HttpResponseMessage>[] responses)
     {
         var script = new ScriptedHttpMessageHandler(responses);
-        // Bolt 036 contract: tests exercise retry semantics without the bolt-037
+        // Contract: tests exercise retry semantics without the bolt-037
         // rate-limit interfering. SamedayResilienceHandler reads
         // MaxConcurrentSamedayCalls; the special sentinel int.MaxValue disables
         // the limiter via SamedayPolicies.BuildRetryPipeline.
@@ -64,7 +64,7 @@ public class SamedayPoliciesTests
     [Fact]
     public async Task Does_not_retry_on_401()
     {
-        // ADR-014 regression: 401 must NOT be in the retryable set; session
+        // Regression: 401 must NOT be in the retryable set; session
         // expiry is owned by SamedayAuthHandler at a higher layer.
         var (script, client) = Build(
             _ => ScriptedHttpMessageHandler.Empty(HttpStatusCode.Unauthorized));
@@ -102,7 +102,7 @@ public class SamedayPoliciesTests
         script.CallCount.Should().Be(2);
     }
 
-    // ── Rate limiter (bolt 037): one shared limiter, actually throttling ─────────
+    // ── Rate limiter: one shared limiter, actually throttling ─────────
 
     [Fact]
     public async Task Shared_rate_limiter_throttles_when_its_only_permit_is_held()
