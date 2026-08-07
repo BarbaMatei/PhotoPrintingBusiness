@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 044-045-observability
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 # Canonical finding ledger — 044-045-observability
@@ -165,11 +165,15 @@ the parent `D#`) or pre-dates the fix round. **11 of the 18 are fix-caused.** Th
 not a wrong behaviour but an **unpinned mechanism**: five rows are "the point of a fix, deletable
 with a green suite", and five of those seven surfaces were measured rather than argued.
 
+Verification pass v5 (2026-08-07) revert-and-rerun tested all four `fixed` rows against `52a0cb9`
+(source-identical to the branch tip `d37f867`). **All four flip to `verified`** — three on local
+mutation, D113 on CI, the only place it can be proven.
+
 | D# | Sev | First seen | Title | File | Cause | Status |
 |---|---|---|---|---|---|---|
-| D103 | 🟠 | v4 (F1) | SLO 3's `or vector(0)` guards are pinned by nothing — deleting both leaves 1133 green, restoring the "No Data while healthy" defect this round shipped once | `memory-bank/operations/slos.md:95-97`, `ops/dashboards/fototipar-overview.json:232` | fix-caused (D80) | open |
-| D104 | 🟠 | v4 (F2) | Both invariants F2's discriminator rests on are unpinned: the linked deadline token, and `HttpBackstop > RequestDeadline` — breaking the latter restores D75 invisibly | `Services/GoogleTokenValidator.cs:43-50`, `Extensions/SocialAuthExtensions.cs:17` | fix-caused (D75) | open |
-| D105 | 🟠 | v4 (F3) | SLO 4 and SLO 5 put benign `skipped`/`pending` in the denominator — the defect D80 fixed — while the status block now says there are "two caveats that matter" | `memory-bank/operations/slos.md:6`, `:135`, `:158` | pre-existing; misleading enumeration fix-caused (D81) | open |
+| D103 | 🟠 | v4 (F1) | SLO 3's `or vector(0)` guards are pinned by nothing — deleting both leaves 1133 green, restoring the "No Data while healthy" defect this round shipped once | `memory-bank/operations/slos.md:95-97`, `ops/dashboards/fototipar-overview.json:232` | fix-caused (D80) | **verified** at `52a0cb9` (v5) — a class rule, not an instance check: deleting both guards reddens it, and so does collapsing the two-term numerator to one matcher. Its disclosed hole — single-term sides are skipped — is now D121 |
+| D104 | 🟠 | v4 (F2) | Both invariants F2's discriminator rests on are unpinned: the linked deadline token, and `HttpBackstop > RequestDeadline` — breaking the latter restores D75 invisibly | `Services/GoogleTokenValidator.cs:43-50`, `Extensions/SocialAuthExtensions.cs:17` | fix-caused (D75) | **verified** at `52a0cb9` (v5) — each invariant reddens its own test: the registered timeout behind the deadline reddens the ordering test, and unwiring the deadline from `GetAsync` reddens the wall-clock test at 32 s, the mutation v4 could only measure 0-red |
+| D105 | 🟠 | v4 (F3) | SLO 4 and SLO 5 put benign `skipped`/`pending` in the denominator — the defect D80 fixed — while the status block now says there are "two caveats that matter" | `memory-bank/operations/slos.md:6`, `:135`, `:158` | pre-existing; misleading enumeration fix-caused (D81) | **verified** at `52a0cb9` (v5) — both denominators exclude the benign values in both copies, the `orphaned` value reddens on revert, and the enumeration reads true again. Two records the fix left behind are D122 (acceptance criterion) and D123 (union doc comment); the guards it also added are D121 |
 | D106 | 🟡 | v4 (F5) | `Sentry:TracesSampleRate=0` no longer switches performance monitoring off, only its output — `IsPerformanceMonitoringEnabled` is true whenever a sampler is set | `Program.cs:59` | fix-caused (D77) | open |
 | D107 | 🟡 | v4 (F6) | The booted-host sampler test covers only `isSampled: true`; the `-0` blinding half of D77 is unpinned | `Tests/Integration/SentryOptionsWiringTests.cs:38-48` | fix-caused (D77) | open |
 | D108 | 🟡 | v4 (F7) | The re-enqueue query's `Paid`-only scope — an explicit owner decision — is pinned by nothing, and the new test's second assertion cannot fail for its stated reason | `BackgroundJobs/AwbRetryJob.cs:86`, `Tests/Unit/Services/Sameday/AwbRetryJobTests.cs:244` | fix-caused (D82) | open |
@@ -177,7 +181,7 @@ with a green suite", and five of those seven surfaces were measured rather than 
 | D110 | 🟡 | v4 (F9) | The dilution figures now on the operator-facing panel are wrong: 5,760/day is `/metrics` alone and the real floor is ~94.5%, not ~99.7% | `memory-bank/operations/slos.md:8-12`, `ops/dashboards/fototipar-overview.json:60` | fix-caused (D81) | open |
 | D111 | 🟡 | v4 (F10) | SLO 3's documented query has no time window while its heading says "rolling 7 days" and its dashboard twin uses `rate(…[7d])`; SLO 4/5 the same | `memory-bank/operations/slos.md:80`, `:95-97` | pre-existing shape | open |
 | D112 | 🟡 | v4 (F11) | D75's class unswept: two sibling sites still infer "our own timeout" from `!ct.IsCancellationRequested`, losing a claim release on shutdown | `Services/Sameday/AwbCreator.cs:166`, `BackgroundJobs/ShipmentTrackingJob.cs:184` | pre-existing | open |
-| D113 | 🟠 | v4 (F4) | `secret-scan` fails on every pull-request run of this branch — gitleaks flags a fabricated test token `.gitleaks.toml` does not allowlist | `Tests/Unit/Configuration/SentryDataScrubbersTests.cs:16`, `.gitleaks.toml` | pre-existing (`44c3e2d`) | open |
+| D113 | 🟠 | v4 (F4) | `secret-scan` fails on every pull-request run of this branch — gitleaks flags a fabricated test token `.gitleaks.toml` does not allowlist | `Tests/Unit/Configuration/SentryDataScrubbersTests.cs:16`, `.gitleaks.toml`, `.gitleaksignore` | pre-existing (`44c3e2d`) | **verified by CI only** at `52a0cb9` (v5) — the PR-event scan was red at `f0aadd7` and every earlier PR run, green from `a9c9478` (the first commit carrying `.gitleaksignore`) onward; both fingerprints checked byte-for-byte against the commits they name. Not provable locally: gitleaks is not installed here, and any history rewrite of this branch invalidates commit-pinned fingerprints silently |
 | D114 | 🟡 | v4 (F12) | The new real-Kestrel boot test runs un-collectioned in the parallel pool and installs a process-wide console-exporting `TracerProvider` under `ASPNETCORE_ENVIRONMENT=Development` | `Tests/Unit/Observability/ScrapeListenerCheckTests.cs:94-120` | fix-caused (D74), extends D51 | open |
 | D115 | 🟡 | v4 (F13) | `system-architecture.md` still describes the old 5 s `HttpClient` timeout — the standard CLAUDE.md routes readers to, unchanged by the fix that moved the bound | `memory-bank/standards/system-architecture.md:45` | fix-caused (D75) | open |
 | D116 | ⚪ | v4 (F15) | `DEPLOYMENT.md:949` still reasons from the availability target as if the denominator were customer traffic — the third copy D81's fix left behind | `docs/DEPLOYMENT.md:949` | fix-caused (incomplete D81) | open |
@@ -185,6 +189,20 @@ with a green suite", and five of those seven surfaces were measured rather than 
 | D118 | ⚪ | v4 (F17) | Comment-rule residue: two two-line narrating comments and a stray double blank line | `Program.cs:57-61`, `BackgroundJobs/AwbRetryJob.cs:105-106` | fix-caused (D77/D82) | open |
 | D119 | ⚪ | v4 (F18) | `resolution-v3.md`'s F11 note overstates the parser unification — three parsers exist and `LabelUsagesIn` keeps its own regex | `reviews/044-045-observability/resolution-v3.md:20` | records accuracy | open |
 | D120 | 🟡 | v4 (F14) | The give-up alarm's one-shot registry is per-process, so a restart re-pages every order in the 24 h→32 d window — a population D82's fix enlarged | `BackgroundJobs/AwbGiveUpRegistry.cs:21-23` | pre-existing, amplified (D82) | open |
+
+## v5 findings (D121–D123)
+
+Minted by the [v5 verification pass](review-v5.md) at `52a0cb9`. Detail per row in
+[findings-v5.md](findings-v5.md). **All three are fix-caused by D105**, and all three are one shape:
+the round added a mechanism and left one of its records — a test, an acceptance criterion, a type
+comment — describing the world before it. None changes today's behaviour; each hides the next
+author's mistake.
+
+| D# | Sev | First seen | Title | File | Cause | Status |
+|---|---|---|---|---|---|---|
+| D121 | 🟡 | v5 (F1) | The `or vector(0)` guards added to the SLO 4 and SLO 5 numerators are pinned by nothing — D103's class rule skips single-term sides, measured green on deletion | `memory-bank/operations/slos.md:142`, `:173`, `ops/dashboards/fototipar-overview.json:271`, `:310`, `Tests/Integration/DashboardMetricNamesTests.cs:133` | fix-caused (D105), same class as D103 | open |
+| D122 | 🟡 | v5 (F2) | The acceptance criterion still says SLO 4 excludes only `skipped`, and gives `retry_later`'s reason for it; `orphaned` is unmentioned | `memory-bank/intents/020-observability-stack/units/002-error-tracking-and-slos/stories/002-slo-documentation-and-dashboard.md:27-29` | fix-caused (D105) | open |
+| D123 | 🟡 | v5 (F3) | The outcome union's doc comment calls the cancelled-order case a plain skip — the one case that must now set `Orphaned: true` — and never mentions the flag | `Services/Sameday/AwbCreationOutcome.cs:9` | fix-caused (D105) | open |
 
 **Record note (v3):** `findings-v2.md`'s F23 rationale ends with "`slos.md` does not carry the
 caveat (F11/D50)". That half is closed — the caveat landed at `slos.md:86-94` and `:5-7`. The

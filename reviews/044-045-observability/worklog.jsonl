@@ -123,3 +123,7 @@
 {"t":"2026-08-06T17:01:38+03:00","ev":"round-end","round":4}
 {"t":"2026-08-06T17:17:45+03:00","ev":"test-run","round":4,"kind":"red","filter":"Unit.Services.GoogleTokenValidatorTests","passed":10,"failed":1,"duration_s":60}
 {"t":"2026-08-06T17:17:45+03:00","ev":"test-run","round":4,"kind":"green","filter":"Unit.Services.GoogleTokenValidatorTests","passed":11,"failed":0,"duration_s":1}
+{"t":"2026-08-07T15:24:34+03:00","ev":"pass-launch","pass":5,"type":"verification"}
+{"t":"2026-08-07T16:13:31+03:00","ev":"pass-records-done","pass":5,"type":"verification"}
+{"t":"2026-08-07T16:15:29+03:00","ev":"gate-open","pass":5,"reason":"router exit 3 (row 4/5): is the v4 fix round delta-worthy or patch-grade? It added a new metric surface (orphaned label value, cardinality 5 to 6, production change in AwbCreator/AwbCreationOutcome) and redefined what SLO 4/5 measure, which reads delta-worthy; the other three fixes are patch-grade. Delta discovery ~0.6-1.2M tokens vs loop quiet + certification only on explicit go-ahead"}
+{"t":"2026-08-07T16:19:39+03:00","ev":"gate-closed","pass":5,"answer":"owner called the v4 fix round PATCH-GRADE (no delta discovery) and asked the loop to end naturally: fix the 3 new minors plus D110 by hand first, then close"}
