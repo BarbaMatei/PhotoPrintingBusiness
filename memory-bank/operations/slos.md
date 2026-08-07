@@ -6,10 +6,13 @@
 > **Two caveats that matter:**
 >
 > - **SLO 1's denominator is not customer traffic.** It counts every instrumented request,
->   including roughly 5,760 always-200 `/health` and `/metrics` self-monitoring requests a
->   day, so the ratio cannot read below about 99.7% however broken the site is — and the
->   latency and RPS panels are diluted the same way. Do not read the availability number as
->   availability until this is drained; watch the 5xx rate on customer routes instead.
+>   including about **8,640 always-200 self-monitoring requests a day** — 5,760 `/metrics`
+>   scrapes at the 15 s interval in [`DEPLOYMENT.md`](../../docs/DEPLOYMENT.md) plus 2,880
+>   `/health` checks at the Dockerfile's 30 s `HEALTHCHECK` interval. Against the ~500
+>   customer requests a day that document projects, the ratio **cannot read below about
+>   94.5%** (8,640 ÷ 9,140) however broken the site is, and the latency and RPS panels are
+>   diluted the same way. Do not read the availability number as availability until this is
+>   drained; watch the 5xx rate on customer routes instead.
 > - **SLO 3 cannot see a total outage** — see the note under it.
 >
 > A test (`DashboardMetricNamesTests`) holds every metric name below against a real
