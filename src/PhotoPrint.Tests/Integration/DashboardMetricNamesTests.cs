@@ -26,6 +26,14 @@ public class DashboardMetricNamesTests
         "le", "offset", "and", "or", "unless", "bool",
     };
 
+    private static readonly string[] GuardedSuccessSelectors =
+    [
+        "payment_webhook_total{result=\"ok\"}",
+        "payment_webhook_total{result=\"duplicate\"}",
+        "awb_creation_total{result=\"ok\"}",
+        "invoice_anaf_status_total{status=\"accepted\"}",
+    ];
+
     [Fact]
     public async Task Every_dashboard_query_names_a_metric_the_api_actually_exposes()
     {
@@ -151,6 +159,47 @@ public class DashboardMetricNamesTests
                 + "no added term is found any more — someone collapsed them to one `=~` matcher, or "
                 + "the collector stopped reaching the query — then this test has quietly stopped "
                 + "checking rather than started passing");
+    }
+
+    [Fact]
+    public void Every_hand_named_success_numerator_keeps_its_absent_series_guard()
+    {
+        var unguarded = new List<string>();
+        var seen = GuardedSuccessSelectors.ToDictionary(s => s, _ => 0, StringComparer.Ordinal);
+
+        foreach (var query in DashboardQueries().Concat(SloQueries()))
+        {
+            foreach (var selector in GuardedSuccessSelectors)
+            {
+                var at = query.IndexOf(selector, StringComparison.Ordinal);
+
+                while (at >= 0)
+                {
+                    seen[selector]++;
+
+                    var tail = query[(at + selector.Length)..];
+                    if (tail.Length > 24) tail = tail[..24];
+
+                    if (!Regex.IsMatch(tail, "or\\s+vector\\(0\\)"))
+                        unguarded.Add($"{selector} in {query.Trim()}");
+
+                    at = query.IndexOf(selector, at + selector.Length, StringComparison.Ordinal);
+                }
+            }
+        }
+
+        unguarded.Should().BeEmpty(
+            "a selector naming one success value by hand matches no series until that value has "
+                + "been observed once, and `sum()` over nothing is an EMPTY vector — so an "
+                + "unguarded success numerator reads \"No Data\" in exactly the case where the "
+                + "ratio should read a red 0%: a fresh process where every attempt is failing. "
+                + "The added-term rule cannot see these, because a lone `sum()` is one term");
+
+        seen.Should().OnlyContain(
+            kv => kv.Value >= 2,
+            "each of these selectors is written twice — once in slos.md and once in its dashboard "
+                + "twin — so a count below two means a query was deleted, renamed or moved out of "
+                + "this test's reach, and the guard it carried is no longer being checked at all");
     }
 
     private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
