@@ -82,7 +82,12 @@ function resolutionTallies(text) {
   const end = text.indexOf('\n---', 3)
   const fm = text.startsWith('---') && end !== -1 ? text.slice(3, end) : ''
   let found = false
-  for (const m of fm.matchAll(/^ {2}[A-Za-z]+-?\d+:\s*\{\s*status:\s*([a-z-]+)/gm)) {
+  // New shape: "## Findings" body table. Old shape (grandfathered targets): frontmatter map.
+  const section = text.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+  const rowRe = /^\|\s*(?:D\d+|[A-Za-z]+-\d+)\s*\|\s*([a-z-]+)\s*\|/gm
+  const mapRe = /^ {2}[A-Za-z]+-?\d+:\s*\{\s*status:\s*([a-z-]+)/gm
+  const matches = [...section.matchAll(rowRe)]
+  for (const m of matches.length ? matches : fm.matchAll(mapRe)) {
     found = true
     const s = m[1]
     if (s === 'fixed') t.fixed++

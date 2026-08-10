@@ -62,7 +62,7 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
 |---|---|
 | `summary-v<n>.md` | 60 lines of body |
 | `review-v<n>.md` | 120 lines of body; table rows are single lines |
-| `resolution-v<n>.md` | 150 lines of body; frontmatter `note` ≤ 240 characters; each Decision ≤ 15 lines |
+| `resolution-v<n>.md` | 200 lines of body (the Findings table rows live here); `Note` cell ≤ 240 characters; each Decision ≤ 15 lines |
 | `ledger.md` detail block | 20 lines per defect; table cells one line; Status cell is the status word only |
 | `backlog.md` row | 1 table line |
 
@@ -109,10 +109,12 @@ row's wording. `Notes for the fixer` gives order and traps, never re-describes.
 
 ### resolution-v<n>.md — template `templates/resolution.md`
 
-Audience: the verifier and the ledger's historian. The frontmatter `findings:`
-map is keyed by D# and is the machine-read state; notes are one line. Rationale
-that deserves prose goes under `Decisions`, one titled block per decision.
-The fixer never writes `verified`.
+Audience: the verifier and the ledger's historian. One resolution per **fix
+round**, numbered by the pass that raised its findings; a clean verification
+raises nothing and gets no resolution. Frontmatter carries scalars only. The
+`## Findings` body table (D# · Status · Commit · Note, note ≤ 240 chars) is the
+machine-read state. Rationale that deserves prose goes under `Decisions`, one
+titled block per decision. The fixer never writes `verified`.
 
 ### summary-v<n>.md — template `templates/summary.md`
 

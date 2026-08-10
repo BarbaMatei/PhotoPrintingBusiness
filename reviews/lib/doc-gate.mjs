@@ -116,19 +116,23 @@ if (existsSync(join(dir, resolutionFile))) {
   const p = split(read(resolutionFile))
   if (!p) bad(resolutionFile, 'no frontmatter block')
   else {
-    checkFrontmatter(resolutionFile, p.fm, ['type', 'target', 'version', 'answers', 'status', 'fixed_commit', 'findings'])
-    for (const m of p.fm.matchAll(/^ {2}([A-Za-z-]+\d+):/gm)) {
-      resolutionKeys.push(m[1])
-      if (!/^D\d+$/.test(m[1])) bad(resolutionFile, `findings map key "${m[1]}" — keys are D# only (doc-contracts.md)`)
+    checkFrontmatter(resolutionFile, p.fm, ['type', 'target', 'version', 'answers', 'status', 'fixed_commit'])
+    if (/^findings:/m.test(p.fm)) bad(resolutionFile, 'frontmatter carries a findings map — per-finding state lives in the "## Findings" body table (doc-contracts.md)')
+    const RSTAT = /^(fixed|wont-fix|deferred|disputed|false-positive|backlog)$/
+    const findingsSection = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+    for (const r of findingsSection.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*(D#|-)/.test(l))) {
+      const cells = r.split('|').map(c => c.trim())
+      if (!/^D\d+$/.test(cells[1] ?? '')) { bad(resolutionFile, `findings row key "${cells[1]}" — D# only (doc-contracts.md)`); continue }
+      resolutionKeys.push(cells[1])
+      if (!RSTAT.test(cells[2] ?? '')) bad(resolutionFile, `${cells[1]} status "${cells[2]}" — one status word, never "verified" (that belongs to a re-review)`)
+      if ((cells[4] ?? '').length > 240) bad(resolutionFile, `${cells[1]} note is ${cells[4].length} chars — cap is 240; the story goes in Decisions`)
     }
-    for (const m of p.fm.matchAll(/note:\s*"([^"]*)"/g)) {
-      if (m[1].length > 240) bad(resolutionFile, `a note is ${m[1].length} chars — cap is 240; the story goes in Decisions`)
-    }
+    if (!resolutionKeys.length) bad(resolutionFile, 'the "## Findings" table has no rows')
     const got = headings(p.body)
     if (!got[0] || !new RegExp(`^# Resolution v${pass} — ${name}$`).test(got[0]))
       bad(resolutionFile, `title is "${got[0] ?? '(none)'}" — template requires "# Resolution v${pass} — ${name}"`)
-    for (const h of ['## Scope', '## Decisions']) if (!got.includes(h)) bad(resolutionFile, `missing heading "${h}"`)
-    if (bodyLines(p.body) > 150) bad(resolutionFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 150`)
+    for (const h of ['## Findings', '## Scope', '## Decisions']) if (!got.includes(h)) bad(resolutionFile, `missing heading "${h}"`)
+    if (bodyLines(p.body) > 200) bad(resolutionFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 200`)
     const decisions = p.body.split(/^### /m).slice(1)
     for (const d of decisions) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1

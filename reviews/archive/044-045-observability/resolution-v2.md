@@ -6,44 +6,48 @@ answers: review-v2.md
 status: resolved
 fixed_commit: 7e28317
 closed: 2026-08-05
-findings:
-  D40: { status: fixed, commit: 22bede9, note: "`OrderStatusMachine.HasBeenPaid` (explicit set: Paid/Printing/Shipped/Delivered) replaces the `== Paid` guard in both webhook handlers; a redelivery past `Paid` records `duplicate` and logs nothing. Cancelled still alarms. 10 tests." }
-  D41: { status: fixed, commit: d932343, note: "One-arg `ParentBasedSampler` removed as a no-op wrapper; new `BuildSampler` seam so pipeline tests build the sampler production uses. 3 tests at the ActivitySource seam with a remote parent. Trace-id residual not closed — see Decisions." }
-  D42: { status: fixed, commit: d932343, note: "Doc only, per the owner's no-benchmark choice. ADR-017's cost bullet and §14.7 now say `RecordOnly` sets `IsAllDataRequested`: lowering the rate is an egress lever, not a CPU one. The ADR's 'one root span' wording corrected." }
-  D43: { status: fixed, commit: 60c5866, note: "Caller cancellation is rethrown, not mapped to `BadGatewayException`; the discriminator is `ex.GetBaseException() is not TimeoutException`. Same fix at the body-read catch that turned an abort into a 401. 2 tests; see Decisions." }
-  D44: { status: fixed, commit: ba1c182, note: "DashboardMetricNamesTests checks queried label names against the real exposition and literal label values against `MetricNames.LabelContract`; the walker recurses into row panels, closing D57. Both cited renames redden — measured." }
-  D45: { status: fixed, commit: 67b0be7, note: "`IHostedLifecycleService.StartedAsync` guard; pure `ScrapeListenerCheck.Verdict` (12 unit tests) refuses boot when ScrapePort is unbound or the only listener; skips when no addresses are reported (TestServer). §14.10 updated." }
-  D46: { status: deferred, commit: null, note: "Owner parked 2026-08-05: the gate-chosen fix (exclude at the instrumentation) needs .NET 9, and the two remaining routes change SLO 1's meaning. SLO 1 counts ~5,760 self-monitoring requests/day; availability cannot read below ~99.7%." }
-  D47: { status: fixed, commit: d96d6f4, note: "`MetricCapture` scopes captures to the test's execution context (AsyncLocal token); the old `ReferenceEquals` meter filter excluded nothing. 3 tests, one using `ExecutionContext.SuppressFlow`; removing the gate reddens one — measured." }
-  D48: { status: fixed, commit: 82342dd, note: "A breadcrumb carrying a token-bearing URL is pushed through the booted host's real SentryClient and the serialized envelope asserted. Deleting `SetBeforeBreadcrumb` reddens exactly this one test — measured; before it left 358 green." }
-  D49: { status: fixed, commit: 2c92655, note: "Two tests: a mapped 5xx logs at Error with the exception attached, and a mapped 4xx stays off Error. Reverting `LogError` to `LogWarning` reddens the first — measured; before it left 24 green." }
-  D50: { status: fixed, commit: ba1c182, note: "Doc only. slos.md's status block no longer says 'SLOs 1-4 are measured' unqualified, and SLO 3 names its blind spot: the counter increments inside a terminal branch, so a throw before any branch moves neither side of the ratio." }
-  D51: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D52: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D53: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D54: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D55: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D56: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D57: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D58: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D59: { status: backlog, commit: null, note: "🟡 — ledger backlog; flagged to the owner in summary-v2 as the first finding in the still-owed db-parity gap" }
-  D60: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D61: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D62: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D63: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D64: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D65: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D66: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D67: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D68: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D69: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D70: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D71: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D72: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D73: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
 ---
 
 # Resolution v2 — 044-045-observability
+
+## Findings
+
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D40 | fixed | `22bede9` | `OrderStatusMachine.HasBeenPaid` (explicit set: Paid/Printing/Shipped/Delivered) replaces the `== Paid` guard in both webhook handlers; a redelivery past `Paid` records `duplicate` and logs nothing. Cancelled still alarms. 10 tests. |
+| D41 | fixed | `d932343` | One-arg `ParentBasedSampler` removed as a no-op wrapper; new `BuildSampler` seam so pipeline tests build the sampler production uses. 3 tests at the ActivitySource seam with a remote parent. Trace-id residual not closed — see Decisions. |
+| D42 | fixed | `d932343` | Doc only, per the owner's no-benchmark choice. ADR-017's cost bullet and §14.7 now say `RecordOnly` sets `IsAllDataRequested`: lowering the rate is an egress lever, not a CPU one. The ADR's 'one root span' wording corrected. |
+| D43 | fixed | `60c5866` | Caller cancellation is rethrown, not mapped to `BadGatewayException`; the discriminator is `ex.GetBaseException() is not TimeoutException`. Same fix at the body-read catch that turned an abort into a 401. 2 tests; see Decisions. |
+| D44 | fixed | `ba1c182` | DashboardMetricNamesTests checks queried label names against the real exposition and literal label values against `MetricNames.LabelContract`; the walker recurses into row panels, closing D57. Both cited renames redden — measured. |
+| D45 | fixed | `67b0be7` | `IHostedLifecycleService.StartedAsync` guard; pure `ScrapeListenerCheck.Verdict` (12 unit tests) refuses boot when ScrapePort is unbound or the only listener; skips when no addresses are reported (TestServer). §14.10 updated. |
+| D46 | deferred | — | Owner parked 2026-08-05: the gate-chosen fix (exclude at the instrumentation) needs .NET 9, and the two remaining routes change SLO 1's meaning. SLO 1 counts ~5,760 self-monitoring requests/day; availability cannot read below ~99.7%. |
+| D47 | fixed | `d96d6f4` | `MetricCapture` scopes captures to the test's execution context (AsyncLocal token); the old `ReferenceEquals` meter filter excluded nothing. 3 tests, one using `ExecutionContext.SuppressFlow`; removing the gate reddens one — measured. |
+| D48 | fixed | `82342dd` | A breadcrumb carrying a token-bearing URL is pushed through the booted host's real SentryClient and the serialized envelope asserted. Deleting `SetBeforeBreadcrumb` reddens exactly this one test — measured; before it left 358 green. |
+| D49 | fixed | `2c92655` | Two tests: a mapped 5xx logs at Error with the exception attached, and a mapped 4xx stays off Error. Reverting `LogError` to `LogWarning` reddens the first — measured; before it left 24 green. |
+| D50 | fixed | `ba1c182` | Doc only. slos.md's status block no longer says 'SLOs 1-4 are measured' unqualified, and SLO 3 names its blind spot: the counter increments inside a terminal branch, so a throw before any branch moves neither side of the ratio. |
+| D51 | backlog | — | 🟡 — ledger backlog per the README router |
+| D52 | backlog | — | 🟡 — ledger backlog per the README router |
+| D53 | backlog | — | 🟡 — ledger backlog per the README router |
+| D54 | backlog | — | 🟡 — ledger backlog per the README router |
+| D55 | backlog | — | 🟡 — ledger backlog per the README router |
+| D56 | backlog | — | 🟡 — ledger backlog per the README router |
+| D57 | backlog | — | 🟡 — ledger backlog per the README router |
+| D58 | backlog | — | 🟡 — ledger backlog per the README router |
+| D59 | backlog | — | 🟡 — ledger backlog; flagged to the owner in summary-v2 as the first finding in the still-owed db-parity gap |
+| D60 | backlog | — | 🟡 — ledger backlog per the README router |
+| D61 | backlog | — | 🟡 — ledger backlog per the README router |
+| D62 | backlog | — | 🟡 — ledger backlog per the README router |
+| D63 | backlog | — | 🟡 — ledger backlog per the README router |
+| D64 | backlog | — | 🟡 — ledger backlog per the README router |
+| D65 | backlog | — | ⚪ — ledger backlog per the README router |
+| D66 | backlog | — | ⚪ — ledger backlog per the README router |
+| D67 | backlog | — | ⚪ — ledger backlog per the README router |
+| D68 | backlog | — | ⚪ — ledger backlog per the README router |
+| D69 | backlog | — | ⚪ — ledger backlog per the README router |
+| D70 | backlog | — | ⚪ — ledger backlog per the README router |
+| D71 | backlog | — | ⚪ — ledger backlog per the README router |
+| D72 | backlog | — | ⚪ — ledger backlog per the README router |
+| D73 | backlog | — | ⚪ — ledger backlog per the README router |
 
 ## Scope
 

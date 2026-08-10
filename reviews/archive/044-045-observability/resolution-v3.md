@@ -6,39 +6,43 @@ answers: review-v3.md
 status: resolved
 fixed_commit: dc203c7
 closed: 2026-08-06
-findings:
-  D74: { status: fixed, commit: c363b7a, note: "Socket/pipe classified by prefix before `Parse`; port 0 excluded as dynamic-bind. 'Addresses but no TCP port' is its own refuse verdict; the TestServer carve-out keys on an empty address list. Linux proof is CI: 6 red runs, then green." }
-  D75: { status: fixed, commit: 7c002a0, note: "The validator owns the deadline: `CancellationTokenSource(_deadline)` linked with the caller's token; the discriminator is `ct.IsCancellationRequested && !deadline.IsCancellationRequested`. `HttpClient.Timeout` is a 15 s backstop." }
-  D76: { status: fixed, commit: feb5636, note: "Test-only. `InvokeAsync_UnmappedServerError_LogsAtErrorWithTheException` pins the level and the attached exception on the unmapped branch; reverting `LogError` to `LogWarning` there reddens it — measured; before, 255 green." }
-  D77: { status: fixed, commit: f2a7ef9, note: "`o.TracesSampler` answers the configured rate on every call; per the SDK IL it outranks an inherited `sentry-trace` only when non-null. Caddy now strips `sentry-trace` and `baggage`; `traceparent` kept on purpose. See Decisions." }
-  D78: { status: fixed, commit: 2a82f01, note: "Test-only. `A_second_capture_in_the_same_test_fails_loudly`; deleting the nested-capture throw reddens it — measured; before, 738 green." }
-  D79: { status: fixed, commit: 163f912, note: "Test-only. The pin reads the installed sampler off the booted TracerProvider by reflection, failing loudly on a rename; re-wrapping the call site reddens it — measured; before, 1120 green. Behavioural route rejected as flaky (D51)." }
-  D80: { status: fixed, commit: caeb866, note: "Owner chose 'match the prose': numerator `ok`+`duplicate`; `signature_invalid` leaves the denominator, in both copies (slos.md and the dashboard panel). Literal `=` matchers keep `ok` and `duplicate` build-checked. See Decisions." }
-  D81: { status: fixed, commit: caeb866, note: "The status block no longer claims SLO 1 is measured; it names the dilution (~5,760 always-200 requests/day, ~99.7% floor) and says not to read it as availability. SLO 3's cross-check is now the webhook-route 5xx rate. D46 stays deferred." }
-  D82: { status: fixed, commit: 55f6441, note: "Give-up query widened to `Paid || Printing` only; the re-enqueue query stays strictly `Paid` on purpose. The log line now carries `status=`. Narrowing back to `Paid` reddens the new test — measured. See Decisions." }
-  D83: { status: fixed, commit: f81626f, note: "Doc-only. metrics.md step 10 now states what the test proves: an undeclared queried name fails the build; the exposition is test-seeded, so a never-incremented metric (`invoice_anaf_status_total`) stays green. Seeding obligation named." }
-  D84: { status: fixed, commit: cdb5554, note: "`StripBraceGroups` replaces the first-`}` regex in `MetricNamesIn`, reusing the exposition's quote-aware `ClosingBrace`. Red proof: `A_route_template_label_value_is_not_read_as_a_metric_name`. `LabelUsagesIn` gap stays open (D88)." }
-  D85: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D86: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D87: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D88: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D89: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D90: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D91: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D92: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D93: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D94: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D95: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D96: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D97: { status: backlog, commit: null, note: "🟡 — ledger backlog; flagged to the owner in summary-v3 as the one minor worth their eye" }
-  D98: { status: backlog, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D99: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D100: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D101: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D102: { status: backlog, commit: null, note: "⚪ — ledger backlog per the README router" }
 ---
 
 # Resolution v3 — 044-045-observability
+
+## Findings
+
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D74 | fixed | `c363b7a` | Socket/pipe classified by prefix before `Parse`; port 0 excluded as dynamic-bind. 'Addresses but no TCP port' is its own refuse verdict; the TestServer carve-out keys on an empty address list. Linux proof is CI: 6 red runs, then green. |
+| D75 | fixed | `7c002a0` | The validator owns the deadline: `CancellationTokenSource(_deadline)` linked with the caller's token; the discriminator is `ct.IsCancellationRequested && !deadline.IsCancellationRequested`. `HttpClient.Timeout` is a 15 s backstop. |
+| D76 | fixed | `feb5636` | Test-only. `InvokeAsync_UnmappedServerError_LogsAtErrorWithTheException` pins the level and the attached exception on the unmapped branch; reverting `LogError` to `LogWarning` there reddens it — measured; before, 255 green. |
+| D77 | fixed | `f2a7ef9` | `o.TracesSampler` answers the configured rate on every call; per the SDK IL it outranks an inherited `sentry-trace` only when non-null. Caddy now strips `sentry-trace` and `baggage`; `traceparent` kept on purpose. See Decisions. |
+| D78 | fixed | `2a82f01` | Test-only. `A_second_capture_in_the_same_test_fails_loudly`; deleting the nested-capture throw reddens it — measured; before, 738 green. |
+| D79 | fixed | `163f912` | Test-only. The pin reads the installed sampler off the booted TracerProvider by reflection, failing loudly on a rename; re-wrapping the call site reddens it — measured; before, 1120 green. Behavioural route rejected as flaky (D51). |
+| D80 | fixed | `caeb866` | Owner chose 'match the prose': numerator `ok`+`duplicate`; `signature_invalid` leaves the denominator, in both copies (slos.md and the dashboard panel). Literal `=` matchers keep `ok` and `duplicate` build-checked. See Decisions. |
+| D81 | fixed | `caeb866` | The status block no longer claims SLO 1 is measured; it names the dilution (~5,760 always-200 requests/day, ~99.7% floor) and says not to read it as availability. SLO 3's cross-check is now the webhook-route 5xx rate. D46 stays deferred. |
+| D82 | fixed | `55f6441` | Give-up query widened to `Paid ·· Printing` only; the re-enqueue query stays strictly `Paid` on purpose. The log line now carries `status=`. Narrowing back to `Paid` reddens the new test — measured. See Decisions. |
+| D83 | fixed | `f81626f` | Doc-only. metrics.md step 10 now states what the test proves: an undeclared queried name fails the build; the exposition is test-seeded, so a never-incremented metric (`invoice_anaf_status_total`) stays green. Seeding obligation named. |
+| D84 | fixed | `cdb5554` | `StripBraceGroups` replaces the first-`}` regex in `MetricNamesIn`, reusing the exposition's quote-aware `ClosingBrace`. Red proof: `A_route_template_label_value_is_not_read_as_a_metric_name`. `LabelUsagesIn` gap stays open (D88). |
+| D85 | backlog | — | 🟡 — ledger backlog per the README router |
+| D86 | backlog | — | 🟡 — ledger backlog per the README router |
+| D87 | backlog | — | 🟡 — ledger backlog per the README router |
+| D88 | backlog | — | 🟡 — ledger backlog per the README router |
+| D89 | backlog | — | 🟡 — ledger backlog per the README router |
+| D90 | backlog | — | 🟡 — ledger backlog per the README router |
+| D91 | backlog | — | 🟡 — ledger backlog per the README router |
+| D92 | backlog | — | 🟡 — ledger backlog per the README router |
+| D93 | backlog | — | 🟡 — ledger backlog per the README router |
+| D94 | backlog | — | 🟡 — ledger backlog per the README router |
+| D95 | backlog | — | 🟡 — ledger backlog per the README router |
+| D96 | backlog | — | 🟡 — ledger backlog per the README router |
+| D97 | backlog | — | 🟡 — ledger backlog; flagged to the owner in summary-v3 as the one minor worth their eye |
+| D98 | backlog | — | 🟡 — ledger backlog per the README router |
+| D99 | backlog | — | ⚪ — ledger backlog per the README router |
+| D100 | backlog | — | ⚪ — ledger backlog per the README router |
+| D101 | backlog | — | ⚪ — ledger backlog per the README router |
+| D102 | backlog | — | ⚪ — ledger backlog per the README router |
 
 ## Scope
 

@@ -152,9 +152,11 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   never re-described. **Verification passes write no files** — their record is ledger
   status flips, worklog events, the metrics line and the index row; their outcome is
   reported at the owner gate in chat.
-- `resolution-v<n>.md` — the fixer's answer, living until closed. Frontmatter: `status: open |
-  in-progress | resolved`, `fixed_commit`, and a `findings:` map keyed by `D#`
-  (`{D#: {status, commit, note}}`, note ≤ 240 chars); body carries the scope table +
+- `resolution-v<n>.md` — the fixer's answer, living until closed; one per **fix round**,
+  numbered by the pass that raised its findings (a clean verification raises nothing and
+  gets no resolution). Frontmatter: scalars only (`status: open | in-progress | resolved`,
+  `fixed_commit`, `answers`); the `## Findings` body table (`| D# | Status | Commit | Note |`,
+  note ≤ 240 chars) is the machine-read state; body also carries the scope table +
   decisions/rationale.
 - `summary-v<n>.md` — the one-page owner summary, written only for passes that can need an
   owner decision (discovery, delta-discovery, certification; via the `owner-summary` skill).

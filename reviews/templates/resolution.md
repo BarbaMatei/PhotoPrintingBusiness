@@ -1,16 +1,20 @@
 ---
 type: resolution
 target: <target>
-version: <n>
-answers: review-v<n>.md
+version: <n — the pass that raised the findings>
+answers: <review-v<n>.md, or "pass v<n> (verification — index row)" when that pass wrote no file>
 status: <open | in-progress | resolved>
 fixed_commit: <sha of the round's final commit>
 closed: <yyyy-mm-dd>
-findings:
-  D<#>: { status: <fixed | wont-fix | deferred | disputed | false-positive | backlog>, commit: <sha>, note: "<one line, max 240 characters>" }
 ---
 
 # Resolution v<n> — <target>
+
+## Findings
+
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D<#> | <fixed | wont-fix | deferred | disputed | false-positive | backlog> | <sha or —> | <one line, max 240 characters> |
 
 ## Scope
 

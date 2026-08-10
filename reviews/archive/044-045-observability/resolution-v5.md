@@ -6,14 +6,18 @@ answers: review-v5.md
 status: resolved
 fixed_commit: a4eb7e5
 closed: 2026-08-07
-findings:
-  D121: { status: fixed, commit: a4eb7e5, note: "Two commits: 796a330 the pin, a4eb7e5 the repair. Test-only: each of the four hand-named success selectors needs `or vector(0)` within 24 chars, counted per source. Red proof: the mutation review-v5 measured green now reddens 1 test." }
-  D122: { status: fixed, commit: d8a63a4, note: "Doc-only, no test (an acceptance-criteria line has no build check by design). The criterion now names both exclusions — `skipped` (no label needed), `retry_later` (per-attempt counter) — and states `orphaned` stays in the denominator." }
-  D123: { status: fixed, commit: 3c0a13d, note: "Doc-only, no test. Two sites: the union doc comment (`AwbCreationOutcome.cs:9`) and the operator log table (`DEPLOYMENT.md:771`), which also gained the missing `sameday.awb.orphaned` row. bolt-037 ddd docs left as point-in-time records." }
-  D110: { status: fixed, commit: 9cfbf75, note: "Owner-directed, outside review-v5's set. Both copies now say ~8,640/day and a ~94.5% floor, each figure naming its source; 'Tracked as D46' dropped. Corrects the claim, not the dilution — D46 stays parked. No test: prose is unpinned." }
 ---
 
 # Resolution v5 — 044-045-observability
+
+## Findings
+
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D121 | fixed | `a4eb7e5` | Two commits: 796a330 the pin, a4eb7e5 the repair. Test-only: each of the four hand-named success selectors needs `or vector(0)` within 24 chars, counted per source. Red proof: the mutation review-v5 measured green now reddens 1 test. |
+| D122 | fixed | `d8a63a4` | Doc-only, no test (an acceptance-criteria line has no build check by design). The criterion now names both exclusions — `skipped` (no label needed), `retry_later` (per-attempt counter) — and states `orphaned` stays in the denominator. |
+| D123 | fixed | `3c0a13d` | Doc-only, no test. Two sites: the union doc comment (`AwbCreationOutcome.cs:9`) and the operator log table (`DEPLOYMENT.md:771`), which also gained the missing `sameday.awb.orphaned` row. bolt-037 ddd docs left as point-in-time records. |
+| D110 | fixed | `9cfbf75` | Owner-directed, outside review-v5's set. Both copies now say ~8,640/day and a ~94.5% floor, each figure naming its source; 'Tracked as D46' dropped. Corrects the claim, not the dilution — D46 stays parked. No test: prose is unpinned. |
 
 ## Scope
 

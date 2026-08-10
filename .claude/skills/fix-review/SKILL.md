@@ -192,16 +192,15 @@ Batched doc/cleanup-only rounds may skip micro-review.
 After each finding (worklog `finding` event at the same moment), update its entry in
 `resolution-v<n>.md`:
 
-- The frontmatter `findings:` map (keyed by `D#`) → `status`, `commit`, one-line `note`
-  (what you did, or why you won't; **max 240 characters** — the story behind it goes in the
-  decisions section, each decision ≤ 15 lines, per `reviews/doc-contracts.md`). A
-  mechanism-adding fix's note also names the **new surface** — that is where the re-review
-  points the owning lens.
-- The body findings table sits between `<!-- rendered:findings-table:start -->` and
-  `<!-- rendered:findings-table:end -->` markers and is **generated** — run
-  `node reviews/lib/render-records.mjs <target>` rather than hand-editing it. You still
-  hand-write everything with judgment in it: the decisions section, per-cluster prose,
-  deviations, boundaries.
+- The `## Findings` body table (the machine-read state — frontmatter carries scalars only):
+  one row per finding, `| D# | Status | Commit | Note |`, hand-written at the moment the
+  finding closes. Note = one line, what you did or why you won't, **max 240 characters** —
+  the story behind it goes in the decisions section, each decision ≤ 15 lines, per
+  `reviews/doc-contracts.md`. A mechanism-adding fix's note also names the **new surface** —
+  that is where the re-review points the owning lens.
+- `node reviews/lib/render-records.mjs <target>` no longer generates any table — it reads
+  your Findings rows for the tallies and computes the round's runtime + metrics line. You
+  hand-write everything: the table, the decisions section, deviations, boundaries.
 
 Status values: `fixed` · `wont-fix` · `deferred` · `disputed` · `false-positive`
 (never `verified`). For anything other than `fixed`, write the rationale in the

@@ -6,28 +6,32 @@ answers: review-v4.md
 status: resolved
 fixed_commit: 52a0cb9
 closed: 2026-08-06
-findings:
-  D103: { status: fixed, commit: d899559, note: "Test-only class rule: every added-term side in slos.md and the dashboard guards each sum() with `or vector(0)`; covers SLO 4/5 and future terms. Red proof: deleting both guards reddens 1 test where 1133 stayed green. Repaired at `aca24fd`." }
-  D104: { status: fixed, commit: 770f852, note: "Test-only: two tests pin the invariants — registered client Timeout > RequestDeadline, and the deadline (not the HTTP backstop) ends a hanging GetAsync, wall-clock-proven at 30s014ms against a 15 s bar. Each mutation reddens its own test." }
-  D105: { status: fixed, commit: 9112aa8, note: "Three commits: 8b5cb3f exclusions (SLO 4 drops `skipped`, SLO 5 drops `pending`, both copies), b0718d8 numerator guards + AC doc, 9112aa8 residuals: `retry_later` out of the denominator, new `orphaned` result value (cardinality 5→6)." }
-  D113: { status: fixed, commit: 243625c, note: ".gitleaksignore with the two commit-pinned fingerprints (44c3e2d…:16, 295a51c…:19); the `ab7860f` rename kept as hygiene only — it cannot clear a commit-range scan. Not provable locally; the next pull_request run is the proof." }
-  D106: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D107: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D108: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D109: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D110: { status: deferred, commit: null, note: "🟡 — ledger backlog; flagged to the owner in summary-v4 as the one minor worth their eye" }
-  D111: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D112: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D114: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D115: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D120: { status: deferred, commit: null, note: "🟡 — ledger backlog per the README router" }
-  D116: { status: deferred, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D117: { status: deferred, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D118: { status: deferred, commit: null, note: "⚪ — ledger backlog per the README router" }
-  D119: { status: deferred, commit: null, note: "⚪ — ledger backlog per the README router" }
 ---
 
 # Resolution v4 — 044-045-observability
+
+## Findings
+
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D103 | fixed | `d899559` | Test-only class rule: every added-term side in slos.md and the dashboard guards each sum() with `or vector(0)`; covers SLO 4/5 and future terms. Red proof: deleting both guards reddens 1 test where 1133 stayed green. Repaired at `aca24fd`. |
+| D104 | fixed | `770f852` | Test-only: two tests pin the invariants — registered client Timeout > RequestDeadline, and the deadline (not the HTTP backstop) ends a hanging GetAsync, wall-clock-proven at 30s014ms against a 15 s bar. Each mutation reddens its own test. |
+| D105 | fixed | `9112aa8` | Three commits: 8b5cb3f exclusions (SLO 4 drops `skipped`, SLO 5 drops `pending`, both copies), b0718d8 numerator guards + AC doc, 9112aa8 residuals: `retry_later` out of the denominator, new `orphaned` result value (cardinality 5→6). |
+| D113 | fixed | `243625c` | .gitleaksignore with the two commit-pinned fingerprints (44c3e2d…:16, 295a51c…:19); the `ab7860f` rename kept as hygiene only — it cannot clear a commit-range scan. Not provable locally; the next pull_request run is the proof. |
+| D106 | deferred | — | 🟡 — ledger backlog per the README router |
+| D107 | deferred | — | 🟡 — ledger backlog per the README router |
+| D108 | deferred | — | 🟡 — ledger backlog per the README router |
+| D109 | deferred | — | 🟡 — ledger backlog per the README router |
+| D110 | deferred | — | 🟡 — ledger backlog; flagged to the owner in summary-v4 as the one minor worth their eye |
+| D111 | deferred | — | 🟡 — ledger backlog per the README router |
+| D112 | deferred | — | 🟡 — ledger backlog per the README router |
+| D114 | deferred | — | 🟡 — ledger backlog per the README router |
+| D115 | deferred | — | 🟡 — ledger backlog per the README router |
+| D120 | deferred | — | 🟡 — ledger backlog per the README router |
+| D116 | deferred | — | ⚪ — ledger backlog per the README router |
+| D117 | deferred | — | ⚪ — ledger backlog per the README router |
+| D118 | deferred | — | ⚪ — ledger backlog per the README router |
+| D119 | deferred | — | ⚪ — ledger backlog per the README router |
 
 ## Scope
 

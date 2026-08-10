@@ -41,13 +41,19 @@ const resText = readFileSync(resPath, 'utf8')
 const fmEnd = resText.indexOf('\n---', 3)
 const fm = resText.startsWith('---') && fmEnd !== -1 ? resText.slice(3, fmEnd) : fail('resolution has no frontmatter')
 const findings = new Map() // id -> {status, commit, note}
-for (const m of fm.matchAll(/^ {2}([A-Za-z]+-?\d+(?:–[A-Za-z]*\d+)?):\s*\{\s*status:\s*([a-z-]+)([^\n]*)/gm) ?? []) {
+// New shape: "## Findings" body table. Old shape (grandfathered): frontmatter map.
+const fSection = resText.slice(fmEnd).split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+for (const r of fSection.split('\n').filter(l => /^\|\s*(?:D\d+|[A-Za-z]+-\d+)\s*\|/.test(l))) {
+  const c = r.split('|').map(x => x.trim())
+  findings.set(c[1], { status: c[2], commit: c[3] === '—' ? null : c[3].replace(/`/g, ''), note: c[4] ?? null })
+}
+if (!findings.size) for (const m of fm.matchAll(/^ {2}([A-Za-z]+-?\d+(?:–[A-Za-z]*\d+)?):\s*\{\s*status:\s*([a-z-]+)([^\n]*)/gm) ?? []) {
   const restLine = m[3]
   const commit = (/commit:\s*"([^"]+)"/.exec(restLine) || /commit:\s*([0-9a-f]{7,40})/.exec(restLine))?.[1] ?? null
   const noteTxt = /note:\s*"((?:[^"\\]|\\.)*)"/.exec(restLine)?.[1] ?? null
   findings.set(m[1], { status: m[2], commit, note: noteTxt })
 }
-if (!findings.size) fail('resolution frontmatter has no findings map')
+if (!findings.size) fail('no "## Findings" table rows and no frontmatter findings map')
 const resStatus = /^status:\s*(\S+)/m.exec(fm)?.[1] ?? 'open'
 const fixedCommitRaw = /^fixed_commit:\s*(\S+)/m.exec(fm)?.[1] ?? 'null'
 const fixedCommit = fixedCommitRaw === 'null' ? null : fixedCommitRaw.replace(/"/g, '')
