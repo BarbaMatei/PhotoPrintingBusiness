@@ -127,3 +127,18 @@
 {"t":"2026-08-07T16:13:31+03:00","ev":"pass-records-done","pass":5,"type":"verification"}
 {"t":"2026-08-07T16:15:29+03:00","ev":"gate-open","pass":5,"reason":"router exit 3 (row 4/5): is the v4 fix round delta-worthy or patch-grade? It added a new metric surface (orphaned label value, cardinality 5 to 6, production change in AwbCreator/AwbCreationOutcome) and redefined what SLO 4/5 measure, which reads delta-worthy; the other three fixes are patch-grade. Delta discovery ~0.6-1.2M tokens vs loop quiet + certification only on explicit go-ahead"}
 {"t":"2026-08-07T16:19:39+03:00","ev":"gate-closed","pass":5,"answer":"owner called the v4 fix round PATCH-GRADE (no delta discovery) and asked the loop to end naturally: fix the 3 new minors plus D110 by hand first, then close"}
+{"t":"2026-08-07T16:21:43+03:00","ev":"round-start","round":5}
+{"t":"2026-08-07T16:29:07+03:00","ev":"test-run","round":5,"kind":"red","filter":"Integration.DashboardMetricNamesTests","passed":5,"failed":1,"duration_s":3}
+{"t":"2026-08-07T16:34:01+03:00","ev":"test-run","round":5,"kind":"green","filter":"PhotoPrint.Tests.Integration","passed":203,"failed":0,"duration_s":11}
+{"t":"2026-08-07T16:34:02+03:00","ev":"finding","round":5,"id":"F1","status":"fixed","commit":"796a330"}
+{"t":"2026-08-07T16:54:19+03:00","ev":"test-run","round":5,"kind":"green","filter":"Integration|Unit.Services.Sameday|Unit.Observability","passed":471,"failed":0,"duration_s":6}
+{"t":"2026-08-07T17:05:36+03:00","ev":"finding","round":5,"id":"F2","status":"fixed","commit":"d8a63a4"}
+{"t":"2026-08-07T17:05:36+03:00","ev":"finding","round":5,"id":"F3","status":"fixed","commit":"3c0a13d"}
+{"t":"2026-08-07T17:05:36+03:00","ev":"finding","round":5,"id":"D110","status":"fixed","commit":"9cfbf75"}
+{"t":"2026-08-07T17:21:01+03:00","ev":"micro-review-dispatched","round":5,"cluster":"A+B (whole round diff)"}
+{"t":"2026-08-07T17:21:01+03:00","ev":"triage-done","round":5,"clusters":2,"checks_needed":0,"pre_cleared":0,"gates":0}
+{"t":"2026-08-07T17:28:59+03:00","ev":"test-run","round":5,"kind":"final","filter":"Integration|Unit.Observability|Unit.Services|Unit.Configuration|Unit.Middleware|Unit.BackgroundJobs","passed":1097,"failed":0,"duration_s":14}
+{"t":"2026-08-10T13:54:15+03:00","ev":"micro-review-returned","round":5,"cluster":"A+B (whole round diff)","found":3}
+{"t":"2026-08-10T13:54:15+03:00","ev":"test-run","round":5,"kind":"red","filter":"Integration.DashboardMetricNamesTests (A/B: old rule green, per-side rule red, same mutation)","passed":5,"failed":1,"duration_s":13}
+{"t":"2026-08-10T13:55:10+03:00","ev":"finding","round":5,"id":"F1","status":"fixed","commit":"a4eb7e5"}
+{"t":"2026-08-10T13:55:10+03:00","ev":"round-end","round":5}
