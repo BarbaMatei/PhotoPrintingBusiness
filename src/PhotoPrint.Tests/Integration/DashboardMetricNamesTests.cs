@@ -165,26 +165,37 @@ public class DashboardMetricNamesTests
     public void Every_hand_named_success_numerator_keeps_its_absent_series_guard()
     {
         var unguarded = new List<string>();
-        var seen = GuardedSuccessSelectors.ToDictionary(s => s, _ => 0, StringComparer.Ordinal);
+        var missing = new List<string>();
 
-        foreach (var query in DashboardQueries().Concat(SloQueries()))
+        foreach (var (source, queries) in new[]
+                 {
+                     ("slos.md", SloQueries()),
+                     ("the dashboard", DashboardQueries()),
+                 })
         {
             foreach (var selector in GuardedSuccessSelectors)
             {
-                var at = query.IndexOf(selector, StringComparison.Ordinal);
+                var occurrences = 0;
 
-                while (at >= 0)
+                foreach (var query in queries)
                 {
-                    seen[selector]++;
+                    var at = query.IndexOf(selector, StringComparison.Ordinal);
 
-                    var tail = query[(at + selector.Length)..];
-                    if (tail.Length > 24) tail = tail[..24];
+                    while (at >= 0)
+                    {
+                        occurrences++;
 
-                    if (!Regex.IsMatch(tail, "or\\s+vector\\(0\\)"))
-                        unguarded.Add($"{selector} in {query.Trim()}");
+                        var tail = query[(at + selector.Length)..];
+                        if (tail.Length > 24) tail = tail[..24];
 
-                    at = query.IndexOf(selector, at + selector.Length, StringComparison.Ordinal);
+                        if (!Regex.IsMatch(tail, "or\\s+vector\\(0\\)"))
+                            unguarded.Add($"{selector} in {source}: {query.Trim()}");
+
+                        at = query.IndexOf(selector, at + selector.Length, StringComparison.Ordinal);
+                    }
                 }
+
+                if (occurrences == 0) missing.Add($"{selector} in {source}");
             }
         }
 
@@ -195,11 +206,13 @@ public class DashboardMetricNamesTests
                 + "ratio should read a red 0%: a fresh process where every attempt is failing. "
                 + "The added-term rule cannot see these, because a lone `sum()` is one term");
 
-        seen.Should().OnlyContain(
-            kv => kv.Value >= 2,
-            "each of these selectors is written twice — once in slos.md and once in its dashboard "
-                + "twin — so a count below two means a query was deleted, renamed or moved out of "
-                + "this test's reach, and the guard it carried is no longer being checked at all");
+        missing.Should().BeEmpty(
+            "each selector is written in BOTH copies — slos.md and its dashboard twin — and each "
+                + "copy is read by someone: the doc by whoever writes the alert, the panel by "
+                + "whoever is on call. A selector missing from one side means that side was "
+                + "deleted, renamed or moved out of this test's reach and its guard is no longer "
+                + "checked at all. Counting both copies together would let two doc copies stand in "
+                + "for a deleted panel");
     }
 
     private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
