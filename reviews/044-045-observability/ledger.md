@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 044-045-observability
-updated: 2026-08-07
+updated: 2026-08-10
 ---
 
 # Canonical finding ledger — 044-045-observability
@@ -178,7 +178,7 @@ mutation, D113 on CI, the only place it can be proven.
 | D107 | 🟡 | v4 (F6) | The booted-host sampler test covers only `isSampled: true`; the `-0` blinding half of D77 is unpinned | `Tests/Integration/SentryOptionsWiringTests.cs:38-48` | fix-caused (D77) | open |
 | D108 | 🟡 | v4 (F7) | The re-enqueue query's `Paid`-only scope — an explicit owner decision — is pinned by nothing, and the new test's second assertion cannot fail for its stated reason | `BackgroundJobs/AwbRetryJob.cs:86`, `Tests/Unit/Services/Sameday/AwbRetryJobTests.cs:244` | fix-caused (D82) | open |
 | D109 | 🟡 | v4 (F8) | Rule 3 now aborts boot on a unix-socket API plus a dedicated TCP metrics port, printing a message that is false for that topology | `Observability/ScrapeListenerGuard.cs:57-63` | fix-caused (D74) | open |
-| D110 | 🟡 | v4 (F9) | The dilution figures now on the operator-facing panel are wrong: 5,760/day is `/metrics` alone and the real floor is ~94.5%, not ~99.7% | `memory-bank/operations/slos.md:8-12`, `ops/dashboards/fototipar-overview.json:60` | fix-caused (D81) | **fixed** at `9cfbf75` (round 5, owner-directed outside the v5 finding set) — ~8,640/day and a ~94.5% floor, each figure naming its source; the `Tracked as D46` citation is gone too (half of D117). Corrects the claim, not the dilution: D46 stays parked |
+| D110 | 🟡 | v4 (F9) | The dilution figures now on the operator-facing panel are wrong: 5,760/day is `/metrics` alone and the real floor is ~94.5%, not ~99.7% | `memory-bank/operations/slos.md:8-12`, `ops/dashboards/fototipar-overview.json:60` | fix-caused (D81) | **verified** at `a4eb7e5` (v6) — fixed at `9cfbf75` (round 5, owner-directed outside the v5 finding set): ~8,640/day and a ~94.5% floor, each figure naming its source; the `Tracked as D46` citation is gone too (half of D117). v6 recomputed every figure from `DEPLOYMENT.md:1049`, `Dockerfile:43` and `DEPLOYMENT.md:951`, and confirmed the premise at `ObservabilityExtensions.cs:98` (no instrumentation filter). Corrects the claim, not the dilution: D46 stays parked |
 | D111 | 🟡 | v4 (F10) | SLO 3's documented query has no time window while its heading says "rolling 7 days" and its dashboard twin uses `rate(…[7d])`; SLO 4/5 the same | `memory-bank/operations/slos.md:80`, `:95-97` | pre-existing shape | open |
 | D112 | 🟡 | v4 (F11) | D75's class unswept: two sibling sites still infer "our own timeout" from `!ct.IsCancellationRequested`, losing a claim release on shutdown | `Services/Sameday/AwbCreator.cs:166`, `BackgroundJobs/ShipmentTrackingJob.cs:184` | pre-existing | open |
 | D113 | 🟠 | v4 (F4) | `secret-scan` fails on every pull-request run of this branch — gitleaks flags a fabricated test token `.gitleaks.toml` does not allowlist | `Tests/Unit/Configuration/SentryDataScrubbersTests.cs:16`, `.gitleaks.toml`, `.gitleaksignore` | pre-existing (`44c3e2d`) | **verified by CI only** at `52a0cb9` (v5) — the PR-event scan was red at `f0aadd7` and every earlier PR run, green from `a9c9478` (the first commit carrying `.gitleaksignore`) onward; both fingerprints checked byte-for-byte against the commits they name. Not provable locally: gitleaks is not installed here, and any history rewrite of this branch invalidates commit-pinned fingerprints silently |
@@ -199,14 +199,26 @@ comment — describing the world before it. None changes today's behaviour; each
 author's mistake.
 
 **Round 5 (2026-08-07) fixed all three rather than backlogging them**, on the owner's instruction to
-let the loop end naturally, and cleared **D110** in the same round by owner request. Statuses below
-are `fixed`, awaiting a re-review; see [resolution-v5.md](resolution-v5.md).
+let the loop end naturally, and cleared **D110** in the same round by owner request; see
+[resolution-v5.md](resolution-v5.md). **All four flip to `verified` in the
+[v6 verification pass](review-v6.md)** at `a4eb7e5` — D121 by measurement (two mutations, both
+predicted red and measured red), D110/D122/D123 by reading each prose claim against the code it
+describes.
 
 | D# | Sev | First seen | Title | File | Cause | Status |
 |---|---|---|---|---|---|---|
-| D121 | 🟡 | v5 (F1) | The `or vector(0)` guards added to the SLO 4 and SLO 5 numerators are pinned by nothing — D103's class rule skips single-term sides, measured green on deletion | `memory-bank/operations/slos.md:142`, `:173`, `ops/dashboards/fototipar-overview.json:271`, `:310`, `Tests/Integration/DashboardMetricNamesTests.cs:133` | fix-caused (D105), same class as D103 | **fixed** at `a4eb7e5` (round 5, over `796a330`) — the four hand-named success selectors are pinned by name, per source, since the added-term rule cannot see a single-term side; red-proven with the mutation v5 measured green, and the micro-review's A/B then showed the first version's total-count floor let a deleted panel pass |
-| D122 | 🟡 | v5 (F2) | The acceptance criterion still says SLO 4 excludes only `skipped`, and gives `retry_later`'s reason for it; `orphaned` is unmentioned | `memory-bank/intents/020-observability-stack/units/002-error-tracking-and-slos/stories/002-slo-documentation-and-dashboard.md:27-29` | fix-caused (D105) | **fixed** at `d8a63a4` (round 5) — both exclusions stated, the retry-loop rationale moved to the value it belongs to, and `orphaned` named as staying in the denominator |
-| D123 | 🟡 | v5 (F3) | The outcome union's doc comment calls the cancelled-order case a plain skip — the one case that must now set `Orphaned: true` — and never mentions the flag | `Services/Sameday/AwbCreationOutcome.cs:9` | fix-caused (D105) | **fixed** at `3c0a13d` (round 5) — corrected on the union AND in the operator log table at `DEPLOYMENT.md:771`, which additionally had no row at all for the `sameday.awb.orphaned` Error log; bolt-037 design docs left as point-in-time records |
+| D121 | 🟡 | v5 (F1) | The `or vector(0)` guards added to the SLO 4 and SLO 5 numerators are pinned by nothing — D103's class rule skips single-term sides, measured green on deletion | `memory-bank/operations/slos.md:142`, `:173`, `ops/dashboards/fototipar-overview.json:271`, `:310`, `Tests/Integration/DashboardMetricNamesTests.cs:133` | fix-caused (D105), same class as D103 | **verified** at `a4eb7e5` (v6) — fixed in round 5 over `796a330`; the v6 pass reddened it twice independently, on guard deletion in both copies and on a deleted panel a duplicated doc copy tried to cover. Residual: the pinned list is hand-maintained (D124) |
+| D122 | 🟡 | v5 (F2) | The acceptance criterion still says SLO 4 excludes only `skipped`, and gives `retry_later`'s reason for it; `orphaned` is unmentioned | `memory-bank/intents/020-observability-stack/units/002-error-tracking-and-slos/stories/002-slo-documentation-and-dashboard.md:27-29` | fix-caused (D105) | **verified** at `a4eb7e5` (v6) — fixed at `d8a63a4`; both exclusions stated, the retry-loop rationale moved to the value it belongs to, and `orphaned` named as staying in the denominator. v6 checked each clause against the shipped query and against the per-attempt counter at `AwbCreator.cs:61` |
+| D123 | 🟡 | v5 (F3) | The outcome union's doc comment calls the cancelled-order case a plain skip — the one case that must now set `Orphaned: true` — and never mentions the flag | `Services/Sameday/AwbCreationOutcome.cs:9` | fix-caused (D105) | **verified** at `a4eb7e5` (v6) — fixed at `3c0a13d` on the union AND in the operator log table at `DEPLOYMENT.md:771`, which additionally had no row at all for the `sameday.awb.orphaned` Error log; bolt-037 design docs left as point-in-time records. v6 matched both texts against all six `Skipped(...)` sites and the `LogError` at `AwbCreator.cs:269` |
+
+## v6 findings (D124)
+
+Minted by the [v6 verification pass](review-v6.md) at `a4eb7e5`. Detail in
+[findings-v6.md](findings-v6.md). One row, ⚪, the residual the round-5 fixer disclosed.
+
+| D# | Sev | First seen | Title | File | Cause | Status |
+|---|---|---|---|---|---|---|
+| D124 | ⚪ | v6 (F1) | The guarded-selector list is hand-maintained, so a fifth hand-named success numerator ships unpinned and nothing notices — and the stated reason for not writing the class rule does not hold for a rule keyed on literal `=` matchers | `Tests/Integration/DashboardMetricNamesTests.cs:29-35` | fix-residual of D121 | backlog |
 
 **Record note (v3):** `findings-v2.md`'s F23 rationale ends with "`slos.md` does not carry the
 caveat (F11/D50)". That half is closed — the caveat landed at `slos.md:86-94` and `:5-7`. The

@@ -142,3 +142,5 @@
 {"t":"2026-08-10T13:54:15+03:00","ev":"test-run","round":5,"kind":"red","filter":"Integration.DashboardMetricNamesTests (A/B: old rule green, per-side rule red, same mutation)","passed":5,"failed":1,"duration_s":13}
 {"t":"2026-08-10T13:55:10+03:00","ev":"finding","round":5,"id":"F1","status":"fixed","commit":"a4eb7e5"}
 {"t":"2026-08-10T13:55:10+03:00","ev":"round-end","round":5}
+{"t":"2026-08-10T14:11:38+03:00","ev":"pass-launch","pass":6,"type":"verification"}
+{"t":"2026-08-10T14:24:15+03:00","ev":"pass-records-done","pass":6,"type":"verification"}
