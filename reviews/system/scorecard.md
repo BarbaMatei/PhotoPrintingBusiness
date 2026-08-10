@@ -15,19 +15,44 @@ grades table below, every cell carrying evidence; past columns are never edited.
 
 ## Grades
 
-| # | Dimension | Baseline | Evidence |
-|---|---|---|---|
-| 1 | Bug-finding power | 6 | [review-v1](review-v1.md) 2026-07-29 |
-| 2 | False-alarm control | 8 | [review-v1](review-v1.md) 2026-07-29 |
-| 3 | Severity judgment | 5 | [review-v1](review-v1.md) 2026-07-29 |
-| 4 | Fix verification | 8 | [review-v1](review-v1.md) 2026-07-29 |
-| 5 | Reviewer independence | 3 | [review-v1](review-v1.md) 2026-07-29 |
-| 6 | Cost efficiency | 5 | [review-v1](review-v1.md) 2026-07-29 |
-| 7 | Autonomy | 3 | [review-v1](review-v1.md) 2026-07-29 |
-| 8 | Self-measurement | 7 | [review-v1](review-v1.md) 2026-07-29 |
-| 9 | Rule discipline | 6 | [review-v1](review-v1.md) 2026-07-29 |
-| 10 | Proven outcomes | 1 | [review-v1](review-v1.md) 2026-07-29 (no data possible yet) |
-| 11 | **Speed** | **2** | this file, 2026-08-03 (below) |
+| # | Dimension | Baseline | 2026-08-10 | Baseline evidence |
+|---|---|---|---|---|
+| 1 | Bug-finding power | 6 | — | [review-v1](review-v1.md) 2026-07-29 |
+| 2 | False-alarm control | 8 | — | [review-v1](review-v1.md) 2026-07-29 |
+| 3 | Severity judgment | 5 | — | [review-v1](review-v1.md) 2026-07-29 |
+| 4 | Fix verification | 8 | — | [review-v1](review-v1.md) 2026-07-29 |
+| 5 | Reviewer independence | 3 | — | [review-v1](review-v1.md) 2026-07-29 |
+| 6 | Cost efficiency | 5 | 5 | [review-v1](review-v1.md) 2026-07-29 |
+| 7 | Autonomy | 3 | 5 | [review-v1](review-v1.md) 2026-07-29 |
+| 8 | Self-measurement | 7 | 8 | [review-v1](review-v1.md) 2026-07-29 |
+| 9 | Rule discipline | 6 | — | [review-v1](review-v1.md) 2026-07-29 |
+| 10 | Proven outcomes | 1 | — | [review-v1](review-v1.md) 2026-07-29 (no data possible yet) |
+| 11 | **Speed** | **2** | **3** | this file, 2026-08-03 (below) |
+
+## Re-grade 2026-08-10 — after the 044-045 loop closed with 5 metered fix rounds
+
+Scope per the protocol below: Speed + the dimensions the 2026-08-03 redesign touched.
+Evidence: the five `fix-round` lines in
+[044-045 metrics.jsonl](../044-045-observability/metrics.jsonl), worklog-backed.
+
+- **Speed 2 → 3.** By the written anchor (median of the last two metered rounds):
+  rounds 4+5 = 156 active min / 8 serious fixes = **19.5 min/fix** — between the ≤18 and
+  ≥25 anchors. Fuller picture the next re-grade should weigh: all metered rounds combined =
+  273 min / 29 fixes = **9.4 min/fix** (2.7× the 25-min baseline); the two mid-size rounds
+  (10–11 fixes) ran at **4.2–7.1 min/fix** — grade-8 pace; the small tail rounds (4 fixes)
+  pay fixed overhead. Blocked-on-owner: 0–21 min/round (the batched gate works). Idle is
+  now visible and dominates wall-clock (up to 68h between sessions).
+- **Autonomy 3 → 5.** Six passes + five rounds driven by the loop-driver with recorded
+  gates and near-zero mid-round blocking; gates remain owner-held by design, seeded run 2
+  still owed (SF14), so no higher.
+- **Self-measurement 7 → 8.** Fix rounds, runtime, and gate waits are now metered and
+  auditor-validated (the SF7 gap closed by owner decision); fixer token cost still `null`
+  on all five lines, synthesis labor still unmetered — that is the remaining point.
+- **Cost efficiency 5 → 5 (held, with a flag).** No new cross-target token roll-up to
+  re-grade on. Flag for the next system pass: the contract's 20–30k approach-check cap
+  did **not** hold in practice — metered checks ran ~62–146k tokens (rounds 1–3). The
+  58 micro-review follow-up fixes across the five rounds argue the per-cluster
+  micro-reviews earn their cost.
 
 ## Dimension 11 — Speed
 
