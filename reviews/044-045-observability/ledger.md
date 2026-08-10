@@ -2,6 +2,7 @@
 type: review-ledger
 target: 044-045-observability
 updated: 2026-08-10
+closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 round judged patch-grade; no certification pass ran, so no commit of this feature has been blind-searched since v1)
 ---
 
 # Canonical finding ledger — 044-045-observability

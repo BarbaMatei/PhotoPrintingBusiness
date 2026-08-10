@@ -32,6 +32,11 @@ with the doubt stated: under-counting escapes corrupts the one number trust rest
 An 015 escape is judged against the closure commit `5734021`; note in the entry whether it
 also predates `5fc330b` (that grades the certification itself, not just the sign-off).
 
+**044-045-observability is not in the table and must not be counted as a certification.** Its loop
+closed 2026-08-10 by owner sign-off at `a4eb7e5` with no certification pass ever run, so a serious
+defect found later in its files is a **missed defect of the v1 discovery**, not a post-cert escape —
+it does not belong in the escapes-÷-certifications rate. Recorded here so the distinction survives.
+
 ## Escapes
 
 None recorded. This section is the counter — append, never rewrite.
