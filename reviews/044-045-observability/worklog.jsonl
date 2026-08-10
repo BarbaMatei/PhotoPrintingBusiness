@@ -144,3 +144,4 @@
 {"t":"2026-08-10T13:55:10+03:00","ev":"round-end","round":5}
 {"t":"2026-08-10T14:11:38+03:00","ev":"pass-launch","pass":6,"type":"verification"}
 {"t":"2026-08-10T14:24:15+03:00","ev":"pass-records-done","pass":6,"type":"verification"}
+{"t":"2026-08-10T14:26:45+03:00","ev":"gate-open","pass":6,"reason":"delta-worthy or patch-grade? patch-grade means the loop is quiet and certification is next, which needs an explicit go-ahead"}
