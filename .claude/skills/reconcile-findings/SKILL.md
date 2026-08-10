@@ -27,9 +27,11 @@ per real defect per target.
 
 ## Inputs
 
-1. The finding list(s): id, severity, file/line, one-line claim (from `review-v<n>.md` /
-   `findings-v<n>.md`). If an item lacks an ID (a test-gap row, an aside, a fix-note
-   observation), mint one before matching — ID-less findings escape any ledger.
+1. The finding list(s): id, severity, file/line, one-line claim — from the pass's synthesis
+   output (the workflow's deduped canonical list; reconciliation runs *before* `review-v<n>.md`
+   is written, so the review can reference D#s). If an item lacks an ID (a test-gap row, an
+   aside, a fix-note observation), mint one before matching — ID-less findings escape any
+   ledger.
 2. `reviews/<target>/ledger.md` — every known `D#`, status, and prior decisions (ledger mode).
 3. The code at the reviewed commit, read only to adjudicate close calls.
 
@@ -66,8 +68,13 @@ One row per new finding:
 plus `residual-of` lineage links, and the prior decision attached to every matched decided
 item. Then:
 
-- **Ledger mode:** add a row per NEW (next free `D#`), append this pass to each matched row's
-  provenance, carry each finding's convergence count and `hinted` flag into the row.
+- **Ledger mode:** per NEW finding, add a table row (next free `D#`) **and its detail block**
+  per `reviews/templates/ledger.md` — What / Evidence / Suggested fix / History, the defect's
+  only full description anywhere (`reviews/doc-contracts.md`, describe-once). The History's
+  first line records this pass, the convergence count and the `hinted` flag; serious findings'
+  Suggested-fix lines carry the fix brief (see the discovery runbook). For each **matched**
+  row, append one History line (this pass, what changed) — never edit existing block text; a
+  matched decided item's History line carries the prior decision verbatim.
 - **Overlap mode:** N_A / N_B / M per stratum (serious = 🔴+🟠, minor = 🟡+⚪); exclude
   `hinted` findings from independence claims; list unknown-provenance items honestly instead
   of guessing.

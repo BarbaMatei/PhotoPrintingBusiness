@@ -87,7 +87,7 @@ function resolutionTallies(text) {
     const s = m[1]
     if (s === 'fixed') t.fixed++
     else if (s === 'wont-fix') t.wont_fix++
-    else if (s === 'deferred') t.deferred++
+    else if (s === 'deferred' || s === 'backlog') t.deferred++ // backlog = the deferred bucket in metrics tallies
     else if (s === 'disputed') t.disputed++
     else if (s === 'false-positive') t.false_positive++
     else t.open++ // open, in-progress, anything non-terminal
@@ -291,7 +291,9 @@ function auditTarget(t) {
   }
   if (missingFm) warn(`${tag}: ${missingFm} review file(s) missing pass-type frontmatter (pre-convention)`)
   for (const [p, ls] of passes) {
-    if (!reviewVersions.includes(p)) strictTier(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
+    // Verification passes write no review file (doc-contracts.md, 2026-08-10).
+    if (!reviewVersions.includes(p) && !ls.every(l => l.type === 'verification'))
+      strictTier(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
     if (ls.length > 1 && !ls.every(l => l.subtype && l.subtype.startsWith('certification-pair'))) warn(`${tag}: ${ls.length} metrics lines share pass ${p} without pair subtypes`)
   }
 

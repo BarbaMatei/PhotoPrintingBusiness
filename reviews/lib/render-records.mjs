@@ -56,13 +56,19 @@ const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', di
 const tallies = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
 for (const { status } of findings.values()) tallies[TALLY[status] ?? 'open']++
 
-// ---------- severities + titles from findings-v<round>.md ----------
+// ---------- severities + titles: ledger table (D# keys); findings-v fallback for old rounds (F# keys) ----------
 const sevTitle = new Map()
+const lPath = join(dir, 'ledger.md')
+if (existsSync(lPath)) {
+  for (const m of readFileSync(lPath, 'utf8').matchAll(/^\|\s*(D\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|]*\|\s*([^|]+?)\s*\|/gm))
+    sevTitle.set(m[1], { sev: m[2], title: m[3].trim() })
+}
 const fPath = join(dir, `findings-v${round}.md`)
 if (existsSync(fPath)) {
   for (const m of readFileSync(fPath, 'utf8').matchAll(/^## (🔴|🟠|🟡|⚪) ([A-Za-z]+-?\d+)(?:\s*\/\s*D\d+)? — (.+)$/gm))
     sevTitle.set(m[2], { sev: m[1], title: m[3].trim() })
-} else note(`no findings-v${round}.md — table gets no severity/title columns`)
+}
+if (!sevTitle.size) note('no ledger.md table rows and no findings-v file — table gets no severity/title columns')
 
 // ---------- worklog slice for this round ----------
 const wlPath = join(dir, 'worklog.jsonl')

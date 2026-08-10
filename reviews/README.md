@@ -72,8 +72,12 @@ touches full-loop-tier code.
 
 **What re-arms the loop — exactly three things:** a new 🔴; a fix-caused 🟠 regression; a
 reopened fix. New non-regression 🟠 get fixed and verified but do not re-arm a delta. New
-🟡/⚪ enter the ledger as `backlog` — drained deliberately (a groomer sweep, the next bolt in
-that area, or re-judged by certification), never silently dropped.
+🟡/⚪ enter the ledger as `backlog`, never silently dropped: while the loop is open they may
+be re-judged by certification; at close every surviving `backlog` row rolls up into
+[backlog.md](backlog.md); from there **every new bolt must sweep the rows in its area**
+(bolt-process.md) and the **pre-deployment regression phase requires the file empty** —
+each row fixed and verified, or owner-ruled wont-fix, written back to its home ledger row
+before the queue row is removed.
 
 ## Severity & verdicts
 
@@ -115,12 +119,20 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 
 ## Files & conventions
 
-- One folder per target: `reviews/<target>/`. Dormant or closed targets move to
-  `reviews/archive/<target>/` unchanged.
+- One folder per target: `reviews/<target>/`. **Archiving is the last step of recording a
+  close**, done by the loop-driver in this order: `closed:` in the ledger frontmatter →
+  surviving `backlog` rows copied to [backlog.md](backlog.md) → `archived: <date>` on the
+  index row → `git mv` to `reviews/archive/<target>/`, contents unchanged. Dormant targets
+  (no pass in 30+ days, nothing serious open) are *offered* for archiving at the next
+  loop-driver run, never moved silently. A `post-cert-escape` moves the folder back out.
 - `inbox.md` — the single holding pen for findings recorded outside any open target
   (evidence + suggested target per row), untriaged. Rows move into a ledger when the owner
   opens that loop. Distinct from a ledger row's `backlog` status, which is a triaged minor
   deferred within its target.
+- `backlog.md` — the cross-target queue of unfixed minors from closed targets (template
+  `templates/backlog.md`): one line per row (D#, source target, severity, what, area). Rows
+  enter at target close; they leave only as fixed-and-verified or owner-ruled wont-fix, and
+  only after the home ledger row records that terminal state.
 - `worklog.jsonl` — per-target, append-only, one timestamped JSON event per line: fix-round
   events written by the `/fix-review` skill as work happens, `pass-launch`/`pass-records-done`
   and owner-gate stamps written by the loop-driver. The crash-safe evidence trail; every
@@ -128,24 +140,38 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   ([schema v3](metrics-schema.md)).
 - A closed loop records `closed: <date> — <how>` in the **ledger frontmatter** — the
   router's machine-read terminal state (the index row carries the story).
-- `review-v<n>.md` — immutable, one per pass; frontmatter: `version`, `supersedes`, `commit`,
-  and required `pass-type: discovery | delta-discovery | verification`.
+- **Every artifact follows [doc-contracts.md](doc-contracts.md)** (templates in
+  [templates/](templates/), fixed structure, size caps, language rules, vocabulary) —
+  enforced by the round-end doc gate. Artifact set (2026-08-10): a target folder holds at
+  most `review-v<n>.md`, `resolution-v<n>.md`, `summary-v<n>.md`, `ledger.md`,
+  `worklog.jsonl`, `metrics.jsonl`. One-off measurement files are banned (metrics/worklog).
+- `review-v<n>.md` — immutable once the round's doc gate passes; one per **discovery-type**
+  pass; frontmatter: `version`, `supersedes`, `commit`, and required
+  `pass-type: discovery | delta-discovery | certification`. Finalized *after*
+  reconciliation, so its table pairs each `F#` with its `D#`; defects are referenced,
+  never re-described. **Verification passes write no files** — their record is ledger
+  status flips, worklog events, the metrics line and the index row; their outcome is
+  reported at the owner gate in chat.
 - `resolution-v<n>.md` — the fixer's answer, living until closed. Frontmatter: `status: open |
-  in-progress | resolved`, `fixed_commit`, and a `findings:` map of `{id: {status, commit,
-  note}}`; body carries the table + decisions/rationale.
-- `findings-v<n>.md` — full per-finding detail (scenario/fix/evidence), so nothing survives
-  only in session scratch.
-- `summary-v<n>.md` — the one-page owner summary per pass (decisions needed · reasons to
-  doubt · evidence links; written via the `owner-summary` skill). The review file is the
-  record; this page is what the owner reads.
+  in-progress | resolved`, `fixed_commit`, and a `findings:` map keyed by `D#`
+  (`{D#: {status, commit, note}}`, note ≤ 240 chars); body carries the scope table +
+  decisions/rationale.
+- `summary-v<n>.md` — the one-page owner summary, written only for passes that can need an
+  owner decision (discovery, delta-discovery, certification; via the `owner-summary` skill).
+  The review file is the record; this page is what the owner reads.
 - **Finding IDs:** pass-local `F1, F2, …` in ranked order; severity and category are columns,
-  never encoded in the ID. Older `BUG-`/`SEC-`-style prefixes are grandfathered. `F#` joins
-  review↔resolution *within* a pass; the cross-pass key is the ledger's `D#`.
+  never encoded in the ID. Older `BUG-`/`SEC-`-style prefixes are grandfathered. `F#` appears
+  only inside its own pass's files, always next to its `D#`; everywhere else a finding is
+  named by `D#` alone.
 - **Ledger** (`ledger.md`) — one canonical `D#` per real defect, forever; each pass's `F#`
-  mapped on *after* the blinded pass. Terminal rows feed the discovery script's
-  `decidedFindings`; each deferral row records the commit at which it was last affirmed. A
-  re-raise of a decided item gets the prior decision **attached, never suppressed** — the first
-  5 recorded re-raises overturned 3 prior calls; the ~55 since mostly re-affirmed.
+  mapped on *after* the blinded pass. **The single home of defect detail** (describe-once):
+  each D# gets one table row plus one detail block — What / Evidence / Suggested fix /
+  History — written at creation; the block grows only append-only History lines, and every
+  other file references the D# instead of re-describing. Terminal rows feed the discovery
+  script's `decidedFindings`; each deferral row records the commit at which it was last
+  affirmed. A re-raise of a decided item gets the prior decision **attached, never
+  suppressed** — the first 5 recorded re-raises overturned 3 prior calls; the ~55 since
+  mostly re-affirmed.
 - Per-finding lifecycle: `open → in-progress → fixed → verified`, or terminal
   `wont-fix | deferred | disputed | false-positive` (rationale required in the resolution).
 - Review artifacts ride with the code branch. This README and the runbooks are the system

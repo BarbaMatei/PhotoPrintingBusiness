@@ -88,16 +88,32 @@ run journal (not guesswork) explains an empty result.
 `runtime: {started, ended}` copies these two timestamps. Fix rounds stamp themselves
 (the `/fix-review` skill owns its own worklog events).
 
-In the runbooks' order: ledger update via **reconcile-findings** (discovery-type passes;
-verification updates statuses per its own runbook) · metrics.jsonl line (schema v3 —
-discovery lines carry the per-finding `findings[]` array and every pass line carries
-`runtime`) · index.md row · summary page via **owner-summary**. These are written at
-synthesis time because they are unreconstructable later — that is the metrics schema's
-founding lesson. Then:
+In the runbooks' order: ledger update via **reconcile-findings** (discovery-type passes,
+*before* the review file so it can reference D#s; verification updates statuses per its own
+runbook) · metrics.jsonl line (schema v3 — discovery lines carry the per-finding `findings[]`
+array and every pass line carries `runtime`) · index.md row · summary page via
+**owner-summary** (decision passes only — a verification pass writes **no files**; its
+outcome is the ledger flips, worklog, metrics and index row, reported at the owner gate in
+chat, per `reviews/doc-contracts.md`). These are written at synthesis time because they are
+unreconstructable later — that is the metrics schema's founding lesson. Then:
 
 ```
 node reviews/lib/records-auditor.mjs <target>     # must exit clean before hand-back
 ```
+
+**The doc gate — before anything reaches the owner.** After the records, run both halves:
+
+```
+node reviews/lib/doc-gate.mjs <target> <pass>     # structure lint — must exit clean
+```
+
+then spawn the **Haiku judge** (Agent, `model: haiku`): input = `reviews/doc-contracts.md`
+plus the round's new/changed `reviews/` files; output = approve, or disapprove with per-file
+reasons (language vs the vocabulary, evidence links supporting their claims, real reasons in
+"Reasons to doubt"). Append a `doc-gate` worklog event with the verdict. On disapprove: fix
+the files, re-run both halves. The summary is not handed to the owner and the review file is
+not declared immutable until both halves pass. The gate judges, never edits — read its
+reasons; don't game the lint.
 
 ## 5 · Close out
 
@@ -106,6 +122,22 @@ plain sentence (the summary page carries the depth — don't restate it), the ne
 what the router says comes next with its cost. Then **stop** — unless the owner said
 **"until a gate"** this invocation, in which case loop back to step 1 and continue,
 still stopping at every exit-2/3 gate and before every discovery-scale launch.
+
+## 6 · Closing a loop — the owner said "close it"
+
+Archiving is the last step of recording the close, in exactly this order (README, Files &
+conventions):
+
+1. `closed: <date> — <how>` into the ledger frontmatter; the index row records the story.
+2. **Backlog rollup:** every ledger row still at `backlog` gets one line in
+   `reviews/backlog.md` (D#, target, severity, what, area — template `templates/backlog.md`).
+3. `archived: <date>` on the target's index row.
+4. `git mv reviews/<target> reviews/archive/<target>` — contents unchanged, nothing rewritten.
+
+Dormancy: when routing shows a target with no pass in 30+ days and nothing serious open,
+*offer* archiving in the report — never move a folder the owner didn't ask about. A
+`post-cert-escape` on an archived target moves its folder back out of `archive/` before the
+re-armed pass runs.
 
 ## Never
 

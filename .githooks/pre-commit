@@ -1,8 +1,7 @@
 #!/bin/sh
 # Lists every // comment line this commit adds so the CLAUDE.md comment rule
-# gets a deliberate check at commit time. COMMENTS_OK=1 acknowledges and passes.
-[ -n "$COMMENTS_OK" ] && exit 0
-
+# gets a deliberate check at commit time. COMMENTS_OK=1 acknowledges and passes
+# (the doc gate below stays independent of it).
 hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
   /^\+\+\+ b\// { file = substr($0, 7); next }
   /^\+/ {
@@ -12,7 +11,28 @@ hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
   }
 ')
 
-[ -z "$hits" ] && exit 0
+# Doc-gate backstop: staged review artifacts of contracts-era targets must pass the
+# structure lint. Old-shape targets (no "### D" detail blocks in the ledger) are exempt.
+if [ -z "$DOCGATE_OK" ]; then
+  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u)
+  for d in $dirs; do
+    [ -f "$d/ledger.md" ] || continue
+    grep -q '^### D' "$d/ledger.md" || continue
+    tgt=${d#reviews/}
+    passes=$(git diff --cached --name-only -- "$d/" | grep -oE '(review|resolution|summary)-v[0-9]+' | grep -oE '[0-9]+' | sort -un)
+    [ -z "$passes" ] && passes=$(ls "$d" | grep -oE '^review-v[0-9]+' | grep -oE '[0-9]+' | sort -un | tail -1)
+    for p in $passes; do
+      if ! node reviews/lib/doc-gate.mjs "$tgt" "$p" >&2; then
+        echo "" >&2
+        echo "Doc gate failed for $tgt v$p. Fix the files (reviews/doc-contracts.md) and" >&2
+        echo "recommit. Only for a genuine false positive, re-run with DOCGATE_OK=1." >&2
+        exit 1
+      fi
+    done
+  done
+fi
+
+if [ -n "$COMMENTS_OK" ] || [ -z "$hits" ]; then exit 0; fi
 
 n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
 {

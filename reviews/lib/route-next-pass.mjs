@@ -116,6 +116,16 @@ if (L.outcome === 'certified' && L.pass === N && (!RN || RN < N)) {
   finish(2, null, `close the loop (record \`closed:\` in the ledger frontmatter + index row, README note ²) — owner decision`)
 }
 
+// Latest pass is a verification: its results decide. This branch must run before the
+// resolved-resolution branch — verifications write no review file, so N stays at the
+// discovery version and RN === N would otherwise re-route to verification forever.
+if (L.type === 'verification') {
+  if ((L.reopened || 0) > 0) { say('ROUTER: reopened fixes re-arm the loop (last row).'); finish(0, 'fix round', null) }
+  if (serious > 0) { say('ROUTER: verification surfaced new serious findings (last row).'); finish(0, 'fix round', null) }
+  say('ROUTER: verification clean (0 reopened, 0 new serious).')
+  say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
+  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`)
+}
 // A fix round exists for the latest review and is resolved → verification.
 if (RN === N && rStatus === 'resolved') {
   say(`ROUTER: resolution-v${N} resolved, not yet re-reviewed (row 3).`)
@@ -126,14 +136,6 @@ if (RN === N && rStatus && rStatus !== 'resolved') {
   finish(0, 'fix round', null)
 }
 
-// No resolution answering the latest review yet.
-if (L.type === 'verification') {
-  if ((L.reopened || 0) > 0) { say('ROUTER: reopened fixes re-arm the loop (last row).'); finish(0, 'fix round', null) }
-  if (serious > 0) { say('ROUTER: verification surfaced new serious findings (last row).'); finish(0, 'fix round', null) }
-  say('ROUTER: verification clean (0 reopened, 0 new serious).')
-  say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
-  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`)
-}
 if (L.verdict === 'request-changes' || serious > 0) {
   say(`ROUTER: open serious findings with no resolution answering review-v${N} (row 2).`)
   finish(0, 'fix round', null)

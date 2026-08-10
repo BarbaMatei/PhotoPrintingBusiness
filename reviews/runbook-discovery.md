@@ -105,10 +105,13 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
 1. Findings arrive deduped, convergence-counted, verdicted — don't re-verify or re-dedup.
    Drop `refuted` with a stated reason; sanity-check `plausible` and high-convergence calls;
    rank by severity.
-2. Write `review-v<n>.md` (immutable; frontmatter `pass-type`; record each finding's
-   convergence count) and `findings-v<n>.md` (full per-finding detail). Since 2026-08-03
-   every **serious** findings-v entry also carries what the fix round would otherwise
-   re-derive:
+2. **Reconcile first.** Map this pass's `F#` onto ledger `D#` rows with the
+   **`reconcile-findings` skill** (scored against the 035 ground truth before trust — see its
+   Scores section). Each **new** defect gets its D# row *and* its detail block
+   ([templates/ledger.md](templates/ledger.md), [doc-contracts.md](doc-contracts.md)) — the
+   block is the defect's only full description, ever. It carries What / Evidence / Suggested
+   fix / History; for **serious** findings the Suggested-fix lines include what the fix round
+   would otherwise re-derive:
    - **Fix brief** — files:lines (the trace skeptic's `filesTouched`, or your own recheck
      for convergence-confirmed findings), the traced failing path, a suggested
      regression-test shape (`testShape`), and whether the suggested fix is
@@ -116,21 +119,24 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
    - **Approach pre-check** — for trigger-list-shaped suggested fixes, dispatch the
      adversarial approach-check NOW, in parallel, in the background (~20–30k output-token
      cap each, same posture as skeptics: this pass's findings + the code, nothing from
-     `reviews/`) and keep writing records while they run. Record the verdict in the entry:
-     `Approach pre-check: cleared | revised (how) | refuted (why)`. The fix round consumes
-     `cleared`/`revised` and only re-checks deviations. A wrong suggested fix dies here
-     instead of anchoring the fixer (F5 on 044-045 recommended a fix that was impossible
-     on .NET 8 — this step exists because of it). Delta passes run these inside their
-     existing token budget; when skipped, say so in the entry.
-3. Map this pass's `F#` onto ledger `D#` rows with the **`reconcile-findings` skill** (scored
-   against the 035 ground truth before trust — see its Scores section) and update the ledger.
+     `reviews/`) and keep writing records while they run. Record the verdict as a History
+     line: `Approach pre-check: cleared | revised (how) | refuted (why)`. The fix round
+     consumes `cleared`/`revised` and only re-checks deviations. A wrong suggested fix dies
+     here instead of anchoring the fixer. Delta passes run these inside their existing token
+     budget; when skipped, say so in the History line.
+   Re-finds get one appended History line, never a re-description.
+3. Write `review-v<n>.md` from [templates/review.md](templates/review.md) — after
+   reconciliation, so its table carries both `F#` and `D#`. Lean: ranked table, refuted
+   table, notes for the fixer; defects are referenced, never re-described. Immutable once
+   the round's doc gate passes. **There is no findings file** (retired 2026-08-10).
 4. Append the [metrics.jsonl](metrics-schema.md) line (v3: include the per-finding
    `findings[]` array, `runtime: {started, ended}` from the loop-driver's worklog stamps,
    and count the pre-checks under `cost.agents_by_stage.approach_checks`) and the one-line
    [index.md](index.md) row, then run
    `node reviews/lib/records-auditor.mjs <target>` — it must exit clean.
-5. Write `summary-v<n>.md` via the **`owner-summary` skill** — the page the owner reads; the
-   review file is the record, the summary is the interface.
+5. Write `summary-v<n>.md` via the **`owner-summary` skill**, from
+   [templates/summary.md](templates/summary.md) — the page the owner reads; the review file
+   is the record, the summary is the interface.
 6. Feedback edges: a v1 pass's severity-weighted new-finding count is the bolt-process KPI;
    a finding class now seen in ≥2 targets gets a `definition-of-done.md` line.
 7. Verdict caps: a delta pass gates *to* certification, never certifies; only a

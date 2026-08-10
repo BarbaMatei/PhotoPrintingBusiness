@@ -28,13 +28,14 @@ Three artifacts, three roles (like a GitHub review thread):
 ```
 review-v<n>.md      (reviewer, IMMUTABLE)  — findings with IDs + verdict, at a commit
 resolution-v<n>.md  (you, the fixer)       — per-finding: status + commit + note
-review-v<n+1>.md    (re-review, IMMUTABLE)  — verifies your fixes, sets "verified"
+verification pass   (re-review, no files)  — flips ledger rows to "verified" or reopens
 ```
 
 Each pass numbers its findings `F1, F2, …` (older reviews used `BUG-`/`SEC-`-style prefixes —
-grandfathered). The IDs join the three files within a pass; across passes the key is the
-ledger's `D#`. You write only in the resolution file and the worklog. You hand back for
-re-review — you do **not** declare anything verified.
+grandfathered), and the review's table pairs each `F#` with its ledger `D#`. The resolution's
+`findings:` map is keyed by `D#` — the cross-pass key — per `reviews/doc-contracts.md`. You
+write only in the resolution file and the worklog. You hand back for re-review — you do
+**not** declare anything verified.
 
 `reviews/README.md` owns the loop conventions (router, severities, verdicts, file shapes).
 **This skill is the sole owner of the fixer contract** — how a fix round runs is defined here
@@ -46,14 +47,13 @@ and nowhere else.
    `reviews/`). If ambiguous, list `reviews/*/` and ask which one.
 2. In `reviews/<target>/`, find the **highest** `review-v<n>.md` and its paired
    `resolution-v<n>.md`. If the resolution file is missing, create it from the review's
-   finding list (all `status: open`) before starting — mirror the frontmatter shape in
-   `reviews/README.md`.
-3. Read the review's frontmatter `blockers:` list and the body's findings (ID, severity,
-   location, recommended fix). Read `findings-v<n>.md` too: since 2026-08-03 each serious
-   finding may carry a **Fix brief** (files:lines, traced failing path, suggested test
-   shape, trigger classification) and an **Approach pre-check** verdict — triage consumes
-   both. Read the resolution to see what's already done — never redo a finding already at a
-   terminal status.
+   finding list (all `status: open`) before starting — copy `reviews/templates/resolution.md`.
+3. Read the review's frontmatter `blockers:` list and its findings table (F#, D#, severity,
+   location). The defect detail lives on each D#'s **ledger detail block** — What / Evidence /
+   Suggested fix / History; serious findings' Suggested-fix lines carry the **Fix brief**
+   (files:lines, traced failing path, suggested test shape, trigger classification) and the
+   History an **Approach pre-check** verdict — triage consumes both. Read the resolution to
+   see what's already done — never redo a finding already at a terminal status.
 
 Do not re-run the review or invent new findings. If you spot something genuinely new
 while fixing, note it in the resolution's decisions section for the re-reviewer; don't
@@ -192,9 +192,11 @@ Batched doc/cleanup-only rounds may skip micro-review.
 After each finding (worklog `finding` event at the same moment), update its entry in
 `resolution-v<n>.md`:
 
-- The frontmatter `findings:` map → `status`, `commit`, one-line `note` (what you did, or
-  why you won't). A mechanism-adding fix's note also names the **new surface** — that is
-  where the re-review points the owning lens.
+- The frontmatter `findings:` map (keyed by `D#`) → `status`, `commit`, one-line `note`
+  (what you did, or why you won't; **max 240 characters** — the story behind it goes in the
+  decisions section, each decision ≤ 15 lines, per `reviews/doc-contracts.md`). A
+  mechanism-adding fix's note also names the **new surface** — that is where the re-review
+  points the owning lens.
 - The body findings table sits between `<!-- rendered:findings-table:start -->` and
   `<!-- rendered:findings-table:end -->` markers and is **generated** — run
   `node reviews/lib/render-records.mjs <target>` rather than hand-editing it. You still
@@ -211,8 +213,8 @@ leave `status: in-progress` — the worklog means a cancelled round loses nothin
 
 **Example finding entry (frontmatter):**
 ```yaml
-  F1: { status: fixed, commit: a1b2c3d, note: "scoped GetByIdempotencyKeyAsync + stale-free to userId/guestSessionId; added cross-tenant test" }
-  F2: { status: wont-fix, commit: null, note: "DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now" }
+  D45: { status: fixed, commit: a1b2c3d, note: "scoped GetByIdempotencyKeyAsync + stale-free to userId/guestSessionId; added cross-tenant test" }
+  D52: { status: wont-fix, commit: null, note: "DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now" }
 ```
 
 ## Hand back — do not self-verify
@@ -222,13 +224,18 @@ When the last micro-review is folded in and the final scoped run is green:
 1. Append `round-end`, then run `node reviews/lib/render-records.mjs <target>` — it
    refreshes the rendered table, computes the round's runtime (active / blocked / idle)
    from the worklog, and appends the round's `fix-round` line to `metrics.jsonl`.
-2. Run `node reviews/lib/records-auditor.mjs <target>` — it must exit clean.
+2. Run `node reviews/lib/records-auditor.mjs <target>` — it must exit clean. Then the doc
+   gate on the resolution: `node reviews/lib/doc-gate.mjs <target> <n>` (must exit clean)
+   plus the Haiku judge (Agent, `model: haiku`; input `reviews/doc-contracts.md` + this
+   round's changed `reviews/` files; approve, or disapprove with reasons you then fix).
+   Append a `doc-gate` worklog event with the verdict.
 3. Update `reviews/index.md`'s Status column for the target (`open → in-progress/resolved`).
 4. Summarize to the user: which findings are `fixed` / `deferred` / `wont-fix`, the
    commits, the round's runtime split, and that the resolution is `resolved`/`in-progress`.
-   Then state plainly that the next step is a **re-review** against `fixed_commit` to
-   produce `review-v<n+1>.md`, which is what flips surviving findings to `verified` (or
-   reopens them). Offer to trigger it, but don't mark verification yourself.
+   Then state plainly that the next step is a **verification pass** against `fixed_commit` —
+   it writes no files; it flips surviving findings to `verified` on the ledger (or reopens
+   them) and records its verdict in the index row. Offer to trigger it, but don't mark
+   verification yourself.
 
 ## Guardrails recap
 
