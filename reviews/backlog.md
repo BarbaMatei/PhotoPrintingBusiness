@@ -62,7 +62,6 @@ Seeded 2026-08-10 from every closed target: the ledgers of 015/043/044-045 plus
 | D87 | 043-cloud-storage-provider | 🟡 | Retention sweep query omits the `DeletedAt` filter → reprocesses soft-deleted rows, re-emits false audit (`ArchiveRetentionJob.cs:96`) | `storage/gallery` |
 | D88 | 043-cloud-storage-provider | 🟡 | Promoter tests assert cloud-write keys but never the bytes written (`OrderPhotoPromoterTests.cs`) | `storage/gallery` |
 | D90 | 043-cloud-storage-provider | 🟡 | D36 close-*during*-refresh resolve-time re-read has no spec (only close-before-error is tested) (`order-detail-page.spec.ts`) | `storage/gallery` |
-| D62 | 043-cloud-storage-provider | 🟡 | ZIP mid-loop `GetStream` truncation — v9 adds the concurrent-promotion trigger (Local→Cloud+delete) alongside the original concurrent-purge one (`AdminOrderService.cs`) | `storage/gallery` |
 | D24 | 044-045-observability | 🟡 | Scope enricher registered after auth — pre-auth failures reach Sentry untagged | `Program.cs` |
 | D25 | 044-045-observability | 🟡 | EF spans ship full SQL and exception messages to OTLP unscrubbed | `Extensions` |
 | D26 | 044-045-observability | 🟡 | `NaN` sample rates pass both validators and silently drop everything | `Validators` |
