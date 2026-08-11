@@ -168,7 +168,8 @@ must not read as "saturated".
 First frozen-commit overlap measurement
 ([overlap-pair-v7.md], labeled 2026-07-27): the
 v7 passes shared only 4 of 34 new findings (12%); 2 of 12 serious. Pass A alone would have
-missed the D49 High. Chapman estimate: ~19 serious findable, 12 found ⇒ ~7 still hidden — a
+missed the D49 High (the name that pass used; `reviews/archive/id-map.md` translates every
+pre-2026-08-11 name to its `PPW-<n>`). Chapman estimate: ~19 serious findable, 12 found ⇒ ~7 still hidden — a
 lower bound, since shared-model blind spots inflate agreement. This settled the policy (owner
 decision 2026-07-27): **pair on the full-loop tier, single full pass below it** — the second
 pass provably earns its cost exactly where a miss is expensive.

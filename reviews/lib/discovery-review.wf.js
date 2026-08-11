@@ -229,7 +229,7 @@ const DEDUP_SCHEMA = {
           severity: { type: 'string', enum: ['high', 'medium', 'low', 'cleanup'] },
           canonicalTitle: { type: 'string' },
           hinted: { type: 'boolean', description: 'true if the finding topic was planted by the shared PROJECT CONTEXT hints rather than discovered from the code alone' },
-          matchesDecided: { type: 'string', description: 'D# of the KNOWN DECIDED ITEM this group re-raises (same root cause at the same site), else ""' },
+          matchesDecided: { type: 'string', description: 'Ledger id (PPW-<n>) of the KNOWN DECIDED ITEM this group re-raises (same root cause at the same site), else ""' },
         },
         required: ['memberIds', 'representativeId', 'severity', 'canonicalTitle', 'hinted', 'matchesDecided'],
       },
@@ -339,7 +339,7 @@ if (!flat.length) { log('No findings.'); return lensResults.filter(Boolean).map(
 const digest = flat.map(f => `#${f.id} [${f.lens}] ${f.severity} ${f.file}:${f.line ?? '?'} — ${f.title}`).join('\n')
 // #5: decided ledger items — only this post-lens agent ever sees them, so blinding holds.
 const decidedBlock = DECIDED.length
-  ? `\n\nKNOWN DECIDED ITEMS (terminal-status ledger rows — each already judged real and decided in a prior pass):\n${DECIDED.map(d => `${d.dId} [${d.status}] ${d.file || ''} — ${d.title}${d.decision ? ` | decision: ${d.decision}` : ''}`).join('\n')}\nIf a group re-raises one of these — SAME root cause at the SAME site, not merely the same theme — set matchesDecided to its D#. Match conservatively: when unsure, leave it "". Matching never suppresses a finding; it only attaches the prior decision.`
+  ? `\n\nKNOWN DECIDED ITEMS (terminal-status ledger rows — each already judged real and decided in a prior pass):\n${DECIDED.map(d => `${d.dId} [${d.status}] ${d.file || ''} — ${d.title}${d.decision ? ` | decision: ${d.decision}` : ''}`).join('\n')}\nIf a group re-raises one of these — SAME root cause at the SAME site, not merely the same theme — set matchesDecided to its ledger id. Match conservatively: when unsure, leave it "". Matching never suppresses a finding; it only attaches the prior decision.`
   : ''
 const recon = await agent(
   `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, SQLite/Postgres parity, two-tier storage routing / StorageLocation, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nSet matchesDecided="" for every group unless the KNOWN DECIDED ITEMS block below says otherwise.${decidedBlock}\n\nFINDINGS:\n${digest}`,
@@ -357,7 +357,7 @@ if (recon?.groups?.length) {
     const members = ids.map(id => flat[id])
     const sev = [g.severity, ...members.map(m => m.severity)].sort((x, y) => SEV_RANK[y] - SEV_RANK[x])[0]
     const lenses = [...new Set(members.map(m => m.lens))]
-    // A matchesDecided that names no real ledger row (hallucinated D#) is dropped -> skeptics run.
+    // A matchesDecided that names no real ledger row (hallucinated id) is dropped -> skeptics run.
     const prior = g.matchesDecided ? DECIDED.find(d => d.dId === g.matchesDecided) : null
     canonical.push({ ...rep, severity: sev, title: g.canonicalTitle || rep.title, hinted: !!g.hinted, matchesDecided: prior ? g.matchesDecided : '', priorDecision: prior ? `${prior.dId} ${prior.status}${prior.decision ? `: ${prior.decision}` : ''}` : '', convergence: lenses.length, agreeingLenses: lenses, memberCount: members.length })
   }

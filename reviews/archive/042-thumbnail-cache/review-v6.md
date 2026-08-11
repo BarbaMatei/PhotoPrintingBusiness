@@ -19,37 +19,37 @@ tests: { dotnet: "531/531", frontend: "409/409" }
 
 ## Findings
 
-| F# | D# | Sev | Title | File | Fix now? |
-|---|---|---|---|---|---|
-| F1 | D61 | 🟠 | The decode limiter defaults to the core count and ignores memory, so it still exhausts memory | `Program.cs:359` | yes |
-| F2 | D48 | 🟠 | Any unauthenticated 401 wipes the whole guest session, checkout contact details included | `UI/…/error.interceptor.ts:33` | yes |
-| F3 | D63 | 🟠 | A logged-in user whose token expired is re-attributed to a throwaway guest | `UI/…/format-selector-page.ts:232` | yes |
-| F4 | D34 | 🟠 | The cache-fill write races the cleanup job and strands a thumbnail on the dead row | `Services/UploadService.cs:216` | no |
-| F5 | D62 | 🟠 | A bomb caught by the allocator backstop never emits the reserved bomb event | `Middleware/ExceptionHandlerMiddleware.cs:106` | yes |
-| F6 | D64 | 🟠 | The HEIC removal is missing from the bolt's bundled-scope document | `memory-bank/…/bolt.md:57` | yes |
-| F7 | D65 | 🟠 | The test walkthrough certifies a `Cache-Control` value the code never emits | `memory-bank/…/test-walkthrough.md:28` | yes |
-| F8 | D28 | 🟠 | The storage contract assumes a rewindable stream with a readable length | `Controllers/UploadsController.cs:155` | no |
-| F9 | D66 | 🟡 | `ExistsAsync` was added to the storage interface but nothing in production calls it | `IStorageService.cs:21` | no |
-| F10 | D71 | 🟡 | A failed thumbnail delete in the cleanup job is untested and silently leaks the file again | `BackgroundJobs/UploadCleanupJob.cs:114` | no |
-| F11 | D79 | 🟡 | Storage faults and cancellation are reported as an unreadable image | `Services/ImageProcessor.cs:56` | no |
-| F12 | D77 | 🟡 | The pixel-area cap ignores bytes per pixel, so a legitimate 16-bit PNG is refused | `Services/ImageProcessor.cs:23` | no |
-| F13 | D75 | 🟡 | Moving a file onto a shared key races other writers on Windows and returns 500 | `Services/LocalStorageService.cs:45` | no |
-| F14 | D76 | 🟡 | A cleanup delete fails against an open read handle on Windows and leaves an orphan | `Services/LocalStorageService.cs` | no |
-| F15 | D68 | 🟡 | Nothing reports how saturated or how queued the decode limiter is | `ImageDecodeLimiter.cs:27` | no |
-| F16 | D72 | 🟡 | Parallel preview 401s defeat the init sharing, and a late 401 wipes a fresh token | `UI/…/format-selector-page.ts:381` | no |
-| F17 | D67 | 🟡 | Every cache-miss preview pays an extra database round-trip to spot the soft-delete race | `Services/UploadService.cs:216` | no |
-| F18 | D73 | 🟡 | The logged-in 401-during-upload path has no test | `UI/…/error.interceptor.ts:24` | no |
-| F19 | D74 | 🟡 | The guest-init error path in `onFilesAccepted` is untested, so files hang as uploading | `UI/…/format-selector-page.ts:176` | no |
-| F20 | D80 | 🟡 | The implementation plan's acceptance criteria are stale after documented substitutions | `memory-bank/…/implementation-plan.md:59` | no |
-| F21 | D69 | 🟡 | No test proves the decode slot is released when the decode throws | `Services/ImageProcessor.cs:67` | no |
-| F22 | D70 | 🟡 | The allocator-exception-to-422 mapping is proven only by an injected instance | `Middleware/ExceptionHandlerMiddleware.cs:26` | no |
-| F23 | D78 | 🟡 | The pixel guard is skipped when the identify call returns null | `Services/ImageProcessor.cs:77` | no |
-| F24 | D23 | 🟡 | The migration's Postgres arm and the model snapshot are exercised by no test | `Migrations/20260527102718_AddUploadThumbnailPath.cs:19` | no |
-| F25 | D23 | 🟡 | The migration's Postgres arm and the model snapshot are exercised by no test | `Migrations/PhotoPrintDbContextModelSnapshot.cs:707` | no |
-| F26 | D81 | ⚪ | The bomb-alert log template is copied across the controller and the middleware | `Controllers/UploadsController.cs:130` | no |
-| F27 | D82 | ⚪ | `dropRestoredEntry` repeats the body of `onRemoveUpload` word for word | `UI/…/format-selector-page.ts:420` | no |
-| F28 | D83 | ⚪ | The client-abort log reads the raw correlation-id item instead of the accessor | `Middleware/ExceptionHandlerMiddleware.cs:64` | no |
-| F29 | D84 | ⚪ | Storage save and delete traces sit at Debug under an Information floor, so they never emit | `Services/LocalStorageService.cs:53` | no |
+| ID | Sev | Title | File | Fix now? |
+|---|---|---|---|---|
+| PPW-112 | 🟠 | The decode limiter defaults to the core count and ignores memory, so it still exhausts memory | `Program.cs:359` | yes |
+| PPW-99 | 🟠 | Any unauthenticated 401 wipes the whole guest session, checkout contact details included | `UI/…/error.interceptor.ts:33` | yes |
+| PPW-114 | 🟠 | A logged-in user whose token expired is re-attributed to a throwaway guest | `UI/…/format-selector-page.ts:232` | yes |
+| PPW-85 | 🟠 | The cache-fill write races the cleanup job and strands a thumbnail on the dead row | `Services/UploadService.cs:216` | no |
+| PPW-113 | 🟠 | A bomb caught by the allocator backstop never emits the reserved bomb event | `Middleware/ExceptionHandlerMiddleware.cs:106` | yes |
+| PPW-115 | 🟠 | The HEIC removal is missing from the bolt's bundled-scope document | `memory-bank/…/bolt.md:57` | yes |
+| PPW-116 | 🟠 | The test walkthrough certifies a `Cache-Control` value the code never emits | `memory-bank/…/test-walkthrough.md:28` | yes |
+| PPW-79 | 🟠 | The storage contract assumes a rewindable stream with a readable length | `Controllers/UploadsController.cs:155` | no |
+| PPW-117 | 🟡 | `ExistsAsync` was added to the storage interface but nothing in production calls it | `IStorageService.cs:21` | no |
+| PPW-122 | 🟡 | A failed thumbnail delete in the cleanup job is untested and silently leaks the file again | `BackgroundJobs/UploadCleanupJob.cs:114` | no |
+| PPW-130 | 🟡 | Storage faults and cancellation are reported as an unreadable image | `Services/ImageProcessor.cs:56` | no |
+| PPW-128 | 🟡 | The pixel-area cap ignores bytes per pixel, so a legitimate 16-bit PNG is refused | `Services/ImageProcessor.cs:23` | no |
+| PPW-126 | 🟡 | Moving a file onto a shared key races other writers on Windows and returns 500 | `Services/LocalStorageService.cs:45` | no |
+| PPW-127 | 🟡 | A cleanup delete fails against an open read handle on Windows and leaves an orphan | `Services/LocalStorageService.cs` | no |
+| PPW-119 | 🟡 | Nothing reports how saturated or how queued the decode limiter is | `ImageDecodeLimiter.cs:27` | no |
+| PPW-123 | 🟡 | Parallel preview 401s defeat the init sharing, and a late 401 wipes a fresh token | `UI/…/format-selector-page.ts:381` | no |
+| PPW-118 | 🟡 | Every cache-miss preview pays an extra database round-trip to spot the soft-delete race | `Services/UploadService.cs:216` | no |
+| PPW-124 | 🟡 | The logged-in 401-during-upload path has no test | `UI/…/error.interceptor.ts:24` | no |
+| PPW-125 | 🟡 | The guest-init error path in `onFilesAccepted` is untested, so files hang as uploading | `UI/…/format-selector-page.ts:176` | no |
+| PPW-131 | 🟡 | The implementation plan's acceptance criteria are stale after documented substitutions | `memory-bank/…/implementation-plan.md:59` | no |
+| PPW-120 | 🟡 | No test proves the decode slot is released when the decode throws | `Services/ImageProcessor.cs:67` | no |
+| PPW-121 | 🟡 | The allocator-exception-to-422 mapping is proven only by an injected instance | `Middleware/ExceptionHandlerMiddleware.cs:26` | no |
+| PPW-129 | 🟡 | The pixel guard is skipped when the identify call returns null | `Services/ImageProcessor.cs:77` | no |
+| PPW-74 | 🟡 | The migration's Postgres arm and the model snapshot are exercised by no test | `Migrations/20260527102718_AddUploadThumbnailPath.cs:19` | no |
+| PPW-74 | 🟡 | The migration's Postgres arm and the model snapshot are exercised by no test | `Migrations/PhotoPrintDbContextModelSnapshot.cs:707` | no |
+| PPW-132 | ⚪ | The bomb-alert log template is copied across the controller and the middleware | `Controllers/UploadsController.cs:130` | no |
+| PPW-133 | ⚪ | `dropRestoredEntry` repeats the body of `onRemoveUpload` word for word | `UI/…/format-selector-page.ts:420` | no |
+| PPW-134 | ⚪ | The client-abort log reads the raw correlation-id item instead of the accessor | `Middleware/ExceptionHandlerMiddleware.cs:64` | no |
+| PPW-135 | ⚪ | Storage save and delete traces sit at Debug under an Information floor, so they never emit | `Services/LocalStorageService.cs:53` | no |
 
 ## Refuted
 

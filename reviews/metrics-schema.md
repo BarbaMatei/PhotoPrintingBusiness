@@ -72,16 +72,22 @@ known. Sources: the discovery script's output (`agreeingLenses`, `convergence`, 
 
 | Key | Type | Meaning |
 |---|---|---|
-| `f` | `"F<n>"` | pass-local id |
-| `d` | `"D<n>"` | ledger id after reconciliation |
+| `f` | `"F<n>"` | the finder's own number for this find, kept as provenance; it exists nowhere else |
+| `d` | `"PPW-<n>"` | the ledger id minted at reconciliation |
 | `new` | bool | true when `d` was minted this pass — Σ by `sev` over `new: true` entries must equal `new_findings` |
 | `sev` | high\|medium\|low\|cleanup | final synthesis severity |
 | `lenses` | array | the lenses that independently raised it (`agreeingLenses`) |
 | `conv` | int ≥ 1 | convergence count |
 | `hinted` | bool | topic planted by shared prompt hints |
 | `verdict` | script verdict enum | `confirmed` · `plausible` · `refuted` · `re-raise` · `unverified-*` |
-| `fix_generated` | `"D<n>"` \| null | the earlier finding whose **fix** caused this one (reconciler `residual-of` lineage) |
+| `fix_generated` | `"PPW-<n>"` \| null | the earlier finding whose **fix** caused this one (reconciler `residual-of` lineage) |
 | `sev_delta` | `"<lens-max>-><final>"` \| null | only when synthesis changed the severity vs the lens maximum |
+
+Lines appended before 2026-08-11 carry the old per-target names in `d` and `fix_generated`
+(this file is append-only, so they stay); `reviews/archive/id-map.md` translates them.
+Two things follow from the global ids: the auditor's `d` check still expects the old shape
+and must be widened before the next discovery line is appended, and `f` is now the only
+place a finder's own number is ever recorded.
 
 What this buys, after 2–3 more targets: per-lens yield ("which lenses earn their keep") by
 grouping on `lenses`; the fix-generativity rate (`fix_generated` non-null / `new`) that tells

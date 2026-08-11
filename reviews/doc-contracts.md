@@ -9,10 +9,12 @@ owner: Matei Barba
 
 Every review artifact follows a fixed template, a size cap, and the language rules
 below. The round-end gate (lint + Sonnet judge) enforces this file. It judges and
-explains; it never edits. Scope: every per-target artifact. Archived targets are being
+explains; it never edits. Scope: every per-target artifact, plus the cross-target
+`index.md` and `backlog.md`. `reviews/system/` and `track-record.md` have no contract
+here. Archived targets are being
 retrofitted to this shape by owner order (2026-08-10, newest to oldest; the owner
 explicitly lifted review-file immutability for the retrofit — originals live in git
-history). `reviews/system/` is out of scope.
+history).
 
 ## The artifact set
 
@@ -26,6 +28,11 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
   discovery, delta-discovery, certification.
 - One-off measurement files are banned. Measurements go to `metrics.jsonl` or
   the worklog.
+- One folder per target, `reviews/<target>/`, riding with the code branch.
+- Archiving is the last step of recording a close, in this order: `closed:` in
+  the ledger frontmatter → surviving `backlog` rows copied to `backlog.md` →
+  `archived: <date>` on the index row → `git mv` to `reviews/archive/<target>/`,
+  contents unchanged. A post-cert escape moves the folder back out.
 
 ## Core rules — all files
 
@@ -33,11 +40,19 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    Headings keep the template's exact wording and order. No extra sections,
    no decorations on headings (no counts, dates, or links in a heading).
 2. **Describe once.** A defect's full description lives on its ledger row,
-   written when the D# is created. Every other mention is one line plus the D#.
-   Re-finds append a history line, never a re-description.
-3. **IDs.** `F#` is pass-local and appears only inside its own pass's files,
-   always next to its D#. Everywhere else a finding is named by `D#` alone.
-4. **Links.** Cross-round references go through the D# on the ledger.
+   written when its `PPW-<n>` is minted. Every other mention is one line plus
+   that id. Re-finds append a history line, never a re-description.
+3. **IDs.** `PPW-<n>` is the only defect id a file may carry. The numbers are
+   global: one sequence shared by every target, never reused. The next free
+   number is the whole content of `reviews/id-counter`; whoever mints ids reads
+   it, assigns them in order, and writes the incremented number back in the same
+   change — two sessions minting at once collide in git, which is the alarm.
+   A blinded finder still numbers its own finds, but those numbers live in the
+   running session only: reconciliation mints the `PPW-<n>` before any file of
+   that pass is written. Severity and category are columns, never encoded in an
+   id. Names used before 2026-08-11 translate through `archive/id-map.md`, the
+   only place they survive.
+4. **Links.** Cross-round references go through the `PPW-<n>` on the ledger.
    File-to-file links are allowed only between files of the same round.
 5. **Append-only detail.** A ledger detail block never changes after creation,
    except new History lines. Status fields in the table may change.
@@ -79,11 +94,11 @@ Allowed system terms. Anything else must be everyday English.
 - **certification** — the closing full pass; its verdict can be `approved`.
 - **fix round** — the fixer working through a review's findings.
 - **blinded / anchored** — finder cannot see prior findings / checker deliberately starts from them.
-- **D#** — a defect's permanent id on the ledger.
-- **F#** — a finding's pass-local id inside one pass's files.
+- **`PPW-<n>`** — a defect's permanent id, one global sequence across all targets.
+- **id counter** — `reviews/id-counter`, holding the next free `PPW-<n>` and nothing else.
 - **ledger** — `ledger.md`, the permanent per-target defect record.
-- **backlog** — `reviews/backlog.md`, unfixed minors from closed targets awaiting drain.
-- **inbox** — `reviews/inbox.md`, findings noticed outside any open target.
+- **backlog** — `reviews/backlog.md`, the cross-target queue: unfixed minors from closed
+  targets, plus defects the owner routed there from outside any pass, all awaiting drain.
 - **worklog** — `worklog.jsonl`, the per-target append-only event trail.
 - **index** — `reviews/index.md`, one row per pass, repo-wide.
 - **severity** — 🔴 High · 🟠 Medium · 🟡 Low · ⚪ Cleanup.
@@ -96,29 +111,41 @@ Allowed system terms. Anything else must be everyday English.
 - **owner gate** — a stop where only the owner's decision continues the loop.
 - **approach-check** — an adversarial pre-implementation check of a fix's design (trigger list in the `/fix-review` skill).
 - **micro-review** — the anchored per-cluster diff review a fix round dispatches on its own work.
-- **reconciliation** — mapping a pass's F#s onto ledger D#s after the blinded pass.
+- **reconciliation** — after the blinded pass, matching its finds to ledger rows and
+  minting a `PPW-<n>` for each one that is new.
 
 ## Per-file contracts
 
 ### review-v<n>.md — template `templates/review.md`
 
 Audience: the fixer. Written by a discovery-type pass, finalized after
-reconciliation so the table carries both F# and D#. Immutable once the round's
-gate passes. The Findings table ranks worst first. Titles reuse the ledger
-row's wording. `Notes for the fixer` gives order and traps, never re-describes.
+reconciliation so every row carries its `PPW-<n>`. Immutable once the round's
+gate passes. Frontmatter: `type`, `target`, `version`, `supersedes`, `commit`,
+`branch`, `pass-type`, `date`, `lenses`, `lenses-not-run`, `verdict`, `blockers`,
+`findings`, `tests`. `pass-type` is `discovery`, `delta-discovery` or
+`certification`; `verification` is not a legal value, because those passes write
+no review file. The Findings table has one id column, `ID`, and ranks worst first.
+Titles reuse the ledger row's wording. `Notes for the fixer` gives order and
+traps, never re-describes.
 
 ### resolution-v<n>.md — template `templates/resolution.md`
 
 Audience: the verifier and the ledger's historian. One resolution per **fix
 round**, numbered by the pass that raised its findings; a clean verification
-raises nothing and gets no resolution. Frontmatter carries scalars only. The
-`## Findings` body table (D# · Status · Commit · Note, note ≤ 240 chars) is the
-machine-read state. Rationale that deserves prose goes under `Decisions`, one
-titled block per decision. The fixer never writes `verified`.
+raises nothing and gets no resolution. It lives until the target closes.
+Frontmatter carries scalars only: `type`, `target`, `version`, `answers`,
+`fixed_commit`, and `status: open | in-progress | resolved`.
+The `## Findings` body table (ID · Status · Commit ·
+Note, note ≤ 240 chars) is the machine-read state, keyed by `PPW-<n>`; the body
+also carries the scope table. Rationale that deserves prose goes under
+`Decisions`, one titled block per decision — including the owner's ruling on any
+defect proposed at this round's gate from outside the finding set. `verified` is
+not a legal value in the Status column.
 
 ### summary-v<n>.md — template `templates/summary.md`
 
-Audience: the owner. Full-strength language rules. Four fixed sections.
+Audience: the owner. Frontmatter: `type`, `target`, `pass`, `pass-type`,
+`commit`, `date`, `decisions-needed`. Full-strength language rules. Four fixed sections.
 `Needs your decision` states each decision with a suggested action, or exactly
 "Nothing.". `Reasons to doubt` is computed from the pass's own data. Every
 claim links its evidence.
@@ -126,12 +153,62 @@ claim links its evidence.
 ### ledger.md — template `templates/ledger.md`
 
 Audience: everyone; the single home of defect detail. One table row plus one
-detail block per D#. The block is written at D# creation and grows only
-History lines. Statuses: `open`, `in-progress`, `fixed`, `verified`, and
-terminal `wont-fix`, `deferred`, `disputed`, `false-positive`, `backlog`.
+detail block per `PPW-<n>` — What / Evidence / Suggested fix / History. The block
+is written when the id is minted and grows only History lines. `First seen` and
+every History line name the pass by its number alone (`v1`), with no finder's
+number beside it.
+
+A row runs `open → in-progress → fixed → verified`, or ends at terminal
+`wont-fix`, `deferred`, `disputed`, `false-positive`, `backlog` — a terminal
+status needs its rationale in the resolution. Terminal rows feed the discovery
+script's `decidedFindings`, and each deferral row records the commit at which it
+was last affirmed. A re-raise of a decided row gets the prior decision attached
+to it, never suppressed: of the first 5 recorded re-raises, 3 overturned the
+prior call, while the ~55 since mostly re-affirmed it.
+
+Frontmatter carries `closed: <date> — <how>` once the loop closes. That line is
+the router's machine-read terminal state; the story of the close lives on the
+index row.
+
+### worklog.jsonl — no template
+
+Audience: the auditor and anyone reconstructing a round. Per-target,
+append-only, one timestamped JSON event per line, each carrying at least a
+string `t` and a string `ev`. Events cover the fix round's work as it happens
+plus `pass-launch`, `pass-records-done` and the owner-gate stamps. It is the
+crash-safe evidence trail: every metrics `runtime` value is computed from it and
+never estimated.
+
+### metrics.jsonl — schema `metrics-schema.md`
+
+Audience: whoever measures the system. Per-target, append-only, one JSON line
+per record. `metrics-schema.md` owns the field list and the schema version.
 
 ### backlog.md — template `templates/backlog.md`
 
-Audience: the owner and bolt-opening agents. One line per row. Rows enter at
-target close, before archiving. Rows leave only as fixed-and-verified or
-owner-ruled wont-fix, and only after the home ledger row records that state.
+Audience: the owner and bolt-opening agents. One line per row, keyed by
+`PPW-<n>`, with columns ID · Target · Sev · What · Area. This file is the
+cross-target queue and is distinct from a ledger row's `backlog` status, which
+marks a triaged minor deferred inside its own target. Rows enter at target close,
+before archiving, or when the owner routes
+a defect noticed outside any pass here at a round's gate — that row takes the
+next number from the id counter. Rows leave only as fixed-and-verified or owner-ruled wont-fix,
+and only after the home ledger row records that state. An owner-routed row has
+no ledger row until a loop opens for its area; until then it leaves on the
+owner's ruling alone, recorded in that round's resolution `Decisions` and in this
+file's git history.
+
+### index.md — no template
+
+Audience: the owner scanning review history. Frontmatter: `type` and `updated`.
+Body: a short paragraph saying what the file is, the two tables below, and
+pointer lines to other files — no other prose. `Targets at a glance` holds one row per target; its
+State cell is at most 5 short lines — close and archive status with its date and
+how, the headline residue by `PPW-<n>`, and what re-arms the loop — and never
+narrates pass by pass. `Passes` holds one row per pass, newest first; its
+description cell is at most 2 sentences and 50 words: what the pass proved or
+found, the worst finding by `PPW-<n>`, anything that re-armed the loop, plus the
+surviving links. Pass rows are append-only — a row is never rewritten once its
+pass closes, and the 2026-08-11 compression is the one owner-ordered exception.
+Full-strength language rules, as for a summary. Ids are `PPW-<n>`, except the
+`system` target's rows, which carry the `SF<n>` of `system/review-v1.md`.

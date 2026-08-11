@@ -1,25 +1,26 @@
 ---
 name: reconcile-findings
 description: >-
-  Match review findings to the target's canonical ledger (F# → D#) or match two parallel
-  passes' finding lists for an overlap measurement. Use after a discovery pass's synthesis
-  ("reconcile the findings", "map F# to the ledger", "update the ledger for <target>") or when
-  measuring pass overlap ("compute the A/B overlap"). Decides same-problem vs new with a
-  confidence and a one-line reason per match, links fix-residuals as lineage, attaches prior
-  decisions to re-finds (never suppresses them), and splits when unsure. Must pass the
-  bolt-035 ground-truth scoring gate before being trusted.
+  Match review findings to the target's canonical ledger and mint a global PPW id for each
+  new defect, or match two parallel passes' finding lists for an overlap measurement. Use
+  after a discovery pass's synthesis ("reconcile the findings", "map the findings onto the
+  ledger", "update the ledger for <target>") or when measuring pass overlap ("compute the A/B
+  overlap"). Decides same-problem vs new with a confidence and a one-line reason per match,
+  links fix-residuals as lineage, attaches prior decisions to re-finds (never suppresses
+  them), and splits when unsure. Must pass the bolt-035 ground-truth scoring gate before
+  being trusted.
 ---
 
 # Reconcile findings
 
 Decide which findings are the *same problem* and which are *new* — the memory that lets the
-review loop measure overlap, stop re-arguing settled decisions, and keep one canonical `D#`
-per real defect per target.
+review loop measure overlap, stop re-arguing settled decisions, and keep one canonical
+`PPW-<n>` per real defect.
 
 ## Modes
 
-- **Ledger mode** (after a discovery pass): match the pass's `F#` findings onto
-  `reviews/<target>/ledger.md`, then update the ledger.
+- **Ledger mode** (after a discovery pass): match the pass's finds onto
+  `reviews/<target>/ledger.md`, then update the ledger and mint an id per new defect.
 - **Overlap mode** (two parallel passes on one frozen commit): match pass A's list against
   pass B's; report N_A, N_B, M (shared) per severity stratum. Only meaningful for passes
   against the same frozen commit — sequential audits on moving code have an open problem
@@ -29,11 +30,13 @@ per real defect per target.
 
 1. The finding list(s): id, severity, file/line, one-line claim — from the pass's synthesis
    output (the workflow's deduped canonical list; reconciliation runs *before* `review-v<n>.md`
-   is written, so the review can reference D#s). If an item lacks an ID (a test-gap row, an
-   aside, a fix-note observation), mint one before matching — ID-less findings escape any
-   ledger.
-2. `reviews/<target>/ledger.md` — every known `D#`, status, and prior decisions (ledger mode).
-3. The code at the reviewed commit, read only to adjudicate close calls.
+   is written, so the review can reference the ids). These incoming numbers are the finders'
+   own and stay in this session — they are never written to a file. If an item arrives with
+   no number at all (a test-gap row, an aside, a fix-note observation), give it one before
+   matching: an unnumbered finding escapes any ledger.
+2. `reviews/<target>/ledger.md` — every known row, status, and prior decisions (ledger mode).
+3. `reviews/id-counter` — the next free `PPW-<n>` (ledger mode).
+4. The code at the reviewed commit, read only to adjudicate close calls.
 
 ## Matching rules
 
@@ -42,7 +45,7 @@ per real defect per target.
   are distinct problems (e.g. "the doc misstates this behavior" vs "the behavior is a bug" —
   they have different fixes).
 - **Fix-residual ≠ re-find.** A new defect living inside the fix of an earlier finding is NEW,
-  linked as lineage (`residual-of: D#`), never merged — chains run generations deep.
+  linked as lineage (`residual-of: PPW-<n>`), never merged — chains run generations deep.
 - **A defect inside code an earlier pass explicitly cleared or judged benign** is distinct,
   and the match note must say it re-opens that judgment.
 - **A re-find of a decided item** (wont-fix / deferred / disputed / false-positive): match it
@@ -50,8 +53,8 @@ per real defect per target.
   calls (3 of the first 5 recorded); the ~55 since mostly re-affirmed — attach the decision and
   let the synthesizer re-judge either way.
 - **When unsure, SPLIT.** A wrong merge inflates overlap → the loop stops early → a bug
-  ships. A wrong split only costs another look. Prefer "NEW — possible remainder of D#" over
-  a merge; that flag is more useful than either verdict.
+  ships. A wrong split only costs another look. Prefer "NEW — possible remainder of
+  `PPW-<n>`" over a merge; that flag is more useful than either verdict.
 - **Post-cert escape.** Ledger mode, target listed in `reviews/track-record.md`: a new 🔴/🟠
   whose mechanism already existed at the certified commit (cited site unchanged since it —
   `git diff <certified>..<reviewed> -- <file>`) is additionally marked `post-cert-escape`,
@@ -63,12 +66,15 @@ per real defect per target.
 
 One row per new finding:
 
-| newId | D# / NEW | confidence (high·med·low) | reason (one line) |
+| finding | `PPW-<n>` / NEW | confidence (high·med·low) | reason (one line) |
 
 plus `residual-of` lineage links, and the prior decision attached to every matched decided
 item. Then:
 
-- **Ledger mode:** per NEW finding, add a table row (next free `D#`) **and its detail block**
+- **Ledger mode:** per NEW finding, mint the next id — read `reviews/id-counter`, assign in
+  order, and write the incremented number back **in the same change**, so two instances
+  minting at once collide in git instead of reusing a number. Add its table row **and its
+  detail block**
   per `reviews/templates/ledger.md` — What / Evidence / Suggested fix / History, the defect's
   only full description anywhere (`reviews/doc-contracts.md`, describe-once). The History's
   first line records this pass, the convergence count and the `hinted` flag; serious findings'
@@ -99,3 +105,6 @@ well.
   (P04→P05→P06, P08→P09, P12→P49, P34→P50, P19→P21) and all 5 decided-item re-raises carried
   their prior decision (P07, P10, P11, P24, P28). One cheap-direction miss: v5:QUAL-5's
   ID-less aside split from P02 where the key says same-gap.
+
+The names in that entry are the eval set's own and the finding names 035 used at the time,
+kept as recorded; `reviews/archive/id-map.md` translates the pre-2026-08-11 ledger names.

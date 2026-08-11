@@ -41,5 +41,5 @@ it does not belong in the escapes-÷-certifications rate. Recorded here so the d
 
 None recorded. This section is the counter — append, never rewrite.
 
-| Date | Target | D# | Sev | Existed at certified commit? | Found by | Evidence |
+| Date | Target | ID | Sev | Existed at certified commit? | Found by | Evidence |
 |---|---|---|---|---|---|---|

@@ -34,8 +34,8 @@ anything a lens receives; commit messages and test names are an accepted leak.
 4. **Build + run both suites yourself**; record pass/fail. A green suite that can't reach a
    named failure mode is itself a finding — feed it to the tests lens.
 5. **decidedFindings.** Pull the terminal-status rows from `reviews/<target>/ledger.md` as
-   `[{dId, title, file, status, decision}]`. Blinding holds: only the post-lens dedup agent
-   sees them.
+   `[{dId, title, file, status, decision}]` — the script's field name; `dId` carries the
+   row's `PPW-<n>`. Blinding holds: only the post-lens dedup agent sees them.
 
 ## Lens manifest
 
@@ -105,9 +105,11 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
 1. Findings arrive deduped, convergence-counted, verdicted — don't re-verify or re-dedup.
    Drop `refuted` with a stated reason; sanity-check `plausible` and high-convergence calls;
    rank by severity.
-2. **Reconcile first.** Map this pass's `F#` onto ledger `D#` rows with the
+2. **Reconcile first.** Match this pass's finds onto the ledger's rows with the
    **`reconcile-findings` skill** (scored against the 035 ground truth before trust — see its
-   Scores section). Each **new** defect gets its D# row *and* its detail block
+   Scores section). Each **new** defect is minted the next `PPW-<n>` from
+   [id-counter](id-counter) — the skill writes the incremented counter in the same change —
+   and gets its ledger row *and* its detail block
    ([templates/ledger.md](templates/ledger.md), [doc-contracts.md](doc-contracts.md)) — the
    block is the defect's only full description, ever. It carries What / Evidence / Suggested
    fix / History; for **serious** findings the Suggested-fix lines include what the fix round
@@ -126,7 +128,7 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
      budget; when skipped, say so in the History line.
    Re-finds get one appended History line, never a re-description.
 3. Write `review-v<n>.md` from [templates/review.md](templates/review.md) — after
-   reconciliation, so its table carries both `F#` and `D#`. Lean: ranked table, refuted
+   reconciliation, so its one `ID` column carries each finding's `PPW-<n>`. Lean: ranked table, refuted
    table, notes for the fixer; defects are referenced, never re-described. Immutable once
    the round's doc gate passes. **There is no findings file** (retired 2026-08-10).
 4. Append the [metrics.jsonl](metrics-schema.md) line (v3: include the per-finding

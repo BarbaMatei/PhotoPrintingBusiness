@@ -10,7 +10,7 @@ date: <yyyy-mm-dd>
 lenses: [<lenses run>]
 lenses-not-run: [<lenses owed>]
 verdict: <request-changes | approve-with-followups>
-blockers: [<D#s, or empty>]
+blockers: [<PPW ids, or empty>]
 findings: { high: <n>, medium: <n>, low: <n>, cleanup: <n>, refuted: <n> }
 tests: { dotnet: "<passed/total>", frontend: "<passed/total>" }
 ---
@@ -19,9 +19,9 @@ tests: { dotnet: "<passed/total>", frontend: "<passed/total>" }
 
 ## Findings
 
-| F# | D# | Sev | Title | File | Fix now? |
-|---|---|---|---|---|---|
-| F1 | D<#> | 🔴 | <one-line title, same wording as the ledger row> | `<path:line>` | yes |
+| ID | Sev | Title | File | Fix now? |
+|---|---|---|---|---|
+| PPW-<n> | 🔴 | <one-line title, same wording as the ledger row> | `<path:line>` | yes |
 
 ## Refuted
 
@@ -31,4 +31,4 @@ tests: { dotnet: "<passed/total>", frontend: "<passed/total>" }
 
 ## Notes for the fixer
 
-<Order of work, coupling warnings, traps. Bullets. No re-describing defects — reference D#s.>
+<Order of work, coupling warnings, traps. Bullets. No re-describing defects — reference ids.>

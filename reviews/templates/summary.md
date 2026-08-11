@@ -24,7 +24,7 @@ trends that could mean reviewer fatigue. Each bullet links its evidence.>
 
 ## Filed automatically
 
-<One line per minor sent to the ledger backlog: D#, severity, what it is.>
+<One line per minor sent to the ledger backlog: PPW-<n>, severity, what it is.>
 
 ## State
 

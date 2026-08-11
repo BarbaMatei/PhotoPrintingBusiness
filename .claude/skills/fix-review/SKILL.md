@@ -31,11 +31,10 @@ resolution-v<n>.md  (you, the fixer)       — per-finding: status + commit + no
 verification pass   (re-review, no files)  — flips ledger rows to "verified" or reopens
 ```
 
-Each pass numbers its findings `F1, F2, …` (older reviews used `BUG-`/`SEC-`-style prefixes —
-grandfathered), and the review's table pairs each `F#` with its ledger `D#`. The resolution's
-`findings:` map is keyed by `D#` — the cross-pass key — per `reviews/doc-contracts.md`. You
-write only in the resolution file and the worklog. You hand back for re-review — you do
-**not** declare anything verified.
+Every defect carries one id, `PPW-<n>`, global across all targets and minted at
+reconciliation. The review's `ID` column and the resolution's `## Findings` table are both
+keyed by it, per `reviews/doc-contracts.md`. You write only in the resolution file and the
+worklog. You hand back for re-review — you do **not** declare anything verified.
 
 `reviews/README.md` owns the loop conventions (router, severities, verdicts, file shapes).
 **This skill is the sole owner of the fixer contract** — how a fix round runs is defined here
@@ -48,8 +47,8 @@ and nowhere else.
 2. In `reviews/<target>/`, find the **highest** `review-v<n>.md` and its paired
    `resolution-v<n>.md`. If the resolution file is missing, create it from the review's
    finding list (all `status: open`) before starting — copy `reviews/templates/resolution.md`.
-3. Read the review's frontmatter `blockers:` list and its findings table (F#, D#, severity,
-   location). The defect detail lives on each D#'s **ledger detail block** — What / Evidence /
+3. Read the review's frontmatter `blockers:` list and its findings table (id, severity,
+   location). The defect detail lives on each id's **ledger detail block** — What / Evidence /
    Suggested fix / History; serious findings' Suggested-fix lines carry the **Fix brief**
    (files:lines, traced failing path, suggested test shape, trigger classification) and the
    History an **Approach pre-check** verdict — triage consumes both. Read the resolution to
@@ -70,8 +69,12 @@ file and the worklog.
   for its own fix is exactly the bias the loop exists to prevent);
 - change unrelated behavior, or fix things outside the finding set without recording why;
 - create a `reviews/<target>/` folder or ledger for anything — a defect you notice outside
-  the finding set is recorded with its evidence in `reviews/inbox.md` (only an
-  owner-opened loop creates a target folder);
+  the finding set is **proposed at this round's owner gate** (immediately, if it is serious),
+  and the owner either routes it into `reviews/backlog.md` — one row, the next `PPW-<n>` from
+  `reviews/id-counter`, a one-line What, and a pointer to the commit or resolution recording
+  it — or drops it. Write the ruling, either way, into this round's `Decisions`. A drop on
+  the owner's word is allowed; a silent drop is not. Only an owner-opened loop creates a
+  target folder;
 - close a non-trivial bug/security finding without a regression test (see below);
 - run more than **one** test process at a time, ever (the machine rule in CLAUDE.md).
 
@@ -79,8 +82,9 @@ file and the worklog.
 
 Append one JSON line per event to `reviews/<target>/worklog.jsonl` **at the moment the
 event happens** (`date -Is` for the timestamp). This is what survives a cancelled session —
-the F7/F16/F17 evidence loss must stay impossible — and it is the source the renderer and
-the runtime metric read. Never edit a past line.
+the loss that forced three findings' fix records to be reconstructed from commits must stay
+impossible — and it is the source the renderer and the runtime metric read. Never edit a
+past line.
 
 ```bash
 echo '{"t":"'$(date -Is)'","ev":"round-start","round":1}' >> "reviews/<target>/worklog.jsonl"
@@ -193,7 +197,7 @@ After each finding (worklog `finding` event at the same moment), update its entr
 `resolution-v<n>.md`:
 
 - The `## Findings` body table (the machine-read state — frontmatter carries scalars only):
-  one row per finding, `| D# | Status | Commit | Note |`, hand-written at the moment the
+  one row per finding, `| ID | Status | Commit | Note |` keyed by `PPW-<n>`, hand-written at the moment the
   finding closes. Note = one line, what you did or why you won't, **max 240 characters** —
   the story behind it goes in the decisions section, each decision ≤ 15 lines, per
   `reviews/doc-contracts.md`. A mechanism-adding fix's note also names the **new surface** —
@@ -210,10 +214,10 @@ When every finding has a terminal status **and all blockers are addressed**, set
 top-level `status: resolved`, `fixed_commit:`, and `closed:` date. If you stopped partway,
 leave `status: in-progress` — the worklog means a cancelled round loses nothing.
 
-**Example finding entry (frontmatter):**
-```yaml
-  D45: { status: fixed, commit: a1b2c3d, note: "scoped GetByIdempotencyKeyAsync + stale-free to userId/guestSessionId; added cross-tenant test" }
-  D52: { status: wont-fix, commit: null, note: "DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now" }
+**Example finding rows:**
+```
+| PPW-45 | fixed | `a1b2c3d` | scoped GetByIdempotencyKeyAsync + stale-free to userId/guestSessionId; added cross-tenant test |
+| PPW-52 | wont-fix | — | DivergentFields payload justifies a distinct type; not worth refactoring ConflictException now |
 ```
 
 ## Hand back — do not self-verify

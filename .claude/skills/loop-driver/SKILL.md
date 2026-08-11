@@ -89,7 +89,7 @@ run journal (not guesswork) explains an empty result.
 (the `/fix-review` skill owns its own worklog events).
 
 In the runbooks' order: ledger update via **reconcile-findings** (discovery-type passes,
-*before* the review file so it can reference D#s; verification updates statuses per its own
+*before* the review file so it can reference the minted ids; verification updates statuses per its own
 runbook) · metrics.jsonl line (schema v3 — discovery lines carry the per-finding `findings[]`
 array and every pass line carries `runtime`) · index.md row · summary page via
 **owner-summary** (decision passes only — a verification pass writes **no files**; its
@@ -130,7 +130,8 @@ conventions):
 
 1. `closed: <date> — <how>` into the ledger frontmatter; the index row records the story.
 2. **Backlog rollup:** every ledger row still at `backlog` gets one line in
-   `reviews/backlog.md` (D#, target, severity, what, area — template `templates/backlog.md`).
+   `reviews/backlog.md` (`PPW-<n>`, target, severity, what, area — template
+   `templates/backlog.md`).
 3. `archived: <date>` on the target's index row.
 4. `git mv reviews/<target> reviews/archive/<target>` — contents unchanged, nothing rewritten.
 
@@ -147,7 +148,10 @@ re-armed pass runs.
 - Mark anything `verified` while being the fixer, outside the written test-only exemption.
 - Edit a `review-v*.md`, skip a record, or hand back with the auditor red.
 - Create a `reviews/<target>/` folder except by executing a pass the owner requested for
-  that target — findings noticed along the way go to `reviews/inbox.md`, and no owner
-  decision is ever recorded that the owner did not state in so many words.
+  that target — a defect noticed along the way is proposed at the round's owner gate, and
+  the owner either routes it into `reviews/backlog.md` (one row, the next `PPW-<n>` from
+  `reviews/id-counter`) or drops it, with the ruling written into that round's resolution
+  `Decisions`. No owner decision is ever recorded that the owner did not state in so many
+  words, and nothing is dropped without one.
 - Chain past a gate because the answer "seems obvious" — obvious-looking gates are where
   the recorded deviations clustered.

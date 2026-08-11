@@ -12,63 +12,63 @@ closed: 2026-08-04
 
 ## Findings
 
-| D# | Status | Commit | Note |
+| ID | Status | Commit | Note |
 |---|---|---|---|
-| D1 | fixed | `9fb6858, a054fdd` | /metrics now served only on an unproxied scrape listener (Observability:Metrics:ScrapePort; other listeners 404); Caddyfile refuses /metrics* at the edge. ADR-018 amended. Approach-check changed the design (Decisions). |
-| D2 | fixed | `44c3e2d` | SentryDataScrubbers.Register wires all three egress hooks (BeforeSend, BeforeSendTransaction, BeforeBreadcrumb); test asserts on real SentryClient envelopes via a stub ITransport. A throwing hook now drops the payload (Decisions). |
-| D3 | fixed | `44c3e2d, bea8c98` | Query-string values redacted (parameter names kept); URL query, fragment and credentials stripped; applied to Request.Url, span descriptions and breadcrumb URLs. |
-| D4 | fixed | `44c3e2d` | Header matching replaced by a case-insensitive allow-list, so lowercase HTTP/2 names cannot leak by omission; the deny-list-miss class is removed structurally rather than patched. |
-| D5 | fixed | `3438475, 3ca89b4` | Per-route matching removed, not repaired: the sampler receives Tags=null at span start (measured), so no key can match. One service-wide rate (DeterministicTraceIdSampler); leftover Sampling:Routes aborts boot. Owner accepted (Decisions). |
-| D6 | fixed | `33474bc, 3ca89b4` | Out-of-rate Server spans sampled RecordOnly instead of Drop, so ErrorOverrideProcessor.OnEnd runs and promotes errored spans; non-server roots keep Drop. SamplingPipelineTests run the real OTel SDK and redden on Drop (Decisions). |
-| D7 | fixed | `6df47b2` | Every terminal webhook branch records payment_webhook_total and logs, incl. the EuPlatesc fall-through; new MetricCapture helper drives a MeterListener, 8 tests. Recorded from the commit — fixer cancelled before reporting (Decisions). |
-| D8 | fixed | `295a51c` | The booted host's SentryAspNetCoreOptions are pushed through a real SentryClient with a capturing ITransport; assertions run over serialized envelope bytes. Reddening shown twice. The mocked IHub stays only for the scope-enricher capture. |
-| D9 | fixed | `fbaf9f4` | MeterListener emission tests at both uncovered call sites (orders_created_total incl. idempotent replay; upload_size_bytes incl. rejected upload) plus a test that emits then scrapes /metrics. All 4 redden under the review's own mutations. |
-| D10 | fixed | `b4a3789, a054fdd` | New ScrapeIpAllowList parser shared by the middleware and the validator: entries trimmed, CIDR supported, every unparseable entry aborts boot naming itself; octal, inet_aton and IPv4-mapped IPv6 range forms rejected too. |
-| D11 | fixed | `7266f21` | Registered AddSingleton so the parsed allow-list and the deny-log dedupe survive across requests; dedupe keyed on (peer, reason), bounded at 512 distinct entries with a one-shot Warning at the cap. |
-| D12 | fixed | `b4a3789` | Peer and allow-list entries canonicalized before comparison (IsIPv4MappedToIPv6 -> MapToIPv4, scope id stripped) for plain entries and CIDR ranges; regression tests use ::ffff:10.42.0.5. |
-| D13 | fixed | `144584e, 3ca89b4` | Deviates: a blank Otlp:Endpoint outside Development skips the WithTracing pipeline (metrics keep working) and logs observability.tracing.disabled at boot instead of failing it (Decisions). Console exporter reachable only in Development. |
-| D14 | fixed | `4fb0386, e965c99` | Dashboard and slos.md renamed to the emitted names, discovered by scraping a real exposition rather than read off SDK docs; DashboardMetricNamesTests holds every dashboard and slos.md query name against the exposition (Decisions). |
-| D15 | fixed | `c7b6a75, e965c99` | Capture keyed on the mapped status code (>= 500), not an exception list, so a later mapping cannot skip it; mapped 5xx moves LogWarning to LogError. Deviates on the Serilog half: docs corrected, no Sentry sink added (Decisions). |
-| D16 | fixed | `ead3c12` | CreateForOrderAsync wraps the inner call in try/catch-rethrow and records awb_creation_total{result=error}; shutdown cancellation records nothing by design. 3 tests. Recorded from the commit — fixer cancelled before reporting (Decisions). |
-| D17 | fixed | `c407685` | Partial: the duration is recorded only after SaveChangesAsync returns (2 tests, incl. the commit-fails leg). The concurrent double-click leg got no guard and no test; the re-review must judge whether that leg is closed (Decisions). |
-| D18 | fixed | `98a5671, e965c99` | Deviates — the suggested fix is not implementable: DiagnosticLogger's getter returns null when Debug=false (measured). Debug now always true; Sentry:Debug picks the verbosity (Warning/Debug). Owner accepted the posture (Decisions). |
-| D19 | fixed | `c809f30` | Deviates: test hosts no longer touch process state — IWebHostBuilder.UseSetting makes Sentry and Observability config per-host; the non-parallel collection kept but narrowed. 2 tests redden when a static-ctor env var is restored. |
-| D20 | fixed | `0ef6cf0, 972d057` | Split: MetricNames.LabelContract derives the budget and MetricCapture.ContractViolations() checks observed tags at every call site; the review's user_id mutation now reddens. 'unknown' deliberately not whitelisted (Decisions). |
-| D21 | fixed | `2d25b03` | The enricher now runs against a real Sentry Scope behind a hub stub reporting IsEnabled=true; authenticated, anonymous, no-correlation-id and disabled-hub legs asserted. Mutating the claim type to one that never exists reddens it. |
-| D22 | fixed | `44c3e2d` | Tests cover SDK-populated shapes: a real DefaultHttpContext through ScopeExtensions.Populate, an SDK-shaped transaction with spans, Mechanism.Data, Contexts.Response, SentryMessage, and an end-to-end envelope with no token or email. |
-| D23 | fixed | `4711fac, a054fdd` | DEPLOYMENT.md §14 written (14.1-14.12: flags, gates, Prometheus provisioning, allow-list syntax, OTLP, cost, rollout, curl matrix, playbook, env-var table); ADR-018 and ddd-02 pointers now resolve; .env.example gained the block. |
-| D24 | backlog | — | 🟡 routed to the ledger backlog per the README router; new 🟡/⚪ findings do not enter a fix round. |
-| D25 | backlog | — | 🟡 routed to the ledger backlog; flagged to the owner in summary-v1 as a second unscrubbed egress path (EF spans ship SQL to OTLP). |
-| D26 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D27 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D28 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D29 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D30 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D31 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D32 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
-| D33 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
-| D34 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
-| D35 | backlog | — | ⚪ routed to the ledger backlog; cross-target — the residue comes from the repo-wide comment sweep (09173c4), which belongs to the system target's loop. |
-| D36 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
-| D37 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
-| D38 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
-| D39 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
+| PPW-336 | fixed | `9fb6858, a054fdd` | /metrics now served only on an unproxied scrape listener (Observability:Metrics:ScrapePort; other listeners 404); Caddyfile refuses /metrics* at the edge. ADR-018 amended. Approach-check changed the design (Decisions). |
+| PPW-337 | fixed | `44c3e2d` | SentryDataScrubbers.Register wires all three egress hooks (BeforeSend, BeforeSendTransaction, BeforeBreadcrumb); test asserts on real SentryClient envelopes via a stub ITransport. A throwing hook now drops the payload (Decisions). |
+| PPW-338 | fixed | `44c3e2d, bea8c98` | Query-string values redacted (parameter names kept); URL query, fragment and credentials stripped; applied to Request.Url, span descriptions and breadcrumb URLs. |
+| PPW-339 | fixed | `44c3e2d` | Header matching replaced by a case-insensitive allow-list, so lowercase HTTP/2 names cannot leak by omission; the deny-list-miss class is removed structurally rather than patched. |
+| PPW-340 | fixed | `3438475, 3ca89b4` | Per-route matching removed, not repaired: the sampler receives Tags=null at span start (measured), so no key can match. One service-wide rate (DeterministicTraceIdSampler); leftover Sampling:Routes aborts boot. Owner accepted (Decisions). |
+| PPW-341 | fixed | `33474bc, 3ca89b4` | Out-of-rate Server spans sampled RecordOnly instead of Drop, so ErrorOverrideProcessor.OnEnd runs and promotes errored spans; non-server roots keep Drop. SamplingPipelineTests run the real OTel SDK and redden on Drop (Decisions). |
+| PPW-342 | fixed | `6df47b2` | Every terminal webhook branch records payment_webhook_total and logs, incl. the EuPlatesc fall-through; new MetricCapture helper drives a MeterListener, 8 tests. Recorded from the commit — fixer cancelled before reporting (Decisions). |
+| PPW-343 | fixed | `295a51c` | The booted host's SentryAspNetCoreOptions are pushed through a real SentryClient with a capturing ITransport; assertions run over serialized envelope bytes. Reddening shown twice. The mocked IHub stays only for the scope-enricher capture. |
+| PPW-344 | fixed | `fbaf9f4` | MeterListener emission tests at both uncovered call sites (orders_created_total incl. idempotent replay; upload_size_bytes incl. rejected upload) plus a test that emits then scrapes /metrics. All 4 redden under the review's own mutations. |
+| PPW-345 | fixed | `b4a3789, a054fdd` | New ScrapeIpAllowList parser shared by the middleware and the validator: entries trimmed, CIDR supported, every unparseable entry aborts boot naming itself; octal, inet_aton and IPv4-mapped IPv6 range forms rejected too. |
+| PPW-346 | fixed | `7266f21` | Registered AddSingleton so the parsed allow-list and the deny-log dedupe survive across requests; dedupe keyed on (peer, reason), bounded at 512 distinct entries with a one-shot Warning at the cap. |
+| PPW-347 | fixed | `b4a3789` | Peer and allow-list entries canonicalized before comparison (IsIPv4MappedToIPv6 -> MapToIPv4, scope id stripped) for plain entries and CIDR ranges; regression tests use ::ffff:10.42.0.5. |
+| PPW-348 | fixed | `144584e, 3ca89b4` | Deviates: a blank Otlp:Endpoint outside Development skips the WithTracing pipeline (metrics keep working) and logs observability.tracing.disabled at boot instead of failing it (Decisions). Console exporter reachable only in Development. |
+| PPW-349 | fixed | `4fb0386, e965c99` | Dashboard and slos.md renamed to the emitted names, discovered by scraping a real exposition rather than read off SDK docs; DashboardMetricNamesTests holds every dashboard and slos.md query name against the exposition (Decisions). |
+| PPW-350 | fixed | `c7b6a75, e965c99` | Capture keyed on the mapped status code (>= 500), not an exception list, so a later mapping cannot skip it; mapped 5xx moves LogWarning to LogError. Deviates on the Serilog half: docs corrected, no Sentry sink added (Decisions). |
+| PPW-351 | fixed | `ead3c12` | CreateForOrderAsync wraps the inner call in try/catch-rethrow and records awb_creation_total{result=error}; shutdown cancellation records nothing by design. 3 tests. Recorded from the commit — fixer cancelled before reporting (Decisions). |
+| PPW-352 | fixed | `c407685` | Partial: the duration is recorded only after SaveChangesAsync returns (2 tests, incl. the commit-fails leg). The concurrent double-click leg got no guard and no test; the re-review must judge whether that leg is closed (Decisions). |
+| PPW-353 | fixed | `98a5671, e965c99` | Deviates — the suggested fix is not implementable: DiagnosticLogger's getter returns null when Debug=false (measured). Debug now always true; Sentry:Debug picks the verbosity (Warning/Debug). Owner accepted the posture (Decisions). |
+| PPW-354 | fixed | `c809f30` | Deviates: test hosts no longer touch process state — IWebHostBuilder.UseSetting makes Sentry and Observability config per-host; the non-parallel collection kept but narrowed. 2 tests redden when a static-ctor env var is restored. |
+| PPW-355 | fixed | `0ef6cf0, 972d057` | Split: MetricNames.LabelContract derives the budget and MetricCapture.ContractViolations() checks observed tags at every call site; the review's user_id mutation now reddens. 'unknown' deliberately not whitelisted (Decisions). |
+| PPW-356 | fixed | `2d25b03` | The enricher now runs against a real Sentry Scope behind a hub stub reporting IsEnabled=true; authenticated, anonymous, no-correlation-id and disabled-hub legs asserted. Mutating the claim type to one that never exists reddens it. |
+| PPW-357 | fixed | `44c3e2d` | Tests cover SDK-populated shapes: a real DefaultHttpContext through ScopeExtensions.Populate, an SDK-shaped transaction with spans, Mechanism.Data, Contexts.Response, SentryMessage, and an end-to-end envelope with no token or email. |
+| PPW-358 | fixed | `4711fac, a054fdd` | DEPLOYMENT.md §14 written (14.1-14.12: flags, gates, Prometheus provisioning, allow-list syntax, OTLP, cost, rollout, curl matrix, playbook, env-var table); ADR-018 and ddd-02 pointers now resolve; .env.example gained the block. |
+| PPW-359 | backlog | — | 🟡 routed to the ledger backlog per the README router; new 🟡/⚪ findings do not enter a fix round. |
+| PPW-360 | backlog | — | 🟡 routed to the ledger backlog; flagged to the owner in summary-v1 as a second unscrubbed egress path (EF spans ship SQL to OTLP). |
+| PPW-361 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-362 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-363 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-364 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-365 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-366 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-367 | backlog | — | 🟡 routed to the ledger backlog per the README router. |
+| PPW-368 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
+| PPW-369 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
+| PPW-370 | backlog | — | ⚪ routed to the ledger backlog; cross-target — the residue comes from the repo-wide comment sweep (09173c4), which belongs to the system target's loop. |
+| PPW-371 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
+| PPW-372 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
+| PPW-373 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
+| PPW-374 | backlog | — | ⚪ routed to the ledger backlog per the README router. |
 
 ## Scope
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A — /metrics access control | D1, D10, D11, D12, D23 | `MetricsEndpointIpAllowListMiddleware.cs`, `ObservabilitySettingsValidator.cs`, `Caddyfile`, `DEPLOYMENT.md` | ran — refuted the header-deny rule; the listener gate became the control |
-| B — Sentry data egress | D2, D3, D4, D22 | `SentryDataScrubbers.cs`, `Program.cs` | ran — surfaced the span/breadcrumb credential path; refuted fail-closed |
-| C — tracing correctness | D5, D6, D13 | `Sampling/DeterministicTraceIdSampler.cs` (was `RouteAwareSampler.cs`), `ErrorOverrideProcessor.cs`, `ObservabilityExtensions.cs` | ran — refuted the in-process per-route rescue |
-| D — metric emission gaps | D7, D16, D17 | `WebhooksController.cs`, `AwbCreator.cs`, `AdminOrderService.cs` | ran — output lost; the fixer was cancelled before reporting |
-| E — test vacuity | D8, D9, D19, D20, D21 | new test files, `SentryIntegrationFactory.cs` | not needed (test-only; no new mechanism in the running service) |
-| F — error-signal routing | D14, D15, D18 | `ExceptionHandlerMiddleware.cs`, `ops/dashboards/fototipar-overview.json`, `slos.md` | ran — refuted the suggested D18 fix as not implementable |
-| Backlog | D24–D39 | ledger | not needed (no fix; routed per the README router) |
+| A — /metrics access control | PPW-336, PPW-345, PPW-346, PPW-347, PPW-358 | `MetricsEndpointIpAllowListMiddleware.cs`, `ObservabilitySettingsValidator.cs`, `Caddyfile`, `DEPLOYMENT.md` | ran — refuted the header-deny rule; the listener gate became the control |
+| B — Sentry data egress | PPW-337, PPW-338, PPW-339, PPW-357 | `SentryDataScrubbers.cs`, `Program.cs` | ran — surfaced the span/breadcrumb credential path; refuted fail-closed |
+| C — tracing correctness | PPW-340, PPW-341, PPW-348 | `Sampling/DeterministicTraceIdSampler.cs` (was `RouteAwareSampler.cs`), `ErrorOverrideProcessor.cs`, `ObservabilityExtensions.cs` | ran — refuted the in-process per-route rescue |
+| D — metric emission gaps | PPW-342, PPW-351, PPW-352 | `WebhooksController.cs`, `AwbCreator.cs`, `AdminOrderService.cs` | ran — output lost; the fixer was cancelled before reporting |
+| E — test vacuity | PPW-343, PPW-344, PPW-354, PPW-355, PPW-356 | new test files, `SentryIntegrationFactory.cs` | not needed (test-only; no new mechanism in the running service) |
+| F — error-signal routing | PPW-349, PPW-350, PPW-353 | `ExceptionHandlerMiddleware.cs`, `ops/dashboards/fototipar-overview.json`, `slos.md` | ran — refuted the suggested PPW-353 fix as not implementable |
+| Backlog | PPW-359–PPW-374 | ledger | not needed (no fix; routed per the README router) |
 
 ## Decisions
 
-### Scrape listener over header rules (D1)
+### Scrape listener over header rules
 
 The approach-check refuted the planned deny-on-`X-Forwarded-For` rule: `ForwardedHeadersMiddleware`
 removes the header it consumes, a sidecar adds it to legitimate in-pod scrapes, and it fires only in
@@ -85,9 +85,9 @@ global rate limiter partitions on the proxy IP (`SecurityExtensions.cs:58-69`), 
 are unpartitioned (`AuthExtensions.cs:84-106`), and audit logs record the proxy IP as the client's
 (`AuthController.cs:54,72,160`). Owner routed all three to `reviews/inbox.md` (2026-08-03).
 
-### Deny-by-default scrubbing; the SDK fails open (D2)
+### Deny-by-default scrubbing; the SDK fails open
 
-D2, D3 and D4 were fixed as one class: allow-lists at all three egress hooks via
+PPW-337, PPW-338 and PPW-339 were fixed as one class: allow-lists at all three egress hooks via
 `SentryDataScrubbers.Register`, so a field the SDK adds later arrives redacted. Measured against
 Sentry 4.13.0: when `BeforeSend` or `BeforeSendTransaction` throws, the SDK sends the original
 unscrubbed payload — `implementation-walkthrough.md:80` claimed the opposite and was corrected. The
@@ -96,22 +96,22 @@ approach-check surfaced a live credential path: the Google OAuth `id_token` in a
 (`GoogleTokenValidator.cs:37`) reaches span descriptions and breadcrumbs, neither reachable from
 `BeforeSend` — hence the third hook and URL sanitising. Boundaries: exception messages and span
 descriptions ship in full (redacting them guts triage; no interpolating call site exists today),
-and the OTLP exporter stays a second unscrubbed egress path (D25).
+and the OTLP exporter stays a second unscrubbed egress path.
 
-### Per-route sampling removed, not repaired (D5)
+### Per-route sampling removed, not repaired
 
 Measured with a throwaway probe on the real stack: at span start the sampler gets `Tags = null`, so
 neither `http.route` nor the review's suggested `url.path` exists — that half of the suggestion is
 not implementable on .NET 8 (`url.path` is written after the sampler returns). The only in-process
 rescue, `IHttpContextAccessor`, was refuted: registering it stops `DefaultHttpContext` pooling, so
-every request pays for telemetry, and raw-path matching reproduces D5's own silent-miss class. So
+every request pays for telemetry, and raw-path matching reproduces PPW-340's own silent-miss class. So
 the capability moved out: one service-wide deterministic rate, `Observability:Sampling:Routes`
 deleted everywhere, and a leftover key aborts boot naming where the rate moved. ADR-017 amended
 twice; §14.7/§14.11, `.env.example` and the settings doc updated. Owner accepted the removal
 2026-08-03: story 003's per-route capability is a known gap, deferred to collector-side tail
 sampling that is not yet provisioned.
 
-### Error promotion holds Server spans only (D6)
+### Error promotion holds Server spans only
 
 Out-of-rate spans go `RecordOnly` instead of `Drop`, verified against the OTel 1.11.2 sources:
 `OnEnd` is gated on `IsAllDataRequested` only. What the fix does not give: a promoted span exports
@@ -123,27 +123,27 @@ non-server roots keep `Drop`. `Sampling:Default = 0.0` changed meaning to "expor
 only"; the off switch is `Observability:Enabled = false`. Boundary: no test pins the production
 processor order — a host-based test passed alone but failed in the full suite (every live
 TracerProvider samples the same hosting source), so it was deleted, not disabled; it becomes
-possible once test hosts stop leaking observability config (the D19 fix).
+possible once test hosts stop leaking observability config (the PPW-354 fix).
 
-### Blank OTLP endpoint skips tracing instead of failing boot (D13)
+### Blank OTLP endpoint skips tracing instead of failing boot
 
 The suggested fail-at-boot was rejected: it would break DEPLOYMENT §14.8's documented metrics-first
-rollout stage and, through the env-var leak D19 fixed, abort unrelated test hosts
+rollout stage and, through the env-var leak PPW-354 fixed, abort unrelated test hosts
 nondeterministically. Instead a blank `Otlp:Endpoint` outside Development skips the whole
 `WithTracing` pipeline, keeps metrics working, and logs `observability.tracing.disabled` once at
 boot. The console exporter is reachable only in Development. `AddObservability` gained an
 `IHostEnvironment` parameter.
 
-### Three fixes recorded from commits alone (D7, D16, D17)
+### Three fixes recorded from commits alone (PPW-342, PPW-351, PPW-352)
 
-The cluster-D fixer was cancelled before reporting; the loop driver recorded D7, D16 and D17 from
+The cluster-D fixer was cancelled before reporting; the loop driver recorded PPW-342, PPW-351 and PPW-352 from
 their commits. The approach-check output is lost and the test reddening was never demonstrated to
-the driver. D17 is knowingly partial: the after-commit leg is fixed and tested, but the concurrent
+the driver. PPW-352 is knowingly partial: the after-commit leg is fixed and tested, but the concurrent
 double-click leg has no conditional write and no once-only guard — left to the re-review to judge.
 The cancelled round had also left `o.SendDefaultPii = false;` replaced by a mutation marker in
 `Program.cs`, uncommitted — restored this round and called out as a process failure.
 
-### Budget derived from a label contract; "unknown" not whitelisted (D20)
+### Budget derived from a label contract; "unknown" not whitelisted
 
 Split what the finding conflated: `MetricNames.LabelContract` derives the cardinality budget, and
 `MetricCapture.ContractViolations()` holds observed tags against it at each call site — the
@@ -151,12 +151,12 @@ review's own `user_id` mutation now reddens. Against the suggestion, `"unknown"`
 the `All` arrays: `PaymentProcessor` has two members and `AwbCreationOutcome` is a closed record
 hierarchy, so both `_ => "unknown"` arms are unreachable; whitelisting would inflate the budget and
 make a real occurrence invisible. An emitted `"unknown"` is now a test failure; deleting the dead
-literals is D33. A fresh-eyes review restored the exact per-instrument series counts the rewrite
+literals is PPW-368. A fresh-eyes review restored the exact per-instrument series counts the rewrite
 had loosened to `<= 100` (`972d057`). `LabelContract` stays in the API assembly deliberately: it is
 the documented single source of truth for names and label values, and moving it to the test project
 would let production drift from it silently.
 
-### Dashboard names measured from a live exposition (D14)
+### Dashboard names measured from a live exposition
 
 The names came from scraping a booted host, not SDK docs: the HTTP metric is
 `http_server_request_duration_seconds` (histogram) with `http_response_status_code` and
@@ -166,7 +166,7 @@ histogram's `_count`. Also measured: the Prometheus exporter does not append a s
 metric also appears in `slos.md` was wrong (business panels have no SLO behind them) and was
 replaced by the direction that matters: every name `slos.md` queries must be emitted.
 
-### Status-code keying; no Serilog-to-Sentry sink (D15)
+### Status-code keying; no Serilog-to-Sentry sink
 
 Capture fires on `mapping.StatusCode >= 500`, not on an exception list — an enumerated list would
 repeat the finding's own defect class. On the Serilog half the docs were corrected instead of
@@ -175,7 +175,7 @@ every `LogError` in the repo into a 5k-events/month tier; §13.1 now states this
 never pass through `ExceptionHandlerMiddleware`, so the fix does not reach them; the owner declined
 a review target for that gap and routed it to `reviews/inbox.md` (2026-08-04).
 
-### Sentry Debug always on; the knob picks verbosity (D18)
+### Sentry Debug always on; the knob picks verbosity
 
 The suggested fix cannot work: `SentryOptions.DiagnosticLogger`'s getter returns null whenever
 `Debug` is false, so an assigned logger is discarded — probed in-repo against Sentry 4.13.0

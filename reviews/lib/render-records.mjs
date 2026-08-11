@@ -66,7 +66,7 @@ for (const { status } of findings.values()) tallies[TALLY[status] ?? 'open']++
 const sevTitle = new Map()
 const lPath = join(dir, 'ledger.md')
 if (existsSync(lPath)) {
-  for (const m of readFileSync(lPath, 'utf8').matchAll(/^\|\s*(D\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|]*\|\s*([^|]+?)\s*\|/gm))
+  for (const m of readFileSync(lPath, 'utf8').matchAll(/^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|]*\|\s*([^|]+?)\s*\|/gm))
     sevTitle.set(m[1], { sev: m[2], title: m[3].trim() })
 }
 const fPath = join(dir, `findings-v${round}.md`)

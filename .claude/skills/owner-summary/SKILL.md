@@ -42,10 +42,10 @@ contract (headings verbatim, vocabulary, cap 60 body lines — aim for ~40). Fro
 
 ## Rules
 
-- **Every claim carries a link** (file, commit, test, `D#`, metric). A claim with no link
+- **Every claim carries a link** (file, commit, test, `PPW-<n>`, metric). A claim with no link
   does not go on the page — an unverifiable summary forces trust.
 - Plain words; short sentences; the reader is technical but cold (spell out what a feature or
-  job does; quote UI strings as shipped). Severity dots, `D#` and file paths are fine.
+  job does; quote UI strings as shipped). Severity dots, `PPW-<n>` and file paths are fine.
 - Suggested actions are suggestions — the page never decides, never buries an option the
   owner might prefer.
 - Written by the pass runner at synthesis time; the fixer never edits it.

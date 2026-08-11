@@ -19,23 +19,23 @@ tests: { dotnet: "466/466", frontend: "not recorded" }
 
 ## Findings
 
-| F# | D# | Sev | Title | File | Fix now? |
-|---|---|---|---|---|---|
-| DB-1 | D20 | 🟠 | The model snapshot is SQLite-flavoured, so the next Postgres scaffold emits a phantom migration | `Migrations/PhotoPrintDbContextModelSnapshot.cs` | no |
-| DB-2 | D21 | 🟠 | The Stripe secret column is sized at exactly the vendor ceiling, so a longer secret fails on Postgres after the charge | `Data/PhotoPrintDbContext.cs:296` | yes |
-| OBS-1 | D22 | 🟠 | The 409 body names the divergent fields only outside Development, and no test reads the body | `Middleware/ExceptionHandlerMiddleware.cs:103` | yes |
-| BUG-1 | D23 | 🟡 | The recovery catch infers that any database write failure was the key collision | `Services/OrderService.cs:161` | no |
-| SEC-1 | D24 | 🟡 | With both owner ids null the scope test collapses to "any order without a guest id" | `Services/OrderService.cs:235` | no |
-| SEC-2 | D25 | 🟡 | Key length is never checked, so an over-long key fails on Postgres instead of being refused | `Filters/IdempotencyKeyFilter.cs:22` | no |
-| OBS-2 | D26 | 🟡 | The reserved conflict log event is never emitted | `Middleware/ExceptionHandlerMiddleware.cs` | no |
-| OBS-3 | D27 | 🟡 | The recovery replay calls the gateway again and writes no replay log, so it reads as a fresh request | `Controllers/PaymentsController.cs:117` | no |
-| DOC-1 | D28 | 🟡 | The design document says the stale key is freed inside the insert's transaction; the code uses a separate save | `Services/OrderService.cs:108` | no |
-| DOC-2 | D29 | ⚪ | No document states that the gateway is keyed by the order id rather than the caller's key | `memory-bank/…/ddd-02` | no |
-| QUAL-1 | D30 | ⚪ | The pre-insert and post-collision resolution blocks are near duplicates | `Services/OrderService.cs` | no |
-| QUAL-2 | D31 | ⚪ | Provider names are written out as literal strings in four places | `Data/PhotoPrintDbContext.cs` | no |
-| QUAL-3 | D32 | ⚪ | The controller saves through the database context itself rather than through the order service | `Controllers/PaymentsController.cs:125` | no |
-| QUAL-4 | D33 | ⚪ | The payment request builders and the SQLite fixture setup are duplicated across test files | `Tests/…` | no |
-| QUAL-5 | D34 | ⚪ | The order-number query raises a compiler warning and its Postgres branch has no test | `Services/OrderNumberService.cs:33` | no |
+| ID | Sev | Title | File | Fix now? |
+|---|---|---|---|---|
+| PPW-20 | 🟠 | The model snapshot is SQLite-flavoured, so the next Postgres scaffold emits a phantom migration | `Migrations/PhotoPrintDbContextModelSnapshot.cs` | no |
+| PPW-21 | 🟠 | The Stripe secret column is sized at exactly the vendor ceiling, so a longer secret fails on Postgres after the charge | `Data/PhotoPrintDbContext.cs:296` | yes |
+| PPW-22 | 🟠 | The 409 body names the divergent fields only outside Development, and no test reads the body | `Middleware/ExceptionHandlerMiddleware.cs:103` | yes |
+| PPW-23 | 🟡 | The recovery catch infers that any database write failure was the key collision | `Services/OrderService.cs:161` | no |
+| PPW-24 | 🟡 | With both owner ids null the scope test collapses to "any order without a guest id" | `Services/OrderService.cs:235` | no |
+| PPW-25 | 🟡 | Key length is never checked, so an over-long key fails on Postgres instead of being refused | `Filters/IdempotencyKeyFilter.cs:22` | no |
+| PPW-26 | 🟡 | The reserved conflict log event is never emitted | `Middleware/ExceptionHandlerMiddleware.cs` | no |
+| PPW-27 | 🟡 | The recovery replay calls the gateway again and writes no replay log, so it reads as a fresh request | `Controllers/PaymentsController.cs:117` | no |
+| PPW-28 | 🟡 | The design document says the stale key is freed inside the insert's transaction; the code uses a separate save | `Services/OrderService.cs:108` | no |
+| PPW-29 | ⚪ | No document states that the gateway is keyed by the order id rather than the caller's key | `memory-bank/…/ddd-02` | no |
+| PPW-30 | ⚪ | The pre-insert and post-collision resolution blocks are near duplicates | `Services/OrderService.cs` | no |
+| PPW-31 | ⚪ | Provider names are written out as literal strings in four places | `Data/PhotoPrintDbContext.cs` | no |
+| PPW-32 | ⚪ | The controller saves through the database context itself rather than through the order service | `Controllers/PaymentsController.cs:125` | no |
+| PPW-33 | ⚪ | The payment request builders and the SQLite fixture setup are duplicated across test files | `Tests/…` | no |
+| PPW-34 | ⚪ | The order-number query raises a compiler warning and its Postgres branch has no test | `Services/OrderNumberService.cs:33` | no |
 
 ## Refuted
 
@@ -56,14 +56,14 @@ tests: { dotnet: "466/466", frontend: "not recorded" }
 
 ## Notes for the fixer
 
-- Nothing here blocks merge. Two items are cheap and matter before deployment: D21 and D22.
-- D21 is the clearest case of the local database hiding a production failure. Length limits are ignored
+- Nothing here blocks merge. Two items are cheap and matter before deployment: PPW-21 and PPW-22.
+- PPW-21 is the clearest case of the local database hiding a production failure. Length limits are ignored
   locally and enforced on Postgres, and the failure lands after the charge already exists.
-- D23 and D24 are both residuals of earlier fixes to this same recovery path, not new behaviour. Read
-  them next to D1 and D2 on the ledger before changing the catch.
-- D20 is scaffold-time only. There is no startup drift, because the runtime model and this migration
+- PPW-23 and PPW-24 are both residuals of earlier fixes to this same recovery path, not new behaviour. Read
+  them next to PPW-1 and PPW-2 on the ledger before changing the catch.
+- PPW-20 is scaffold-time only. There is no startup drift, because the runtime model and this migration
   agree; the trap is for whoever scaffolds the next migration.
-- D26, D27 and D22 are one theme: the feature's documented signals are reserved but not emitted, so a
+- PPW-26, PPW-27 and PPW-22 are one theme: the feature's documented signals are reserved but not emitted, so a
   conflict, a recovery replay and a divergent field are all invisible in operation.
 - The lenses ran blind to the earlier passes and to the finding ids written into the source comments,
   which were handed over as claims to check rather than as facts.

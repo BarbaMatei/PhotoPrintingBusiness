@@ -12,31 +12,31 @@ closed: 2026-07-29
 
 ## Findings
 
-| D# | Status | Commit | Note |
+| ID | Status | Commit | Note |
 |---|---|---|---|
-| D27 | fixed | `5734021` | Two tests drive a second replica writing between the poll's load and its write, pinning both clauses: never stamp a row another replica moved to Delivered, never move the sync timestamp backwards. Both redden when the guard is dropped. |
-| D39 | fixed | `5734021` | The composition-root test now resolves the shipping interface and asserts its type, so the registration the round-5 fix added is load-bearing. Removing that registration reddens it. |
-| D71 | fixed | `5734021` | The retry-options builder was extracted and made public; the test asserts the delay generator yields 1, 4 and 16 seconds for attempts 0, 1 and 2 with no real waiting. Reverting to the library default reddens it. |
-| D79 | fixed | `5734021` | The token-service test asserts the name claim; the auth-service specs assert the current-user stream emits on login and on session restore, plus the blank-name case. All four redden when their half is removed. |
-| D68 | fixed | `5734021` | Coverage gap closed: the post-create persist-failure leg asserts the claim is preserved, driven by closing the connection inside the vendor-call callback. Reverting that leg reddens it. |
-| D78 | fixed | `5734021` | Weak assertion replaced. The old one could never fail, because Angular renders a missing value as blank. The spec now seeds a leftover courier address and asserts it is suppressed. |
+| PPW-266 | fixed | `5734021` | Two tests drive a second replica writing between the poll's load and its write, pinning both clauses: never stamp a row another replica moved to Delivered, never move the sync timestamp backwards. Both redden when the guard is dropped. |
+| PPW-278 | fixed | `5734021` | The composition-root test now resolves the shipping interface and asserts its type, so the registration the round-5 fix added is load-bearing. Removing that registration reddens it. |
+| PPW-310 | fixed | `5734021` | The retry-options builder was extracted and made public; the test asserts the delay generator yields 1, 4 and 16 seconds for attempts 0, 1 and 2 with no real waiting. Reverting to the library default reddens it. |
+| PPW-318 | fixed | `5734021` | The token-service test asserts the name claim; the auth-service specs assert the current-user stream emits on login and on session restore, plus the blank-name case. All four redden when their half is removed. |
+| PPW-307 | fixed | `5734021` | Coverage gap closed: the post-create persist-failure leg asserts the claim is preserved, driven by closing the connection inside the vendor-call callback. Reverting that leg reddens it. |
+| PPW-317 | fixed | `5734021` | Weak assertion replaced. The old one could never fail, because Angular renders a missing value as blank. The spec now seeds a leftover courier address and asserts it is suppressed. |
 
 ## Scope
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A — Reopened fixes given a test that can fail | D27, D39, D71, D79 | `Tests/…/ShipmentTrackingJobTests.cs`, `SamedayCompositionRootTests.cs`, `SamedayPoliciesTests.cs`, `TokenServiceTests.cs`, `UI/…/auth.service.spec.ts` | not needed (test-only) |
-| B — Coverage gaps recorded on fixes that held | D68, D78 | `Tests/…/AwbCreatorTests.cs`, `UI/…/checkout-state.service.spec.ts` | not needed (test-only) |
+| A — Reopened fixes given a test that can fail | PPW-266, PPW-278, PPW-310, PPW-318 | `Tests/…/ShipmentTrackingJobTests.cs`, `SamedayCompositionRootTests.cs`, `SamedayPoliciesTests.cs`, `TokenServiceTests.cs`, `UI/…/auth.service.spec.ts` | not needed (test-only) |
+| B — Coverage gaps recorded on fixes that held | PPW-307, PPW-317 | `Tests/…/AwbCreatorTests.cs`, `UI/…/checkout-state.service.spec.ts` | not needed (test-only) |
 
 ## Decisions
 
-### Two source edits, both test-enabling rather than behavioural (D71, D82)
+### Two source edits, both test-enabling rather than behavioural (PPW-310, PPW-321)
 
 The retry-options builder was extracted from the pipeline builder and made public, so the backoff
 schedule can be asserted directly instead of waiting out 21 seconds of real delay; the strategy
 contents are byte-identical. Separately, the fake time provider now fakes timers, not only the
 clock. It had overridden the clock alone, so the delay call fell through to the real system timer,
-which means the D82 dispatcher test had been sleeping 30 real seconds. That single test was the
+which means the PPW-321 dispatcher test had been sleeping 30 real seconds. That single test was the
 whole backend suite's runtime. Fixing it makes the test deterministic and takes the suite from 916
 tests in 30 seconds to 921 in 4.
 

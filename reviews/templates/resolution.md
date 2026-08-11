@@ -12,19 +12,19 @@ closed: <yyyy-mm-dd>
 
 ## Findings
 
-| D# | Status | Commit | Note |
+| ID | Status | Commit | Note |
 |---|---|---|---|
-| D<#> | <fixed | wont-fix | deferred | disputed | false-positive | backlog> | <sha or —> | <one line, max 240 characters> |
+| PPW-<n> | <fixed | wont-fix | deferred | disputed | false-positive | backlog> | <sha or —> | <one line, max 240 characters> |
 
 ## Scope
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A — <label> | D<#>, D<#> | `<paths>` | <needed: link, or "not needed (<reason>)"> |
+| A — <label> | PPW-<n>, PPW-<n> | `<paths>` | <needed: link, or "not needed (<reason>)"> |
 
 ## Decisions
 
-### <One-line decision title (D#)>
+### <One-line decision title (PPW-<n>)>
 
 <Why the fix took this shape and not the obvious alternative. What was measured.
 Max 15 lines per decision. Longer history belongs on the ledger row.>

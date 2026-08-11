@@ -12,49 +12,49 @@ closed: 2026-08-07
 
 ## Findings
 
-| D# | Status | Commit | Note |
+| ID | Status | Commit | Note |
 |---|---|---|---|
-| D121 | fixed | `a4eb7e5` | Two commits: 796a330 the pin, a4eb7e5 the repair. Test-only: each of the four hand-named success selectors needs `or vector(0)` within 24 chars, counted per source. Red proof: the mutation review-v5 measured green now reddens 1 test. |
-| D122 | fixed | `d8a63a4` | Doc-only, no test (an acceptance-criteria line has no build check by design). The criterion now names both exclusions — `skipped` (no label needed), `retry_later` (per-attempt counter) — and states `orphaned` stays in the denominator. |
-| D123 | fixed | `3c0a13d` | Doc-only, no test. Two sites: the union doc comment (`AwbCreationOutcome.cs:9`) and the operator log table (`DEPLOYMENT.md:771`), which also gained the missing `sameday.awb.orphaned` row. bolt-037 ddd docs left as point-in-time records. |
-| D110 | fixed | `9cfbf75` | Owner-directed, outside review-v5's set. Both copies now say ~8,640/day and a ~94.5% floor, each figure naming its source; 'Tracked as D46' dropped. Corrects the claim, not the dilution — D46 stays parked. No test: prose is unpinned. |
+| PPW-456 | fixed | `a4eb7e5` | Two commits: 796a330 the pin, a4eb7e5 the repair. Test-only: each of the four hand-named success selectors needs `or vector(0)` within 24 chars, counted per source. Red proof: the mutation review-v5 measured green now reddens 1 test. |
+| PPW-457 | fixed | `d8a63a4` | Doc-only, no test (an acceptance-criteria line has no build check by design). The criterion now names both exclusions — `skipped` (no label needed), `retry_later` (per-attempt counter) — and states `orphaned` stays in the denominator. |
+| PPW-458 | fixed | `3c0a13d` | Doc-only, no test. Two sites: the union doc comment (`AwbCreationOutcome.cs:9`) and the operator log table (`DEPLOYMENT.md:771`), which also gained the missing `sameday.awb.orphaned` row. bolt-037 ddd docs left as point-in-time records. |
+| PPW-445 | fixed | `9cfbf75` | Owner-directed, outside review-v5's set. Both copies now say ~8,640/day and a ~94.5% floor, each figure naming its source; 'Tracked as PPW-381' dropped. Corrects the claim, not the dilution — PPW-381 stays parked. No test: prose unpinned. |
 
 ## Scope
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A — guard pinning | D121 | `Tests/Integration/DashboardMetricNamesTests.cs` | not needed (test-only) |
-| B — stale records | D122, D123, D110 | story AC doc, `AwbCreationOutcome.cs`, `docs/DEPLOYMENT.md`, `memory-bank/operations/slos.md`, `ops/dashboards/fototipar-overview.json` | not needed (doc-only) |
+| A — guard pinning | PPW-456 | `Tests/Integration/DashboardMetricNamesTests.cs` | not needed (test-only) |
+| B — stale records | PPW-457, PPW-458, PPW-445 | story AC doc, `AwbCreationOutcome.cs`, `docs/DEPLOYMENT.md`, `memory-bank/operations/slos.md`, `ops/dashboards/fototipar-overview.json` | not needed (doc-only) |
 
 ## Decisions
 
-### Fixed rather than backlogged (D121, D122, D123)
+### Fixed rather than backlogged (PPW-456, PPW-457, PPW-458)
 
 All three findings are 🟡 and would normally route to the ledger backlog per the README router.
 They are fixed here because the owner judged the v4 round patch-grade and asked the loop to end
-naturally, which means clearing the small items rather than parking them. D110 — a v4 backlog
+naturally, which means clearing the small items rather than parking them. PPW-445 — a v4 backlog
 row flagged in three consecutive summaries — was added by owner request; it keeps its D# key in
 the frontmatter because it is not a review-v5 finding. No owner gate was needed: nothing adds a
 mechanism or changes a key scheme, a concurrency model, a resource budget or retry semantics,
 and the one judgment call — how far to broaden the guard rule — was resolved by scoping down
 rather than guessing at the owner's intent.
 
-### Four selectors pinned by name instead of the general rule (D121)
+### Four selectors pinned by name instead of the general rule
 
 The obvious class rule — every side whose selector names a value by hand must carry
 `or vector(0)` — reds two panels this round has no mandate to touch: SLO 1's
 `{http_response_status_code!~"5.."}` numerator and the error-rate panel's `=~"5.."` numerator.
 Both would read "No Data" in an edge case (every request 5xx; no request 5xx), and both belong
-to the parked D46 question of what SLO 1 measures. So the test pins the four numerators this
+to the parked PPW-381 question of what SLO 1 measures. So the test pins the four numerators this
 repo has decided must never read "No Data" — `payment_webhook` ok and duplicate, `awb_creation`
 ok, `invoice_anaf` accepted — requiring `or vector(0)` within 24 characters after each
-occurrence, in every query of both copies. D103's class rule could not see these sides: it
+occurrence, in every query of both copies. PPW-438's class rule could not see these sides: it
 counts added terms and skips any side with no `+`. The cost, recorded: the list is
 hand-maintained, so a fifth guarded ratio added later ships uncovered until someone adds it —
 which is why the test also fails when a listed selector stops appearing twice, not only when a
 guard goes missing.
 
-### The per-source counting repair, measured both ways (D121)
+### The per-source counting repair, measured both ways
 
 The micro-review found my first version's occurrence floor counted per pair of files, not per
 file: duplicating the doc's numerator while deleting the dashboard panel's query kept the count
@@ -70,19 +70,19 @@ false-reds, the safe direction. Round red proof: the exact mutation review-v5 me
 (delete `or vector(0)` from the SLO 4 numerator in both copies) reddens 1 test, no collateral;
 203 Integration green restored.
 
-### D110's arithmetic, and what it does not fix (D110)
+### PPW-445's arithmetic, and what it does not fix
 
 The corrected figures come from three sources, each now named in the prose: `scrape_interval: 15s`
 (`docs/DEPLOYMENT.md:1048`) → 5,760 `/metrics` a day; `HEALTHCHECK --interval=30s`
 (`Dockerfile:43`) → 2,880 `/health` a day; ~500 customer requests a day
 (`docs/DEPLOYMENT.md:950`). Floor = 8,640 ÷ 9,140 ≈ 94.5%. Both copies corrected — the
 `slos.md` status block and the availability panel's `description`. This corrects the claim, not
-the dilution: SLO 1's denominator still counts self-monitoring traffic, which is D46, parked
+the dilution: SLO 1's denominator still counts self-monitoring traffic, which is PPW-381, parked
 because the fix needs .NET 9 (`IHttpMetricsTagsFeature.MetricsDisabled`). The panel description
-also loses its "Tracked as D46" citation — an id no operator can resolve, half of backlog row
-D117 — and now tells the operator that 95% here does not mean the monitoring is broken.
+also loses its "Tracked as PPW-381" citation — an id no operator can resolve, half of backlog row
+PPW-452 — and now tells the operator that 95% here does not mean the monitoring is broken.
 
-### The operator log table and the comment gate (D123)
+### The operator log table and the comment gate
 
 The sweep was token-wide rather than file-wide and found two live sites: the outcome union's
 doc comment (`AwbCreationOutcome.cs:9`) and the operator log table (`DEPLOYMENT.md:771`), both
@@ -96,9 +96,9 @@ doc comment was shortened once under the comment gate and committed with `COMMEN
 allowed type-contract doc; a reviewer who judges a doc comment on an abstract record is not the
 allowed case should delete the entry rather than restore the old, now-wrong wording.
 
-### Outside the finding set, left for its own row (D116)
+### Outside the finding set, left for its own row
 
 `docs/DEPLOYMENT.md:949` still reasons from the availability target as if the denominator were
 customer traffic. It survives this round's token sweep because it carries neither of the wrong
 figures — it draws a different wrong inference from the same confusion. Left for backlog row
-D116; the owner scoped this round to D110.
+PPW-451; the owner scoped this round to PPW-445.

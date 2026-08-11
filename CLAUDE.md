@@ -71,7 +71,7 @@ whole suite by default.**
 - **Comments are a last resort, kept to one short line.** Never add a comment to narrate a
   change, a bug fix, or a feature. Only two reasons justify one: (a) to explain *why*
   non-obvious code exists — state the constraint or gotcha itself, with **no reference** to the
-  bolt, review, finding/decision ID (`F3`, `D50`, `BUG-2`, `SEC-1`…), ADR, ticket, PR, or past
+  bolt, review, finding/decision ID (`PPW-12`, `F3`, `D50`, `BUG-2`…), ADR, ticket, PR, or past
   discussion where it was decided (that history lives in commits/resolution files); (b) a short
   behaviour description on an **interface** member (`///`, JSDoc) — never on concrete classes.
   When you edit a file, delete non-essential comments you pass through.
@@ -85,7 +85,7 @@ whole suite by default.**
 - Commits: conventional style, **exactly one sentence, subject line only** — no body and no
   trailers (no `Co-Authored-By`). Sole exception: a breaking change may carry a body.
   Reference bolt/finding IDs in the subject where relevant, e.g.
-  `fix(orders): guard duplicate AWB creation (D45, review 015-v3)`.
+  `fix(orders): guard duplicate AWB creation (PPW-284, review 015-v3)`.
 
 ## Response style (chat replies to the user — not code, commits, or docs)
 

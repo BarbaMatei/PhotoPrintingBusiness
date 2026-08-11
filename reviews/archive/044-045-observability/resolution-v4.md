@@ -12,50 +12,50 @@ closed: 2026-08-06
 
 ## Findings
 
-| D# | Status | Commit | Note |
+| ID | Status | Commit | Note |
 |---|---|---|---|
-| D103 | fixed | `d899559` | Test-only class rule: every added-term side in slos.md and the dashboard guards each sum() with `or vector(0)`; covers SLO 4/5 and future terms. Red proof: deleting both guards reddens 1 test where 1133 stayed green. Repaired at `aca24fd`. |
-| D104 | fixed | `770f852` | Test-only: two tests pin the invariants — registered client Timeout > RequestDeadline, and the deadline (not the HTTP backstop) ends a hanging GetAsync, wall-clock-proven at 30s014ms against a 15 s bar. Each mutation reddens its own test. |
-| D105 | fixed | `9112aa8` | Three commits: 8b5cb3f exclusions (SLO 4 drops `skipped`, SLO 5 drops `pending`, both copies), b0718d8 numerator guards + AC doc, 9112aa8 residuals: `retry_later` out of the denominator, new `orphaned` result value (cardinality 5→6). |
-| D113 | fixed | `243625c` | .gitleaksignore with the two commit-pinned fingerprints (44c3e2d…:16, 295a51c…:19); the `ab7860f` rename kept as hygiene only — it cannot clear a commit-range scan. Not provable locally; the next pull_request run is the proof. |
-| D106 | deferred | — | 🟡 — ledger backlog per the README router |
-| D107 | deferred | — | 🟡 — ledger backlog per the README router |
-| D108 | deferred | — | 🟡 — ledger backlog per the README router |
-| D109 | deferred | — | 🟡 — ledger backlog per the README router |
-| D110 | deferred | — | 🟡 — ledger backlog; flagged to the owner in summary-v4 as the one minor worth their eye |
-| D111 | deferred | — | 🟡 — ledger backlog per the README router |
-| D112 | deferred | — | 🟡 — ledger backlog per the README router |
-| D114 | deferred | — | 🟡 — ledger backlog per the README router |
-| D115 | deferred | — | 🟡 — ledger backlog per the README router |
-| D120 | deferred | — | 🟡 — ledger backlog per the README router |
-| D116 | deferred | — | ⚪ — ledger backlog per the README router |
-| D117 | deferred | — | ⚪ — ledger backlog per the README router |
-| D118 | deferred | — | ⚪ — ledger backlog per the README router |
-| D119 | deferred | — | ⚪ — ledger backlog per the README router |
+| PPW-438 | fixed | `d899559` | Test-only class rule: every added-term side in slos.md and the dashboard guards each sum() with `or vector(0)`; covers SLO 4/5 and future terms. Red proof: deleting both guards reddens 1 test where 1133 stayed green. Repaired at `aca24fd`. |
+| PPW-439 | fixed | `770f852` | Test-only: two tests pin the invariants — registered client Timeout > RequestDeadline, and the deadline (not the HTTP backstop) ends a hanging GetAsync, wall-clock-proven at 30s014ms against a 15 s bar. Each mutation reddens its own test. |
+| PPW-440 | fixed | `9112aa8` | Three commits: 8b5cb3f exclusions (SLO 4 drops `skipped`, SLO 5 drops `pending`, both copies), b0718d8 numerator guards + AC doc, 9112aa8 residuals: `retry_later` out of the denominator, new `orphaned` result value (cardinality 5→6). |
+| PPW-448 | fixed | `243625c` | .gitleaksignore with the two commit-pinned fingerprints (44c3e2d…:16, 295a51c…:19); the `ab7860f` rename kept as hygiene only — it cannot clear a commit-range scan. Not provable locally; the next pull_request run is the proof. |
+| PPW-441 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-442 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-443 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-444 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-445 | deferred | — | 🟡 — ledger backlog; flagged to the owner in summary-v4 as the one minor worth their eye |
+| PPW-446 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-447 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-449 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-450 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-455 | deferred | — | 🟡 — ledger backlog per the README router |
+| PPW-451 | deferred | — | ⚪ — ledger backlog per the README router |
+| PPW-452 | deferred | — | ⚪ — ledger backlog per the README router |
+| PPW-453 | deferred | — | ⚪ — ledger backlog per the README router |
+| PPW-454 | deferred | — | ⚪ — ledger backlog per the README router |
 
 ## Scope
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A — SLO documents and dashboard queries | D103, D105 | `memory-bank/operations/slos.md`, `ops/dashboards/fototipar-overview.json`, `Tests/Integration/DashboardMetricNamesTests.cs` | not needed (doc/query + test); owner gate on D105 |
-| B — Google deadline invariants | D104 | `Tests/Unit/Services/GoogleTokenValidatorTests.cs`, `Tests/Integration/` | not needed (test-only) |
-| C — secret scanner gate | D113 | `.gitleaks.toml`, `hooks/pre-commit`, `Tests/Unit/Configuration/SentryDataScrubbersTests.cs` | not needed (test constant + scanner config); owner gate |
-| — | D106–D112, D114–D120 | — | not needed (🟡/⚪ deferred to the ledger backlog per the README router) |
+| A — SLO documents and dashboard queries | PPW-438, PPW-440 | `memory-bank/operations/slos.md`, `ops/dashboards/fototipar-overview.json`, `Tests/Integration/DashboardMetricNamesTests.cs` | not needed (doc/query + test); owner gate on PPW-440 |
+| B — Google deadline invariants | PPW-439 | `Tests/Unit/Services/GoogleTokenValidatorTests.cs`, `Tests/Integration/` | not needed (test-only) |
+| C — secret scanner gate | PPW-448 | `.gitleaks.toml`, `hooks/pre-commit`, `Tests/Unit/Configuration/SentryDataScrubbersTests.cs` | not needed (test constant + scanner config); owner gate |
+| — | PPW-441–PPW-447, PPW-449–PPW-455 | — | not needed (🟡/⚪ deferred to the ledger backlog per the README router) |
 
 ## Decisions
 
-### Same-session round, recorded for the verifier (D103, D104, D105, D113)
+### Same-session round, recorded for the verifier (PPW-438, PPW-439, PPW-440, PPW-448)
 
 The v4 verification pass and this fix round ran in one session — the caveat resolution-v3
 recorded, biting harder here: three of the four findings in scope were raised and measured by the
 fixer, so no independent pressure sits on either finding or fix. Two partial offsets: every
 in-scope finding was established by a recorded mutation with a measured result (1133 green with
-the mechanism removed), so confirming one is re-reading a measurement; and D103, D104 and D113
+the mechanism removed), so confirming one is re-reading a measurement; and PPW-438, PPW-439 and PPW-448
 are add-the-missing-guard work that either reddens on revert or does not. The v5 re-review should
-run from a fresh session and be sceptical about whether the D103 and D104 tests pin the mechanism
+run from a fresh session and be sceptical about whether the PPW-438 and PPW-439 tests pin the mechanism
 or merely restate it.
 
-### The guard test needed three repairs before it pinned the mechanism (D103)
+### The guard test needed three repairs before it pinned the mechanism
 
 The first micro-review found three defects in the shipped test; all repaired in `aca24fd`:
 1. It could pass while checking nothing — `if (!numerator.Contains('+')) continue;` ended in an
@@ -71,12 +71,12 @@ The first micro-review found three defects in the shipped test; all repaired in 
    passed, and SLO 4/5 were written in exactly that style. Now it counts added terms (`'+' count + 1`).
 Residuals recorded, not fixed: the requirement is a count per side, not per-term structure, so
 `((sum(A) or vector(0) or vector(0)) + sum(B))` passes with `B` unguarded (a PromQL parser in a
-test helper is a worse trade); and single-term sides are skipped — the hole that became D121.
+test helper is a worse trade); and single-term sides are skipped — the hole that became PPW-456.
 
-### The timing bar took three attempts, and CI set the final one (D104)
+### The timing bar took three attempts, and CI set the final one
 
 Two tests pin the invariants: `The_registered_google_client_keeps_its_backstop_behind_our_own_deadline`
-(registered client's `Timeout > RequestDeadline` — the breakage that silently restores D75) and
+(registered client's `Timeout > RequestDeadline` — the breakage that silently restores PPW-410) and
 `Our_own_deadline_and_not_the_http_backstop_ends_a_hanging_request` (wall clock only, because a
 deadline that never reaches `GetAsync` throws the same exception type ~15 s later). Bar history:
 5 s equaled `RequestDeadline` itself (micro-review); 1 s failed locally on ~1 s first-call handler
@@ -90,7 +90,7 @@ tighten `BuildServiceProvider(validateScopes: true)` to `ValidateOnBuild` — `A
 registers `ISocialAuthService`, whose constructor needs `PhotoPrintDbContext`, `ITokenService`
 and `IOptions<JwtSettings>`, none of which that extension registers.
 
-### Owner gates, twice: match the prose, then fix the residuals (D105)
+### Owner gates, twice: match the prose, then fix the residuals
 
 First gate (2026-08-06), answered as recommended: match the prose as SLO 3 did — SLO 4 drops
 `skipped` (returned when no label was needed at all), SLO 5 drops `pending` (a submission still
@@ -106,7 +106,7 @@ of which (`AwbCreator.cs:270`) returns right after an Error-level "orphaned bill
 Second gate (2026-08-06): fix both — `retry_later` left the denominator and the orphaned case
 got its own result value (`9112aa8`).
 
-### `orphaned` is a new metric surface, shipped as a flag (D105)
+### `orphaned` is a new metric surface, shipped as a flag
 
 The second gate's cost, more than a query edit: `AwbResultValues.Orphaned` plus its `All` entry,
 `awb_creation_total` cardinality 5→6, a `metrics.md` row, and the `skipped` row rewritten to list
@@ -123,7 +123,7 @@ its own text says "accepted on first or retried submission", so it likely carrie
 per-attempt bias — but the owner was asked about the AWB ratio only, and nothing increments the
 ANAF counter yet. Recorded for the re-reviewer.
 
-### The rename could not clear the scanner; the owner chose a .gitleaksignore (D113)
+### The rename could not clear the scanner; the owner chose a .gitleaksignore
 
 First attempt `ab7860f` renamed the fixture constant per the first owner gate (2026-08-06); the
 second micro-review broke it and I confirmed both halves. gitleaks on a `pull_request` event
@@ -141,15 +141,15 @@ open PR. The rename stays as hygiene; the sweep found a second copy at `SentryOp
 Not provable locally — gitleaks is not installed here; the next `pull_request` run is the proof.
 The same literal still sits in three tracked `reviews/**` docs, outside `.gitleaks.toml`'s allowlist.
 
-### Found outside the finding set, filed not fixed (D104, D88)
+### Found outside the finding set, filed not fixed (PPW-439, PPW-423)
 
 - The Sameday HTTP client's timeout is shorter than its own retry ladder: `HttpClient.Timeout`
   (10 s default) wraps the resilience handler's ~21 s backoff schedule, so `MaxRetryAttempts = 3`
   is silently 2 and a vendor outage surfaces as a cancellation instead of the vendor's status.
-  The true class sibling of D104; filed to `reviews/inbox.md` with its evidence. Not fixed here:
+  The true class sibling of PPW-439; filed to `reviews/inbox.md` with its evidence. Not fixed here:
   it changes a resource budget and retry semantics on the AWB path, which owes its own
   adversarial approach-check, and this is an observability round.
-- Two dashboard-walker blind spots, D88's family: `CollectPanelQueries` never walks
+- Two dashboard-walker blind spots, PPW-423's family: `CollectPanelQueries` never walks
   `templating.list[]` or `annotations.list[].expr`, and `SloQueries()` matches only untagged code
   fences, so a single promql fence tag would drop a block and shift the fence pairing. Neither
-  has a live instance today; left on D88 rather than minted as new rows by a fixer.
+  has a live instance today; left on PPW-423 rather than minted as new rows by a fixer.

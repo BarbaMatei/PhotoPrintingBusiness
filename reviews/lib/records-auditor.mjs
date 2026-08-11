@@ -263,14 +263,14 @@ function auditTarget(t) {
         o.findings.forEach((f, i) => {
           const fat = `${at} findings[${i}]`
           if (!/^F\d+$/.test(f.f || '')) err(`${fat}: f must be "F<n>"`)
-          if (!/^D\d+$/.test(f.d || '')) err(`${fat}: d must be "D<n>" (reconcile before appending)`)
+          if (!/^(PPW-\d+|D\d+)$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>" (reconcile before appending; pre-2026-08-11 lines carry "D<n>")`)
           if (typeof f.new !== 'boolean') err(`${fat}: new must be boolean`)
           if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
           if (!Array.isArray(f.lenses) || !f.lenses.length) err(`${fat}: lenses[] required`)
           if (!num(f.conv) || f.conv < 1) err(`${fat}: conv must be >= 1`)
           if (typeof f.hinted !== 'boolean') err(`${fat}: hinted must be boolean`)
           if (!VERDICTS.has(f.verdict)) err(`${fat}: verdict "${f.verdict}" invalid`)
-          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^D\d+$/.test(f.fix_generated)) err(`${fat}: fix_generated must be D<n>|null`)
+          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^(PPW-\d+|D\d+)$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null (pre-2026-08-11: D<n>)`)
           if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
           if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
         })

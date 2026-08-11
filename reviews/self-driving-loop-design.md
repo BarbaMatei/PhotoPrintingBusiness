@@ -15,7 +15,8 @@ piece of the bigger goal: an agentic system doing a development team's work with
 human input as possible.
 
 **Split of responsibilities:** [README.md](README.md) + the runbooks own everything
-*operational* — router, entry tiers, stop rule, pass mechanics, file shapes.
+*operational* — router, entry tiers, stop rule, pass mechanics.
+[doc-contracts.md](doc-contracts.md) owns the *file shapes*.
 [rationale.md](rationale.md) owns the *evidence*. This file owns the *research*: the
 assumptions that must hold for autonomy, the experiments that test them, and the tools still
 to build. On any overlap, the README wins.
@@ -92,7 +93,7 @@ decisions it already made.
 
 **Spec.** *In:* two or more finding lists (file/line, severity, description) + the code at the
 reviewed commit. *Out:* matched groups with a confidence and a one-line reason each;
-everything unmatched is new. It maintains the per-target ledger (`D#` rows, per-pass
+everything unmatched is new. It maintains the per-target ledger (`PPW-<n>` rows, per-pass
 convergence counts, `hinted` flags — manufactured agreement must not inflate overlap). It
 **links** a re-find to the prior decision and hands both to the synthesizer; it never
 auto-suppresses a re-find (3 of 5 recorded re-raises overturned the prior call).

@@ -78,11 +78,12 @@ if (existsSync(join(dir, reviewFile))) {
       /^## Findings$/, /^## Refuted$/, /^## Notes for the fixer$/,
     ])
     if (bodyLines(p.body) > 120) bad(reviewFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 120`)
-    const rows = p.body.split('\n').filter(l => /^\|\s*F\d+\s*\|/.test(l))
+    const findingsOnly = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+    const rows = findingsOnly.split('\n').filter(l => /^\|\s*(?:PPW-|—|F\d|[A-Z]{2,7}-\d)/.test(l))
     for (const r of rows) {
       const cells = r.split('|').map(c => c.trim())
-      if (!/^D\d+$/.test(cells[2] ?? '')) bad(reviewFile, `finding row "${cells[1]}" has no D# in column 2 — reviews are finalized after reconciliation`)
-      if (!SEV.includes(cells[3] ?? '')) bad(reviewFile, `finding row "${cells[1]}" severity cell is "${cells[3]}" — one of ${SEV.join(' ')} only`)
+      if (!/^(PPW-\d+|—)$/.test(cells[1] ?? '')) bad(reviewFile, `finding row key "${cells[1]}" — PPW-<n> only (doc-contracts.md); reviews are finalized after reconciliation`)
+      if (!SEV.includes(cells[2] ?? '')) bad(reviewFile, `finding row "${cells[1]}" severity cell is "${cells[2]}" — one of ${SEV.join(' ')} only`)
     }
     if (existsSync(join(dir, `findings-v${pass}.md`))) bad(`findings-v${pass}.md`, 'findings files are retired — detail lives on the ledger row (doc-contracts.md)')
   }
@@ -120,9 +121,9 @@ if (existsSync(join(dir, resolutionFile))) {
     if (/^findings:/m.test(p.fm)) bad(resolutionFile, 'frontmatter carries a findings map — per-finding state lives in the "## Findings" body table (doc-contracts.md)')
     const RSTAT = /^(fixed|wont-fix|deferred|disputed|false-positive|backlog)$/
     const findingsSection = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
-    for (const r of findingsSection.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*(D#|-)/.test(l))) {
+    for (const r of findingsSection.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*(ID|D#|-)/.test(l))) {
       const cells = r.split('|').map(c => c.trim())
-      if (!/^D\d+$/.test(cells[1] ?? '')) { bad(resolutionFile, `findings row key "${cells[1]}" — D# only (doc-contracts.md)`); continue }
+      if (!/^PPW-\d+$/.test(cells[1] ?? '')) { bad(resolutionFile, `findings row key "${cells[1]}" — PPW-<n> only (doc-contracts.md)`); continue }
       resolutionKeys.push(cells[1])
       if (!RSTAT.test(cells[2] ?? '')) bad(resolutionFile, `${cells[1]} status "${cells[2]}" — one status word, never "verified" (that belongs to a re-review)`)
       if ((cells[4] ?? '').length > 240) bad(resolutionFile, `${cells[1]} note is ${cells[4].length} chars — cap is 240; the story goes in Decisions`)
@@ -145,12 +146,12 @@ if (existsSync(join(dir, resolutionFile))) {
 const STATUSES = new Set(['open', 'in-progress', 'fixed', 'verified', 'wont-fix', 'deferred', 'disputed', 'false-positive', 'backlog'])
 const blocksOf = raw => {
   const map = new Map()
-  for (const m of raw.matchAll(/^### (D\d+)[^\n]*\n([\s\S]*?)(?=^### D\d+|(?![\s\S]))/gm)) map.set(m[1], m[2])
+  for (const m of raw.matchAll(/^### (PPW-\d+)[^\n]*\n([\s\S]*?)(?=^### PPW-\d+|(?![\s\S]))/gm)) map.set(m[1], m[2])
   return map
 }
 if (existsSync(join(dir, 'ledger.md'))) {
   const raw = read('ledger.md')
-  for (const m of raw.matchAll(/^\|\s*(D\d+)\s*\|(.*)\|\s*$/gm)) {
+  for (const m of raw.matchAll(/^\|\s*(PPW-\d+)\s*\|(.*)\|\s*$/gm)) {
     const cells = m[2].split('|').map(c => c.trim())
     const status = cells[4]
     if (status !== undefined && status !== '' && !STATUSES.has(status.replace(/\*/g, '')))
@@ -178,7 +179,7 @@ if (existsSync(join(dir, 'ledger.md'))) {
 
 // ---------- cross-file: blockers answered when a resolution exists ----------
 if (reviewFm && resolutionKeys.length) {
-  const blockers = (fmVal(reviewFm, 'blockers') ?? '').match(/D\d+/g) ?? []
+  const blockers = (fmVal(reviewFm, 'blockers') ?? '').match(/PPW-\d+/g) ?? []
   for (const b of blockers) if (!resolutionKeys.includes(b))
     bad(resolutionFile, `review blocker ${b} has no entry in the findings map`)
 }
