@@ -22,7 +22,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
 | D9 | 🟡 | v1 (BUG-5) | The migration writes an unfiltered `TEXT` index while the runtime model filters it on Postgres | `Migrations/20260527075359_AddOrderIdempotencyKey.cs:34` | verified | `650f615` |
 | D10 | 🟡 | v1 (DOC-1) | A comment credits the per-statement constraint check to Postgres alone, though SQLite enforces it too | `Services/OrderService.cs:405` | verified | `650f615` |
 | D11 | 🟡 | v1 (DOC-2) | The unique-index null comment reads as if duplicate nulls were forbidden | `Data/PhotoPrintDbContext.cs:146` | verified | `650f615` |
-| D12 | 🟡 | v1 (DOC-3) | The ddd-02 design sketch puts conflict resolution in the controller, the code puts it in the order service | `memory-bank/…/ddd-02` | deferred | `650f615` |
+| D12 | 🟡 | v1 (DOC-3) | The ddd-02 design sketch puts conflict resolution in the controller, the code puts it in the order service | `memory-bank/…/ddd-02` | backlog | `650f615` |
 | D13 | ⚪ | v1 (QUAL-2) | A second conflict exception type exists only to carry the divergent-field payload | `Exceptions/IdempotencyConflictException.cs` | wont-fix | `b52f4b6` |
 | D14 | ⚪ | v1 (QUAL-5) | The correlation id is read out of the request items bag by a raw string key in two places | `Controllers/PaymentsController.cs:109` | verified | `650f615` |
 | D15 | ⚪ | v1 (QUAL-6) | Each create saves twice, once in the service and once in the controller | `Controllers/PaymentsController.cs:65` | wont-fix | `b52f4b6` |
@@ -42,7 +42,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
 | D29 | ⚪ | v5 (DOC-2) | No document states that the gateway is keyed by the order id rather than the caller's key | `memory-bank/…/ddd-02` | verified | `3faaae6` |
 | D30 | ⚪ | v5 (QUAL-1) | The pre-insert and post-collision resolution blocks are near duplicates | `Services/OrderService.cs` | verified | `3faaae6` |
 | D31 | ⚪ | v5 (QUAL-2) | Provider names are written out as literal strings in four places | `Data/PhotoPrintDbContext.cs` | verified | `3faaae6` |
-| D32 | ⚪ | v5 (QUAL-3) | The controller saves through the database context itself rather than through the order service | `Controllers/PaymentsController.cs:125` | deferred | `fbb4c7c` |
+| D32 | ⚪ | v5 (QUAL-3) | The controller saves through the database context itself rather than through the order service | `Controllers/PaymentsController.cs:125` | backlog | `fbb4c7c` |
 | D33 | ⚪ | v5 (QUAL-4) | The payment request builders and the SQLite fixture setup are duplicated across test files | `Tests/…` | verified | `fbb4c7c` |
 | D34 | ⚪ | v5 (QUAL-5) | The order-number query raises a compiler warning and its Postgres branch has no test | `Services/OrderNumberService.cs:33` | verified | `3faaae6` |
 | D35 | ⚪ | v6 (DOC-3) | The ddd-02 controller sketch still forwards the caller's key to Stripe, contradicting the section above it | `memory-bank/…/ddd-02:265` | fixed | `3faaae6` |
@@ -188,6 +188,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - round 1: deferred — historical-document churn, batched into a later documents pass
   - v2: deferral accepted @`b52f4b6` · v4: still batched @`650f615`
   - 2026-08-11: still deferred at close and not carried to `reviews/backlog.md`
+  - 2026-08-11: owner ruled — queued to backlog.md
 
 ### D13 — A second conflict exception type exists only to carry the divergent-field payload
 
@@ -399,6 +400,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v6: deferral accepted @`3faaae6`
   - v7: deferral re-affirmed @`fbb4c7c` — the real fix is a repository-wide boundary decision
   - 2026-08-11: still deferred at close and not carried to `reviews/backlog.md`
+  - 2026-08-11: owner ruled — queued to backlog.md
 
 ### D33 — The payment request builders and the SQLite fixture setup are duplicated across test files
 

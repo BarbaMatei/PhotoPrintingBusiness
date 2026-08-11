@@ -16,6 +16,8 @@ records were retrofitted and their loops closed retroactively.
 
 | D# | Target | Sev | What | Area |
 |---|---|---|---|---|
+| D12 | 035-payment-idempotency | 🟡 | The ddd-02 design sketch puts conflict resolution in the controller, the code puts it in the order service (was 035 DOC-3) | `memory-bank/bolts/035` |
+| D32 | 035-payment-idempotency | ⚪ | The controller saves through the database context itself rather than through the order service (was 035 QUAL-3) | `Controllers/payments` |
 | D36 | 035-payment-idempotency | 🟠 | Entire Postgres production DB path is unexercised by tests — deferred to the migration/3-env phase (was 035 DB-1) | `data-stack/migrations` |
 | D39 | 035-payment-idempotency | 🟡 | Global single-column idempotency-key uniqueness = cross-tenant existence oracle + key-squatting; durable fix needs a per-tenant composite index (migration) (was 035 SEC-1) | `Orders/idempotency` |
 | D40 | 035-payment-idempotency | 🟡 | EuPlatesc recovery-replay regenerates a different redirect URL (no gateway idempotency key); row-lock fix needs the Postgres arm (was 035 BUG-2) | `Controllers/payments` |
