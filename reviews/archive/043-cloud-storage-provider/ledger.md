@@ -1,314 +1,1158 @@
 ---
 type: review-ledger
 target: 043-cloud-storage-provider
-updated: 2026-07-22
+updated: 2026-08-11
 closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 ---
 
-# Canonical finding ledger — 043-cloud-storage-provider
+# Ledger — 043-cloud-storage-provider
 
-Stable `D#` identities for this target, per the README's persistent-ledger standard. Each real defect
-gets a `D#` that lives forever; each pass's pass-local `F#` maps onto a `D#` **after** the blinded pass
-completes (blinding is preserved during the search — finders never see `D#`).
+## Findings
 
-**v1 is the first pass**, so `F#` ↔ `D#` is 1:1. **v3 (delta-discovery, 2026-07-14)** added D20–D34
-and re-found three prior items (D19, D13, D5b). Those three re-finds are *not* independent-draw
-overlap for a capture–recapture estimate: v1 and v3 ran against **different commits** (v3 is
-post-fix), and all three were known carry-forward / deferred-to-this-lens items, so they were
-*expected* to re-surface, not a saturation signal (per the README, overlap only estimates a
-population across **parallel blinded passes on one frozen commit** — the still-owed certification pair).
+| D# | Sev | First seen | Title | File | Status | Affirmed |
+|---|---|---|---|---|---|---|
+| D1 | 🔴 | v1 (F1) | Admin ZIP fulfilment download reads promoted originals from the local tier only | `Services/AdminOrderService.cs:168` | verified | `1e7b9d3` |
+| D2 | 🟠 | v1 (F2) | Cleanup job deletes Cloud uploads against the local tier and never deletes the large preview | `BackgroundJobs/UploadCleanupJob.cs:67` | verified | `1e7b9d3` |
+| D3 | 🟠 | v1 (F3) | Missing cloud original throws `AmazonS3Exception`, not `FileNotFoundException` → preview 500 | `Services/S3StorageService.cs:91` | verified | `1e7b9d3` |
+| D4 | 🟠 | v1 (F4) | Purge on Shipped fires once and skips an in-flight promotion → original never purged until reboot | `Services/AdminOrderService.cs:136` | verified | `1e7b9d3` |
+| D5 | 🟠 | v1 (F5) | Presigned-URL lifetime and the hardcoded `Cache-Control` max-age diverge → expired images | `Controllers/UploadsController.cs:185` | verified | `1e7b9d3` |
+| D5b | 🟠 | v1 (F5 part b) | Lightbox large URL is minted at list fetch and expires after its 1h lifetime, with no refresh | `UI/…/order-detail-page.ts` | verified | `972a8b4` |
+| D6 | 🟠 | v1 (F6) | Promotion worker disposes the concurrency semaphore while tasks are still in flight | `BackgroundJobs/OrderPhotoPromotionWorker.cs:108` | verified | `1e7b9d3` |
+| D7 | 🟠 | v1 (F7) | Migration dropping the `FilePath` NOT NULL constraint is unverified by any test | `Migrations/…MakeUploadFilePathNullable.cs` | verified | `1e7b9d3` |
+| D8 | 🟡 | v1 (F8) | Preview read races promotion deleting the local thumbnail → 500 instead of 404 | `Controllers/UploadsController.cs:190` | verified | `1e7b9d3` |
+| D9 | 🟡 | v1 (F9) | Duplicate payment webhooks race `Order.Status`; there is no concurrency token | `Controllers/WebhooksController.cs:218` | deferred | `2d02b13` |
+| D10 | 🟡 | v1 (F10) | 403 rather than 404 for another user's order tells an attacker which order ids exist | `Services/OrderService.cs:468` | wont-fix | `ac97e42` |
+| D11 | 🟡 | v1 (F11) | `/photos` returns presigned URLs with no `Cache-Control: private` | `Controllers/OrdersController.cs:82` | verified | `1e7b9d3` |
+| D12 | 🟡 | v1 (F12) | Guest-placed orders cannot reach the new `/photos` endpoint | `Controllers/OrdersController.cs:10` | wont-fix | `1e7b9d3` |
+| D13 | 🟠 | v1 (F13) | Empty-state copy collapses four causes into one permanent "no longer available", with no retry | `UI/…/order-detail-page.ts:103` | verified | `972a8b4` |
+| D14 | 🟡 | v1 (F14) | Cloud preview regeneration branch never runs — every test presets the thumbnail path | `Tests/…/CloudPreviewIntegrationTests.cs:225` | verified | `2d02b13` |
+| D15 | 🟡 | v1 (F15) | `GET /orders/{id}/photos` has no integration test, so its auth pipeline is unproven | `Controllers/OrdersController.cs:73` | verified | `1e7b9d3` |
+| D16 | 🟡 | v1 (F16) | Promoter row-update-failure and preview-generation-failure branches untested | `Services/OrderPhotoPromoter.cs:198` | verified | `1e7b9d3` |
+| D17 | 🟡 | v1 (F17) | Paid-then-cancelled originals: purge behaviour undecided and untested | `BackgroundJobs/OriginalPurgeRecoveryScanner.cs:54` | verified | `2d02b13` |
+| D18 | 🟡 | v1 (F18) | `BackfillCommand` and `S3BucketVerifier` have no tests at all | `Cli/BackfillCommand.cs:42` | verified | `1e7b9d3` |
+| D19 | 🟠 | v3 (F1) | Promotion recovery left boot-only while its purge sibling was made periodic | `BackgroundJobs/PromotionRecoveryScanner.cs` | verified | `972a8b4` |
+| D20 | 🟡 | v3 (F15) | The `FilePath` NOT NULL drop is verified on SQLite only, never on Postgres | `Tests/…/UploadThumbnailPathMigrationTests.cs:48` | deferred | `ac97e42` |
+| D21 | 🟠 | v3 (F3) | Purge sweep untested — tests call the sweep by reflection and `ExecuteAsync` is never driven | `BackgroundJobs/OriginalPurgeRecoveryScanner.cs:60` | verified | `972a8b4` |
+| D22 | 🟠 | v3 (F5) | Cancel-purge try/catch untested — a throwing purger is never exercised | `Services/AdminOrderService.cs:235` | verified | `972a8b4` |
+| D23 | 🟠 | v3 (F4) | Production-complete purge lacks the cancel path's try/catch → 500 after the transition committed | `Services/AdminOrderService.cs:135` | verified | `972a8b4` |
+| D24 | 🟠 | v3 (F2) | Tier resolve throws with cloud disabled and wedges every cleanup batch | `BackgroundJobs/UploadCleanupJob.cs:92` | verified | `972a8b4` |
+| D25 | 🟡 | v3 (F9) | ZIP tier resolve throws mid-stream with cloud disabled → truncated admin ZIP | `Services/AdminOrderService.cs:171` | verified | `972a8b4` |
+| D26 | 🟡 | v3 (F10) | Cleanup routes by the row's tier, so a failed promotion's cloud litter is never reclaimed | `BackgroundJobs/UploadCleanupJob.cs:92` | deferred | `972a8b4` |
+| D27 | 🟡 | v3 (F11) | Duplicate concurrent promotion re-creates a just-purged cloud original as an orphan | `Services/OrderPhotoPromoter.cs:168` | deferred | `2d02b13` |
+| D28 | 🟡 | v3 (F12) | New sweep-interval validator untested → an interval of 0 boots, then crashes the host | `Configuration/ArchiveSettings.cs:86` | verified | `972a8b4` |
+| D29 | 🟡 | v3 (F14) | Preview re-resolve-to-local success branch untested | `Controllers/UploadsController.cs:200` | verified | `972a8b4` |
+| D30 | 🟡 | v3 (F13) | Backfill filter test never crosses the exclusion boundary | `Tests/…/BackfillCommandTests.cs:40` | verified | `972a8b4` |
+| D31 | 🟠 | v3 (F8) | Upload thumbnail mints an unrevoked blob URL on every change-detection cycle | `UI/…/photo-thumbnail.component.ts:86` | verified | `972a8b4` |
+| D32 | 🟡 | v3 (F16) | Order detail redirects on any fetch error, so a transient failure bounces the user with no retry | `UI/…/order-detail-page.ts:357` | verified | `972a8b4` |
+| D33 | 🟡 | v3 (F17) | Lightbox modal has no focus trap, dialog role, modal flag or focus restore | `UI/…/photo-lightbox.component.ts` | verified | `972a8b4` |
+| D34 | 🟡 | v3 (F18) | Order detail loads only in `ngOnInit` despite a route-bound id → latent staleness | `UI/…/order-detail-page.ts:357` | deferred | `972a8b4` |
+| D35 | 🟡 | v4 (NF1) | Periodic promotion sweep has no in-flight dedup, so it can start a second promotion of one order | `BackgroundJobs/PromotionRecoveryScanner.cs` | deferred | `ac97e42` |
+| D36 | 🟠 | v5 (F1) | A stale lightbox photo id re-opens a closed lightbox when a thumbnail URL expires | `UI/…/order-detail-page.ts` | verified | `2d02b13` |
+| D37 | 🟠 | v5 (F3) | The periodic re-scan is untested and untestable — the interval has no test seam | `BackgroundJobs/PromotionRecoveryScanner.cs` | deferred | `ac97e42` |
+| D38 | 🟠 | v5 (F2) | Unroutable Cloud rows are skipped after the fetch, starving local-orphan cleanup | `BackgroundJobs/UploadCleanupJob.cs` | verified | `2d02b13` |
+| D39 | 🟡 | v5 (F13) | Renamed guard tests seed an empty database, so they pass for the wrong reason | `Tests/…/PromotionRecoveryScannerTests.cs` | backlog | `2d02b13` |
+| D40 | 🟡 | v5 (F11) | The anti-refresh-loop guard has no test | `UI/…/order-detail-page.ts` | backlog | `2d02b13` |
+| D41 | 🟡 | v5 (F12) | The lightbox focus trap has no spec | `UI/…/photo-lightbox.component.ts` | backlog | `ac97e42` |
+| D42 | 🟡 | v5 (F9) | The lightbox tells the user to reload while the app is already fetching a fresh URL | `UI/…/photo-lightbox.component.ts` | backlog | `ac97e42` |
+| D43 | 🟡 | v5 (F8) | A 401 for a non-authenticated user leaves a blank order body, with no error and no redirect | `UI/…/order-detail-page.ts` | backlog | `2d02b13` |
+| D44 | ⚪ | v5 (F14) | Order retries and init subscriptions have no in-flight dedup or teardown | `UI/…/order-detail-page.ts` | backlog | `2d02b13` |
+| D45 | 🟡 | v5 (F6) | The ZIP pre-flight throws an unmapped exception → a generic 500 logged as unhandled | `Services/AdminOrderService.cs` | backlog | `ac97e42` |
+| D46 | 🟡 | v5 (F5) | The periodic sweep re-enqueues permanently failed promotions forever | `BackgroundJobs/PromotionRecoveryScanner.cs` | deferred | `ac97e42` |
+| D47 | 🟡 | v5 (F7) | The cloud-enabled flag is fixed at boot, so switching provider at runtime needs a restart | `BackgroundJobs/PromotionRecoveryScanner.cs` | deferred | `ac97e42` |
+| D48 | 🟡 | v5 (F10) | The lightbox failure flag is reset only on a changed URL, so an identical refreshed URL stays stuck | `UI/…/photo-lightbox.component.ts` | backlog | `ac97e42` |
+| D49 | 🔴 | v7 (F1) | The S3 upload rewinds the stream outside the retry loop → a retried upload silently loses the photo | `Services/S3StorageService.cs:63` | verified | `ac97e42` |
+| D50 | 🟠 | v7 (F2) | Purge and retention destroy a photo a second still-active order needs | `Services/OriginalPurger.cs:103` | verified | `ac97e42` |
+| D51 | 🟠 | v7 (F3) | The promotion worker holds its concurrency slot through the whole retry backoff | `BackgroundJobs/OrderPhotoPromotionWorker.cs:107` | verified | `ac97e42` |
+| D52 | 🟠 | v7 (F4) | The photos query has no soft-delete filter → presigned URLs for uploads whose blobs are gone | `Services/OrderService.cs:460` | verified | `ac97e42` |
+| D53 | 🟠 | v7 (F5) | The webhook paid transition is an unguarded check-then-act → duplicate confirmation emails | `Controllers/WebhooksController.cs:215` | deferred | `ac97e42` |
+| D54 | 🟠 | v7 (F6) | Upload service re-advertises HEIC while the validator and the UI still reject it | `Services/UploadService.cs:52` | verified | `ac97e42` |
+| D55 | 🟠 | v7 (F7) | Client filename is not truncated to the column width → Postgres rejects it and returns 500 | `Services/UploadService.cs:113` | verified | `ac97e42` |
+| D56 | 🟠 | v7 (F8) | The retention audit event is written before the save, so a failed save leaves false audit records | `BackgroundJobs/ArchiveRetentionJob.cs:123` | verified | `ac97e42` |
+| D57 | 🟠 | v7 (F9) | Cloud-off purge refusal is logged at Error on every ship in the default configuration | `Services/OriginalPurger.cs:43` | verified | `ac97e42` |
+| D58 | 🟠 | v7 (F10) | The promotion worker's retry, backoff and re-enqueue path is entirely untested | `BackgroundJobs/OrderPhotoPromotionWorker.cs:130` | verified | `ac97e42` |
+| D59 | 🟠 | v7 (F11) | No test asserts that the payment webhook enqueues promotion | `Controllers/WebhooksController.cs:183` | verified | `ac97e42` |
+| D60 | 🟠 | v7 (F12) | A real cloud provider is never exercised — only a skip-gated MinIO suite and fakes | `Tests/…/S3StorageServiceIntegrationTests.cs:18` | deferred | `ac97e42` |
+| D61 | 🟡 | v7 | Retention's fixed candidate window is starved by rows whose delete keeps failing | `BackgroundJobs/ArchiveRetentionJob.cs:98` | backlog | `ac97e42` |
+| D62 | 🟡 | v7 | A read failure part-way through the admin ZIP truncates the archive after the headers are sent | `Services/AdminOrderService.cs:197` | backlog | `ac97e42` |
+| D63 | 🟡 | v7 | Preview cache-fill regeneration races the retention delete → an orphaned blob and a null reference | `Services/UploadService.cs:203` | backlog | `ac97e42` |
+| D64 | 🟡 | v7 | A failed best-effort local delete in the promoter leaks local bytes nothing reclaims | `Services/OrderPhotoPromoter.cs:212` | backlog | `ac97e42` |
+| D65 | 🟡 | v7 | The local storage root re-anchor uses a prefix match with no separator boundary | `Services/LocalStorageService.cs:99` | backlog | `ac97e42` |
+| D66 | 🟡 | v7 | The ZIP entry extension is taken from the untrusted client filename, not the validated type | `Services/AdminOrderService.cs:190` | backlog | `ac97e42` |
+| D67 | 🟡 | v7 | Batch upload caps total bytes but not the number of files | `Controllers/UploadsController.cs:102` | backlog | `ac97e42` |
+| D68 | 🟡 | v7 | A broken grid thumbnail has no fallback or retry after the one presigned-URL refresh | `UI/…/order-detail-page.ts:472` | backlog | `ac97e42` |
+| D69 | 🟡 | v7 | Originals of orders that never reach production-complete or Cancelled escape the retention window | `BackgroundJobs/ArchiveRetentionJob.cs:92` | backlog | `ac97e42` |
+| D70 | 🟡 | v7 | The documented 502 for a persistent storage failure is not implemented; it surfaces as 500 | `Services/S3StorageService.cs:145` | backlog | `ac97e42` |
+| D71 | 🟡 | v7 | Idempotent-skip reasons are logged at Debug and never emit under the Information floor | `Services/OrderPhotoPromoter.cs:120` | backlog | `ac97e42` |
+| D72 | 🟡 | v7 | Transient and permanent cloud-write failures collapse into one warning, so poison is retried | `Services/OrderPhotoPromoter.cs:182` | backlog | `ac97e42` |
+| D73 | 🟡 | v7 | The preview cache-hit path lost its no-tracking read | `Services/UploadService.cs:139` | backlog | `ac97e42` |
+| D74 | 🟡 | v7 | The promotable-status set is written out three times under a false single-source comment | `Cli/BackfillCommand.cs:43` | backlog | `ac97e42` |
+| D75 | 🟡 | v7 | The S3 retry classification, re-upload and presign protocol are untested | `Services/S3StorageService.cs:60` | backlog | `ac97e42` |
+| D76 | 🟡 | v7 | Storage wiring, configuration and the CLI sat outside the lens list; the region setting is a trap | `Extensions/StorageExtensions.cs:56` | backlog | `ac97e42` |
+| D77 | 🟡 | v7 | Recovery and retention sweeps run unindexed full scans every six hours | `Data/Configurations/UploadConfiguration.cs:30` | backlog | `ac97e42` |
+| D78 | ⚪ | v7 | The promoter reads the whole original into an array and leaves memory streams undisposed | `Services/OrderPhotoPromoter.cs:138` | backlog | `ac97e42` |
+| D79 | ⚪ | v7 | The best-effort orphan-thumbnail delete swallows its exception with no log | `Services/UploadService.cs:222` | backlog | `ac97e42` |
+| D80 | ⚪ | v7 | Local preview cache header disagrees with the documented one | `Controllers/UploadsController.cs:26` | backlog | `ac97e42` |
+| D81 | ⚪ | v7 | A freshly generated local thumbnail is re-read from disk on a cache miss | `Services/UploadService.cs:240` | backlog | `ac97e42` |
+| D82 | ⚪ | v7 | Order detail shows both the interceptor toast and an inline error for one failure | `UI/…/order-detail-page.ts:403` | backlog | `ac97e42` |
+| D83 | 🟠 | v9 | "Photos no longer available" is shown for a just-paid order and for pending orders | `UI/…/order-detail-page.ts` | fixed | `b9af326` |
+| D84 | 🟠 | v9 | No test asserts that the EuPlatesc payment notification enqueues promotion | `Tests/…/PaymentControllerIntegrationTests.cs` | wont-fix | — |
+| D85 | 🟠 | v9 | The backfill command was outside the review file list, and backfill against the live worker is untested | `Cli/BackfillCommand.cs` | deferred | `d041295` |
+| D86 | 🟡 | v9 | Retention deletes the blobs before it persists the null keys → a broken-URL window | `BackgroundJobs/ArchiveRetentionJob.cs:146` | backlog | `ac97e42` |
+| D87 | 🟡 | v9 | The retention sweep query has no soft-delete filter, so it reprocesses deleted rows | `BackgroundJobs/ArchiveRetentionJob.cs:96` | backlog | `ac97e42` |
+| D88 | 🟡 | v9 | Promoter tests assert the cloud keys written but never the bytes | `Tests/…/OrderPhotoPromoterTests.cs` | backlog | `ac97e42` |
+| D89 | ⚪ | v9 | Code comments cite finding, decision and design-record ids, which the repo rule bans | codebase-wide | fixed | `09173c4` |
+| D90 | 🟡 | v9 | Closing the lightbox during a refresh has no spec; only closing before the error is tested | `UI/…/order-detail-page.spec.ts` | backlog | `ac97e42` |
 
-Status column reflects the cumulative outcome through **resolution-v5 (2026-07-22 fix round)**:
-`verified` = fix held (revert-and-rerun / construction / inspection); `fixed` = fixed with a
-regression test, awaiting the next verification pass; `deferred` = assigned to future work
-(bolt-035 / 3-env); `backlog` = triaged Low/Cleanup that does not re-arm the loop (severity-based
-stop rule, README 2026-07-22); `wont-fix` = decision upheld. v4 flipped D13/D5b/D19/D21–D34's 14
-fixables to `verified` and upheld the 4 deferrals; **v5 added D36–D48 (13 new, all fix-generative)
-and corroborated D35**. **resolution-v5** then fixed the two recommended Mediums (**D36, D38**),
-deferred **cluster A (D35/D37/D46/D47)** to bolt-035 as one design item, and sent the Low/Cleanup
-tail (**D39–D45, D48**) to **backlog**. **v6 (independent verification, 2026-07-22) verified
-D36 + D38** non-vacuously. The fix→verify loop for the v5 population went quiet — but **v7 (the
-certification pair, 2026-07-22) did NOT certify**: the first full-manifest audit ever run on this
-feature found **1 High (D49, silent data loss on S3 retry)** + a **cross-order data-loss class (D50)**
-independently confirmed by both passes, plus D51–D82. Per the protocol, new serious findings reset the
-counter → back to a fix round. **resolution-v7 (2026-07-22, same day) then fixed all 8 fixable serious
-findings** (D49 High + D50/D51/D52/D54/D55/D56/D57, plus coverage D58/D59) with regression tests @
-`ac97e42` (incl. the micro-review's **A4 class-sweep**: the D50 guard extended to UploadCleanupJob's
-referenced-retention branch — a third site of the same class), deferred **D53 → bolt-035** (with D9)
-and **D60 → 3-env** (with D20), and sent **D61–D82 to backlog**. **v8 (independent verification,
-2026-07-22) verified all 10 fixes non-vacuously** (D49 red with its exact data-loss signature; D51
-red with the slot-starvation timeout; D59 by mutation) and upheld both deferrals + the backlog —
-**0 reopened, 0 new.** **v9 (single-pass certification, owner-approved deviation, 2026-07-22 @
-`ac97e42`) — CERTIFIED CLEAN OF SERIOUS DEFECTS: 0 High, 0 fix-caused regression.** The 10 Mediums
-it surfaced are all accepted-residual / folded-into-deferred / re-raises / sub-serious follow-ups
-(new: D83 empty-state-before-promotion, D84 EuPlatesc coverage, D85 backfill review-gap; new Lows
-D86–D88/D90; new codebase-wide Cleanup D89). Under the severity-based stop rule the loop does **not**
-re-arm — 043's serious population is closed and confirmed. Remaining Mediums/Lows/Cleanup are
-triaged follow-ups, not blockers.
+## Details
 
-| D# | First seen | Sev (v1) | Status (through v2) | Title |
-|----|-----------|----------|--------|-------|
-| D1 | v1 · F1 | 🔴 High | **verified** *(was blocker)* | Admin ZIP fulfilment download reads promoted originals from local tier only |
-| D2 | v1 · F2 | 🟠 Med | **verified** | UploadCleanupJob deletes Cloud uploads against local tier; never deletes LargePreviewPath |
-| D3 | v1 · F3 | 🟠 Med | **verified** | Cloud missing-original throws AmazonS3Exception not FileNotFoundException → preview 500 |
-| D4 | v1 · F4 | 🟠 Med | **verified** | Purge on Shipped one-shot; skips in-flight promotion → original never purged until reboot |
-| D5 | v1 · F5 | 🟠 Med | **verified** (part a); **D5b → confirmed v3** | Presigned-URL TTL vs hardcoded Cache-Control max-age divergence → expired/broken images |
-| D5b | v1 · F5(b) | 🟠 Med | **verified** (v4 · F7) | Lightbox `largeUrl` captured at list-fetch expires after 1h TTL; no refresh/`(error)` fallback → broken image |
-| D6 | v1 · F6 | 🟠 Med | **verified** | Promotion worker disposes concurrency semaphore under in-flight tasks on shutdown |
-| D7 | v1 · F7 | 🟠 Med | **verified** | Migration DDL (FilePath NOT-NULL drop) unverified by tests/CI |
-| D8 | v1 · F8 | 🟡 Low | **verified** | Preview GET TOCTOU: promotion deletes local thumb between service read and stream-open → 500 |
-| D9 | v1 · F9 | 🟡 Low | **deferred** → bolt-035 | Concurrent duplicate payment webhooks race Order.Status (no concurrency token) |
-| D10 | v1 · F10 | 🟡 Low | **wont-fix** (403 convention) | 403-vs-404 order-existence oracle on /photos and /detail |
-| D11 | v1 · F11 | 🟡 Low | **verified** | /photos returns presigned URLs without Cache-Control: private |
-| D12 | v1 · F12 | 🟡 Low | **wont-fix** (owner: user-only) | Guest-placed orders unreachable from the new /photos endpoint |
-| D13 | v1 · F13 | 🟡 Low → 🟠 | **verified** (v4 · F6) *(four-way empty signal → follow-up)* | Empty-state copy conflates transient error / 401-expired / not-yet-promoted / purged into one permanent "no longer available"; no retry; contradictory toast on 500 |
-| D14 | v1 · F14 | 🟡 Low | **verified** | Cloud preview regen branch never exercised (fake presets ThumbnailPath) |
-| D15 | v1 · F15 | 🟡 Low | **verified** | GET /orders/{id}/photos has no integration test (auth pipeline untested) |
-| D16 | v1 · F16 | 🟡 Low | **verified** | Promoter row-update-failure and preview-generation-failure branches untested |
-| D17 | v1 · F17 | 🟡 Low | **verified** (owner: purge-on-cancel) | Paid-then-cancelled original-purge lifecycle |
-| D18 | v1 · F18 | 🟡 Low | **verified** | BackfillCommand and S3BucketVerifier have zero tests |
-| D19 | v2 · carry-fwd | 🟡 Low → 🟠 | **verified** (v4 · F1) | PromotionRecoveryScanner still boot-only while F4 made its purge sibling periodic — terminal-Local paid orders never reach cloud until reboot (ADR-008 durability intent unmet; local copy still serves) |
-| D20 | v3 · F15 | 🟡 Low | **deferred** → 3-env/Testcontainers *(upheld v4)* | FilePath NOT-NULL drop migration verified only on SQLite, not Postgres (recurring db-parity / DB-1; *plausible*, not a live defect today) |
-| D21 | v3 · F3 | 🟠 Med | **verified** (v4 · F3) | OriginalPurgeRecoveryScanner sweep untested — F4's periodic conversion left tests calling RunSweepAsync by reflection, `ExecuteAsync` undriven (coverage **regression**) |
-| D22 | v3 · F5 | 🟠 Med | **verified** (v4 · F5) | Purge-on-cancel try/catch (F17) untested — throwing purger never exercised |
-| D23 | v3 · F4 | 🟠 Med | **verified** (v4 · F4) | Production-complete purge lacks the cancel path's try/catch (F17 **class-sweep miss**) → 500 after commit+email+SignalR |
-| D24 | v3 · F2 | 🟠 Med | **verified** (v4 · F2) | UploadCleanupJob `For(Cloud)` throws (uncaught) when cloud disabled → deterministic batch **wedges all cleanup** (fix-generated by F2 routing) |
-| D25 | v3 · F9 | 🟡 Low | **verified** (v4 · F9) | StreamZipAsync `For(Cloud)` throws mid-stream when cloud disabled → corrupt admin ZIP (**sibling class of D24**; F1 routing) |
-| D26 | v3 · F10 | 🟡 Low | **deferred** (orphan-reclaim design) *(upheld v4)* | Cleanup routes by StorageLocation → a **failed** promotion's cross-tier cloud litter never reclaimed (F2 residual); F1's periodic sweep now self-heals the *transient*-failure case |
-| D27 | v3 · F11 | 🟡 Low | **deferred** → bolt-035 *(upheld v4; rationale incomplete → [[D35]])* | Duplicate concurrent promotion re-creates a just-purged cloud original as an unreclaimable orphan. v4: the deferral rests on the dup-webhook (D9) precondition, but this round's **F1 periodic sweep** is a **second, D9-independent trigger** (D35) — the ledger carries both |
-| D28 | v3 · F12 | 🟡 Low | **verified** (v4 · F12) | New `PurgeSweepIntervalHours<=0` validator (F4) untested → `=0` boots then `PeriodicTimer(0)` crashes host |
-| D29 | v3 · F14 | 🟡 Low | **verified** (v4 · F14) *(coverage; no live bug)* | Preview TOCTOU re-resolve-to-Local **200** branch (F8) untested |
-| D30 | v3 · F13 | 🟡 Low | **verified** (v4 · F13) | BackfillCommand filter-drift test (F18) never crosses the exclusion boundary (Cancelled/PaymentFailed unseeded) |
-| D31 | v3 · F8 | 🟠 Med | **verified** (v4 · F8) *(pre-existing, upload flow)* | photo-thumbnail `localUrl()` mints an unrevoked blob URL every CD cycle (leak/flicker) — **not a 043 regression** |
-| D32 | v3 · F16 | 🟡 Low | **verified** (v4 · F16) *(Medium strand refuted)* | getOrderDetail blanket catchError bounces on transient/5xx with no retry (the logged-out-**strand** Medium was refuted — authGuard covers it) |
-| D33 | v3 · F17 | 🟡 Low | **verified** (v4 · F17) | Lightbox modal lacks focus trap / `role=dialog` / `aria-modal` / focus restore (a11y — first-time frontend coverage) |
-| D34 | v3 · F18 | 🟡 Low | **deferred** (latent) *(upheld v4)* | order-detail loads only in `ngOnInit` despite route-bound `orderId` input → stale on a future detail→detail reuse |
-| D35 | v4 · NF1 | 🟡 Low | **deferred** → bolt-035 *(cluster A; with D9/D27)* | F1's periodic promotion sweep has **no in-flight/queued dedup** (worker uses a plain `List<Task>`, `MaxConcurrentOrders=4`; promoter never re-reads live state before its row-flip) → the sweep can spawn a second concurrent promotion of one order and hit the [[D27]] orphan race **without** duplicate webhooks. v5's blinded race lens independently re-found the dedup gap (added consequence: a spurious `promotion.upload.failed reason=local-original-missing` + wasted retry). Folds into the D27/D9 concurrency-token fix (bolt-035) |
-| D36 | v5 · F1 | 🟠 Med | **verified** (v6 @2d02b13) *(regression — F7 fix, conv 4)* | Stale `lightboxPhotoId` (never cleared on close) makes `refreshPhotoUrls` **re-open a closed lightbox** when a grid/lightbox thumbnail's expired presigned URL fires `(error)`. 4 lenses converged |
-| D37 | v5 · F3 | 🟠 Med | **deferred** → bolt-035 *(cluster A)* | F1's periodic re-scan (its whole purpose) is **untested + untestable** — only the boot sweep is tested; delete the `PeriodicTimer` loop and the suite stays green; interval is whole-hours so no fast periodic test. Wants a `TimeSpan`/`TimeProvider` seam |
-| D38 | v5 · F2 | 🟠 Med | **verified** (v6 @036ba05) *(F2 fix edge)* | Unroutable-Cloud cleanup skip is **post-fetch**, so ≥500 aged Cloud rows re-fill the deterministic batch every sweep and **starve local-orphan cleanup indefinitely** — the "later sweep" comment is wrong. Needs a query-level `WHERE` filter |
-| D39 | v5 · F13 | 🟡 Low | **backlog** *(F1 test quality)* | Renamed `ExecuteAsync_ArchiveDisabled/_CloudTierOff` guard tests seed an **empty DB** → guard removal enqueues nothing anyway → `VerifyNoOtherCalls()` passes for the wrong reason. Seed a stuck Paid+Local order |
-| D40 | v5 · F11 | 🟡 Low | **backlog** *(F7 coverage)* | Anti-refresh-loop guard (`urlsRefreshed`) untested — no spec dispatches a *second* img `(error)` to assert no third `getOrderPhotos` fetch |
-| D41 | v5 · F12 | 🟡 Low | **backlog** *(F17 coverage)* | Lightbox focus-trap (`trapFocus` Tab/Shift+Tab `preventDefault` + refocus) has no spec — drop `preventDefault` and Tab escapes the modal, no test reddens |
-| D42 | v5 · F9 | 🟡 Low | **backlog** *(F7 UX)* | Auto-heal shows "Reîncarcă pagina" **while** silently re-fetching a fresh URL → the user is told to reload for an error the app then auto-recovers. Show a neutral reloading state first |
-| D43 | v5 · F8 | 🟡 Low | **backlog** *(hinted)* | 401 on order fetch for a **non-authenticated** user (interceptor guest branch only clears the token, no navigate) → `loadOrder` sets neither error nor redirect → **blank order body**, no retry |
-| D44 | v5 · F14 | ⚪ Cleanup | **backlog** | Order retries + `ngOnInit` subs have no in-flight dedup / `takeUntilDestroyed` / `switchMap` — last-arriving-wins on rapid retries; late response sets signals post-destroy |
-| D45 | v5 · F6 | 🟡 Low | **backlog** *(F9 residual)* | F9's ZIP pre-flight throws `InvalidOperationException` — unmapped → generic **500 logged "Unhandled exception"**; ops can't tell config-error from a crash. Map to 409/422 + Warning log |
-| D46 | v5 · F5 | 🟡 Low | **deferred** → bolt-035 *(cluster A)* | Periodic sweep re-enqueues **permanently-terminal** promotions (lost local original) **forever** — re-burns `MaxAttempts` + re-logs terminal every interval (boot-only never repeated this). Needs a give-up marker |
-| D47 | v5 · F7 | 🟡 Low | **deferred** → bolt-035 *(cluster A)* | `CloudEnabled` fixed at boot (`StorageRouter._cloud` set once) → a runtime `Provider=local→S3` flip **needs a restart**; contradicts the "retried when set back to S3" claim. Document or `IOptionsMonitor` |
-| D48 | v5 · F10 | 🟡 Low | **backlog** *(F7/F17 edge)* | Lightbox `failed()` reset keyed on `src !== lastSrc`; an identical refreshed presigned URL leaves `failed` stuck (+ `urlsRefreshed` blocks retry) → error until page reload |
-| D49 | v7 · A/B | 🔴 High | **verified** (v8 @c37ca44) *(was certification blocker)* | S3 `SaveAsync` rewinds the stream (`Position=0`) **outside** the Polly retry loop → a retried transient upload re-sends from EOF (truncated/empty), PUT "succeeds", row flips Cloud, local original deleted → **silent data loss** of a paid original (`S3StorageService.cs:63-72`) |
-| D50 | v7 · A+B | 🟠 Med | **verified** (v8 @4dfd755) *(design-checked; AwaitingPayment residual accepted)* | Shared-`Upload` cross-order data loss: purge (`OriginalPurger.cs:103`) and retention (`ArchiveRetentionJob.cs:95` `Any(PaidAt<cutoff)`) destroy a photo a **second still-active order** needs. Needs ref-count / all-orders-past-cutoff guard (rule-3 approach-check) |
-| D51 | v7 · A+B | 🟠 Med | **verified** (v8 @df1026d) *(design-checked: bounded detach)* | Promotion worker holds the concurrency slot **and DI scope** for the whole retry backoff (`Task.Delay` up to 3600s inside the semaphore) → all `MaxConcurrentOrders` slots park in backoff during a cloud blip, starving fresh promotions (`OrderPhotoPromotionWorker.cs:107/283`) |
-| D52 | v7 · A | 🟠 Med | **verified** (v8 @5cfc9f9) | `GetOrderPhotosAsync` lacks a `DeletedAt==null` filter → serves presigned URLs for soft-deleted uploads (blobs gone) → broken thumbnails/lightbox refresh can't fix (`OrderService.cs:460`) |
-| D53 | v7 · B | 🟠 Med | **deferred** → bolt-035 *(with [[D9]]; adds the duplicate-email consequence)* | Webhook Paid-transition unguarded check-then-act → concurrent duplicate Stripe deliveries double-enqueue promotion **and send duplicate confirmation emails** (`WebhooksController.cs:215`) |
-| D54 | v7 · B | 🟠 Med | **verified** (v8 @b171ce8) *(bolt-042 M5 regression closed)* | `UploadService` re-advertises **HEIC** as accepted while the MIME validator + UI still reject it (`UploadService.cs:52`) |
-| D55 | v7 · B | 🟠 Med | **verified** (v8 @b171ce8) *(hinted; prod-only)* | Client filename not truncated to `varchar(260)` → InMemory/SQLite accept, **Postgres 22001 → 500 in prod**; passes all tests (`UploadService.cs:113`) |
-| D56 | v7 · A | 🟠 Med | **verified** (v8 @04149fa) | `ArchiveExpired` audit event logged **before** the batched `SaveChanges` → duplicate/false audit records on save failure, re-fired next tick (`ArchiveRetentionJob.cs:123`) |
-| D57 | v7 · A | 🟠 Med | **verified** (v8 @fe0e6d2) | Cloud-off purge refusal logged at **Error on every ship** in the default `Provider=local` config (ship path lacks the cancel path's `CloudEnabled` gate) → chronic false-Error noise (`OriginalPurger.cs:43`) |
-| D58 | v7 · B | 🟠 Med | **verified** (v8 @df1026d) *(coverage)* | Promotion worker retry/backoff/re-enqueue path entirely untested (`OrderPhotoPromotionWorker.cs:130`) |
-| D59 | v7 · B | 🟠 Med | **verified** (v8 @a80b819) *(coverage)* | Webhook→promotion `EnqueueAsync` wiring never asserted by a test (`WebhooksController.cs:183`) |
-| D60 | v7 · B | 🟠 Med | **deferred** → 3-env *(with [[D20]]; real-provider exercise is env infra)* | Real cloud provider exercised only by skip-gated MinIO + in-memory fakes; R2/AWS (incl. the [[D49]] retry path) never run (`S3StorageServiceIntegrationTests.cs:18`) |
-| D61 | v7 · A | 🟡 Low | **backlog** *(D38 class in a 2nd job)* | Retention `OrderBy/Take` window starved by persistent delete-failures (`ArchiveRetentionJob.cs:98`) |
-| D62 | v7 · A+B | 🟡 Low | **backlog** *(both passes)* | Admin ZIP mid-loop `GetStream` failure (incl. concurrent purge) truncates the archive after headers committed (`AdminOrderService.cs:197`) |
-| D63 | v7 · A+B | 🟡 Low | **backlog** *(both passes)* | Preview cache-fill regeneration races retention delete → orphaned blob, ref nulled (`UploadService.cs:203` / `ArchiveRetentionJob.cs:124`) |
-| D64 | v7 · B | 🟡 Low | **backlog** | Failed best-effort local delete in `OrderPhotoPromoter` leaks unreclaimable local bytes (`OrderPhotoPromoter.cs:212`) |
-| D65 | v7 · B | 🟡 Low | **backlog** *(plausible)* | `LocalStorageService` storage-root re-anchor uses prefix match without a separator boundary (`LocalStorageService.cs:99`) |
-| D66 | v7 · B | 🟡 Low | **backlog** | ZIP entry extension taken from untrusted client filename instead of validated MIME (`AdminOrderService.cs:190`) |
-| D67 | v7 · B | 🟡 Low | **backlog** | Batch upload has no file-**count** cap (only 500MB total) (`UploadsController.cs:102`) |
-| D68 | v7 · B | 🟡 Low | **backlog** | Broken grid thumbnails have no fallback/retry after the single presigned-URL refresh (`order-detail-page.ts:472`) |
-| D69 | v7 · B | 🟡 Low | **backlog** | Originals of orders never reaching production-complete/Cancelled escape the retention window (`ArchiveRetentionJob.cs:92`) |
-| D70 | v7 · A | 🟡 Low | **backlog** | 043 NFR "persistent S3 → 502 (BadGatewayException)" not implemented → surfaces as 500 (`S3StorageService.cs:145`) |
-| D71 | v7 · A | 🟡 Low | **backlog** | Idempotent-skip reasons at Debug never emit under the Information floor (`OrderPhotoPromoter.cs:120`) |
-| D72 | v7 · A | 🟡 Low | **backlog** | Transient vs permanent cloud-write failures collapsed into one Warning → poison retried like a blip (`OrderPhotoPromoter.cs:182`) |
-| D73 | v7 · A | 🟡 Low | **backlog** *(bolt-042 QUAL-1 regression)* | `GetPreviewAsync` dropped `AsNoTracking` on the hot cache-hit path (`UploadService.cs:139`) |
-| D74 | v7 · A | 🟡 Low | **backlog** *(plausible)* | Promotable-status set triplicated with a false "single source of truth" comment (`BackfillCommand.cs:43`) |
-| D75 | v7 · B | 🟡 Low | **backlog** *(coverage; [[D49]] sibling)* | S3 Polly retry classification/re-upload + presign HTTP/HTTPS protocol untested (`S3StorageService.cs:60/41`) |
-| D76 | v7 · B | 🟡 Low | **backlog** | Storage DI/config/CLI outside the lens manifest; AWS-native region config foot-gun (`StorageExtensions.cs:56`) |
-| D77 | v7 · B | 🟡 Low | **backlog** *(plausible)* | Recovery/retention sweeps run unindexed full scans every 6h; masked by InMemory tests (`UploadConfiguration.cs:30`) |
-| D78 | v7 · A | ⚪ Cleanup | **backlog** *(conv 2)* | Promoter materializes the whole original via `ToArray` + multiple undisposed `MemoryStream`s (`OrderPhotoPromoter.cs:138`) |
-| D79 | v7 · A | ⚪ Cleanup | **backlog** | Best-effort orphan-thumbnail delete swallows its exception with no log (`UploadService.cs:222`) |
-| D80 | v7 · A | ⚪ Cleanup | **backlog** | Local-preview `Cache-Control` mismatch: ADR-008 says public/immutable, code sends `private` (`UploadsController.cs:26`) |
-| D81 | v7 · A | ⚪ Cleanup | **backlog** | Freshly generated local thumbnail re-read from disk on cache miss (`UploadService.cs:240`) |
-| D82 | v7 · B | ⚪ Cleanup | **backlog** | Redundant dual feedback: interceptor toast plus inline error/redirect (`order-detail-page.ts:403`) |
+### D1 — Admin ZIP fulfilment download reads promoted originals from the local tier only
 
-## Refuted (recorded, no D# assigned)
+- **What:** With the cloud tier on, the fulfilment ZIP read every original from local disk. A promoted
+  order's download failed part-way through and the admin could not get the photos to print.
+- **History:**
+  - v1: found (F1) — the pass's only High, and the one fix it required before merge
+  - round 1: fixed @`ec94fca` — the ZIP reads through the storage router
+  - v2: verified @`1e7b9d3`
 
-| Was | Sev | Claim | Disposition |
-|-----|-----|-------|-------------|
-| v1 R1 | 🟡 Low | S3StorageService coverage hinges on the MinIO gate | **refuted** — CI runs MinIO on every PR/non-main push and sets the `STORAGE_TEST_*` vars, so the SkippableFacts execute. Do not re-raise; the residual `IsTransient`/multipart gap is tracked under D3/D16. |
-| v3 RV3-1 | 🟡 Low | Worker drain (F6) defeated by a long in-flight S3 upload vs the host shutdown timeout | **refuted** — `OrderPhotoPromoter` is Confirmed-Write-Then-Delete (row flips Cloud only after all writes succeed), same-key PUT idempotent, recovery scan re-runs; a force-killed mid-write leaves the row Local = harmless/re-doable regardless of timeout. Do not re-raise. |
+### D2 — Cleanup job deletes Cloud uploads against the local tier and never deletes the large preview
 
-## Accepted decisions / deferrals (through v2)
+- **What:** The cleanup job resolved the local tier for cloud uploads, so its deletes did nothing and
+  the large preview key was never referenced. The row was soft-deleted and three cloud objects were
+  left with no row to reclaim them.
+- **History:**
+  - v1: found (F2)
+  - round 1: fixed @`6b63bd7` — deletes route by the row's tier and the large preview is deleted too
+  - v2: verified @`1e7b9d3`
 
-- **D12 / F12 — guest order-history photos: wont-fix (owner ruling).** `/photos` stays `[Authorize]`
-  user-only; guests out of scope for bolt-053. Forward path if revisited: DualAuth + guest branch.
-- **D17 / F17 — paid-then-cancelled originals: fixed (owner ruling = purge on cancel).** Fast-path
-  purge in `CancelOrderAsync` + `Cancelled` in the recovery-sweep status set.
-- **D10 / F10 — 403-vs-404 oracle: wont-fix.** 403-for-non-owner is the codebase convention;
-  negligible GUID-enumeration risk. Re-open only as a codebase-wide 404 standardisation.
-- **D9 / F9 — duplicate-webhook Order.Status race: deferred → bolt-035** (needs an `Order`
-  concurrency token / event-dedup — payment-idempotency remit; no data loss today).
-- **D13 / F13 + D5b / F5(b) — frontend-ux debt PAID by v3.** The v3 delta pass ran the owed
-  full-surface frontend-ux lens (deliberate exception to delta scope, per the prior note). Both
-  deferred items were **confirmed** — D13 re-found *and expanded* (also swallows transient/401 errors
-  with no retry → re-rated 🟠, now D13/F6) and D5b confirmed with a concrete trace (D5b/F7). They are
-  no longer deferred: they are **open findings for the next fix round**, along with four new frontend
-  items the full-surface pass surfaced (D31 blob-URL leak · D32 catchError no-retry · D33 lightbox
-  a11y · D34 ngOnInit-only staleness).
+### D3 — Missing cloud original throws `AmazonS3Exception`, not `FileNotFoundException` → preview 500
 
-The **wont-fix / deferred-elsewhere** decisions (D9→bolt-035, D10 403-convention, D12 guest-scope)
-were passed to the v3 delta pass as `decidedFindings`; the dedup agent matched **none** of them
-(0 re-raises) — none re-surfaced in the fix diff. They remain **upheld — last affirmed @ `1e7b9d3`**
-(the code-tip v3 reviewed; HEAD `2be8ab8` adds only docs). D13/D5b are no longer deferred (paid by
-v3, above). Per the README's verification-runbook deferral gate, the next verification pass re-judges
-a decision by agent only if `git diff 1e7b9d3..HEAD -- <cited file(s)>` shows the cited code moved;
-otherwise it records "unchanged, stands" with no agent.
+- **What:** The cloud adapter raised its own exception type for a missing object while the caller
+  caught only the local type, so a missing cloud original returned 500 instead of 404. The cloud test
+  fake threw the local type, which hid the gap.
+- **History:**
+  - v1: found (F3)
+  - round 1: fixed @`0f85f56` — the adapter translates a missing object into the shared exception type
+  - v2: verified @`1e7b9d3`
 
-## v3 delta-discovery provenance (2026-07-14)
+### D4 — Purge on Shipped fires once and skips an in-flight promotion → original never purged until reboot
 
-Blinded delta pass over `5706580..HEAD` (the v1→v2 fix round). **Backend:** 6 lenses (correctness ·
-race · security · requirements · tests-coverage · completeness-critic), `passType: delta`, 17 raw →
-13 canonical, max convergence 2. **Frontend:** owed full-surface `frontend-ux` lens, 6 findings.
-Verdict `approve-with-followups` (0 High, 0 blockers; a delta pass cannot certify). **Dominant
-theme: fix-generativity** — nearly every backend finding traces to a v1→v2 fix (F4's periodic
-conversion, F17's cancel try/catch, F1/F2's `IStorageRouter` routing). **Not quiet → fix → verify →
-delta again.** See [review-v3.md](review-v3.md) + [findings-v3.md](findings-v3.md).
+- **What:** The purge ran once on the Shipped transition and skipped uploads still on local storage.
+  A promotion finishing later was never re-purged, so the original stayed in cloud past its retention
+  window until the process restarted.
+- **History:**
+  - v1: found (F4)
+  - round 1: fixed @`cc69025` — the purge recovery scanner became a periodic background service
+  - v2: verified @`1e7b9d3` — by inspection of the periodic structure plus the sweep test
 
-## v5 delta-discovery provenance (2026-07-20)
+### D5 — Presigned-URL lifetime and the hardcoded `Cache-Control` max-age diverge → expired images
 
-Blinded 5-lens delta (correctness · race · tests-coverage · frontend-ux · completeness-critic) over
-the **v3 fix round** `151abef..972a8b4`, `passType: delta`, 9 terminal decisions passed as
-`decidedFindings`. 19 raw → **14 canonical** (max convergence **4**), 0 refuted, 0 decided-re-raises.
-Verdict `approve-with-followups` (0 High, 0 blockers). **Not quiet — the v3 fix round was itself
-fix-generative**, in two clusters: (A) F1's periodic promotion sweep shipped under-built — D35
-(corroborated), D37 (untested), D46 (perpetual terminal re-enqueue), D47 (boot-fixed config); (B) the
-frontend F7 refresh introduced a conv-4 Medium regression D36 (reopens a closed lightbox) + Lows
-D40/D42/D48. Plus D38 (F2 batch-starvation edge) and D45 (F9 unmapped 500). Recommend: fix D36 + D38
-now; treat cluster A as one design item folded into bolt-035 (D9/D27); batch cluster B. See
-[review-v5.md](review-v5.md) + [findings-v5.md](findings-v5.md). **Certification remains gated behind a
-quiet delta — not yet reached.**
+- **What:** The preview redirect hardcoded a one-hour cache lifetime while the presigned URL lifetime
+  was an operator setting. Setting it below an hour let the browser replay a cached redirect to an
+  already-expired URL.
+- **History:**
+  - v1: found (F5) — part b split off as D5b
+  - round 1: fixed @`d15b9af` — the cache lifetime is derived from the presign setting
+  - v2: verified @`1e7b9d3`
 
-## resolution-v5 fix round (2026-07-22)
+### D5b — Lightbox large URL is minted at list fetch and expires after its 1h lifetime, with no refresh
 
-Fixed the two recommended Mediums with revert-verified regression tests: **D36** (@`2d02b13` —
-clear `lightboxPhotoId` on close + re-read at resolve time) and **D38** (@`036ba05` — exclude
-unroutable Cloud rows in the candidate-query WHERE + cloud-off-only diagnostic count). Suites
-**.NET 702/702** (+10 skipped MinIO) · **FE 439/439**. See [resolution-v5.md](resolution-v5.md).
+- **What:** The large photo URL was signed when the photo list loaded and reused when the lightbox
+  opened. A user who opened it after the lifetime elapsed got a broken image, and the image tag had no
+  error handler, refresh or fallback.
+- **History:**
+  - v1: found (F5 part b) — deferred to the frontend lens the lean pass skipped
+  - v3: re-found and confirmed with a trace (F7)
+  - round 3: fixed @`a5cb0be`, `c4ec6ca`, `972a8b4` — the lightbox reports the error, the page re-fetches fresh URLs, and the grid tiles got the same handler
+  - v4: verified @`972a8b4`
 
-**Triage of the rest (per the 2026-07-22 severity-based stop rule, README):**
+### D6 — Promotion worker disposes the concurrency semaphore while tasks are still in flight
 
-- **Cluster A → bolt-035, one design item: D35, D37, D46, D47.** The F1 boot→periodic
-  promotion-sweep conversion shipped under-built; its four symptoms (dedup / testable interval seam /
-  terminal give-up marker / runtime-config awareness) are one mechanism, and the concurrency half
-  (D35) is the same root cause as the already-deferred **D9/D27**. Bolt-035 owns the `Order`/`Upload`
-  concurrency-token work and gets one adversarial design pass on the periodic-recovery model before
-  code (fixer rule #3). Last affirmed @`972a8b4`.
-- **Backlog (does not re-arm the loop): D39, D40, D41, D42, D43, D44, D45, D48.** Non-regression
-  Lows + one Cleanup — a standalone unmapped-exception Low (D45), the frontend-refresh UX/coverage
-  polish cluster (D40/D41/D42/D48/D39/D44), and a hinted guest-401 Low (D43). Drained by the backlog
-  groomer / the next frontend bolt / the certification pair.
+- **What:** On shutdown the worker disposed its concurrency gate while detached promotion tasks were
+  still running. Their release call then threw on a disposed object and the promotion was abandoned
+  mid-write.
+- **History:**
+  - v1: found (F6)
+  - round 1: fixed @`3d97258` — in-flight tasks are tracked and drained before disposal
+  - v2: verified @`1e7b9d3`
 
-This fix round was **patch-grade** (no High fixed, no mechanism added/converted, no design changed),
-so per the router it does **not** re-arm a delta. Next: **verification** re-review @`2d02b13` →
-`review-v6.md` flips D36/D38 → `verified` (or reopens). With those verified the loop is **quiet** →
-risk-tiered **certification pair** (storage = full-loop tier), folding in the owed full-manifest
-lenses, on explicit owner go-ahead.
+### D7 — Migration dropping the `FilePath` NOT NULL constraint is unverified by any test
 
-## v7 certification pair provenance (2026-07-22)
+- **What:** No test proved the migration that makes the original-path column nullable. Purger tests ran
+  on the in-memory provider, which allows nulls regardless, and the SQLite migration test asserted only
+  the thumbnail column.
+- **History:**
+  - v1: found (F7) — hinted by the shared dual-database context
+  - round 1: fixed @`3326607` — the SQLite migration test asserts the column is nullable
+  - v2: verified @`1e7b9d3` — by construction over the real migration chain
 
-Two independent blinded full-manifest discovery passes on frozen `2d02b13` (Pass A `wf_8e3b5928-a15`:
-correctness·security·race·db-parity·observability·requirements·quality, 33 agents/1.83M tok, 25
-canonical; Pass B `wf_9250d60a-e9f`: correctness·security·race·input-validation·frontend-ux·
-tests-coverage·completeness-critic, 40 agents/2.13M tok, 28 canonical). **First full manifest ever run
-on this feature** — v1 lean, v3/v5 delta, v2/v4/v6 verification. Verdict **`request-changes` — NOT
-CERTIFIED**. Combined ~3.96M tok / 73 agents. **34 new (D49–D82): 1 High, 11 Med, 17 Low, 5 Cleanup**;
-9 decided-item re-raises (prior decisions upheld; D9 sharpened by D53's double-email consequence; D17
-flagged for a doc-vs-code reconcile). Headline: **D49** (High, data loss — confirmed by inspection) and
-**D50** (shared-`Upload` cross-order data loss — both passes; upload-shared-across-orders confirmed at
-`OrderService.cs:77`). The passes converged on the serious spine (D50/D51/D62/D63) but found large
-disjoint sets otherwise → **not saturated, not certifiable**. Meta-lesson: six prior lean/delta/
-verification passes read as "merge-ready" yet the first full pass found a data-loss High + class — the
-delta/verification tiers are structurally blind to whole-feature issues; certification (mandatory for a
-full-loop-tier storage feature) is what caught them. See [review-v7.md](review-v7.md).
+### D8 — Preview read races promotion deleting the local thumbnail → 500 instead of 404
 
-## v4 verification provenance (2026-07-20)
+- **What:** The service reported the thumbnail as local, then a concurrent promotion deleted it before
+  the controller opened the file. The uncaught file-missing exception surfaced as 500 rather than the
+  intended 404 or redirect.
+- **History:**
+  - v1: found (F8)
+  - round 1: fixed @`881547f` — the controller catches the missing file and re-resolves once
+  - v2: verified @`1e7b9d3`
 
-Independent verification of [resolution-v3.md](resolution-v3.md) @ `972a8b4` by a fresh reviewer
-(not the fixer). **14 of 14 fixed findings verified** non-vacuously by revert-and-rerun (each
-reverted, owning test reddened with clean attribution + 0 collateral, restored → green; tree clean
-after every revert); F1's periodicity additionally by inspection (as F4 in v2). Both fresh-eyes
-class-sweeps (`0fc577a` UploadService preview, `972a8b4` grid-thumbnail) revert-proven. **4 deferrals
-upheld** (D20/D26/D34 sound; **D27 upheld but rationale incomplete** → **D35/NF1**) + the D13 four-way
-empty-signal follow-up. **1 new Low: D35 (NF1)** — F1's dedup-less periodic sweep is a D9-independent
-trigger of the D27 orphan race; the fixer's "wasteful not corrupting" note was under-weighted.
-Verdict `approve-with-followups` (a verification pass cannot certify). Suites: .NET 701/701 (+10 CI
-MinIO) · FE 438/438 (3 non-043 load-flakes, green isolated). **NF1 surfaced → loop not quiet; owed:
-full-manifest discovery + certification pair.** See [review-v4.md](review-v4.md).
+### D9 — Duplicate payment webhooks race `Order.Status`; there is no concurrency token
 
-## resolution-v7 fix round (2026-07-22)
+- **What:** Two overlapping deliveries of the same payment event both read the order as awaiting
+  payment, both moved it to paid, both sent the confirmation email and both queued promotion.
+  Promotion is idempotent, so there is no data loss, but the customer gets two emails.
+- **Evidence:** `Controllers/WebhooksController.cs:218`. No event de-duplication and no row version on
+  `Order` exist anywhere in the API.
+- **Suggested fix:** Add a guarded paid transition or an event-dedup table, in the payment-idempotency
+  work that owns concurrency for orders.
+- **History:**
+  - v1: found (F9)
+  - round 1: deferred → bolt-035, the payment-idempotency remit
+  - v2: decision upheld — no token exists at the reviewed tip
+  - v7: re-raised (pass A), decision upheld @`2d02b13`; D53 adds the duplicate-email consequence to the same remit
+  - 2026-07-22: target closed with the row still deferred
 
-Owner-directed **lean round** (cost pressure): no discovery fan-outs; exactly two subagents, both
-process-mandated — the rule-3 **design check** (one agent covering D51's concurrency change + D50's
-guards; its three corrections applied: bounded thread-safe retry tracking, purge status set
-{Paid, Printing}, `PaidAt != null` mirror in the retention clause) and the **fresh-eyes micro-review**
-of the final diff. All 8 fixable serious findings fixed with regression tests:
+### D10 — 403 rather than 404 for another user's order tells an attacker which order ids exist
 
-- **D49** @`c37ca44` — rewind inside the S3 retry lambda; non-seekable retry fails loudly. The
-  regression test was red with the exact bug signature (retry received 0 of 8 bytes) pre-fix.
-- **D50** @`4dfd755` — live-order-reference guards at purge ({Paid, Printing} blockers; sweep
-  liveness) + retention (no in-window referencing order). Accepted residual: AwaitingPayment sharer
-  that pays post-purge (owner: corner-case; revisit with bolt-035).
-- **D51+D58** @`df1026d` — backoff detached from the slot, bounded (100) parked retries, sweep
-  backstop; slot-starvation + retry-success tests.
-- **D52** @`5cfc9f9`, **D54+D55** @`b171ce8`, **D56** @`04149fa`, **D57** @`fe0e6d2`, **D59** @`a80b819`.
-- **A4 (micro-review class-sweep)** @`ac97e42` — the D50 guard extended to UploadCleanupJob's
-  referenced-retention branch (third site of the shared-upload data-loss class; live-order +
-  in-window exclusions in the shared `retentionExpired` predicate, 3 regression tests).
-- **Deferred:** D53 → bolt-035 (with D9; adds the duplicate-email consequence); D60 → 3-env (with D20).
-- **Backlog:** D61–D77 (Low), D78–D82 (Cleanup) — severity-based stop rule.
+- **What:** The photos and detail endpoints return 404 for an unknown order but 403 for an order owned
+  by somebody else, so a signed-in attacker can tell real order ids from invented ones. Order ids are
+  random version-4 identifiers, so the practical gain is negligible.
+- **History:**
+  - v1: found (F10)
+  - round 1: wont-fix — 403 for a non-owner is the codebase-wide convention
+  - v2: decision upheld
+  - v9: re-raised, decision upheld @`ac97e42`; the finder noted that the bolt-053 plan says 404, so the document and the code disagree
 
-Suites **.NET 719/719** (+10 CI MinIO) · **FE 439/439**. Next: **v8 verification** @`ac97e42`, then
-re-freeze + re-run the **certification pair** (owner chooses full pair vs the cheaper single-pass
-variant leveraging the existing A/B overlap data). See [resolution-v7.md](resolution-v7.md).
+### D11 — `/photos` returns presigned URLs with no `Cache-Control: private`
 
-## v8 verification provenance (2026-07-22)
+- **What:** The photos endpoint returned signed URLs without the private cache header its sibling
+  preview endpoint sets, so a caching proxy in front of the API could store and replay them.
+- **History:**
+  - v1: found (F11) — judged plausible, not proven live
+  - round 1: fixed @`751894b` — the response sets a private, no-store cache header
+  - v2: verified @`1e7b9d3`
 
-Independent verification of [resolution-v7.md](resolution-v7.md) @ `ac97e42` by a fresh agent (not
-the fixer). **10/10 fixed findings verified non-vacuous**: 8 by source-only revert-and-rerun with
-clean attribution (D49 — the High — red with the exact "expected 8L, found 0L" data-loss signature;
-D51 red with the 5s slot-starvation timeout; D50 at both sites, plus the A4 third site whose pre-fix
-state fails to compile confined to its test file), D58 by construction via D51's revert, D59 by
-mutation (commenting the Stripe `EnqueueAsync` reddened exactly the wiring test). **Both deferrals
-upheld** (D53: WebhooksController source unchanged in the round; D60: integration tests untouched);
-backlog spot-checks clean. Suites **.NET 719/719** (+10 CI MinIO) · **FE 439/439** (one non-043
-`format-selector` load-flake, green isolated + on the clean run — backlog note, not a reopen).
-**0 reopened, 0 new → the v7 counter-reset is serviced.** See [review-v8.md](review-v8.md).
+### D12 — Guest-placed orders cannot reach the new `/photos` endpoint
 
-## v9 certification (single full-manifest pass, 2026-07-22)
+- **What:** The photos endpoint requires a signed-in user and matches on the user id, so an order
+  placed by a guest can never be read through it, unlike the uploads and payments endpoints.
+- **History:**
+  - v1: found (F12)
+  - round 1: wont-fix @`cda3685` — owner ruling that guest order history is out of scope; a test pins the 401
+  - v2: decision upheld
 
-Owner-approved single blinded full-manifest pass on frozen `ac97e42` (deviation from the two-pass
-protocol — README *The pair is not sacred*; justified by the v7 pair having just audited the same
-feature + a small, verified v7→v8 fix round). `wf_f9c87958-fa1`, 45 agents / 2.87M tok, 31 raw → 30
-canonical. **Verdict: certified clean of serious defects — 0 High, 0 fix-caused regression.** See
-[review-v9.md](review-v9.md).
+### D13 — Empty-state copy collapses four causes into one permanent "no longer available", with no retry
 
-New / updated identities:
+- **What:** The order page showed the same permanent-sounding message for a transient fetch failure, an
+  expired session, a photo set not yet archived, and a purged one. On a server error it showed that
+  message alongside a contradictory toast, and offered no retry.
+- **History:**
+  - v1: found (F13) — 🟡, scoped to the not-yet-archived case
+  - round 1: deferred to the frontend lens the lean pass skipped
+  - v2: decision upheld
+  - v3: re-found and widened by that lens (F6), re-rated 🟠
+  - round 3: fixed @`c4ec6ca` — a fetch failure is separated from a genuine empty result and offers a retry
+  - v4: verified @`972a8b4`; the four-way empty signal stays an open follow-up, later raised as D83
 
-| D# | Sev | Status | Title |
-|----|-----|--------|-------|
-| D83 | 🟠 Med | **fixed** `d041295`+`b9af326` *(owner triage 2026-07-27; [[D13]] follow-up)* | "Fotografiile … nu mai sunt disponibile" shown for a just-paid order before in-process promotion runs, and for pending orders — empty-archive copy now gated on order lifecycle (`order-detail-page.ts`) |
-| D84 | 🟠 Med | **wont-fix** *(owner 2026-07-27: EuPlatesc slated for removal — no investment in its coverage; [[D59]] coverage sibling)* | EuPlatesc IPN → promotion `EnqueueAsync` wiring never asserted (only the Stripe twin is) (`PaymentControllerIntegrationTests.cs`) |
-| D85 | 🟠 Med | **deferred** → 3-env *(owner 2026-07-27; ops CLI unused until then; affirmed @d041295; review-scope)* | Backfill CLI omitted from the review manifest (lighter scrutiny); backfill × live-worker concurrent promotion untested (`BackfillCommand.cs`) |
-| D86 | 🟡 Low | **backlog** *(new)* | Retention deletes blobs before persisting key-null → broken-URL window on a concurrent read (`ArchiveRetentionJob.cs:146`) |
-| D87 | 🟡 Low | **backlog** *(new; [[D52]]/[[D56]] class)* | Retention sweep query omits the `DeletedAt` filter → reprocesses soft-deleted rows, re-emits false audit (`ArchiveRetentionJob.cs:96`) |
-| D88 | 🟡 Low | **backlog** *(new)* | Promoter tests assert cloud-write keys but never the bytes written (`OrderPhotoPromoterTests.cs`) |
-| D89 | ⚪ Cleanup | **fixed** `09173c4` *(sweep 2026-07-30; the records auditor now enforces 0)* | Fix comments cite finding/decision/ADR IDs — CLAUDE.md hard-rule violation, 67 occurrences / 27 files (mostly pre-existing). Swept codebase-wide: 371 tracked occurrences in 118 files removed; both suites green |
-| D90 | 🟡 Low | **backlog** *(new; [[D36]] coverage)* | D36 close-*during*-refresh resolve-time re-read has no spec (only close-before-error is tested) (`order-detail-page.spec.ts`) |
-| D62 | 🟡 Low | **backlog** *(widened v9)* | ZIP mid-loop `GetStream` truncation — v9 adds the concurrent-**promotion** trigger (Local→Cloud+delete) alongside the original concurrent-purge one (`AdminOrderService.cs`) |
+### D14 — Cloud preview regeneration branch never runs — every test presets the thumbnail path
 
-Re-raises upheld (prior decisions stand): **D10** (403-vs-404 wont-fix — but reconcile 053's
-implementation-plan AC, which says 404: doc-vs-code discrepancy), D42, D69, D74, D75, D80.
-Folded: worker-dedup → **D35** (cluster A → bolt-035); cost/poison-amplification → **D46/D51**;
-sweep-query parity → **D20**. Refuted (dropped, do not re-raise): frontend manifest-path skip
-(file was reviewed), ImageProcessor fail-open (fail-closed confirmed), MimeValidator partial-read.
+- **What:** Every cloud test stored the thumbnail and set its path, so the preview call returned at the
+  cache hit. The regenerate, save and persist path never ran against the cloud tier.
+- **History:**
+  - v1: found (F14)
+  - round 1: fixed @`0ceabf8` — a test seeds a cloud upload with no thumbnail and asserts the thumbnail is regenerated, saved and persisted
+  - v2: verified @`1e7b9d3` — by construction
+  - v7: re-raised (pass B) as a fake-stream coverage concern, decision upheld @`2d02b13`
+
+### D15 — `GET /orders/{id}/photos` has no integration test, so its auth pipeline is unproven
+
+- **What:** Ownership was unit-tested but the endpoint's HTTP wiring was not, so dropping the
+  authorization attribute or the null-user guard would have reddened nothing.
+- **History:**
+  - v1: found (F15)
+  - round 1: fixed @`cda3685` — integration tests cover no-auth, cross-user, unknown order and guest token
+  - v2: verified @`1e7b9d3` — by construction
+
+### D16 — Promoter row-update-failure and preview-generation-failure branches untested
+
+- **What:** The save-failure and preview-generation-failure branches never ran, because the in-memory
+  provider does not throw and the preview generator was always mocked. A miscount would have shipped
+  green.
+- **History:**
+  - v1: found (F16)
+  - round 1: fixed @`a770a13` — a throwing context and a throwing preview generator drive both branches
+  - v2: verified @`1e7b9d3` — by construction
+
+### D17 — Paid-then-cancelled originals: purge behaviour undecided and untested
+
+- **What:** Purge fired only at Shipped or Delivered, so a paid order later cancelled kept its cloud
+  original indefinitely. Nothing recorded whether that was intended.
+- **History:**
+  - v1: found (F17)
+  - round 1: fixed @`2fcdf3d` — owner ruling is purge on cancel, with the sweep as a backstop
+  - v2: verified @`1e7b9d3`
+  - v7: re-raised (pass A) — the requirements lens read the bolt-052 design record as saying cancelled originals are kept, so document and code disagree; the owner ruling stands @`2d02b13`
+
+### D18 — `BackfillCommand` and `S3BucketVerifier` have no tests at all
+
+- **What:** The backfill command's order filter was a hand copy of a tested scanner and its exit codes
+  drive operator automation, yet nothing tested either. The bucket verifier's boot abort was also
+  unproven.
+- **History:**
+  - v1: found (F18)
+  - round 1: fixed @`682f1e2` — exit-code unit tests plus MinIO-backed bucket-verifier tests
+  - v2: verified @`1e7b9d3` — by construction
+
+### D19 — Promotion recovery left boot-only while its purge sibling was made periodic
+
+- **What:** The D4 fix made the purge scanner periodic but left the promotion scanner running once at
+  boot. A paid order whose promotion exhausted its retries stayed on local storage until the next
+  restart, so its original never reached the durable tier.
+- **History:**
+  - v2: noticed as a carry-forward, not acted on
+  - v3: found and confirmed with a trace (F1)
+  - round 3: fixed @`2f49a8d` — the promotion scanner became a periodic background service with its own validated interval
+  - v4: verified @`972a8b4` — boot sweep by revert-and-rerun, the periodic loop by inspection
+
+### D20 — The `FilePath` NOT NULL drop is verified on SQLite only, never on Postgres
+
+- **What:** The migration that makes the original-path column nullable is asserted on SQLite only.
+  Purger tests run in memory, where nulls are allowed regardless, so a Postgres regression would be
+  counted as a failed purge and stay invisible.
+- **Evidence:** `Tests/…/UploadThumbnailPathMigrationTests.cs:48`. A skeptic confirmed the migration is
+  correct on Postgres today, so this is a coverage gap rather than a live defect.
+- **Suggested fix:** Run the migration and a null write against a real Postgres container in the
+  three-environment stage.
+- **History:**
+  - v3: found (F15) — hinted by the shared dual-database context
+  - round 3: deferred → the three-environment and container-test track
+  - v4: deferral upheld @`972a8b4`
+  - v7: re-raised by both passes, decision upheld; the retention-column concern folded in here
+  - v9: the untested sweep query on the purge scanner folded in here as well @`ac97e42`
+  - 2026-07-22: target closed with the row still deferred
+
+### D21 — Purge sweep untested — tests call the sweep by reflection and `ExecuteAsync` is never driven
+
+- **What:** The D4 conversion left the tests calling the internal sweep method by reflection, and both
+  entry-point tests returned at a guard. Deleting the boot sweep or the timer loop left the suite green.
+- **History:**
+  - v3: found (F3) — a coverage regression introduced by the D4 fix
+  - round 3: fixed @`fea2490` — a test drives the entry point and reddens when the boot sweep is removed
+  - v4: verified @`972a8b4`
+
+### D22 — Cancel-purge try/catch untested — a throwing purger is never exercised
+
+- **What:** The guard added for D17 kept a purge failure from failing an already-committed cancellation,
+  but no test made the purger throw, so removing the guard reddened nothing.
+- **History:**
+  - v3: found (F5)
+  - round 3: fixed @`c30d734` — a throwing-purger cancel test
+  - v4: verified @`972a8b4`
+
+### D23 — Production-complete purge lacks the cancel path's try/catch → 500 after the transition committed
+
+- **What:** The D17 fix wrapped the cancel purge but not its production-complete sibling. A purge that
+  threw there returned 500 to the admin after the status change had already been committed, emailed and
+  broadcast.
+- **History:**
+  - v3: found (F4) — the D17 fix treated the instance, not the class
+  - round 3: fixed @`c30d734` — the same guard on the production-complete purge
+  - v4: verified @`972a8b4`
+
+### D24 — Tier resolve throws with cloud disabled and wedges every cleanup batch
+
+- **What:** The D2 routing fix resolved the tier outside the per-upload guard. With cloud switched off
+  and cloud rows in the batch, the resolve threw before anything was soft-deleted, so the same batch was
+  retried every hour and all cleanup stopped, local orphans included.
+- **History:**
+  - v3: found (F2) — a new fault introduced by the D2 fix
+  - round 3: fixed @`4674dcd`, `0fc577a` — unroutable cloud rows are skipped with a count warning; the customer preview path got the same guard
+  - v4: verified @`972a8b4`
+
+### D25 — ZIP tier resolve throws mid-stream with cloud disabled → truncated admin ZIP
+
+- **What:** With cloud switched off, the fulfilment ZIP resolved the cloud tier after the response
+  headers were already written, so the admin got a truncated archive instead of a clean error.
+- **History:**
+  - v3: found (F9) — the same class as D24
+  - round 3: fixed @`c30d734`, `0fc577a` — the ZIP fails before writing any response bytes
+  - v4: verified @`972a8b4`
+
+### D26 — Cleanup routes by the row's tier, so a failed promotion's cloud litter is never reclaimed
+
+- **What:** When a promotion writes its three cloud objects and then fails the row update, the row stays
+  local with empty preview keys. Cleanup routes by that recorded tier and deletes only the local
+  original, so the three cloud objects leak with no row that can ever reclaim them.
+- **Evidence:** `BackgroundJobs/UploadCleanupJob.cs:92`, with the promoter writing at
+  `Services/OrderPhotoPromoter.cs:168-178` and failing the update at `:196`.
+- **Suggested fix:** Reclaim by the deterministic key scheme regardless of the recorded tier, as an
+  orphan-sweep design rather than a patch.
+- **History:**
+  - v3: found (F10) — a residual of the D2 routing fix
+  - round 3: deferred — the reclaim needs its own design pass
+  - v4: deferral upheld @`972a8b4`; the new periodic promotion sweep narrows it, because a transient failure now self-heals
+  - 2026-07-22: target closed with the row still deferred
+
+### D27 — Duplicate concurrent promotion re-creates a just-purged cloud original as an orphan
+
+- **What:** Two concurrent promotions of one order can interleave with a purge. The second job rewrites
+  the cloud original after the purge has deleted it and cleared the path, and its save never restores
+  that path, so nothing can ever reclaim the object. Personal data outlives its retention window.
+- **Evidence:** `Services/OrderPhotoPromoter.cs:168`. The purger, cleanup and the recovery scanner all
+  key on a non-empty original path.
+- **Suggested fix:** Re-read the live tier and path before the flip, or put a concurrency token on the
+  upload, in the same work that owns D9.
+- **History:**
+  - v3: found (F11) — the new and more frequent purge triggers widened the window
+  - round 3: deferred → bolt-035, with D9
+  - v4: deferral upheld @`972a8b4`, but the rationale was judged incomplete: it rests on duplicate webhooks, and the new sweep is a second trigger. Raised as D35
+  - v7: re-raised (pass A), decision upheld @`2d02b13`
+  - 2026-07-22: target closed with the row still deferred
+
+### D28 — New sweep-interval validator untested → an interval of 0 boots, then crashes the host
+
+- **What:** The validator rule added with the D4 fix had no test. Dropping it let an interval of zero
+  boot and then crash the host on the first timer construction, instead of failing fast.
+- **History:**
+  - v3: found (F12)
+  - round 3: fixed @`66a5f64` — validator tests for both sweep intervals
+  - v4: verified @`972a8b4`
+
+### D29 — Preview re-resolve-to-local success branch untested
+
+- **What:** The D8 fix's re-resolve had tests for the redirect and the double-miss, but not for the
+  case where the second local read succeeds. A regression there would have reddened nothing.
+- **History:**
+  - v3: found (F14) — a coverage gap, no live defect
+  - round 3: fixed @`66a5f64` — a test drives the successful re-resolve
+  - v4: verified @`972a8b4`
+
+### D30 — Backfill filter test never crosses the exclusion boundary
+
+- **What:** The D18 test claimed to guard against filter drift but seeded only included statuses, so
+  widening the filter to re-promote cancelled or refunded photos would have shipped green.
+- **History:**
+  - v3: found (F13) — a residual of the D18 fix
+  - round 3: fixed @`66a5f64` — boundary cases on both sides of the filter
+  - v4: verified @`972a8b4`
+
+### D31 — Upload thumbnail mints an unrevoked blob URL on every change-detection cycle
+
+- **What:** The thumbnail created a browser object URL inside a template-evaluated method with no
+  memoisation, so every upload progress event minted a fresh unrevoked URL. Memory leaked and the image
+  flickered. It predates this feature and was caught by the full-surface frontend pass.
+- **History:**
+  - v3: found (F8)
+  - round 3: fixed @`f048dc1` — the URL is created once per file and revoked on destroy
+  - v4: verified @`972a8b4`
+
+### D32 — Order detail redirects on any fetch error, so a transient failure bounces the user with no retry
+
+- **What:** The order fetch redirected on every error. A transient failure threw a still-signed-in user
+  off the page with no way to retry. The stronger claim, that it stranded a signed-out user, was refuted:
+  the route guard sends them to the login page anyway.
+- **History:**
+  - v3: found (F16) — the Medium strand refuted, the Low residual kept
+  - round 3: fixed @`c4ec6ca` — definitive errors redirect, expired sessions go to the interceptor, transient errors show an inline retry
+  - v4: verified @`972a8b4`
+
+### D33 — Lightbox modal has no focus trap, dialog role, modal flag or focus restore
+
+- **What:** Keyboard and screen-reader users could tab through the page behind the backdrop, the overlay
+  was not announced as a dialog, and focus was not returned to the thumbnail on close.
+- **History:**
+  - v3: found (F17) — first accessibility coverage of this surface
+  - round 3: fixed @`a5cb0be` — dialog role, modal flag, focus move, tab trap and focus restore
+  - v4: verified @`972a8b4`
+
+### D34 — Order detail loads only in `ngOnInit` despite a route-bound id → latent staleness
+
+- **What:** The order id is bound from the route but the order and photos load only on component init.
+  If a detail-to-detail link is ever added, the reused component would show the previous order's data.
+- **Evidence:** `UI/…/order-detail-page.ts:357`. Every entry today comes from the list route, which
+  recreates the component, so no failing trace exists against the current code.
+- **Suggested fix:** React to the route-bound id and re-fetch, rather than loading once on init.
+- **History:**
+  - v3: found (F18) — latent, not triggerable today
+  - round 3: deferred as a recorded trap
+  - v4: deferral upheld @`972a8b4`
+  - 2026-07-22: target closed with the row still deferred
+
+### D35 — Periodic promotion sweep has no in-flight dedup, so it can start a second promotion of one order
+
+- **What:** The sweep queues every paid order still holding a local upload, with no check against jobs
+  already queued or running, and the worker keeps no set of active orders. A sweep during an in-flight
+  promotion starts a second one, which reaches the D27 orphan outcome without needing duplicate webhooks.
+  It also logs a missing local original for an order that promoted fine, wasting a retry.
+- **Evidence:** `BackgroundJobs/PromotionRecoveryScanner.cs` sweep query, plus the worker's plain task
+  list and the promoter never re-reading live state before its update.
+- **Suggested fix:** Fold into the concurrency-token work that owns D9 and D27; de-duplicate the queue by
+  order.
+- **History:**
+  - v4: found (NF1) while checking the D27 deferral rationale — introduced by the D19 fix
+  - v5: independently re-found by the blinded race lens (F4), with the false failure signal as a new consequence
+  - round 5: deferred → bolt-035 as part of cluster A, one design item
+  - v6: deferral upheld @`2d02b13` — the file was untouched in the round
+  - v7: re-raised by both passes, decision upheld
+  - v9: re-raised through the worker, folded back here @`ac97e42`
+  - 2026-07-22: target closed with the row still deferred
+
+### D36 — A stale lightbox photo id re-opens a closed lightbox when a thumbnail URL expires
+
+- **What:** Closing the lightbox cleared the image source but not the photo id. A later expired-thumbnail
+  error triggered the URL refresh, which read the stale id and set the source again, so the modal
+  re-opened with no user action. Four lenses agreed.
+- **History:**
+  - v5: found (F1) — a regression from the D5b refresh fix
+  - round 5: fixed @`2d02b13` — close clears both fields and the refresh re-reads the id when it resolves
+  - v6: verified @`2d02b13` — the spec reddens when the id clear is reverted, with no collateral
+
+### D37 — The periodic re-scan is untested and untestable — the interval has no test seam
+
+- **What:** The only test awaits the boot sweep, so deleting the periodic loop leaves the suite green and
+  restores the exact D19 defect. The interval is configured in whole hours, so no fast periodic test can
+  be written.
+- **Evidence:** `BackgroundJobs/PromotionRecoveryScanner.cs` timer loop, with the only entry-point test in
+  `PromotionRecoveryScannerTests.cs` awaiting the boot sweep.
+- **Suggested fix:** Add an internal interval seam so a short-interval test can assert a second enqueue.
+- **History:**
+  - v5: found (F3) — the D19 fix shipped its headline behaviour untested
+  - round 5: deferred → bolt-035 as part of cluster A
+  - v6: deferral upheld @`2d02b13`
+  - v8: the file was untouched in the round; deferral spot-checked @`ac97e42`
+  - 2026-07-22: target closed with the row still deferred
+
+### D38 — Unroutable Cloud rows are skipped after the fetch, starving local-orphan cleanup
+
+- **What:** With cloud off and at least a full batch of aged cloud rows, the candidate query kept
+  selecting the same oldest rows, which were skipped and never soft-deleted, so local orphans sorted
+  behind them were never reached and disk cleanup stopped.
+- **History:**
+  - v5: found (F2) — the edge the D24 fix dismissed as out of scope
+  - round 5: fixed @`036ba05` — unroutable rows are excluded in the query, with a cloud-off-only count kept for the operator signal
+  - v6: verified @`2d02b13` — the seeded starvation test reddens on revert, with no collateral
+
+### D39 — Renamed guard tests seed an empty database, so they pass for the wrong reason
+
+- **What:** Two guard tests use an empty database, so removing the guard queues nothing anyway and the
+  no-other-calls assertion still passes. Guard removal ships green.
+- **Evidence:** `Tests/…/PromotionRecoveryScannerTests.cs`, the archive-disabled and cloud-off tests.
+- **Suggested fix:** Seed one stuck paid order still on local storage in both tests, so removing a guard
+  reddens them.
+- **History:**
+  - v5: found (F13) — test quality left by the D19 fix
+  - round 5: sent to backlog under the severity-based stop rule
+  - v6: backlog upheld @`2d02b13`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D40 — The anti-refresh-loop guard has no test
+
+- **What:** The guard caps URL refreshes at one per load or open, so a permanently bad URL cannot storm
+  the photos endpoint. No spec dispatches a second image error to assert that no third fetch happens, so
+  a regression resetting the guard would loop unbounded and ship green.
+- **Evidence:** `UI/…/order-detail-page.ts`, with the specs in `order-detail-page.spec.ts` dispatching
+  only one error.
+- **Suggested fix:** Add a spec that dispatches a second error and asserts the photos endpoint was called
+  exactly twice.
+- **History:**
+  - v5: found (F11) — coverage left by the D5b refresh fix
+  - round 5: sent to backlog
+  - v6: backlog upheld @`2d02b13` — the D36 fix did not touch the guard
+  - v7: re-raised (pass B), still open @`2d02b13`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D41 — The lightbox focus trap has no spec
+
+- **What:** The tab trap added for D33 has no test. Dropping the prevent-default or the refocus lets tab
+  escape the modal to the page behind the backdrop, and nothing reddens.
+- **Evidence:** `UI/…/photo-lightbox.component.ts`; the accessibility spec covers only focus move on open
+  and close.
+- **Suggested fix:** Add a spec that dispatches a tab keydown and asserts the event was prevented and
+  focus stayed on the close button.
+- **History:**
+  - v5: found (F12) — coverage left by the D33 fix
+  - round 5: sent to backlog
+  - v6: backlog upheld @`2d02b13`
+  - v8: file untouched in the round; backlog spot-checked @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D42 — The lightbox tells the user to reload while the app is already fetching a fresh URL
+
+- **What:** An expired large URL renders a failure message telling the user to reload the page, while the
+  parent silently re-fetches a fresh URL. On success the image appears, so the user was told to reload for
+  an error the app recovered from.
+- **Evidence:** `UI/…/photo-lightbox.component.ts`, the image error handler.
+- **Suggested fix:** Show a neutral reloading state first, and keep the reload message for after the one
+  refresh attempt fails.
+- **History:**
+  - v5: found (F9) — user experience left by the D5b refresh fix
+  - round 5: sent to backlog
+  - v6: backlog upheld @`2d02b13`
+  - v7: re-raised (pass B), still open
+  - v9: re-raised, decision upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D43 — A 401 for a non-authenticated user leaves a blank order body, with no error and no redirect
+
+- **What:** A guest or expired-guest visitor opening an order URL gets a 401. The interceptor's guest
+  branch only clears the token and does not navigate, and the page's 401 path sets neither an error nor a
+  redirect, so every block is hidden and the body is blank with no retry.
+- **Evidence:** `UI/…/order-detail-page.ts` load path, with the guest branch in `error.interceptor.ts`.
+- **Suggested fix:** For a 401 on a non-authenticated visitor, show a retryable error or redirect rather
+  than relying on the interceptor to navigate.
+- **History:**
+  - v5: found (F8) — hinted by the shared guest-authentication context
+  - round 5: sent to backlog
+  - v6: backlog upheld @`2d02b13` — the D36 fix did not touch the 401 path
+  - v7: re-raised (pass B), still open @`2d02b13`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D44 — Order retries and init subscriptions have no in-flight dedup or teardown
+
+- **What:** Rapid clicks on the retry button fire overlapping fetches, so a slow stale response can
+  overwrite a newer one. The init subscriptions are not torn down, so a late response can write signals
+  after the component is destroyed.
+- **Evidence:** `UI/…/order-detail-page.ts`, the retry action and the init subscriptions.
+- **Suggested fix:** Disable retry while a load is in flight, and switch to a cancelling, destroy-aware
+  subscription.
+- **History:**
+  - v5: found (F14) — recorded as ⚪, skeptics skipped
+  - round 5: sent to backlog
+  - v6: backlog upheld @`2d02b13`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D45 — The ZIP pre-flight throws an unmapped exception → a generic 500 logged as unhandled
+
+- **What:** With cloud off, the admin ZIP pre-flight added for D25 throws an exception the middleware does
+  not map, so the operator sees a generic 500 logged as an unhandled exception and cannot tell a
+  configuration error from a crash.
+- **Evidence:** `Services/AdminOrderService.cs` ZIP guard, with no matching entry in the exception
+  middleware map.
+- **Suggested fix:** Throw a mapped domain error with a 409 or 422 status and log the cloud-off reason as
+  a warning.
+- **History:**
+  - v5: found (F6) — a residual of the D25 fix
+  - round 5: sent to backlog as a standalone item
+  - v6: backlog upheld @`2d02b13`
+  - v8: file untouched in the round; backlog spot-checked @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D46 — The periodic sweep re-enqueues permanently failed promotions forever
+
+- **What:** A paid order whose local original was lost exhausts its retries and stays on local storage.
+  There is no give-up marker, so every sweep re-selects it, burns the retry budget again and logs a
+  terminal failure again, for every stuck order. The boot-only scanner never repeated this.
+- **Evidence:** `BackgroundJobs/PromotionRecoveryScanner.cs` sweep query.
+- **Suggested fix:** Add a row-level give-up marker excluded from the sweep query, or throttle re-sweeps
+  of known-terminal orders.
+- **History:**
+  - v5: found (F5) — introduced by the D19 conversion to a periodic sweep
+  - round 5: deferred → bolt-035 as part of cluster A
+  - v6: deferral upheld @`2d02b13`
+  - v9: the steady-state cost and poison-amplification flag folded back here @`ac97e42`
+  - 2026-07-22: target closed with the row still deferred
+
+### D47 — The cloud-enabled flag is fixed at boot, so switching provider at runtime needs a restart
+
+- **What:** The storage router decides once at construction whether cloud is available, so switching the
+  provider setting from local to S3 while the process runs never starts a sweep. That contradicts the
+  cleanup comment promising the work is retried when cloud comes back.
+- **Evidence:** `BackgroundJobs/PromotionRecoveryScanner.cs` entry point and the router's construction.
+- **Suggested fix:** Document the restart requirement, or re-read the setting each sweep.
+- **History:**
+  - v5: found (F7) — surfaced by the D19 conversion
+  - round 5: deferred → bolt-035 as part of cluster A
+  - v6: deferral upheld @`2d02b13`
+  - v8: file untouched in the round; deferral spot-checked @`ac97e42`
+  - 2026-07-22: target closed with the row still deferred
+
+### D48 — The lightbox failure flag is reset only on a changed URL, so an identical refreshed URL stays stuck
+
+- **What:** The failure flag clears only when the image source string changes. If the refreshed signed URL
+  is identical to the failed one, the flag stays set and the one-refresh guard blocks another attempt, so
+  the error persists until a full page reload.
+- **Evidence:** `UI/…/photo-lightbox.component.ts`, the failure-reset effect.
+- **Suggested fix:** Reset the flag on every open or refresh assignment, regardless of string equality.
+- **History:**
+  - v5: found (F10) — an edge of the D5b and D33 fixes, judged narrow
+  - round 5: sent to backlog
+  - v6: backlog upheld @`2d02b13`
+  - v8: file untouched in the round; backlog spot-checked @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D49 — The S3 upload rewinds the stream outside the retry loop → a retried upload silently loses the photo
+
+- **What:** The upload rewound the stream once, before the retry policy ran. A retried attempt therefore
+  read from the end of the stream and uploaded an empty or truncated object. The upload reported success,
+  the row flipped to cloud and the local original was deleted, so a paid customer's photo was destroyed
+  with no error anywhere.
+- **History:**
+  - v7: found (pass B, F1) — confirmed by direct inspection; the pass's only High, and the reason it did not certify
+  - round 7: fixed @`c37ca44` — the rewind moved inside the retry attempt, and a non-seekable stream now fails loudly
+  - v8: verified @`ac97e42` — the regression test reddens on revert with the exact data-loss signature
+
+### D50 — Purge and retention destroy a photo a second still-active order needs
+
+- **What:** One upload is shared by id across orders. Purge keyed on one order shipping, and retention
+  keyed on the oldest order's payment date, both destroyed a photo that a second, still-active order still
+  needed. Both certification passes found it independently.
+- **History:**
+  - v7: found by both passes (F2)
+  - round 7: fixed @`4dfd755` — live-order guards at purge and retention, after an adversarial design check; the accepted residual is a sharer still awaiting payment
+  - round 7: the same class fixed at a third site @`ac97e42` — the cleanup job's referenced-retention branch
+  - v8: verified @`ac97e42` at all three sites
+  - v9: the awaiting-payment residual independently re-found, owner decision unchanged
+
+### D51 — The promotion worker holds its concurrency slot through the whole retry backoff
+
+- **What:** The worker kept both the concurrency slot and its dependency scope for the entire retry
+  wait, up to an hour. During a cloud outage every slot parked in backoff and fresh promotions starved.
+- **History:**
+  - v7: found by both passes (F3)
+  - round 7: fixed @`df1026d` — the backoff is detached from the slot, parked retries are bounded and the sweep is the backstop
+  - v8: verified @`ac97e42` — the slot-starvation test reddens on revert
+  - v9: the cost and poison-amplification flag noted against this row and D46
+
+### D52 — The photos query has no soft-delete filter → presigned URLs for uploads whose blobs are gone
+
+- **What:** The order photos query did not exclude soft-deleted uploads, so it signed URLs for photos the
+  cleanup job had already deleted. The customer saw broken thumbnails that no refresh could fix.
+- **History:**
+  - v7: found (pass A, F4)
+  - round 7: fixed @`5cfc9f9` — the query filters soft-deleted rows
+  - v8: verified @`ac97e42`
+
+### D53 — The webhook paid transition is an unguarded check-then-act → duplicate confirmation emails
+
+- **What:** Concurrent duplicate payment deliveries both pass the status check, so promotion is queued
+  twice and the customer receives two confirmation emails. Same root cause as D9, with the email
+  consequence added.
+- **Evidence:** `Controllers/WebhooksController.cs:215`.
+- **Suggested fix:** Guard the paid transition in the payment-idempotency work; a conditional update here
+  would break the repository's no-optimistic-concurrency rule and the in-memory test provider.
+- **History:**
+  - v7: found (pass B, F5)
+  - round 7: deferred → bolt-035, with D9
+  - v8: deferral upheld @`ac97e42` — the controller was untouched in the round
+  - 2026-07-22: target closed with the row still deferred
+
+### D54 — Upload service re-advertises HEIC while the validator and the UI still reject it
+
+- **What:** The rejection message listed HEIC as accepted although the type validator and the interface
+  both refuse it, so the user is told to upload a format that always fails. It reintroduced a defect
+  closed in bolt-042.
+- **History:**
+  - v7: found (pass B, F6)
+  - round 7: fixed @`b171ce8` — the message no longer offers HEIC and the dead extension branch is gone
+  - v8: verified @`ac97e42`
+
+### D55 — Client filename is not truncated to the column width → Postgres rejects it and returns 500
+
+- **What:** An overlong client filename was stored unmodified. The in-memory and SQLite providers accept
+  it, so every test passes, but Postgres rejects it and the request fails with 500 in production only.
+- **History:**
+  - v7: found (pass B, F7) — hinted by the shared dual-database context
+  - round 7: fixed @`b171ce8` — the filename is sanitised and truncated at the service boundary
+  - v8: verified @`ac97e42`
+
+### D56 — The retention audit event is written before the save, so a failed save leaves false audit records
+
+- **What:** The archive-expired audit event was emitted before the batched save. A save failure left
+  audit records for rows that were never persisted, and the same rows fired again on the next tick.
+- **History:**
+  - v7: found (pass A, F8)
+  - round 7: fixed @`04149fa` — the audit is emitted only after the save succeeds
+  - v8: verified @`ac97e42`
+
+### D57 — Cloud-off purge refusal is logged at Error on every ship in the default configuration
+
+- **What:** The ship path lacked the cloud-enabled gate the cancel path has, so the default local-only
+  configuration logged an error on every shipment. Constant false errors mask real ones.
+- **History:**
+  - v7: found (pass A, F9)
+  - round 7: fixed @`fe0e6d2` — the ship path is gated like the cancel path
+  - v8: verified @`ac97e42`
+
+### D58 — The promotion worker's retry, backoff and re-enqueue path is entirely untested
+
+- **What:** No test drove the worker's retry path, so its backoff and re-queue behaviour was unproven.
+- **History:**
+  - v7: found (pass B, F10)
+  - round 7: fixed @`df1026d` — slot-starvation and retry-success tests
+  - v8: verified @`ac97e42` — by construction through the D51 revert
+
+### D59 — No test asserts that the payment webhook enqueues promotion
+
+- **What:** The wiring from the payment webhook to the promotion queue had no test, so deleting the call
+  would have shipped green.
+- **History:**
+  - v7: found (pass B, F11)
+  - round 7: fixed @`a80b819` — an integration test asserts the enqueue for a paid order
+  - v8: verified @`ac97e42` — by mutation; commenting out the call reddens exactly that test
+
+### D60 — A real cloud provider is never exercised — only a skip-gated MinIO suite and fakes
+
+- **What:** Cloud behaviour is proven only against a MinIO container in continuous integration and
+  in-memory fakes. No test ever runs against the real provider, including the retry path D49 lived in.
+- **Evidence:** `Tests/…/S3StorageServiceIntegrationTests.cs:18`.
+- **Suggested fix:** Exercise the real provider in the three-environment stage; this is environment work,
+  not a code change.
+- **History:**
+  - v7: found (pass B, F12)
+  - round 7: deferred → the three-environment track, with D20; the D49 regression tests shrank what only a real provider can prove
+  - v8: deferral upheld @`ac97e42` — the integration tests were untouched in the round
+  - 2026-07-22: target closed with the row still deferred
+
+### D61 — Retention's fixed candidate window is starved by rows whose delete keeps failing
+
+- **What:** The retention sweep orders by age and takes a fixed window. Rows whose delete keeps failing
+  stay at the front of that window every tick, so newer expired rows are never reached.
+- **Evidence:** `BackgroundJobs/ArchiveRetentionJob.cs:98`. The same shape as D38, in a second job.
+- **Suggested fix:** Exclude repeatedly failing rows from the candidate window so it advances.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog under the severity-based stop rule
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D62 — A read failure part-way through the admin ZIP truncates the archive after the headers are sent
+
+- **What:** The admin ZIP opens the response, then reads each original in turn. A read that fails part-way
+  through, including one racing a concurrent purge or promotion, leaves the admin with a truncated archive
+  and no clean error, because the headers are already committed.
+- **Evidence:** `Services/AdminOrderService.cs:197`.
+- **Suggested fix:** Check every entry can be read before writing the response, or write to a buffer that
+  can still fail cleanly.
+- **History:**
+  - v7: found by both passes
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - v9: widened — a concurrent promotion moving the original to cloud and deleting the local copy is a
+    second trigger alongside the concurrent purge
+  - 2026-08-10: row carried to `reviews/backlog.md`, where it appears twice — one row to prune
+
+### D63 — Preview cache-fill regeneration races the retention delete → an orphaned blob and a null reference
+
+- **What:** Regenerating a preview at the same moment retention deletes it leaves the freshly written blob
+  with no row pointing at it, because retention then clears the key.
+- **Evidence:** `Services/UploadService.cs:203` against `BackgroundJobs/ArchiveRetentionJob.cs:124`.
+- **Suggested fix:** Do not regenerate a preview for an upload the retention window has already expired,
+  or re-check the row before persisting the key.
+- **History:**
+  - v7: found by both passes
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D64 — A failed best-effort local delete in the promoter leaks local bytes nothing reclaims
+
+- **What:** After a successful promotion the promoter deletes the local original on a best-effort basis.
+  If that delete fails, the row is already recorded as cloud, so no later job looks at the local file and
+  the bytes stay on disk forever.
+- **Evidence:** `Services/OrderPhotoPromoter.cs:212`.
+- **Suggested fix:** Record the failed delete so a sweep can retry it.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D65 — The local storage root re-anchor uses a prefix match with no separator boundary
+
+- **What:** The local adapter re-anchors stored paths under the storage root using a plain prefix match.
+  Without a separator boundary a sibling directory whose name starts with the root's name also matches.
+- **Evidence:** `Services/LocalStorageService.cs:99`.
+- **Suggested fix:** Compare on a path-separator boundary, or resolve and compare full paths.
+- **History:**
+  - v7: found (pass B) — judged plausible
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D66 — The ZIP entry extension is taken from the untrusted client filename, not the validated type
+
+- **What:** Entry names inside the admin ZIP take their extension from the filename the client sent,
+  rather than the validated content type the server already knows.
+- **Evidence:** `Services/AdminOrderService.cs:190`.
+- **Suggested fix:** Derive the entry extension from the validated content type.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D67 — Batch upload caps total bytes but not the number of files
+
+- **What:** A batch upload is limited to 500 MB in total with no limit on how many files it may contain,
+  so a very large number of tiny files passes the check.
+- **Evidence:** `Controllers/UploadsController.cs:102`.
+- **Suggested fix:** Add a file-count cap alongside the byte cap.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D68 — A broken grid thumbnail has no fallback or retry after the one presigned-URL refresh
+
+- **What:** The grid refreshes signed URLs once when a thumbnail fails. If the refreshed URL also fails,
+  the tile stays broken with no placeholder and no further retry.
+- **Evidence:** `UI/…/order-detail-page.ts:472`.
+- **Suggested fix:** Show a placeholder tile and allow a manual retry after the single refresh fails.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D69 — Originals of orders that never reach production-complete or Cancelled escape the retention window
+
+- **What:** Retention only considers orders that reached a production-complete status or were cancelled,
+  so an order that stalls in any other state keeps its original indefinitely.
+- **Evidence:** `BackgroundJobs/ArchiveRetentionJob.cs:92`.
+- **Suggested fix:** Include stalled orders in the retention window, or record the intended exception.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - v9: re-raised, decision upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D70 — The documented 502 for a persistent storage failure is not implemented; it surfaces as 500
+
+- **What:** The bolt-043 requirement says a persistent storage failure returns 502. The code has no such
+  mapping, so the caller gets a generic 500.
+- **Evidence:** `Services/S3StorageService.cs:145`.
+- **Suggested fix:** Map a persistent storage failure to the documented status, or correct the requirement.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D71 — Idempotent-skip reasons are logged at Debug and never emit under the Information floor
+
+- **What:** The promoter logs why it skipped an already-promoted upload at Debug level, below the
+  configured floor, so the reason never reaches the log.
+- **Evidence:** `Services/OrderPhotoPromoter.cs:120`.
+- **Suggested fix:** Raise these reasons to Information, or drop the calls.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D72 — Transient and permanent cloud-write failures collapse into one warning, so poison is retried
+
+- **What:** Both a temporary cloud outage and a permanently bad object produce the same warning and the
+  same retry, so a permanently failing upload is retried like a passing blip.
+- **Evidence:** `Services/OrderPhotoPromoter.cs:182`.
+- **Suggested fix:** Classify the failure and stop retrying the permanent case.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D73 — The preview cache-hit path lost its no-tracking read
+
+- **What:** The hot preview cache-hit path now loads the upload with change tracking on, which it does
+  not need. It was a no-tracking read before bolt-042.
+- **Evidence:** `Services/UploadService.cs:139`.
+- **Suggested fix:** Restore the no-tracking read on the cache-hit path.
+- **History:**
+  - v7: found (pass A) — a regression from bolt-042
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D74 — The promotable-status set is written out three times under a false single-source comment
+
+- **What:** The set of order statuses eligible for promotion is duplicated in three places, and a comment
+  claims one of them is the single source of truth. The three can drift apart silently.
+- **Evidence:** `Cli/BackfillCommand.cs:43`.
+- **Suggested fix:** Define the set once and reference it from all three call sites.
+- **History:**
+  - v7: found (pass A) — judged plausible
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - v9: re-raised, decision upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D75 — The S3 retry classification, re-upload and presign protocol are untested
+
+- **What:** Nothing tested which failures the adapter treats as retryable, what a retried upload sends, or
+  which protocol the signed URL uses. This is the coverage gap D49 lived inside.
+- **Evidence:** `Services/S3StorageService.cs:60` for the retry policy and `:41` for the signing.
+- **Suggested fix:** Test the retry classification and the signing protocol directly.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog; the re-upload half gained a regression test with the D49 fix @`c37ca44`
+  - v8: backlog upheld @`ac97e42`
+  - v9: re-raised, decision upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D76 — Storage wiring, configuration and the CLI sat outside the lens list; the region setting is a trap
+
+- **What:** The storage registration, its settings and the command-line entry point were not in the file
+  list the lenses reviewed, so they got lighter scrutiny. The pass also flagged the provider region setting
+  as easy to get wrong.
+- **Evidence:** `Extensions/StorageExtensions.cs:56`.
+- **Suggested fix:** Include these files in the review file list, and validate the region setting at boot.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D77 — Recovery and retention sweeps run unindexed full scans every six hours
+
+- **What:** The sweep queries have no supporting index, so each one scans the whole uploads table every six
+  hours. The in-memory test provider hides the cost.
+- **Evidence:** `Data/Configurations/UploadConfiguration.cs:30`.
+- **Suggested fix:** Add an index covering the sweep predicates.
+- **History:**
+  - v7: found (pass B) — judged plausible
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D78 — The promoter reads the whole original into an array and leaves memory streams undisposed
+
+- **What:** The promoter materialises the entire original photo in memory and creates more than one memory
+  streams it never disposes, for every promoted upload.
+- **Evidence:** `Services/OrderPhotoPromoter.cs:138`.
+- **Suggested fix:** Stream the original through instead of buffering it, and dispose what is created.
+- **History:**
+  - v7: found (pass A) — two lenses
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D79 — The best-effort orphan-thumbnail delete swallows its exception with no log
+
+- **What:** A failed delete of an orphaned thumbnail is caught and discarded silently, so the leak leaves
+  no trace.
+- **Evidence:** `Services/UploadService.cs:222`.
+- **Suggested fix:** Log the failure at warning level.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D80 — Local preview cache header disagrees with the documented one
+
+- **What:** The design record says local previews are cached publicly and immutably; the code sends a
+  private cache header instead.
+- **Evidence:** `Controllers/UploadsController.cs:26`.
+- **Suggested fix:** Align the header with the design record, or correct the record.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - v9: re-raised, decision upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D81 — A freshly generated local thumbnail is re-read from disk on a cache miss
+
+- **What:** On a cache miss the service generates the thumbnail, writes it to disk and then reads the same
+  bytes back to serve them.
+- **Evidence:** `Services/UploadService.cs:240`.
+- **Suggested fix:** Serve the bytes already in hand.
+- **History:**
+  - v7: found (pass A)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D82 — Order detail shows both the interceptor toast and an inline error for one failure
+
+- **What:** A single failed request produces two messages, the global toast and the page's own inline
+  error or redirect.
+- **Evidence:** `UI/…/order-detail-page.ts:403`.
+- **Suggested fix:** Pick one channel per failure class.
+- **History:**
+  - v7: found (pass B)
+  - round 7: sent to backlog
+  - v8: backlog upheld @`ac97e42`
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D83 — "Photos no longer available" is shown for a just-paid order and for pending orders
+
+- **What:** A customer who has just paid sees the message saying their photos are gone, during the seconds
+  before archiving runs, and so does a customer whose order has not been paid yet. It is the concrete form
+  of the D13 follow-up.
+- **History:**
+  - v9: found — the certification pass's one genuinely new user-facing Medium
+  - 2026-07-27: owner ruled fix now
+  - round 9: fixed @`d041295` and `b9af326` — the message is gated on the order's lifecycle, with specs across the whole status matrix
+
+### D84 — No test asserts that the EuPlatesc payment notification enqueues promotion
+
+- **What:** The Stripe path has a wiring test; the EuPlatesc path does not, so deleting its enqueue call
+  would ship green.
+- **History:**
+  - v9: found — coverage sibling of D59
+  - 2026-07-27: owner ruled wont-fix — the EuPlatesc gateway is slated for removal, so its coverage is not worth building
+
+### D85 — The backfill command was outside the review file list, and backfill against the live worker is untested
+
+- **What:** The backfill command was not in the file list the lenses reviewed, so it got lighter scrutiny.
+  Running it while the live worker promotes the same orders is also untested.
+- **Evidence:** `Cli/BackfillCommand.cs`, absent from the pass's changed-file list.
+- **Suggested fix:** Review the command and test the concurrent case when the operator tooling is first
+  used against a real environment.
+- **History:**
+  - v9: found — recorded as a confidence caveat for that file
+  - 2026-07-27: owner ruled defer to the three-environment stage, with D20 and D60; affirmed @`d041295`
+  - 2026-07-22: target closed with the row still deferred
+
+### D86 — Retention deletes the blobs before it persists the null keys → a broken-URL window
+
+- **What:** Retention deletes the preview and thumbnail objects and only then clears their keys in the
+  database. A read landing in between gets a URL for an object that is already gone.
+- **Evidence:** `BackgroundJobs/ArchiveRetentionJob.cs:146`.
+- **Suggested fix:** Clear the keys first, then delete the objects.
+- **History:**
+  - v9: found — sent to backlog
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D87 — The retention sweep query has no soft-delete filter, so it reprocesses deleted rows
+
+- **What:** The retention candidate query does not exclude soft-deleted uploads, so it processes them
+  again and emits audit records for rows that are already gone.
+- **Evidence:** `BackgroundJobs/ArchiveRetentionJob.cs:96`. The same class as D52 and D56, missed when
+  those were fixed.
+- **Suggested fix:** Add the soft-delete filter to the candidate query.
+- **History:**
+  - v9: found — sent to backlog
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D88 — Promoter tests assert the cloud keys written but never the bytes
+
+- **What:** The promoter tests check which keys were written to cloud storage but never what was written
+  to them, so a wrong or empty payload would pass.
+- **Evidence:** `Tests/…/OrderPhotoPromoterTests.cs`.
+- **Suggested fix:** Assert the written content, not only the key.
+- **History:**
+  - v9: found — sent to backlog
+  - 2026-08-10: row carried to `reviews/backlog.md`
+
+### D89 — Code comments cite finding, decision and design-record ids, which the repo rule bans
+
+- **What:** Fix comments across the codebase named finding, decision and design-record identifiers, which
+  the repository comment rule forbids. 67 occurrences in 27 files, mostly predating this feature.
+- **History:**
+  - v9: found — sent to backlog as a dedicated sweep, not a per-file scramble
+  - 2026-07-30: fixed @`09173c4` — 371 occurrences removed across 118 tracked files, both suites green; the
+    records auditor now counts them
+
+### D90 — Closing the lightbox during a refresh has no spec; only closing before the error is tested
+
+- **What:** The D36 fix also covers closing the lightbox while the refresh is still in flight, by re-reading
+  the photo id when the fetch resolves. Only the close-before-error case has a spec.
+- **Evidence:** `UI/…/order-detail-page.spec.ts`.
+- **Suggested fix:** Add a spec that closes the lightbox during the refresh and asserts it stays closed.
+- **History:**
+  - v9: found — sent to backlog
+  - 2026-08-10: row carried to `reviews/backlog.md`

@@ -1,40 +1,57 @@
 ---
 type: resolution
 target: 043-cloud-storage-provider
+version: 9
 answers: review-v9.md
 status: resolved
 fixed_commit: b9af326
 closed: 2026-07-27
-findings:
-  D83: { status: fixed, commit: b9af326, note: "empty-archive copy gated on order lifecycle (d041295 + b9af326): pre-payment/production shows 'se pregătesc … în curând'; the purged copy is reserved for Shipped/Delivered/Cancelled/PaymentFailed — 8 status-matrix specs, red before/green after" }
-  D84: { status: wont-fix, commit: null, note: "owner 2026-07-27: the EuPlatesc gateway is slated for removal — no further investment in its coverage" }
-  D85: { status: deferred, commit: null, note: "owner 2026-07-27: backfill CLI is an ops tool unused until the 3-env/deployment phase — targeted scrutiny lands there (with D20/D60)" }
 ---
 
-# Resolution v9 — owner triage of the certification follow-ups
+# Resolution v9 — 043-cloud-storage-provider
 
-The v9 certification left three open Mediums for owner triage (everything else was already
-terminal in the ledger). Owner ruled 2026-07-27 via [summary-v9](summary-v9.md).
+## Findings
 
-| ID | Severity | Status | How |
-|----|----------|--------|-----|
-| D83 | 🟠 Med | fixed `d041295` | Order-lifecycle gate on the empty-archive message in `order-detail-page.ts`; regression specs cover all six statuses (3 pre-production → "în curând", 3 purge-eligible → "nu mai sunt disponibile"), failing before the fix and passing after. FE suite 444/444. |
-| D84 | 🟠 Med | wont-fix | EuPlatesc is planned for removal; testing its IPN→promotion wiring buys nothing durable. The Stripe twin stays tested. |
-| D85 | 🟠 Med | deferred → 3-env | Backfill CLI is operator tooling for the deployment phase; its scrutiny (incl. backfill × live-worker concurrency) belongs with the D20/D60 environment work. |
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D83 | fixed | `b9af326` | The empty-archive message is gated on the order's lifecycle: before payment and during production it says the photos are being prepared, and the "no longer available" copy is kept for the later statuses. First fix at `d041295`. |
+| D84 | wont-fix | — | Owner ruling on 2026-07-27: the EuPlatesc gateway is slated for removal, so testing its wiring buys nothing durable. The Stripe twin stays tested. See Decisions. |
+| D85 | deferred | — | Owner ruling on 2026-07-27: the backfill command is operator tooling for the deployment stage, so its scrutiny lands there with D20 and D60. See Decisions. |
+
+## Scope
+
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A — Empty-archive message gated on the order's lifecycle (`d041295`, `b9af326`) | D83 | `UI/…/order-detail-page.ts`, `UI/…/order-detail-page.spec.ts` | not needed (a condition on an existing message) |
+| B — Ruled without code | D84, D85 | — | not needed (no code changed) |
 
 ## Decisions
 
-- **D84 (wont-fix):** rationale is strategic, not technical — the owner intends to remove the
-  EuPlatesc gateway. Any future EuPlatesc-only coverage/parity finding should cite this
-  decision rather than be re-fixed.
-- **D85 (deferred):** re-check when the 3-env phase starts or the backfill command is first
-  used against a real environment; affirmed at `d041295`.
-- **Open doc note (no ruling requested):** v9's D10 row flagged that bolt-053's
-  implementation-plan AC says the photos endpoint returns 404 for non-owners while the
-  shipped code and upheld convention use 403 — a doc-vs-code reconcile for the next doc
-  sweep.
-- **Fix-diff micro-review (ran, 1 anchored agent):** class-sweep clean (single site);
-  regression clean (error/retry, grid, lightbox, error-vs-empty untouched); **one edge
-  caught and fixed** — `PaymentFailed` sits outside the linear status chain and fell into
-  the optimistic copy; now treated like `Cancelled` (follow-up commit, `Pending` +
-  `PaymentFailed` added to the status matrix, FE 446/446).
+### The certification follow-ups were the only open items left (D83, D84, D85)
+
+The certification pass left exactly three Medium items needing a decision; everything else it raised
+was already terminal on the ledger. The owner ruled all three on 2026-07-27 through the owner summary
+for this pass.
+
+### EuPlatesc coverage will not be built (D84)
+
+The reason is strategic rather than technical: the owner intends to remove that payment gateway. Any
+later finding about EuPlatesc-only coverage or parity should cite this ruling instead of being fixed.
+
+### The backfill command is re-checked at the deployment stage (D85)
+
+Re-check when the three-environment stage starts, or the first time the command is run against a real
+environment, whichever comes first. Affirmed at `d041295`.
+
+### The fix review caught one status the first fix missed
+
+One anchored review of the fix diff ran. The class sweep was clean, since there is a single site, and
+nothing adjacent regressed. It caught one edge that was fixed in the follow-up commit: the
+payment-failed status sits outside the linear order chain and fell into the optimistic copy, so it is
+now treated like a cancelled order, with both it and the pending status added to the tested matrix.
+
+### One document still disagrees with the code (D10)
+
+No ruling was requested. The certification pass flagged that the bolt-053 implementation plan says the
+photos endpoint returns 404 for a non-owner while the shipped code and the upheld decision use 403.
+That is a document-versus-code reconcile for the next documentation sweep, not a code change.
