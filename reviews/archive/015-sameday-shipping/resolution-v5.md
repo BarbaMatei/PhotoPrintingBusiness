@@ -2,117 +2,123 @@
 type: resolution
 target: 015-sameday-shipping
 version: 5
+answers: review-v5.md
 status: resolved
-review_commit: 5fc330b
 fixed_commit: 1816f5f
 closed: 2026-07-29
-findings:
-  # v5 mediums (D55–D66)
-  D55: { status: fixed, commit: 3764fa0, note: "Easybox address fields length-capped (locker supplies the address); Block capped in both types. Test: oversized Easybox Street fails." }
-  D56: { status: fixed, commit: 66c6d50, note: "AwbLabelUrl + ShippedAt + DeliveredAt added to the admin order-detail DTO + projection; test asserts they surface. GetLabelPdfAsync (D89) kept as the auth-safe fetch path for a pre-enable label-proxy endpoint." }
-  D57: { status: fixed, commit: c75003d, note: "Test seeds a claim older than the TTL, asserts the creator reclaims + creates (crashed-worker recovery)." }
-  D58: { status: fixed, commit: c75003d, note: "Test: on a definitive (unreachable) failure the claim is released; complements D68's preserve-on-timeout." }
-  D59: { status: fixed, commit: c611a23, note: "Specs: guest-session prefill and malformed-JSON safety in prefillEasyboxContact." }
-  D60: { status: fixed, commit: c75003d, note: "Over-length vendor label url dropped (null + warning) before persist so the AWB number always records — breaks the re-bill loop; column widened 500→2048 via a new migration; test covers it. Approach-checked." }
-  D61: { status: fixed, commit: 3764fa0, note: "Phone requires 9-15 real digits (HasEnoughDigits Must), not just charset. Tests: '1-2-3-4' / '()-. ()' fail." }
-  D62: { status: fixed, commit: 56320c0, note: "Vendor rejection body (truncated to limit PII) logged on permanent AWB failure." }
-  D63: { status: fixed, commit: 16d065b, note: "Auth/Protocol caught before the base catch, logged at Error, deduped per outage window via TrackingStopRegistry.MarkOutageOnce; per-order detail at Debug. Approach-checked (per-order Error would storm)." }
-  D64: { status: fixed, commit: c611a23, note: "selectMethod resets selectedLockerId (+ no-op re-click guard) so a stale locker can't reach payment as null. Test covers the Easybox→Courier→Easybox switch. Approach-checked." }
-  D65: { status: fixed, commit: fd59bf2, note: "SamedayAuthHandler resolves ISamedayTokenProvider lazily via IServiceProvider — breaks the ctor-time resolution cycle. Registration extracted to AddSamedayIntegration; a test resolves the Enabled=true root (client + creator + 3 jobs). Confirmed a real cycle by approach-check." }
-  D66: { status: fixed, commit: 56320c0, note: "Clearer give-up log (D62's vendor-reason logging) surfaces stale-locker failures — the finding's give-up-log alternative. Locker-table sync is a pre-enable operational task (no live sync); see decisions." }
-  # v5 lows (D67–D82)
-  D67: { status: fixed, commit: 16d065b, note: "Tick-start-clock stamp + interval-minus-buffer eligibility window → polls ~every interval, not every other tick. Test covers a one-interval-ago order. Approach-checked (kept the cross-replica dedup band)." }
-  D68: { status: fixed, commit: c75003d, note: "PreserveClaim on timeout + post-create persist-fail + (micro-review, 1816f5f) a retryable 5xx/408/429 on the create call — all 'AWB may be billed' cases hold the claim through its TTL; a status-less transport failure still releases. Dispatcher defers re-enqueue past the TTL (floor clamps the TTL). Tests cover timeout, create-5xx-preserve, transport-release. Approach-checked." }
-  D69: { status: fixed, commit: c611a23, note: "Client phone control mirrors the server charset + 9-15 digit rule (both forms). Test: digit-poor phone keeps Continue disabled." }
-  D70: { status: fixed, commit: 56320c0, note: "Sameday HttpClient caps buffered responses at 10 MB; label PDF still streams (ResponseHeadersRead)." }
-  D71: { status: fixed, commit: 56320c0, note: "Transport backoff now the intended 1/4/16 s via an explicit DelayGenerator (Polly Exponential is base-2)." }
-  D72: { status: deferred, commit: null, note: "ShippedAt backfill moot pre-deploy (no legacy Shipped orders exist); the admin transition stamps ShippedAt going forward. A one-time backfill belongs in the deploy runbook if legacy data ever exists. See decisions." }
-  D73: { status: fixed, commit: aa995c1, note: "Retry sweep logs order_id per re-enqueue (per-order traceability)." }
-  D74: { status: fixed, commit: c611a23, note: "Prefill reads the guest session via GuestAuthService.getStoredSession() instead of an inline localStorage parse." }
-  D75: { status: fixed, commit: 56320c0, note: "One EnsureSuccessOrThrowAsync chokepoint in SamedayClient, sharing SamedayPolicies.IsRetryableStatus so the 4 ladders can't drift." }
-  D76: { status: fixed, commit: 16d065b, note: "Two-order tick test exercises the parallel per-order-scope fan-out." }
-  D77: { status: fixed, commit: aa995c1, note: "AwbRetryJobTests ported to SQLite; fresh-claim (skip) + stale-claim (re-drive) cases added." }
-  D78: { status: fixed, commit: c611a23, note: "Tests: setLocker preserves the Easybox contact; review-step renders no address line for an Easybox order." }
-  D79: { status: fixed, commit: c611a23, note: "TokenService adds a `name` claim; auth.service populates currentUser$ from it on login + restore, so the signed-in recipient prefill is live (was dead code)." }
-  D80: { status: fixed, commit: c611a23, note: "Transient locker-search error sets a distinct lockerSearchError signal (reset per fetch) + retry, instead of showing 'no easybox here'. Test covers error→recover. Approach-checked." }
-  D81: { status: deferred, commit: null, note: "Service-id validation is the parked pre-enable config task (owner deferred setting real Sameday service ids); the feature is dormant, so no boot-time guard added now. See decisions + [[project_sameday_service_ids_parked]]." }
-  D82: { status: fixed, commit: aa995c1, note: "Dispatcher re-enqueue is unit-testable (ComputeReEnqueueDelay + clock-based DelayedReEnqueueAsync); tests assert schedule, TTL floor, attempt+1." }
-  # v5 cleanups (D83–D89)
-  D83: { status: wont-fix, commit: null, note: "The bundled locker-map UX (prime-all-on-init, clear-restores-list, search-error survival) is intentional and is now covered by tests this round; not worth a separate story. See decisions." }
-  D84: { status: fixed, commit: c75003d, note: "AwbCreator loads the order AsNoTracking (all writes use ExecuteUpdate)." }
-  D85: { status: fixed, commit: 16d065b, note: "Tracking poll loads the order AsNoTracking." }
-  D86: { status: fixed, commit: 3764fa0, note: "Recipient name+phone rules extracted to AddRecipientRules() shared by both blocks; regex hoisted to a const." }
-  D87: { status: fixed, commit: aa995c1, note: "Retry sweep's outside-window floor derived from AwbGiveUpRegistry.EntryLifetime so the dedup + query window can't drift." }
-  D88: { status: false-positive, commit: null, note: "Refuted at cert: Npgsql maps any-offset DateTimeOffset to the UTC instant; no timestamptz write bug. No fix." }
-  D89: { status: wont-fix, commit: null, note: "GetLabelPdfAsync is not dead — it is the auth-safe fetch path retained for a pre-enable admin label-proxy endpoint (the raw vendor url may require the bearer token). See decisions." }
-  # folded backlog (owner chose 'Everything')
-  D20: { status: fixed, commit: 56320c0, note: "MaxRequestsPerSecond decouples the transport rate from the concurrency gate (defaults to it, preserving behaviour)." }
-  D24: { status: fixed, commit: 56320c0, note: "Client no longer fabricates a wall-clock observedAt; TrackingSnapshot.ObservedAt is nullable and the job supplies its poll clock for DeliveredAt. Test updated." }
-  D25: { status: fixed, commit: 56320c0, note: "Token expiry normalized with ToUniversalTime()." }
-  D27: { status: fixed, commit: 16d065b, note: "Non-delivered LastTrackingSyncAt write guarded (Status=Shipped AND stamp < now) — monotonic, never touches a Delivered row." }
-  D29: { status: fixed, commit: 56320c0, note: "Retries log via an OnRetry callback (attempt/delay/outcome)." }
-  D30: { status: fixed, commit: 56320c0, note: "Corrected ddd-02: the documented /health sameday field was never delivered by the generic writer; dropped as out of scope." }
-  D33: { status: false-positive, commit: null, note: "Obsolete: the tick loads IDs only (AsNoTracking) then PollOneAsync loads each order once on its own scoped context — required by the parallel design, not a wasteful re-query; no unused 'inWindow' variable exists in the current code. See decisions." }
-  D35: { status: fixed, commit: c611a23, note: "Locker list primed lazily through the search stream only when Easybox is active — a courier-only user never triggers a fetch. Test asserts no init fetch for courier." }
-  D37: { status: fixed, commit: 56320c0, note: "Removed the unreferenced LogRedactor." }
-  D38: { status: fixed, commit: 16d065b, note: "AwbGiveUpRegistry + TrackingStopRegistry share a MemoryCacheOnceRegistry base." }
-  D39: { status: fixed, commit: fd59bf2, note: "SamedayShippingService injects StaticShippingService (registered scoped) instead of new-ing it; drops the db/config ctor params." }
-  D40: { status: deferred, commit: null, note: "Pre-existing bolt-035 model/designer drift (StripeClientSecret 255 vs 512): the current model snapshot + all post-June migration designers carry 512; only the two June designers hold the point-in-time 255 (immutable history). Harmless — Stripe secrets are ~66 chars. Align the DB in a bolt-035 groom, not this round. See decisions." }
-  D50: { status: fixed, commit: aa995c1, note: "AwbDispatcher orchestration unit-tested (ComputeReEnqueueDelay + DelayedReEnqueueAsync) — the deferred coverage gap is closed." }
 ---
 
 # Resolution v5 — 015-sameday-shipping
 
-Fixer response to [review-v5.md](review-v5.md) (certification; all findings dormant behind the two
-`false` flags). Owner chose the widest scope: all v5 findings **plus** the foldable backlog. Worked
-in file-clusters. Design/mechanism/UI-state changes got adversarial approach-checks before
-implementation (D68/D60, D65/D39, D64/D35/D80, D67/D27/D63). A fresh-eyes fix-diff micro-review (3
-Explore agents) ran before hand-back; it confirmed the DI-cycle break, the client refactor, and the
-frontend stream, and found one class-vs-instance gap — a retryable 5xx on the AWB create call also
-leaves a possibly-billed AWB, so `PreserveClaim` was extended to it (1816f5f) — plus minor tightenings
-(TTL floor clamp, outage-window constant, extra tests). All folded in.
+## Findings
 
-Backend 914 / frontend 457 green; 10 MinIO tests skipped. Nothing pushed.
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D55 | fixed | `3764fa0` | Easybox address fields length-capped, since the locker supplies the address; the block field is capped in both delivery types. Test: an oversized Easybox street fails validation. |
+| D56 | fixed | `66c6d50` | The label link and both timestamps added to the admin order-detail response and projection; a test asserts they surface. The fetch method is kept as the authenticated path — see Decisions. |
+| D57 | fixed | `c75003d` | A test seeds a claim older than the lifetime and asserts the creator reclaims it and creates the label, which is the crashed-worker recovery path. |
+| D58 | fixed | `c75003d` | A test asserts the claim is released on a definitive failure, complementing the D68 preserve-on-timeout case. |
+| D59 | fixed | `c611a23` | Specs cover guest-session prefill and malformed stored data in the Easybox contact prefill. |
+| D60 | fixed | `c75003d` | An over-length vendor label link is dropped with a warning before the persist, so the AWB number always records and the re-bill loop cannot start; the column widened from 500 to 2048 by a new migration. Approach-checked. |
+| D61 | fixed | `3764fa0` | The phone rule requires 9 to 15 real digits, not just an allowed character set. Tests: "1-2-3-4" and a separator-only value both fail. |
+| D62 | fixed | `56320c0` | The vendor rejection body, truncated to limit personal data, is logged on a permanent label failure. |
+| D63 | fixed | `16d065b` | Authentication and protocol faults are caught before the base catch and logged at Error, deduplicated per outage window; per-order detail drops to Debug. Approach-checked: a per-order Error would storm. |
+| D64 | fixed | `c611a23` | Choosing a method resets the selected locker, with a no-op guard on re-clicking the same one, so a stale locker cannot reach payment as null. Test covers the Easybox, Courier, Easybox switch. Approach-checked. |
+| D65 | fixed | `fd59bf2` | The auth handler resolves the token provider lazily through the service provider, breaking the constructor-time cycle. Registration moved into one extension; a test resolves the enabled root. The approach-check confirmed a real cycle. |
+| D66 | fixed | `56320c0` | The clearer give-up log from D62 surfaces stale-locker failures, which is the finding's own alternative. Keeping the locker table in step is a pre-enable operational task — see Decisions. |
+| D67 | fixed | `16d065b` | A tick-start clock stamp and an interval-minus-buffer eligibility window, so orders poll about every interval rather than every other tick. Approach-checked, keeping the cross-replica band. |
+| D68 | fixed | `c75003d` | The claim is preserved on timeout, on a post-create persist failure and, after the micro-review (1816f5f), on a retryable 5xx; a transport failure with no status still releases. Approach-checked. |
+| D69 | fixed | `c611a23` | The client phone control mirrors the server character set and the 9-to-15-digit rule on both forms. Test: a digit-poor phone keeps Continue disabled. |
+| D70 | fixed | `56320c0` | The vendor client caps buffered responses at 10 MB; the label PDF still streams. |
+| D71 | fixed | `56320c0` | The transport backoff is the intended 1, 4 and 16 seconds through an explicit delay generator, because the library default is base 2. |
+| D72 | deferred | — | The shipped-timestamp backfill is moot before deployment: no legacy Shipped orders exist and the admin transition stamps it going forward. See Decisions. |
+| D73 | fixed | `aa995c1` | The retry sweep logs the order id on each re-enqueue, so a single order's attempts can be followed. |
+| D74 | fixed | `c611a23` | The prefill reads the guest session through the shared accessor instead of an inline local-storage parse. |
+| D75 | fixed | `56320c0` | One status-check chokepoint in the client, sharing the policy helper's classification, so the four ladders cannot drift. |
+| D76 | fixed | `16d065b` | A two-order tick test exercises the parallel per-order scope fan-out. |
+| D77 | fixed | `aa995c1` | The retry-sweep tests moved to SQLite, with fresh-claim skip and stale-claim re-drive cases added. |
+| D78 | fixed | `c611a23` | Tests: selecting a locker preserves the Easybox contact, and the review step renders no address line for an Easybox order. |
+| D79 | fixed | `c611a23` | The token service adds a name claim and the auth service populates the current-user stream from it on login and on session restore, so the signed-in prefill is live rather than dead code. |
+| D80 | fixed | `c611a23` | A transient locker-search error sets a distinct error signal, reset per fetch, with a retry, instead of showing "no easybox here". Test covers error then recovery. Approach-checked. |
+| D81 | deferred | — | Service-id validation is the parked pre-enable configuration task; the feature is dormant, so no boot-time guard was added now. See Decisions. |
+| D82 | fixed | `aa995c1` | The dispatcher re-enqueue is unit-testable through a pure delay computation and a clock-based delayed re-enqueue; tests assert the schedule, the lifetime floor and the attempt increment. |
+| D83 | wont-fix | — | The bundled locker-map behaviour is intentional and is now covered by tests from this round; a retrospective story adds nothing. See Decisions. |
+| D84 | fixed | `c75003d` | The creator loads the order untracked, since all writes go through direct updates. |
+| D85 | fixed | `16d065b` | The tracking poll loads the order untracked. |
+| D86 | fixed | `3764fa0` | Recipient name and phone rules extracted into one shared method used by both blocks; the pattern hoisted to a constant. |
+| D87 | fixed | `aa995c1` | The sweep's outside-window floor is derived from the registry entry lifetime, so the deduplication window and the query window cannot drift. |
+| D88 | false-positive | — | Refuted at the certification pass: Npgsql maps any-offset values to the UTC instant, so there is no timestamp write bug. No fix. |
+| D89 | wont-fix | — | The label-fetch method is not dead: it is the authenticated path kept for a pre-enable admin label-proxy endpoint. See Decisions. |
+| D20 | fixed | `56320c0` | A separate requests-per-second setting decouples the transport rate from the concurrency gate, defaulting to it so behaviour is preserved. |
+| D24 | fixed | `56320c0` | The client no longer fabricates a wall-clock observation time; the snapshot value is nullable and the job supplies its poll clock for the delivered timestamp. Test updated. |
+| D25 | fixed | `56320c0` | The token expiry is normalized to UTC. |
+| D27 | fixed | `16d065b` | The non-delivered sync write is guarded on Status = Shipped and a forward stamp, so it is monotonic and never touches a delivered row. |
+| D29 | fixed | `56320c0` | Retries log through a retry callback carrying attempt, delay and outcome. |
+| D30 | fixed | `56320c0` | Resolved the other way: the design document was corrected, because the generic health writer never delivered the documented Sameday field; the field itself was dropped as out of scope. |
+| D33 | false-positive | — | Obsolete: the tick loads ids only and each poll loads its order once on its own scope, which the parallel design requires. The unused variable the finding cites does not exist. See Decisions. |
+| D35 | fixed | `c611a23` | The locker list is primed lazily through the search stream only while Easybox is active, so a courier-only customer triggers no fetch. Test asserts no fetch at init for courier. |
+| D37 | fixed | `56320c0` | The unreferenced redaction helper removed. |
+| D38 | fixed | `16d065b` | The give-up and tracking-stop registries share one base type. |
+| D39 | fixed | `fd59bf2` | The shipping service injects the static shipping service, registered scoped, instead of constructing it, and drops the two constructor parameters. |
+| D40 | deferred | — | Pre-existing bolt-035 model and designer drift on a secret's length. The current snapshot and every later designer carry 512; only the two June designers hold 255. See Decisions. |
+| D50 | fixed | `aa995c1` | The dispatcher orchestration is unit-tested through the pure delay computation and the delayed re-enqueue, so the deferred coverage gap is closed. |
 
-## Outcome counts
+## Scope
 
-- **fixed:** 30 (all mediums except D66-note; all actioned lows/cleanups; 9 folded backlog).
-- **deferred:** D72, D81, D40 (+ D50 was the prior deferral — now fixed).
-- **wont-fix:** D83, D89.
-- **false-positive:** D88 (refuted at cert), D33 (obsolete).
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A — Validation rules and shared rule extraction (`3764fa0`) | D55, D61, D86 | `Validators/Payments/CreateOrderRequestValidator.cs` | not needed (rules only) |
+| B — Claim lifecycle, label-link clamp, creator tests (`c75003d`) | D57, D58, D60, D68, D84 | `Services/Sameday/AwbCreator.cs`, `Migrations/`, `Tests/…/AwbCreatorTests.cs` | run before implementation — sound-with-changes, folded in |
+| C — Client hardening and transport behaviour (`56320c0`) | D62, D66, D70, D71, D75, D20, D24, D25, D29, D30, D37 | `Services/Sameday/SamedayClient.cs`, `SamedayPolicies.cs` | not needed (classification, limits and log content) |
+| D — Tracking poll clock, outage dedup, untracked reads (`16d065b`) | D63, D67, D76, D85, D27, D38 | `BackgroundJobs/ShipmentTrackingJob.cs`, registries | run before implementation — sound-with-changes, folded in |
+| E — Checkout state, prefill, locker search (`c611a23`) | D59, D64, D69, D74, D78, D79, D80, D35 | `UI/…/delivery-step.ts`, `checkout-state.service.ts`, specs | run before implementation — sound-with-changes, folded in |
+| F — Enabled-root wiring and container registration (`fd59bf2`) | D65, D39 | `Program.cs`, `Extensions/SamedayServiceCollectionExtensions.cs` | run before implementation — confirmed a real resolution cycle |
+| G — Dispatcher and retry-sweep testability (`aa995c1`) | D73, D77, D82, D87, D50 | `BackgroundJobs/AwbDispatcher.cs`, `AwbRetryJob.cs` | not needed (extracting pure functions to test) |
+| H — Admin label surface (`66c6d50`) | D56 | `DTOs/Admin/AdminOrderDtos.cs` | not needed (a projection and a DTO) |
+| I — Micro-review follow-up: preserve the claim on a retryable 5xx (`1816f5f`) | D68 | `Services/Sameday/AwbCreator.cs` | covered by cluster B's check |
+| J — Not fixed | D72, D81, D40, D83, D89, D88, D33 | — | not needed (no code changed) |
 
-## Decisions & rationale (non-`fixed`)
+## Decisions
 
-- **D72 (deferred) — ShippedAt backfill.** No deployed data exists, so there are no legacy Shipped
-  orders with a null ShippedAt; the admin transition stamps it going forward. A one-time backfill
-  (`ShippedAt = UpdatedAt` for legacy Shipped rows) belongs in the deploy runbook if the app ever
-  ships with pre-integration Shipped orders. Adding a data-migration now for zero current rows is
-  churn.
-- **D81 (deferred) — service-id validation.** The real Sameday service ids are a parked pre-enable
-  configuration task (owner decision). The feature is dormant, so no boot-time guard is added now;
-  configuring real ids before flipping the flag is the existing pre-enable step.
-- **D40 (deferred) — StripeClientSecret 255-vs-512.** Pre-existing bolt-035 drift, not Sameday. The
-  current model snapshot and every post-June migration designer carry 512; only the two June
-  designers hold the historical 255. Stripe client secrets are ~66 chars, so any DB-vs-model gap is
-  harmless. Aligning the actual Postgres column is a bolt-035 groom item.
-- **D83 (wont-fix) — bundled locker-map UX.** The prime-all-on-init / clear-restores-list /
-  search-error-survival behaviours are intentional UX and are now covered by delivery-step specs;
-  a retro-story adds no value.
-- **D89 (wont-fix) — GetLabelPdfAsync no caller.** Not dead: it is the auth-safe way to fetch the
-  label PDF by AWB number, retained for a pre-enable admin label-proxy endpoint (the raw vendor
-  `AwbLabelUrl`, now surfaced by D56, may require the bearer token to open).
-- **D33 (false-positive) — tracking re-query.** The current tick selects IDs only (`AsNoTracking`),
-  then each `PollOneAsync` loads its order once on its own scoped context — mandatory for the
-  parallel fan-out, not a wasteful re-query of an already-loaded entity; the "unused inWindow" the
-  finding cited does not exist in the current code.
-- **D88 (false-positive)** — refuted during certification (Npgsql handles any-offset DateTimeOffset).
+### The shipped-timestamp backfill is deferred (D72)
 
-## Follow-ups for the re-reviewer (new surface this round)
+No deployed data exists, so there are no legacy Shipped orders with an empty shipped timestamp, and
+the admin transition stamps it going forward. A one-time backfill belongs in the deploy runbook if
+the application ever ships with pre-integration Shipped orders. Adding a data migration now, for
+zero current rows, is churn.
 
-- **New mechanisms** (owning lens in parentheses): durable-claim `PreserveClaim` + dispatcher TTL-floor
-  re-enqueue (race); label-url clamp + `AlterAwbLabelUrlLength` migration (db-parity); tracking
-  systemic-failure outage dedup via `MarkOutageOnce` + `MemoryCacheOnceRegistry` base (observability);
-  `SamedayAuthHandler` lazy token-provider resolution + `AddSamedayIntegration` extension (correctness/DI);
-  frontend `primeLockers$` stream + `lockerSearchError` signal (frontend-ux).
-- **Accepted residual (unchanged):** D45 vendor-idempotency crash-window — still rests on Sameday
-  deduping on `ClientInternalReference`; verify with the vendor before enabling (ADR-015).
+### Service-id validation is deferred to the pre-enable step (D81, D66)
+
+The real Sameday service ids are a parked pre-enable configuration task by owner decision. The
+feature is dormant, so no boot-time guard was added now; configuring the real ids before flipping
+the flag is the existing pre-enable step. The same reasoning covers D66's locker-table freshness:
+this round improved the give-up log so a stale locker is diagnosable, and keeping the locker table
+in step with the vendor stays an operational task, not code.
+
+### The secret-length drift stays deferred (D40)
+
+Pre-existing bolt-035 drift, not Sameday. The current model snapshot and every migration designer
+after June carry 512; only the two June designers hold the historical 255, and those are immutable
+history. Stripe client secrets are about 66 characters, so any gap between database and model is
+harmless. Aligning the actual Postgres column is a bolt-035 groom item.
+
+### Two cleanup rows ruled wont-fix (D83, D89)
+
+D83: the locker-map behaviours that rode into the diff — prime on init, clear restores the list,
+survive a search error — are intentional and are now covered by the delivery-step specs this round
+added, so a retrospective story adds no value. D89: the label-fetch method is not dead code. It is
+the authenticated way to fetch the label by AWB number, kept for a pre-enable admin label-proxy
+endpoint, because the raw vendor link that D56 now surfaces may need the bearer token to open.
+
+### Two rows ruled false-positive (D33, D88)
+
+D33: the tick selects ids only and untracked, then each poll loads its own order on its own scoped
+context, which the parallel fan-out requires rather than a wasteful re-query; the unused variable
+the finding cites does not exist in the current code. D88 was refuted during the certification pass
+itself: Npgsql maps any-offset values to the UTC instant.
+
+### The vendor-idempotency residual is unchanged (D45)
+
+Not in this round's scope and not touched by it. Avoiding a double courier charge after a crash
+between the vendor call and the persist still rests on Sameday deduplicating on the reference we
+send. Confirm that with the vendor before enabling the jobs, per ADR-015.

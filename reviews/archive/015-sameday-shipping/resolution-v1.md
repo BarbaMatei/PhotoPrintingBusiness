@@ -1,134 +1,99 @@
 ---
 type: resolution
 target: 015-sameday-shipping
-review-version: 1
+version: 1
+answers: review-v1.md
 status: resolved
 fixed_commit: 835e932
 closed: 2026-07-27
-findings:
-  F1:  { status: fixed, commit: edd49f7, note: "clientInternalReference = OrderNumber (per-order), not the shop-wide PickupPointId; wire test pins it. Design got an adversarial approach-check." }
-  F2:  { status: fixed, commit: edd49f7, note: "guarded ExecuteUpdate (WHERE AwbNumber IS NULL AND Status != Cancelled) — one writer wins the DB row; per-order key (F1) covers the vendor side. No void API, so a genuine orphan is logged." }
-  F3:  { status: fixed, commit: d6744f1, note: "per-order scope+DbContext opened AFTER the semaphore gate (live contexts <= MaxConcurrentSamedayCalls); tick reads projected AsNoTracking. Approach-checked." }
-  F4:  { status: fixed, commit: 835e932, note: "Easybox contact (name+phone) captured at checkout (frontend 835e932, prefilled from account/guest), required server-side (validator e8d4b53), and re-validated in the mapper (edd49f7) — a blank recipient now fails locally as GiveUp instead of reaching Sameday null." }
-  F5:  { status: fixed, commit: edd49f7, note: "AwbCreationRequest carries the delivery-type ServiceId + locker SamedayId; client sends service + lockerLastMile. Service ids are now per-merchant config (LockerServiceId/CourierServiceId) — see decisions." }
-  F6:  { status: fixed, commit: e8d4b53, note: "RecordingAwbCreationNotifier + StripeWebhook_PaymentSucceeded_EnqueuesAwbCreation — deleting NotifyPaidAsync now reddens the suite." }
-  F7:  { status: fixed, commit: d6744f1, note: "CAS test now seeds a genuinely Shipped order and advances it out of Shipped mid-poll via a separate scope, so the ExecuteUpdate WHERE Status==Shipped actually runs and returns 0; removing the predicate reddens it." }
-  F8:  { status: fixed, commit: ef8d323, note: "guard was attempt >= Length (skipped the last delay); extracted NextDispatchDelay(attempt, backoffs) as a pure tested function, exhausted only past the last entry." }
-  F9:  { status: fixed, commit: 1a240b7, note: "one SlidingWindowRateLimiter per handler (was new-per-call → inert + timer leak), surfaced by BuildPipeline and disposed via Dispose(bool). QueueLimit kept unbounded — jobs are semaphore-bounded and the request path doesn't route through this limiter today (noted)." }
-  F10: { status: fixed, commit: 010c6dc, note: "admin ->Shipped only overwrites AwbNumber/TrackingUrl when the field is non-empty; test seeds a machine AWB and asserts it survives an omitted field." }
-  F11: { status: fixed, commit: 010c6dc, note: "admin AwaitingPayment->Paid stamps PaidAt and calls IAwbCreationNotifier.NotifyPaidAsync (Null no-op when jobs off). Owner decision: no new cash/COD UI. Does NOT fire the confirmation email — see decisions." }
-  F12: { status: fixed, commit: edd49f7, note: "guard uses Status != Cancelled (not == Paid) per the approach-check: a mid-call Paid->Printing keeps its label instead of being orphaned + stranded." }
-  F13: { status: fixed, commit: e8d4b53, note: "courier RecipientName/Phone/Street/Number/City/County/PostalCode NotEmpty + MaximumLength + phone regex; tests cover blank + overlong + bad-format." }
-  F14: { status: fixed, commit: d6744f1, note: "SamedayUnreachableException in the tracking poll now logs a Warning with order id before returning." }
-  F15: { status: fixed, commit: edd49f7, note: "the billable AwbNumber is logged BEFORE the DB write; a persist throw returns transient RetryLater and is tested (drop-table injection)." }
-  F16: { status: fixed, commit: edd49f7, note: "AwbCreatorTests moved to SQLite; the happy-path read-back goes through a FRESH context, so a missing persist reddens it." }
-  F17: { status: fixed, commit: 010c6dc, note: "tests assert ShippedAt on ->Shipped and DeliveredAt on ->Delivered (the tracking job depends on ShippedAt != null)." }
-  F18: { status: fixed, commit: 835e932, note: "clearing the city search no longer tears down the pipe — the fetch is wrapped in catchError(() => of([])) inside switchMap." }
-  F19: { status: fixed, commit: 835e932, note: "the init prime is a startWith('') inside the same switchMap stream (immediate, but cancellable), replacing the rival standalone subscription that could overwrite a filtered result." }
-  F32: { status: fixed, commit: edd49f7, note: "folded into F4 — the mapper now rejects a blank recipient name/phone with ArgumentException -> GiveUp." }
-  F34: { status: fixed, commit: 1a240b7, note: "folded into F9 — a finite-limit test now exercises the production limiter branch the suite previously skipped (int.MaxValue)." }
-  F20: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F21: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F22: { status: deferred, commit: null, note: "ledger backlog (Low, dual-DB parity) — not in this fix round" }
-  F23: { status: deferred, commit: null, note: "ledger backlog (Low, dual-DB parity) — not in this fix round" }
-  F24: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F25: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F26: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F27: { status: deferred, commit: null, note: "ledger backlog (Low, plausible) — not in this fix round" }
-  F28: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F29: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F30: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F31: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F33: { status: deferred, commit: null, note: "ledger backlog (Low) — the tracking-job reload was removed as a side effect of F3 (delivered email now uses the loaded order), but the finding itself stays backlog" }
-  F35: { status: deferred, commit: null, note: "ledger backlog (Low) — not in this fix round" }
-  F36: { status: deferred, commit: null, note: "ledger backlog (Cleanup) — not in this fix round" }
-  F37: { status: deferred, commit: null, note: "ledger backlog (Cleanup) — not in this fix round" }
-  F38: { status: deferred, commit: null, note: "ledger backlog (Cleanup) — not in this fix round" }
-  F39: { status: deferred, commit: null, note: "ledger backlog (Cleanup) — not in this fix round" }
-  F40: { status: deferred, commit: null, note: "ledger backlog (Cleanup) — not in this fix round" }
-  F41: { status: deferred, commit: null, note: "ledger backlog (Cleanup) — not in this fix round" }
-  F42: { status: false-positive, commit: null, note: "refuted at review — JsonContent re-serializes per attempt; test-gap folded into F34" }
 ---
 
 # Resolution v1 — 015-sameday-shipping
 
-Fixer response to [review-v1.md](review-v1.md). All 19 serious findings (🔴 F1–F5, 🟠 F6–F19) are
-`fixed` with regression tests, plus F32/F34 folded into their clusters. The 22 Low/Cleanup
-(F20–F41) stay in the ledger `backlog`; F42 is a recorded false-positive. **Status: `resolved`** —
-handed back for re-review.
-
-**Tests:** backend `892/892` (+10 skipped MinIO), frontend `450/450`, both green at `835e932`.
-
-**Process:** the two blocker clusters were design changes on the fixer trigger list, so each got an
-adversarial approach-check **before** implementation — the AWB write path (F1/F2/F12/F15) and the
-tracking-scope + limiter (F3/F9). Both returned SOUND-WITH-CHANGES; the required changes were folded
-in (write guard `!= Cancelled` not `== Paid`; read-back on `affected==0` to avoid a void-warning on a
-converged AWB; open the per-order scope after the gate; surface + dispose the single limiter; add the
-finite-limit test). The full fix diff then got a two-agent fresh-eyes micro-review, which found one
-regression (fixed: F4 recap render) and one coverage gap (fixed: F15 persist-failed test).
-
-## Fix commits
-
-| Commit | Cluster | Findings |
-|---|---|---|
-| `edd49f7` | AWB idempotency + guarded write + recipient/service mapping | F1, F2, F4, F5, F12, F15, F16, F32 |
-| `d6744f1` | Tracking poll per-order scope + swallowed-outage log + real CAS test | F3, F7, F14 |
-| `1a240b7` | Rate limiter built once + disposed + finite-limit test | F9, F34 |
-| `ef8d323` | Dispatcher backoff off-by-one | F8 |
-| `010c6dc` | Admin Paid enqueue + preserve AWB + timestamp tests | F10, F11, F17 |
-| `e8d4b53` | Recipient server-validation + webhook-enqueue test | F4, F6, F13 |
-| `835e932` | Easybox contact capture + resilient locker search + recap fix | F4, F18, F19 |
-
 ## Findings
 
-| ID | Sev | Status | Commit | How |
-|----|-----|--------|--------|-----|
-| F1 | 🔴 | fixed | `edd49f7` | per-order `OrderNumber` reference |
-| F2 | 🔴 | fixed | `edd49f7` | guarded `ExecuteUpdate` write |
-| F3 | 🔴 | fixed | `d6744f1` | per-order `DbContext` after the gate |
-| F4 | 🔴 | fixed | `835e932` | Easybox contact captured + validated (also `e8d4b53`, `edd49f7`) |
-| F5 | 🔴 | fixed | `edd49f7` | service id + locker OOH id on the wire |
-| F6 | 🟠 | fixed | `e8d4b53` | recording notifier + webhook test |
-| F7 | 🟠 | fixed | `d6744f1` | CAS test reaches the CAS |
-| F8 | 🟠 | fixed | `ef8d323` | `NextDispatchDelay` boundary fix |
-| F9 | 🟠 | fixed | `1a240b7` | single shared, disposed limiter |
-| F10 | 🟠 | fixed | `010c6dc` | preserve machine AWB on `→Shipped` |
-| F11 | 🟠 | fixed | `010c6dc` | admin Paid stamps `PaidAt` + enqueues AWB |
-| F12 | 🟠 | fixed | `edd49f7` | write guard `!= Cancelled` |
-| F13 | 🟠 | fixed | `e8d4b53` | courier recipient server-validation |
-| F14 | 🟠 | fixed | `d6744f1` | log the swallowed unreachable |
-| F15 | 🟠 | fixed | `edd49f7` | log AWB before write; persist-fail → RetryLater (tested) |
-| F16 | 🟠 | fixed | `edd49f7` | SQLite fresh-context read-back |
-| F17 | 🟠 | fixed | `010c6dc` | assert `ShippedAt`/`DeliveredAt` |
-| F18 | 🟠 | fixed | `835e932` | `catchError` keeps the search alive |
-| F19 | 🟠 | fixed | `835e932` | single-stream prime + search |
-| F32 | 🟡 | fixed | `edd49f7` | mapper rejects blank recipient (folded into F4) |
-| F34 | 🟡 | fixed | `1a240b7` | finite-limit test (folded into F9) |
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D1 | fixed | `edd49f7` | The vendor reference is the order number, per order, not the shop-wide pickup-point id; a wire test pins it. The design got an adversarial approach-check first. |
+| D2 | fixed | `edd49f7` | Guarded update (AwbNumber IS NULL AND Status != Cancelled) so one writer wins the row; the per-order key from D1 covers the vendor side. The client has no void endpoint, so a genuine orphan is logged. |
+| D3 | fixed | `d6744f1` | Scope and DbContext per order, opened after the semaphore gate, so live contexts never exceed the concurrency cap; tick reads are untracked projections. Approach-checked. |
+| D4 | fixed | `835e932` | Easybox contact captured at checkout, prefilled from the account or the guest session, required on the server (e8d4b53) and re-checked in the mapper (edd49f7), so a blank recipient now fails locally. |
+| D5 | fixed | `edd49f7` | The request carries the delivery-type service id and the locker's vendor id, and the client sends both. Service ids became per-merchant configuration — see Decisions. |
+| D6 | fixed | `e8d4b53` | A recording notifier double plus a Stripe webhook enqueue test; deleting the notifier call now reddens the suite. |
+| D7 | fixed | `d6744f1` | The test seeds a genuinely Shipped order and advances it out of Shipped mid-poll through a separate scope, so the guarded update runs and returns 0; removing the predicate reddens it. |
+| D8 | fixed | `ef8d323` | The guard compared attempt against schedule length with the wrong operator; the delay is now a pure tested function, exhausted only past the last entry. |
+| D9 | fixed | `1a240b7` | One sliding-window limiter per handler, surfaced by the pipeline builder and disposed. The queue limit stays unbounded — see Decisions. |
+| D10 | fixed | `010c6dc` | The admin transition overwrites the AWB number and tracking link only when the field is non-empty; the test seeds a machine-created number and asserts it survives an omitted field. |
+| D11 | fixed | `010c6dc` | The admin path to Paid stamps the paid timestamp and calls the notifier, which is a no-op while jobs are off. It still sends no confirmation email — see Decisions. |
+| D12 | fixed | `edd49f7` | The write guard tests Status != Cancelled rather than == Paid, per the approach-check: an order that moved Paid to Printing mid-call keeps its label instead of being orphaned. |
+| D13 | fixed | `e8d4b53` | Courier recipient name, phone, street, number, city, county and postal code get non-empty and maximum-length rules plus a phone format check; tests cover blank, overlong and malformed. |
+| D14 | fixed | `d6744f1` | The unreachable case in the tracking poll now logs a warning with the order id before returning. |
+| D15 | fixed | `edd49f7` | The billable AWB number is logged before the database write; a persist failure returns a transient retry and is tested by dropping the table under it. |
+| D16 | fixed | `edd49f7` | The creator tests moved to SQLite and the happy-path read-back goes through a fresh context, so a missing persist reddens the test. |
+| D17 | fixed | `010c6dc` | Tests assert the shipped timestamp on the Shipped transition and the delivered timestamp on the Delivered one. |
+| D18 | fixed | `835e932` | Clearing the city search no longer tears down the stream: the inner fetch is wrapped so its error cannot reach the outer subscription. |
+| D19 | fixed | `835e932` | The init prime is now an immediate but cancellable first value inside the same stream, replacing the rival subscription that could overwrite a filtered result. |
+| D32 | fixed | `edd49f7` | Folded into D4 — the mapper rejects a blank recipient name or phone with an argument exception, which becomes a give-up. |
+| D34 | fixed | `1a240b7` | Folded into D9 — a finite-limit test exercises the production limiter branch every earlier test skipped. |
+| D20 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D21 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D22 | deferred | — | Ledger backlog (Low, dual-database parity) — not in this round. |
+| D23 | deferred | — | Ledger backlog (Low, dual-database parity) — not in this round. |
+| D24 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D25 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D26 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D27 | deferred | — | Ledger backlog (Low, one leg refuted) — not in this round. |
+| D28 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D29 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D30 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D31 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D33 | deferred | — | Ledger backlog (Low) — the tracking-job reload disappeared as a side effect of the D3 fix, but the finding itself stays at backlog. |
+| D35 | deferred | — | Ledger backlog (Low) — not in this round. |
+| D36 | deferred | — | Ledger backlog (Cleanup) — not in this round. |
+| D37 | deferred | — | Ledger backlog (Cleanup) — not in this round. |
+| D38 | deferred | — | Ledger backlog (Cleanup) — not in this round. |
+| D39 | deferred | — | Ledger backlog (Cleanup) — not in this round. |
+| D40 | deferred | — | Ledger backlog (Cleanup) — not in this round. |
+| D41 | deferred | — | Ledger backlog (Cleanup) — not in this round. |
+| D42 | false-positive | — | Refuted at the review: the JSON content re-serializes on every attempt, so there is no exhausted stream. The residual test gap folded into D34. |
 
-## Decisions & rationale
+## Scope
 
-- **F5 (service code):** the Sameday service ids are per-merchant vendor config, not universal
-  constants, so they are now `Sameday:LockerServiceId` / `Sameday:CourierServiceId` (default `7`,
-  documented in `appsettings.json`). **The owner must set the real courier + locker service ids from
-  their Sameday contract before enabling the jobs** — the code differentiates by delivery type and
-  sends the locker OOH id, which was the concretely-fixable defect; the actual numbers are vendor data
-  not in the repo.
-- **F9 (QueueLimit):** kept unbounded. The jobs are already concurrency-capped by the `SemaphoreSlim`
-  (same number as the permit limit), so queue depth is naturally bounded, and `SamedayShippingService`
-  (the request path) delegates locker/cost to the static fallback and does **not** route through this
-  limiter today. If a future request-path caller does, a finite `QueueLimit` (reject-fast) should be
-  reconsidered so checkout calls don't queue to `HttpClient.Timeout`.
-- **NEW — admin-Paid confirmation email (spotted during the micro-review, NOT in a finding):** the
-  webhook Paid path fires the order-confirmation email and enqueues photo promotion; the admin Paid
-  path (F11) now sets `PaidAt` + enqueues the AWB but does **neither**. Photo promotion self-heals via
-  the `PromotionRecoveryScanner` sweep, but the **confirmation email has no backstop** — an order
-  reconciled to Paid by an admin never sends one. Left as a conscious decision for the re-reviewer /
-  owner (it was outside F11's scope and an admin may prefer to handle that comms manually). If wanted,
-  it is a one-line `FireOrderConfirmedEmail` call in `AdminOrderService`'s Paid branch.
-- Backlog (F20–F41) and the F42 false-positive: see the frontmatter notes.
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A — AWB idempotency, guarded write, recipient and service mapping (`edd49f7`) | D1, D2, D4, D5, D12, D15, D16, D32 | `Services/Sameday/SamedayClient.cs`, `AwbCreator.cs`, `OrderToAwbRequestMapper.cs`, `AwbCreationRequest.cs` | run before implementation — sound-with-changes, all changes folded in |
+| B — Tracking poll scope, swallowed-outage log, real CAS test (`d6744f1`) | D3, D7, D14 | `BackgroundJobs/ShipmentTrackingJob.cs`, `Tests/…/ShipmentTrackingJobTests.cs` | run before implementation — sound-with-changes, all changes folded in |
+| C — Rate limiter built once and disposed (`1a240b7`) | D9, D34 | `Services/Sameday/SamedayPolicies.cs` | covered by cluster B's check |
+| D — Dispatcher backoff boundary (`ef8d323`) | D8 | `BackgroundJobs/AwbDispatcher.cs` | not needed (an off-by-one closed by extracting a pure function) |
+| E — Admin Paid enqueue, preserved AWB, timestamp tests (`010c6dc`) | D10, D11, D17 | `Services/AdminOrderService.cs` | not needed (no new mechanism) |
+| F — Server-side recipient rules and the webhook enqueue test (`e8d4b53`) | D6, D13 | `Validators/Payments/CreateOrderRequestValidator.cs`, `Tests/…/PaymentControllerIntegrationTests.cs` | not needed (validation rules and one test double) |
+| G — Easybox contact capture and resilient locker search (`835e932`) | D18, D19 | `UI/…/delivery-step.ts` | not needed (no new mechanism) |
+| H — Left at backlog, plus the one refuted row | D20–D31, D33, D35–D42 | — | not needed (no code changed) |
 
-## Hand-back
+## Decisions
 
-Next step is a **re-review** (verification pass) against `fixed_commit` `835e932` to produce
-`review-v2.md`, which is what flips these fixes to `verified` (or reopens them). The fixer does not
-self-verify.
+### Service ids became per-merchant configuration (D5)
+
+The Sameday service codes are vendor contract data, not universal constants, so they are now two
+settings with a documented default of 7. The code differentiates by delivery type and sends the
+locker's own vendor id, which was the concretely fixable defect; the real numbers are not in the
+repository. The owner must set the courier and locker service ids from the Sameday contract before
+enabling the jobs. Recorded as a pre-enable task rather than a code residual.
+
+### The limiter's queue limit stays unbounded (D9)
+
+The jobs are already capped by the semaphore, using the same number as the permit limit, so queue
+depth is naturally bounded. The request path delegates locker and cost lookups to the static
+fallback and does not route through this limiter today. If a future request-path caller does, a
+finite queue limit that rejects fast should be reconsidered, so a checkout call cannot queue until
+the client timeout.
+
+### Admin-paid orders still send no confirmation email (D11)
+
+Spotted during the fix-diff micro-review, outside every finding. The webhook path to Paid fires the
+order-confirmation email and enqueues photo promotion. The admin path now stamps the paid timestamp
+and enqueues the label but does neither of those two. Photo promotion self-heals through the
+recovery sweep; the confirmation email has no such backstop, so an order reconciled to Paid by an
+admin never sends one. Left as a conscious decision for the re-reviewer and the owner: it was
+outside this finding's scope, and an admin may prefer to send that message by hand. If wanted, it
+is a one-line call in the admin service's Paid branch.
