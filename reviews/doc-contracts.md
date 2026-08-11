@@ -8,7 +8,7 @@ owner: Matei Barba
 # Doc contracts — review artifacts
 
 Every review artifact follows a fixed template, a size cap, and the language rules
-below. The round-end gate (lint + Haiku judge) enforces this file. It judges and
+below. The round-end gate (lint + Sonnet judge) enforces this file. It judges and
 explains; it never edits. Scope: every per-target artifact. Archived targets are being
 retrofitted to this shape by owner order (2026-08-10, newest to oldest; the owner
 explicitly lifted review-file immutability for the retrofit — originals live in git

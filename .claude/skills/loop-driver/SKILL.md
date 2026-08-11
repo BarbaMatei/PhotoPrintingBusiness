@@ -107,7 +107,7 @@ node reviews/lib/records-auditor.mjs <target>     # must exit clean before hand-
 node reviews/lib/doc-gate.mjs <target> <pass>     # structure lint — must exit clean
 ```
 
-then spawn the **Haiku judge** (Agent, `model: haiku`): input = `reviews/doc-contracts.md`
+then spawn the **Sonnet judge** (Agent, `model: sonnet`): input = `reviews/doc-contracts.md`
 plus the round's new/changed `reviews/` files; output = approve, or disapprove with per-file
 reasons (language vs the vocabulary, evidence links supporting their claims, real reasons in
 "Reasons to doubt"). Append a `doc-gate` worklog event with the verdict. On disapprove: fix

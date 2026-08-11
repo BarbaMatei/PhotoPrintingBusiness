@@ -225,7 +225,7 @@ When the last micro-review is folded in and the final scoped run is green:
    from the worklog, and appends the round's `fix-round` line to `metrics.jsonl`.
 2. Run `node reviews/lib/records-auditor.mjs <target>` — it must exit clean. Then the doc
    gate on the resolution: `node reviews/lib/doc-gate.mjs <target> <n>` (must exit clean)
-   plus the Haiku judge (Agent, `model: haiku`; input `reviews/doc-contracts.md` + this
+   plus the Sonnet judge (Agent, `model: sonnet`; input `reviews/doc-contracts.md` + this
    round's changed `reviews/` files; approve, or disapprove with reasons you then fix).
    Append a `doc-gate` worklog event with the verdict.
 3. Update `reviews/index.md`'s Status column for the target (`open → in-progress/resolved`).
