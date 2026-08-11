@@ -1,6 +1,6 @@
 ---
 type: review-backlog
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 # Backlog — unfixed minors from closed targets
@@ -26,26 +26,8 @@ Seeded 2026-08-10 from every closed target: the ledgers of 015/043/044-045 plus
 | D94 | 015-sameday-shipping | ⚪ | `MaxRequestsPerSecond` missing from appsettings.json, the settings validator, and bolt-037 ddd-02 | `sameday/shipping` |
 | D95 | 015-sameday-shipping | ⚪ | D67's 30 s poll buffer is a flat constant, not scaled to the interval | `sameday/shipping` |
 | D96 | 015-sameday-shipping | ⚪ | Record accuracy: resolution-v5/index.md say "backend 914" (tip = 916) and "fixed: 30" (frontmatter holds 41); index cites `66c6d50` not the tip `1816f5f` | `sameday/shipping` |
-| D20 | 015-sameday-shipping | 🟡 | `MaxConcurrentSamedayCalls` overloaded as concurrency gate AND req/s rate limit | `sameday/shipping` |
-| D21 | 015-sameday-shipping | 🟡 | Raw vendor error body in exception + logged at Error (conditional PII) | `sameday/shipping` |
-| D22 | 015-sameday-shipping | 🟡 | `AwbLabelUrl` migration hardcodes `text` → unbounded on Postgres, diverges from model *(hinted)* | `sameday/shipping` |
 | D23 | 015-sameday-shipping | 🟡 | Dual-DB parity: migrations + `timestamptz` CAS never run on Postgres (offset-write may throw) *(hinted)* | `sameday/shipping` |
-| D24 | 015-sameday-shipping | 🟡 | Tracking `observedAt` fabricated to `UtcNow` when vendor omits timestamps → wrong `DeliveredAt` | `sameday/shipping` |
-| D25 | 015-sameday-shipping | 🟡 | `expire_at_utc` bound without UTC guarantee (non-UTC host shifts token expiry) | `sameday/shipping` |
-| D26 | 015-sameday-shipping | 🟡 | Monotonic guard can drop a legitimate `Delivered` snapshot (untested) | `sameday/shipping` |
-| D27 | 015-sameday-shipping | 🟡 | Non-delivered tracking write not monotonic across replicas (early-repoll leg refuted) — *plausible* | `sameday/shipping` |
-| D28 | 015-sameday-shipping | 🟡 | AWB-enqueue logged at Debug, below Information floor → never emits | `sameday/shipping` |
-| D29 | 015-sameday-shipping | 🟡 | Polly retry has no `OnRetry` callback → transient retries invisible | `sameday/shipping` |
-| D30 | 015-sameday-shipping | 🟡 | Documented `/health` `sameday:enabled` field not delivered | `sameday/shipping` |
-| D31 | 015-sameday-shipping | 🟡 | `GenerateAwbAsync` returns stale "generate manually" + pre-037 comment | `sameday/shipping` |
-| D33 | 015-sameday-shipping | 🟡 | Tracking job re-queries already-loaded order; `inWindow` tracked-but-unused | `sameday/shipping` |
-| D35 | 015-sameday-shipping | 🟡 | Locker list fetched on every init even for Courier-only users (wasted fetch + toast) | `sameday/shipping` |
-| D36 | 015-sameday-shipping | ⚪ | `TrackingPollOutcome` dead code (declared return type, never constructed) | `sameday/shipping` |
-| D37 | 015-sameday-shipping | ⚪ | `LogRedactor` defined but never referenced → no HTTP transport tracing | `sameday/shipping` |
-| D38 | 015-sameday-shipping | ⚪ | `TrackingStopRegistry` is a near-copy of `AwbGiveUpRegistry` | `sameday/shipping` |
-| D39 | 015-sameday-shipping | ⚪ | Hand-constructs `StaticShippingService` instead of injecting | `sameday/shipping` |
 | D40 | 015-sameday-shipping | ⚪ | New migration designer snapshots embed stale `StripeClientSecret` 255 vs 512 *(hinted)* | `sameday/shipping` |
-| D41 | 015-sameday-shipping | ⚪ | Per-print gram weight bare literal `50` colliding with `MinimumGrams` | `sameday/shipping` |
 | D39 | 043-cloud-storage-provider | 🟡 | Renamed `ExecuteAsync_ArchiveDisabled/_CloudTierOff` guard tests seed an empty DB → guard removal enqueues nothing anyway → `VerifyNoOtherCalls()` passes for the wrong reason. Seed a stuck Paid+Local order | `storage/gallery` |
 | D40 | 043-cloud-storage-provider | 🟡 | Anti-refresh-loop guard (`urlsRefreshed`) untested — no spec dispatches a *second* img `(error)` to assert no third `getOrderPhotos` fetch | `storage/gallery` |
 | D41 | 043-cloud-storage-provider | 🟡 | Lightbox focus-trap (`trapFocus` Tab/Shift+Tab `preventDefault` + refocus) has no spec — drop `preventDefault` and Tab escapes the modal, no test reddens | `storage/gallery` |
