@@ -327,7 +327,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v4: re-raised twice; a SQLite smoke test landed @`2945bda`, verified at v5
   - v6: re-raised (F24, F25) · v8: re-raised — both deferred to the three-environment phase
   - v9: deferral upheld; the provider branch is still present at `bd0d5fd`
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-75 — The HEIC magic-byte check accepts any ISO-BMFF container, including video
 
@@ -379,7 +379,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v4: re-raised · v6: re-raised · v8: re-raised — deferral upheld each time
   - v9: deferral upheld; only rewindable implementations exist at `bd0d5fd`
   - 2026-08-11: the cloud-storage target 043 closed on 2026-07-22 without taking this row
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-80 — The 50 MP decode cap refuses legitimate large-format print uploads
 
@@ -415,7 +415,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: re-raised · v8: re-raised (F1, F18) — deferral upheld, no atomic update exists anywhere
   - v9: deferral upheld; the non-atomic re-read is verbatim present at `bd0d5fd`
   - 2026-08-11: the cloud-storage target 043 closed on 2026-07-22 without taking this row
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-83 — Stored keys use the operating system's separator instead of a forward slash
 
@@ -450,7 +450,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - round 4: fixed @`4d4d998` — a liveness re-read after the write, deleting the file if the row died
   - v5: verified @`6c4f334` with a documented residual, backed by PPW-82 rather than reopened
   - v6: re-raised · v8: re-raised — deferred both times to the cloud-storage orphan sweep
-  - v9: deferral upheld. 2026-08-11: 043 closed without taking it; row carried to `reviews/backlog.md`
+  - v9: deferral upheld. 2026-08-11: 043 closed without taking it; row carried to the backlog
 
 ### PPW-86 — Two first previews at once collide on an exclusive file create and return 500
 
@@ -530,7 +530,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v5: verified @`6c4f334`
   - v8: re-raised — the coverage is on the helper, not the public path; deferred to the next pass
   - v9: deferral upheld; the pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-94 — The cache-hit path checks then reads, so a vanished file gives 500 and costs a round-trip
 
@@ -571,7 +571,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v4: found — deferred with the constraint documented at `8466658`
   - v5: the deferral was upheld
   - v6, v8: not re-raised; no later pass revisited it
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-98 — The batch-rejection log prints the raw client filename with no length limit
 
@@ -616,7 +616,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v5: verified @`6c4f334`
   - v8: re-raised — the failure branch is still uncovered; deferred to the next pass
   - v9: deferral upheld; the pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-102 — The bomb log test asserts the event name but not the dimensions the event exists to carry
 
@@ -777,7 +777,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v8: re-raised twice (F9 for the member, F26 for the stubs); deferral upheld
   - v9: deferral upheld at `bd0d5fd`
   - 2026-08-11: the cloud-storage target 043 closed on 2026-07-22 without taking this row
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-118 — Every cache-miss preview pays an extra database round-trip to spot the soft-delete race
 
@@ -790,7 +790,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v8: re-raised; deferral upheld and paired again
   - v9: deferral upheld at `bd0d5fd`
   - 2026-08-11: the cloud-storage target 043 closed on 2026-07-22 without taking this row
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-119 — Nothing reports how saturated or how queued the decode limiter is
 
@@ -802,7 +802,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: found — deferred to the next pass
   - v8: re-raised; deferral upheld
   - v9: deferral upheld at `bd0d5fd`; the next pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-120 — No test proves the decode slot is released when the decode throws
 
@@ -814,7 +814,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: found — recorded as plausible, since the current code releases the slot; deferred
   - v8: re-raised; deferral upheld
   - v9: deferral upheld at `bd0d5fd`; the next pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-121 — The allocator-exception-to-422 mapping is proven only by an injected instance
 
@@ -826,7 +826,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — recorded as plausible; deferred to the next pass
   - v7: deferral upheld; the condition is verbatim present at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-122 — A failed thumbnail delete in the cleanup job is untested and silently leaks the file again
 
@@ -838,7 +838,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred, same orphan family as PPW-82
   - v7: deferral upheld; the condition is verbatim present at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-123 — Parallel preview 401s defeat the init sharing, and a late 401 wipes a fresh token
 
@@ -851,7 +851,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred; the visible outcome is unchanged
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-124 — The logged-in 401-during-upload path has no test
 
@@ -872,7 +872,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred; outside that round's recommended set
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-126 — Moving a file onto a shared key races other writers on Windows and returns 500
 
@@ -885,7 +885,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: found — the residual of the PPW-86 fix; deferred as development-only
   - v8: re-raised; deferral upheld
   - v9: deferral upheld at `bd0d5fd`
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-127 — A cleanup delete fails against an open read handle on Windows and leaves an orphan
 
@@ -896,7 +896,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred as development-only
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-128 — The pixel-area cap ignores bytes per pixel, so a legitimate 16-bit PNG is refused
 
@@ -928,7 +928,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred to the next pass
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-131 — The implementation plan's acceptance criteria are stale after documented substitutions
 
@@ -940,7 +940,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: found — deferred; that round's document fixes were scoped to PPW-115 and PPW-116
   - v7: deferral upheld and judged a defensible scope call
   - v8: not re-raised. A different stale value in the same file was fixed under PPW-110
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-132 — The bomb-alert log template is copied across the controller and the middleware
 
@@ -952,7 +952,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: found — deferred; the same round's PPW-113 fix added the third site
   - v8: re-raised with the missing field noted; deferral upheld
   - v9: deferral upheld at `bd0d5fd`
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-133 — `dropRestoredEntry` repeats the body of `onRemoveUpload` word for word
 
@@ -962,7 +962,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — the residual of the PPW-91 fix; deferred
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-134 — The client-abort log reads the raw correlation-id item instead of the accessor
 
@@ -973,7 +973,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred even though the PPW-113 fix touched the same file, to keep that round's scope
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-135 — Storage save and delete traces sit at Debug under an Information floor, so they never emit
 
@@ -984,7 +984,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v6: found — deferred
   - v7: deferral upheld at `79c2eda`
-  - v8: not re-raised. 2026-08-11: row carried to `reviews/backlog.md`
+  - v8: not re-raised. 2026-08-11: row carried to the backlog
 
 ### PPW-136 — The global split-query default mis-pages a collection include that has no tiebreaker
 
@@ -1046,7 +1046,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — deferred as a design call and flagged for the owner rather than dropped
   - v9: deferral upheld, with the cost corrected: the fix does not defeat the cache, it revalidates it
-  - 2026-08-11: the owner decision was never taken; row carried to `reviews/backlog.md`
+  - 2026-08-11: the owner decision was never taken; row carried to the backlog
 
 ### PPW-142 — Bundled change C has no criterion or test and is labelled as changing no behaviour
 
@@ -1067,7 +1067,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — the residual of the PPW-105 fix; deferred to the next pass
   - v9: deferral upheld at `bd0d5fd`; the next pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-144 — No end-to-end test reaches the bomb-to-422 path because the integration fake pins 800×600
 
@@ -1079,7 +1079,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — deferred to the next pass
   - v9: deferral upheld at `bd0d5fd`; the next pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-145 — A guest 401 away from the upload page is a silent dead end
 
@@ -1092,7 +1092,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — deferred; outside that round's recommended set
   - v9: deferral upheld at `bd0d5fd`
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-146 — `localUrl()` mints an untracked object URL on every change-detection cycle
 
@@ -1103,7 +1103,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — the residual of the PPW-105 fix; deferred to the next pass
   - v9: deferral upheld at `bd0d5fd`; the next pass it waited for never ran
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-147 — The decode memory budget ignores the upload buffering that shares the same memory
 
@@ -1114,7 +1114,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — the residual of the PPW-112 fix; deferred as a configuration matter
   - v9: deferral upheld at `bd0d5fd`
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog
 
 ### PPW-148 — The conditional GET matches only an exact strong tag, so weak, list and `*` fall back to 200
 
@@ -1126,4 +1126,4 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 - **History:**
   - v8: found — deferred; bandwidth only
   - v9: deferral upheld at `bd0d5fd`
-  - 2026-08-11: row carried to `reviews/backlog.md`
+  - 2026-08-11: row carried to the backlog

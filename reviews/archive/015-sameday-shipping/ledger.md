@@ -296,7 +296,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog, outside the round
   - round 5: fixed @`56320c0` — a separate `MaxRequestsPerSecond` decouples the rate from the gate
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-260 — Raw vendor error body in exception + logged at Error (conditional PII)
 
@@ -310,7 +310,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v3: re-raised by both passes, decision unchanged
   - round 3: fixed @`6606c25` — the vendor body no longer rides on the exception message
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-261 — `AwbLabelUrl` migration hardcodes `text` → unbounded on Postgres, diverges from model
 
@@ -323,7 +323,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 3: fixed @`2c434ad` — the migration ships a 500-character column on Postgres
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-262 — Dual-DB parity: migrations + `timestamptz` CAS never run on Postgres
 
@@ -338,7 +338,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 3: deferred again — the Postgres test belongs to the owner's three-environment stage
   - v5: re-raised, deferral re-affirmed
   - v6: re-affirmed @`1816f5f` — now also covers the round-5 label-length migration
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`; named in the pre-enable checklist
+  - 2026-07-29: target closed — row carried to the backlog; named in the pre-enable checklist
 
 ### PPW-263 — Tracking `observedAt` fabricated to `UtcNow` when vendor omits timestamps → wrong `DeliveredAt`
 
@@ -353,7 +353,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v4: verified @`5fc330b`
   - round 5: fixed again @`56320c0` — the observation time is nullable and the job supplies its poll clock
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-264 — `expire_at_utc` bound without UTC guarantee (non-UTC host shifts token expiry)
 
@@ -366,7 +366,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 5: fixed @`56320c0` — the expiry is normalized to UTC
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-265 — Monotonic guard can drop a legitimate `Delivered` snapshot (untested)
 
@@ -380,7 +380,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v3: the same interaction was raised at Medium as PPW-287
   - round 3: fixed @`18e7815` — the monotonic guard removed, the sync stamped from the poll clock
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-266 — Non-delivered tracking write not monotonic across replicas
 
@@ -395,7 +395,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v6: reopened @`1816f5f` — the fix was correct but deleting it left both suites green
   - round 6: fixed @`5734021` — two replica-race tests pin both clauses, each proven to redden on revert
   - 2026-07-29: verified @`5734021` — recorded deviation: the fixer was also the verifier for this round
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-267 — AWB-enqueue logged at Debug, below Information floor → never emits
 
@@ -408,7 +408,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 3: fixed @`6606c25` — the enqueue log raised to Information
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-268 — Polly retry has no `OnRetry` callback → transient retries invisible
 
@@ -422,7 +422,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v5: re-raised, deferral re-affirmed
   - round 5: fixed @`56320c0` — retries log through a retry callback
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-269 — Documented `/health` `sameday:enabled` field not delivered
 
@@ -435,7 +435,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 5: fixed @`56320c0` — resolved the other way: the design document corrected, the field dropped as out of scope
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-270 — `GenerateAwbAsync` returns stale "generate manually" + pre-037 comment
 
@@ -449,7 +449,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v3: re-raised by both passes and raised to Medium for the duplicate-label risk
   - round 3: fixed @`f3d2508` — the endpoint reports automatic creation
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-271 — `AwbCreationRequest` documented as validated value object but has no validation
 
@@ -471,7 +471,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 5: recorded false-positive — the tick selects ids only and each poll loads its own order on its own scope, which the parallel design requires; the unused variable the finding cites does not exist
   - v6: re-checked independently @`1816f5f`, disposition upheld
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-273 — Production rate-limiter path never exercised in tests
 
@@ -494,7 +494,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 3: considered and dropped to bound the round
   - round 5: fixed @`c611a23` — priming runs through the search stream only while Easybox is active
   - v6: verified @`1816f5f` — the change reddened 16 sibling specs, inherent to the helper contract rather than fix-caused
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-275 — `TrackingPollOutcome` dead code (declared return type, never constructed)
 
@@ -507,7 +507,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 3: fixed @`f3d2508` — the dead union deleted
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-276 — `LogRedactor` defined but never referenced → no HTTP transport tracing
 
@@ -520,7 +520,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 5: fixed @`56320c0` — the unreferenced class removed
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-277 — `TrackingStopRegistry` is a near-copy of `AwbGiveUpRegistry`
 
@@ -533,7 +533,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 5: fixed @`16d065b` — both share a common base
   - v6: verified @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-278 — Hand-constructs `StaticShippingService` instead of injecting
 
@@ -549,7 +549,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v6: reopened @`1816f5f` — the composition-root test never resolved the shipping interface, so the new registration was unproven
   - round 6: fixed @`5734021` — the test resolves the interface and asserts its type; dropping the registration reddens it
   - 2026-07-29: verified @`5734021` — recorded deviation: the fixer was also the verifier for this round
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-279 — New migration designer snapshots embed stale `StripeClientSecret` 255 vs 512
 
@@ -562,7 +562,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 5: deferred again — the drift predates this feature and Stripe secrets are about 66 characters, so the gap is harmless
   - v6: re-affirmed @`1816f5f` — cited files unchanged since `5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-280 — Per-print gram weight bare literal `50` colliding with `MinimumGrams`
 
@@ -575,7 +575,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 1: deferred — ledger backlog
   - round 3: fixed @`f3d2508` — the constant named
   - v4: verified @`5fc330b`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-281 — "5xx retry unsafe for POST bodies" — `JsonContent` re-serializes each attempt
 
@@ -1035,7 +1035,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes, not while searching
   - v6: filed at backlog @`1816f5f` — does not re-arm the loop
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-330 — `ISamedayClient` doc still claims `NotImplementedException` "until bolt 037"
 
@@ -1046,7 +1046,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes
   - v6: filed at backlog @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-331 — `AwbNumber` is the unclamped sibling of PPW-299's clamp on the same post-billing persist
 
@@ -1057,7 +1057,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes
   - v6: filed at backlog @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-332 — `Created` outcome reports the unclamped label link while the row stores null
 
@@ -1068,7 +1068,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes
   - v6: filed at backlog @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-333 — `MaxRequestsPerSecond` missing from `appsettings.json`, the validator and ddd-02
 
@@ -1079,7 +1079,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes
   - v6: filed at backlog @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-334 — PPW-306's 30 s poll buffer is a flat constant, not scaled to the interval
 
@@ -1090,7 +1090,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes
   - v6: filed at backlog @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
 
 ### PPW-335 — Record accuracy: two wrong counts in resolution-v5, one stale commit in the index
 
@@ -1102,5 +1102,5 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 - **History:**
   - v6: found while verifying the round-5 fixes
   - v6: filed at backlog @`1816f5f`
-  - 2026-07-29: target closed — row carried to `reviews/backlog.md`
+  - 2026-07-29: target closed — row carried to the backlog
   - 2026-08-11: records converted to the doc contracts — resolution-v5 no longer states either count; the stale index commit is unchanged

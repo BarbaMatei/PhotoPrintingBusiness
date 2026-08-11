@@ -316,7 +316,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — enricher still at `Program.cs:357`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-360 — EF spans ship full SQL and exception messages to OTLP unscrubbed
 
@@ -328,7 +328,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-361 — `NaN` sample rates pass both validators and silently drop everything
 
@@ -340,7 +340,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — `NaN` still satisfies neither comparison
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-362 — `PrometheusEndpoint="/"` passes validation and would gate the whole site
 
@@ -352,7 +352,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — the validator still only checks `StartsWith('/')`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-363 — `ValidateOnStart` wiring untested
 
@@ -364,7 +364,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: narrowed @`e965c99` — `An_unparseable_allow_list_entry_aborts_boot` now exercises the wiring; only the blank-`PrometheusEndpoint` leg remains untested
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-364 — Enricher sets `scope.User.Id` instead of the required `user_id` tag
 
@@ -375,7 +375,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — file unchanged since `5cac465`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-365 — Sampler startup log (story 003 AC) not implemented
 
@@ -388,7 +388,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: changed shape @`e965c99` — `RouteAwareSampler.cs` is gone so there is no "resolved table", but
     nothing logs the sampler choice at boot and `Description_includes_the_rate_for_the_startup_log`
     pins a description for a log that does not exist
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-366 — Neither subsystem logs its enabled state at boot
 
@@ -400,7 +400,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: narrowed @`e965c99` — `observability.tracing.disabled` now covers the blank-endpoint case; Sentry's state and the observability master flag are still unlogged
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-367 — Unsynchronized capture collections in the shared test fixture
 
@@ -412,7 +412,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found — plausible, not confirmed
   - v2: re-affirmed @`e965c99` — still a bare `List`/`Dictionary`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-368 — Magic `"unknown"` label escapes `MetricNames`, docs and the cardinality budget
 
@@ -424,7 +424,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found — severity reduced low → cleanup at synthesis; the dashboard-drop scenario cannot occur today
   - v2: re-affirmed @`e965c99` — file unchanged since `5cac465`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-369 — `///` blocks on concrete classes citing bolt/ADR/story IDs
 
@@ -436,7 +436,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — file unchanged since `5cac465`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-370 — Comment-sweep residue: dangling `/`, surviving bolt citations, run-on lines
 
@@ -449,7 +449,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — line shifted to `Program.cs:144`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-371 — `ddd-02` describes the `Random` approach ADR-017 forbids
 
@@ -461,7 +461,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — file unchanged since `5cac465`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-372 — Metric vocabulary shipped ahead of emission (ANAF; constant `status` label)
 
@@ -474,7 +474,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v1: found
   - v2: re-affirmed @`e965c99` — `invoice_anaf_status_total` still has no production call site
   - v5: re-affirmed @`52a0cb9` — the round added `orphaned`, which is emitted; the ANAF vocabulary is untouched
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-373 — Observability config re-read by string key after binding; duplicated default
 
@@ -486,7 +486,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — still re-read by string key with the duplicated fallback
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-374 — Sentry wiring inlined in `Program.cs` while bolt 044 got an extension method
 
@@ -498,7 +498,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v1: found
   - v2: re-affirmed @`e965c99` — wiring still inlined with fully-qualified names
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-375 — Redelivered success webhook for an order past `Paid` logs an incident and burns SLO 3
 
@@ -605,7 +605,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7` — extended: the PPW-414 fix added a second live `TracerProvider` build in the
     same class, and the PPW-409 fix added an un-collectioned real-Kestrel boot in `ScrapeListenerCheckTests`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-387 — `payment_failed` records `failed` unconditionally where its sibling uses `duplicate`
 
@@ -618,7 +618,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-342 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-388 — `MaskedForm` suggests an `::ffff:…/112` form the parser then rejects
 
@@ -630,7 +630,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-345 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-389 — `A_mapped_404_is_not_captured_to_sentry` is satisfied by an unrouted request
 
@@ -643,7 +643,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-350 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-390 — The documented `Sentry__Debug=true` verbosity knob is inert under Serilog's Information floor
 
@@ -658,7 +658,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
   - v6: re-affirmed @`a4eb7e5` — the cited `DEPLOYMENT.md` section untouched
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-391 — No volume ceiling on the new Sentry capture site
 
@@ -672,7 +672,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-350 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-392 — Dashboard extractor ignores nested row panels
 
@@ -698,7 +698,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
   - v6: re-affirmed @`a4eb7e5` — section untouched; line drifts +1 from the added operator row
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-394 — AWB shutdown carve-out matches only `OperationCanceledException`; tests run on SQLite, prod is Postgres
 
@@ -713,7 +713,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
   - v5: re-affirmed @`52a0cb9` — the carve-out at `:50` unchanged; the round edited `:67-72` and `:269-273`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-395 — `CapturingSentryTransport.Payloads` is an unsynchronized `List` across threads
 
@@ -725,7 +725,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-343 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-396 — `wrong_listener` and `not_allowed` denials share one 512-entry log budget
 
@@ -737,7 +737,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-346 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-397 — A throw escaping a webhook endpoint records no metric at all — sibling class resolved the opposite way
 
@@ -752,7 +752,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: doc half closed — the SLO 3 caveat landed at `slos.md:86-94` and `:5-7`; the row carries no open doc half
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-398 — `Idempotency-Key` scrubbed, so duplicate-payment triage loses the colliding key
 
@@ -765,7 +765,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-337/PPW-338/PPW-339 fixes
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-399 — The fail-closed drop is never exercised through the hook, and has no metric behind it
 
@@ -779,7 +779,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-337 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-400 — Empty allow-list entry error names neither value nor index
 
@@ -792,7 +792,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-345 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-401 — `Scrub(Breadcrumb)` restamps `Timestamp`
 
@@ -804,7 +804,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-337 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-402 — bolt-045 walkthrough lines 39/46 still describe the deleted deny-list
 
@@ -816,7 +816,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-337 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-403 — Series-count failure never names `DeclaredInstruments()`
 
@@ -829,7 +829,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
   - v5: re-affirmed @`52a0cb9` — only the expected count moved 5 → 6
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-404 — `LogCapture` discards category and exception
 
@@ -842,7 +842,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-344 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-405 — Nothing proves `ContractViolations()` ever returns non-empty
 
@@ -854,7 +854,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-355 fix
   - v3: re-affirmed @`7e28317` — all 16 call sites assert emptiness, and the new isolation tests never call it
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-406 — "Background roots stay dropped" holds only below rate 1.0
 
@@ -867,7 +867,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-341 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-407 — Stale-`Routes` boot abort sits below the `Enabled` early return, so §14.8 step 1 cannot catch it
 
@@ -880,7 +880,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-340 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-408 — Promotion emits no in-app signal, so "stopped" and "no errors" look identical
 
@@ -893,7 +893,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v2: found — caused by the PPW-341 fix
   - v3: re-affirmed @`7e28317`
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-409 — Scrape guard mis-parses socket/pipe listeners off-Windows: its own test fails on `ubuntu-latest` (CI red since the fix round) and rule 2 cannot fire
 
@@ -1008,7 +1008,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: found — caused by the PPW-383 fix; downgraded from the lens's 🟠 on measurement
   - v4: re-affirmed @`dc203c7`
   - v5: re-affirmed @`52a0cb9` — only the fixture constant was renamed
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-421 — `metrics.md`'s add-a-metric procedure never states `MetricCapture`'s execution-context requirement
 
@@ -1022,7 +1022,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v3: found — caused by the PPW-382 fix
   - v4: re-affirmed @`dc203c7`
   - v5: re-affirmed @`52a0cb9` — the round edited the AWB result-value table, not the add-a-metric procedure
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-422 — ADR-017 still says "a promoted error trace is a single root span" 19 lines below its own amendment
 
@@ -1034,7 +1034,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — caused by the PPW-377 fix
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-423 — Walker reach: `templating`/`annotations` queries and library panels unwalked; query-side parser mis-handles an escaped quote the exposition side handles
 
@@ -1050,7 +1050,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
     `LabelUsagesIn`'s own regex, so the two query-side parsers now disagree on an escaped quote
   - v5: re-affirmed @`52a0cb9` — extended: the new guard test consumes `DashboardQueries()`/`SloQueries()` and inherits their reach limits
   - v6: re-affirmed @`a4eb7e5` — the v5 extension unchanged
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-424 — The label test requires every queried metric to be seeded by the test itself, undocumented
 
@@ -1070,7 +1070,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — pre-existing
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-426 — `AdminOrderService` logs client-disconnect cancellations at `Error` on its highest-signal strings
 
@@ -1083,7 +1083,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — pre-existing
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-427 — The `HasBeenPaid` invariant test excludes `Cancelled` by name, pushing a future author to add a refund status to `PaidStatuses`
 
@@ -1095,7 +1095,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — caused by the PPW-375 fix
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-428 — `Verdict` counts ports, not reachability: a loopback-only API port plus a wildcard scrape port passes both rules
 
@@ -1107,7 +1107,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — caused by the PPW-380 fix
   - v4: re-affirmed @`dc203c7` — a loopback-only API port plus a wildcard scrape port still yields two ports and passes both rules
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-429 — `PrometheusEndpoint` is coupled to the `Caddyfile`'s hard-coded path by comment only
 
@@ -1120,7 +1120,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — pre-existing
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-430 — `TracingWired == false` in Production warns and boots — same warn-only class as the admitted `ScrapePort == 0`
 
@@ -1132,7 +1132,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — pre-existing
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-431 — Inbound `baggage` rides out to Stripe, Sameday and Google
 
@@ -1145,7 +1145,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — pre-existing
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-432 — Nothing exercises `StartedAsync`: not the addresses read, not the `Critical` line §14.10 tells operators to grep, not the throw
 
@@ -1166,7 +1166,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — caused by the PPW-376 fix
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-434 — `MetricCapture._outer` is provably always null; `Dispose`'s restore is dead code advertising forbidden nesting
 
@@ -1178,7 +1178,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — caused by the PPW-382 fix
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-435 — DEPLOYMENT §14.8 step 2 does not name the `ASPNETCORE_URLS` prerequisite that can now hard-fail boot
 
@@ -1198,7 +1198,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
 - **History:**
   - v3: found — pre-existing
   - v4: re-affirmed @`dc203c7`
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-437 — `resolution-v2.md` misdescribes TestServer as reporting the addresses feature "present but empty" — it returns null
 
@@ -1212,7 +1212,7 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v4: re-affirmed @`dc203c7` — the guard now keys the carve-out on an empty address list, and
     `?.Addresses ?? []` still turns the null TestServer feature into one; the misdescription stands as a
     record inaccuracy
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog
 
 ### PPW-438 — SLO 3's `or vector(0)` guards are pinned by nothing — deleting both leaves 1133 green, restoring the "No Data while healthy" defect this round shipped once
 
@@ -1459,4 +1459,4 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   ratio means adding a line to the list.
 - **History:**
   - v6: found — residual of the PPW-456 fix, disclosed by the round-5 fixer
-  - 2026-08-10: target closed — row carried to `reviews/backlog.md`
+  - 2026-08-10: target closed — row carried to the backlog

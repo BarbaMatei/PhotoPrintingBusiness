@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// Deterministic half of the round-end doc gate (reviews/doc-contracts.md).
+// Deterministic half of the round-end doc gate (reviews/rules/doc-contracts.md).
 // Checks whichever of the round's files exist against the templates: frontmatter keys,
 // heading order and wording, size caps, ID rules, ledger append-only (vs git HEAD),
 // cross-file agreement. The Haiku judge covers language; this covers structure.
 // Judges only — never edits. Old-shape targets are out of scope (grandfathered).
 //
 // Usage: node reviews/lib/doc-gate.mjs [--root <repoRoot>] <target> <pass>
+//        node reviews/lib/doc-gate.mjs [--root <repoRoot>] state   (the cross-target files)
 // Exit: 0 clean · 1 violations (listed) · 2 usage/IO error.
-import { readFileSync, existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { BACKLOG, INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
 
 const argv = process.argv.slice(2)
 let root = null
@@ -19,21 +20,110 @@ for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--root') root = argv[++i]
   else rest.push(argv[i])
 }
+
+const problems = []
+const bad = (file, msg) => problems.push(`${file}: ${msg}`)
+const SEV = ['🔴', '🟠', '🟡', '⚪']
+const BANNED = /\b(critical|severe|blocker)s?\b/i
+// doc-contracts.md stays the prose authority for what each area covers.
+const AREAS = ['payments', 'orders', 'shipping', 'uploads', 'gallery', 'auth', 'edge', 'observability', 'jobs', 'data', 'tests', 'records']
+const TARGETLESS = new Set(['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'])
+
+function report(label) {
+  if (problems.length) {
+    console.log(`DOC GATE: ${problems.length} violation(s) for ${label}:\n`)
+    for (const p of problems) console.log(`  - ${p}`)
+    console.log('\nFix the files and re-run. The gate judges only — it never edits (reviews/rules/doc-contracts.md).')
+    process.exit(1)
+  }
+  console.log(`DOC GATE: clean for ${label}.`)
+  process.exit(0)
+}
+
+// Root-file mode: reviews/state/backlog.md and reviews/state/index.md.
+if (rest[0] === 'state') {
+  const at = p => (root ? join(root, 'reviews', relative(REVIEWS_HOME, p)) : p)
+  const rows = raw => raw.replace(/\r\n/g, '\n').split('\n')
+    .map((line, i) => ({ line, n: i + 1, cells: line.split('|').map(c => c.trim()) }))
+    .filter(r => /^\|/.test(r.line) && r.cells[1] !== 'ID' && r.cells[1] !== 'Target' && r.cells[1] !== 'Date' && !/^:?-{2,}:?$/.test(r.cells[1]))
+  const words = s => s.replace(/\[[^\]]*\]\([^)]*\)/g, ' ').split(/\s+/).filter(w => /[a-z0-9]/i.test(w)).length
+
+  const backlogFile = at(BACKLOG)
+  if (!existsSync(backlogFile)) bad('state/backlog.md', 'file is missing')
+  else {
+    const list = rows(readFileSync(backlogFile, 'utf8'))
+    if (!list.length) bad('state/backlog.md', 'no table rows found')
+    for (const r of list) {
+      const f = 'state/backlog.md'
+      if (r.cells.length !== 7) { bad(f, `line ${r.n}: ${Math.max(r.cells.length - 2, 0)} cells — a row has exactly 5 (ID · Target · Sev · What · Area); escape or reword a stray "|"`); continue }
+      const [, id, tgt, sev, what, area] = r.cells
+      if (!/^PPW-\d+$/.test(id)) bad(f, `line ${r.n}: key "${id}" — PPW-<n> only (doc-contracts.md)`)
+      if (!SEV.includes(sev)) bad(f, `${id}: severity cell is "${sev}" — one of ${SEV.join(' ')} only`)
+      if (!tgt) bad(f, `${id}: Target cell is empty`)
+      if (!what) bad(f, `${id}: What cell is empty`)
+      else if (/<br\s*\/?>/i.test(what)) bad(f, `${id}: What cell spans more than one line — a backlog row is one line`)
+      const plain = area.replace(/`/g, '')
+      if (!AREAS.includes(plain)) bad(f, `${id}: Area "${area}" — one of the twelve areas only: ${AREAS.join(' · ')}`)
+    }
+  }
+
+  const indexFile = at(INDEX)
+  if (!existsSync(indexFile)) bad('state/index.md', 'file is missing')
+  else {
+    const f = 'state/index.md'
+    const raw = readFileSync(indexFile, 'utf8').replace(/\r\n/g, '\n')
+    const reviewsHome = root ? join(root, 'reviews') : REVIEWS_HOME
+    const keys = new Set()
+    for (const base of [reviewsHome, join(reviewsHome, 'archive')]) {
+      if (!existsSync(base)) continue
+      for (const e of readdirSync(base, { withFileTypes: true })) {
+        if (!e.isDirectory() || TARGETLESS.has(e.name)) continue
+        keys.add(e.name)
+        const num = /^\d+(-\d+)?/.exec(e.name)
+        if (num) { keys.add(num[0]); keys.add(num[0].split('-')[0]) }
+      }
+    }
+    const section = h => {
+      const m = new RegExp(`^## ${h}$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm').exec(raw)
+      return m ? m[1] : null
+    }
+    const glance = section('Targets at a glance')
+    if (glance === null) bad(f, 'missing heading "## Targets at a glance"')
+    else for (const r of rows(glance)) {
+      const state = r.cells[2] ?? ''
+      const breaks = (state.match(/<br\s*\/?>/gi) ?? []).length
+      if (breaks > 4) bad(f, `glance row "${r.cells[1]}": State cell is ${breaks + 1} lines — cap is 5 (doc-contracts.md)`)
+    }
+    const passes = section('Passes')
+    if (passes === null) bad(f, 'missing heading "## Passes"')
+    else {
+      const list = rows(passes)
+      if (!list.length) bad(f, 'the "## Passes" table has no rows')
+      for (const r of list) {
+        const [, date, tgt, passCell, , counts, description] = r.cells
+        const where = `pass row "${date} ${tgt} ${passCell}"`
+        if (!/^\d+\/\d+\/\d+\/\d+/.test((counts ?? '').trim())) bad(f, `${where}: New H/M/L/C cell is "${counts ?? ''}" — must open with <h>/<m>/<l>/<c>`)
+        if (!/system/i.test(tgt ?? '') && !keys.has((tgt ?? '').trim())) bad(f, `${where}: target "${tgt}" is not a target folder key (${[...keys].filter(k => /^\d/.test(k)).sort().join(' · ')}); only meta rows are exempt`)
+        const w = description ? words(description) : 0
+        if (w > 50) bad(f, `${where}: description is ${w} words — cap is 50`)
+      }
+    }
+  }
+  report('the state files')
+}
+
 const [target, passArg] = rest
 const pass = Number(passArg)
 if (!target || !Number.isFinite(pass)) {
-  console.error('usage: node reviews/lib/doc-gate.mjs [--root <repoRoot>] <target> <pass>')
+  console.error('usage: node reviews/lib/doc-gate.mjs [--root <repoRoot>] <target> <pass> | state')
   process.exit(2)
 }
-const REVIEWS = root ? join(root, 'reviews') : join(dirname(fileURLToPath(import.meta.url)), '..')
+const REVIEWS = root ? join(root, 'reviews') : REVIEWS_HOME
 let dir = join(REVIEWS, target)
 if (!existsSync(dir)) dir = join(REVIEWS, 'archive', target)
 if (!existsSync(dir)) { console.error(`no such target folder: ${join(REVIEWS, target)} (also tried archive/)`); process.exit(2) }
 const name = target.replace(/^archive\//, '')
 const gitPath = dir.slice(join(REVIEWS, '..').length + 1).replace(/\\/g, '/')
-
-const problems = []
-const bad = (file, msg) => problems.push(`${file}: ${msg}`)
 
 const read = f => readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n')
 const split = raw => {
@@ -58,9 +148,6 @@ function checkFrontmatter(file, fm, required) {
   const keys = fmKeys(fm)
   for (const k of required) if (!keys.includes(k)) bad(file, `frontmatter missing "${k}:"`)
 }
-
-const SEV = ['🔴', '🟠', '🟡', '⚪']
-const BANNED = /\b(critical|severe|blocker)s?\b/i
 
 // ---------- review-v<pass>.md ----------
 const reviewFile = `review-v${pass}.md`
@@ -184,10 +271,4 @@ if (reviewFm && resolutionKeys.length) {
     bad(resolutionFile, `review blocker ${b} has no entry in the findings map`)
 }
 
-if (problems.length) {
-  console.log(`DOC GATE: ${problems.length} violation(s) for ${target} v${pass}:\n`)
-  for (const p of problems) console.log(`  - ${p}`)
-  console.log('\nFix the files and re-run. The gate judges only — it never edits (reviews/doc-contracts.md).')
-  process.exit(1)
-}
-console.log(`DOC GATE: clean for ${target} v${pass}.`)
+report(`${target} v${pass}`)

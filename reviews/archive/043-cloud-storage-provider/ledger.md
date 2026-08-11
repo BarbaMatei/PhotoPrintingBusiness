@@ -542,7 +542,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v5: found — test quality left by the PPW-168 fix
   - round 5: sent to backlog under the severity-based stop rule
   - v6: backlog upheld @`2d02b13`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-189 — The anti-refresh-loop guard has no test
 
@@ -558,7 +558,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 5: sent to backlog
   - v6: backlog upheld @`2d02b13` — the PPW-185 fix did not touch the guard
   - v7: re-raised (pass B), still open @`2d02b13`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-190 — The lightbox focus trap has no spec
 
@@ -573,7 +573,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 5: sent to backlog
   - v6: backlog upheld @`2d02b13`
   - v8: file untouched in the round; backlog spot-checked @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-191 — The lightbox tells the user to reload while the app is already fetching a fresh URL
 
@@ -589,7 +589,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v6: backlog upheld @`2d02b13`
   - v7: re-raised (pass B), still open
   - v9: re-raised, decision upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-192 — A 401 for a non-authenticated user leaves a blank order body, with no error and no redirect
 
@@ -604,7 +604,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 5: sent to backlog
   - v6: backlog upheld @`2d02b13` — the PPW-185 fix did not touch the 401 path
   - v7: re-raised (pass B), still open @`2d02b13`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-193 — Order retries and init subscriptions have no in-flight dedup or teardown
 
@@ -618,7 +618,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v5: found — recorded as ⚪, skeptics skipped
   - round 5: sent to backlog
   - v6: backlog upheld @`2d02b13`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-194 — The ZIP pre-flight throws an unmapped exception → a generic 500 logged as unhandled
 
@@ -634,7 +634,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 5: sent to backlog as a standalone item
   - v6: backlog upheld @`2d02b13`
   - v8: file untouched in the round; backlog spot-checked @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-195 — The periodic sweep re-enqueues permanently failed promotions forever
 
@@ -677,7 +677,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 5: sent to backlog
   - v6: backlog upheld @`2d02b13`
   - v8: file untouched in the round; backlog spot-checked @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-198 — The S3 upload rewinds the stream outside the retry loop → a retried upload silently loses the photo
 
@@ -812,7 +812,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A)
   - round 7: sent to backlog under the severity-based stop rule
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-211 — A read failure part-way through the admin ZIP truncates the archive after the headers are sent
 
@@ -828,7 +828,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v8: backlog upheld @`ac97e42`
   - v9: widened — a concurrent promotion moving the original to cloud and deleting the local copy is a
     second trigger alongside the concurrent purge
-  - 2026-08-10: row carried to `reviews/backlog.md`, where it appears twice — one row to prune
+  - 2026-08-10: row carried to the backlog, where it appears twice — one row to prune
 
 ### PPW-212 — Preview cache-fill regeneration races the retention delete → an orphaned blob and a null reference
 
@@ -841,7 +841,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found by both passes
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-213 — A failed best-effort local delete in the promoter leaks local bytes nothing reclaims
 
@@ -854,7 +854,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-214 — The local storage root re-anchor uses a prefix match with no separator boundary
 
@@ -866,7 +866,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B) — judged plausible
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-215 — The ZIP entry extension is taken from the untrusted client filename, not the validated type
 
@@ -878,7 +878,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-216 — Batch upload caps total bytes but not the number of files
 
@@ -890,7 +890,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-217 — A broken grid thumbnail has no fallback or retry after the one presigned-URL refresh
 
@@ -902,7 +902,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-218 — Originals of orders that never reach production-complete or Cancelled escape the retention window
 
@@ -915,7 +915,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
   - v9: re-raised, decision upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-219 — The documented 502 for a persistent storage failure is not implemented; it surfaces as 500
 
@@ -927,7 +927,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-220 — Idempotent-skip reasons are logged at Debug and never emit under the Information floor
 
@@ -939,7 +939,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-221 — Transient and permanent cloud-write failures collapse into one warning, so poison is retried
 
@@ -951,7 +951,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-222 — The preview cache-hit path lost its no-tracking read
 
@@ -963,7 +963,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A) — a regression from bolt-042
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-223 — The promotable-status set is written out three times under a false single-source comment
 
@@ -976,7 +976,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
   - v9: re-raised, decision upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-224 — The S3 retry classification, re-upload and presign protocol are untested
 
@@ -989,7 +989,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 7: sent to backlog; the re-upload half gained a regression test with the PPW-198 fix @`c37ca44`
   - v8: backlog upheld @`ac97e42`
   - v9: re-raised, decision upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-225 — Storage wiring, configuration and the CLI sat outside the lens list; the region setting is a trap
 
@@ -1002,7 +1002,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-226 — Recovery and retention sweeps run unindexed full scans every six hours
 
@@ -1014,7 +1014,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B) — judged plausible
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-227 — The promoter reads the whole original into an array and leaves memory streams undisposed
 
@@ -1026,7 +1026,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A) — two lenses
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-228 — The best-effort orphan-thumbnail delete swallows its exception with no log
 
@@ -1038,7 +1038,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-229 — Local preview cache header disagrees with the documented one
 
@@ -1051,7 +1051,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
   - v9: re-raised, decision upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-230 — A freshly generated local thumbnail is re-read from disk on a cache miss
 
@@ -1063,7 +1063,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass A)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-231 — Order detail shows both the interceptor toast and an inline error for one failure
 
@@ -1075,7 +1075,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - v7: found (pass B)
   - round 7: sent to backlog
   - v8: backlog upheld @`ac97e42`
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-232 — "Photos no longer available" is shown for a just-paid order and for pending orders
 
@@ -1115,7 +1115,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 - **Suggested fix:** Clear the keys first, then delete the objects.
 - **History:**
   - v9: found — sent to backlog
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-236 — The retention sweep query has no soft-delete filter, so it reprocesses deleted rows
 
@@ -1126,7 +1126,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 - **Suggested fix:** Add the soft-delete filter to the candidate query.
 - **History:**
   - v9: found — sent to backlog
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-237 — Promoter tests assert the cloud keys written but never the bytes
 
@@ -1136,7 +1136,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 - **Suggested fix:** Assert the written content, not only the key.
 - **History:**
   - v9: found — sent to backlog
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog
 
 ### PPW-238 — Code comments cite finding, decision and design-record ids, which the repo rule bans
 
@@ -1155,4 +1155,4 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 - **Suggested fix:** Add a spec that closes the lightbox during the refresh and asserts it stays closed.
 - **History:**
   - v9: found — sent to backlog
-  - 2026-08-10: row carried to `reviews/backlog.md`
+  - 2026-08-10: row carried to the backlog

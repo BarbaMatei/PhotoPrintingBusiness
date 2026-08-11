@@ -23,7 +23,7 @@ manifest (what was owed but didn't run).
 
 ## Output shape
 
-Copy `reviews/templates/summary.md` and fill it in; `reviews/doc-contracts.md` is the
+Copy `reviews/templates/summary.md` and fill it in; `reviews/rules/doc-contracts.md` is the
 contract (headings verbatim, vocabulary, cap 60 body lines — aim for ~40). Frontmatter:
 `type: owner-summary`, `target`, `pass`, `pass-type`, `commit`, `date`,
 `decisions-needed: <n>`. Then exactly four sections:

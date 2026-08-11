@@ -65,10 +65,10 @@ mean "breaks the system's core promise (trustworthy autonomous closure)".
 
 Both certification pairs ever run ended `request-changes` (015-v3, 043-v7). Both eventual
 closures used escape hatches: 043-v9 via the written single-pass deviation (preconditions
-genuinely met — [rationale.md](../rationale.md) certification section); 015 via owner
+genuinely met — [rationale.md](../notes/rationale.md) certification section); 015 via owner
 sign-off with **no post-fix blinded pass at all**, on a full-loop-tier target where the
-sign-off clause was written for lower tiers ([index.md](../index.md) targets table;
-[015 ledger closure section](../015-sameday-shipping/ledger.md)). Every deviation is
+sign-off clause was written for lower tiers ([index.md](../state/index.md) targets table;
+[015 ledger closure section](../archive/015-sameday-shipping/ledger.md)). Every deviation is
 honestly recorded — that is the system's real strength — but the standard path
 (pair → quiet → certified) has completed **zero** times, so its cost/benefit is still a
 hypothesis. Fix: a calibration ruling (per the rule-budget rule, replace — don't stack):
@@ -90,7 +90,7 @@ recalibration removed.
 
 ### SF14 🟠 — certified under an untested stop rule *(checker-added)*
 
-[self-driving-loop-design.md](../self-driving-loop-design.md) names seeded-bug run 2 "the
+[self-driving-loop-design.md](../notes/self-driving-loop-design.md) names seeded-bug run 2 "the
 single most important experiment", build-order **#1**, gated "**before trusting any stop
 rule**" — queued since 2026-07-04. 043 and 015 were both certified/closed under that
 stop rule anyway, and run 1 explicitly could not test the load-bearing assumption
@@ -139,7 +139,7 @@ Confirmed drift: `cost.subagent_tokens` (042) vs schema's `cost.tokens`;
 `deferred_reaffirmed` vs `deferrals_upheld` (same concept, two names); undocumented
 `disputed_upheld` / `outcome` / `certified` / `subtype` / `base` / `code_tip` /
 `delta_base` / `tests.frontend_*`; one `lenses` value that is prose; the 043 pass-7B
-tally-vs-item-list contradiction recorded in [overlap-pair-v7.md](../043-cloud-storage-provider/overlap-pair-v7.md)
+tally-vs-item-list contradiction recorded in overlap-pair-v7.md
 but never corrected by a next-line note as the schema requires. Roll-ups are computable —
 today's numbers below prove it — but only by hand-special-casing each target, and
 "which lenses earn their keep" is **not** computable: per-finding lens attribution
@@ -170,7 +170,7 @@ lens-visible file set for citation patterns).
 
 ### SF15 🟡 — the independence rule bent exactly at closure pressure *(checker-added)*
 
-"You must not be the fixer" ([runbook-verification.md](../runbook-verification.md) step 1)
+"You must not be the fixer" ([runbook-verification.md](../runbooks/runbook-verification.md) step 1)
 became "Recorded deviation: fixer == verifier" at the 015-v6 fix round — the final round
 before closure. Mitigants: test-only round, revert-proofs are reproducible measurements,
 expiry recorded ("next calibration"). But the pattern — the one hard rule waived the one

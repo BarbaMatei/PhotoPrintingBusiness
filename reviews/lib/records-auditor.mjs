@@ -63,7 +63,7 @@ const SHA_RE = /^[0-9a-f]{7,40}$/
 function listTargets() {
   const out = []
   for (const e of readdirSync(REVIEWS, { withFileTypes: true })) {
-    if (!e.isDirectory() || ['lib', 'experiments', 'archive'].includes(e.name)) continue
+    if (!e.isDirectory() || ['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'].includes(e.name)) continue
     out.push({ name: e.name, dir: join(REVIEWS, e.name), archived: false })
   }
   const arch = join(REVIEWS, 'archive')
@@ -324,8 +324,8 @@ function auditTarget(t) {
 
   // certified targets are "under watch" and must be listed in the track record
   if (holdsCertification) {
-    if (TRACK === null) strictTier(`${tag}: holds a certification but reviews/track-record.md is missing`)
-    else if (!TRACK.includes(t.name)) strictTier(`${tag}: holds a certification but is not listed in reviews/track-record.md`)
+    if (TRACK === null) strictTier(`${tag}: holds a certification but reviews/state/track-record.md is missing`)
+    else if (!TRACK.includes(t.name)) strictTier(`${tag}: holds a certification but is not listed in reviews/state/track-record.md`)
   }
 
   // index.md mention (warn-level; prose matching is fuzzy; archive rows use ranges — skipped)
@@ -341,8 +341,8 @@ function auditTarget(t) {
   }
 }
 
-const INDEX = existsSync(join(REVIEWS, 'index.md')) ? readFileSync(join(REVIEWS, 'index.md'), 'utf8') : null
-if (!INDEX) warn('reviews/index.md not found — index pairing skipped')
+const INDEX = existsSync(join(REVIEWS, 'state', 'index.md')) ? readFileSync(join(REVIEWS, 'state', 'index.md'), 'utf8') : null
+if (!INDEX) warn('reviews/state/index.md not found — index pairing skipped')
 const TRACK = existsSync(join(REVIEWS, 'track-record.md')) ? readFileSync(join(REVIEWS, 'track-record.md'), 'utf8') : null
 
 for (const t of listTargets()) auditTarget(t)

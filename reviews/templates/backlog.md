@@ -7,7 +7,7 @@ updated: <yyyy-mm-dd>
 
 A row enters when its target closes, or when the owner routes a defect noticed
 outside any pass here at a round's gate — that row takes the next number from
-`reviews/id-counter`. A
+the id counter. A
 row leaves only two ways, and only after the terminal state is written back to
 its home ledger row: fixed (with the normal verification a backlogged minor
 requires) or owner-ruled wont-fix. An owner-routed row has no ledger row until a
@@ -17,4 +17,4 @@ means nothing is owed. The pre-deployment regression phase requires it empty.
 
 | ID | Target | Sev | What | Area |
 |---|---|---|---|---|
-| PPW-<n> | <target> | 🟡 | <one plain line> | <code area, e.g. uploads, orders, payments> |
+| PPW-<n> | <target> | 🟡 | <one plain line> | <one of the twelve areas in doc-contracts.md> |

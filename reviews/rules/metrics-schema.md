@@ -15,7 +15,7 @@ hand-back. Append-only: never edit a past line; corrections are their own
 appended lines (see *Corrections*). Unknown values are `null`, never guessed.
 
 This data answers the open questions in
-[self-driving-loop-design.md](self-driving-loop-design.md): does new-serious-per-pass decay?
+[self-driving-loop-design.md](../notes/self-driving-loop-design.md): does new-serious-per-pass decay?
 what does a pass cost? which lenses earn their keep? does fixing create new defects at a lower
 rate than before? It cannot be reconstructed later — bolt 035's `cost` fields are `null`
 forever because nobody recorded them at the time.
@@ -184,7 +184,7 @@ Readers of old lines need this table:
   appends them at hand-back — the fixer never hand-writes a metrics line.
 - `refinds_identity` / `reraises_of_decided` / `fix_generated` use the **`reconcile-findings`
   skill's** judgment (labeling rules per
-  [.claude/skills/reconcile-findings/overlap-ground-truth.md](../.claude/skills/reconcile-findings/overlap-ground-truth.md)).
+  .claude/skills/reconcile-findings/overlap-ground-truth.md).
 - No global roll-up file: compute cross-feature summaries on demand from the per-feature files
   (they are labeled pass-cost-only); a hand-maintained roll-up would drift.
 - Run the auditor after every append.

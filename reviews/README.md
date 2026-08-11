@@ -13,17 +13,17 @@ One reviewer in one sitting catches a *sample* of what's wrong, not all of it �
 samples repeatedly, from designed-in breadth, until no 🔴 survives and every 🟠 carries a
 recorded owner-visible decision. **Certified means exactly that — not zero defects.**
 
-- **Why it's built this way** (the 035/042/043 evidence and numbers): [rationale.md](rationale.md)
-- **Where it's heading** (autonomy, experiments, tool build order): [self-driving-loop-design.md](self-driving-loop-design.md)
-- **Log of every pass**: [index.md](index.md) · **per-pass metrics**: [metrics-schema.md](metrics-schema.md)
+- **Why it's built this way** (the 035/042/043 evidence and numbers): [rationale.md](notes/rationale.md)
+- **Where it's heading** (autonomy, experiments, tool build order): [self-driving-loop-design.md](notes/self-driving-loop-design.md)
+- **Log of every pass**: [index.md](state/index.md) · **per-pass metrics**: [metrics-schema.md](rules/metrics-schema.md)
 
 ## How to run
 
 | Task | Follow |
 |---|---|
 | Any pass — picked and driven end to end | the **`loop-driver` skill** (mechanical router: [lib/route-next-pass.mjs](lib/route-next-pass.mjs)) |
-| Discovery pass (full · delta · certification) | [runbook-discovery.md](runbook-discovery.md) |
-| Verification pass (after a fix round) | [runbook-verification.md](runbook-verification.md) |
+| Discovery pass (full · delta · certification) | [runbook-discovery.md](runbooks/runbook-discovery.md) |
+| Verification pass (after a fix round) | [runbook-verification.md](runbooks/runbook-verification.md) |
 | Fix round | the `/fix-review` skill — **sole owner of the fixer contract** |
 | Owner summary ending a decision-bearing pass | the `owner-summary` skill |
 
@@ -75,7 +75,7 @@ touches full-loop-tier code.
 reopened fix. New non-regression 🟠 get fixed and verified but do not re-arm a delta. New
 🟡/⚪ enter the ledger as `backlog`, never silently dropped: while the loop is open they may
 be re-judged by certification; at close the survivors roll up into
-[backlog.md](backlog.md) on the terms doc-contracts.md sets. From there **every new bolt
+[backlog.md](state/backlog.md) on the terms doc-contracts.md sets. From there **every new bolt
 must sweep the rows in its area** (bolt-process.md), and the **pre-deployment regression
 phase requires the file empty**.
 
@@ -98,7 +98,7 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   executing a pass the owner explicitly requested for that target. A defect noticed outside
   any open pass — by a fixer, a driver, anyone — is **proposed at the round's owner gate**,
   never written into a new folder; serious ones are proposed the moment they are seen. The
-  owner then routes it into [backlog.md](backlog.md) as one new row, or drops it. Either
+  owner then routes it into [backlog.md](state/backlog.md) as one new row, or drops it. Either
   ruling is written into that round's resolution `Decisions`. A drop on the owner's ruling
   is allowed; a silent drop is not.
 - Only a re-review grants `verified`.
@@ -106,13 +106,15 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   auditor exists); verification is **anchored** on purpose. Never mix the postures in a pass.
 - A review produces findings; fixing is a separate explicit step, verification a third. Never
   auto-apply fixes mid-review.
-- Every pass appends its [metrics.jsonl](metrics-schema.md) line and its [index.md](index.md)
+- Every pass appends its [metrics.jsonl](rules/metrics-schema.md) line and its [index.md](state/index.md)
   row — at synthesis time, unreconstructable later. **Fix rounds append theirs too**
   (since 2026-08-03) — at hand-back, via `reviews/lib/render-records.mjs`.
-- A target holding a certification is **under watch** ([track-record.md](track-record.md)): a
+- A target holding a certification is **under watch** ([track-record.md](state/track-record.md)): a
   later serious finding whose defect existed in the certified code is marked
   `post-cert-escape` and appended there the same day — the reconciler flags it, the
   synthesizer records it. Escapes ÷ certifications is the system's false-certification rate.
+- A change under `reviews/lib/` runs `node reviews/lib/tests/run-tests.mjs` before hand-back —
+  the fixture suite for the gate machinery; the pre-commit hook runs it too.
 - **Rule budget:** a calibration **replaces or deletes** a rule, never stacks an exception on
   top of one; any exception states its expiry (a date, or "next calibration"). The router
   table is the single decision surface for pass selection — executed mechanically by
@@ -121,9 +123,9 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 ## Files & conventions
 
 - **Layout:** one folder per target under `reviews/`; the cross-target files
-  ([index.md](index.md), [backlog.md](backlog.md), [id-counter](id-counter),
-  [track-record.md](track-record.md)) at the top level; `archive/` for closed targets.
-- **[doc-contracts.md](doc-contracts.md) owns every file's shape** — the artifact set, the
+  ([index.md](state/index.md), [backlog.md](state/backlog.md), [id-counter](state/id-counter),
+  [track-record.md](state/track-record.md)) at the top level; `archive/` for closed targets.
+- **[doc-contracts.md](rules/doc-contracts.md) owns every file's shape** — the artifact set, the
   templates in [templates/](templates/), frontmatter, size caps, id rules, language rules,
   vocabulary, and each file's lifecycle. No file shape is restated here; if the two ever
   disagree, doc-contracts.md is right.

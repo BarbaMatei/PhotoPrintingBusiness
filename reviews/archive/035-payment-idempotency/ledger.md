@@ -187,8 +187,8 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v1: found
   - round 1: deferred — historical-document churn, batched into a later documents pass
   - v2: deferral accepted @`b52f4b6` · v4: still batched @`650f615`
-  - 2026-08-11: still deferred at close and not carried to `reviews/backlog.md`
-  - 2026-08-11: owner ruled — queued to backlog.md
+  - 2026-08-11: still deferred at close and not carried to the backlog
+  - 2026-08-11: owner ruled — queued to the backlog
 
 ### PPW-13 — A second conflict exception type exists only to carry the divergent-field payload
 
@@ -280,7 +280,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v7: deferral re-affirmed @`fbb4c7c` — the application creates its schema directly and never runs migrations
   - v8: re-found, severity recorded as 🟡 rather than v5's 🟠
   - round 8: deferred again @`01b5264` · v9: deferral sound @`01b5264` · v10: unchanged @`065a516`
-  - 2026-08-11: row carried to `reviews/backlog.md` under its old name DB-2
+  - 2026-08-11: row carried to the backlog under its old name DB-2
 
 ### PPW-21 — The Stripe secret column is sized at exactly the vendor ceiling, so a longer secret fails on Postgres after the charge
 
@@ -399,8 +399,8 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - round 5: deferred — one more controller does the same in six places, so fixing one is inconsistent churn
   - v6: deferral accepted @`3faaae6`
   - v7: deferral re-affirmed @`fbb4c7c` — the real fix is a repository-wide boundary decision
-  - 2026-08-11: still deferred at close and not carried to `reviews/backlog.md`
-  - 2026-08-11: owner ruled — queued to backlog.md
+  - 2026-08-11: still deferred at close and not carried to the backlog
+  - 2026-08-11: owner ruled — queued to the backlog
 
 ### PPW-33 — The payment request builders and the SQLite fixture setup are duplicated across test files
 
@@ -446,7 +446,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v8: found — one of the pass's two mediums; the pass confirmed the literal matches today
   - round 8: deferred @`01b5264` — belongs with the migration and deployment work, like PPW-20
   - v9: deferral sound @`01b5264` · v10: unchanged @`065a516`
-  - 2026-08-11: row carried to `reviews/backlog.md` under its old name DB-1
+  - 2026-08-11: row carried to the backlog under its old name DB-1
 
 ### PPW-37 — The cross-tenant key collision has no distinct log event, so key probing is invisible
 
@@ -482,7 +482,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - round 8: deferred @`01b5264` — the durable fix is a schema change; exploitability is low with random keys
   - v9: deferral sound @`01b5264` — the accepted-residual note at the index is present and accurate
   - v10: unchanged @`065a516`
-  - 2026-08-11: row carried to `reviews/backlog.md` under its old name SEC-1
+  - 2026-08-11: row carried to the backlog under its old name SEC-1
 
 ### PPW-40 — The EuPlatesc recovery replay builds a fresh redirect URL instead of returning the stored one
 
@@ -500,7 +500,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - round 8: deferred @`01b5264` — the row lock needs the unbuilt Postgres path; the asymmetry was documented
   - v9: deferral sound @`01b5264` — no double charge today; only the verbatim-replay promise breaks
   - v10: unchanged @`065a516`
-  - 2026-08-11: row carried to `reviews/backlog.md` under its old name BUG-2
+  - 2026-08-11: row carried to the backlog under its old name BUG-2
 
 ### PPW-41 — The key is never trimmed, so a padded copy of the same key creates a second order and a second charge
 

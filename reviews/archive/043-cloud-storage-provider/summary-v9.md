@@ -32,4 +32,4 @@ Five minor findings went to the ledger backlog at this pass: PPW-235, PPW-236, P
 
 ## State
 
-The review loop is complete. The serious-defect population is closed and independently confirmed closed, so no further discovery or certification pass is warranted. Triage was ruled on 2026-07-27 ([resolution-v9.md](resolution-v9.md)): PPW-232 fixed, PPW-233 wont-fix, PPW-234 deferred. What remains is a follow-up list that does not gate closure — the cluster deferred to the concurrency-token work, the two items deferred to the three-environment stage, and the 34 backlog rows carried to `reviews/backlog.md`.
+The review loop is complete. The serious-defect population is closed and independently confirmed closed, so no further discovery or certification pass is warranted. Triage was ruled on 2026-07-27 ([resolution-v9.md](resolution-v9.md)): PPW-232 fixed, PPW-233 wont-fix, PPW-234 deferred. What remains is a follow-up list that does not gate closure — the cluster deferred to the concurrency-token work, the two items deferred to the three-environment stage, and the 34 backlog rows carried to the backlog.

@@ -35,7 +35,7 @@ review loop measure overlap, stop re-arguing settled decisions, and keep one can
    no number at all (a test-gap row, an aside, a fix-note observation), give it one before
    matching: an unnumbered finding escapes any ledger.
 2. `reviews/<target>/ledger.md` — every known row, status, and prior decisions (ledger mode).
-3. `reviews/id-counter` — the next free `PPW-<n>` (ledger mode).
+3. `reviews/state/id-counter` — the next free `PPW-<n>` (ledger mode).
 4. The code at the reviewed commit, read only to adjudicate close calls.
 
 ## Matching rules
@@ -55,7 +55,7 @@ review loop measure overlap, stop re-arguing settled decisions, and keep one can
 - **When unsure, SPLIT.** A wrong merge inflates overlap → the loop stops early → a bug
   ships. A wrong split only costs another look. Prefer "NEW — possible remainder of
   `PPW-<n>`" over a merge; that flag is more useful than either verdict.
-- **Post-cert escape.** Ledger mode, target listed in `reviews/track-record.md`: a new 🔴/🟠
+- **Post-cert escape.** Ledger mode, target listed in `reviews/state/track-record.md`: a new 🔴/🟠
   whose mechanism already existed at the certified commit (cited site unchanged since it —
   `git diff <certified>..<reviewed> -- <file>`) is additionally marked `post-cert-escape`,
   and the synthesizer appends the event to track-record.md. Serious findings introduced by
@@ -71,12 +71,12 @@ One row per new finding:
 plus `residual-of` lineage links, and the prior decision attached to every matched decided
 item. Then:
 
-- **Ledger mode:** per NEW finding, mint the next id — read `reviews/id-counter`, assign in
+- **Ledger mode:** per NEW finding, mint the next id — read `reviews/state/id-counter`, assign in
   order, and write the incremented number back **in the same change**, so two instances
   minting at once collide in git instead of reusing a number. Add its table row **and its
   detail block**
   per `reviews/templates/ledger.md` — What / Evidence / Suggested fix / History, the defect's
-  only full description anywhere (`reviews/doc-contracts.md`, describe-once). The History's
+  only full description anywhere (`reviews/rules/doc-contracts.md`, describe-once). The History's
   first line records this pass, the convergence count and the `hinted` flag; serious findings'
   Suggested-fix lines carry the fix brief (see the discovery runbook). For each **matched**
   row, append one History line (this pass, what changed) — never edit existing block text; a

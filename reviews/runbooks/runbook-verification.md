@@ -28,11 +28,11 @@ feature clean?".
    - *New surface at the bar* — does each added mechanism have sized defaults, a signal,
      failure-mode tests, docs?
    - *Regression* — did the fix change adjacent behavior?
-   Asking only the regression question is the documented failure mode ([rationale](rationale.md)).
-5. **Write no files** (artifact rules of 2026-08-10, [doc-contracts.md](doc-contracts.md)).
+   Asking only the regression question is the documented failure mode ([rationale](../notes/rationale.md)).
+5. **Write no files** (artifact rules of 2026-08-10, [doc-contracts.md](../rules/doc-contracts.md)).
    The pass's record is: ledger status flips (`verified` for held fixes, reopen failures) with
-   one History line per row touched, worklog events, the [metrics.jsonl](metrics-schema.md)
-   line and the [index.md](index.md) row (then run
+   one History line per row touched, worklog events, the [metrics.jsonl](../rules/metrics-schema.md)
+   line and the [index.md](../state/index.md) row (then run
    `node reviews/lib/records-auditor.mjs <target>` — must exit clean). The verdict — at most
    `approve-with-followups`; a quiet verification means "the fixes held", never "the code is
    clean" — goes in the index row. Report the outcome at the owner gate in chat; any owner

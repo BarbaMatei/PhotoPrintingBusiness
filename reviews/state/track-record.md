@@ -7,7 +7,7 @@ owner: Matei Barba
 
 # Certification track record
 
-The trust ledger [self-driving-loop-design.md](self-driving-loop-design.md) calls for: every
+The trust ledger [self-driving-loop-design.md](../notes/self-driving-loop-design.md) calls for: every
 certification, and every serious defect later shown to have **survived** one (a
 "post-cert escape"). Escapes ÷ certifications is the system's live false-certification rate —
 the interim trust measure while seeded-bug run 2 stays deferred (owner decision 2026-07-29).

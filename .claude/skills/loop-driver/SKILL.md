@@ -75,10 +75,10 @@ run journal (not guesswork) explains an empty result.
 
 | Router says | Do |
 |---|---|
-| full discovery · delta discovery · certification | Follow `reviews/runbook-discovery.md` exactly — scoping, lens manifest, launch args, synthesis. The delta lens cap (5) and token budget (600k) are script-enforced; don't fight them. |
-| verification | Follow `reviews/runbook-verification.md`. You must not be the fixer — sole exception: the test-only rule written in its step 1. Self-verification is the exact bias the loop exists to prevent. |
+| full discovery · delta discovery · certification | Follow `reviews/runbooks/runbook-discovery.md` exactly — scoping, lens manifest, launch args, synthesis. The delta lens cap (5) and token budget (600k) are script-enforced; don't fight them. |
+| verification | Follow `reviews/runbooks/runbook-verification.md`. You must not be the fixer — sole exception: the test-only rule written in its step 1. Self-verification is the exact bias the loop exists to prevent. |
 | fix round | Invoke the **/fix-review** skill and stop there — it is the sole owner of the fixer contract. Do not fix findings inline. |
-| loop CLOSED | Report the closure line and stop. The target is under watch: a new serious finding in its files re-arms the loop and may be a `post-cert-escape` (reviews/track-record.md). |
+| loop CLOSED | Report the closure line and stop. The target is under watch: a new serious finding in its files re-arms the loop and may be a `post-cert-escape` (reviews/state/track-record.md). |
 
 ## 4 · Records — the pass didn't happen until they exist
 
@@ -94,7 +94,7 @@ runbook) · metrics.jsonl line (schema v3 — discovery lines carry the per-find
 array and every pass line carries `runtime`) · index.md row · summary page via
 **owner-summary** (decision passes only — a verification pass writes **no files**; its
 outcome is the ledger flips, worklog, metrics and index row, reported at the owner gate in
-chat, per `reviews/doc-contracts.md`). These are written at synthesis time because they are
+chat, per `reviews/rules/doc-contracts.md`). These are written at synthesis time because they are
 unreconstructable later — that is the metrics schema's founding lesson. Then:
 
 ```
@@ -107,7 +107,7 @@ node reviews/lib/records-auditor.mjs <target>     # must exit clean before hand-
 node reviews/lib/doc-gate.mjs <target> <pass>     # structure lint — must exit clean
 ```
 
-then spawn the **Sonnet judge** (Agent, `model: sonnet`): input = `reviews/doc-contracts.md`
+then spawn the **Sonnet judge** (Agent, `model: sonnet`): input = `reviews/rules/doc-contracts.md`
 plus the round's new/changed `reviews/` files; output = approve, or disapprove with per-file
 reasons (language vs the vocabulary, evidence links supporting their claims, real reasons in
 "Reasons to doubt"). Append a `doc-gate` worklog event with the verdict. On disapprove: fix
@@ -130,7 +130,7 @@ conventions):
 
 1. `closed: <date> — <how>` into the ledger frontmatter; the index row records the story.
 2. **Backlog rollup:** every ledger row still at `backlog` gets one line in
-   `reviews/backlog.md` (`PPW-<n>`, target, severity, what, area — template
+   `reviews/state/backlog.md` (`PPW-<n>`, target, severity, what, area — template
    `templates/backlog.md`).
 3. `archived: <date>` on the target's index row.
 4. `git mv reviews/<target> reviews/archive/<target>` — contents unchanged, nothing rewritten.
@@ -149,8 +149,8 @@ re-armed pass runs.
 - Edit a `review-v*.md`, skip a record, or hand back with the auditor red.
 - Create a `reviews/<target>/` folder except by executing a pass the owner requested for
   that target — a defect noticed along the way is proposed at the round's owner gate, and
-  the owner either routes it into `reviews/backlog.md` (one row, the next `PPW-<n>` from
-  `reviews/id-counter`) or drops it, with the ruling written into that round's resolution
+  the owner either routes it into `reviews/state/backlog.md` (one row, the next `PPW-<n>` from
+  `reviews/state/id-counter`) or drops it, with the ruling written into that round's resolution
   `Decisions`. No owner decision is ever recorded that the owner did not state in so many
   words, and nothing is dropped without one.
 - Chain past a gate because the answer "seems obvious" — obvious-looking gates are where

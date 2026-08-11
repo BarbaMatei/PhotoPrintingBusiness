@@ -7,7 +7,7 @@ owner: Matei Barba
 
 # Why the review system is built this way
 
-The rules in [README.md](README.md) and the runbooks are conclusions. This file keeps the
+The rules in [README.md](../README.md) and the runbooks are conclusions. This file keeps the
 evidence — per feature, dated, with the numbers. Nothing here is needed to *run* a pass;
 read it when questioning or recalibrating a rule.
 
@@ -53,7 +53,7 @@ The ecology estimator (pass A finds N_A, pass B finds N_B, sharing M ⇒ populat
 N_A·N_B/M) is only valid for **parallel blinded passes against one frozen commit**. The 035
 audits ran on three different commits — fixes removed old problems and created new ones — so
 they cannot feed the estimator at all. Hand-labeling
-([.claude/skills/reconcile-findings/overlap-ground-truth.md](../.claude/skills/reconcile-findings/overlap-ground-truth.md))
+(.claude/skills/reconcile-findings/overlap-ground-truth.md)
 shows: 53 finding IDs collapse to **50 distinct problems**; true cross-audit identity overlap is
 **1**; about a quarter of all 50 problems were **introduced by fixes**. The qualitative signal
 survives measurement: v5's commit already contained ≥14 problems only v8 later named. Use
@@ -89,7 +89,7 @@ had raised independently. Takeaways:
   skeptic tiers, output caps, read-once codePack, decided-re-raise skip (on 042-v8, 15 of 28
   findings were re-raises ⇒ ~40% of the skeptic layer removed).
 - Low-tier skeptic models (replay run 2026-07-27,
-  [experiment](experiments/skeptic-tiering/experiment-design.md)): Sonnet matched 13/17 Opus
+  [experiment](../archive/experiments/skeptic-tiering/experiment-design.md)): Sonnet matched 13/17 Opus
   verdicts; the 4 flips were one-directional (`plausible→confirmed` — Sonnet accepts
   mutation-style traces on coverage-gap findings), all on Lows, and changed no synthesis call.
   The strict zero-flip gate failed, but the owner adopted the trade: **🟡 checks run on

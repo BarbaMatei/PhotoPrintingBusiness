@@ -9,7 +9,9 @@ owner: Matei Barba
 
 Every review artifact follows a fixed template, a size cap, and the language rules
 below. The round-end gate (lint + Sonnet judge) enforces this file. It judges and
-explains; it never edits. Scope: every per-target artifact, plus the cross-target
+explains; it never edits. `doc-gate.mjs <target> <pass>` lints a round's files,
+`doc-gate.mjs state` the two cross-target files, and `lib/tests/run-tests.mjs` lints
+the gate itself against fixtures. Scope: every per-target artifact, plus the cross-target
 `index.md` and `backlog.md`. `reviews/system/` and `track-record.md` have no contract
 here. Archived targets are being
 retrofitted to this shape by owner order (2026-08-10, newest to oldest; the owner
@@ -44,7 +46,7 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    that id. Re-finds append a history line, never a re-description.
 3. **IDs.** `PPW-<n>` is the only defect id a file may carry. The numbers are
    global: one sequence shared by every target, never reused. The next free
-   number is the whole content of `reviews/id-counter`; whoever mints ids reads
+   number is the whole content of `reviews/state/id-counter`; whoever mints ids reads
    it, assigns them in order, and writes the incremented number back in the same
    change — two sessions minting at once collide in git, which is the alarm.
    A blinded finder still numbers its own finds, but those numbers live in the
@@ -54,6 +56,10 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    only place they survive.
 4. **Links.** Cross-round references go through the `PPW-<n>` on the ledger.
    File-to-file links are allowed only between files of the same round.
+   Prose never spells out a system file's path — it uses the file's vocabulary
+   name ("the backlog", "the ledger"); the vocabulary entry owns the path, and
+   `lib/paths.mjs` owns it for scripts. Literal paths appear only in markdown
+   links (kept true by `lib/fix-links.mjs`), definitions, and commands.
 5. **Append-only detail.** A ledger detail block never changes after creation,
    except new History lines. Status fields in the table may change.
 
@@ -95,12 +101,14 @@ Allowed system terms. Anything else must be everyday English.
 - **fix round** — the fixer working through a review's findings.
 - **blinded / anchored** — finder cannot see prior findings / checker deliberately starts from them.
 - **`PPW-<n>`** — a defect's permanent id, one global sequence across all targets.
-- **id counter** — `reviews/id-counter`, holding the next free `PPW-<n>` and nothing else.
+- **id counter** — `reviews/state/id-counter`, holding the next free `PPW-<n>` and nothing else.
 - **ledger** — `ledger.md`, the permanent per-target defect record.
-- **backlog** — `reviews/backlog.md`, the cross-target queue: unfixed minors from closed
+- **backlog** — `reviews/state/backlog.md`, the cross-target queue: unfixed minors from closed
   targets, plus defects the owner routed there from outside any pass, all awaiting drain.
+- **area** — the one word on a backlog row naming where that row's fix lands. Twelve are
+  allowed; the list and the tiebreak rule sit under `backlog.md` below.
 - **worklog** — `worklog.jsonl`, the per-target append-only event trail.
-- **index** — `reviews/index.md`, one row per pass, repo-wide.
+- **index** — `reviews/state/index.md`, one row per pass, repo-wide.
 - **severity** — 🔴 High · 🟠 Medium · 🟡 Low · ⚪ Cleanup.
 - **verdict** — `request-changes` · `approve-with-followups` · `approved`.
 - **refuted** — a suspected defect investigated and shown not real.
@@ -187,7 +195,30 @@ per record. `metrics-schema.md` owns the field list and the schema version.
 ### backlog.md — template `templates/backlog.md`
 
 Audience: the owner and bolt-opening agents. One line per row, keyed by
-`PPW-<n>`, with columns ID · Target · Sev · What · Area. This file is the
+`PPW-<n>`, with columns ID · Target · Sev · What · Area.
+
+`Area` is one of these twelve words, lowercase, and nothing else:
+
+| Area | Covers |
+|---|---|
+| `payments` | charging, webhooks, idempotency, invoices |
+| `orders` | order lifecycle, admin ops |
+| `shipping` | Sameday, AWB, couriers |
+| `uploads` | upload handling, originals and thumbnails, storage tiers, S3 and local |
+| `gallery` | customer-facing photo UI |
+| `auth` | identity, sessions, guest tokens |
+| `edge` | proxy, endpoint exposure, rate limiting, health and metrics gating |
+| `observability` | metrics, tracing, Sentry, SLOs, dashboards |
+| `jobs` | background jobs, retries, sweeps |
+| `data` | EF, migrations, dual-provider parity |
+| `tests` | test infrastructure: flakes, helpers, coverage gaps whose fix is test-only |
+| `records` | docs, memory-bank, process records |
+
+When two areas fit, pick the one where the fix would land, not the one where
+the symptom shows. A file path, a line number or a second area in this cell is a
+violation: that detail lives on the home ledger row.
+
+This file is the
 cross-target queue and is distinct from a ledger row's `backlog` status, which
 marks a triaged minor deferred inside its own target. Rows enter at target close,
 before archiving, or when the owner routes

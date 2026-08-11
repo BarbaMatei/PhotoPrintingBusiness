@@ -32,7 +32,7 @@ real.
 
 - **Zero outcome-changing flips** (`confirmed` ↔ `refuted`/`plausible`, or any new `disputed`)
   → adopt tiering: add a severity-based `model` opt to `traceAgent`/`guardAgent` in
-  [lib/discovery-review.wf.js](../../lib/discovery-review.wf.js) (low → sonnet).
+  [lib/discovery-review.wf.js](../../../lib/discovery-review.wf.js) (low → sonnet).
 - **Any flip that would have changed a synthesis call** → keep Opus for all skeptics, record the
   flip here, close the question.
 
@@ -77,6 +77,6 @@ inseparable).
 
 **Owner decision (2026-07-27): adopted anyway.** The flips were one-directional, Lows-only,
 and changed no synthesis call, and the ~5× price difference won: 🟡 skeptics now run on
-Sonnet (`SKEPTIC_MODEL` in [lib/discovery-review.wf.js](../../lib/discovery-review.wf.js));
+Sonnet (`SKEPTIC_MODEL` in [lib/discovery-review.wf.js](../../../lib/discovery-review.wf.js));
 ⚪ continue to skip skeptics, with Haiku designated if they ever get one. The Opus-replay
 noise control stays open for whoever wants to fund it.

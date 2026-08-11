@@ -36,7 +36,7 @@ function findDir(name) {
   for (const base of [REVIEWS, join(REVIEWS, 'archive')]) {
     if (!existsSync(base)) continue
     for (const e of readdirSync(base, { withFileTypes: true })) {
-      if (e.isDirectory() && e.name.includes(name) && !['lib', 'experiments', 'archive'].includes(e.name)) {
+      if (e.isDirectory() && e.name.includes(name) && !['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'].includes(e.name)) {
         hits.push({ dir: join(base, e.name), name: e.name, archived: base.endsWith('archive') })
       }
     }

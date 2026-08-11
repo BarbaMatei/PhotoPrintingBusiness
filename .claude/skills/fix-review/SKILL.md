@@ -33,7 +33,7 @@ verification pass   (re-review, no files)  — flips ledger rows to "verified" o
 
 Every defect carries one id, `PPW-<n>`, global across all targets and minted at
 reconciliation. The review's `ID` column and the resolution's `## Findings` table are both
-keyed by it, per `reviews/doc-contracts.md`. You write only in the resolution file and the
+keyed by it, per `reviews/rules/doc-contracts.md`. You write only in the resolution file and the
 worklog. You hand back for re-review — you do **not** declare anything verified.
 
 `reviews/README.md` owns the loop conventions (router, severities, verdicts, file shapes).
@@ -70,8 +70,8 @@ file and the worklog.
 - change unrelated behavior, or fix things outside the finding set without recording why;
 - create a `reviews/<target>/` folder or ledger for anything — a defect you notice outside
   the finding set is **proposed at this round's owner gate** (immediately, if it is serious),
-  and the owner either routes it into `reviews/backlog.md` — one row, the next `PPW-<n>` from
-  `reviews/id-counter`, a one-line What, and a pointer to the commit or resolution recording
+  and the owner either routes it into `reviews/state/backlog.md` — one row, the next `PPW-<n>` from
+  `reviews/state/id-counter`, a one-line What, and a pointer to the commit or resolution recording
   it — or drops it. Write the ruling, either way, into this round's `Decisions`. A drop on
   the owner's word is allowed; a silent drop is not. Only an owner-opened loop creates a
   target folder;
@@ -200,7 +200,7 @@ After each finding (worklog `finding` event at the same moment), update its entr
   one row per finding, `| ID | Status | Commit | Note |` keyed by `PPW-<n>`, hand-written at the moment the
   finding closes. Note = one line, what you did or why you won't, **max 240 characters** —
   the story behind it goes in the decisions section, each decision ≤ 15 lines, per
-  `reviews/doc-contracts.md`. A mechanism-adding fix's note also names the **new surface** —
+  `reviews/rules/doc-contracts.md`. A mechanism-adding fix's note also names the **new surface** —
   that is where the re-review points the owning lens.
 - `node reviews/lib/render-records.mjs <target>` no longer generates any table — it reads
   your Findings rows for the tallies and computes the round's runtime + metrics line. You
@@ -229,10 +229,10 @@ When the last micro-review is folded in and the final scoped run is green:
    from the worklog, and appends the round's `fix-round` line to `metrics.jsonl`.
 2. Run `node reviews/lib/records-auditor.mjs <target>` — it must exit clean. Then the doc
    gate on the resolution: `node reviews/lib/doc-gate.mjs <target> <n>` (must exit clean)
-   plus the Sonnet judge (Agent, `model: sonnet`; input `reviews/doc-contracts.md` + this
+   plus the Sonnet judge (Agent, `model: sonnet`; input `reviews/rules/doc-contracts.md` + this
    round's changed `reviews/` files; approve, or disapprove with reasons you then fix).
    Append a `doc-gate` worklog event with the verdict.
-3. Update `reviews/index.md`'s Status column for the target (`open → in-progress/resolved`).
+3. Update `reviews/state/index.md`'s Status column for the target (`open → in-progress/resolved`).
 4. Summarize to the user: which findings are `fixed` / `deferred` / `wont-fix`, the
    commits, the round's runtime split, and that the resolution is `resolved`/`in-progress`.
    Then state plainly that the next step is a **verification pass** against `fixed_commit` —

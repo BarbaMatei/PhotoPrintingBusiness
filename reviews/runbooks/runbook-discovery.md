@@ -12,7 +12,7 @@ since the last full pass (delta). Checking a specific fix is a different job:
 
 **Blinding is best-effort today:** prompts bar lenses from `reviews/` and git history, but no
 tool verifies it (the blinding auditor is unbuilt — see
-[self-driving-loop-design.md](self-driving-loop-design.md)). Keep `reviews/` content out of
+[self-driving-loop-design.md](../notes/self-driving-loop-design.md)). Keep `reviews/` content out of
 anything a lens receives; commit messages and test names are an accepted leak.
 
 ## Before the script
@@ -22,7 +22,7 @@ anything a lens receives; commit messages and test names are an accepted leak.
    Delta pass: diff since the last full discovery pass instead. Certification: freeze the
    commit; a feature's **first** certification attempt runs **two** of these passes in
    parallel, a re-certification after a small independently-verified fix round runs **one**
-   ([README note ²](README.md#the-router)) — either way folding in any still-owed manifest
+   ([README note ²](../README.md#the-router)) — either way folding in any still-owed manifest
    lenses.
 2. **Pick lenses** from the manifest below. Delta: the lenses owning the fix classes +
    correctness + completeness-critic, **max 5** (script-enforced).
@@ -108,9 +108,9 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
 2. **Reconcile first.** Match this pass's finds onto the ledger's rows with the
    **`reconcile-findings` skill** (scored against the 035 ground truth before trust — see its
    Scores section). Each **new** defect is minted the next `PPW-<n>` from
-   [id-counter](id-counter) — the skill writes the incremented counter in the same change —
+   [id-counter](../state/id-counter) — the skill writes the incremented counter in the same change —
    and gets its ledger row *and* its detail block
-   ([templates/ledger.md](templates/ledger.md), [doc-contracts.md](doc-contracts.md)) — the
+   ([templates/ledger.md](../templates/ledger.md), [doc-contracts.md](../rules/doc-contracts.md)) — the
    block is the defect's only full description, ever. It carries What / Evidence / Suggested
    fix / History; for **serious** findings the Suggested-fix lines include what the fix round
    would otherwise re-derive:
@@ -127,17 +127,17 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
      here instead of anchoring the fixer. Delta passes run these inside their existing token
      budget; when skipped, say so in the History line.
    Re-finds get one appended History line, never a re-description.
-3. Write `review-v<n>.md` from [templates/review.md](templates/review.md) — after
+3. Write `review-v<n>.md` from [templates/review.md](../templates/review.md) — after
    reconciliation, so its one `ID` column carries each finding's `PPW-<n>`. Lean: ranked table, refuted
    table, notes for the fixer; defects are referenced, never re-described. Immutable once
    the round's doc gate passes. **There is no findings file** (retired 2026-08-10).
-4. Append the [metrics.jsonl](metrics-schema.md) line (v3: include the per-finding
+4. Append the [metrics.jsonl](../rules/metrics-schema.md) line (v3: include the per-finding
    `findings[]` array, `runtime: {started, ended}` from the loop-driver's worklog stamps,
    and count the pre-checks under `cost.agents_by_stage.approach_checks`) and the one-line
-   [index.md](index.md) row, then run
+   [index.md](../state/index.md) row, then run
    `node reviews/lib/records-auditor.mjs <target>` — it must exit clean.
 5. Write `summary-v<n>.md` via the **`owner-summary` skill**, from
-   [templates/summary.md](templates/summary.md) — the page the owner reads; the review file
+   [templates/summary.md](../templates/summary.md) — the page the owner reads; the review file
    is the record, the summary is the interface.
 6. Feedback edges: a v1 pass's severity-weighted new-finding count is the bolt-process KPI;
    a finding class now seen in ≥2 targets gets a `definition-of-done.md` line.

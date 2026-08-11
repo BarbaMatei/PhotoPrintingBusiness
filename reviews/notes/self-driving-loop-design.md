@@ -14,9 +14,9 @@ eyes, stop when confident, then boil everything down to two short plain-English 
 piece of the bigger goal: an agentic system doing a development team's work with as little
 human input as possible.
 
-**Split of responsibilities:** [README.md](README.md) + the runbooks own everything
+**Split of responsibilities:** [README.md](../README.md) + the runbooks own everything
 *operational* — router, entry tiers, stop rule, pass mechanics.
-[doc-contracts.md](doc-contracts.md) owns the *file shapes*.
+[doc-contracts.md](../rules/doc-contracts.md) owns the *file shapes*.
 [rationale.md](rationale.md) owns the *evidence*. This file owns the *research*: the
 assumptions that must hold for autonomy, the experiments that test them, and the tools still
 to build. On any overlap, the README wins.
@@ -39,7 +39,7 @@ trust — and a wrong system produces confident, readable summaries too.
    10/10 recall on both passes — zero misses means miss-correlation is undefined, and the
    implanter and finders shared a model, so high recall is partly a shared-brain artifact.
    Run 2 needs a different implanter model and harder seeds
-   ([results](experiments/seeded-bugs/seeded-run-results.md)).
+   ([results](../archive/experiments/seeded-bugs/seeded-run-results.md)).
 2. **"The loop can tell serious from minor."** The stop rule keys on this classification, made
    by the same fallible reviewer. One serious bug mislabeled minor goes silently to the
    backlog. **Status: measured once, encouraging** — across 10 seeds the reviewers erred high
@@ -62,7 +62,7 @@ blinded discovery pass: recall becomes a **measurement** — fraction found per 
 severity accuracy, which lenses caught what. Repeat with a differently-framed or
 different-model pass and check whether the two missed the **same** seeds (shared blind spot)
 or different ones (independent-ish). Re-run whenever the review approach changes materially.
-Run 1: [experiments/seeded-bugs/](experiments/seeded-bugs/seeded-run-results.md). Run 2
+Run 1: [experiments/seeded-bugs/](../archive/experiments/seeded-bugs/seeded-run-results.md). Run 2
 (different implanter model, harder seeds): queued.
 
 ## Blinding, done properly (auditor spec)
@@ -103,7 +103,7 @@ loop stops early → a bug ships. Wrongly *splitting* one problem deflates overl
 runs longer → money wasted. Waste is recoverable; shipped bugs aren't. **When unsure, split.**
 
 **Eval set exists:**
-[.claude/skills/reconcile-findings/overlap-ground-truth.md](../.claude/skills/reconcile-findings/overlap-ground-truth.md)
+.claude/skills/reconcile-findings/overlap-ground-truth.md
 — 53 IDs → 50 distinct problems, ten hard rulings, a scoring guide. Every reconciler version
 gets scored against it before being trusted.
 
@@ -148,13 +148,13 @@ that went missing. Backed by a **compress-review** skill + a general **plain-lan
 
 ## Measuring — so the next five features aren't anecdotes
 
-Every pass appends a metrics line ([metrics-schema.md](metrics-schema.md)); per finding:
+Every pass appends a metrics line ([metrics-schema.md](../rules/metrics-schema.md)); per finding:
 severity, lens, verdict, fix commit, ever-reopened. Nearly free at review time, impossible to
 reconstruct later. This is what eventually answers: does the stop rule work? do
 findings-per-pass decay? what does a pass cost? which lenses earn their keep? It also feeds
 the **track record** — the only legitimate basis for autonomy: measured seeded-bug recall,
 plus the count of certified-clean features that later turned out to have a serious bug
-(collector live since 2026-07-30: [track-record.md](track-record.md), enforced by the records
+(collector live since 2026-07-30: [track-record.md](../state/track-record.md), enforced by the records
 auditor). Trust comes from that record, not from a human reading a summary and nodding.
 
 ## Tools — status and build order
@@ -163,13 +163,13 @@ Built and operating:
 
 | Tool | Where |
 |---|---|
-| Discovery fan-out script (lenses → in-pass dedup + `hinted` → trace-first skeptics with severity-tiered models, delta budget guard, decided-re-raise skip) | [lib/discovery-review.wf.js](lib/discovery-review.wf.js) |
+| Discovery fan-out script (lenses → in-pass dedup + `hinted` → trace-first skeptics with severity-tiered models, delta budget guard, decided-re-raise skip) | [lib/discovery-review.wf.js](../lib/discovery-review.wf.js) |
 | Reconciler (`reconcile-findings` skill — scored vs the 035 ground truth: 0 over-merges) | `.claude/skills/reconcile-findings/SKILL.md` |
 | Owner summary (`owner-summary` skill — one page per pass: decisions · dissent · evidence) | `.claude/skills/owner-summary/SKILL.md` |
-| Metrics recorder (schema **v2** 2026-07-30: per-finding lens attribution, fix-lineage, severity-delta) | [metrics-schema.md](metrics-schema.md) |
-| Records auditor (schema validation · tally cross-check · review↔metrics pairing · commit reachability from pushed refs · citation-leak count) | [lib/records-auditor.mjs](lib/records-auditor.mjs) |
-| Loop driver (audit → route → announce → gate → execute → record; session-model guard + resume protocol; eval-tested + independently reviewed 2026-07-30) | `.claude/skills/loop-driver/SKILL.md` + [lib/route-next-pass.mjs](lib/route-next-pass.mjs) |
-| Verification runbook | [runbook-verification.md](runbook-verification.md) |
+| Metrics recorder (schema **v2** 2026-07-30: per-finding lens attribution, fix-lineage, severity-delta) | [metrics-schema.md](../rules/metrics-schema.md) |
+| Records auditor (schema validation · tally cross-check · review↔metrics pairing · commit reachability from pushed refs · citation-leak count) | [lib/records-auditor.mjs](../lib/records-auditor.mjs) |
+| Loop driver (audit → route → announce → gate → execute → record; session-model guard + resume protocol; eval-tested + independently reviewed 2026-07-30) | `.claude/skills/loop-driver/SKILL.md` + [lib/route-next-pass.mjs](../lib/route-next-pass.mjs) |
+| Verification runbook | [runbook-verification.md](../runbooks/runbook-verification.md) |
 | Fixer contract | `/fix-review` skill |
 | Per-target ledgers (hand-maintained) | `reviews/<target>/ledger.md` |
 

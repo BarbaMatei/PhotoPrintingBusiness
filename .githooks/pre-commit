@@ -24,12 +24,30 @@ if [ -z "$DOCGATE_OK" ]; then
     for p in $passes; do
       if ! node reviews/lib/doc-gate.mjs "$tgt" "$p" >&2; then
         echo "" >&2
-        echo "Doc gate failed for $tgt v$p. Fix the files (reviews/doc-contracts.md) and" >&2
+        echo "Doc gate failed for $tgt v$p. Fix the files (reviews/rules/doc-contracts.md) and" >&2
         echo "recommit. Only for a genuine false positive, re-run with DOCGATE_OK=1." >&2
         exit 1
       fi
     done
   done
+  if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- reviews/state/backlog.md reviews/state/index.md)" ]; then
+    if ! node reviews/lib/doc-gate.mjs state >&2; then
+      echo "" >&2
+      echo "Doc gate failed for the state files. Fix reviews/state/backlog.md or" >&2
+      echo "reviews/state/index.md (reviews/rules/doc-contracts.md) and recommit. Only for a" >&2
+      echo "genuine false positive, re-run with DOCGATE_OK=1." >&2
+      exit 1
+    fi
+  fi
+fi
+
+# The gate machinery has its own fixtures-based suite; a change under reviews/lib/ runs it.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')" ]; then
+  if ! node reviews/lib/tests/run-tests.mjs >&2; then
+    echo "" >&2
+    echo "reviews/lib test suite failed. Fix the script or the fixture and recommit." >&2
+    exit 1
+  fi
 fi
 
 if [ -n "$COMMENTS_OK" ] || [ -z "$hits" ]; then exit 0; fi
