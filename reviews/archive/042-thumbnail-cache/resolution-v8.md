@@ -1,187 +1,110 @@
 ---
 type: resolution
 target: 042-thumbnail-cache
-answers_review: review-v8.md
 version: 8
-branch: feat/bolt-042-thumbnail-cache
+answers: review-v8.md
 status: resolved
 fixed_commit: bd0d5fd
-opened: 2026-07-14
 closed: 2026-07-14
-findings:
-  F1:  { status: deferred, commit: null, note: "D34/D31 cleanup/cache-fill orphan race — the accepted bolt-043 orphan-sweep class. Durable fix is the conditional atomic UPDATE … WHERE DeletedAt IS NULL (ExecuteUpdate) + cleanup deriving thumbs/{owner}/{id}.jpg; InMemory can't run ExecuteUpdate (why M1 used a re-read). F6's new log makes the race face visible meanwhile. See decisions." }
-  F2:  { status: fixed, commit: ac0485b, note: "Added unique ThenBy(o.Id) to the two Skip/Take sites (AdminOrderService.GetOrdersAsync — the real Include(Items) split-query hazard; OrderService.GetOrdersAsync — projection, added for stable paging). Class sweep: no other Skip/Take exists; ProductService/CartService/AdminProductService Include collections but don't paginate. Regression test: tied-CreatedAt pagination complete+deterministic, red on revert. NEW SURFACE: none (ordering refinement). Parity: split-query missing-items symptom needs Postgres (InMemory can't split) — rides 3-env (D23)." }
-  F3:  { status: fixed, commit: 62a33cd, note: "storeSession now MERGES — an empty incoming contact field keeps the existing non-empty value; fresh guestToken always wins. Class-level fix covering every re-init caller (the two guestSession-key writers are storeSession + clearGuestToken). Tests: preserve-on-empty / overwrite-on-nonempty + full clear→re-init sequence, red on revert. NEW SURFACE: empty incoming contact no longer clears — no caller intends that today (checkout form always sends non-empty)." }
-  F4:  { status: fixed, commit: 521fa15, note: "Upload-time bomb test now asserts the derived DecompressionBombException + WidthPx/HeightPx (was base UnprocessableEntityException only), pinning the type the alert emitters gate on. Revert-verified red (regress throw to base → red). Class sweep: preview-time test (ImageProcessorTests) already pins the derived type; only the upload-time test had the gap." }
-  F5:  { status: fixed, commit: 521fa15, note: "Emit distinct Warning uploads.original.missing_file at the lost-original catch, so a storage-integrity incident is distinguishable from a routine unknown-id 404. Log-assertion test, red on revert. NEW SURFACE: one additive Warning on an existing branch; no sizing/limits." }
-  F6:  { status: fixed, commit: 521fa15, note: "Emit distinct Warning uploads.thumbnail.deleted_row_race around the soft-delete-race delete, matching sibling anomaly paths. Log-assertion test, red on revert. NEW SURFACE: one additive Warning. The stale ThumbnailPath left on the dead row is F1/D31's deferred durable fix, not this log — noted in code + decisions." }
-  F7:  { status: fixed, commit: bd0d5fd, note: "Pin preview decode to Image.LoadAsync<Rgba32> (4 B/px) so a legit ≤100 MP 16-bit source can't decode to 8 B/px and trip the 512 MB backstop → permanent un-previewability. Bounds any ≤100 MP decode ≤400 MB; keeps the 100 MP cap + large-format use case. Adversarial approach-check (rule #3) caught two blockers in the review's one-liner (won't compile; return type must stay Task<Image>) — folded in. Tests: reflection bit-depth guard (16-bit→32 bpp, red on revert) + e2e deep-colour→JPEG. NEW SURFACE: common 8-bit path 3→4 B/px (~300→~400 MB at 100 MP, still <512 MB & <limiter/slot budget); grayscale now 3-ch JPEG. See decisions for a finding-writeup correction." }
-  F8:  { status: deferred, commit: null, note: "D90 — preview Cache-Control private,max-age=2592000 is recoverable device-locally on a shared browser. Real privacy nit but a DESIGN call: private,no-cache defeats the 30-day cache the D1/SEC-1 fix deliberately added (revalidation cost/bandwidth vs shared-device privacy). Not in the merge-recommendation set; flagged for owner decision, not silently dropped. See decisions." }
-  F9:  { status: deferred, commit: null, note: "D66 — ExistsAsync has no production caller; bolt-043 cloud seam. Documenting/dropping it belongs with the 043 provider work. Couples with F26." }
-  F10: { status: deferred, commit: null, note: "D75 — File.Move over an open reader; Windows-dev-only (prod Linux rename-over-open-fd succeeds). Next pass." }
-  F11: { status: deferred, commit: null, note: "D67 — extra AnyAsync round-trip on cache-miss preview; removed only by F1's conditional ExecuteUpdate. Paired with F1 → bolt-043." }
-  F12: { status: deferred, commit: null, note: "D69 — slot-release-on-throw untested; plausible/latent (using var releases today). Next pass." }
-  F13: { status: deferred, commit: null, note: "D93 — no end-to-end bomb/oversize→422 integration test (FakeImageProcessor pins 800×600). Coverage gap; next pass / integration-fake work." }
-  F14: { status: deferred, commit: null, note: "D23 — Npgsql migration DDL arm + snapshot exercised by no test (InMemory ignores migrations; only SQLite arm runs). Standing 3-env / Testcontainers deferral. F2's parity gap rides the same phase." }
-  F15: { status: deferred, commit: null, note: "D68 — decode-limiter saturation/queue-depth unobservable. Observability follow-up; next pass." }
-  F16: { status: deferred, commit: null, note: "D42 — frame-cap (MaxFrames=1) tested only on the internal helper, not through GenerateThumbnailAsync; plausible (cap holds today). Next pass." }
-  F17: { status: deferred, commit: null, note: "D50 — ensureGuestSession recovery-after-init-error untested (all 12 specs mock init as success). Coverage gap; next pass." }
-  F18: { status: deferred, commit: null, note: "D31 hard-kill variant — SIGKILL/OOM between SaveAsync and commit orphans the thumbnail. Same bolt-043 orphan-sweep deferral as F1 (the sweep attempts the derivable key for every candidate). See decisions." }
-  F19: { status: deferred, commit: null, note: "D94 — guest 401 off the upload page is a silent dead-end (self-heal is format-selector-only). FE UX follow-up; not in the merge-recommendation set. Next pass." }
-  F20: { status: deferred, commit: null, note: "D95 — localUrl() mints untracked blob URLs per change-detection for in-session photos (C1/D54 residual). FE leak, tab-lifetime; next pass." }
-  F21: { status: deferred, commit: null, note: "D92 — restore-preview subscription resolving after ngOnDestroy leaks one object URL (C1/D54 residual). FE leak; next pass." }
-  F22: { status: deferred, commit: null, note: "D96 — decode memory budget ignores concurrent upload buffering (F1/D61 residual). Memory-bound-config only; fold upload-buffer memory into the budget — next pass / limiter follow-up." }
-  F23: { status: fixed, commit: 76d0b6a, note: "bolt.md Change C rewritten: states the split-query default IS a production query-execution change (was 'no behavior change'), + retroactive AC (every Skip/Take + collection-Include query carries a unique ORDER BY tiebreaker) referencing the F2 test and the Postgres/3-env verification (D23). Doc-only." }
-  F24: { status: deferred, commit: null, note: "D28 — cloud stream seekable/Length contract untested; latent until the bolt-043 non-seekable provider (only seekable FileStream exists today). Standing bolt-043 deferral." }
-  F25: { status: deferred, commit: null, note: "D81 — uploads.decompression_bomb.rejected literal copy-pasted in 3 places (controller batch omits source=). Extract a helper + add source=batch. Cleanup; next pass." }
-  F26: { status: deferred, commit: null, note: "D66 test-side — inert ExistsAsync⇒true Moq stubs on cache-hit tests would mask a reintroduced exists-then-get TOCTOU. Delete; couples with F9. Cleanup; next pass." }
-  F27: { status: fixed, commit: 76d0b6a, note: "implementation-plan.md ThumbnailPath 'character varying(500)' → 512 (76d0b6a); the fix-diff micro-review then caught a SECOND stale occurrence in intents/019 requirements.md the finding didn't cite → also fixed (00b0d39). Repo-wide grep now confirms no other ThumbnailPath 500 remains. Doc-only (D59 class)." }
-  F28: { status: deferred, commit: null, note: "D97 — conditional-GET If-None-Match only matches an exact strong tag; weak/list/* degrade to full 200. Parse per RFC + test. Cleanup (bandwidth-only); next pass." }
 ---
 
-# Resolution — Bolt 042: Thumbnail Cache (answers review-v8)
-
-Fixer-owned; one row per finding ID from [review-v8.md](review-v8.md). No blockers
-(`blockers: []`), verdict `approve-with-followups`. IDs are pass-local to v8 and map to
-canonical `D#` in [ledger.md](ledger.md).
-
-This round deliberately **applies the new fixer-contract rules** (README §*Bounding
-fix-generativity*) the v8 review asked for, because v8 showed the fix-generativity loop is still
-live (F3 defeated a v7-verified fix). Per fix: **#1 class sweep**, **#2 new-mechanism bar**,
-**#3 design-check for the resource-budget change (F7)**, **#4 fresh-eyes micro-review of the fix
-diff** (see the closing section).
-
-## Scope of this resolution
-
-Driven by review-v8's **Recommendation**: fix the mediums **F2, F3, F4** + cheap observability
-**F5, F6** + doc **F23**, and a bounded **F7**; defer **F1/F18** (orphan sweep → bolt-043),
-**F14** (Npgsql DDL → 3-env), **F24** (cloud stream → bolt-043); leave the Low/Cleanup long tail
-for the next blinded discovery pass the review asks for. **F27** (a cheap doc-token fix in the
-same D59 stale-token class as F23) is batched with F23. Everything deferred is recorded here with
-rationale, not silently dropped.
-
-Suites after the fixes: **.NET 540/540, frontend 416/416** (were 535/413 at v8; +5 .NET from the
-F2/F5/F6 + two F7 tests, F4 strengthened an existing test; +3 FE from the F3 tests).
+# Resolution v8 — 042-thumbnail-cache
 
 ## Findings
 
-| ID | Sev | Status | Commit | How |
-|----|-----|--------|--------|-----|
-| F1 | 🟠 | deferred | — | bolt-043 orphan sweep (D31/D34); atomic ExecuteUpdate blocked by InMemory; F6 log covers the race meanwhile |
-| F2 | 🟠 | fixed | ac0485b | ThenBy(o.Id) on both Skip/Take queries; tied-CreatedAt pagination test (red on revert) |
-| F3 | 🟠 | fixed | 62a33cd | storeSession merges (empty incoming keeps existing); preserve/overwrite + clear→re-init tests |
-| F4 | 🟠 | fixed | 521fa15 | Bomb test asserts derived DecompressionBombException + dims; revert-verified |
-| F5 | 🟠 | fixed | 521fa15 | Emit uploads.original.missing_file on lost-original; log-assertion test |
-| F6 | 🟠 | fixed | 521fa15 | Emit uploads.thumbnail.deleted_row_race on soft-delete race; log-assertion test |
-| F7 | 🟠 | fixed | bd0d5fd | Pin decode to Rgba32 (4 B/px); adversarial-checked; bit-depth guard + e2e tests |
-| F8 | 🟡 | deferred | — | D90 — Cache-Control device-local recoverable; a design call vs the deliberate 30-day cache (decisions) |
-| F9 | 🟡 | deferred | — | D66 — ExistsAsync no caller; bolt-043 cloud seam (couples F26) |
-| F10 | 🟡 | deferred | — | D75 — File.Move over open reader; Windows-dev-only |
-| F11 | 🟡 | deferred | — | D67 — extra round-trip; removed by F1's ExecuteUpdate (paired) |
-| F12 | 🟡 | deferred | — | D69 — slot-release-on-throw untested; plausible/latent |
-| F13 | 🟡 | deferred | — | D93 — no e2e bomb→422 integration test (fake pins 800×600) |
-| F14 | 🟡 | deferred | — | D23 — Npgsql DDL/snapshot untested; 3-env/Testcontainers |
-| F15 | 🟡 | deferred | — | D68 — limiter saturation unobservable |
-| F16 | 🟡 | deferred | — | D42 — frame-cap tested only on helper; plausible |
-| F17 | 🟡 | deferred | — | D50 — ensureGuestSession recovery-after-error untested |
-| F18 | 🟡 | deferred | — | D31 hard-kill variant; bolt-043 orphan sweep (with F1) |
-| F19 | 🟡 | deferred | — | D94 — guest 401 off upload page silent dead-end; FE UX follow-up |
-| F20 | 🟡 | deferred | — | D95 — localUrl() blob leak (C1 residual) |
-| F21 | 🟡 | deferred | — | D92 — restore-preview-after-destroy blob leak (C1 residual) |
-| F22 | 🟡 | deferred | — | D96 — decode budget ignores upload buffering (D61 residual) |
-| F23 | 🟡 | fixed | 76d0b6a | Change C label corrected + retroactive AC referencing F2 test/D23 |
-| F24 | 🟡 | deferred | — | D28 — cloud stream contract; bolt-043 |
-| F25 | ⚪ | deferred | — | D81 — bomb event copy-pasted ×3; extract helper + source=batch |
-| F26 | ⚪ | deferred | — | D66 test-side — inert ExistsAsync stubs; delete (couples F9) |
-| F27 | ⚪ | fixed | 76d0b6a, 00b0d39 | implementation-plan.md + intents/019 varchar(500)→512 (D59 token, repo-wide) |
-| F28 | ⚪ | deferred | — | D97 — conditional-GET weak/list/* ETag not matched |
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D34 | deferred | — | The accepted cloud-storage orphan-sweep class. The durable conditional update cannot run on the in-memory test provider. The new D89 log makes the race visible meanwhile. See Decisions. |
+| D85 | fixed | `ac0485b` | A unique tiebreaker was added to both paged queries. A sweep for the same shape found no other paged query; the other collection includes do not paginate. Regression test on tied timestamps, red on revert. |
+| D86 | fixed | `62a33cd` | Storing a session now merges: an empty incoming contact field keeps the stored value, and a fresh token always wins. This covers every re-init caller, since only two writers touch that key. Three tests, red on revert. |
+| D87 | fixed | `521fa15` | The upload-time bomb test now asserts the specific bomb exception and its dimensions rather than the base type, pinning what the alert emitters key on. The preview-time test already pinned it. |
+| D88 | fixed | `521fa15` | A distinct warning is emitted on the lost-original branch, so a storage-integrity incident is distinguishable from a request for an unknown id. Log-assertion test, red on revert. |
+| D89 | fixed | `521fa15` | A distinct warning is emitted around the soft-delete-race deletion, matching the sibling anomaly branches. The stale path left on the dead row is D34's deferred work, not this signal. |
+| D77 | fixed | `bd0d5fd` | The preview decode is pinned to four bytes per pixel, so a legitimate image under the pixel cap cannot decode at eight and trip the 512 MB backstop. Bit-depth guard plus an end-to-end test. See Decisions. |
+| D90 | deferred | — | A real privacy point but a design call: requiring revalidation trades shared-device privacy against the 30-day cache the D1 fix deliberately added. Flagged for the owner, not dropped. See Decisions. |
+| D66 | deferred | — | Raised twice: the existence check still has no production caller, and the inert stubs on the cache-hit tests would mask a reintroduced check-then-read. Both belong with the cloud-provider work. |
+| D75 | deferred | — | Moving a file over an open reader fails on Windows only; on Linux the rename over an open handle succeeds. Deferred to the next pass. |
+| D67 | deferred | — | The extra round-trip on a cache miss disappears only with D34's conditional update. Paired with D34 and deferred with it. |
+| D69 | deferred | — | No test pins the decode slot's release on a throwing decode. Latent, since today's code releases it. Deferred to the next pass. |
+| D93 | deferred | — | No end-to-end path reaches the bomb rejection, because dependency injection resolves a fake image processor that always reports 800×600. A coverage gap; deferred to the next pass. |
+| D23 | deferred | — | The Postgres arm of the migration and the model snapshot are exercised by no test, since the integration provider ignores migrations and only the SQLite arm runs. The standing three-environment deferral. |
+| D68 | deferred | — | Limiter saturation and queue depth are unobservable. An observability follow-up; deferred to the next pass. |
+| D42 | deferred | — | The one-frame cap is tested on the internal helper, not through the public thumbnail call. Latent, since the cap holds today. Deferred to the next pass. |
+| D50 | deferred | — | Guest-session recovery after a failed init is untested, because all twelve specifications supply a successful init. A coverage gap; deferred to the next pass. |
+| D31 | deferred | — | The hard-kill shape: a process killed between the file write and the commit orphans the thumbnail. The same orphan-sweep deferral as D34, since the sweep would cover it. |
+| D94 | deferred | — | A guest 401 away from the upload page is a silent dead end, because the self-heal lives on that page only. An interface follow-up, outside the recommended set. |
+| D95 | deferred | — | The thumbnail component mints an untracked object URL on each change-detection cycle for a photo held in the session. A leak for the life of the tab; deferred to the next pass. |
+| D92 | deferred | — | A restore preview that resolves after the page is destroyed leaks one object URL. Deferred to the next pass. |
+| D96 | deferred | — | The decode memory budget ignores concurrent upload buffering drawing on the same memory. A configuration matter; fold the buffering allowance into the budget next pass. |
+| D91 | fixed | `76d0b6a` | The bolt's change C now states the split-query default is a production query-execution change rather than no change, and carries a retroactive criterion naming the D85 test and the Postgres verification. |
+| D28 | deferred | — | The stream contract is untested and stays latent until a provider that returns a stream which cannot rewind exists. Only rewindable implementations exist today. The standing deferral. |
+| D81 | deferred | — | The reserved bomb event is copied in three places and the controller copy omits the field naming which guard caught it. Extract a helper and add the missing value. Cleanup; deferred. |
+| D59 | fixed | `76d0b6a` | The implementation plan's stale column width was corrected, and the micro-review then caught a second stale copy in a requirements document the finding did not cite, fixed at `00b0d39`. |
+| D97 | deferred | — | The conditional GET compares the incoming validator as plain text, so a weak validator, a list or a wildcard silently becomes a full response. Bandwidth only; deferred to the next pass. |
 
-**8 fixed · 20 deferred · 0 wont-fix · 0 disputed.** All 7 mediums except F1 (accepted
-bolt-043 deferral) are fixed. No blockers.
+## Scope
 
-## Decisions / deferrals (attached, not suppressed)
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A — Deterministic paging (`ac0485b`) | D85 | `Services/AdminOrderService.cs`, `Services/OrderService.cs` | not needed (one ordering term at two sites, swept for others) |
+| B — Session merge (`62a33cd`) | D86 | `UI/…/guest-auth.service.ts` | not needed (one write turned into a merge) |
+| C — Bomb type and anomaly signals (`521fa15`) | D87, D88, D89 | `Services/UploadService.cs`, `Tests/…/UploadServiceTests.cs` | not needed (two warnings on existing branches and one test assertion) |
+| D — Decode pixel type (`bd0d5fd`) | D77 | `Services/ImageProcessor.cs` | run before implementation — it caught two defects in the review's suggested change, see Decisions |
+| E — Documents (`76d0b6a`, `00b0d39`) | D91, D59 | `memory-bank/…/bolt.md`, `memory-bank/…/implementation-plan.md`, `memory-bank/…/requirements.md` | not needed (documents only) |
+| F — Left undone this round | D34, D31, D67, D28, D23, D42, D50, D66, D68, D69, D75, D90, D92, D93, D94, D95, D96, D81, D97 | — | not needed (no code changed) |
 
-- **F1 + F18 + F11 → bolt-043 orphan sweep (D31/D34).** The durable fix is the conditional
-  atomic write — `UPDATE … SET ThumbnailPath WHERE Id=@id AND DeletedAt IS NULL` via
-  `ExecuteUpdate`, deleting the just-written file on 0 rows — plus cleanup deriving
-  `thumbs/{owner}/{id}.jpg` for every candidate (which also kills the F18 hard-kill leak and the
-  F11 extra round-trip). The InMemory integration provider **cannot run `ExecuteUpdate`** (exactly
-  why the v4 M1 fix used a liveness re-read), so landing it now ships untestable in this suite. Same
-  accepted-deferral class as v5 V5-1. **F6's new `deleted_row_race` log makes the race observable in
-  the interim** — it does not resolve the underlying non-atomicity.
-- **F7 finding-writeup correction (for the re-reviewer).** The adversarial approach-check confirmed,
-  against the real ImageSharp 3.1.11 package, that the current PNG failure path wraps the allocation
-  error as `InvalidImageContentException` (derives from `ImageFormatException`) → caught locally in
-  `GenerateThumbnailAsync` → re-thrown as a plain `UnprocessableEntityException`. So the middleware
-  emits **no** `decompression_bomb.rejected` event on this path — the review's "plus a false
-  decompression_bomb alert" is inaccurate for a PNG. The **real** defect (permanent
-  un-previewability, every retry re-trips) is exactly as described and is what the fix removes; the
-  correction does not change the fix.
-- **F7 new-surface (rule #2).** Forcing `Rgba32` raises the **common 8-bit** decode from Rgb24
-  (3 B/px, ~300 MB at 100 MP) to 4 B/px (~400 MB) — still under the 512 MB allocator backstop and
-  under the decode limiter's 512 MB-per-slot budget, so no sizing change is needed. The existing
-  `Program.cs` note "if the pixel cap is raised materially, raise [the 512 MB backstop] in step"
-  stays correct; the per-pixel multiplier is now a fixed 4. Grayscale sources now encode as a
-  3-channel JPEG (marginally larger, visually identical). This is the surface the re-review's
-  input-validation/observability lens should re-audit.
-- **F2 parity limitation (green ≠ proven).** The InMemory regression test proves the
-  deterministic-ordering + per-order-item contract and goes red without the tiebreaker, but InMemory
-  **does not split queries**, so the actual split-query *missing-items* symptom can only reproduce on
-  Postgres. Full verification rides with the 3-env / Postgres-CI phase — the same class as F14/D23.
-  The bolt.md Change-C AC (F23) records this.
-- **F8 → deferred as a design call (D90).** `private, max-age=2592000` is recoverable from the
-  browser's per-profile cache on a shared device. The review's fix (`private, no-cache` / short
-  max-age) is real, but it **partially defeats the 30-day cache the D1/SEC-1 fix deliberately
-  added** — it trades shared-device privacy for revalidation cost/bandwidth on every preview. It is
-  a Low, not in the merge-recommendation set, and changes a deliberate caching design, so it wants an
-  owner decision rather than a reflexive patch. Flagged, not dropped.
-- **Long tail (F9, F10, F12, F13, F15, F16, F17, F19, F20, F21, F22, F25, F26, F28) → deferred.**
-  Per the review's own disposition, the feature is **not saturated** and wants another blinded
-  discovery pass; these Lows/Cleanups (Windows-dev-only races, latent/plausible test gaps, FE blob
-  leaks, observability polish, cleanups) are the long tail that pass will re-weigh. None is a prod
-  data-loss or runtime-break. Several (F20/F21 blob leaks, F13 integration coverage, F17 init-error
-  coverage) are cheap and good candidates for the next fix round if the discovery pass re-raises them.
+## Decisions
 
-## Fix-diff micro-review (rule #4) — before hand-back
+### The orphan race and its two companions stay deferred (D34, D31, D67)
 
-Two fresh-eyes anchored Explore agents (independent context) reviewed the full fix diff
-(`bcf1ecc..bd0d5fd`), split backend vs frontend/docs, each asked the three required questions
-(class-or-instance / new-surface-at-the-bar / regression).
+The durable fix has two halves. One is a conditional update that sets the path only while the row is
+live, deleting the just-written file on no match. The other is a cleanup that deletes the derivable key
+for every candidate. That
+also removes the hard-kill leak recorded under D31 and the extra round-trip under D67. The in-memory
+integration provider cannot run a conditional update. That is exactly why the earlier round used a
+re-read. Landing it now would ship code this suite cannot test. The new D89 log makes the race observable in the
+meantime; it does not resolve the underlying problem.
 
-- **Backend cluster (F2, F4, F5, F6, F7): clean.** Confirmed the F2 class sweep is complete (only
-  two `Skip/Take` sites exist; `UploadCleanupJob`/`EmailRetryJob`/`AdminStatsService` are non-hazards
-  — no Skip + no split collection Include); F4 pins the derived type at both production throw sites
-  and the remaining base assertions cover genuine base scenarios; F5/F6 make all four `GetPreviewAsync`
-  anomaly branches signal, with non-vacuous log-assertion tests; F7's ~400 MB peak sits under **both**
-  the 512 MB allocator backstop **and** the decode-limiter's 512 MB-per-slot budget, no caller depends
-  on the source pixel type, and the `async Task<Image>` signature is safe for all (production +
-  reflection) callers. No regressions.
-- **Frontend/docs cluster (F3, F23, F27): clean but for one class-sweep miss.** Confirmed the two
-  `guestSession` writers both preserve contact, the legitimate `guest-checkout-form` overwrite still
-  works (validator-gated non-empty), and the Change-C AC cross-references are accurate. **Caught: F27
-  had a second stale `varchar(500)` in `intents/019-.../requirements.md:66` the finding didn't cite —
-  fixed (00b0d39), completing the repo-wide token sweep.** Minor note (not a defect): the F3
-  "overwrites non-empty" test is a reverse-direction guard, not a merge-pin; the other two F3 tests are
-  the merge-pins (red on revert).
+### The decode was pinned to a fixed pixel type (D77)
 
-**Spotted while fixing — NEW, out of the finding set, flagged for the re-reviewer (not fixed):**
-`AdminStatsService.GetProductStatsAsync` (`AdminStatsService.cs:109-114`) does
-`OrderByDescending(TotalQuantity).Take(10)` on an **in-memory** GroupBy; a tie at the #10/#11 boundary
-picks non-deterministically. It's a top-N stats display (not pagination, not the split-query hazard),
-so it's cosmetic — but it's the nearest cousin to F2 and a re-review may want to weigh a `ThenBy` there.
-Left untouched to keep this round to the finding set (README fixer rule).
+An approach-check against the shipped library corrected the finding's write-up: the current failure
+path is wrapped and re-raised as a plain 422, so no false bomb alert is emitted for a PNG. The real
+defect, permanent failure to preview with every retry failing the same way, is exactly as described and
+is what the fix removes. The check also caught two defects in the review's suggested one-line change:
+it would not compile, and the return type had to stay as it was. Both were folded in.
 
-## Hand back — next step is a re-review
+### Pinning the pixel type raises the common case's memory, and it still fits
 
-The eight recommended/bounded findings (F2, F3, F4, F5, F6, F7, F23, F27) are `fixed` with
-revert-verified regression tests (or doc-only for F23/F27). F1/F18/F11 (orphan sweep), F14
-(Npgsql DDL), F24 (cloud stream) and the Low/Cleanup long tail are `deferred` with rationale above.
-Resolution is **`resolved`** at `fixed_commit: bd0d5fd`. Suites **.NET 540/540 · FE 416/416**.
+Forcing four bytes per pixel raises an ordinary eight-bit decode from three bytes to four, about 400 MB
+at the 100 MP cap. That is still under the 512 MB allocator backstop and under the limiter's per-slot
+allowance, so no sizing changes. The existing note that raising the pixel cap means raising the
+backstop in step stays correct; the multiplier is now fixed at four. Grayscale sources now encode as
+three-channel output, marginally larger and visually identical.
 
-Per the loop contract I do **not** self-verify. The next step is a **verification re-review**
-against `bd0d5fd` — revert-and-rerun each `fixed` finding's regression test (I confirmed each goes
-red on revert; the re-review re-confirms independently), judge the doc fixes + deferral rationales —
-producing `review-v9.md`, which flips the held findings to `verified` (or reopens them). The review
-also asks for a **separate blinded discovery pass** to test saturation: with the fix-generativity
-rules now applied, a quiet discovery pass (0 new mediums, only long-tail cleanups) would make the
-feature a candidate for `approved`.
+### The paging fix is proven in shape, not in symptom (D85)
+
+The regression test proves deterministic ordering and that each order keeps its own items, and it
+reddens without the tiebreaker. The in-memory provider does not split queries, so the missing-items
+symptom itself can only be reproduced on Postgres. That verification rides with D23, and the retroactive
+criterion added under D91 records it.
+
+### The shared-device cache is an owner decision, not a patch (D90)
+
+The stored preview is recoverable from the browser's own store on a shared computer profile. The
+suggested fix changes a deliberate caching design that the D1 fix introduced, it is a low finding, and
+it is outside the recommended set, so it wants an owner decision rather than a reflexive change. It is
+flagged, not dropped.
+
+### The micro-review found a defect in the fixer's own work
+
+Two micro-reviews read the whole fix diff with no prior context, split between the backend and the
+frontend and documents. The backend cluster came back clean. The frontend and document cluster caught one class
+sweep that stopped short: the D59 fix had left a second stale column width in a requirements document
+the finding never cited, which was then fixed and confirmed absent repository-wide.
+
+### One nearby defect was spotted and deliberately left alone
+
+While fixing D85 the fixer found a pre-existing cousin: an administrator statistics query takes the top
+ten of an in-memory grouping with no tiebreaker, so a tie at the tenth place is decided arbitrarily. It
+is a display of top-ranked figures rather than paging, so it is cosmetic, and it was left untouched to
+keep this round to the finding set. It is recorded here for a later pass to weigh.

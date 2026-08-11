@@ -1,98 +1,104 @@
 ---
 type: resolution
 target: 042-thumbnail-cache
-answers_review: review-v4.md
 version: 4
-branch: feat/bolt-042-thumbnail-cache
+answers: review-v4.md
 status: resolved
 fixed_commit: 6c4f334
-opened: 2026-07-14
 closed: 2026-07-14
-findings:
-  M1:  { status: fixed, commit: 4d4d998, note: "After the preview ThumbnailPath persist, re-read liveness (DeletedAt null); if the row was soft-deleted under us, delete the just-written thumb. Used liveness re-read not guarded ExecuteUpdate (InMemory test provider can't run it). Race test injects concurrent soft-delete, revert-verified red." }
-  M2:  { status: fixed, commit: aad083d, note: "SaveAsync writes to unique temp file then File.Move(overwrite) into place; concurrent writers of the same key no longer collide. Deterministic gated-stream concurrency test, revert-verified red." }
-  M3:  { status: fixed, commit: aa6639c, note: "Added process-wide ImageDecodeLimiter (SemaphoreSlim) gating GenerateThumbnailAsync; config ImageProcessing:MaxConcurrentDecodes, default ProcessorCount. Limiter unit tests + gate-ordering test (revert-verified red)." }
-  M4:  { status: fixed, commit: f1c4ade, note: "Batch catch now emits uploads.decompression_bomb.rejected with width/height when ex is DecompressionBombException, matching the middleware. Test asserts event name + dimensions (also covers L12 for the batch path). Revert-verified red." }
-  M5:  { status: fixed, commit: "80379f6+63b815a", note: "Stop accepting HEIC (no HEIF decoder). Backend @80379f6: MimeValidator no longer classifies ISO-BMFF as image/heic (-> null/415), message drops HEIC. UI @63b815a: removed .heic from ACCEPTED_EXTENSIONS/accept attr/hint + home copy. Validator + photo-upload specs flipped accept->reject, revert-verified red. Real HEIC decode deferred to a future bolt." }
-  M6:  { status: fixed, commit: fea0d45, note: "Catch FileNotFoundException around the cache-miss GenerateThumbnailAsync; throw NotFoundException (404) since the original is unrecoverable (also lets the FE drop the dead entry). Regression test, revert-verified red." }
-  M7:  { status: fixed, commit: 2b22e25, note: "GenerateThumbnailAsync catch now logs warning with {StoragePath} + caught exception (mirrors GetInfoAsync) and passes it as inner via new UnprocessableEntityException(msg, inner) ctor. Test asserts log carries storagePath + non-null exception, revert-verified red." }
-  M8:  { status: fixed, commit: 1bdb21b, note: "fetchPreviewWithRetry now drops the restored entry on 403 and on a still-401 after re-init (like 404); only 5xx/network stay kept (NEW-2). Two tests (403-after-retry drop; persistent-401 drop), revert-verified red." }
-  M9:  { status: fixed, commit: 2945bda, note: "Added SQLite Migrate() smoke test applying the real migration chain, asserting ThumbnailPath column lands (nullable); mutation-verified (broken column name -> red). Npgsql varchar(512) arm stays deferred to 3-env/Testcontainers (DB-1/D23) per standing decision." }
-  M10: { status: fixed, commit: 7a7170e, note: "Added _storageMock.Verify(DeleteAsync, Times.Once) to the dimensions-exceed test; mutation-verified (remove bomb-path delete -> red)." }
-  M11: { status: fixed, commit: 1108d47, note: "Extracted decode into internal LoadSingleFrameAsync (MaxFrames=1) used by production; reflection test asserts a 3-frame GIF decodes to 1 frame. Mutation-verified (drop MaxFrames -> red)." }
-  L1:  { status: fixed, commit: dfb8f56, note: "Cache-hit path reads directly (dropped ExistsAsync pre-check) and catches FileNotFoundException -> regenerate; no TOCTOU 500, one round-trip. Test regenerate-not-500, revert-verified red." }
-  L2:  { status: false-positive, commit: null, note: "Refuted in review-v4 §H — MIME change IS traced to f850f69 (INPUT-1). Residual folded into C4/docs." }
-  L3:  { status: fixed, commit: dfb8f56, note: "Emit uploads.thumbnail.cache_miss_missing_file when a recorded thumbnail is absent (folded into the L1 catch). Signal test, revert-verified red." }
-  L4:  { status: fixed, commit: 9b0bc81, note: "Wrap cache-fill SaveChangesAsync: emit uploads.thumbnail.orphaned_on_commit_failure + best-effort delete the just-written thumb, then rethrow. Test via throwing DbContext, revert-verified red." }
-  L5:  { status: deferred, commit: 8466658, note: "Documented the primary-DB constraint at the write site (finding's 'at minimum document' bar). Re-architecture (cache-fill off the GET path) deferred until read-replica routing exists — none today, not planned pre-deployment." }
-  L6:  { status: fixed, commit: 158b733, note: "SanitizeFileNameForLog strips control chars + caps to 128 before the batch-reject log. Test (newline + 200-char name), revert-verified red." }
-  L7:  { status: disputed, commit: null, note: "Conflicts with FE-3/D13 (verified): this guest-first app DELIBERATELY does not bounce unauthenticated 401s to login, with a passing test asserting exactly that. L7 wants the opposite. See decisions." }
-  L8:  { status: fixed, commit: 1bdb21b, note: "Added persistent-401 upload test: exactly 2 attempts then error (the !isRetry guard prevents a loop). Coverage test (regression would be an infinite loop, not a clean red)." }
-  L9:  { status: fixed, commit: 1bdb21b, note: "Added re-init-after-settle test with a completing init + null token -> initAnonymousSession called twice. Mutation-verified: neutralising finalize() -> red." }
-  L10: { status: deferred, commit: null, note: "Same DB-1/D23 theme as M9. Per the finding, accept as a documented deferral — the migration comment already notes the phantom AlterColumn, and no in-place snapshot edit is wanted; per-provider migration assemblies deferred to the 3-env phase." }
-  L11: { status: deferred, commit: null, note: "Re-raises v1 CLOUD-1 — seekable-stream/ETag assumption; not triggerable until bolt-043 cloud provider. Deferral stands." }
-  L12: { status: fixed, commit: c0c07c7, note: "Bomb-log test now uses distinct 31000x32000 and asserts both dimensions render; mutation-verified (drop width/height from the log -> red)." }
-  L13: { status: fixed, commit: e1c56c4, note: "Mapped SixLabors.ImageSharp.Memory.InvalidMemoryOperationException -> 422 in the middleware map; test asserts 422, mutation-verified red." }
-  L14: { status: fixed, commit: ec8a894, note: "Added a corrupt-IDAT (recognized-but-broken) PNG test hitting the InvalidImageContentException branch; mutation-verified (narrow catch to UnknownImageFormatException -> red)." }
-  C1:  { status: fixed, commit: af5cf74, note: "Revoke preview blob URLs on remove/drop/add-to-cart-clear/destroy (ngOnDestroy + revokeAllPreviews/revokePreview). Test: removing an upload revokes its URL." }
-  C2:  { status: fixed, commit: af5cf74, note: "Extracted the thrice-duplicated upload-error string into a single UPLOAD_ERROR field." }
-  C3:  { status: fixed, commit: f444a81, note: "Added a real-seam test (real AuthService, no clear spy): a guest 401 clears the same localStorage key getGuestToken reads. Covers the divergence concern without full component+HTTP wiring (component reads via the same AuthService)." }
-  C4:  { status: fixed, commit: 6c4f334, note: "Refreshed walkthrough to shipped: private cache directive (SEC-1), AsNoTracking+Attach, migration 20260527102718. Also corrected adjacent drift in the same doc (deterministic key, 100 MP area cap, 800px) — see decisions." }
-  C5:  { status: fixed, commit: 6c4f334, note: "Story 003 AC: '54 MP' -> '110 MP over the 100 MP cap'; '<=300 px' -> '<=800 px'." }
-  C6:  { status: fixed, commit: 6c4f334, note: "Story 001 AC: varchar(500)->varchar(512); 'same shape as StoragePath' -> 'same shape as FilePath (varchar(512))'." }
-  C7:  { status: fixed, commit: 28aff33, note: "Owner chose code->800px: ThumbnailMaxDimension 300->800; story ACs (already 800) now correct. Test asserts a 2000x1500 source downscales to >300 and <=800, revert-verified red." }
 ---
 
-# Resolution — Bolt 042: Thumbnail Cache (answers review-v4)
+# Resolution v4 — 042-thumbnail-cache
 
-Fixer-owned; one row per finding ID from [review-v4.md](review-v4.md). No blockers, so this is a
-follow-up list, not a gate. IDs are pass-local to v4 (they do **not** map to v1's IDs).
+## Findings
 
-## Recommended order (from review §I)
+| D# | Status | Commit | Note |
+|---|---|---|---|
+| D34 | fixed | `4d4d998` | After the path is persisted, the row's liveness is read again; if it was soft-deleted underneath, the just-written thumbnail is deleted. A conditional update was not used; see Decisions. Race test reddens on revert. |
+| D35 | fixed | `aad083d` | Saving writes to a unique temporary file and then moves it into place, so two writers of the same key no longer collide. A gated concurrency test reddens on revert. |
+| D33 | fixed | `aa6639c` | A process-wide decode limiter gates thumbnail generation, with a configurable slot count defaulting to the processor count. Limiter unit tests plus a gate-ordering test, red on revert. |
+| D36 | fixed | `f1c4ade` | The batch catch emits the reserved bomb event with the dimensions when the rejection is a bomb, matching the middleware. The test asserts the name and both dimensions, and also covers D51 for this route. |
+| D37 | fixed | `80379f6` | HEIC is no longer accepted, since no decoder exists. The validator no longer classifies the container as an image, and the interface dropped the extension, the accept list and the copy at `63b815a`. |
+| D38 | fixed | `fea0d45` | A missing original on the cache-miss path is caught and raised as a 404, since the original is unrecoverable, which also lets the interface drop the dead entry. Regression test, red on revert. |
+| D39 | fixed | `2b22e25` | The generate catch logs a warning naming the storage path and carries the caught error inward, mirroring the sibling method. The test asserts both. |
+| D40 | fixed | `1bdb21b` | A restored entry is dropped on a 403 and on a still-failing 401 after re-init, as it already was on a 404. Only server errors and network failures keep it. Two tests, red on revert. |
+| D23 | deferred | `2945bda` | A SQLite smoke test now applies the real migration chain and asserts the column lands. The Postgres arm and the model snapshot stay deferred to the three-environment phase. See Decisions. |
+| D41 | fixed | `7a7170e` | The dimensions test now asserts the stored file is deleted exactly once. Proven by removing the delete and watching it redden. |
+| D42 | fixed | `1108d47` | The decode moved into an internal helper carrying the one-frame limit, which production uses. A reflection test asserts a three-frame image decodes to one frame; dropping the limit reddens it. |
+| D43 | fixed | `dfb8f56` | The cache-hit path reads directly and catches a missing file to regenerate, so there is no failure window and no second storage call. Test proves it regenerates rather than failing. |
+| D44 | fixed | `dfb8f56` | A distinct event is emitted when a recorded thumbnail is absent, folded into the same catch as D43. Signal test, red on revert. |
+| D45 | fixed | `9b0bc81` | The cache-fill save is wrapped: on failure it emits a distinct event, deletes the just-written thumbnail on a best-effort basis, then re-raises. Test through a throwing context, red on revert. |
+| D46 | deferred | `8466658` | The constraint is documented at the write site, which is the finding's own minimum bar. Moving the cache fill off the read path waits until read-replica routing exists. See Decisions. |
+| D47 | fixed | `158b733` | The batch-reject log strips control characters and caps the name at 128 characters. Test with a newline and a 200-character name, red on revert. |
+| D48 | disputed | — | As written this asks to undo D13, which was fixed and verified, and a passing test asserts the behaviour it wants reverted. Surfaced for the owner rather than implemented. See Decisions. |
+| D49 | fixed | `1bdb21b` | A persistent-401 upload test pins exactly two attempts then an error, which is what the one-shot guard gives. A regression would show as an endless loop rather than a clean red. |
+| D50 | fixed | `1bdb21b` | A re-init-after-settle test drives a completing init and then a null token, and asserts the init runs twice. Proven by neutralising the reset and watching it redden. |
+| D28 | deferred | — | Re-raises the first pass's cloud storage constraint: the entity tag reads the stream's length. Not triggerable until the cloud provider lands. The deferral stands. |
+| D51 | fixed | `c0c07c7` | The bomb log test uses distinct width and height and asserts both render. Proven by dropping them from the log and watching it redden. |
+| D52 | fixed | `e1c56c4` | The allocator's memory exception is mapped to 422 in the middleware; the test asserts the 422 and reddens when the mapping is removed. |
+| D53 | fixed | `ec8a894` | A corrupt-but-recognised PNG test reaches the broken-content branch. Proven by narrowing the catch to the unknown-format type and watching it redden. |
+| D54 | fixed | `af5cf74` | Preview object URLs are released on remove, drop, cart clear and page destroy. Test: removing an upload releases its URL. |
+| D55 | fixed | `af5cf74` | The upload error message was extracted into one field. |
+| D56 | fixed | `f444a81` | A real-seam test with the real authentication service: a guest 401 clears the same stored key the token reader reads, which covers the divergence without wiring the whole component. |
+| D57 | fixed | `6c4f334` | The walkthrough was refreshed to the shipped private directive, the tracking behaviour and the real migration, plus adjacent drift in the same document. See Decisions. |
+| D58 | fixed | `6c4f334` | Story 003's criterion now says 110 MP over the 100 MP cap, and its thumbnail size now says 800 px. |
+| D59 | fixed | `6c4f334` | Story 001's criterion now says `varchar(512)` and describes the column as the same shape as `FilePath`. |
+| D60 | fixed | `28aff33` | The owner chose to change the code: the thumbnail's longest side went from 300 px to 800 px, which the stories already said. Test: a 2000×1500 source scales to over 300 and at most 800. Red on revert. |
 
-1. **M3** — decode concurrency gate (`SemaphoreSlim`); the only process-kill vector.
-2. **M1 + M2 + M6** — make the deterministic-key write safe (temp-file+atomic-move, `DeletedAt`-guarded
-   update, catch `FileNotFoundException`). One change closes most of cluster A.
-3. **M4** — emit the bomb event on the batch path.
-4. **M5** — HEIC: add a decoder or stop advertising it.
-5. **M7, M9–M11** and §G lows/cleanup — fast-follows. **C4** (walkthrough's stale insecure
-   `Cache-Control: public…immutable`) fix regardless — copying it reintroduces SEC-1.
+## Scope
 
-## Decisions / deferrals (attached, not suppressed)
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A — Safe cache-fill write (`4d4d998`, `aad083d`, `fea0d45`, `dfb8f56`, `9b0bc81`) | D34, D35, D38, D43, D44, D45 | `Services/UploadService.cs`, `Services/LocalStorageService.cs`, `Services/ImageProcessor.cs` | not needed (guards and a temporary-file write on existing paths) |
+| B — Decode concurrency limiter (`aa6639c`) | D33 | `Services/ImageProcessor.cs`, `ImageDecodeLimiter.cs`, `Program.cs` | not needed (one gate around one call) |
+| C — Bomb signals and their tests (`f1c4ade`, `c0c07c7`, `e1c56c4`, `ec8a894`, `7a7170e`, `1108d47`) | D36, D41, D42, D51, D52, D53 | `Controllers/UploadsController.cs`, `Middleware/ExceptionHandlerMiddleware.cs`, `Tests/…` | not needed (one emit site plus tests) |
+| D — Upload contract and logging (`80379f6`, `63b815a`, `2b22e25`, `158b733`) | D37, D39, D47 | `Services/MimeValidator.cs`, `Services/ImageProcessor.cs`, `Controllers/UploadsController.cs`, `UI/…` | not needed (removing an advertised format and two log changes) |
+| E — Guest session and previews (`1bdb21b`, `af5cf74`, `f444a81`) | D40, D49, D50, D54, D55, D56 | `UI/…/format-selector-page.ts` | not needed (drop conditions, URL release and tests) |
+| F — Documents and criteria (`6c4f334`, `28aff33`) | D57, D58, D59, D60 | `memory-bank/…`, `Services/ImageProcessor.cs` | not needed (documents plus one constant) |
+| G — Migration coverage (`2945bda`) | D23 | `Tests/…` | not needed (tests only) |
+| H — Left undone this round | D46, D48, D28 | `Services/UploadService.cs` | not needed (a constraint note and two rulings) |
 
-- **L11 → deferred** (re-raises v1 **CLOUD-1**): seekable-stream / ETag `stream.Length` assumption
-  only breaks once the bolt-043 cloud `IStorageService` lands. Deferral stands; design constraint for 043.
-- **C4 scope**: the finding named three walkthrough contradictions (cache directive, tracking,
-  migration). Fixing them, the same one doc also mis-described the thumbnail path scheme (fresh UUID
-  vs the shipped deterministic key), the decode cap (`MaxDecodeDimension=25000` vs `MaxDecodePixels`
-  100 MP area), and the thumbnail size (300 vs the now-800 px from C7). A half-corrected walkthrough
-  misleads identically, so all were refreshed in the C4 commit — recorded here per the "don't fix
-  outside the finding set without saying why" rule.
-- **M9 / L10 re-raise v1 DB-1** (migration DDL / snapshot never exercised): the Migrate()-based DDL
-  test is deferred to the 3-env phase per the roadmap. The fixer may still add a cheap SQLite-file
-  `Migrate()` smoke test now; the Postgres/Testcontainers arm stays deferred.
-- **L2 → false-positive** (refuted in review-v4 §H).
-- **L7 → disputed** (self-heal "broadened to swallow every unauthenticated 401"): this is a
-  *direct conflict with FE-3 (D13), which was fixed AND verified*. FE-3 deliberately removed the
-  login redirect for unauthenticated 401s because this is a guest-first app where a guest has no
-  account to log into — and there's a **passing test** asserting an anonymous 401 does NOT navigate
-  to login (`error.interceptor.spec.ts`: "does not navigate an anonymous user (no guest token) to
-  login on 401"). L7 asks to restore that redirect / surface login, i.e. revert FE-3. A fixer must
-  not revert a verified decision, so this is surfaced for the re-reviewer/owner rather than
-  implemented. The residual over-broadening L7 notes is harmless: `clearGuestToken()` on an absent
-  token is a no-op, and a guest token cleared by a spurious non-preview 401 self-heals on the next
-  request. **If** the owner wants `clearGuestToken` scoped to upload/preview requests specifically,
-  that's a small follow-up — but it does not change the no-login-redirect behavior FE-3 fixed.
-- **L5 → deferred** (read-replica hazard): GET /preview writes on a cache miss. There is no read
-  replica today (dual DB is SQLite dev / single Postgres prod), so the hazard can't fire. Took the
-  finding's "at minimum document" option (a constraint note at the write site @8466658); the
-  re-architecture to move cache-fill off the GET path is deferred until read-replica routing is
-  actually introduced — premature to build now per the pre-deployment roadmap.
+## Decisions
 
-## Notes for the fixer
+### The liveness re-read was used instead of a conditional update (D34)
 
-- **Fix-generativity is the theme here** — M1/M2/M6 exist *because* of the v1 BUG-3 deterministic-key
-  fix. Self-review the concurrency of whatever you change (README *Bounding fix-generativity*).
-- Keep comments minimal and don't narrate the fixes in-code (rationale goes here + the commit).
-- A finding isn't `fixed` without the regression test the review named (esp. M9–M11, L12–L14 are
-  themselves coverage gaps — the "fix" is the test).
+The durable fix is a conditional update that sets the path only while the row is live, deleting the
+just-written file when it matches nothing. The in-memory provider the integration tests run on cannot
+execute one, so landing it now would ship code this suite cannot test. The re-read closes the ordering
+the finding stated; the narrower symmetric window stays open behind D31's sweep.
+
+### The read-replica hazard was documented, not designed away (D46)
+
+The preview writes on a cache miss. There is no read replica today — development uses SQLite and
+production a single Postgres — so the hazard cannot fire. The finding's own minimum option was taken:
+a constraint note at the write site. Moving the cache fill off the read path waits until read-replica
+routing actually exists, rather than being built ahead of need.
+
+### The guest self-heal finding conflicts with a verified decision (D48)
+
+D48 asks to restore the login redirect for unauthenticated 401s. D13 deliberately removed it, because
+this is a guest-first application where a guest has no account to log into, and a passing test asserts
+an anonymous 401 does not navigate to a login page. A fixer must not revert a verified decision, so
+this is surfaced for the owner and the re-reviewer instead. The residual breadth it names is harmless
+today: clearing an absent token does nothing, and a token cleared by a stray 401 self-heals on the next
+request. Scoping the clear to upload and preview requests would be a small follow-up that leaves D13's
+behaviour intact.
+
+### The walkthrough fix went past the three contradictions named (D57)
+
+The finding named the cache directive, the tracking behaviour and the migration. Fixing them exposed
+three more errors in the same document: the thumbnail path scheme, the decode limit's name and units,
+and the thumbnail size. A half-corrected walkthrough misleads exactly as much as an uncorrected one, so
+all six were refreshed in the same commit, recorded here rather than done quietly.
+
+### One finding was refuted rather than fixed
+
+The suspicion that the change to accepted file types shipped untraceably is not real: it traces to the
+commit that fixed D24, and the scope document does cover it. The residual stale document text is
+carried by D57. It is recorded in review-v4's refuted table and gets no defect id.
+
+### Fixes making new defects are the theme of this round
+
+D34, D35 and D38 exist because the first round made the thumbnail key deterministic. Anything changed
+here needs its own concurrency self-review, and a finding is not fixed without the regression test the
+review named — for D23, D41, D42 and D51 to D53, the test is the fix.

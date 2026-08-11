@@ -11,7 +11,8 @@ verification a backlogged minor requires) or owner-ruled wont-fix. Empty file
 means nothing is owed. The pre-deployment regression phase requires it empty.
 Seeded 2026-08-10 from every closed target: the ledgers of 015/043/044-045 plus
 035's four close-time accepted deferrals (pre-ledger era, grandfathered IDs).
-042's ledger had no surviving backlog rows.
+042's rows were added on 2026-08-11, when its records were
+retrofitted and its loop closed retroactively.
 
 | D# | Target | Sev | What | Area |
 |---|---|---|---|---|
@@ -116,3 +117,33 @@ Seeded 2026-08-10 from every closed target: the ledgers of 015/043/044-045 plus
 | D101 | 044-045-observability | ⚪ | bolt-044 ddd docs declare a four-value `result` set and `ParentBasedSampler` as shipped | `memory-bank/bolts/044-tracing-and-metrics` |
 | D102 | 044-045-observability | ⚪ | `resolution-v2.md` misdescribes TestServer as reporting the addresses feature "present but empty" — it returns null | `Observability` |
 | D124 | 044-045-observability | ⚪ | The guarded-selector list is hand-maintained, so a fifth hand-named success numerator ships unpinned and nothing notices — and the stated reason for not writing the class rule does not hold for a rule keyed on literal `=` matchers | `Tests/Integration` |
+| D23 | 042-thumbnail-cache | 🟡 | The migration's Postgres arm and the model snapshot are exercised by no test; the next scaffolded migration would show a phantom column change | `data-stack/migrations` |
+| D28 | 042-thumbnail-cache | 🟡 | The storage contract assumes a rewindable stream with a readable length; deferred to bolt 043, which closed without taking it | `uploads/storage` |
+| D31 | 042-thumbnail-cache | 🟡 | Nothing reclaims a thumbnail written between the cleanup job's read and its commit; deferred to bolt 043, which closed without taking it | `uploads/storage` |
+| D34 | 042-thumbnail-cache | 🟠 | The cache-fill write races the cleanup job and strands a thumbnail on the dead row; the liveness re-read narrows the window but does not close it | `uploads/storage` |
+| D42 | 042-thumbnail-cache | 🟠 | The one-frame decode cap, the defence against an animated-image bomb, is proven only through the internal helper, not the public call | `uploads/thumbnails` |
+| D46 | 042-thumbnail-cache | 🟡 | The preview GET writes to the database on a cache miss, so it cannot be routed to a read replica; only documented | `uploads/thumbnails` |
+| D50 | 042-thumbnail-cache | 🟡 | Guest-session recovery after a failed init is untested — every specification supplies a successful init | `uploads/guest-session` |
+| D66 | 042-thumbnail-cache | 🟡 | `ExistsAsync` has no production caller, and inert test stubs would hide a reintroduced check-then-read | `uploads/storage` |
+| D67 | 042-thumbnail-cache | 🟡 | Every cache-miss preview pays an extra database round-trip to spot the soft-delete race; it disappears with D34's fix | `uploads/thumbnails` |
+| D68 | 042-thumbnail-cache | 🟡 | Nothing reports how saturated or how queued the decode limiter is, so a wrong slot count looks like ordinary slowness | `uploads/thumbnails` |
+| D69 | 042-thumbnail-cache | 🟡 | No test proves the decode slot is released when the decode throws; a leak would block every later preview | `uploads/thumbnails` |
+| D70 | 042-thumbnail-cache | 🟡 | The allocator-exception-to-422 mapping is proven only by an injected instance, so a library upgrade could break it green | `uploads/thumbnails` |
+| D71 | 042-thumbnail-cache | 🟡 | A failed thumbnail delete in the cleanup job is untested and silently leaks the file again | `uploads/storage` |
+| D72 | 042-thumbnail-cache | 🟡 | Parallel preview 401s defeat the init sharing, and a late 401 wipes a freshly minted token | `uploads/guest-session` |
+| D74 | 042-thumbnail-cache | 🟡 | The guest-init error path when files are dropped is untested, so files hang showing as uploading | `uploads/guest-session` |
+| D75 | 042-thumbnail-cache | 🟡 | Moving a file onto a shared key races other writers on Windows and returns 500; production on Linux is unaffected | `uploads/storage` |
+| D76 | 042-thumbnail-cache | 🟡 | A cleanup delete fails against an open read handle on Windows and leaves an orphan; production on Linux is unaffected | `uploads/storage` |
+| D79 | 042-thumbnail-cache | 🟡 | Storage faults and cancellation are reported as an unreadable image, so a storage outage looks like bad uploads | `uploads/thumbnails` |
+| D80 | 042-thumbnail-cache | 🟡 | The implementation plan's acceptance criteria still list the public cache directive and the per-axis cap, both replaced | `memory-bank/bolts/042-thumbnail-cache` |
+| D81 | 042-thumbnail-cache | ⚪ | The reserved bomb event is written out at three sites and the batch copy omits which guard caught it | `uploads/thumbnails` |
+| D82 | 042-thumbnail-cache | ⚪ | `dropRestoredEntry` repeats the body of `onRemoveUpload` word for word | `uploads/guest-session` |
+| D83 | 042-thumbnail-cache | ⚪ | The client-abort log reads the raw correlation-id item instead of the accessor every sibling uses | `uploads/thumbnails` |
+| D84 | 042-thumbnail-cache | ⚪ | Storage save and delete traces sit at Debug under an Information floor, so they never emit | `uploads/storage` |
+| D90 | 042-thumbnail-cache | 🟡 | The 30-day private preview cache stays recoverable on a shared device; the owner decision on requiring revalidation was never taken | `uploads/thumbnails` |
+| D92 | 042-thumbnail-cache | 🟡 | A restore preview that resolves after the page is destroyed leaks an object URL | `uploads/guest-session` |
+| D93 | 042-thumbnail-cache | 🟡 | No end-to-end test reaches the bomb-to-422 path, because the integration fake always reports 800×600 | `uploads/thumbnails` |
+| D94 | 042-thumbnail-cache | 🟡 | A guest 401 away from the upload page is a silent dead end: no re-init, no message, no navigation | `uploads/guest-session` |
+| D95 | 042-thumbnail-cache | 🟡 | `localUrl()` mints an untracked object URL on every change-detection cycle for a photo held in the session | `uploads/guest-session` |
+| D96 | 042-thumbnail-cache | 🟡 | The decode memory budget ignores the upload buffering that draws on the same memory | `uploads/thumbnails` |
+| D97 | 042-thumbnail-cache | ⚪ | The conditional GET matches only an exact strong tag, so weak, list and `*` forms fall back to a full response | `uploads/thumbnails` |
