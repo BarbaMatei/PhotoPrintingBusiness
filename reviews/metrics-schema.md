@@ -178,7 +178,7 @@ Readers of old lines need this table:
   appends them at hand-back — the fixer never hand-writes a metrics line.
 - `refinds_identity` / `reraises_of_decided` / `fix_generated` use the **`reconcile-findings`
   skill's** judgment (labeling rules per
-  [archive/035-payment-idempotency/overlap-ground-truth.md](archive/035-payment-idempotency/overlap-ground-truth.md)).
+  [.claude/skills/reconcile-findings/overlap-ground-truth.md](../.claude/skills/reconcile-findings/overlap-ground-truth.md)).
 - No global roll-up file: compute cross-feature summaries on demand from the per-feature files
   (they are labeled pass-cost-only); a hand-maintained roll-up would drift.
 - Run the auditor after every append.

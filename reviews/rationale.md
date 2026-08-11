@@ -53,7 +53,7 @@ The ecology estimator (pass A finds N_A, pass B finds N_B, sharing M ⇒ populat
 N_A·N_B/M) is only valid for **parallel blinded passes against one frozen commit**. The 035
 audits ran on three different commits — fixes removed old problems and created new ones — so
 they cannot feed the estimator at all. Hand-labeling
-([archive/035-payment-idempotency/overlap-ground-truth.md](archive/035-payment-idempotency/overlap-ground-truth.md))
+([.claude/skills/reconcile-findings/overlap-ground-truth.md](../.claude/skills/reconcile-findings/overlap-ground-truth.md))
 shows: 53 finding IDs collapse to **50 distinct problems**; true cross-audit identity overlap is
 **1**; about a quarter of all 50 problems were **introduced by fixes**. The qualitative signal
 survives measurement: v5's commit already contained ≥14 problems only v8 later named. Use

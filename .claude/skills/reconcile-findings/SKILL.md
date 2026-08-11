@@ -83,7 +83,7 @@ item. Then:
 
 Before first trusted use — and after any material change to the rules above — run **blind**
 against the eval set at
-`reviews/archive/035-payment-idempotency/overlap-ground-truth.md` (scoring guide at its
+`.claude/skills/reconcile-findings/overlap-ground-truth.md` (scoring guide at its
 bottom; the runner must NOT read that file or any text derived from it) and record the score
 below. Any over-merge of the eval set's hard cases 1–7 is a failing run, whatever else scores
 well.

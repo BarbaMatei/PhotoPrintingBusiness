@@ -102,7 +102,7 @@ loop stops early → a bug ships. Wrongly *splitting* one problem deflates overl
 runs longer → money wasted. Waste is recoverable; shipped bugs aren't. **When unsure, split.**
 
 **Eval set exists:**
-[archive/035-payment-idempotency/overlap-ground-truth.md](archive/035-payment-idempotency/overlap-ground-truth.md)
+[.claude/skills/reconcile-findings/overlap-ground-truth.md](../.claude/skills/reconcile-findings/overlap-ground-truth.md)
 — 53 IDs → 50 distinct problems, ten hard rulings, a scoring guide. Every reconciler version
 gets scored against it before being trusted.
 
