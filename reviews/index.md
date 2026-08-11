@@ -18,7 +18,7 @@ history. Findings = new 🔴/🟠/🟡/⚪. Dormant targets live under `archive/
 | 015 sameday shipping | **Archived 2026-08-10.** **CLOSED 2026-07-29 by owner sign-off** (`5734021`) — no post-fix blinded pass ran; recorded per README note ². Path: v5 certified `5fc330b` → 41-fix round → v6 verification (37 verified, **4 reopened**: D27/D39/D71/D79 were correct but *nothing could prove them* — deleting each left both suites green) → v6 test-only fix round closing all 4 plus the D68/D78 gaps, every one revert-proven. v6 also **reproduced** D65's DI cycle: flipping `Sameday:Enabled=true` pre-fix would have thrown on the first courier call. Backend 921 / frontend 460 green (suite 30 s → 4 s once `FakeTimeProvider` stopped sleeping for real). **The pre-enable checklist is the gate, not this closure** — D45 vendor idempotency unconfirmed, D23 Postgres DDL never executed, D81 service ids still `7`, D90–D96 backlog. Dormant behind two false flags |
 | 043 cloud storage | **Archived 2026-08-10.** **Certified 2026-07-22** (no serious defect survives; D83–D90 → backlog) — loop complete |
 | 042 thumbnail cache | **CLOSED 2026-08-11 by retroactive owner sign-off (quiet since v9, never certified).** Archived. Loop quiet after v9; certification never ran (pre-dates the risk tiers) |
-| 035 payment idempotency | Archived. Fix loop complete at v10; never certified (pre-dates the protocol) |
+| 035 payment idempotency | **CLOSED 2026-08-11 by retroactive owner sign-off (loop complete at v10, never certified).** Archived. Fix loop complete at v10; never certified (pre-dates the protocol) |
 
 ## Passes
 

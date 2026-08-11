@@ -10,16 +10,16 @@ the terminal state is written back to its home ledger row: fixed (with the norma
 verification a backlogged minor requires) or owner-ruled wont-fix. Empty file
 means nothing is owed. The pre-deployment regression phase requires it empty.
 Seeded 2026-08-10 from every closed target: the ledgers of 015/043/044-045 plus
-035's four close-time accepted deferrals (pre-ledger era, grandfathered IDs).
-042's rows were added on 2026-08-11, when its records were
-retrofitted and its loop closed retroactively.
+035's four close-time accepted deferrals. 042's rows were added on 2026-08-11,
+and 035's four rows were re-keyed to its ledger the same day, when both targets'
+records were retrofitted and their loops closed retroactively.
 
 | D# | Target | Sev | What | Area |
 |---|---|---|---|---|
-| DB-1 | 035-payment-idempotency | 🟠 | Entire Postgres production DB path is unexercised by tests — deferred to the migration/3-env phase | `data-stack/migrations` |
-| SEC-1 | 035-payment-idempotency | 🟡 | Global single-column idempotency-key uniqueness = cross-tenant existence oracle + key-squatting; durable fix needs a per-tenant composite index (migration) | `Orders/idempotency` |
-| BUG-2 | 035-payment-idempotency | 🟡 | EuPlatesc recovery-replay regenerates a different redirect URL (no gateway idempotency key); row-lock fix needs the Postgres arm | `Controllers/payments` |
-| DB-2 | 035-payment-idempotency | 🟡 | Model snapshot is SQLite-flavored — next Npgsql migration scaffolds a phantom diff | `data-stack/migrations` |
+| D36 | 035-payment-idempotency | 🟠 | Entire Postgres production DB path is unexercised by tests — deferred to the migration/3-env phase (was 035 DB-1) | `data-stack/migrations` |
+| D39 | 035-payment-idempotency | 🟡 | Global single-column idempotency-key uniqueness = cross-tenant existence oracle + key-squatting; durable fix needs a per-tenant composite index (migration) (was 035 SEC-1) | `Orders/idempotency` |
+| D40 | 035-payment-idempotency | 🟡 | EuPlatesc recovery-replay regenerates a different redirect URL (no gateway idempotency key); row-lock fix needs the Postgres arm (was 035 BUG-2) | `Controllers/payments` |
+| D20 | 035-payment-idempotency | 🟡 | Model snapshot is SQLite-flavored — next Npgsql migration scaffolds a phantom diff (was 035 DB-2) | `data-stack/migrations` |
 | D90 | 015-sameday-shipping | 🟡 | `ISamedayAuthenticator` singleton captures the transient typed `ISamedayClient` → handler never rotated (pre-existing, carried into the new extension) | `sameday/shipping` |
 | D91 | 015-sameday-shipping | ⚪ | `ISamedayClient` doc still claims NotImplementedException "until bolt 037" — stale twin of the claim stripped from `SamedayClient.cs` | `sameday/shipping` |
 | D92 | 015-sameday-shipping | ⚪ | `AwbNumber` (varchar(100)) is the unclamped sibling of D60's clamp on the same post-bill persist | `sameday/shipping` |
