@@ -31,7 +31,7 @@ trigger types rather than a real secret. A check that is always red teaches ever
 🟡 `src/PhotoPrint.Tests/Unit/Services/EmailRetryJobTests.cs` —
 `Processing_SuccessfulSend_MarksEmailAsSent` fails intermittently under parallel load and passes
 in isolation. Noticed during the 044-045-observability v3 fix round
-([resolution](044-045-observability/resolution-v3.md)) as unexplained collateral in a mutation run.
+([resolution](archive/044-045-observability/resolution-v3.md)) as unexplained collateral in a mutation run.
 
 **Evidence, both measured 2026-08-05 at `cd99cdb`:** in a 1139-test scoped run it failed after
 3 s; re-run alone (`--filter FullyQualifiedName~EmailRetryJobTests`) it passed 4/4 in 1 s. It was
@@ -42,7 +42,7 @@ thing that gets blamed on whatever change is in flight when it fires.
 ## auth / rate limiting — no loop opened
 
 Found incidentally during the 044-045-observability v1 fix round
-([resolution](044-045-observability/resolution-v1.md)): that review's D1 was "the
+([resolution](archive/044-045-observability/resolution-v1.md)): that review's D1 was "the
 `/metrics` allow-list trusts the TCP peer address, which behind the Caddy edge is the
 proxy for every caller", and the fixer noticed the same defect class in the rate limiters
 and the security-audit log. The loop driver verified the first two rows by reading the

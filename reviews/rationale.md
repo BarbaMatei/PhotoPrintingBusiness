@@ -166,7 +166,7 @@ still open at close, since no target has ever produced a zero-serious full pass 
 must not read as "saturated".
 
 First frozen-commit overlap measurement
-([overlap-pair-v7.md](043-cloud-storage-provider/overlap-pair-v7.md), labeled 2026-07-27): the
+([overlap-pair-v7.md], labeled 2026-07-27): the
 v7 passes shared only 4 of 34 new findings (12%); 2 of 12 serious. Pass A alone would have
 missed the D49 High. Chapman estimate: ~19 serious findable, 12 found ⇒ ~7 still hidden — a
 lower bound, since shared-model blind spots inflate agreement. This settled the policy (owner
