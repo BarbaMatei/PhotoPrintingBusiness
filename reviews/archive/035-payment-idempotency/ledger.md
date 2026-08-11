@@ -2,7 +2,7 @@
 type: review-ledger
 target: 035-payment-idempotency
 updated: 2026-08-11
-closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v10 2026-07-27; no certification pass ran)
+closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v10 2026-07-04; no certification pass ran)
 ---
 
 # Ledger — 035-payment-idempotency
