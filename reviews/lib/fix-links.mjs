@@ -4,7 +4,7 @@
 //   apply: rewrite path fragments after a move (edit MOVES, run with --apply).
 // Moving a file = git mv + update lib/paths.mjs + MOVES here + run --apply, then check.
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, relative, sep } from 'node:path'
 import { REVIEWS, REPO } from './paths.mjs'
 
 const MOVES = {
@@ -43,10 +43,30 @@ if (process.argv.includes('--apply')) {
     const before = txt
     for (const [oldF, newF] of Object.entries(MOVES)) {
       txt = txt.split('reviews/' + oldF).join('reviews/' + newF)
-      if (dirname(p) === REVIEWS || p.endsWith('README.md') && dirname(p) === REVIEWS) {
+      if (dirname(p) === REVIEWS) {
         txt = txt.replace(new RegExp('\\]\\((?:\\./)?' + oldF.replace('.', '\\.') + '(#[^)]*)?\\)', 'g'), '](' + newF + '$1)')
       }
     }
+    if (txt !== before) { writeFileSync(p, txt); hits++ }
+  }
+  // A moved file's own relative links still point from its OLD directory: re-resolve each
+  // against the old location and re-relativize from the new one.
+  for (const [oldF, newF] of Object.entries(MOVES)) {
+    const p = join(REVIEWS, newF)
+    if (!existsSync(p) || !newF.endsWith('.md')) continue
+    const oldDir = dirname(join(REVIEWS, oldF)), newDir = dirname(p)
+    if (oldDir === newDir) continue
+    let txt = readFileSync(p, 'utf8')
+    const before = txt
+    txt = txt.replace(/\]\(([^)\s]+)\)/g, (whole, t) => {
+      if (/^https?:|^#|^mailto:/.test(t)) return whole
+      const [path, ...anch] = t.split('#')
+      const anchor = anch.length ? '#' + anch.join('#') : ''
+      if (existsSync(join(newDir, path))) return whole
+      const abs = join(oldDir, path)
+      if (!existsSync(abs)) return whole
+      return '](' + relative(newDir, abs).split(sep).join('/') + anchor + ')'
+    })
     if (txt !== before) { writeFileSync(p, txt); hits++ }
   }
   console.log(`apply: ${hits} files rewritten`)
