@@ -102,6 +102,7 @@ if (rest[0] === 'state') {
       for (const r of list) {
         const [, date, tgt, passCell, , counts, description] = r.cells
         const where = `pass row "${date} ${tgt} ${passCell}"`
+        if (r.cells.length !== 7 && r.cells.length !== 9) bad(f, `${where}: ${Math.max(r.cells.length - 2, 0)} cells — a pass row has 5, or 7 when Outcome and Files apply (doc-contracts.md)`)
         if (!/^\d+\/\d+\/\d+\/\d+/.test((counts ?? '').trim())) bad(f, `${where}: New H/M/L/C cell is "${counts ?? ''}" — must open with <h>/<m>/<l>/<c>`)
         if (!/system/i.test(tgt ?? '') && !keys.has((tgt ?? '').trim())) bad(f, `${where}: target "${tgt}" is not a target folder key (${[...keys].filter(k => /^\d/.test(k)).sort().join(' · ')}); only meta rows are exempt`)
         const w = description ? words(description) : 0

@@ -78,6 +78,7 @@ const firstLine = out => out.split('\n')[0]
     'New H/M/L/C cell is "0/0/0"',
     'target "999" is not a target folder key',
     'description is 56 words — cap is 50',
+    '6 cells — a pass row has 5, or 7 when Outcome and Files apply',
   ]
   for (const e of expected) check(`doc-gate state reports: ${e}`, r.out.includes(e), 'not in the gate output')
 }
