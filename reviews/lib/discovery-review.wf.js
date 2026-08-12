@@ -123,7 +123,9 @@ DISCOVERY SCOPE — ${EXPLORE}${DELTA_NOTE}
 CHANGED FILES:
 ${CHANGED}
 
-BLINDING (critical): do NOT read anything under the "reviews/" directory. This is an unbiased blinded pass.
+BLINDING (critical): do NOT read anything under the "reviews/" directory, and do NOT run any git
+history command (git log, git show, git blame, git reflog) or read commit messages — commits carry
+finding ids. This is an unbiased blinded pass.
 
 PROJECT CONTEXT: ${HINTS}
 
