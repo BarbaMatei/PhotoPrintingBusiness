@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// Records renderer — turns a fix round's worklog + resolution frontmatter into the mechanical
-// records, per metrics-schema.md v3: the resolution body's findings table (between
-// <!-- rendered:findings-table:start/end --> markers), the round's fix-round metrics line
-// (runtime split computed from worklog events), and a suggested index.md status cell (printed,
-// never applied — index prose stays a human's). Judgment prose is never touched.
+// Records renderer — turns a fix round's worklog + hand-written resolution into the round's
+// fix-round metrics line (runtime split computed from worklog events, tallies read from the
+// resolution's Findings table) plus a printed index-row suggestion the fixer pastes by hand.
+// It writes only metrics.jsonl; every prose file stays a human's.
 //
 // Usage: node reviews/lib/render-records.mjs <target> [--round <n>] [--dry-run] [--root <repoRoot>]
 // Exit 0 = rendered (or dry-run) · 1 = cannot render (missing records, duplicate line, bad worklog).
@@ -58,23 +57,9 @@ const resStatus = /^status:\s*(\S+)/m.exec(fm)?.[1] ?? 'open'
 const fixedCommitRaw = /^fixed_commit:\s*(\S+)/m.exec(fm)?.[1] ?? 'null'
 const fixedCommit = fixedCommitRaw === 'null' ? null : fixedCommitRaw.replace(/"/g, '')
 
-const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', disputed: 'disputed', 'false-positive': 'false_positive' }
+const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', backlog: 'deferred', disputed: 'disputed', 'false-positive': 'false_positive' }
 const tallies = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
 for (const { status } of findings.values()) tallies[TALLY[status] ?? 'open']++
-
-// ---------- severities + titles: ledger table (D# keys); findings-v fallback for old rounds (F# keys) ----------
-const sevTitle = new Map()
-const lPath = join(dir, 'ledger.md')
-if (existsSync(lPath)) {
-  for (const m of readFileSync(lPath, 'utf8').matchAll(/^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|]*\|\s*([^|]+?)\s*\|/gm))
-    sevTitle.set(m[1], { sev: m[2], title: m[3].trim() })
-}
-const fPath = join(dir, `findings-v${round}.md`)
-if (existsSync(fPath)) {
-  for (const m of readFileSync(fPath, 'utf8').matchAll(/^## (🔴|🟠|🟡|⚪) ([A-Za-z]+-?\d+)(?:\s*\/\s*D\d+)? — (.+)$/gm))
-    sevTitle.set(m[2], { sev: m[1], title: m[3].trim() })
-}
-if (!sevTitle.size) note('no ledger.md table rows and no findings-v file — table gets no severity/title columns')
 
 // ---------- worklog slice for this round ----------
 const wlPath = join(dir, 'worklog.jsonl')
@@ -91,7 +76,7 @@ if (endIdx === -1) note('no round-end yet — treating the last event as the cur
 const ts = e => Date.parse(e.t)
 for (const e of slice) if (!Number.isFinite(ts(e))) fail(`worklog event with unparseable timestamp: ${JSON.stringify(e)}`)
 
-// ---------- runtime: blocked (gates) / active (gaps <= 15 min) / idle ----------
+// ---------- runtime: blocked (gates) / active (gaps <= 30 min) / idle ----------
 const CAP_S = 30 * 60 // schema v3: gaps above this with no open gate = nobody at the wheel
 const blocked = []
 let open = null
@@ -141,20 +126,6 @@ const line = {
   notes: resStatus === 'resolved' ? '' : `resolution status: ${resStatus}`,
 }
 
-// ---------- findings table between markers ----------
-const START = '<!-- rendered:findings-table:start -->', END = '<!-- rendered:findings-table:end -->'
-let newResText = null
-if (resText.includes(START) && resText.includes(END)) {
-  const rows = [...findings.entries()].map(([id, f]) => {
-    const st = sevTitle.get(id) ?? { sev: '', title: '' }
-    const how = f.note ? (f.note.length > 110 ? f.note.slice(0, 107).trimEnd() + '…' : f.note) : '—'
-    const commit = f.commit ? '`' + f.commit + '`' : '—'
-    return `| ${id} | ${st.sev} | ${st.title} | ${f.status} | ${commit} | ${how} |`
-  })
-  const table = ['| ID | Sev | Title | Status | Commit | How |', '|---|---|---|---|---|---|', ...rows].join('\n')
-  newResText = resText.slice(0, resText.indexOf(START) + START.length) + '\n' + table + '\n' + resText.slice(resText.indexOf(END))
-} else note('resolution has no rendered:findings-table markers — table skipped (pre-v2 round or hand-kept table)')
-
 // ---------- duplicate guard + write ----------
 const metricsPath = join(dir, 'metrics.jsonl')
 const already = existsSync(metricsPath) && readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim()).some(l => {
@@ -165,7 +136,6 @@ console.log(JSON.stringify(line, null, 2))
 console.log(`\nindex.md status suggestion for "${target}": fix round v${round} ${resStatus} — ${tallies.fixed} fixed / ${tallies.open} open, active ${(activeS / 60).toFixed(0)} min, blocked ${(blockedS / 60).toFixed(0)} min`)
 if (DRY) { note('dry-run: nothing written'); process.exit(0) }
 if (already) fail(`metrics.jsonl already has a fix-round line for round ${round} — append a correction line instead (schema: Corrections)`)
-if (newResText) writeFileSync(resPath, newResText)
 const prev = existsSync(metricsPath) ? readFileSync(metricsPath, 'utf8') : ''
 appendFileSync(metricsPath, (prev && !prev.endsWith('\n') ? '\n' : '') + JSON.stringify(line) + '\n')
-note(`appended fix-round line for round ${round}${newResText ? ' and refreshed the findings table' : ''} — now run: node reviews/lib/records-auditor.mjs ${target}`)
+note(`appended fix-round line for round ${round} — now run: node reviews/lib/records-auditor.mjs ${target}`)
