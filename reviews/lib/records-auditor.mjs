@@ -266,10 +266,11 @@ function auditTarget(t) {
         const tally = { high: 0, medium: 0, low: 0, cleanup: 0 }
         o.findings.forEach((f, i) => {
           const fat = `${at} findings[${i}]`
-          if (!/^(PPW-\d+)$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>"`)
+          if (!/^(PPW-\d+|D\d+)$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>" (pre-2026-08-11 lines carry "D<n>")`)
           if (typeof f.new !== 'boolean') err(`${fat}: new must be boolean`)
           if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
-          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^PPW-\d+$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null`)
+          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^(PPW-\d+|D\d+)$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null (pre-2026-08-11: D<n>)`)
+          if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
           for (const k of Object.keys(f)) if (!['d', 'new', 'sev', 'fix_generated', 'sev_delta'].includes(k)) err(`${fat}: unknown key "${k}" on a verification entry`)
           if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
         })

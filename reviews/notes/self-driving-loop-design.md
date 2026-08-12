@@ -296,17 +296,11 @@ end state needs all three, and the second and third are the point of the word
   the schema's promised questions are still uncomputed.
 - The router's cost table is hardcoded from 2026-07-30 roll-ups; 044-045's verification
   actuals (175k–772k) already exceed its 60–250k estimate.
-- The index's system-target row still says recommendations 1–7 await decision;
-  [the resolution](../system/review-v1/resolution-v1.md) shows 13 of 14 standing findings
-  fixed by 2026-07-31, one deferred (SF14).
-- Stale prose in two spots: the metrics schema still says the auditor's `d` check "must be
-  widened" (the auditor already accepts both id shapes), and the gate script's header
-  comment still names the Haiku judge.
 - Fix-round `cost.tokens` is null on every recorded round — the second-biggest spend has a
   runtime record but no token record.
-- The [test-quality audit](../system/test-quality-v1.md) (309 findings, 4 confirmed 🔴)
-  lives outside every contract; the system target's folder has no artifact rules and that
-  file is not yet committed.
+- The [test-quality audit](../system/test-quality-v1.md) (309 findings, 4 confirmed 🔴) is
+  committed since 2026-08-12 but its findings are still unprocessed by any loop; the system
+  target now keeps a lightweight ledger + metrics line per meta-pass (v2 fix round).
 - Retrofit residue: retrofitted summaries still say "D#" in prose while their ids were
   re-keyed to `PPW-<n>`.
 

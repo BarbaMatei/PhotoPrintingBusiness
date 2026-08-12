@@ -262,7 +262,7 @@ const findingCtx = (f) => `A code-review finding to adversarially check. Repo ro
 FINDING — ${f.title}
   file: ${f.file}:${f.line ?? '?'}  severity: ${f.severity}  (independently raised by ${f.convergence} lens(es))
   failure scenario: ${f.failureScenario}
-Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/. Keep your answer <= 80 words.`
+Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/, and do NOT run git history commands (git log, git show, git blame) or read commit messages. Keep your answer <= 80 words.`
 
 let guardRuns = 0, traceRuns = 0, reraiseSkips = 0, budgetSkips = 0
 // Serious findings keep the session model; cheaper tiers carry the low-stakes checks.

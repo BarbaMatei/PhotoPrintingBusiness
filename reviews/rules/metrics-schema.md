@@ -68,7 +68,9 @@ node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 One entry per **canonical** finding of a discovery/delta pass, including re-raises and refuted
 candidates (they carry lens-precision information). Written after reconciliation, so `d` is
 known. Sources: the discovery script's output (`agreeingLenses`, `convergence`, `hinted`,
-`verdict`) and the reconciler (`d`, `new`, `fix_generated`).
+`verdict`) and the reconciler (`d`, `new`, `fix_generated`). A **verification** entry carries
+only `d`, `new`, `sev`, `fix_generated`, `sev_delta` — the other keys below are lens-stage
+fields and the auditor rejects them there.
 
 | Key | Type | Meaning |
 |---|---|---|
