@@ -257,6 +257,27 @@ function auditTarget(t) {
       if (o.outcome === 'certified' && strict && !num(o.mediums_open_at_close)) err(`${at}: outcome certified requires mediums_open_at_close (calibration 2026-07-29)`)
     }
 
+    // Verification lines may carry findings[] for fix lineage (schema, SF-era 2026-08-12):
+    // per entry only {d, new, sev, fix_generated, sev_delta} — the lens-stage keys belong
+    // to discovery entries.
+    if (strict && o.type === 'verification' && o.findings !== undefined) {
+      if (!Array.isArray(o.findings)) err(`${at}: findings must be an array`)
+      else {
+        const tally = { high: 0, medium: 0, low: 0, cleanup: 0 }
+        o.findings.forEach((f, i) => {
+          const fat = `${at} findings[${i}]`
+          if (!/^(PPW-\d+)$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>"`)
+          if (typeof f.new !== 'boolean') err(`${fat}: new must be boolean`)
+          if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
+          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^PPW-\d+$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null`)
+          for (const k of Object.keys(f)) if (!['d', 'new', 'sev', 'fix_generated', 'sev_delta'].includes(k)) err(`${fat}: unknown key "${k}" on a verification entry`)
+          if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
+        })
+        if (o.new_findings) for (const s of SEVS) if (num(o.new_findings[s]) && o.new_findings[s] !== tally[s])
+          err(`${at}: new_findings.${s}=${o.new_findings[s]} but findings[] has ${tally[s]} new ${s} entries`)
+      }
+    }
+
     if (strict && (o.type === 'discovery' || o.type === 'delta-discovery')) {
       if (!Array.isArray(o.findings)) err(`${at}: strict ${o.type} line requires findings[]`)
       else {

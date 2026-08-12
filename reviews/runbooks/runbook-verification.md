@@ -33,7 +33,9 @@ feature clean?".
    The pass's record is: ledger status flips (`verified` for held fixes, reopen failures) with
    one History line per row touched, worklog events, the [metrics.jsonl](../rules/metrics-schema.md)
    line and the [index.md](../state/index.md) row (then run
-   `node reviews/lib/records-auditor.mjs <target>` — must exit clean). The verdict — at most
+   `node reviews/lib/records-auditor.mjs <target>` — must exit clean). A verification that
+   names **new** defects reconciles them like any pass and adds a `findings[]` entry per new
+   defect — `{d, new, sev, fix_generated}` — so fix lineage is counted where it surfaces. The verdict — at most
    `approve-with-followups`; a quiet verification means "the fixes held", never "the code is
    clean" — goes in the index row. Report the outcome at the owner gate in chat; any owner
    decision made there is recorded on the ledger row it concerns.

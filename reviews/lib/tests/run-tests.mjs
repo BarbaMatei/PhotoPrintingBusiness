@@ -113,6 +113,8 @@ const firstLine = out => out.split('\n')[0]
 {
   const r = run('records-auditor.mjs', ['--root', GOOD_ROOT])
   check('auditor reports a cross-target duplicate id', r.out.includes('duplicate id PPW-9001'), 'no duplicate-id error in the output')
+  check('auditor accepts a well-formed verification findings[] with lineage', !r.out.includes('908-verification-lineage metrics line 2 findings['), r.out.split('\n').find(l => l.includes('line 2 findings[')) ?? '')
+  check('auditor rejects a malformed verification findings[] entry', r.out.includes('908-verification-lineage metrics line 3 findings[') && r.out.includes('d must be'), 'no shape error for the malformed lineage entry')
 }
 {
   const r = run('render-records.mjs', ['--root', GOOD_ROOT, '901-good-target', '--dry-run'])

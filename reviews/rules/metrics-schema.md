@@ -50,7 +50,7 @@ node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 | `outcome` | `"certified"` \| `"not-certified"` \| absent | certification lines only |
 | `mediums_open_at_close` | int | **required when `outcome: "certified"`** — 🟠 count not `fixed`/`verified` at close (mirrors the index-row rule, calibration 2026-07-29) |
 | `new_findings` | `{high, medium, low, cleanup}` | **new** problems this pass named (info items count as `cleanup`, note it) |
-| `findings` | array | **required on strict discovery/delta lines** — one entry per canonical finding, see below |
+| `findings` | array | **required on strict discovery/delta lines** — one entry per canonical finding, see below. **Optional on verification lines** that name new defects: one entry per new defect, carrying only `{d, new, sev, fix_generated, sev_delta?}` — this is where fix lineage gets counted, since fix-caused defects surface mainly in verifications |
 | `refinds_identity` | int | same problem as an earlier finding (reconciler judgment) |
 | `reraises_of_decided` | int | findings re-raising an accepted wont-fix / deferral / dismissal |
 | `refuted` | int | candidate findings recorded as false positives this pass |
