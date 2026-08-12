@@ -93,10 +93,15 @@ const allLines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.
 const lines = allLines.filter(l => !l.correction_for)
 if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null) }
 const L = lines[lines.length - 1]
-// Corrections are authoritative but not machine-applied here — surface them instead.
-for (const c of allLines.filter(l => l.correction_for && l.correction_for.pass === L.pass)) {
-  const target = Number.isFinite(c.correction_for.pass) ? `pass ${c.correction_for.pass}` : `fix round ${c.correction_for.round}`
-  say(`NOTE: a correction line is on file for ${target} ("${c.correction_for.field}") — read it before acting on this state.`)
+// Corrections are authoritative but not machine-applied here — surface the ones that
+// correct the latest line: round-keyed for a fix-round line, pass-keyed for a pass line.
+for (const c of allLines.filter(l => l.correction_for && (
+  L.type === 'fix-round'
+    ? Number.isFinite(l.correction_for.round) && l.correction_for.round === L.round
+    : Number.isFinite(l.correction_for.pass) && l.correction_for.pass === L.pass
+))) {
+  const which = Number.isFinite(c.correction_for.pass) ? `pass ${c.correction_for.pass}` : `fix round ${c.correction_for.round}`
+  say(`NOTE: a correction line is on file for ${which} ("${c.correction_for.field}") — read it before acting on this state.`)
 }
 
 const resolutions = readdirSync(t.dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
