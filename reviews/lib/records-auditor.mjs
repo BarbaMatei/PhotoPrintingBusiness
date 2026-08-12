@@ -381,6 +381,7 @@ for (const t of listTargets()) auditTarget(t)
     for (const m of readFileSync(lp, 'utf8').matchAll(/^\|\s*(PPW-\d+)\s*\|/gm)) {
       const prev = mintHomes.get(m[1])
       if (prev && prev !== t.name) err(`duplicate id ${m[1]}: ledger rows in both ${prev} and ${t.name} — an id is minted once, globally`)
+      else if (prev) err(`duplicate id ${m[1]}: listed twice in ${t.name}'s ledger — one table row per id`)
       else mintHomes.set(m[1], t.name)
     }
   }

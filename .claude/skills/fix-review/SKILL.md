@@ -206,9 +206,9 @@ After each finding (worklog `finding` event at the same moment), update its entr
   your Findings rows for the tallies and computes the round's runtime + metrics line. You
   hand-write everything: the table, the decisions section, deviations, boundaries.
 
-Status values: `fixed` · `wont-fix` · `deferred` · `disputed` · `false-positive`
-(never `verified`). For anything other than `fixed`, write the rationale in the
-**decisions** section so the re-reviewer can agree or push back.
+Status values: `fixed` · `wont-fix` · `deferred` · `backlog` · `disputed` ·
+`false-positive` (never `verified`). For anything other than `fixed`, write the
+rationale in the **decisions** section so the re-reviewer can agree or push back.
 
 When every finding has a terminal status **and all blockers are addressed**, set the
 top-level `status: resolved`, `fixed_commit:`, and `closed:` date. If you stopped partway,

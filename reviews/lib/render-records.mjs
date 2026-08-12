@@ -6,7 +6,7 @@
 //
 // Usage: node reviews/lib/render-records.mjs <target> [--round <n>] [--dry-run] [--root <repoRoot>]
 // Exit 0 = rendered (or dry-run) · 1 = cannot render (missing records, duplicate line, bad worklog).
-import { readFileSync, writeFileSync, appendFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, appendFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -44,7 +44,7 @@ const findings = new Map() // id -> {status, commit, note}
 const fSection = resText.slice(fmEnd).split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
 for (const r of fSection.split('\n').filter(l => /^\|\s*(?:D\d+|[A-Za-z]+-\d+)\s*\|/.test(l))) {
   const c = r.split('|').map(x => x.trim())
-  findings.set(c[1], { status: c[2], commit: c[3] === '—' ? null : c[3].replace(/`/g, ''), note: c[4] ?? null })
+  findings.set(c[1], { status: c[2] })
 }
 if (!findings.size) for (const m of fm.matchAll(/^ {2}([A-Za-z]+-?\d+(?:–[A-Za-z]*\d+)?):\s*\{\s*status:\s*([a-z-]+)([^\n]*)/gm) ?? []) {
   const restLine = m[3]

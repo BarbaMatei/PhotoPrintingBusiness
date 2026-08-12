@@ -110,7 +110,7 @@ const rStatus = RN ? fm(join(t.dir, `resolution-v${RN}.md`), 'status') : null
 const rCommit = RN ? fm(join(t.dir, `resolution-v${RN}.md`), 'fixed_commit') : null
 
 const serious = L.new_findings ? (L.new_findings.high || 0) + (L.new_findings.medium || 0) : 0
-say(`STATE: latest review v${N} · last pass v${L.pass} ${L.type}${L.subtype ? ` (${L.subtype})` : ''} → ${L.verdict ?? '—'}${L.outcome ? ` · outcome ${L.outcome}` : ''} · new serious ${serious} · reopened ${L.reopened || 0}`)
+say(`STATE: latest review v${N} · last ${L.type === 'fix-round' ? `fix round r${L.round}` : `pass v${L.pass} ${L.type}`}${L.subtype ? ` (${L.subtype})` : ''} → ${L.verdict ?? '—'}${L.outcome ? ` · outcome ${L.outcome}` : ''} · new serious ${serious} · reopened ${L.reopened || 0}`)
 say(`STATE: latest resolution v${RN || '—'}${rStatus ? ` (${rStatus}${rCommit ? ` @${rCommit}` : ''})` : ''}`)
 
 // Certified with NO post-cert fix round pending → close decision belongs to the owner.
