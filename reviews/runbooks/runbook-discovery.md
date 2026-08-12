@@ -1,7 +1,7 @@
 ---
 type: runbook
 for: discovery · delta-discovery · certification passes
-updated: 2026-07-24
+updated: 2026-08-12
 ---
 
 # Discovery runbook (full · delta · certification)

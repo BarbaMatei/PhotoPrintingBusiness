@@ -142,7 +142,8 @@ Audience: the verifier and the ledger's historian. One resolution per **fix
 round**, numbered by the pass that raised its findings; a clean verification
 raises nothing and gets no resolution. It lives until the target closes.
 Frontmatter carries scalars only: `type`, `target`, `version`, `answers`,
-`fixed_commit`, and `status: open | in-progress | resolved`.
+`fixed_commit`, `status: open | in-progress | resolved`, and `closed:` — the
+hand-back date, set when status turns `resolved`.
 The `## Findings` body table (ID · Status · Commit ·
 Note, note ≤ 240 chars) is the machine-read state, keyed by `PPW-<n>`; the body
 also carries the scope table. Rationale that deserves prose goes under

@@ -1,7 +1,7 @@
 ---
 type: runbook
 for: verification passes (after a fix round)
-updated: 2026-07-24
+updated: 2026-08-12
 ---
 
 # Verification runbook

@@ -77,7 +77,7 @@ function listTargets(all = false) {
 function num(v) { return typeof v === 'number' && Number.isFinite(v) }
 function numOrNull(v) { return v === null || num(v) }
 
-// Counts statuses in a resolution file's frontmatter findings map; null if no map found.
+// Counts statuses from a resolution's "## Findings" body table (frontmatter map on old rounds).
 function resolutionTallies(text) {
   const t = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
   const end = text.indexOf('\n---', 3)
@@ -182,9 +182,9 @@ function auditTarget(t) {
         }
         else if (o.findings) {
           const tallies = resolutionTallies(readFileSync(resPath, 'utf8'))
-          if (!tallies) warn(`${at}: resolution-v${o.round}.md frontmatter has no findings map — tally cross-check skipped`)
+          if (!tallies) warn(`${at}: resolution-v${o.round}.md has no Findings rows — tally cross-check skipped`)
           else for (const k of FIX_TALLY_KEYS) if (num(o.findings[k]) && o.findings[k] !== tallies[k])
-            err(`${at}: findings.${k}=${o.findings[k]} but resolution-v${o.round}.md frontmatter counts ${tallies[k]}`)
+            err(`${at}: findings.${k}=${o.findings[k]} but resolution-v${o.round}.md Findings rows count ${tallies[k]}`)
         }
       }
       for (const k of ['base_commit', 'fixed_commit']) {

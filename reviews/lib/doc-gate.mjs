@@ -2,7 +2,7 @@
 // Deterministic half of the round-end doc gate (reviews/rules/doc-contracts.md).
 // Checks whichever of the round's files exist against the templates: frontmatter keys,
 // heading order and wording, size caps, ID rules, ledger append-only (vs git HEAD),
-// cross-file agreement. The Haiku judge covers language; this covers structure.
+// cross-file agreement. The Sonnet judge covers language; this covers structure.
 // Judges only — never edits. Old-shape targets are out of scope (grandfathered).
 //
 // Usage: node reviews/lib/doc-gate.mjs [--root <repoRoot>] <target> <pass>

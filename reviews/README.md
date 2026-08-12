@@ -107,8 +107,9 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
 - A review produces findings; fixing is a separate explicit step, verification a third. Never
   auto-apply fixes mid-review.
 - Every pass appends its [metrics.jsonl](rules/metrics-schema.md) line and its [index.md](state/index.md)
-  row — at synthesis time, unreconstructable later. **Fix rounds append theirs too**
-  (since 2026-08-03) — at hand-back, via `reviews/lib/render-records.mjs`.
+  row — at synthesis time, unreconstructable later. **Fix rounds record too** (since
+  2026-08-03), at hand-back: `reviews/lib/render-records.mjs` appends the metrics line;
+  the fixer hand-writes the index row, adapting the suggestion the renderer prints.
 - A target holding a certification is **under watch** ([track-record.md](state/track-record.md)): a
   later serious finding whose defect existed in the certified code is marked
   `post-cert-escape` and appended there the same day — the reconciler flags it, the

@@ -85,9 +85,8 @@ known. Sources: the discovery script's output (`agreeingLenses`, `convergence`, 
 
 Lines appended before 2026-08-11 carry the old per-target names in `d` and `fix_generated`
 (this file is append-only, so they stay); `reviews/archive/id-map.md` translates them.
-Two things follow from the global ids: the auditor's `d` check still expects the old shape
-and must be widened before the next discovery line is appended, and `f` is now the only
-place a finder's own number is ever recorded.
+The auditor accepts both id shapes on old lines; `f` is now the only place a finder's own
+number is ever recorded.
 
 What this buys, after 2–3 more targets: per-lens yield ("which lenses earn their keep") by
 grouping on `lenses`; the fix-generativity rate (`fix_generated` non-null / `new`) that tells
@@ -116,7 +115,7 @@ a wrong line is corrected by a correction line, never edited):
 | `round` | int | matches `resolution-v<n>.md` (fix rounds have no `pass`) |
 | `base_commit` | string | the reviewed commit the round answers (review frontmatter) |
 | `fixed_commit` | string \| null | the resolution's `fixed_commit` (null while `in-progress`) |
-| `findings` | `{fixed, wont_fix, deferred, disputed, false_positive, open}` | counts from the resolution frontmatter map (`in-progress` counts as `open`) |
+| `findings` | `{fixed, wont_fix, deferred, disputed, false_positive, open}` | counts from the resolution's `## Findings` body table (`in-progress` counts as `open`; `backlog` counts as `deferred`) |
 | `tests` | `{invocations, red_runs, green_runs, final: {passed, failed}}` | from `test-run` events; `final` from the last `kind:final` event, null if none |
 | `approach_checks` | `{pre_cleared_consumed, run, tokens}` | review-time verdicts used vs checks this round ran (`check-*` events); `tokens` null if unreported |
 | `micro_reviews` | `{count, follow_up_fixes}` | per-cluster micro-reviews and the extra fixes they caused |

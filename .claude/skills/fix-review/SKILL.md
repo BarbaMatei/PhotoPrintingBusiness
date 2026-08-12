@@ -225,14 +225,17 @@ leave `status: in-progress` — the worklog means a cancelled round loses nothin
 When the last micro-review is folded in and the final scoped run is green:
 
 1. Append `round-end`, then run `node reviews/lib/render-records.mjs <target>` — it
-   refreshes the rendered table, computes the round's runtime (active / blocked / idle)
-   from the worklog, and appends the round's `fix-round` line to `metrics.jsonl`.
+   computes the round's runtime (active / blocked / idle) from the worklog, reads your
+   Findings rows for the tallies, and appends the round's `fix-round` line to
+   `metrics.jsonl`.
 2. Run `node reviews/lib/records-auditor.mjs <target>` — it must exit clean. Then the doc
    gate on the resolution: `node reviews/lib/doc-gate.mjs <target> <n>` (must exit clean)
    plus the Sonnet judge (Agent, `model: sonnet`; input `reviews/rules/doc-contracts.md` + this
    round's changed `reviews/` files; approve, or disapprove with reasons you then fix).
    Append a `doc-gate` worklog event with the verdict.
-3. Update `reviews/state/index.md`'s Status column for the target (`open → in-progress/resolved`).
+3. Hand-write the round's row in `reviews/state/index.md`'s Passes table — adapt the
+   suggestion line the renderer printed — and refresh the target's State cell if the
+   round changed what it says.
 4. Summarize to the user: which findings are `fixed` / `deferred` / `wont-fix`, the
    commits, the round's runtime split, and that the resolution is `resolved`/`in-progress`.
    Then state plainly that the next step is a **verification pass** against `fixed_commit` —
