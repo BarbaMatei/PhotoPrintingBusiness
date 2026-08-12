@@ -1,0 +1,4 @@
+{"t":"2026-08-12T15:30:01+03:00","ev":"round-start","round":2}
+{"t":"2026-08-12T15:30:01+03:00","ev":"triage-done","clusters":6,"checks_needed":0,"pre_cleared":0,"gates":1}
+{"t":"2026-08-12T15:30:01+03:00","ev":"gate-open","reason":"batched owner decisions for round 2"}
+{"t":"2026-08-12T15:36:29+03:00","ev":"gate-closed","reason":"owner: all as proposed; SF31 wont-fix (stockpile until owner-called sweep)"}
