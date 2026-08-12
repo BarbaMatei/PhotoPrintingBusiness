@@ -105,6 +105,23 @@ const firstLine = out => out.split('\n')[0]
   const r = run('records-auditor.mjs', ['044-045-observability'])
   check('auditor exits 0 on 044-045-observability', r.code === 0, `exit ${r.code}: ${r.out.trim().split('\n').slice(-3).join(' | ')}`)
 }
+{
+  const r = run('records-auditor.mjs', ['043-cloud-storage-provider'])
+  check('auditor finds the track record for a certified target', !r.out.includes('track-record.md is missing'), r.out.split('\n').find(l => l.includes('track-record')) ?? firstLine(r.out))
+}
+{
+  const r = run('records-auditor.mjs', ['--root', GOOD_ROOT])
+  check('auditor reports a cross-target duplicate id', r.out.includes('duplicate id PPW-9001'), 'no duplicate-id error in the output')
+}
+{
+  const r = run('render-records.mjs', ['--root', GOOD_ROOT, '901-good-target', '--dry-run'])
+  check('renderer buckets a backlog row as deferred', r.out.includes('"deferred": 1') && r.out.includes('"open": 0'), r.out.split('\n').filter(l => /"(deferred|open)"/.test(l)).join(' ').trim() || r.out.trim().slice(0, 160))
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '907-correction-target'])
+  check("router surfaces the latest round's correction", r.out.includes('for fix round 1'), r.out.trim())
+  check("router hides other rounds' and pass-keyed corrections behind a fix-round line", !r.out.includes('fix round 99') && !r.out.includes('new_findings'), r.out.trim())
+}
 
 if (failures.length) {
   console.log(`FAIL: ${failures.length} of ${count} assertion(s) failed:\n`)

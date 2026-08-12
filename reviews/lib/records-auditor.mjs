@@ -12,8 +12,9 @@
 // Exit 0 = no errors (warnings allowed) · 1 = errors.
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { join, dirname } from 'node:path'
+import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
 
 const argv = process.argv.slice(2)
 let ROOT = null
@@ -60,7 +61,7 @@ function checkSha(sha) {
 }
 const SHA_RE = /^[0-9a-f]{7,40}$/
 
-function listTargets() {
+function listTargets(all = false) {
   const out = []
   for (const e of readdirSync(REVIEWS, { withFileTypes: true })) {
     if (!e.isDirectory() || ['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'].includes(e.name)) continue
@@ -70,7 +71,7 @@ function listTargets() {
   if (existsSync(arch)) for (const e of readdirSync(arch, { withFileTypes: true })) {
     if (e.isDirectory()) out.push({ name: e.name, dir: join(arch, e.name), archived: true })
   }
-  return only.length ? out.filter(t => only.some(o => t.name.includes(o))) : out
+  return only.length && !all ? out.filter(t => only.some(o => t.name.includes(o))) : out
 }
 
 function num(v) { return typeof v === 'number' && Number.isFinite(v) }
@@ -341,13 +342,36 @@ function auditTarget(t) {
   }
 }
 
-const INDEX = existsSync(join(REVIEWS, 'state', 'index.md')) ? readFileSync(join(REVIEWS, 'state', 'index.md'), 'utf8') : null
+// Path constants come from paths.mjs; rebased onto REVIEWS so --root keeps working.
+const underRoot = p => join(REVIEWS, relative(LIVE_REVIEWS, p))
+const INDEX = existsSync(underRoot(INDEX_FILE)) ? readFileSync(underRoot(INDEX_FILE), 'utf8') : null
 if (!INDEX) warn('reviews/state/index.md not found — index pairing skipped')
-const TRACK = existsSync(join(REVIEWS, 'track-record.md')) ? readFileSync(join(REVIEWS, 'track-record.md'), 'utf8') : null
+const TRACK = existsSync(underRoot(TRACK_RECORD)) ? readFileSync(underRoot(TRACK_RECORD), 'utf8') : null
 
 for (const t of listTargets()) auditTarget(t)
 
-// Citation-leak scan (SF9 tracker): finding-ID / review / ADR references in source COMMENTS.
+// Global id uniqueness: a PPW-<n> has exactly one home ledger, across live + archive,
+// regardless of any target filter — duplicate mints from parallel sessions land here.
+{
+  const mintHomes = new Map()
+  for (const t of listTargets(true)) {
+    const lp = join(t.dir, 'ledger.md')
+    if (!existsSync(lp)) continue
+    for (const m of readFileSync(lp, 'utf8').matchAll(/^\|\s*(PPW-\d+)\s*\|/gm)) {
+      const prev = mintHomes.get(m[1])
+      if (prev && prev !== t.name) err(`duplicate id ${m[1]}: ledger rows in both ${prev} and ${t.name} — an id is minted once, globally`)
+      else mintHomes.set(m[1], t.name)
+    }
+  }
+  const counterPath = underRoot(ID_COUNTER)
+  if (existsSync(counterPath) && mintHomes.size) {
+    const next = Number(readFileSync(counterPath, 'utf8').trim())
+    const maxUsed = Math.max(...[...mintHomes.keys()].map(k => Number(k.slice(4))))
+    if (Number.isFinite(next) && maxUsed >= next) err(`id-counter says the next free id is PPW-${next} but PPW-${maxUsed} is already minted`)
+  }
+}
+
+// Citation-leak scan: finding-ID / review / ADR references in source COMMENTS.
 // v2 scan (2026-07-30): counts comment text only — strings and test names are excluded (test
 // names are the review system's accepted leak channel). Spec-file comments count.
 // `--citations` lists every hit. Uses git grep (tracked files only).
@@ -359,7 +383,7 @@ function commentStart(line) {
   return -1
 }
 if (!only.length || argv.includes('--citations')) {
-  const pat = String.raw`\b(BUG|SEC|OBS|QUAL|REQ|NEW|CLOUD|INPUT|TEST|DOC|DB|FE|INFO|OPS|PERF)-[0-9]+\b|reviews? 0[0-9]{2}-v[0-9]|ADR-0[0-9]{2}|\(D[0-9]{1,3}[,) ]|\(F[0-9]{1,3}[,) ]`
+  const pat = String.raw`\b(BUG|SEC|OBS|QUAL|REQ|NEW|CLOUD|INPUT|TEST|DOC|DB|FE|INFO|OPS|PERF|PPW)-[0-9]+\b|\bSF[0-9]+\b|reviews? 0[0-9]{2}-v[0-9]|ADR-0[0-9]{2}|\(D[0-9]{1,3}[,) ]|\(F[0-9]{1,3}[,) ]`
   try {
     let rows = []
     try { rows = git(`grep -P -n "${pat}" -- "src/**/*.cs" "src/**/*.ts"`).split(/\r?\n/) } catch { /* exit 1 = no matches */ }
