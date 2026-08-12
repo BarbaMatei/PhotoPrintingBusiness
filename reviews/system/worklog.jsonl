@@ -29,3 +29,4 @@
 {"t":"2026-08-12T16:03:21+03:00","ev":"round-end","round":2}
 {"t":"2026-08-12T16:03:22+03:00","ev":"test-run","kind":"final","filter":"lib/tests/run-tests.mjs","passed":44,"failed":0,"duration_s":0}
 {"t":"2026-08-12T16:04:30+03:00","ev":"doc-gate","verdict":"state clean; per-target gate + judge out of scope for the uncontracted system target"}
+{"t":"2026-08-12T17:00:01+03:00","ev":"pass-records-done","pass":3,"type":"verification","note":"hand-driven pass, no loop-driver launch stamp; ledger flips + metrics line + index row written, auditor and state gate clean"}
