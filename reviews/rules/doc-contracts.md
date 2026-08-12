@@ -13,7 +13,9 @@ explains; it never edits. `doc-gate.mjs <target> <pass>` lints a round's files,
 `doc-gate.mjs state` the two cross-target files, and `lib/tests/run-tests.mjs` lints
 the gate itself against fixtures. Scope: every per-target artifact, plus the cross-target
 `index.md` and `backlog.md`. `reviews/system/` and `track-record.md` have no contract
-here. Archived targets are being
+here — but the system target keeps its own lightweight records: `SF<n>` ids (outside
+the `PPW-<n>` sequence), a ledger-style status registry, a worklog, and a metrics
+line per meta-pass, grouped per pass under `reviews/system/review-v<n>/`. Archived targets are being
 retrofitted to this shape by owner order (2026-08-10, newest to oldest; the owner
 explicitly lifted review-file immutability for the retrofit — originals live in git
 history).
@@ -121,6 +123,8 @@ Allowed system terms. Anything else must be everyday English.
 - **micro-review** — the anchored per-cluster diff review a fix round dispatches on its own work.
 - **reconciliation** — after the blinded pass, matching its finds to ledger rows and
   minting a `PPW-<n>` for each one that is new.
+- **class sidecar** — `reviews/state/defect-classes.jsonl`, one line per classified
+  ledger row, written by the prevention-sweep backfill, read by the ledger miner.
 
 ## Per-file contracts
 
@@ -240,7 +244,8 @@ how, the headline residue by `PPW-<n>`, and what re-arms the loop — and never
 narrates pass by pass. `Passes` holds one row per pass, newest first; its
 description cell is at most 2 sentences and 50 words: what the pass proved or
 found, the worst finding by `PPW-<n>`, anything that re-armed the loop, plus the
-surviving links. Pass rows are append-only — a row is never rewritten once its
+surviving links. A pass row carries 5 cells, or 7 when the Outcome and Files
+cells apply — those two appear together or not at all. Pass rows are append-only — a row is never rewritten once its
 pass closes, and the 2026-08-11 compression is the one owner-ordered exception.
 Full-strength language rules, as for a summary. Ids are `PPW-<n>`, except the
 `system` target's rows, which carry the `SF<n>` of `system/review-v1/review-v1.md`.
