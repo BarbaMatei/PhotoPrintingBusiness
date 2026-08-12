@@ -175,7 +175,7 @@ Count agents/tokens into the pass metrics under `cost.agents_by_stage.approach_c
 - Blinding unaffected: pre-checks run post-lens at synthesis, see only this pass's own
   findings and the code — the same posture as skeptics. Nothing under `reviews/` enters.
 
-## 6 · Speed — scorecard dimension 11 (`reviews/system/scorecard.md`, new file)
+## 6 · Speed — scorecard dimension 11 (`reviews/system/review-v1/scorecard.md`, new file)
 
 The canonical 11-dimension rubric for all future re-grades: dimensions 1–10 copied verbatim
 from system review v1 with their locked grades (2026-07-29, evidence: that review file);
@@ -226,7 +226,7 @@ delegates to `/fix-review`, which owns its own events.
 | `reviews/lib/discovery-review.wf.js` | `TRACE_SCHEMA` + trace prompt: `filesTouched`, `testShape` |
 | `reviews/runbook-discovery.md` | Synthesis: persist fix briefs; dispatch + record pre-checks |
 | `reviews/README.md` | Conventions: worklog file; metrics note now covers fix rounds |
-| `reviews/system/scorecard.md` | New: 11-dimension rubric + grades table (baseline column) |
+| `reviews/system/review-v1/scorecard.md` | New: 11-dimension rubric + grades table (baseline column) |
 
 Note: `fix-review` and `loop-driver` SKILL.md carry uncommitted working-tree edits from the
 in-flight 044-045 round — implementation rebases on whatever that session lands.

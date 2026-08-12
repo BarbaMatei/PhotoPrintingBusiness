@@ -43,7 +43,7 @@ two independent agents attack my conclusions before you saw them. **14 findings 
 - I graded and reviewed my own review process's records — same-author risk. Mitigation:
   the two checkers were independent and did change the result (2 kills, 2 corrections,
   3 additions), but all three of us are the same model ([the system's own weakest
-  assumption](../notes/self-driving-loop-design.md)).
+  assumption](../../notes/self-driving-loop-design.md)).
 - The roll-up numbers count **pass tokens only** — fix rounds and synthesis were never
   metered ([SF7](review-v1.md#-tail)), so true per-feature cost is higher than the table.
 - Two of my findings did not survive the defense; others may be softer than they read.

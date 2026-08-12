@@ -28,7 +28,7 @@ findings:
 # Resolution v1 — review-system
 
 Owner decisions this round (2026-07-29): **R1, R2, R4 approved and applied. R3 not approved** —
-the seeded-run-2 trust gate in [self-driving-loop-design.md](../notes/self-driving-loop-design.md)
+the seeded-run-2 trust gate in [self-driving-loop-design.md](../../notes/self-driving-loop-design.md)
 stays as written even though practice has run ahead of it; the owner prefers the violated rule
 visible over a re-scoped one. Seeded run 2 itself: deferred ("not now"). Evidence preservation:
 tags chosen over branch re-push (remote branches were deleted deliberately post-merge).

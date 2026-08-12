@@ -8,16 +8,10 @@ import { join, dirname } from 'node:path'
 import { REVIEWS, REPO } from './paths.mjs'
 
 const MOVES = {
-  'backlog.md': 'state/backlog.md',
-  'index.md': 'state/index.md',
-  'track-record.md': 'state/track-record.md',
-  'id-counter': 'state/id-counter',
-  'doc-contracts.md': 'rules/doc-contracts.md',
-  'metrics-schema.md': 'rules/metrics-schema.md',
-  'runbook-discovery.md': 'runbooks/runbook-discovery.md',
-  'runbook-verification.md': 'runbooks/runbook-verification.md',
-  'rationale.md': 'notes/rationale.md',
-  'self-driving-loop-design.md': 'notes/self-driving-loop-design.md',
+  'system/review-v1.md': 'system/review-v1/review-v1.md',
+  'system/resolution-v1.md': 'system/review-v1/resolution-v1.md',
+  'system/summary-v1.md': 'system/review-v1/summary-v1.md',
+  'system/scorecard.md': 'system/review-v1/scorecard.md',
 }
 
 const mdFiles = []

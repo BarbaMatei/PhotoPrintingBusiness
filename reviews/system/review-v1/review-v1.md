@@ -12,7 +12,7 @@ checked-by: 2 independent agents (records verifier · steelman), verdicts folded
 
 # System review v1 — the review system itself
 
-The target is the multi-lens review loop: [README.md](../README.md), the runbooks, the
+The target is the multi-lens review loop: [README.md](../../README.md), the runbooks, the
 discovery script, the three skills, and every record it produced (035, 042, 043, 015).
 Method: full read of the system docs and records, hand-computed cross-target roll-ups,
 then two independent checker agents — one re-verified every factual claim and number, one
@@ -65,10 +65,10 @@ mean "breaks the system's core promise (trustworthy autonomous closure)".
 
 Both certification pairs ever run ended `request-changes` (015-v3, 043-v7). Both eventual
 closures used escape hatches: 043-v9 via the written single-pass deviation (preconditions
-genuinely met — [rationale.md](../notes/rationale.md) certification section); 015 via owner
+genuinely met — [rationale.md](../../notes/rationale.md) certification section); 015 via owner
 sign-off with **no post-fix blinded pass at all**, on a full-loop-tier target where the
-sign-off clause was written for lower tiers ([index.md](../state/index.md) targets table;
-[015 ledger closure section](../archive/015-sameday-shipping/ledger.md)). Every deviation is
+sign-off clause was written for lower tiers ([index.md](../../state/index.md) targets table;
+[015 ledger closure section](../../archive/015-sameday-shipping/ledger.md)). Every deviation is
 honestly recorded — that is the system's real strength — but the standard path
 (pair → quiet → certified) has completed **zero** times, so its cost/benefit is still a
 hypothesis. Fix: a calibration ruling (per the rule-budget rule, replace — don't stack):
@@ -90,7 +90,7 @@ recalibration removed.
 
 ### SF14 🟠 — certified under an untested stop rule *(checker-added)*
 
-[self-driving-loop-design.md](../notes/self-driving-loop-design.md) names seeded-bug run 2 "the
+[self-driving-loop-design.md](../../notes/self-driving-loop-design.md) names seeded-bug run 2 "the
 single most important experiment", build-order **#1**, gated "**before trusting any stop
 rule**" — queued since 2026-07-04. 043 and 015 were both certified/closed under that
 stop rule anyway, and run 1 explicitly could not test the load-bearing assumption
@@ -124,7 +124,7 @@ cited SHA resolves from a pushed ref. One push demotes this finding to 🟡.
 
 ### SF3 🟡 — stale HINTS in the discovery script
 
-[discovery-review.wf.js](../lib/discovery-review.wf.js) lines 108–110 tell every lens
+[discovery-review.wf.js](../../lib/discovery-review.wf.js) lines 108–110 tell every lens
 "Storage is behind IStorageService (local today; a cloud provider is a planned
 follow-up)"; the dedup prompt's hinted-topic list repeats it. Bolt 043 shipped and
 certified two-tier cloud storage on 2026-07-22. Mitigations exist (CLAUDE.md outranks the
@@ -170,7 +170,7 @@ lens-visible file set for citation patterns).
 
 ### SF15 🟡 — the independence rule bent exactly at closure pressure *(checker-added)*
 
-"You must not be the fixer" ([runbook-verification.md](../runbooks/runbook-verification.md) step 1)
+"You must not be the fixer" ([runbook-verification.md](../../runbooks/runbook-verification.md) step 1)
 became "Recorded deviation: fixer == verifier" at the 015-v6 fix round — the final round
 before closure. Mitigants: test-only round, revert-proofs are reproducible measurements,
 expiry recorded ("next calibration"). But the pattern — the one hard rule waived the one
@@ -184,8 +184,8 @@ narrow exemption (test-only rounds with predicted-failure-set revert proofs) or 
   scope is by design and the big losses are noted where they happened; label roll-ups
   "pass costs only" or add a coarse per-round line.
 - **SF8** — "3 of 5 re-raises overturned" is quoted as current in
-  [discovery-review.wf.js:277](../lib/discovery-review.wf.js), reconcile-findings
-  SKILL.md, and [README.md](../README.md) ledger bullet. The post-mechanism record is
+  [discovery-review.wf.js:277](../../lib/discovery-review.wf.js), reconcile-findings
+  SKILL.md, and [README.md](../../README.md) ledger bullet. The post-mechanism record is
   54–56 re-raise events with 0 clean overturns — but the populations differ (early:
   contested calls; since: deferred-tail re-finds where uphold is correct), so
   over-anchoring is *unproven, not disproven*. Fix the stale text; optionally have the

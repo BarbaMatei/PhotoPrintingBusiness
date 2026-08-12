@@ -33,7 +33,7 @@ grades table below, every cell carrying evidence; past columns are never edited.
 
 Scope per the protocol below: Speed + the dimensions the 2026-08-03 redesign touched.
 Evidence: the five `fix-round` lines in
-[044-045 metrics.jsonl](../archive/044-045-observability/metrics.jsonl), worklog-backed.
+[044-045 metrics.jsonl](../../archive/044-045-observability/metrics.jsonl), worklog-backed.
 
 - **Speed 2 → 3.** By the written anchor (median of the last two metered rounds):
   rounds 4+5 = 156 active min / 8 serious fixes = **19.5 min/fix** — between the ≤18 and
@@ -78,7 +78,7 @@ two metered fix rounds**; blocked-on-owner share and idle share qualify the grad
   ~35 findings in ~3.5h across 07-28/29).
 - The round's own records name the sinks: approach-checks run serially before each
   mechanism cluster at ~95k/~95k/~154k tokens against a ~20k design
-  ([resolution-v1](../archive/044-045-observability/resolution-v1.md), clusters A/B/C), plus
+  ([resolution-v1](../../archive/044-045-observability/resolution-v1.md), clusters A/B/C), plus
   per-finding red/green test invocations and ~400 lines of hand-written bookkeeping.
 - **No runtime was measured anywhere** — schema v2 metered pass tokens only and fix
   rounds not at all — which alone caps the grade at 2 by the anchor above.

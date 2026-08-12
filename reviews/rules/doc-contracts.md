@@ -242,4 +242,4 @@ found, the worst finding by `PPW-<n>`, anything that re-armed the loop, plus the
 surviving links. Pass rows are append-only — a row is never rewritten once its
 pass closes, and the 2026-08-11 compression is the one owner-ordered exception.
 Full-strength language rules, as for a summary. Ids are `PPW-<n>`, except the
-`system` target's rows, which carry the `SF<n>` of `system/review-v1.md`.
+`system` target's rows, which carry the `SF<n>` of `system/review-v1/review-v1.md`.
