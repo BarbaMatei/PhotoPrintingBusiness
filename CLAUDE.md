@@ -28,6 +28,23 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
   `STORAGE_TEST_*` env vars) · run API: `dotnet run --project src/PhotoPrint.API`
 - UI (from `src/PhotoPrint.UI`): `npm test -- --watch=false` · `npm start` · `npm run build`
 
+## LSP (semantic code lookup — C# and TypeScript)
+
+Language servers attach to every session automatically: `csharp-ls` for `.cs`,
+`typescript-language-server` for `.ts/.tsx/.js/.jsx` (both installed globally). The `LSP`
+tool is deferred — the first time a task touches C# or TS code, load it once via
+ToolSearch (`select:LSP`) and prefer it over Grep for any question about *symbols*:
+
+- where is X defined · who calls/uses X (rename and refactor blast radius)
+- a symbol's type or signature without opening its file (hover)
+- map an unfamiliar file or locate a type by name (document/workspace symbols)
+- compiler/type errors in a file you changed (diagnostics) — cheaper than a build
+
+Grep stays right for strings, config keys, UI text, and cross-language searches. Edit-time
+diagnostics surface automatically when the server is connected — read them before calling
+an edit done. This applies to subagents too: investigator/reviewer agents answering
+"who calls X" load LSP first instead of grepping.
+
 ## Running tests (hard rule — full runs overload this machine)
 
 A full test run saturates this machine and blocks everything else on it. **Never run the
