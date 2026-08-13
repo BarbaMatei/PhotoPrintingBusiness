@@ -2,6 +2,7 @@ using System.Linq;
 using FluentValidation;
 using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Services.Invoicing;
 
 namespace PhotoPrint.API.Validators.Payments;
 
@@ -27,14 +28,14 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
             When(x => x.ShippingAddress != null, () =>
             {
                 AddRecipientRules();
-                // Locker supplies the address; client-sent address text is unused downstream, so
-                // only bound its length to keep the persisted order snapshot small.
+                // The invoice XML always embeds ShippingAddress as the buyer's postal address, regardless of delivery type.
                 RuleFor(x => x.ShippingAddress!.Street).MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.Number).MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.City).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.City).MaximumLength(InvoiceAddressFormatter.CityNameMaxLength).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.County).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.PostalCode).MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
+                AddCombinedStreetNameRule();
             });
         });
 
@@ -49,16 +50,24 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
                 RuleFor(x => x.ShippingAddress!.Street).NotEmpty().MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.Number).NotEmpty().MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(InvoiceAddressFormatter.CityNameMaxLength).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.County).NotEmpty().MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
                 RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty().MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
+                AddCombinedStreetNameRule();
             });
         });
     }
 
+    private void AddCombinedStreetNameRule() =>
+        RuleFor(x => x.ShippingAddress)
+            .Must(a => InvoiceAddressFormatter
+                .FormatStreetName(a!.Street, a.Number, a.Block).Length <= InvoiceAddressFormatter.StreetNameMaxLength)
+            .WithMessage($"Strada, numărul și blocul combinate nu pot depăși {InvoiceAddressFormatter.StreetNameMaxLength} de caractere.")
+            .OverridePropertyName("ShippingAddress.Street");
+
     private void AddRecipientRules()
     {
-        RuleFor(x => x.ShippingAddress!.RecipientName).NotEmpty().MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
+        RuleFor(x => x.ShippingAddress!.RecipientName).NotEmpty().MaximumLength(InvoiceAddressFormatter.PartyNameMaxLength).Must(TextValidation.HasNoXmlInvalidChars);
         RuleFor(x => x.ShippingAddress!.Phone).NotEmpty().MaximumLength(20)
             .Matches(PhoneCharset).WithMessage("Invalid phone number.")
             .Must(HasEnoughDigits).WithMessage("Invalid phone number.");

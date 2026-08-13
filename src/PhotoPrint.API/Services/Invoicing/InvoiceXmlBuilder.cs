@@ -105,24 +105,27 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
     {
         var isGuest = order.UserId is null && order.User is null;
 
-        var buyerName = isGuest
+        var rawBuyerName = isGuest
             ? GuestBuyerName
             : (order.User?.FirstName + " " + order.User?.LastName).Trim() is { Length: > 0 } full
                 ? full
                 : (order.ShippingAddress?.RecipientName ?? GuestBuyerName);
+        var buyerName = InvoiceAddressFormatter.Truncate(rawBuyerName, InvoiceAddressFormatter.PartyNameMaxLength);
 
         var addr = order.ShippingAddress ?? throw new InvalidOperationException(
             "Order is missing ShippingAddress; cannot build invoice.");
+
+        var streetName = InvoiceAddressFormatter.Truncate(
+            InvoiceAddressFormatter.FormatStreetName(addr.Street, addr.Number, addr.Block),
+            InvoiceAddressFormatter.StreetNameMaxLength);
+        var cityName = InvoiceAddressFormatter.Truncate(addr.City, InvoiceAddressFormatter.CityNameMaxLength);
 
         var party = new XElement(Cac + "Party",
             new XElement(Cac + "PartyName",
                 new XElement(Cbc + "Name", buyerName)),
             new XElement(Cac + "PostalAddress",
-                new XElement(Cbc + "StreetName",
-                    string.Join(' ',
-                        new[] { addr.Street, addr.Number, addr.Block }
-                            .Where(s => !string.IsNullOrWhiteSpace(s)))),
-                new XElement(Cbc + "CityName",   addr.City),
+                new XElement(Cbc + "StreetName",  streetName),
+                new XElement(Cbc + "CityName",    cityName),
                 new XElement(Cbc + "PostalZone", addr.PostalCode),
                 new XElement(Cac + "Country",
                     new XElement(Cbc + "IdentificationCode", "RO"))),

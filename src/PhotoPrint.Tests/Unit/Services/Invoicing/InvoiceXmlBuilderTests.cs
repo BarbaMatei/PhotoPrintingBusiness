@@ -261,6 +261,48 @@ public class InvoiceXmlBuilderTests
     }
 
     [Fact]
+    public void Buyer_name_over_the_cius_ro_party_name_limit_is_truncated()
+    {
+        var (order, invoice) = Fixture();
+        order.User!.FirstName = new string('a', 100);
+        order.User!.LastName  = new string('b', 100);   // combined = 201 chars, over the 200-char PartyName limit
+
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        var customer = doc.Root!.Element(Cac + "AccountingCustomerParty")!;
+        var name = customer.Descendants(Cbc + "Name").First().Value;
+        name.Length.Should().Be(200);
+    }
+
+    [Fact]
+    public void Street_number_block_combined_over_the_cius_ro_street_name_limit_is_truncated()
+    {
+        var (order, invoice) = Fixture();
+        order.ShippingAddress!.Street = new string('s', 100);
+        order.ShippingAddress!.Number = "1";
+        order.ShippingAddress!.Block  = new string('b', 60);   // combined = 163 chars, over the 150-char StreetName limit
+
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        var streetName = doc.Root!.Element(Cac + "AccountingCustomerParty")!
+            .Descendants(Cbc + "StreetName").First().Value;
+        streetName.Length.Should().Be(150);
+    }
+
+    [Fact]
+    public void City_over_the_cius_ro_city_name_limit_is_truncated()
+    {
+        var (order, invoice) = Fixture();
+        order.ShippingAddress!.City = new string('c', 60);   // over the 50-char CityName limit
+
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        var cityName = doc.Root!.Element(Cac + "AccountingCustomerParty")!
+            .Descendants(Cbc + "CityName").First().Value;
+        cityName.Length.Should().Be(50);
+    }
+
+    [Fact]
     public void Bytes_are_utf8_without_bom()
     {
         var (order, invoice) = Fixture();

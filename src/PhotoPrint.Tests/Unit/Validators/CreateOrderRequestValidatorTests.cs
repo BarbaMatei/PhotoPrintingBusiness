@@ -294,4 +294,45 @@ public class CreateOrderRequestValidatorTests
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Street");
     }
+
+    [Fact]
+    public void Courier_WithRecipientNameOverTheCiusRoPartyNameLimit_FailsOnRecipientName()
+    {
+        var address = ValidAddress();
+        address.RecipientName = new string('x', 201);   // legal e-Factura PartyName limit is 200
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.RecipientName");
+    }
+
+    [Fact]
+    public void Courier_WithCityOverTheCiusRoCityNameLimit_FailsOnCity()
+    {
+        var address = ValidAddress();
+        address.City = new string('x', 51);   // legal e-Factura CityName limit is 50
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.City");
+    }
+
+    [Fact]
+    public void Courier_WithStreetNumberBlockCombinedOverTheCiusRoStreetNameLimit_FailsOnStreet()
+    {
+        var address = ValidAddress();
+        address.Street = new string('a', 100);   // passes alone (<=255)
+        address.Number = "1";                    // passes alone (<=50)
+        address.Block = new string('b', 60);      // passes alone (<=100); combined = 163 > 150
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Street");
+    }
 }
