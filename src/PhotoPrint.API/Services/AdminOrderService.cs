@@ -11,6 +11,7 @@ using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
+using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
@@ -27,6 +28,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly ArchiveSettings _archiveSettings;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly IAwbCreationNotifier _awbNotifier;
+    private readonly IInvoiceCreationService _invoiceCreator;
     private readonly ILogger<AdminOrderService> _logger;
 
     public AdminOrderService(
@@ -39,6 +41,7 @@ public class AdminOrderService : IAdminOrderService
         IOptions<ArchiveSettings> archiveSettings,
         IHubContext<AdminOrderHub> hub,
         IAwbCreationNotifier awbNotifier,
+        IInvoiceCreationService invoiceCreator,
         ILogger<AdminOrderService> logger)
     {
         _db = db;
@@ -50,6 +53,7 @@ public class AdminOrderService : IAdminOrderService
         _archiveSettings = archiveSettings.Value;
         _hub = hub;
         _awbNotifier = awbNotifier;
+        _invoiceCreator = invoiceCreator;
         _logger = logger;
     }
 
@@ -141,6 +145,7 @@ public class AdminOrderService : IAdminOrderService
             // Offline / manual reconciliation — PaidAt is what the AWB retry sweep
             // keys off, so it must be stamped like the webhook Paid path does.
             order.PaidAt = DateTimeOffset.UtcNow;
+            await _invoiceCreator.CreateForOrderAsync(order.Id, ct);
         }
 
         await _db.SaveChangesAsync(ct);
