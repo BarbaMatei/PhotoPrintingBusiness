@@ -3,10 +3,8 @@ namespace PhotoPrint.API.Configuration;
 /// <summary>
 /// ANAF SPV (e-Factura submission) integration — intent 016, bolt 039.
 ///
-/// When <see cref="Enabled"/> is false the OAuth, HTTP client, and
-/// <c>InvoiceUploadJob</c> are never wired; the system is byte-identical to
-/// the pre-integration baseline. Same two-stage rollout posture as Sameday
-/// (intent 015) and Sentry (intent 020).
+/// When <see cref="Enabled"/> is false only the ANAF wire calls are skipped —
+/// the Invoice row, its XML/PDF build, and the customer download endpoint stay live regardless.
 ///
 /// Secrets (<see cref="ClientSecret"/>, <see cref="CertPath"/>,
 /// <see cref="CertPassword"/>) live in environment variables in production
