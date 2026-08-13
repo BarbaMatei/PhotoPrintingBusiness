@@ -19,8 +19,12 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
 
 public class InvoiceUploadJobTests
 {
-    private static PhotoPrintDbContext CreateDb(SqliteConnection connection) =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>().UseSqlite(connection).Options);
+    private static PhotoPrintDbContext CreateDb(SqliteConnection connection, Action<string>? sqlLog = null)
+    {
+        var builder = new DbContextOptionsBuilder<PhotoPrintDbContext>().UseSqlite(connection);
+        if (sqlLog is not null) builder.LogTo(sqlLog, LogLevel.Information);
+        return new(builder.Options);
+    }
 
     private static SqliteConnection OpenConnection()
     {
@@ -73,7 +77,7 @@ public class InvoiceUploadJobTests
 
     private static Harness Build(
         SqliteConnection connection, bool cloudEnabled,
-        LogCapture? logCapture = null, int claimTtlMinutes = 10)
+        LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -93,7 +97,7 @@ public class InvoiceUploadJobTests
                  .ReturnsAsync(true);
 
         var services = new ServiceCollection();
-        services.AddScoped(_ => CreateDb(connection));
+        services.AddScoped(_ => CreateDb(connection, sqlLog));
         services.AddScoped(_ => xmlBuilder.Object);
         services.AddScoped(_ => pdfRenderer.Object);
         services.AddScoped(_ => router.Object);
@@ -277,5 +281,32 @@ public class InvoiceUploadJobTests
         using var verify = CreateDb(connection);
         var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
         claimedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_XmlAndPdfAlreadyBuilt_SkipsOrderReloadAndProceedsToUpload()
+    {
+        using var connection = OpenConnection();
+        var sqlLines = new List<string>();
+        var h = Build(connection, cloudEnabled: false, sqlLog: sqlLines.Add);
+        var orderId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        using (var seed = CreateDb(connection))
+        {
+            seed.Orders.Add(MakeOrder(orderId));
+            var invoice = MakeInvoice(orderId, xmlPayload: "<Invoice/>");
+            invoice.Id = invoiceId;
+            invoice.PdfStoragePath = "invoices/2026/existing.pdf";
+            seed.Invoices.Add(invoice);
+            seed.SaveChanges();
+        }
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("upload-1", DateTimeOffset.UtcNow));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.AnafClient.Verify(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        sqlLines.Should().NotContain(l => l.Contains("FROM \"Orders\""));
     }
 }

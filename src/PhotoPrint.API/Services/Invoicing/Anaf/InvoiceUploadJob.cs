@@ -137,8 +137,8 @@ public sealed class InvoiceUploadJob : BackgroundService
             return;
         }
 
-        var (invoice, order) = await LoadPairAsync(db, invoiceId, orderId, ct);
-        if (invoice is null || order is null)
+        var invoice = await db.Invoices.FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
+        if (invoice is null)
         {
             _logger.LogWarning(
                 "anaf.upload-job.row-missing invoice_id={InvoiceId} order_id={OrderId}",
@@ -146,12 +146,29 @@ public sealed class InvoiceUploadJob : BackgroundService
             return;
         }
 
+        var needsOrder = string.IsNullOrEmpty(invoice.XmlPayload) || string.IsNullOrEmpty(invoice.PdfStoragePath);
+        Order? order = null;
+        if (needsOrder)
+        {
+            order = await db.Orders
+                .Include(o => o.Items)
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+            if (order is null)
+            {
+                _logger.LogWarning(
+                    "anaf.upload-job.row-missing invoice_id={InvoiceId} order_id={OrderId}",
+                    invoiceId, orderId);
+                return;
+            }
+        }
+
         try
         {
             // Step 1: build XML if not already cached on the row.
             if (string.IsNullOrEmpty(invoice.XmlPayload))
             {
-                var xmlBytes = xmlBuilder.Build(order, invoice, sellerOpts.Value);
+                var xmlBytes = xmlBuilder.Build(order!, invoice, sellerOpts.Value);
                 invoice.XmlPayload = Encoding.UTF8.GetString(xmlBytes);
                 invoice.UpdatedAt  = _clock.GetUtcNow();
                 await db.SaveChangesAsync(ct);
@@ -163,7 +180,7 @@ public sealed class InvoiceUploadJob : BackgroundService
             // Step 2: render PDF and store it.
             if (string.IsNullOrEmpty(invoice.PdfStoragePath))
             {
-                var pdfBytes = pdfRenderer.Render(order, invoice, sellerOpts.Value);
+                var pdfBytes = pdfRenderer.Render(order!, invoice, sellerOpts.Value);
                 var key = InvoiceStorageKeys.ForPdf(invoice);
                 using (var ms = new MemoryStream(pdfBytes, writable: false))
                     await storage.SaveAsync(ms, key, ct);
@@ -173,7 +190,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                 _logger.LogInformation(
                     "anaf.upload-job.pdf-rendered invoice_id={InvoiceId} key={Key}",
                     invoiceId, key);
-                await notifier.NotifyAsync(invoice, order, ct);
+                await notifier.NotifyAsync(invoice, order!, ct);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -293,19 +310,6 @@ public sealed class InvoiceUploadJob : BackgroundService
         var sumHours = _settings.BackoffHours.Sum();
         var elapsed  = _clock.GetUtcNow() - invoice.CreatedAt;
         return elapsed.TotalHours > sumHours;
-    }
-
-    private static async Task<(Invoice? invoice, Order? order)> LoadPairAsync(
-        PhotoPrintDbContext db, Guid invoiceId, Guid orderId, CancellationToken ct)
-    {
-        var invoice = await db.Invoices.FirstOrDefaultAsync(i => i.Id == invoiceId, ct);
-        if (invoice is null) return (null, null);
-
-        var order = await db.Orders
-            .Include(o => o.Items)
-            .Include(o => o.User)
-            .FirstOrDefaultAsync(o => o.Id == orderId, ct);
-        return (invoice, order);
     }
 
     private static void IncrementAnafStatusMetric(string statusLabel)
