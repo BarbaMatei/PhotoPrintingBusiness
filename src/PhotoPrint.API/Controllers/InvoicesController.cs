@@ -17,12 +17,12 @@ namespace PhotoPrint.API.Controllers;
 public sealed class InvoicesController : ControllerBase
 {
     private readonly PhotoPrintDbContext _db;
-    private readonly IStorageService _storage;
+    private readonly IStorageRouter _storageRouter;
 
-    public InvoicesController(PhotoPrintDbContext db, IStorageService storage)
+    public InvoicesController(PhotoPrintDbContext db, IStorageRouter storageRouter)
     {
         _db = db;
-        _storage = storage;
+        _storageRouter = storageRouter;
     }
 
     /// <summary>
@@ -62,7 +62,8 @@ public sealed class InvoicesController : ControllerBase
             return NotFound();
         }
 
-        var stream = await _storage.GetStreamAsync(invoice.PdfStoragePath, ct);
+        var store = _storageRouter.CloudEnabled ? _storageRouter.Cloud : _storageRouter.Local;
+        var stream = await store.GetStreamAsync(invoice.PdfStoragePath, ct);
 
         Response.Headers["Cache-Control"] = "private, max-age=31536000, immutable";
         return File(
