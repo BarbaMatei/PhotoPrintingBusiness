@@ -58,6 +58,9 @@ public class Invoice
     public DateTimeOffset CreatedAt  { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
 
+    // Reclaimable per Anaf:ClaimTtlMinutes; guards against two workers processing one row at once.
+    public DateTimeOffset? ClaimedAt { get; set; }
+
     public Order? Order { get; set; }
 }
 

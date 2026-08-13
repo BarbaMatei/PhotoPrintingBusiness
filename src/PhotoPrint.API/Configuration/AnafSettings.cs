@@ -39,4 +39,7 @@ public sealed class AnafSettings
     /// <c>(now - Invoice.CreatedAt)</c> against the cumulative sum;
     /// no persisted counter.</summary>
     public int[] BackoffHours { get; set; } = [1, 4, 16, 64];
+
+    // How long one worker owns a Pending invoice before it's reclaimable — must exceed one full pass, not the poll cadence.
+    public int ClaimTtlMinutes { get; set; } = 10;
 }

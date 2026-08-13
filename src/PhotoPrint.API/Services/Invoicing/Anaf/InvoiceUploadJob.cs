@@ -10,16 +10,7 @@ using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services.Invoicing.Anaf;
 
-/// <summary>
-/// Background worker that drives <see cref="Invoice"/> rows through their
-/// ANAF lifecycle (<c>Pending → Submitted → Accepted | Rejected → Failed</c>).
-/// Pulls work from the DB on a <c>PeriodicTimer</c> every
-/// <c>Anaf:PollIntervalMinutes</c> (default 30) per ADR-023 — no
-/// in-process <c>Channel&lt;T&gt;</c>.
-///
-/// Concurrency: multi-replica safe via ADR-015 (ANAF dedupes on
-/// <c>InvoiceNumber</c>) + ADR-016 (CAS via <c>InvoiceLifecycle</c>).
-/// </summary>
+// Multi-replica safety relies on the per-row ClaimedAt+TTL claim below, plus ANAF's own InvoiceNumber dedupe as a crash-window fallback.
 public sealed class InvoiceUploadJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -130,6 +121,22 @@ public sealed class InvoiceUploadJob : BackgroundService
         var sellerOpts  = sp.GetRequiredService<IOptions<SellerSettings>>();
         var notifier    = sp.GetRequiredService<InvoicePdfReadyNotifier>();
 
+        var claimedAt = _clock.GetUtcNow();
+        var claimTtl = TimeSpan.FromMinutes(Math.Max(1, _settings.ClaimTtlMinutes));
+        var claimed = await db.Invoices
+            .Where(i => i.Id == invoiceId
+                        && i.AnafStatus == InvoiceAnafStatus.Pending
+                        && (i.ClaimedAt == null || i.ClaimedAt < claimedAt - claimTtl))
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.ClaimedAt, (DateTimeOffset?)claimedAt), ct);
+
+        if (claimed == 0)
+        {
+            _logger.LogInformation(
+                "anaf.upload-job.claim-lost invoice_id={InvoiceId} — another worker holds a fresh claim",
+                invoiceId);
+            return;
+        }
+
         var (invoice, order) = await LoadPairAsync(db, invoiceId, orderId, ct);
         if (invoice is null || order is null)
         {
@@ -196,9 +203,23 @@ public sealed class InvoiceUploadJob : BackgroundService
             await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
             _logger.LogWarning(ex,
                 "anaf.upload-job.upload-errors invoice_id={InvoiceId}", invoiceId);
+            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
         }
-        // AnafAuthException / AnafUnreachableException propagate to the
-        // batch loop's catch — the next tick will retry naturally.
+        // AnafAuthException / AnafUnreachableException propagate to the batch loop's catch — ambiguous outcome, so the claim just holds through its TTL.
+    }
+
+    private async Task ReleaseClaimAsync(PhotoPrintDbContext db, Guid invoiceId, DateTimeOffset claimedAt, CancellationToken ct)
+    {
+        try
+        {
+            await db.Invoices
+                .Where(i => i.Id == invoiceId && i.ClaimedAt == claimedAt)
+                .ExecuteUpdateAsync(s => s.SetProperty(i => i.ClaimedAt, (DateTimeOffset?)null), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "anaf.upload-job.claim-release-failed invoice_id={InvoiceId}", invoiceId);
+        }
     }
 
     private async Task PollSubmittedAsync(

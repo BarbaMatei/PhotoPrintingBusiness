@@ -1,5 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,10 +19,17 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
 
 public class InvoiceUploadJobTests
 {
-    private static PhotoPrintDbContext CreateDb(string name) =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseInMemoryDatabase(name)
-            .Options);
+    private static PhotoPrintDbContext CreateDb(SqliteConnection connection) =>
+        new(new DbContextOptionsBuilder<PhotoPrintDbContext>().UseSqlite(connection).Options);
+
+    private static SqliteConnection OpenConnection()
+    {
+        var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        using var db = CreateDb(connection);
+        db.Database.EnsureCreated();
+        return connection;
+    }
 
     private static Order MakeOrder(Guid id) => new()
     {
@@ -62,7 +70,9 @@ public class InvoiceUploadJobTests
         public required Mock<IAnafSpvClient> AnafClient { get; init; }
     }
 
-    private static Harness Build(string dbName, bool cloudEnabled, LogCapture? logCapture = null)
+    private static Harness Build(
+        SqliteConnection connection, bool cloudEnabled,
+        LogCapture? logCapture = null, int claimTtlMinutes = 10)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -82,7 +92,7 @@ public class InvoiceUploadJobTests
                  .ReturnsAsync(true);
 
         var services = new ServiceCollection();
-        services.AddScoped(_ => CreateDb(dbName));
+        services.AddScoped(_ => CreateDb(connection));
         services.AddScoped(_ => xmlBuilder.Object);
         services.AddScoped(_ => pdfRenderer.Object);
         services.AddScoped(_ => router.Object);
@@ -101,7 +111,7 @@ public class InvoiceUploadJobTests
             binder: null,
             args: [
                 sp.GetRequiredService<IServiceScopeFactory>(),
-                Options.Create(new AnafSettings()),
+                Options.Create(new AnafSettings { ClaimTtlMinutes = claimTtlMinutes }),
                 TimeProvider.System,
                 logCapture is null
                     ? sp.GetRequiredService<ILogger<InvoiceUploadJob>>()
@@ -116,24 +126,28 @@ public class InvoiceUploadJobTests
         };
     }
 
+    private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(SqliteConnection connection, InvoiceAnafStatus status = InvoiceAnafStatus.Pending, DateTimeOffset? claimedAt = null)
+    {
+        var orderId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        using var seed = CreateDb(connection);
+        var order = MakeOrder(orderId);
+        seed.Orders.Add(order);
+        var invoice = MakeInvoice(orderId);
+        invoice.Id = invoiceId;
+        invoice.AnafStatus = status;
+        invoice.ClaimedAt = claimedAt;
+        seed.Invoices.Add(invoice);
+        seed.SaveChanges();
+        return (orderId, invoiceId);
+    }
+
     [Fact]
     public async Task UploadPendingAsync_CloudEnabled_SavesPdfToCloudAdapterNotLocal()
     {
-        var dbName = $"InvoiceUpload_{Guid.NewGuid():N}";
-        var h = Build(dbName, cloudEnabled: true);
-        var orderId = Guid.NewGuid();
-        var invoiceId = Guid.NewGuid();
-
-        using (var seed = CreateDb(dbName))
-        {
-            var order = MakeOrder(orderId);
-            order.Id = orderId;
-            seed.Orders.Add(order);
-            var invoice = MakeInvoice(orderId);
-            invoice.Id = invoiceId;
-            seed.Invoices.Add(invoice);
-            await seed.SaveChangesAsync();
-        }
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection);
 
         h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new AnafUploadResult("upload-1", DateTimeOffset.UtcNow));
@@ -147,21 +161,9 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_CloudDisabled_SavesPdfToLocalAdapter()
     {
-        var dbName = $"InvoiceUpload_{Guid.NewGuid():N}";
-        var h = Build(dbName, cloudEnabled: false);
-        var orderId = Guid.NewGuid();
-        var invoiceId = Guid.NewGuid();
-
-        using (var seed = CreateDb(dbName))
-        {
-            var order = MakeOrder(orderId);
-            order.Id = orderId;
-            seed.Orders.Add(order);
-            var invoice = MakeInvoice(orderId);
-            invoice.Id = invoiceId;
-            seed.Invoices.Add(invoice);
-            await seed.SaveChangesAsync();
-        }
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: false);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection);
 
         h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new AnafUploadResult("upload-1", DateTimeOffset.UtcNow));
@@ -174,22 +176,10 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyAndRethrows()
     {
-        var dbName = $"InvoiceUpload_{Guid.NewGuid():N}";
+        using var connection = OpenConnection();
         var logs = new LogCapture();
-        var h = Build(dbName, cloudEnabled: false, logs);
-        var orderId = Guid.NewGuid();
-        var invoiceId = Guid.NewGuid();
-
-        using (var seed = CreateDb(dbName))
-        {
-            var order = MakeOrder(orderId);
-            order.Id = orderId;
-            seed.Orders.Add(order);
-            var invoice = MakeInvoice(orderId);
-            invoice.Id = invoiceId;
-            seed.Invoices.Add(invoice);
-            await seed.SaveChangesAsync();
-        }
+        var h = Build(connection, cloudEnabled: false, logs);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection);
 
         h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(new AnafUploadResult("upload-1", DateTimeOffset.UtcNow));
@@ -204,5 +194,49 @@ public class InvoiceUploadJobTests
                  r.Message.StartsWith("anaf.upload-job.submitted-but-not-recorded", StringComparison.Ordinal) &&
                  r.Message.Contains(invoiceId.ToString()) &&
                  r.Message.Contains("upload-1"));
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_RowAlreadyClaimedWithinTtl_SkipsWithoutCallingAnaf()
+    {
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: false, claimTtlMinutes: 10);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection, claimedAt: DateTimeOffset.UtcNow.AddMinutes(-2));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.AnafClient.Verify(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_ClaimExpired_ProceedsAndReclaims()
+    {
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: false, claimTtlMinutes: 10);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection, claimedAt: DateTimeOffset.UtcNow.AddMinutes(-20));
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("upload-1", DateTimeOffset.UtcNow));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.AnafClient.Verify(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafRejectsWithContentErrors_ReleasesClaimForPromptRetry()
+    {
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: false);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUploadException("bad CIF"));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var verify = CreateDb(connection);
+        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
+        claimedAt.Should().BeNull();
     }
 }
