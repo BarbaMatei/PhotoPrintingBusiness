@@ -35,6 +35,7 @@ public class WebhooksControllerMetricsTests
     private readonly Mock<IHubClients> _hubClients = new();
     private readonly Mock<IClientProxy> _clientProxy = new();
     private readonly LogCapture _logs = new();
+    private readonly string _dbName = $"Webhooks_{Guid.NewGuid():N}";
     private readonly PhotoPrintDbContext _db;
     private readonly WebhooksController _sut;
 
@@ -42,7 +43,7 @@ public class WebhooksControllerMetricsTests
     {
         _db = new PhotoPrintDbContext(
             new DbContextOptionsBuilder<PhotoPrintDbContext>()
-                .UseInMemoryDatabase($"Webhooks_{Guid.NewGuid():N}")
+                .UseInMemoryDatabase(_dbName)
                 .Options);
 
         _hub.Setup(h => h.Clients).Returns(_hubClients.Object);
@@ -55,7 +56,7 @@ public class WebhooksControllerMetricsTests
                  .Returns(ValueTask.CompletedTask);
         _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
-        _invoiceCreator.Setup(i => i.CreateForOrderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        _invoiceCreator.Setup(i => i.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
                        .ReturnsAsync((PhotoPrint.API.Models.Invoice?)null);
 
         _sut = new WebhooksController(
@@ -147,6 +148,9 @@ public class WebhooksControllerMetricsTests
 
     private static MetricCapture Capture() =>
         new(MetricNames.Instruments.PaymentWebhookTotal);
+
+    private PhotoPrintDbContext FreshDb() =>
+        new(new DbContextOptionsBuilder<PhotoPrintDbContext>().UseInMemoryDatabase(_dbName).Options);
 
     // ── EuPlatesc fall-through: the charged-but-unpaid case ───────────────────
 
@@ -328,6 +332,44 @@ public class WebhooksControllerMetricsTests
         _logs.Records.Should().NotContain(r =>
             r.Level == Microsoft.Extensions.Logging.LogLevel.Error,
             "a healthy fulfilled order must not raise a reconciliation alert");
+    }
+
+    // ── Invoice creation on the Paid transition ───────────────────────────────
+
+    [Fact]
+    public async Task Stripe_succeeded_for_an_awaiting_order_invokes_invoice_creation()
+    {
+        var order = SeedOrder(OrderStatus.AwaitingPayment);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_inv", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_inv");
+
+        await _sut.StripeWebhookAsync(default);
+
+        _invoiceCreator.Verify(
+            i => i.CreateForOrderAsync(It.Is<Order>(o => o.Id == order.Id), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Stripe_succeeded_when_invoice_creation_throws_leaves_order_awaiting_payment_in_the_database()
+    {
+        var order = SeedOrder(OrderStatus.AwaitingPayment);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_boom", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        _invoiceCreator.Setup(i => i.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+                       .ThrowsAsync(new InvalidOperationException("numbering service unavailable"));
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_boom");
+
+        var act = () => _sut.StripeWebhookAsync(default);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        using var freshDb = FreshDb();
+        var persisted = await freshDb.Orders.FindAsync(order.Id);
+        persisted!.Status.Should().Be(OrderStatus.AwaitingPayment);
+        persisted.PaidAt.Should().BeNull();
     }
 
     // ── The deliberate exception: routine Stripe event types stay out ─────────
