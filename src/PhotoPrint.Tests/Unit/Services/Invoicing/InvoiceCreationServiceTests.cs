@@ -41,6 +41,19 @@ public class InvoiceCreationServiceTests : IDisposable
             new LoggerFactory().CreateLogger<InvoiceCreationService>());
     }
 
+    private PhotoPrintDbContext CreateSqlLoggingDb(List<string> sqlLog) =>
+        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseSqlite(_connection)
+            .LogTo(sqlLog.Add, LogLevel.Information)
+            .Options);
+
+    private InvoiceCreationService MakeSut(PhotoPrintDbContext db) =>
+        new(db,
+            new SqliteInvoiceNumberingService(db),
+            Options.Create(new VatSettings { InvoiceSeries = "FT", Rate = 0.19m }),
+            new FakeClock(_now),
+            new LoggerFactory().CreateLogger<InvoiceCreationService>());
+
     public void Dispose()
     {
         _db.Dispose();
@@ -121,14 +134,21 @@ public class InvoiceCreationServiceTests : IDisposable
     [Fact]
     public async Task Order_overload_creates_invoice_without_reloading_the_order()
     {
-        var order = await SeedPaidOrderAsync(total: 26.00m);
+        var seeded = await SeedPaidOrderAsync(total: 26.00m);
 
-        var invoice = await _sut.CreateForOrderAsync(order);
-        await _db.SaveChangesAsync();
+        var sql = new List<string>();
+        using var db = CreateSqlLoggingDb(sql);
+        var sut = MakeSut(db);
+        var order = await db.Orders.FirstAsync(o => o.Id == seeded.Id);
+        sql.Clear();   // the caller's own load is not what this asserts about
+
+        var invoice = await sut.CreateForOrderAsync(order);
+        await db.SaveChangesAsync();
 
         invoice.Should().NotBeNull();
-        invoice!.OrderId.Should().Be(order.Id);
+        invoice!.OrderId.Should().Be(seeded.Id);
         invoice.InvoiceNumber.Should().Be("FT-2026-00001");
+        sql.Should().NotContain(l => l.Contains("FROM \"Orders\""));
     }
 
     [Fact]
