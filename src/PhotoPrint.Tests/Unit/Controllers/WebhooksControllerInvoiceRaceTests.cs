@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -14,6 +15,7 @@ using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
+using PhotoPrint.Tests.Helpers;
 using Xunit;
 
 namespace PhotoPrint.Tests.Unit.Controllers;
@@ -52,7 +54,7 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         },
     };
 
-    private static WebhooksController MakeController(PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator)
+    private static WebhooksController MakeController(PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator, LogCapture? logCapture = null)
         => new(
             Mock.Of<IOrderService>(),
             Mock.Of<IStripeSignatureVerifier>(),
@@ -65,13 +67,15 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
             Mock.Of<IHubContext<AdminOrderHub>>(),
             Options.Create(new StripeSettings()),
             Options.Create(new EuPlatescSettings()),
-            NullLogger<WebhooksController>.Instance);
+            logCapture is null
+                ? NullLogger<WebhooksController>.Instance
+                : logCapture.LoggerFor<WebhooksController>());
 
-    private static Task<bool> InvokeSaveAsync(WebhooksController controller, Order order)
+    private static Task<bool> InvokeSaveAsync(WebhooksController controller, Order order, OrderStatus statusBeforeTransition)
     {
         var method = typeof(WebhooksController).GetMethod("SaveOrderPaidWithInvoiceAsync",
             BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Task<bool>)method.Invoke(controller, [order, CancellationToken.None])!;
+        return (Task<bool>)method.Invoke(controller, [order, statusBeforeTransition, CancellationToken.None])!;
     }
 
     private static InvoiceCreationService MakeInvoiceCreator(PhotoPrintDbContext db, IInvoiceNumberingService numbering) =>
@@ -135,7 +139,7 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         var order = await dbLoser.Orders.FirstAsync(o => o.Id == orderId);
         var controller = MakeController(dbLoser, MakeInvoiceCreator(dbLoser, new FixedInvoiceNumbering()));
 
-        var created = await InvokeSaveAsync(controller, order);
+        var created = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
         created.Should().BeFalse();
         using var verify = CreateDb();
@@ -165,13 +169,54 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         var numbering = new SequenceInvoiceNumbering(1, 2);
         var controller = MakeController(db, MakeInvoiceCreator(db, numbering));
 
-        var created = await InvokeSaveAsync(controller, order);
+        var created = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
         created.Should().BeTrue();
         numbering.CallCount.Should().Be(2);
         using var verify = CreateDb();
         var mine = await verify.Invoices.FirstAsync(i => i.OrderId == orderId);
         mine.Number.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task SaveOrderPaidWithInvoiceAsync_InvoiceNumberCollisionExhaustsRetries_LogsManualReconciliationAndReturnsFalse()
+    {
+        var winnerOrderId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        using (var seed = CreateDb())
+        {
+            seed.Orders.Add(MakeOrder(winnerOrderId));
+            seed.Orders.Add(MakeOrder(orderId));
+            await seed.SaveChangesAsync();
+        }
+        using (var winner = CreateDb())
+        {
+            var winnerCreator = MakeInvoiceCreator(winner, new AlwaysSameInvoiceNumbering());
+            await winnerCreator.CreateForOrderAsync(winnerOrderId);
+            await winner.SaveChangesAsync();
+        }
+
+        using var db = CreateDb();
+        var order = await db.Orders.FirstAsync(o => o.Id == orderId);
+        var logs = new LogCapture();
+        var controller = MakeController(db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()), logs);
+
+        var created = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
+
+        created.Should().BeFalse();
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Error &&
+                 r.Message.StartsWith("invoice.creation.number-collision-exhausted", StringComparison.Ordinal) &&
+                 r.Message.Contains(order.Id.ToString()) &&
+                 r.Message.Contains(nameof(OrderStatus.AwaitingPayment)));
+        using var verify = CreateDb();
+        (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
+    }
+
+    private sealed class AlwaysSameInvoiceNumbering : IInvoiceNumberingService
+    {
+        public Task<InvoiceNumber> NextNumberAsync(string series, int year, CancellationToken ct = default)
+            => Task.FromResult(new InvoiceNumber(series, year, 1));
     }
 
     private sealed class FixedInvoiceNumbering : IInvoiceNumberingService

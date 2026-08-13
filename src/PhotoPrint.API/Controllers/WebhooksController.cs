@@ -197,10 +197,11 @@ public class WebhooksController : ControllerBase
         if (action == "0" && order.Status == OrderStatus.AwaitingPayment)
         {
             var transactionId = fields.GetValueOrDefault("ep_id", "");
+            var statusBeforeTransition = order.Status;
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
-            var created = await SaveOrderPaidWithInvoiceAsync(order, cancellationToken);
+            var created = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, cancellationToken);
             RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
                 created ? MetricNames.WebhookResultValues.Ok : MetricNames.WebhookResultValues.Duplicate);
             if (created)
@@ -278,9 +279,10 @@ public class WebhooksController : ControllerBase
 
         if (order.Status == OrderStatus.AwaitingPayment)
         {
+            var statusBeforeTransition = order.Status;
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
-            var created = await SaveOrderPaidWithInvoiceAsync(order, ct);
+            var created = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, ct);
             RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
                 created ? MetricNames.WebhookResultValues.Ok : MetricNames.WebhookResultValues.Duplicate);
             if (created)
@@ -378,7 +380,7 @@ public class WebhooksController : ControllerBase
     }
 
     // Returns true only when THIS call created the invoice, so the caller's post-save side effects never repeat for a losing delivery.
-    private async Task<bool> SaveOrderPaidWithInvoiceAsync(Order order, CancellationToken ct)
+    private async Task<bool> SaveOrderPaidWithInvoiceAsync(Order order, OrderStatus statusBeforeTransition, CancellationToken ct)
     {
         const int maxInvoiceNumberRetries = 3;
         for (var attempt = 0; ; attempt++)
@@ -408,6 +410,14 @@ public class WebhooksController : ControllerBase
                 _logger.LogWarning(
                     "invoice.creation.number-collision-retry order_id={OrderId} attempt={Attempt}",
                     order.Id, attempt);
+            }
+            catch (DbUpdateException ex) when (IsInvoiceNumberViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                _logger.LogError(ex,
+                    "invoice.creation.number-collision-exhausted order_id={OrderId} previous_status={PreviousStatus} — customer charged, order not Paid, manual reconciliation required",
+                    order.Id, statusBeforeTransition);
+                return false;
             }
         }
     }
