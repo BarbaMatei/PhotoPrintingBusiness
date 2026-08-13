@@ -63,6 +63,13 @@ public class InvoiceUploadJobTests
         return (Task)method.Invoke(job, [sp, invoiceId, orderId, CancellationToken.None])!;
     }
 
+    private static Task InvokeProcessBatchAsync(InvoiceUploadJob job)
+    {
+        var method = typeof(InvoiceUploadJob).GetMethod("ProcessBatchAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (Task)method.Invoke(job, [CancellationToken.None])!;
+    }
+
     private sealed class Harness
     {
         public required InvoiceUploadJob Job { get; init; }
@@ -73,6 +80,7 @@ public class InvoiceUploadJobTests
         public required Mock<IInvoiceLifecycle> Lifecycle { get; init; }
         public required Mock<IAnafSpvClient> AnafClient { get; init; }
         public required Mock<IInvoiceXmlBuilder> XmlBuilder { get; init; }
+        public required Mock<Sentry.IHub> Hub { get; init; }
     }
 
     private static Harness Build(
@@ -96,6 +104,9 @@ public class InvoiceUploadJobTests
         lifecycle.Setup(l => l.MarkSubmittedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                  .ReturnsAsync(true);
 
+        var hub = new Mock<Sentry.IHub>();
+        hub.SetupGet(h => h.IsEnabled).Returns(true);
+
         var services = new ServiceCollection();
         services.AddScoped(_ => CreateDb(connection, sqlLog));
         services.AddScoped(_ => xmlBuilder.Object);
@@ -103,6 +114,7 @@ public class InvoiceUploadJobTests
         services.AddScoped(_ => router.Object);
         services.AddScoped(_ => anafClient.Object);
         services.AddScoped(_ => lifecycle.Object);
+        services.AddScoped(_ => hub.Object);
         services.AddScoped<IOptions<SellerSettings>>(_ => Options.Create(new SellerSettings()));
         services.AddScoped<IOptions<InvoicingSettings>>(_ => Options.Create(new InvoicingSettings()));
         services.AddLogging();
@@ -127,7 +139,7 @@ public class InvoiceUploadJobTests
         return new Harness
         {
             Job = job, Sp = sp, Router = router, Cloud = cloud, Local = local,
-            Lifecycle = lifecycle, AnafClient = anafClient, XmlBuilder = xmlBuilder,
+            Lifecycle = lifecycle, AnafClient = anafClient, XmlBuilder = xmlBuilder, Hub = hub,
         };
     }
 
@@ -308,5 +320,28 @@ public class InvoiceUploadJobTests
 
         h.AnafClient.Verify(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
         sqlLines.Should().NotContain(l => l.Contains("FROM \"Orders\""));
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_AnafAuthFails_LogsDistinctlyAndCapturesToSentry()
+    {
+        using var connection = OpenConnection();
+        var logs = new LogCapture();
+        var h = Build(connection, cloudEnabled: false, logs);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("anaf-upload"));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Error &&
+                 r.Message.StartsWith("anaf.upload-job.auth-failed", StringComparison.Ordinal) &&
+                 r.Message.Contains(invoiceId.ToString()));
+        logs.Records.Should().NotContain(r => r.Message.StartsWith("anaf.upload-job.row-failed", StringComparison.Ordinal));
+        h.Hub.Verify(hub => hub.CaptureEvent(
+            It.Is<Sentry.SentryEvent>(e => e.Exception is AnafAuthException),
+            It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
     }
 }

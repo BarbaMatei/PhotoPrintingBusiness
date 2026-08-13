@@ -73,12 +73,19 @@ public sealed class InvoiceUploadJob : BackgroundService
             foreach (var row in batch)
             {
                 if (ct.IsCancellationRequested) break;
+                using var perRowScope = _scopeFactory.CreateScope();
                 try
                 {
-                    using var perRowScope = _scopeFactory.CreateScope();
                     await ProcessOneAsync(perRowScope.ServiceProvider, row.Id, row.OrderId, row.AnafStatus, ct);
                 }
                 catch (OperationCanceledException) { throw; }
+                catch (AnafAuthException ex)
+                {
+                    // Urgent (expiring cert / revoked credential) — no retry counter backs "escalate after N tries" per-replica-safely, so treat as urgent on first sight.
+                    _logger.LogError(ex,
+                        "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
+                    perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex,
