@@ -92,7 +92,8 @@ public class InvoiceUploadJobTests
 
     private static Harness Build(
         SqliteConnection connection, bool cloudEnabled,
-        LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null)
+        LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
+        TimeProvider? clock = null, int[]? backoffHours = null)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -135,8 +136,12 @@ public class InvoiceUploadJobTests
             binder: null,
             args: [
                 sp.GetRequiredService<IServiceScopeFactory>(),
-                Options.Create(new AnafSettings { ClaimTtlMinutes = claimTtlMinutes }),
-                TimeProvider.System,
+                Options.Create(new AnafSettings
+                {
+                    ClaimTtlMinutes = claimTtlMinutes,
+                    BackoffHours = backoffHours ?? new AnafSettings().BackoffHours,
+                }),
+                clock ?? TimeProvider.System,
                 logCapture is null
                     ? sp.GetRequiredService<ILogger<InvoiceUploadJob>>()
                     : logCapture.LoggerFor<InvoiceUploadJob>(),
@@ -152,7 +157,8 @@ public class InvoiceUploadJobTests
 
     private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(
         SqliteConnection connection, InvoiceAnafStatus status = InvoiceAnafStatus.Pending,
-        DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>", string? anafUploadId = null)
+        DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>", string? anafUploadId = null,
+        DateTimeOffset? createdAt = null)
     {
         var orderId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -164,6 +170,7 @@ public class InvoiceUploadJobTests
         invoice.AnafStatus = status;
         invoice.ClaimedAt = claimedAt;
         invoice.AnafUploadId = anafUploadId;
+        if (createdAt is not null) invoice.CreatedAt = createdAt.Value;
         seed.Invoices.Add(invoice);
         seed.SaveChanges();
         return (orderId, invoiceId);
@@ -373,5 +380,50 @@ public class InvoiceUploadJobTests
                  r.Message.Contains(invoiceId.ToString()));
         h.Lifecycle.Verify(l => l.MarkAcceptedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
         h.Lifecycle.Verify(l => l.MarkRejectedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PollSubmittedAsync_RejectedWithinBackoffBudget_MarksRejectedNotFailed()
+    {
+        using var connection = OpenConnection();
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(connection, cloudEnabled: false, clock: new FakeClock(now), backoffHours: [1, 4]);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            connection, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-2));   // elapsed 2h < budget (1+4=5h)
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafStatusResult(AnafExternalStatus.Rejected, "date incorecte"));
+
+        await InvokePollSubmittedAsync(h.Job, h.Sp, invoiceId);
+
+        h.Lifecycle.Verify(l => l.MarkRejectedAsync(invoiceId, "date incorecte", It.IsAny<CancellationToken>()), Times.Once);
+        h.Lifecycle.Verify(l => l.MarkFailedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task PollSubmittedAsync_RejectedBudgetExhausted_MarksFailedNotRejected()
+    {
+        using var connection = OpenConnection();
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(connection, cloudEnabled: false, clock: new FakeClock(now), backoffHours: [1, 4]);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            connection, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-6));   // elapsed 6h > budget (1+4=5h)
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafStatusResult(AnafExternalStatus.Rejected, "date incorecte"));
+
+        await InvokePollSubmittedAsync(h.Job, h.Sp, invoiceId);
+
+        h.Lifecycle.Verify(l => l.MarkFailedAsync(invoiceId, "date incorecte", It.IsAny<CancellationToken>()), Times.Once);
+        h.Lifecycle.Verify(l => l.MarkRejectedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private sealed class FakeClock : TimeProvider
+    {
+        private readonly DateTimeOffset _now;
+        public FakeClock(DateTimeOffset now) { _now = now; }
+        public override DateTimeOffset GetUtcNow() => _now;
     }
 }
