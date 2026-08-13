@@ -29,12 +29,12 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
                 AddRecipientRules();
                 // Locker supplies the address; client-sent address text is unused downstream, so
                 // only bound its length to keep the persisted order snapshot small.
-                RuleFor(x => x.ShippingAddress!.Street).MaximumLength(255);
-                RuleFor(x => x.ShippingAddress!.Number).MaximumLength(50);
-                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100);
-                RuleFor(x => x.ShippingAddress!.City).MaximumLength(100);
-                RuleFor(x => x.ShippingAddress!.County).MaximumLength(100);
-                RuleFor(x => x.ShippingAddress!.PostalCode).MaximumLength(20);
+                RuleFor(x => x.ShippingAddress!.Street).MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.Number).MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.City).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.County).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.PostalCode).MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
             });
         });
 
@@ -46,19 +46,19 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
             When(x => x.ShippingAddress != null, () =>
             {
                 AddRecipientRules();
-                RuleFor(x => x.ShippingAddress!.Street).NotEmpty().MaximumLength(255);
-                RuleFor(x => x.ShippingAddress!.Number).NotEmpty().MaximumLength(50);
-                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100);
-                RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(100);
-                RuleFor(x => x.ShippingAddress!.County).NotEmpty().MaximumLength(100);
-                RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty().MaximumLength(20);
+                RuleFor(x => x.ShippingAddress!.Street).NotEmpty().MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.Number).NotEmpty().MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.County).NotEmpty().MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+                RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty().MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
             });
         });
     }
 
     private void AddRecipientRules()
     {
-        RuleFor(x => x.ShippingAddress!.RecipientName).NotEmpty().MaximumLength(255);
+        RuleFor(x => x.ShippingAddress!.RecipientName).NotEmpty().MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
         RuleFor(x => x.ShippingAddress!.Phone).NotEmpty().MaximumLength(20)
             .Matches(PhoneCharset).WithMessage("Invalid phone number.")
             .Must(HasEnoughDigits).WithMessage("Invalid phone number.");

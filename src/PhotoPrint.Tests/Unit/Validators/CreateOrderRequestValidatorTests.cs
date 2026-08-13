@@ -190,6 +190,31 @@ public class CreateOrderRequestValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("ShippingAddress.RecipientName")]
+    [InlineData("ShippingAddress.Street")]
+    [InlineData("ShippingAddress.City")]
+    public void Courier_FieldContainsXmlInvalidControlChar_FailsOnThatField(string field)
+    {
+        var controlChar = ((char)1).ToString();
+        var address = ValidAddress();
+        switch (field)
+        {
+            case "ShippingAddress.RecipientName": address.RecipientName = "Bad" + controlChar + "Name"; break;
+            case "ShippingAddress.Street":         address.Street = "Str." + controlChar + "Test"; break;
+            case "ShippingAddress.City":           address.City = "Cluj" + controlChar + "Napoca"; break;
+        }
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor: PaymentProcessor.Stripe,
+            DeliveryType: DeliveryType.Courier,
+            EasyboxLockerId: null,
+            ShippingAddress: address);
+
+        _sut.TestValidate(request)
+            .ShouldHaveValidationErrorFor(field);
+    }
+
     // ── Courier recipient fields must be present + sane (else the AWB request
     //    goes out blank and Sameday rejects it → permanent give-up) ────────────
 

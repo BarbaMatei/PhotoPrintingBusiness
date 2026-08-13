@@ -68,6 +68,7 @@ public class InvoiceUploadJobTests
         public required Mock<IStorageService> Local { get; init; }
         public required Mock<IInvoiceLifecycle> Lifecycle { get; init; }
         public required Mock<IAnafSpvClient> AnafClient { get; init; }
+        public required Mock<IInvoiceXmlBuilder> XmlBuilder { get; init; }
     }
 
     private static Harness Build(
@@ -122,18 +123,20 @@ public class InvoiceUploadJobTests
         return new Harness
         {
             Job = job, Sp = sp, Router = router, Cloud = cloud, Local = local,
-            Lifecycle = lifecycle, AnafClient = anafClient,
+            Lifecycle = lifecycle, AnafClient = anafClient, XmlBuilder = xmlBuilder,
         };
     }
 
-    private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(SqliteConnection connection, InvoiceAnafStatus status = InvoiceAnafStatus.Pending, DateTimeOffset? claimedAt = null)
+    private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(
+        SqliteConnection connection, InvoiceAnafStatus status = InvoiceAnafStatus.Pending,
+        DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>")
     {
         var orderId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
         using var seed = CreateDb(connection);
         var order = MakeOrder(orderId);
         seed.Orders.Add(order);
-        var invoice = MakeInvoice(orderId);
+        var invoice = MakeInvoice(orderId, xmlPayload);
         invoice.Id = invoiceId;
         invoice.AnafStatus = status;
         invoice.ClaimedAt = claimedAt;
@@ -235,6 +238,42 @@ public class InvoiceUploadJobTests
 
         await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
+        using var verify = CreateDb(connection);
+        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
+        claimedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafUnreachable_RecordsErrorAndReleasesClaim()
+    {
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: false);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 400));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        using var verify = CreateDb(connection);
+        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
+        claimedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_XmlBuildThrows_RecordsErrorAndReleasesClaimWithoutCallingAnaf()
+    {
+        using var connection = OpenConnection();
+        var h = Build(connection, cloudEnabled: false);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(connection, xmlPayload: null);
+        h.XmlBuilder.Setup(b => b.Build(It.IsAny<Order>(), It.IsAny<Invoice>(), It.IsAny<SellerSettings>()))
+                    .Throws(new InvalidOperationException("order has zero items"));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.AnafClient.Verify(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         using var verify = CreateDb(connection);
         var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
         claimedAt.Should().BeNull();

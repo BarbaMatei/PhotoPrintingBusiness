@@ -1,5 +1,6 @@
 using FluentValidation;
 using PhotoPrint.API.DTOs.Auth;
+using PhotoPrint.API.Validators;
 
 namespace PhotoPrint.API.Validators.Auth;
 
@@ -9,11 +10,13 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
     {
         RuleFor(x => x.FirstName)
             .NotEmpty().WithMessage("Prenumele este obligatoriu.")
-            .MaximumLength(100).WithMessage("Prenumele nu poate depăși 100 de caractere.");
+            .MaximumLength(100).WithMessage("Prenumele nu poate depăși 100 de caractere.")
+            .Must(TextValidation.HasNoXmlInvalidChars).WithMessage("Prenumele conține caractere nevalide.");
 
         RuleFor(x => x.LastName)
             .NotEmpty().WithMessage("Numele de familie este obligatoriu.")
-            .MaximumLength(100).WithMessage("Numele nu poate depăși 100 de caractere.");
+            .MaximumLength(100).WithMessage("Numele nu poate depăși 100 de caractere.")
+            .Must(TextValidation.HasNoXmlInvalidChars).WithMessage("Numele conține caractere nevalide.");
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Adresa de email este obligatorie.")

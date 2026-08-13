@@ -146,32 +146,43 @@ public sealed class InvoiceUploadJob : BackgroundService
             return;
         }
 
-        // Step 1: build XML if not already cached on the row.
-        if (string.IsNullOrEmpty(invoice.XmlPayload))
+        try
         {
-            var xmlBytes = xmlBuilder.Build(order, invoice, sellerOpts.Value);
-            invoice.XmlPayload = Encoding.UTF8.GetString(xmlBytes);
-            invoice.UpdatedAt  = _clock.GetUtcNow();
-            await db.SaveChangesAsync(ct);
-            _logger.LogInformation(
-                "anaf.upload-job.xml-built invoice_id={InvoiceId} bytes={Bytes}",
-                invoiceId, xmlBytes.Length);
-        }
+            // Step 1: build XML if not already cached on the row.
+            if (string.IsNullOrEmpty(invoice.XmlPayload))
+            {
+                var xmlBytes = xmlBuilder.Build(order, invoice, sellerOpts.Value);
+                invoice.XmlPayload = Encoding.UTF8.GetString(xmlBytes);
+                invoice.UpdatedAt  = _clock.GetUtcNow();
+                await db.SaveChangesAsync(ct);
+                _logger.LogInformation(
+                    "anaf.upload-job.xml-built invoice_id={InvoiceId} bytes={Bytes}",
+                    invoiceId, xmlBytes.Length);
+            }
 
-        // Step 2: render PDF and store it.
-        if (string.IsNullOrEmpty(invoice.PdfStoragePath))
+            // Step 2: render PDF and store it.
+            if (string.IsNullOrEmpty(invoice.PdfStoragePath))
+            {
+                var pdfBytes = pdfRenderer.Render(order, invoice, sellerOpts.Value);
+                var key = InvoiceStorageKeys.ForPdf(invoice);
+                using (var ms = new MemoryStream(pdfBytes, writable: false))
+                    await storage.SaveAsync(ms, key, ct);
+                invoice.PdfStoragePath = key;
+                invoice.UpdatedAt      = _clock.GetUtcNow();
+                await db.SaveChangesAsync(ct);
+                _logger.LogInformation(
+                    "anaf.upload-job.pdf-rendered invoice_id={InvoiceId} key={Key}",
+                    invoiceId, key);
+                await notifier.NotifyAsync(invoice, order, ct);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            var pdfBytes = pdfRenderer.Render(order, invoice, sellerOpts.Value);
-            var key = InvoiceStorageKeys.ForPdf(invoice);
-            using (var ms = new MemoryStream(pdfBytes, writable: false))
-                await storage.SaveAsync(ms, key, ct);
-            invoice.PdfStoragePath = key;
-            invoice.UpdatedAt      = _clock.GetUtcNow();
-            await db.SaveChangesAsync(ct);
-            _logger.LogInformation(
-                "anaf.upload-job.pdf-rendered invoice_id={InvoiceId} key={Key}",
-                invoiceId, key);
-            await notifier.NotifyAsync(invoice, order, ct);
+            // Otherwise a bad snapshot loops silently forever: no LastError, no claim release, no admin-visible signal.
+            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            _logger.LogError(ex, "anaf.upload-job.build-failed invoice_id={InvoiceId}", invoiceId);
+            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+            return;
         }
 
         // Step 3: upload to ANAF.
@@ -205,7 +216,16 @@ public sealed class InvoiceUploadJob : BackgroundService
                 "anaf.upload-job.upload-errors invoice_id={InvoiceId}", invoiceId);
             await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
         }
-        // AnafAuthException / AnafUnreachableException propagate to the batch loop's catch — ambiguous outcome, so the claim just holds through its TTL.
+        catch (AnafUnreachableException ex)
+        {
+            // Also covers a hard content rejection (HTTP 400) AnafSpvClient can't tell apart from a real outage.
+            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            _logger.LogWarning(ex,
+                "anaf.upload-job.unreachable invoice_id={InvoiceId} status={HttpStatus}",
+                invoiceId, ex.HttpStatus);
+            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+        }
+        // AnafAuthException propagates to the batch loop's catch — the claim just holds through its TTL.
     }
 
     private async Task ReleaseClaimAsync(PhotoPrintDbContext db, Guid invoiceId, DateTimeOffset claimedAt, CancellationToken ct)
