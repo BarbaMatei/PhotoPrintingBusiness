@@ -41,7 +41,9 @@ public class InvoiceLifecycleTests : IDisposable
         _connection.Dispose();
     }
 
-    private async Task<Guid> SeedInvoiceAsync(InvoiceAnafStatus status, string? lastError = null)
+    private async Task<Guid> SeedInvoiceAsync(
+        InvoiceAnafStatus status, string? lastError = null,
+        string? xmlPayload = null, string? pdfStoragePath = null)
     {
         var order = new Order
         {
@@ -68,6 +70,8 @@ public class InvoiceLifecycleTests : IDisposable
             NetTotalRon = 100m, VatRon = 19m, TotalRon = 119m,
             AnafStatus = status,
             LastError = lastError,
+            XmlPayload = xmlPayload,
+            PdfStoragePath = pdfStoragePath,
             CreatedAt = _now,
         };
         _db.Invoices.Add(invoice);
@@ -159,7 +163,8 @@ public class InvoiceLifecycleTests : IDisposable
     [InlineData(InvoiceAnafStatus.Failed)]
     public async Task Retry_from_terminal_state_resets_to_Pending_and_clears_fields(InvoiceAnafStatus from)
     {
-        var id = await SeedInvoiceAsync(from, lastError: "prior error");
+        var id = await SeedInvoiceAsync(from, lastError: "prior error",
+            xmlPayload: "<Invoice>rejected-content</Invoice>", pdfStoragePath: "invoices/2026/FT-2026-00001.pdf");
         // Pre-set AnafUploadId so we can verify it's cleared.
         await _db.Invoices.Where(i => i.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(i => i.AnafUploadId, "old-id"));
@@ -171,6 +176,8 @@ public class InvoiceLifecycleTests : IDisposable
         fresh.AnafStatus.Should().Be(InvoiceAnafStatus.Pending);
         fresh.AnafUploadId.Should().BeNull();
         fresh.LastError.Should().BeNull();
+        fresh.XmlPayload.Should().BeNull();
+        fresh.PdfStoragePath.Should().Be("invoices/2026/FT-2026-00001.pdf");
     }
 
     [Fact]

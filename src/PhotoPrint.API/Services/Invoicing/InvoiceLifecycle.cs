@@ -98,6 +98,18 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
     public async Task<bool> RetryAsync(
         Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default)
     {
+        // PdfStoragePath stays untouched — clearing it would re-trigger the customer "ready" notification once that integration ships, and it plays no role in the ANAF path.
+        var before = await _db.Invoices
+            .Where(i => i.Id == invoiceId)
+            .Select(i => new { i.XmlPayload, i.LastError })
+            .FirstOrDefaultAsync(ct);
+        if (before is not null)
+        {
+            _logger.LogInformation(
+                "invoice.lifecycle.retry-clearing invoice_id={InvoiceId} last_error={LastError} xml_payload_length={XmlPayloadLength}",
+                invoiceId, before.LastError, before.XmlPayload?.Length ?? 0);
+        }
+
         var now = _clock.GetUtcNow();
         var affected = await _db.Invoices
             .Where(i => i.Id == invoiceId && i.AnafStatus == expected)
@@ -105,6 +117,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
                 .SetProperty(i => i.AnafStatus,   InvoiceAnafStatus.Pending)
                 .SetProperty(i => i.AnafUploadId, (string?)null)
                 .SetProperty(i => i.LastError,    (string?)null)
+                .SetProperty(i => i.XmlPayload,   (string?)null)
                 .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),
                 ct);
         return LogAndReturn(invoiceId, expected, InvoiceAnafStatus.Pending, affected);
