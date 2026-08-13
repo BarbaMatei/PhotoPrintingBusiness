@@ -123,7 +123,8 @@ public sealed class InvoiceUploadJob : BackgroundService
         var db          = sp.GetRequiredService<PhotoPrintDbContext>();
         var xmlBuilder  = sp.GetRequiredService<IInvoiceXmlBuilder>();
         var pdfRenderer = sp.GetRequiredService<IInvoicePdfRenderer>();
-        var storage     = sp.GetRequiredService<IStorageService>();
+        var storageRouter = sp.GetRequiredService<IStorageRouter>();
+        var storage     = storageRouter.CloudEnabled ? storageRouter.Cloud : storageRouter.Local;
         var anafClient  = sp.GetRequiredService<IAnafSpvClient>();
         var lifecycle   = sp.GetRequiredService<IInvoiceLifecycle>();
         var sellerOpts  = sp.GetRequiredService<IOptions<SellerSettings>>();
