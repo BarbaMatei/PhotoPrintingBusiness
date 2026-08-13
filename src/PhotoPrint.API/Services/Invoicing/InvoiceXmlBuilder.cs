@@ -193,29 +193,35 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
     private static IEnumerable<XElement> BuildInvoiceLines(Order order, Invoice invoice)
     {
         var rate = VatRateFromInvoice(invoice);
-        var idx  = 1;
 
-        foreach (var item in order.Items)
-        {
-            yield return BuildLine(
-                id: idx++,
-                description: $"{item.ProductSnapshot.ProductName} ({item.ProductSnapshot.Size}, {item.ProductSnapshot.Finish})",
-                quantity: item.Quantity,
-                lineTotalRon: item.LineTotalRon,
-                unitPriceRon: item.UnitPriceRon,
-                vatRate: rate);
-        }
-
+        var lines = order.Items
+            .Select(item => (
+                Description: $"{item.ProductSnapshot.ProductName} ({item.ProductSnapshot.Size}, {item.ProductSnapshot.Finish})",
+                Quantity: item.Quantity,
+                GrossTotal: item.LineTotalRon))
+            .ToList();
         if (order.ShippingCostRon > 0)
+            lines.Add(("Transport", 1, order.ShippingCostRon));
+
+        // Per-line vs. aggregate VAT extraction can drift by a cent from rounding — adjust the last line so Σ(line net) matches invoice.NetTotalRon exactly.
+        var netTotals = lines.Select(l => VatCalculator.ExtractBreakdown(l.GrossTotal, rate).NetTotalRon).ToList();
+        var residual = invoice.NetTotalRon - netTotals.Sum();
+        if (residual != 0m)
+            netTotals[^1] += residual;
+
+        return lines.Select((line, i) =>
         {
-            yield return BuildLine(
-                id: idx,
-                description: "Transport",
-                quantity: 1,
-                lineTotalRon: order.ShippingCostRon,
-                unitPriceRon: order.ShippingCostRon,
+            var netTotal = netTotals[i];
+            // Derived from the reconciled net total, not an independent extraction — that drifts from the line total whenever Quantity > 1.
+            var netUnitPrice = decimal.Round(netTotal / line.Quantity, 2, MidpointRounding.AwayFromZero);
+            return BuildLine(
+                id: i + 1,
+                description: line.Description,
+                quantity: line.Quantity,
+                lineTotalRon: netTotal,
+                unitPriceRon: netUnitPrice,
                 vatRate: rate);
-        }
+        });
     }
 
     private static XElement BuildLine(

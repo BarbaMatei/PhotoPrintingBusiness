@@ -184,6 +184,74 @@ public class InvoiceXmlBuilderTests
     }
 
     [Fact]
+    public void Line_extension_amount_is_net_not_gross()
+    {
+        // Gross line total is 21.00 (3 x 7.00); net at 19% is 17.65 — proves this isn't the raw gross value.
+        var (order, invoice) = Fixture(shippingCost: 0m);
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        var line = doc.Root!.Elements(Cac + "InvoiceLine").Single();
+        var lineExtensionAmount = decimal.Parse(
+            line.Element(Cbc + "LineExtensionAmount")!.Value, CultureInfo.InvariantCulture);
+
+        lineExtensionAmount.Should().Be(17.65m);
+        lineExtensionAmount.Should().NotBe(21.00m);
+    }
+
+    [Fact]
+    public void Sum_of_line_extension_amounts_reconciles_exactly_with_header_net_total()
+    {
+        // These three lines' independently-extracted net totals sum one cent short of the header's aggregate-extracted total — a real rounding drift, proving the reconciliation.
+        var product = new Product { Id = Guid.NewGuid(), Name = "Foto 10x15" };
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            OrderNumber = "FT-99999",
+            Status = OrderStatus.Paid,
+            PaidAt = new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero),
+            PaymentProcessor = PaymentProcessor.Stripe,
+            UserId = Guid.NewGuid(),
+            User = new User { Id = Guid.NewGuid(), Email = "x@y.ro", FirstName = "Alex", LastName = "Pop" },
+            ShippingAddress = new ShippingAddressSnapshot
+            {
+                Street = "Str. Buyer", Number = "10", City = "Cluj-Napoca", County = "Cluj",
+                PostalCode = "400100", RecipientName = "Alex Pop", Phone = "0700000000",
+            },
+            ShippingCostRon = 0m,
+            SubtotalRon = 30.03m, TotalRon = 30.03m,
+            NetTotalRon = decimal.Round(30.03m / 1.19m, 2, MidpointRounding.AwayFromZero),
+            VatRon = decimal.Round(30.03m * 0.19m / 1.19m, 2, MidpointRounding.AwayFromZero),
+            VatRate = 0.19m,
+            Items = Enumerable.Range(0, 3).Select(_ => new OrderItem
+            {
+                OrderId = default, Quantity = 1, UnitPriceRon = 10.01m, LineTotalRon = 10.01m,
+                ProductId = product.Id,
+                ProductSnapshot = new ProductSnapshot { ProductName = "Foto 10x15", Size = "10x15", Finish = "Lucios" },
+            }).ToList(),
+        };
+        var invoice = new Invoice
+        {
+            OrderId = order.Id,
+            InvoiceNumber = "FT-2026-00002",
+            Series = "FT", Number = 2,
+            IssuedAt = order.PaidAt!.Value,
+            NetTotalRon = order.NetTotalRon,
+            VatRon = order.VatRon,
+            TotalRon = order.TotalRon,
+            Order = order,
+            AnafStatus = InvoiceAnafStatus.Pending,
+            CreatedAt = order.PaidAt!.Value,
+        };
+
+        var doc = BuildAndParse(order, invoice, Seller());
+        var lineTotals = doc.Root!.Elements(Cac + "InvoiceLine")
+            .Select(l => decimal.Parse(l.Element(Cbc + "LineExtensionAmount")!.Value, CultureInfo.InvariantCulture))
+            .ToList();
+
+        lineTotals.Sum().Should().Be(invoice.NetTotalRon);
+    }
+
+    [Fact]
     public void No_shipping_line_when_shipping_cost_is_zero()
     {
         var (order, invoice) = Fixture(shippingCost: 0m);
