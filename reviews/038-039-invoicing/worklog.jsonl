@@ -1,0 +1,43 @@
+{"t":"2026-08-13T07:08:25Z","ev":"pass-launch","pass":"v1","type":"full discovery"}
+{"t":"2026-08-13T07:35:00Z","ev":"check-dispatched","pass":"v1","count":9,"note":"trigger-list-shaped suggested fixes: PPW-471,475,476,477,480,486,488,489,490 — adversarial approach-checks per runbook-discovery synthesis step 2"}
+{"t":"2026-08-13T07:52:00Z","ev":"check-returned","pass":"v1","count":9,"verdicts":"9 revised, 0 cleared, 0 refuted"}
+{"t":"2026-08-13T07:53:00Z","ev":"supplemental-check","pass":"v1","scope":"VatCalculator.cs + OrderService.cs VAT wiring — closing the manifest-completeness gap PPW-497 named","result":"VAT rounding math itself clean; surfaced new defect PPW-478 (UBL line amounts gross not net)"}
+{"t":"2026-08-13T08:02:00Z","ev":"check-dispatched","pass":"v1","count":1,"note":"trigger-list-shaped suggested fix for PPW-478 (money-field semantics change)"}
+{"t":"2026-08-13T08:08:00Z","ev":"check-returned","pass":"v1","count":1,"verdicts":"1 revised, 0 cleared, 0 refuted"}
+{"t":"2026-08-13T08:15:00Z","ev":"pass-records-done","pass":"v1"}
+{"t":"2026-08-13T08:45:00Z","ev":"doc-gate","pass":"v1","verdict":"approve","rounds":5,"note":"lint clean throughout; Sonnet judge disapproved rounds 1-4 (heading/title mismatches, unauthorized metrics-schema vocabulary in prose, approach-check naming, index.md sentence/word caps, filename-as-link-text, dense multi-id sentences) — approved round 5"}
+{"t":"2026-08-13T12:08:42+03:00","ev":"round-start","round":1}
+{"t":"2026-08-13T12:11:26+03:00","ev":"gate-open","round":1,"reason":"3 scope decisions: PPW-472 email integration scope, PPW-489 ANAF retry mitigation, PPW-493 Postgres test feasibility (no Docker locally)"}
+{"t":"2026-08-13T12:14:42+03:00","ev":"gate-closed","round":1,"answers":{"PPW-472":"ship flag off, document honestly","PPW-489":"accept documented tolerance, no code change","PPW-493":"write test now, prove in CI"}}
+{"t":"2026-08-13T12:14:43+03:00","ev":"triage-done","round":1,"clusters":25,"checks_needed":0,"pre_cleared":10,"gates":3}
+{"t":"2026-08-13T12:27:41+03:00","ev":"finding","id":"PPW-469","status":"fixed","commit":"04eb38e"}
+{"t":"2026-08-13T12:27:41+03:00","ev":"test-run","kind":"final","filter":"InvoicesControllerTests","passed":2,"failed":0}
+{"t":"2026-08-13T12:27:41+03:00","ev":"finding","id":"PPW-470","status":"fixed","commit":"f8daa1e"}
+{"t":"2026-08-13T12:27:41+03:00","ev":"test-run","kind":"final","filter":"InvoiceUploadJobTests","passed":2,"failed":0}
+{"t":"2026-08-13T12:52:56+03:00","ev":"finding","id":"PPW-471","status":"fixed","commit":"e38537d"}
+{"t":"2026-08-13T12:52:56+03:00","ev":"finding","id":"PPW-490","status":"fixed","commit":"e38537d"}
+{"t":"2026-08-13T12:52:56+03:00","ev":"test-run","kind":"final","filter":"WebhooksControllerInvoiceRaceTests+WebhooksControllerMetricsTests+PaymentIdempotencyRelationalTests+PaymentControllerIntegrationTests+SqliteInvoiceNumberingServiceTests","passed":134,"failed":0}
+{"t":"2026-08-13T12:56:12+03:00","ev":"finding","id":"PPW-472","status":"fixed","commit":"4aa73d5"}
+{"t":"2026-08-13T12:59:09+03:00","ev":"finding","id":"PPW-473","status":"fixed","commit":"e7a1169"}
+{"t":"2026-08-13T13:17:59+03:00","ev":"finding","id":"PPW-474","status":"fixed","commit":"7539dcd"}
+{"t":"2026-08-13T13:21:45+03:00","ev":"finding","id":"PPW-475","status":"fixed","commit":"a33e6d3"}
+{"t":"2026-08-13T13:30:50+03:00","ev":"finding","id":"PPW-476","status":"fixed","commit":"e693baf"}
+{"t":"2026-08-13T13:46:09+03:00","ev":"finding","id":"PPW-477","status":"fixed","commit":"d50f897"}
+{"t":"2026-08-13T13:51:28+03:00","ev":"finding","id":"PPW-478","status":"fixed","commit":"94cd056"}
+{"t":"2026-08-13T13:52:59+03:00","ev":"finding","id":"PPW-479","status":"fixed","commit":"faa7dcb"}
+{"t":"2026-08-13T13:55:15+03:00","ev":"finding","id":"PPW-480","status":"fixed","commit":"bd4d8ba"}
+{"t":"2026-08-13T13:56:46+03:00","ev":"finding","id":"PPW-481","status":"fixed","commit":"82ab013"}
+{"t":"2026-08-13T13:58:29+03:00","ev":"finding","id":"PPW-482","status":"fixed","commit":"881b101"}
+{"t":"2026-08-13T14:07:45+03:00","ev":"finding","id":"PPW-483","status":"fixed","commit":"d24a115"}
+{"t":"2026-08-13T14:12:09+03:00","ev":"finding","id":"PPW-484","status":"fixed","commit":"ed031dc"}
+{"t":"2026-08-13T14:21:26+03:00","ev":"finding","id":"PPW-485","status":"fixed","commit":"0ccb7d6"}
+{"t":"2026-08-13T14:30:13+03:00","ev":"finding","id":"PPW-486","status":"fixed","commit":"8928e09"}
+{"t":"2026-08-13T14:34:11+03:00","ev":"finding","id":"PPW-487","status":"fixed","commit":"5450505"}
+{"t":"2026-08-13T14:39:08+03:00","ev":"finding","id":"PPW-488","status":"fixed","commit":"e7a9f71"}
+{"t":"2026-08-13T14:39:56+03:00","ev":"finding","id":"PPW-489","status":"wont-fix","commit":null}
+{"t":"2026-08-13T14:43:00+03:00","ev":"finding","id":"PPW-491","status":"fixed","commit":"c748d40"}
+{"t":"2026-08-13T14:45:30+03:00","ev":"finding","id":"PPW-492","status":"fixed","commit":"bc8e5a4"}
+{"t":"2026-08-13T14:49:24+03:00","ev":"finding","id":"PPW-493","status":"fixed","commit":"7cde815"}
+{"t":"2026-08-13T14:50:45+03:00","ev":"round-end","round":1}
+{"t":"2026-08-13T15:08:16+03:00","ev":"doc-gate","verdict":"approve","round":1}
+{"t":"2026-08-13T15:09:40+03:00","ev":"test-run","kind":"final","filter":"Controllers|Services.Invoicing|AdminOrderServiceTests|Validators|PostgresInvoiceNumberingServiceIntegrationTests","passed":180,"failed":0,"skipped":3,"note":"true cross-namespace final run before hand-back; earlier test-run stamps in this round covered only individual clusters"}
