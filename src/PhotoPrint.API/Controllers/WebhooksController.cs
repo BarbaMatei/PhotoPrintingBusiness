@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
@@ -199,21 +200,20 @@ public class WebhooksController : ControllerBase
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
-            // Invoice INSERT joins the same transaction (ADR-020 — gap-free
-            // posture requires Order Paid mutation + Invoice INSERT to commit
-            // or roll back together).
-            await _invoiceCreator.CreateForOrderAsync(order.Id, cancellationToken);
-            await _db.SaveChangesAsync(cancellationToken);
+            var created = await SaveOrderPaidWithInvoiceAsync(order, cancellationToken);
             RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.Ok);
-            await BroadcastNewOrderAsync(order, cancellationToken);
-            await FireOrderConfirmedEmailAsync(order, cancellationToken);
-            // Enqueue cloud promotion off the hot path. Returns immediately;
-            // the worker picks up and uploads asynchronously.
-            await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
-            // Enqueue Sameday AWB creation off the hot path.
-            // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
-            await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
+                created ? MetricNames.WebhookResultValues.Ok : MetricNames.WebhookResultValues.Duplicate);
+            if (created)
+            {
+                await BroadcastNewOrderAsync(order, cancellationToken);
+                await FireOrderConfirmedEmailAsync(order, cancellationToken);
+                // Enqueue cloud promotion off the hot path. Returns immediately;
+                // the worker picks up and uploads asynchronously.
+                await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
+                // Enqueue Sameday AWB creation off the hot path.
+                // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
+                await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
+            }
         }
         else if (action == "0" && OrderStatusMachine.HasBeenPaid(order.Status))
         {
@@ -280,20 +280,20 @@ public class WebhooksController : ControllerBase
         {
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
-            // Same Invoice INSERT pattern as the EuPlatesc path — joins the
-            // existing transaction so the gap-free numbering posture holds.
-            await _invoiceCreator.CreateForOrderAsync(order.Id, ct);
-            await _db.SaveChangesAsync(ct);
+            var created = await SaveOrderPaidWithInvoiceAsync(order, ct);
             RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
-                MetricNames.WebhookResultValues.Ok);
-            await BroadcastNewOrderAsync(order, ct);
-            await FireOrderConfirmedEmailAsync(order, ct);
-            // Enqueue cloud promotion off the hot path. Returns immediately;
-            // the worker picks up and uploads asynchronously.
-            await _photoPromoter.EnqueueAsync(order.Id, ct);
-            // Enqueue Sameday AWB creation off the hot path.
-            // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
-            await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+                created ? MetricNames.WebhookResultValues.Ok : MetricNames.WebhookResultValues.Duplicate);
+            if (created)
+            {
+                await BroadcastNewOrderAsync(order, ct);
+                await FireOrderConfirmedEmailAsync(order, ct);
+                // Enqueue cloud promotion off the hot path. Returns immediately;
+                // the worker picks up and uploads asynchronously.
+                await _photoPromoter.EnqueueAsync(order.Id, ct);
+                // Enqueue Sameday AWB creation off the hot path.
+                // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
+                await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+            }
         }
         else
         {
@@ -376,4 +376,63 @@ public class WebhooksController : ControllerBase
         await LoadOrderDetailsForEmailAsync(order, ct);
         _orderEmailService.FireOrderConfirmedEmail(order);
     }
+
+    // Returns true only when THIS call created the invoice, so the caller's post-save side effects never repeat for a losing delivery.
+    private async Task<bool> SaveOrderPaidWithInvoiceAsync(Order order, CancellationToken ct)
+    {
+        const int maxInvoiceNumberRetries = 3;
+        for (var attempt = 0; ; attempt++)
+        {
+            var invoice = await _invoiceCreator.CreateForOrderAsync(order.Id, ct);
+            if (invoice is not null && _db.Entry(invoice).State != EntityState.Added)
+            {
+                // The existing-row check found an already-committed invoice — nothing was tracked to save, so no exception to catch.
+                return false;
+            }
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return true;
+            }
+            catch (DbUpdateException ex) when (IsInvoiceOrderIdViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                _logger.LogInformation(
+                    "invoice.creation.duplicate-race order_id={OrderId} — a concurrent delivery already created this order's invoice",
+                    order.Id);
+                return false;
+            }
+            catch (DbUpdateException ex) when (attempt < maxInvoiceNumberRetries && IsInvoiceNumberViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                _logger.LogWarning(
+                    "invoice.creation.number-collision-retry order_id={OrderId} attempt={Attempt}",
+                    order.Id, attempt);
+            }
+        }
+    }
+
+    private static bool IsInvoiceOrderIdViolation(DbUpdateException ex)
+        => ex.InnerException switch
+        {
+            Microsoft.Data.Sqlite.SqliteException sqlite =>
+                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
+                sqlite.Message.Contains(nameof(PhotoPrint.API.Models.Invoice.OrderId), StringComparison.OrdinalIgnoreCase),
+            Npgsql.PostgresException pg =>
+                pg.SqlState == "23505" /* unique_violation */ &&
+                pg.ConstraintName == PhotoPrintDbContext.InvoiceOrderIdIndexName,
+            _ => false,
+        };
+
+    private static bool IsInvoiceNumberViolation(DbUpdateException ex)
+        => ex.InnerException switch
+        {
+            Microsoft.Data.Sqlite.SqliteException sqlite =>
+                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
+                sqlite.Message.Contains(nameof(PhotoPrint.API.Models.Invoice.InvoiceNumber), StringComparison.OrdinalIgnoreCase),
+            Npgsql.PostgresException pg =>
+                pg.SqlState == "23505" /* unique_violation */ &&
+                pg.ConstraintName == PhotoPrintDbContext.InvoiceNumberIndexName,
+            _ => false,
+        };
 }

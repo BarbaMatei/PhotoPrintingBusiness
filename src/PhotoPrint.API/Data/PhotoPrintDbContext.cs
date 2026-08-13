@@ -23,6 +23,10 @@ public class PhotoPrintDbContext : DbContext
     /// </summary>
     public const string OrderNumberIndexName = "ix_orders_order_number";
 
+    // Shared with WebhooksController's violation classifiers so a rename here is a compile break there.
+    public const string InvoiceOrderIdIndexName = "ix_invoices_order_id";
+    public const string InvoiceNumberIndexName = "ix_invoices_invoice_number";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {
@@ -434,9 +438,10 @@ public class PhotoPrintDbContext : DbContext
 
             entity.HasIndex(i => i.InvoiceNumber)
                   .IsUnique()
-                  .HasDatabaseName("ix_invoices_invoice_number");
+                  .HasDatabaseName(InvoiceNumberIndexName);
             entity.HasIndex(i => i.OrderId)
-                  .HasDatabaseName("ix_invoices_order_id");
+                  .IsUnique()
+                  .HasDatabaseName(InvoiceOrderIdIndexName);
             entity.HasIndex(i => i.AnafStatus)
                   .HasDatabaseName("ix_invoices_anaf_status");
 

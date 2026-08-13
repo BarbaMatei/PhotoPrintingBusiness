@@ -3,15 +3,7 @@ using PhotoPrint.API.Data;
 
 namespace PhotoPrint.API.Services.Invoicing;
 
-/// <summary>
-/// SQLite implementation per ADR-020. SQLite has no <c>SEQUENCE</c>
-/// primitive, so we use <c>MAX(Number) + 1</c> inside a transaction. SQLite
-/// is single-writer at the file level; the transaction serialises the
-/// read-then-write naturally.
-///
-/// Dev-only path. The contract matches the Postgres implementation: same
-/// monotone, no-duplicate guarantee within (series, year).
-/// </summary>
+// No lock on this MAX+1 read — callers must catch and retry an InvoiceNumber unique-index violation.
 public sealed class SqliteInvoiceNumberingService : IInvoiceNumberingService
 {
     private readonly PhotoPrintDbContext _db;
