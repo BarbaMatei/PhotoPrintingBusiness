@@ -128,6 +128,11 @@ public sealed class AnafSpvClient : IAnafSpvClient
             ?? xml.Descendants().Select(e => e.Attribute("stare")?.Value).FirstOrDefault(v => v is not null);
 
         var status = MapStatus(stare);
+        if (status == AnafExternalStatus.Unknown)
+        {
+            _logger.LogWarning(
+                "anaf.spv.status-unrecognized upload_id={UploadId} stare={Stare}", uploadId, stare);
+        }
         string? errorMessage = null;
         if (status == AnafExternalStatus.Rejected)
         {

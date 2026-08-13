@@ -305,8 +305,10 @@ public sealed class InvoiceUploadJob : BackgroundService
                     }
                     break;
                 }
-            case AnafExternalStatus.InProgress:
             case AnafExternalStatus.Unknown:
+                _logger.LogWarning("anaf.upload-job.status-unknown invoice_id={InvoiceId}", invoiceId);
+                break;
+            case AnafExternalStatus.InProgress:
                 // No transition — re-poll next tick.
                 break;
         }

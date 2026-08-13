@@ -70,6 +70,13 @@ public class InvoiceUploadJobTests
         return (Task)method.Invoke(job, [CancellationToken.None])!;
     }
 
+    private static Task InvokePollSubmittedAsync(InvoiceUploadJob job, IServiceProvider sp, Guid invoiceId)
+    {
+        var method = typeof(InvoiceUploadJob).GetMethod("PollSubmittedAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (Task)method.Invoke(job, [sp, invoiceId, CancellationToken.None])!;
+    }
+
     private sealed class Harness
     {
         public required InvoiceUploadJob Job { get; init; }
@@ -145,7 +152,7 @@ public class InvoiceUploadJobTests
 
     private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(
         SqliteConnection connection, InvoiceAnafStatus status = InvoiceAnafStatus.Pending,
-        DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>")
+        DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>", string? anafUploadId = null)
     {
         var orderId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -156,6 +163,7 @@ public class InvoiceUploadJobTests
         invoice.Id = invoiceId;
         invoice.AnafStatus = status;
         invoice.ClaimedAt = claimedAt;
+        invoice.AnafUploadId = anafUploadId;
         seed.Invoices.Add(invoice);
         seed.SaveChanges();
         return (orderId, invoiceId);
@@ -343,5 +351,27 @@ public class InvoiceUploadJobTests
         h.Hub.Verify(hub => hub.CaptureEvent(
             It.Is<Sentry.SentryEvent>(e => e.Exception is AnafAuthException),
             It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PollSubmittedAsync_UnrecognizedStatus_LogsDistinctlyFromInProgressAndDoesNotTransition()
+    {
+        using var connection = OpenConnection();
+        var logs = new LogCapture();
+        var h = Build(connection, cloudEnabled: false, logs);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            connection, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafStatusResult(AnafExternalStatus.Unknown));
+
+        await InvokePollSubmittedAsync(h.Job, h.Sp, invoiceId);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Warning &&
+                 r.Message.StartsWith("anaf.upload-job.status-unknown", StringComparison.Ordinal) &&
+                 r.Message.Contains(invoiceId.ToString()));
+        h.Lifecycle.Verify(l => l.MarkAcceptedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        h.Lifecycle.Verify(l => l.MarkRejectedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

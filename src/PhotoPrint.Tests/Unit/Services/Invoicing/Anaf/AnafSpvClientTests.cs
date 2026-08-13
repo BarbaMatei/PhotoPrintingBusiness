@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Services.Invoicing.Anaf;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.Tests.Unit.Services.Sameday;     // reuse ScriptedHttpMessageHandler
 
 namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
@@ -16,7 +17,7 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
 /// </summary>
 public class AnafSpvClientTests
 {
-    private static AnafSpvClient Build(ScriptedHttpMessageHandler script, DateTimeOffset now)
+    private static AnafSpvClient Build(ScriptedHttpMessageHandler script, DateTimeOffset now, LogCapture? logCapture = null)
     {
         var http = new HttpClient(script)
         {
@@ -26,7 +27,9 @@ public class AnafSpvClientTests
             http,
             Options.Create(new AnafSettings { Enabled = true, BaseUrl = "https://anaf-test/api/" }),
             new FakeClock(now),
-            new LoggerFactory().CreateLogger<AnafSpvClient>());
+            logCapture is null
+                ? new LoggerFactory().CreateLogger<AnafSpvClient>()
+                : logCapture.LoggerFor<AnafSpvClient>());
     }
 
     [Fact]
@@ -86,6 +89,23 @@ public class AnafSpvClientTests
         var result = await sut.GetStatusAsync("upload-99");
 
         result.Status.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task GetStatus_unrecognized_stare_logs_the_raw_value_at_warning()
+    {
+        var logs = new LogCapture();
+        var script = new ScriptedHttpMessageHandler(_ => ScriptedHttpMessageHandler.Json(
+            HttpStatusCode.OK,
+            "<header stare=\"garbled\" />"));
+
+        var sut = Build(script, DateTimeOffset.UtcNow, logs);
+        await sut.GetStatusAsync("upload-99");
+
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Warning &&
+                 r.Message.StartsWith("anaf.spv.status-unrecognized", StringComparison.Ordinal) &&
+                 r.Message.Contains("garbled"));
     }
 
     [Fact]
