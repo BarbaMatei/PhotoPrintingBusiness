@@ -4,16 +4,7 @@ using PhotoPrint.API.Models;
 
 namespace PhotoPrint.API.Services.Invoicing;
 
-/// <summary>
-/// Sends a follow-up "your invoice is ready" email after the PDF lands on
-/// storage. The order-confirmation email already fired at Paid (existing
-/// behaviour); this notifier fills the gap when the PDF wasn't ready at
-/// that moment.
-///
-/// Gated by <c>Invoicing:CustomerEmailAttachments:Enabled</c> (ADR-022).
-/// During the dual-write rollout window, this is a no-op — the upstream
-/// pipeline still runs end-to-end so the inspection week is realistic.
-/// </summary>
+// Placeholder for the "your invoice is ready" email: no send path exists yet, so both flag states only log.
 public sealed class InvoicePdfReadyNotifier
 {
     private readonly InvoicingSettings _settings;

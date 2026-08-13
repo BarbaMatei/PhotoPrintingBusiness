@@ -3,8 +3,7 @@ namespace PhotoPrint.API.Configuration;
 /// <summary>
 /// ANAF SPV (e-Factura submission) integration — intent 016, bolt 039.
 ///
-/// When <see cref="Enabled"/> is false only the ANAF wire calls are skipped —
-/// the Invoice row, its XML/PDF build, and the customer download endpoint stay live regardless.
+/// Enabled=false still creates the Invoice row at Paid, but builds no XML or PDF (the worker is their only caller), so the download endpoint always 404s.
 ///
 /// Secrets (<see cref="ClientSecret"/>, <see cref="CertPath"/>,
 /// <see cref="CertPassword"/>) live in environment variables in production

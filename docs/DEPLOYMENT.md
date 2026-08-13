@@ -1305,8 +1305,8 @@ VAT computation runs **unconditionally**; ANAF submission is gated by a master f
 | Flag | Path | Purpose |
 |---|---|---|
 | `Vat:Rate` | `Vat__Rate` | The Romanian VAT rate (default `0.19`). Snapshotted at order creation; changing this does NOT mutate existing orders. **Always on**; no master flag. |
-| `Anaf:Enabled` | `Anaf__Enabled` | Master gate for ANAF submission. Off → no OAuth, no HTTP client, no worker. Invoice rows are still created (you need the legal artefact); only the SPV submission pipeline is dormant. Boot fails fast if any required ANAF credential is missing when this is on. |
-| `Invoicing:CustomerEmailAttachments:Enabled` | `Invoicing__CustomerEmailAttachments__Enabled` | **Dual-write rollout flag** per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md). Off → XML build, ANAF upload, PDF render all run; the customer-facing email attachment is suppressed. Flip on after the inspection week (§15.7). |
+| `Anaf:Enabled` | `Anaf__Enabled` | Master gate for ANAF submission. Off → no OAuth, no HTTP client, no worker. Invoice rows are still created (you need the legal artefact), but no XML or PDF is built either — the worker is their only caller — so `GET /api/orders/{id}/invoice` always answers 404. Boot fails fast if any required ANAF credential is missing when this is on. |
+| `Invoicing:CustomerEmailAttachments:Enabled` | `Invoicing__CustomerEmailAttachments__Enabled` | **Dual-write rollout flag** per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md). **Currently changes nothing customer-visible: no email send path is implemented.** Flipping it on only swaps which log line the notifier writes. It becomes the real seam once an email integration lands (§15.7). |
 
 **Why three flags, not one:** the rollout posture for regulated work is "exercise the pipeline against real production data, but don't expose the customer-visible side effect until you've inspected the output." The dual-write flag is the seam.
 
@@ -1438,24 +1438,24 @@ Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-d
    Anaf__BaseUrl=https://api.anaf.ro/prod/FCTEL/rest/
    Invoicing__CustomerEmailAttachments__Enabled=false   # ← stays off
    ```
-   Redeploy. **Every paid order now lands in ANAF for real**, but **the PDF is not attached to the customer's order-confirmation email**. The PDF is generated, stored, and available at `GET /api/orders/{id}/invoice` for the customer who knows to look — but the email pipeline doesn't surface it yet.
+   Redeploy. **Every paid order now lands in ANAF for real.** The PDF is generated, stored, and available at `GET /api/orders/{id}/invoice` for the customer who knows to look. No email surfaces it — that integration does not exist yet, so the flag below is not what is holding it back.
 
 5. **Inspection week (7 days):**
    - Daily: open `GET /api/admin/invoices` and verify the day's orders show `AnafStatus=Accepted`. If any are `Rejected` or `Failed`, read the `LastError` and address (typo in `Seller`, wrong VAT category, etc.). Use `POST /api/admin/invoices/{id}/retry` to re-queue.
    - Spot-check the rendered PDFs: download a few via `GET /api/orders/{id}/invoice` and verify they look right (logo, totals, buyer address, fiscal note). PDF fidelity issues found here are cheap to fix — the customer hasn't seen them yet.
    - Check `invoice_anaf_status_total` metric — `accepted` should dominate; ratio of `accepted : rejected` should be > 95:5.
 
-6. **Stage 3 — flip customer emails on.** After 7 clean days:
+6. **Stage 3 — flip customer emails on.** Blocked: there is no email send path to turn on. Setting
    ```bash
    Invoicing__CustomerEmailAttachments__Enabled=true
    ```
-   Restart the API (the flag is read on every request, but restarting also flushes any cached service decisions). Customers now receive the PDF attached to order-confirmation emails (when ready at email-send time) or via a follow-up "your invoice is ready" email when the worker finishes rendering.
+   changes nothing a customer sees — the notifier logs `invoice.pdf-ready.no-email-integration` instead of `invoice.pdf-ready.suppressed` and returns. Do this step only once an email attachment integration ships; until then customers reach their invoice at `GET /api/orders/{id}/invoice` and nowhere else.
 
 7. **Post-rollout cleanup (eventually):** When the dual-write flag stays `true` for ≥ 30 days, a follow-up PR removes the flag + the `if (settings.Enabled)` branches. Tracked in the bolt-039 construction log per ADR-022.
 
 **Rollback paths:**
-- *PDF renderer bug surfaces.* Flip `Invoicing__CustomerEmailAttachments__Enabled=false`. The pipeline keeps running, customers stop seeing the PDF. One env var.
-- *ANAF rejecting most submissions.* Flip `Anaf__Enabled=false`. Invoices still get created with numbers (legal artefact), but no SPV upload. Investigate the rejection cause, fix, then re-enable. Use `POST /api/admin/invoices/{id}/retry` after re-enabling to push the accumulated backlog.
+- *PDF renderer bug surfaces.* This flag is not a rollback path today — it gates no customer-visible send. Flip `Anaf__Enabled=false` to stop the pipeline, or fix forward and re-render via `POST /api/admin/invoices/{id}/retry`.
+- *ANAF rejecting most submissions.* Flip `Anaf__Enabled=false`. Invoices still get created with numbers (legal artefact), but no XML, no PDF, no SPV upload — and the customer download endpoint 404s until you re-enable. Investigate the rejection cause, fix, then re-enable. Use `POST /api/admin/invoices/{id}/retry` after re-enabling to push the accumulated backlog.
 - *Total integration failure.* Flip both flags off. The Order → Paid transition still creates the Invoice row (you need the numbering allocated for the legal sequence), but no XML, no PDF, no upload. You're back to the pre-bolt-039 behaviour with a forward-compatible schema.
 
 ### 15.8 Quarterly invoice-number-gap audit
