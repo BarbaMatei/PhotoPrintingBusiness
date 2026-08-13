@@ -14,7 +14,7 @@ public static class SocialAuthExtensions
         services.AddHttpClient("Google", client =>
         {
             client.BaseAddress = new Uri("https://oauth2.googleapis.com/");
-            client.Timeout = TimeSpan.FromSeconds(5);
+            client.Timeout = GoogleTokenValidator.HttpBackstop;
         });
 
         services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();

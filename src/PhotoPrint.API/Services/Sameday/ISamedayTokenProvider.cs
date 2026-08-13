@@ -1,7 +1,7 @@
 namespace PhotoPrint.API.Services.Sameday;
 
 /// <summary>
-/// In-process token cache for the Sameday API (ADR-013). Implementations
+/// In-process token cache for the Sameday API. Implementations
 /// MUST serialize concurrent first-time fetches behind a single mutex and
 /// MUST treat tokens as expired during their <c>SamedayToken.DefaultSafetyWindow</c>.
 /// </summary>
@@ -12,6 +12,6 @@ public interface ISamedayTokenProvider
     Task<SamedayToken> GetTokenAsync(CancellationToken ct = default);
 
     /// <summary>Drops the cached token. Called by <c>SamedayAuthHandler</c> on 401
-    /// before re-fetching, per ADR-014.</summary>
+    /// before re-fetching.</summary>
     void Invalidate();
 }

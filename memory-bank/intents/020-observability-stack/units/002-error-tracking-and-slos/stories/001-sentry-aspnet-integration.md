@@ -2,11 +2,11 @@
 id: 001-sentry-aspnet-integration
 unit: 002-error-tracking-and-slos
 intent: 020-observability-stack
-status: draft
+status: complete
 priority: must
-created: 2026-05-25T10:35:00Z
+created: 2026-05-25T10:35:00.000Z
 assigned_bolt: 045-error-tracking-and-slos
-implemented: false
+implemented: true
 ---
 
 # Story: 001-sentry-aspnet-integration

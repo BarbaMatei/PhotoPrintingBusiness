@@ -6,6 +6,45 @@ namespace PhotoPrint.Tests.Unit.Services;
 
 public class OrderStatusMachineTests
 {
+    // ── HasBeenPaid ────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(OrderStatus.Paid)]
+    [InlineData(OrderStatus.Printing)]
+    [InlineData(OrderStatus.Shipped)]
+    [InlineData(OrderStatus.Delivered)]
+    public void HasBeenPaid_IsTrue_ForPaidAndEveryFulfilmentStatusAfterIt(OrderStatus status) =>
+        Assert.True(OrderStatusMachine.HasBeenPaid(status));
+
+    [Theory]
+    [InlineData(OrderStatus.AwaitingPayment)]
+    [InlineData(OrderStatus.PaymentFailed)]
+    [InlineData(OrderStatus.Cancelled)]
+    public void HasBeenPaid_IsFalse_ForEveryStatusThatNeedsAHuman(OrderStatus status) =>
+        Assert.False(OrderStatusMachine.HasBeenPaid(status));
+
+    [Fact]
+    public void HasBeenPaid_CoversEveryStatusReachableFromPaid_ExceptCancelled()
+    {
+        var reachable = new HashSet<OrderStatus> { OrderStatus.Paid };
+        bool grew;
+        do
+        {
+            grew = false;
+            foreach (var to in Enum.GetValues<OrderStatus>())
+            {
+                if (reachable.Contains(to) || to == OrderStatus.Cancelled) continue;
+                if (reachable.Any(from => OrderStatusMachine.CanTransition(from, to)))
+                    grew = reachable.Add(to);
+            }
+        }
+        while (grew);
+
+        Assert.All(reachable, s => Assert.True(
+            OrderStatusMachine.HasBeenPaid(s),
+            $"{s} is reachable from Paid but HasBeenPaid says the customer never paid"));
+    }
+
     // ── Valid transitions ──────────────────────────────────────────────────────
 
     [Fact]

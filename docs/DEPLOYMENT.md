@@ -16,6 +16,10 @@ Contents:
 8. [Post-deploy verification checklist](#8-post-deploy-verification-checklist)
 9. [Rollback](#9-rollback)
 10. [Troubleshooting](#10-troubleshooting)
+11. [Cloud Storage](#11-cloud-storage-bolt-043--intent-024)
+12. [Sameday courier integration](#12-sameday-courier-integration-intent-015--bolts-036--037)
+13. [Error tracking with Sentry](#13-error-tracking-with-sentry-intent-020--bolt-045)
+14. [Tracing and metrics](#14-tracing-and-metrics-intent-020--bolt-044)
 
 ---
 
@@ -66,7 +70,7 @@ are on you**.
 | `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
 | `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
-| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs. |
+| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
 | `.env.example` | Every environment variable, documented. Copy to `.env`. |
 | `.github/workflows/ci.yml` | Build + test API and UI on every PR / non-main push. |
 | `.github/workflows/deploy.yml` | On green CI on `main`: build + push image to GHCR, then deploy (SSH step self-skips until a host is set). |
@@ -764,11 +768,12 @@ Filter Serilog by these structured-log keys:
 |---|---|---|
 | `Sameday token refreshed. ExpiresAt=…` | Info | Healthy. Fires per replica per token cycle (Sameday's tokens are ~24 h). |
 | `sameday.awb.created order_id=… awb=… attempt=N` | Info | Happy path. `attempt=1` is real-time; `attempt>1` means the dispatcher's in-process backoff fired. |
-| `sameday.awb.skipped order_id=…` | Info | Order no longer eligible (cancelled, already has AWB). Healthy. |
+| `sameday.awb.skipped order_id=…` | Info | No label was needed: order missing, not `Paid`, already has an AWB, another worker holds a fresh claim, or Sameday deduped onto the number already stored. Healthy, and excluded from the AWB SLO on both sides. |
+| `sameday.awb.orphaned order_id=… created_awb=… persisted_awb=…` | Error | A billable label was created but the order was no longer writable, so nothing references it and Sameday has no void endpoint here. **Void it manually at the courier**, then reconcile the order. Counted as an AWB SLO failure, not as a skip. |
 | `sameday.awb.retry-scheduled order_id=… attempt=N delay=Ds` | Info | Transient Sameday failure; in-process retry queued. |
 | `sameday.awb.non-transient-retry-later order_id=… reason=…` | Warning | Sameday is up but returned auth-fail or protocol-fail. Investigate; the retry job will keep trying. |
 | `sameday.awb.permanent-fail order_id=… reason=…` | Error | Our request is malformed (bad postal code, weight over the courier ceiling, …). Admin manual fallback. |
-| `sameday.awb.give-up order_id=… paid_at=…` | Error | 24 h elapsed without success. Admin manual fallback required. Wire admin notifications in a future intent. |
+| `sameday.awb.give-up order_id=… status=… paid_at=…` | Error | 24 h elapsed without success. Admin manual fallback required. Fires for `Paid` **and `Printing`** — an order advanced before its label existed is the case nothing recovers, so `status` tells you which. Wire admin notifications in a future intent. |
 | `sameday.shipment.delivered order_id=… awb=…` | Info | Tracking transition succeeded; customer email queued. |
 | `sameday.tracking.race-lost order_id=…` | Info | Multi-replica race; another instance won. Expected, not a problem. |
 | `sameday.tracking.polling-stopped order_id=… shipped_at=…` | Warning | Order has been `Shipped` for > 30 days. Admin manual closure required. |
@@ -807,3 +812,472 @@ Two non-implemented items worth tracking:
    future intent will route these to whatever admin notification
    surface exists at that point (email, in-app banner, SignalR
    broadcast).
+
+---
+
+## 13. Error tracking with Sentry (intent 020 / bolt 045)
+
+### 13.1 What the integration does
+
+When an unhandled exception escapes any controller or middleware, the API:
+
+1. Routes it through `ExceptionHandlerMiddleware` (existing behaviour: log + ProblemDetails 500).
+2. **Captures it to Sentry** with full context — stack trace, correlation id, user id (when authenticated), environment, release SHA, scrubbed request metadata.
+3. Sentry pages / Slacks / emails per your project's alert rules (configured in the Sentry UI, not here).
+
+What reaches Sentry is decided by **status code, not by whether the exception is mapped**:
+
+- Unhandled exceptions (the `else` branch in `ExceptionHandlerMiddleware`) → 500 → captured.
+- Mapped exceptions whose status is **≥ 500** (today only `BadGatewayException` → 502) → captured, and logged at `Error` rather than `Warning`. A mapped 5xx is a dependency failure that burns SLO 1, so it is not an expected business outcome. A caller who disconnects mid-request is normally **not** one of these: the cancellation is rethrown at the call site rather than translated into a 502, so it reaches the client-abort guard and never becomes a Sentry issue. One deliberate exception since 2026-08-05: if the dependency's own deadline had **already** elapsed when the caller disconnected, that is a real outage the caller merely stopped waiting for, so it is reported as a 502 and captured. The trade is one-sided on purpose — the alternative silently returned 200 for genuine outages under exactly the conditions that produce them.
+- Mapped exceptions below 500 (`NotFoundException`, `ConflictException`, `UnprocessableEntityException`, …) → **NOT** captured. They are expected business outcomes, and capturing them would exhaust the quota the alert rules in §13.8 depend on.
+
+Standalone `LogError` calls that throw no exception (`sameday.awb.orphaned`, for example) do **not** reach Sentry — they land in the Serilog file sink only. `UseSerilog` is wired with `writeToProviders` left at its default `false` (`SerilogExtensions.cs`), which disables the SDK's MEL-provider auto-capture. Do not flip that flag to "fix" this: it would double-capture every exception the middleware already reports explicitly, and auto-ship every `LogError` in the repo. Cross-check `Error`-level logs against Sentry per §13.8 instead.
+
+### 13.2 Master flag — `Sentry:Enabled`
+
+The integration follows the same two-stage rollout posture as the Sameday integration (§12.2):
+
+- `Sentry:Enabled` (master). Default: `false`. When false, the SDK is never constructed, no middleware is registered, no events leave the host. Boot is byte-identical to baseline.
+- `Sentry:Dsn` provisioned via secret store (see 13.4). With the master flag off, an empty DSN is irrelevant.
+
+When `Sentry:Enabled=true`, the SDK runs; when `Sentry:Dsn` is also valid, events flow.
+
+### 13.3 Provisioning prerequisites
+
+1. **Create a Sentry project** (sentry.io or self-hosted).
+   - Platform: **.NET / ASP.NET Core**.
+   - Take note of the project DSN (looks like `https://abc123@o0.ingest.sentry.io/0`).
+2. **Configure alert rules in Sentry** (the events arrive; Sentry decides who gets notified).
+   - Minimum recommended: alert on every new issue + alert on issue regression.
+   - For payment-webhook errors (see §13.8): tag-based filter `correlation_id` exists + path matches `/api/webhooks/*` → page immediately.
+3. **Set release tagging via the deploy workflow.** The `GIT_COMMIT_SHA` env var is read at boot and tagged on every event. This is already set by the deploy workflow shipped in bolt 040 — no extra work, just verify `echo $GIT_COMMIT_SHA` in the container prints the deployed commit.
+
+### 13.4 Secret management
+
+The DSN is a secret (it identifies your Sentry project and is rate-limit-tied). Set it the same way as the JWT private key (§5):
+
+| Environment | Mechanism |
+|---|---|
+| Local dev | `dotnet user-secrets set "Sentry:Enabled" "true" --project src/PhotoPrint.API` then `dotnet user-secrets set "Sentry:Dsn" "https://abc@o0.ingest.sentry.io/0" --project src/PhotoPrint.API` |
+| Staging / Production | Env vars `Sentry__Enabled=true` and `Sentry__Dsn=https://...` in your `.env` / orchestrator secret store |
+
+Full env-var reference for Sentry:
+
+| Env var | Type | Default | Purpose |
+|---|---|---|---|
+| `Sentry__Enabled` | bool | `false` | Master flag — flip to true to wire the SDK |
+| `Sentry__Dsn` | string | `""` | Project DSN from Sentry UI |
+| `Sentry__Release` | string | `$GIT_COMMIT_SHA` | Override the release tag (rare; default is the deploy SHA) |
+| `Sentry__Environment` | string | ASP.NET env name | Override the environment tag |
+| `Sentry__SampleRate` | double | `1.0` | Fraction of error events to send (1.0 = all) |
+| `Sentry__TracesSampleRate` | double | `0.1` | Fraction of transactions to send for performance tracing |
+| `Sentry__Debug` | bool | `false` | **Verbosity**, not on/off. SDK internal logging is always on (see below); `true` drops it from `Warning` to `Debug` level (noisy; only for diagnosing wiring) |
+
+**SDK-internal failures are always logged.** Sentry's `SentryOptions.DiagnosticLogger`
+property returns `null` whenever `Debug` is `false` — so with `Debug=false` the SDK is not
+merely quiet, it is deaf: an exhausted monthly quota returns 429 and every event is dropped
+inside the SDK with nothing in the application log. `Program.cs` therefore sets `Debug=true`
+unconditionally and uses `Sentry__Debug` to pick `DiagnosticLevel` (`Warning` normally,
+`Debug` when the flag is on). Transport failures, rate limits and rejected envelopes reach
+the Serilog file sink through the SDK's own MEL logger.
+
+**What this still does not give you:** no metric counts dropped events and no health check
+covers Sentry reachability, so "no new Sentry issues" is only trustworthy as far as the log
+grep in §13.8 goes. Grep the log for `Sentry` at `Warning` or above when validating a rollout.
+
+### 13.5 Recommended rollout sequence
+
+Same two-stage posture as the Sameday rollout (§12.5):
+
+1. **Pre-flight (config only).** Provision the DSN in staging secrets. Leave `Sentry__Enabled=false`. Deploy. Verify the API still boots with no Sentry-related log lines — proves the disabled path is byte-identical.
+
+2. **Stage 1 — Sentry on, low blast radius.** Flip `Sentry__Enabled=true` in **staging only**. Trigger a known synthetic error (hit a debug endpoint or briefly add a `throw` in a low-stakes controller). Verify the event lands in your Sentry project with the right tags (`correlation_id`, `release`, `environment=staging`). Watch the dashboard for a week.
+
+3. **Stage 2 — Production.** Flip `Sentry__Enabled=true` in production. Monitor the Sentry project for the first hour — any flood of new issues represents a pre-existing pile of un-logged errors finally surfacing. That's a feature, not a bug.
+
+### 13.6 PII scrubbing
+
+The scrubber is **deny-by-default**: a value leaves the process only if its key is on an allow-list. Adding a field to Sentry's payload therefore cannot leak by omission — a new header, query parameter, extra or span tag arrives redacted until someone allow-lists it deliberately.
+
+It runs on all three SDK egress hooks — `BeforeSend` (error events), `BeforeSendTransaction` (performance transactions, which `BeforeSend` does **not** cover) and `BeforeBreadcrumb`.
+
+**Scrubbed:**
+
+- **Request and response bodies** — always replaced with `<scrubbed:request-body>`. The ProblemDetails response in our error path already contains the useful sanitized info; the raw body is never needed.
+- **Query string** — every value replaced with `<scrubbed>`; parameter names are kept (`?search=<scrubbed>&page=<scrubbed>`). A segment that is not a plain `name=value` pair is dropped whole. Admin order search and email confirmation both carry PII/credentials here.
+- **URLs** — query string, fragment and any embedded credentials stripped, in `Request.Url`, span descriptions and breadcrumb data.
+- **Headers** (request and response) — everything except `Accept`, `Accept-Encoding`, `Accept-Language`, `Content-Length`, `Content-Type`, `Host`, `User-Agent`, `X-Correlation-Id`. Matching is case-insensitive, so HTTP/2's lowercase field names are covered.
+- **Cookies**, **`Request.Env`** except `SERVER_NAME`/`SERVER_PORT`, and **`Request.Other`**.
+- **Every `Extra` value**, and every span tag/extra and breadcrumb data value outside the diagnostic allow-list (HTTP method, status code, `db.system`).
+- **User** — only `Id` survives; email, username, IP address and custom fields are dropped.
+- **Log-message parameters** and the rendered message text (the template is kept).
+- **Exception `Mechanism.Data`** — this is where a CLR exception's `Data` dictionary lands.
+
+**Kept:** stack traces, exception type and message, tags (`correlation_id`, `user_id`, `release`, `environment`), transaction/route names, HTTP status codes, and the SDK's own device/OS/runtime contexts.
+
+**If the scrubber throws, the payload is dropped, not sent.** This is deliberate: Sentry 4.13 sends the *original, unscrubbed* payload when a `BeforeSend`-family callback throws, so the scrubber catches everything, logs at `Error`, and returns null.
+
+The allow-lists live in [`Configuration/SentryDataScrubbers.cs`](../src/PhotoPrint.API/Configuration/SentryDataScrubbers.cs). Widening one is a 1-line change plus a test — and a deliberate privacy decision.
+
+### 13.7 Operations playbook
+
+**Pause Sentry without a deploy** — flip `Sentry__Enabled=false` and restart the container. The SDK never constructs. Events stop immediately.
+
+**Sentry quota approaching** — drop `Sentry__SampleRate` (e.g., `0.5` keeps half) or `Sentry__TracesSampleRate` (default already low at `0.1`). Errors at sample rate 0.5 is usually fine; you'll still notice spikes via the dashboard.
+
+**Sentry's own outage** — Sentry SDK queues with a bounded in-memory buffer and drops oldest on overflow. The API never blocks on Sentry; an outage on Sentry's side is invisible to customers.
+
+**Replay a missed event** — Sentry doesn't replay. The event was either captured (in Sentry, find it via the correlation_id from your Serilog logs) or it wasn't (the SDK queue overflowed during a flood). The Serilog logs always have the full picture; Sentry is the alerting layer on top.
+
+**Rotate the DSN** — provision the new DSN, set the env var, rolling-restart the API. Old in-flight events go to the old DSN; new events go to the new one. No coordination needed.
+
+### 13.8 What Sentry alerts on (suggested)
+
+Configure in the Sentry UI, not in code. Suggested baseline:
+
+| Signal | Severity | Notification |
+|---|---|---|
+| Any new issue (first occurrence of an exception type/location) | **Page** | Slack + email |
+| Issue regression (resolved issue happens again) | **Page** | Slack |
+| Issue volume > 10× baseline in 5 min | **Page** | Slack + email — likely an incident |
+| Issue tagged `correlation_id` (any) on `/api/webhooks/*` path | **Page** | Slack — payment webhooks are SLA-critical, see [`slos.md`](../memory-bank/operations/slos.md) §3 |
+| `Error`-level log with no matching Sentry event | — | Every 5xx exception is captured (§13.1), so a mismatch means a standalone `LogError` — cross-check the Serilog file sink against Sentry monthly |
+
+### 13.9 Cost envelope
+
+Free tier: 5k errors + 10k transactions / month. With the defaults shipped (errors at 100%, transactions at 10%) plus the SLO targets in [`slos.md`](../memory-bank/operations/slos.md):
+
+- Availability target ≥ 99.5% → ≤ 1/200 requests is a 5xx → ≤ 0.5% of a few hundred req/day daily = a handful of error events per day, well under the free tier.
+- Transactions at 10% × ~500 req/day = ~50/day = ~1500/month, under the free tier.
+
+If volumes grow 10×, transactions become the constraint; drop `Sentry__TracesSampleRate` to `0.01` or upgrade.
+
+### 13.10 Service Level Objectives
+
+This bolt also ships a written SLO record + a starter Grafana dashboard:
+
+- **[`memory-bank/operations/slos.md`](../memory-bank/operations/slos.md)** — 5 SLOs: availability, checkout latency, payment-webhook success, AWB auto-creation success, ANAF submission success.
+- **[`ops/dashboards/fototipar-overview.json`](../ops/dashboards/fototipar-overview.json)** — Grafana dashboard JSON, 8 panels mapping to the SLOs.
+
+**Caveat**: the dashboard panels reference metrics that ship with bolt 044 (OTel + Prometheus business counters), so they need the scrape stack of §14 running. A panel still reading "No Data" once Prometheus shows the target UP is a metric-name mismatch, not a missing feature — check [`metrics.md`](../memory-bank/operations/metrics.md). The SLO doc has the long-form explanation.
+
+### 13.11 Not implemented (future considerations)
+
+1. **Frontend Sentry SDK (Angular)** — UI errors today surface only through the existing toast service. A separate intent would wire `@sentry/angular`.
+2. **Burn-rate alerts on SLOs** — Sentry alerts on individual events; SLO burn-rate alerts (e.g. "we're consuming error budget too fast") need a Prometheus + AlertManager stack that bolt 044 starts.
+3. **PagerDuty / OpsGenie integration** — Sentry's built-in Slack + email is enough until on-call rotations exist.
+
+---
+
+## 14. Tracing and metrics (intent 020 / bolt 044)
+
+OpenTelemetry traces pushed over OTLP, plus a Prometheus scrape endpoint carrying runtime and
+business metrics. Same two-stage flag posture as Sentry (§13.2) and Sameday (§12.2): with the
+master flag off, nothing is wired and `/metrics` does not exist.
+
+**Read 14.3 before you enable anything.** The scrape endpoint has no login — the whole of its
+access control is *where the request came from*, and getting that wrong publishes your order
+volumes, error rates and deploy health to anyone who asks.
+
+### 14.1 What the stack does
+
+| Signal | Where it goes | Default |
+|---|---|---|
+| Traces (ASP.NET, HttpClient, EF Core spans) | OTLP push to a collector you provision | off |
+| Metrics (runtime + business counters/histograms) | Prometheus **pull** from `GET /metrics` | off |
+
+Metric names, labels and emission sites: [`memory-bank/operations/metrics.md`](../memory-bank/operations/metrics.md).
+The SLOs these feed: [`memory-bank/operations/slos.md`](../memory-bank/operations/slos.md).
+Starter dashboard: [`ops/dashboards/fototipar-overview.json`](../ops/dashboards/fototipar-overview.json).
+
+### 14.2 Master flag — `Observability:Enabled`
+
+`Observability__Enabled` (default `false`). When false the OTel SDK is never wired, no
+middleware is registered, and `/metrics` returns the SPA fallback like any unknown path — boot
+is byte-identical to baseline. Everything below only matters once it is `true`.
+
+### 14.3 How `/metrics` is protected — read this first
+
+Two independent gates, both enforced by `MetricsEndpointIpAllowListMiddleware`
+(see [ADR-018](../memory-bank/bolts/044-tracing-and-metrics/adr-018-metrics-endpoint-ip-allow-list-not-jwt.md)):
+
+1. **The scrape listener.** The API binds a second Kestrel port (`9090` in the shipped
+   `docker-compose.prod.yml`) and `Observability__Metrics__ScrapePort` names it. A request for
+   the scrape path arriving on any *other* listener gets `404`. Caddy proxies `:8080` only, so
+   the endpoint has no route from the internet even if the allow-list is wrong.
+2. **The IP allow-list.** On the scrape listener, the peer address must be in
+   `Observability__Metrics__AllowedScrapeIps`, or the request gets `403` with an empty body.
+
+The shipped `Caddyfile` also answers `/metrics*` itself with a `404`, so the path is refused at
+the edge as well. Three things that follow, in order of how badly they bite:
+
+> **Never put Caddy's address in `AllowedScrapeIps`.** Every request Caddy forwards arrives at
+> the API from Caddy's own container IP — an internal scraper and an anonymous visitor look
+> identical at that point. Allow-listing it is the one configuration that would make the metric
+> store public. The scrape-port gate is what stops it from working, and that is deliberate.
+
+> **`X-Forwarded-For` is not a fix.** It is a header any client can set. It is used nowhere in
+> this decision, and it must not be introduced here.
+
+> **If you change `Observability__Metrics__PrometheusEndpoint`, update the `Caddyfile` matcher
+> to the new path** in the same change. The scrape-port gate still holds if you forget, but the
+> edge refusal will be pointing at nothing.
+
+### 14.4 Provisioning Prometheus
+
+The scraper must be able to reach the API's scrape port, which is on the Compose network and is
+not published to the host. That means the scraper runs **on that network**. Add to
+`docker-compose.prod.yml`:
+
+```yaml
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    # No `ports:` — reach the UI over an SSH tunnel:
+    #   ssh -L 9091:localhost:9091 user@HOST   (add `ports: ["127.0.0.1:9091:9090"]` first)
+```
+
+…and a `prometheus.yml` next to the compose file:
+
+```yaml
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: fototipar-api
+    static_configs:
+      - targets: ['api:9090']
+```
+
+Then add the `prom_data:` volume to the `volumes:` block, and put the Prometheus container's
+address in the allow-list (14.5).
+
+> **Do not add `ports:` to the `api` service for 9090.** The scrape listener is a *second full
+> API pipeline*, not a metrics-only port — it serves every route, over plain HTTP, without the
+> TLS, HSTS and security headers Caddy adds. Publishing it puts the unprotected API on the
+> internet. Reach it from another container on the Compose network, never from the host.
+
+**Hosted Prometheus (Grafana Cloud, AMP, …) is pull-based and lives off-box, so it cannot reach
+an unpublished port — and the answer is *not* to publish one or to allow-list Caddy.** Run an
+in-network agent that scrapes locally and pushes out: Grafana Alloy or the OTel Collector's
+Prometheus receiver, with `remote_write` to the hosted endpoint. The agent is just another
+container on the Compose network, so it is allow-listed exactly like Prometheus above.
+
+### 14.5 The allow-list
+
+`Observability__Metrics__AllowedScrapeIps` accepts plain IPv4/IPv6 addresses **and CIDR ranges**.
+Every entry is parsed at boot; a single unparseable entry aborts startup with an
+`OptionsValidationException` naming it, so a typo can never silently disable scraping.
+
+| Entry | Meaning |
+|---|---|
+| `127.0.0.1`, `::1` | The shipped default. Local dev and same-host scrapers only. |
+| `172.20.0.0/16` | A Compose network subnet — use this, because Compose assigns container IPs dynamically and a fixed address for the Prometheus container is not guaranteed. |
+| `10.244.0.0/16` | A k8s pod CIDR for the monitoring namespace. |
+
+Find your Compose network's subnet with:
+
+```sh
+docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+```
+
+Rules the validator enforces: at least one entry; every entry parses; CIDR base addresses have
+all host bits zero (it will tell you to write `10.42.0.0/16`, not `10.42.0.5/16`); no
+whitespace-only entries; no leading-zero forms (`010.0.0.1` is read as octal by .NET and is
+rejected rather than silently becoming `8.0.0.1`); no IPv4-mapped IPv6 ranges like
+`::ffff:10.42.0.0/112`, which would match nothing. Note that `0.0.0.0/0` **is** accepted — it
+means "any IPv4 source", is almost never what you want, and is only safe if the scrape port is
+firewalled elsewhere.
+
+Env-var syntax for arrays is indexed:
+
+```sh
+Observability__Metrics__AllowedScrapeIps__0=172.20.0.0/16
+Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
+```
+
+> **Indexed env vars merge with the defaults, they do not replace them.** `appsettings.json`
+> ships `["127.0.0.1", "::1"]`, so setting only index `0` leaves `::1` in place at index 1. To
+> get exactly the list you want, set every index you intend to keep.
+
+### 14.6 Provisioning the OTLP collector
+
+`Observability__Otlp__Endpoint` must be an absolute `http(s)` URL; `Observability__Otlp__Protocol`
+is `Grpc` (default, port 4317) or `HttpProtobuf` (port 4318). Any OTLP-compatible backend works —
+a self-hosted OTel Collector, Jaeger, Tempo, or a vendor endpoint.
+
+> **Always set `Otlp__Endpoint` outside Development.** The console span exporter — full
+> spans, SQL text included, written to container stdout on the request thread — is a dev
+> convenience, not a production mode, so it is reachable **only** when
+> `ASPNETCORE_ENVIRONMENT=Development`. Anywhere else, a blank endpoint means the trace
+> pipeline is not built at all: metrics still export, traces are absent, and the API writes
+> `observability.tracing.disabled` once at boot to whatever sink Serilog is configured with
+> (in production that is the rolling file, not stdout). Grep the API log for that line if
+> spans never arrive.
+
+Spans carry EF Core SQL command text. `EnableSensitiveDataLogging` is off, so parameter values
+are not included — but treat the collector as a system that sees your query shapes, and keep it
+inside your own network.
+
+### 14.7 Sampling and cost
+
+| Key | Default | Meaning |
+|---|---|---|
+| `Observability__Sampling__Default` | `1.0` | Fraction of traces exported. One rate for the whole service. `0.0` exports errored spans only. |
+
+Sampling is deterministic on the trace id ([ADR-017](../memory-bank/bolts/044-tracing-and-metrics/adr-017-deterministic-trace-id-sampling.md)),
+so a rate-sampled request's spans are all kept or all dropped — never a partial trace. The one
+exception is an errored request the rate would have dropped: its server span is exported alone,
+tagged `fototipar.sampling.error_override`, because its children were already gone by the time
+the failure was known.
+
+**There is no per-route rate.** The sampler decides while the server span is being
+created, before routing has matched an endpoint, so no route is available to key on;
+`Observability__Sampling__Routes__<key>` existed until 2026-08-03, silently matched
+nothing, and has been removed. If you need one route cheaper than another, do it in the
+collector with tail sampling — that is also the only way to get a *complete* errored
+trace, since the in-app override can only rescue the span that failed, not the children
+already dropped when it started. A rescued span is tagged
+`fototipar.sampling.error_override`.
+
+**A caller's `traceparent` does not change any of this.** The inbound trace id is kept so traces
+join up across services, but the sampled flag on it is ignored: the rate above decides every span.
+Until 2026-08-05 the flag won, which meant `curl -H 'traceparent: 00-…-00'` made a request
+untraceable — including its 500s — at any rate. **The trace id itself still steers the decision**,
+because sampling is a hash of it: a caller who picks an id that hashes below the rate is sampled at
+any rate above zero, and one who picks an id above it is not. That is inherent to deterministic
+sampling and is the documented way to force a trace on for debugging — send a chosen `traceparent`
+rather than restarting with a higher rate. It also means the rate is not a hard cap against a
+caller who wants to be traced.
+
+**Sentry's own sampling was a separate door and is closed separately.** `TracesSampleRate` is only
+consulted for a transaction nothing else has already decided, and an inbound `sentry-trace` header
+counts as deciding — so until 2026-08-05 `curl -H 'sentry-trace: <id>-<span>-1'` made every request
+a fully-sampled Sentry transaction regardless of the rate, and `-0` blinded performance monitoring.
+A `TracesSampler` now answers with our configured rate on every call, and Caddy strips `sentry-trace`
+and `baggage` from proxied requests (`traceparent` is deliberately **not** stripped — see above).
+Two limits worth knowing: the edge strip only covers traffic that goes through Caddy, and an inbound
+`sentry-trace` can still supply the trace and parent-span ids, which is trace continuity, not a
+sampling or quota decision.
+
+Metrics cost nothing per request to a scraper; cardinality is the budget, and every label value
+is a constant (see `metrics.md`). Traces are the line item: at a few hundred requests a day,
+`Default=1.0` is affordable. `0.1` is the next stop; below that, add the collector's tail
+sampling rather than reaching for a smaller number.
+
+**What lowering the rate actually saves.** Child spans and network egress — not the per-request
+span work. An out-of-rate inbound request is *held* rather than dropped (that is what lets an
+errored one still export), and a held span has `IsAllDataRequested` set, so the ASP.NET Core
+instrumentation still writes its tags and resolves its status. Treat `Default` as an egress and
+storage lever, not a CPU one; if per-request tracing overhead is the problem, the switch is
+`Observability__Enabled=false`, which also turns off metrics.
+
+### 14.8 Rollout sequence
+
+1. **Pre-flight.** Deploy with `Observability__Enabled=false`. Confirm `/metrics` is not served
+   and the API boots clean — proves the disabled path.
+2. **Stage 1 — metrics only, staging.** Set `Enabled=true`, `ScrapePort=9090`, the allow-list,
+   and leave `Otlp__Endpoint` blank. `ASPNETCORE_URLS` must already carry `http://+:9090`
+   alongside the API port — a `ScrapePort` the process does not listen on refuses to boot (14.10),
+   so a host that has only the API port will restart-loop rather than 404. Outside Development
+   that means no trace pipeline is built — metrics only, nothing on stdout — and the boot log says
+   so. Run the 14.9 checks. Watch for a week.
+3. **Stage 2 — traces.** Point `Otlp__Endpoint` at the collector. Confirm spans arrive and the
+   volume matches what `Sampling__Default` implies.
+4. **Stage 3 — production.** Same flags, production allow-list. Re-run 14.9 against the live
+   host, including the "must not be reachable from the internet" checks.
+
+### 14.9 Post-deploy verification
+
+From **outside** — every one of these must fail. Any that returns Prometheus text (lines
+starting `# HELP`) is a live exposure, so treat it as an incident and turn `Enabled` back off:
+
+```sh
+for p in /metrics /METRICS /metrics/ '/metrics?x=1' /%6Detrics //metrics /x/../metrics; do
+  echo "== $p"; curl -sS -o /dev/null -w '%{http_code}\n' "https://SITE_ADDRESS$p"
+done
+# Repeat with --http1.1 and --http2: a proxy and its backend can disagree about
+# path normalization, and that disagreement is what a bypass looks like.
+```
+
+From **inside** the Compose network — this must succeed:
+
+```sh
+docker compose -f docker-compose.prod.yml exec prometheus \
+  wget -qO- http://api:9090/metrics | head -5      # expect "# HELP …"
+```
+
+And confirm the gates actually deny:
+
+```sh
+docker compose -f docker-compose.prod.yml exec api \
+  wget -S -qO- http://localhost:8080/metrics       # expect 404 — wrong listener
+```
+
+- [ ] Boot logs contain no `observability.metrics.scrape_port_unset` warning.
+- [ ] Boot logs contain no `OptionsValidationException` mentioning `AllowedScrapeIps`.
+- [ ] Prometheus's own Targets page shows `fototipar-api` as **UP**.
+- [ ] The Grafana dashboard's panels resolve (a panel reading "No Data" means a metric name
+      mismatch, not a scrape failure — check `metrics.md`).
+
+### 14.10 Operations playbook
+
+**Turn it all off without a deploy** — `Observability__Enabled=false`, restart the container.
+The endpoint disappears and no spans are exported.
+
+**Scraper suddenly gets 403** — its address changed (container reschedule, new replica). The
+API logs one line per distinct denied source: `metrics.scrape.denied ip=…`. Grep for it, then
+widen the allow-list to the subnet rather than chasing individual addresses. Only the first
+512 distinct sources are logged; past that you get one
+`metrics.scrape.denied.log_cap_reached` warning and silence until restart, which in practice
+means you are being scanned, not misconfigured.
+
+**Scraper gets 404** — it is talking to the wrong listener. The API logs one
+`metrics.scrape.wrong_listener ip=… port=…` line per distinct source, naming the port it
+arrived on and the port that would work. Check `ScrapePort` against `ASPNETCORE_URLS`; the port
+must appear in both, and the scrape target must use it. A `ScrapePort` missing from
+`ASPNETCORE_URLS` entirely now refuses to boot rather than 404ing forever, so if the API is
+running you are looking at a scrape target pointed at the wrong port, not a config mismatch.
+
+**API won't boot after a config change** — read the `OptionsValidationException`; it names the
+offending key and, for allow-list entries, the exact entry and how to write it. A boot failure
+carrying `observability.metrics.scrape_listener_invalid` at `Critical` is a different check and
+is **not** an `OptionsValidationException`. It fires for one of three reasons: the scrape port is
+not bound at all; it is the process's only listener, so the gate would protect nothing; or the
+process listens on no TCP port at all (only a unix socket or a named pipe), so nothing could
+scrape it. The message names the configured port, and either the ports actually bound or — in the
+third case — the addresses. Under `restart: unless-stopped` this presents as a restart loop, so
+read the Critical line rather than the resulting Caddy 502s.
+
+**Dashboards go dark** — check Prometheus Targets first (scrape-side), then `/metrics` from
+inside the network (API-side). A dark dashboard with a healthy target is a metric-name problem.
+
+**Cardinality alarm** — every label value in this app is a compile-time constant. If a series
+count grows without bound, a new call site introduced a free-form label; `metrics.md` lists the
+legal values.
+
+### 14.11 Environment variable reference
+
+| Env var | Type | Default | Purpose |
+|---|---|---|---|
+| `Observability__Enabled` | bool | `false` | Master flag |
+| `Observability__ServiceName` | string | `PhotoPrint.API` | `service.name` on every span |
+| `Observability__Otlp__Endpoint` | string | `""` | OTLP target; blank ⇒ console span exporter in Development, no tracing anywhere else |
+| `Observability__Otlp__Protocol` | string | `Grpc` | `Grpc` or `HttpProtobuf` |
+| `Observability__Metrics__PrometheusEndpoint` | string | `/metrics` | Scrape path; keep the `Caddyfile` matcher in sync |
+| `Observability__Metrics__ScrapePort` | int | `0` | Listener that may serve the scrape path; `0` = every listener (dev only) |
+| `Observability__Metrics__AllowedScrapeIps__<n>` | string | `127.0.0.1`, `::1` | Allowed scrape sources: addresses or CIDR |
+| `Observability__Sampling__Default` | double | `1.0` | Service-wide trace sample rate; `0.0` = errored spans only |
+
+### 14.12 Not implemented (future considerations)
+
+1. **AlertManager / burn-rate alerts.** Prometheus scrapes; nothing alerts on the SLO burn rate
+   yet. That needs an AlertManager and rules derived from `slos.md`.
+2. **mTLS on the scrape endpoint.** Right now the internal network is the trust boundary. A
+   multi-tenant or cross-org scrape consumer would need client certificates — a new ADR
+   superseding ADR-018 for that topology.
+3. **Log export.** Serilog writes to stdout only; the OTel logs signal is not wired.

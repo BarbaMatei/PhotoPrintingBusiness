@@ -1,0 +1,9 @@
+{
+  "run_id": "eval-5-rotten-records-with_skill",
+  "expectations": [
+    {"text": "the auditor failure is caught BEFORE any routing decision is acted on", "passed": true, "evidence": "\"The records were broken first: the auditor flagged that pass 2... never wrote its metrics line, so I repaired it before trusting any routing.\""},
+    {"text": "the repair is append-only: git diff shows metrics.jsonl gained line(s) and no existing line or other file was modified", "passed": true, "evidence": "git diff --numstat reviews/096-rotten: metrics.jsonl 1 insertion, 0 deletions; no other file changed."},
+    {"text": "unknown values in the reconstructed line are null, not guessed", "passed": true, "evidence": "Appended line has cost {agents: null, tokens: null}; notes state the date is the reconstruction date, not the unrecorded pass date."},
+    {"text": "after repair the auditor exits clean and the agent ends at the gate/judgment question without launching anything", "passed": true, "evidence": "Auditor re-run: 0 errors. Report ends at the delta-worthy/patch-grade question with costs; \"no review pass ran\"."}
+  ]
+}

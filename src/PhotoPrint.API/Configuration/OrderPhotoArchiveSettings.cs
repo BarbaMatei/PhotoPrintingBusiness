@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 namespace PhotoPrint.API.Configuration;
 
 /// <summary>
-/// Configuration for the intent-024 promote-on-paid lifecycle (bolt 051).
+/// Configuration for the intent-024 promote-on-paid lifecycle.
 /// <para>The master switch <see cref="Enabled"/> can disable promotion independently of
 /// the cloud tier — useful for incident response (drain payments without promoting) or
 /// a deploy that intentionally skips the worker.</para>
@@ -21,7 +21,7 @@ public class OrderPhotoArchiveSettings
     /// <summary>
     /// Retry ceiling per order. After <see cref="MaxAttempts"/> failures the worker logs
     /// <c>UploadPromotionFailed</c> at Error and stops re-enqueueing; the next deploy's
-    /// recovery scan picks it up again (ADR-011).
+    /// recovery scan picks it up again.
     /// </summary>
     public int MaxAttempts { get; set; } = 5;
 
@@ -36,14 +36,13 @@ public class OrderPhotoArchiveSettings
     /// Default 6 hours: the per-order retry envelope (<see cref="MaxAttempts"/> × backoff) tops out
     /// in ~1.5h, so a 6h re-scan bounds how long a paid order that went terminal-Local waits before
     /// it is re-enqueued for another promotion attempt. Boot-only was insufficient on an always-on
-    /// server — its original never reached the durable cloud tier until the next reboot (F1, review
-    /// 043-v3, the class sibling of F4's purge-sweep fix).
+    /// server — its original never reached the durable cloud tier until the next reboot (class sibling of the purge-sweep fix).
     /// </summary>
     public int PromotionRecoverySweepIntervalHours { get; set; } = 6;
 }
 
 /// <summary>
-/// Fails fast at startup (via <c>.ValidateOnStart()</c>) if the settings are malformed —
+/// Fails fast at startup (via <c>.ValidateOnStart</c>) if the settings are malformed —
 /// negative concurrency, zero attempts, or an empty backoff schedule.
 /// </summary>
 public class OrderPhotoArchiveSettingsValidator : IValidateOptions<OrderPhotoArchiveSettings>

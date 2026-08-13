@@ -6,7 +6,7 @@ namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
 /// Smoke tests for <see cref="PromotionQueue"/> — verifies the in-memory channel
-/// preserves order and is consumable by a single reader (ADR-010).
+/// preserves order and is consumable by a single reader.
 /// </summary>
 public class PromotionQueueTests
 {

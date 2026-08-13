@@ -6,7 +6,7 @@ namespace PhotoPrint.Tests.Unit.Configuration;
 
 /// <summary>
 /// Unit tests for <see cref="OrderPhotoArchiveSettingsValidator"/>. The validator is
-/// wired with <c>.ValidateOnStart()</c>, so a failure here would crash the API at boot —
+/// wired with <c>.ValidateOnStart</c>, so a failure here would crash the API at boot —
 /// these tests guarantee the failure surface is correct rather than silent.
 /// </summary>
 public class OrderPhotoArchiveSettingsValidatorTests
@@ -74,7 +74,7 @@ public class OrderPhotoArchiveSettingsValidatorTests
     [Fact]
     public void Validate_NonPositivePromotionRecoveryInterval_Fails()
     {
-        // F1 (review 043-v3) added the periodic promotion-recovery sweep; its interval feeds a
+        // Added the periodic promotion-recovery sweep; its interval feeds a
         // PeriodicTimer, so <= 0 must fail fast at boot rather than crash at runtime.
         var s = Defaults();
         s.PromotionRecoverySweepIntervalHours = 0;

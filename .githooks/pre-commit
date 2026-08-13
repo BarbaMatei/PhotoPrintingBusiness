@@ -1,0 +1,70 @@
+#!/bin/sh
+# Lists every // comment line this commit adds so the CLAUDE.md comment rule
+# gets a deliberate check at commit time. COMMENTS_OK=1 acknowledges and passes
+# (the doc gate below stays independent of it).
+hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
+  /^\+\+\+ b\// { file = substr($0, 7); next }
+  /^\+/ {
+    line = substr($0, 2)
+    if (line ~ /^[[:space:]]*\/\// || line ~ /[[:space:]]\/\/([[:space:]]|$)/)
+      print file ": " line
+  }
+')
+
+# Doc-gate backstop: staged review artifacts of contracts-era targets must pass the
+# structure lint. Targets without detail blocks in the ledger are exempt.
+if [ -z "$DOCGATE_OK" ]; then
+  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u)
+  for d in $dirs; do
+    [ -f "$d/ledger.md" ] || continue
+    grep -q "^### PPW-" "$d/ledger.md" || continue
+    tgt=${d#reviews/}
+    passes=$(git diff --cached --name-only -- "$d/" | grep -oE '(review|resolution|summary)-v[0-9]+' | grep -oE '[0-9]+' | sort -un)
+    [ -z "$passes" ] && passes=$(ls "$d" | grep -oE '^review-v[0-9]+' | grep -oE '[0-9]+' | sort -un | tail -1)
+    for p in $passes; do
+      if ! node reviews/lib/doc-gate.mjs "$tgt" "$p" >&2; then
+        echo "" >&2
+        echo "Doc gate failed for $tgt v$p. Fix the files (reviews/rules/doc-contracts.md) and" >&2
+        echo "recommit. Only for a genuine false positive, re-run with DOCGATE_OK=1." >&2
+        exit 1
+      fi
+    done
+  done
+  if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- reviews/state/backlog.md reviews/state/index.md)" ]; then
+    if ! node reviews/lib/doc-gate.mjs state >&2; then
+      echo "" >&2
+      echo "Doc gate failed for the state files. Fix reviews/state/backlog.md or" >&2
+      echo "reviews/state/index.md (reviews/rules/doc-contracts.md) and recommit. Only for a" >&2
+      echo "genuine false positive, re-run with DOCGATE_OK=1." >&2
+      exit 1
+    fi
+  fi
+fi
+
+# The gate machinery has its own fixtures-based suite; a change under reviews/lib/ runs it.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')" ]; then
+  if ! node reviews/lib/tests/run-tests.mjs >&2; then
+    echo "" >&2
+    echo "reviews/lib test suite failed. Fix the script or the fixture and recommit." >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$COMMENTS_OK" ] || [ -z "$hits" ]; then exit 0; fi
+
+n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
+{
+  echo "COMMENT GATE: this commit adds $n comment line(s):"
+  echo
+  printf '%s\n' "$hits"
+  cat <<'EOF'
+
+CLAUDE.md allows only (a) one short line stating a non-obvious constraint or
+gotcha - never narrating a change, and never citing a bolt/review/finding ID -
+or (b) a SHORT /// doc on an interface member (never on concrete classes, and
+trim any bloat). Delete or shrink every line above that fails this, restage,
+and commit again. Only if every listed line is genuinely allowed,
+re-run the exact same commit prefixed with COMMENTS_OK=1 (never --no-verify).
+EOF
+} >&2
+exit 1

@@ -5,7 +5,7 @@ namespace PhotoPrint.API.Services;
 /// <summary>
 /// Default <see cref="IPromotionQueue"/> implementation — wraps an unbounded
 /// <see cref="Channel{T}"/> (single reader, multi-writer). Crash-safety lives in
-/// <see cref="PromotionRecoveryScanner"/>, not here (ADR-010).
+/// <see cref="PromotionRecoveryScanner"/>, not here.
 /// </summary>
 public class PromotionQueue : IPromotionQueue
 {

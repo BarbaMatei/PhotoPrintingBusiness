@@ -8,14 +8,14 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.API.BackgroundJobs;
 
 /// <summary>
-/// Self-heal for the promote-on-paid lifecycle (ADR-010). Runs one sweep at boot, then repeats
+/// Self-heal for the promote-on-paid lifecycle. Runs one sweep at boot, then repeats
 /// every <see cref="OrderPhotoArchiveSettings.PromotionRecoverySweepIntervalHours"/>. Each sweep
 /// finds orders that are paid (or beyond) but still have <c>StorageLocation = Local</c> uploads and
 /// re-enqueues each onto <see cref="IPromotionQueue"/>.
-/// <para>Boot-only was insufficient on an always-on server (F1, review 043-v3): a promotion that
+/// <para>Boot-only was insufficient on an always-on server: a promotion that
 /// exhausts <see cref="OrderPhotoArchiveSettings.MaxAttempts"/> at runtime stays Local, and its
 /// original never reached the durable cloud tier until the next reboot. This mirrors the periodic
-/// treatment F4 gave the purge sibling (<see cref="OriginalPurgeRecoveryScanner"/>).</para>
+/// treatment the purge sibling got (<see cref="OriginalPurgeRecoveryScanner"/>).</para>
 /// </summary>
 public class PromotionRecoveryScanner : BackgroundService
 {

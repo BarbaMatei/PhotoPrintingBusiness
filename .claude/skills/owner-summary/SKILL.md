@@ -1,11 +1,13 @@
 ---
 name: owner-summary
 description: >-
-  Write the one-page owner summary (summary-v<n>.md) that ends every review pass: the serious
-  items needing a decision with suggested actions, a reasons-to-doubt section computed from
-  raw pass data, and an evidence link on every claim; minors filed automatically. Use at the
-  end of any discovery/delta/verification/certification pass ("write the owner summary",
-  "summary for <target> v<n>"), or to regenerate one from the recorded files.
+  Write the one-page owner summary (summary-v<n>.md) that ends every decision-bearing review
+  pass: the serious items needing a decision with suggested actions, a reasons-to-doubt
+  section computed from raw pass data, and an evidence link on every claim; minors filed
+  automatically. Use at the end of a discovery, delta-discovery, or certification pass
+  ("write the owner summary", "summary for <target> v<n>"), or to regenerate one from the
+  recorded files. Verification passes write no summary file — their outcome is reported at
+  the owner gate in chat.
 ---
 
 # Owner summary
@@ -21,8 +23,10 @@ manifest (what was owed but didn't run).
 
 ## Output shape
 
-Frontmatter: `type: owner-summary`, `target`, `pass`, `pass-type`, `commit`, `date`,
-`decisions-needed: <n>`. Then exactly four sections, body ≤ ~40 lines:
+Copy `reviews/templates/summary.md` and fill it in; `reviews/rules/doc-contracts.md` is the
+contract (headings verbatim, vocabulary, cap 60 body lines — aim for ~40). Frontmatter:
+`type: owner-summary`, `target`, `pass`, `pass-type`, `commit`, `date`,
+`decisions-needed: <n>`. Then exactly four sections:
 
 1. **Needs your decision** — 🔴/🟠 items only, numbered. Per item: one plain sentence a cold
    reader understands, a suggested action with a rough cost ("fix now, ~1h, test exists" /
@@ -38,10 +42,10 @@ Frontmatter: `type: owner-summary`, `target`, `pass`, `pass-type`, `commit`, `da
 
 ## Rules
 
-- **Every claim carries a link** (file, commit, test, `D#`, metric). A claim with no link
+- **Every claim carries a link** (file, commit, test, `PPW-<n>`, metric). A claim with no link
   does not go on the page — an unverifiable summary forces trust.
 - Plain words; short sentences; the reader is technical but cold (spell out what a feature or
-  job does; quote UI strings as shipped). Severity dots, `D#` and file paths are fine.
+  job does; quote UI strings as shipped). Severity dots, `PPW-<n>` and file paths are fine.
 - Suggested actions are suggestions — the page never decides, never buries an option the
   owner might prefer.
 - Written by the pass runner at synthesis time; the fixer never edits it.

@@ -2,7 +2,7 @@ namespace PhotoPrint.API.Extensions;
 
 /// <summary>
 /// Typed accessors over <see cref="HttpContext.Items"/> so call sites stop coupling to
-/// raw string keys (QUAL-5, review 035-v1). The correlation id is stamped by
+/// raw string keys. The correlation id is stamped by
 /// <c>CorrelationIdMiddleware</c> and read by the exception handler and controllers.
 /// </summary>
 public static class HttpContextExtensions

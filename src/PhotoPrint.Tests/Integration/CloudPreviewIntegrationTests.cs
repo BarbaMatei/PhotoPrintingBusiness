@@ -17,8 +17,7 @@ namespace PhotoPrint.Tests.Integration;
 /// <summary>
 /// Verifies the cloud-tier branch of <c>GET /api/uploads/{id}/preview</c> (bolt 043, story 002):
 /// a Cloud-located upload returns <c>302 Found</c> with <c>Location</c> pointing at a
-/// pre-signed URL and <c>Cache-Control: private, max-age = the presign TTL</c> (F5, review
-/// 043-v1 — derived from <c>PresignTtlMinutes</c>, here 60m ⇒ 3600s). Authorization runs in the
+/// pre-signed URL and <c>Cache-Control: private, max-age = the presign TTL</c> (derived from <c>PresignTtlMinutes</c>, here 60m ⇒ 3600s). Authorization runs in the
 /// service before any URL is generated, so an unauthorized caller never sees the URL.
 /// </summary>
 /// <remarks>
@@ -74,7 +73,7 @@ public class CloudPreviewIntegrationTests : IAsyncLifetime
         var response = await _client.GetAsync($"/api/uploads/{upload.Id}/preview");
 
         // 'private' so intermediate caches don't share one user's signed URL with another.
-        // max-age is derived from PresignTtlMinutes (F5); this factory sets 60 ⇒ 1 h, so a
+        // max-age is derived from PresignTtlMinutes; this factory sets 60 ⇒ 1 h, so a
         // cached redirect never outlives its URL. The TTL→max-age derivation for a NON-default
         // TTL is proven in UploadsControllerTests (TTL=30 ⇒ max-age=1800).
         var cache = response.Headers.CacheControl;
@@ -82,7 +81,7 @@ public class CloudPreviewIntegrationTests : IAsyncLifetime
         cache.MaxAge.Should().Be(TimeSpan.FromHours(1));
     }
 
-    // ── Cloud regenerate branch (F14, review 043-v1) ──────────────────────────
+    // ── Cloud regenerate branch ──────────────────────────
 
     [Fact]
     public async Task GetPreview_CloudUpload_NoThumbnail_RegeneratesSavesAndPersists()
@@ -287,7 +286,7 @@ public class CloudUploadFactory : WebApplicationFactory<Program>
 
     /// <summary>
     /// Seeds a Cloud upload with ThumbnailPath=null and ONLY the original in the cloud store —
-    /// forces GetPreview through the cloud regenerate → save → persist branch (F14, review 043-v1).
+    /// forces GetPreview through the cloud regenerate → save → persist branch.
     /// </summary>
     public async Task<Upload> SeedCloudUploadWithoutThumbAsync(Guid userId)
     {

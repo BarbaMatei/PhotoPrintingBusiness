@@ -26,7 +26,7 @@ public class UploadsControllerTests
     [Fact]
     public async Task UploadPhotoBatchAsync_RejectedItem_LogsWarningAndStillReturns200()
     {
-        // OBS-1 (review 042-v1): a batch item rejection is swallowed into a per-item result
+        // A batch item rejection is swallowed into a per-item result
         // (200 overall), so it never reaches ExceptionHandlerMiddleware. The controller must
         // log the rejection itself, otherwise bulk abuse is invisible to ops.
         var uploadService = new Mock<IUploadService>();
@@ -67,7 +67,7 @@ public class UploadsControllerTests
     [Fact]
     public async Task UploadPhotoBatchAsync_RejectedItem_SanitizesAndTruncatesFilenameInLog()
     {
-        // L6 (review 042-v4): the batch-reject log emitted the raw client filename verbatim and
+        // L6: the batch-reject log emitted the raw client filename verbatim and
         // unbounded — a newline forges a fake log line in plain-text sinks, and length is
         // uncapped (volume amplification). Strip control chars and cap length before logging.
         var uploadService = new Mock<IUploadService>();
@@ -108,7 +108,7 @@ public class UploadsControllerTests
     [Fact]
     public async Task UploadPhotoBatchAsync_DecompressionBomb_EmitsReservedBombEventWithDimensions()
     {
-        // M4 (review 042-v4): DecompressionBombException subclasses UnprocessableEntityException,
+        // M4: DecompressionBombException subclasses UnprocessableEntityException,
         // so the batch catch logged only the generic item_rejected event and it never reached the
         // middleware that emits uploads.decompression_bomb.rejected (with dimensions). Ops alerts
         // keyed on that event missed bombs sent via /batch — the code's own "most likely bomb
@@ -146,7 +146,7 @@ public class UploadsControllerTests
             Times.Once);
     }
 
-    // ── GetPreviewAsync TOCTOU (F8, review 043-v1) ────────────────────────────
+    // ── GetPreviewAsync TOCTOU ────────────────────────────
 
     private static UploadsController BuildPreviewController(
         IUploadService uploadService, IStorageRouter router)
@@ -161,7 +161,7 @@ public class UploadsControllerTests
     {
         // GetPreviewAsync resolves Local, then a concurrent promotion best-effort-deletes the
         // local thumb before the controller opens it. The controller must re-resolve (now the
-        // upload is Cloud → 302 presigned) rather than surface an unmapped 500 (F8).
+        // upload is Cloud → 302 presigned) rather than surface an unmapped 500.
         var uploadId = Guid.NewGuid();
         var uploadService = new Mock<IUploadService>();
         uploadService
@@ -195,7 +195,7 @@ public class UploadsControllerTests
     [Fact]
     public async Task GetPreviewAsync_CloudUpload_MaxAgeTracksPresignTtl()
     {
-        // F5 (review 043-v1): the redirect's Cache-Control max-age must be derived from
+        // The redirect's Cache-Control max-age must be derived from
         // PresignTtlMinutes, not hardcoded to 3600. A shorter TTL previously left the browser
         // replaying a still-fresh cached redirect to an already-expired URL (broken thumbnail).
         var uploadId = Guid.NewGuid();
@@ -257,7 +257,7 @@ public class UploadsControllerTests
     [Fact]
     public async Task GetPreviewAsync_LocalThumbRegeneratedOnReResolve_Returns200()
     {
-        // F14 (review 043-v3): the re-resolve can also land back on Local with the thumb
+        // The re-resolve can also land back on Local with the thumb
         // regenerated → 200. Both prior TOCTOU tests make the local read ALWAYS throw, so this
         // success branch (StreamLocalAsync at UploadsController line 200) was never exercised —
         // a regression there would ship green.

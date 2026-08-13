@@ -10,7 +10,7 @@ using PhotoPrint.API.Services.Sameday;
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
-/// Behavioural tests for the auth handler (ADR-014):
+/// Behavioural tests for the auth handler:
 ///   - bearer is attached to every non-authenticate call,
 ///   - /api/authenticate is passed through without a token,
 ///   - 401 triggers token invalidate + re-fetch + retry exactly once,

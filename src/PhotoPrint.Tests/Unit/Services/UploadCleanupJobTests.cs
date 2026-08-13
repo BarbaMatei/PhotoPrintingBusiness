@@ -223,7 +223,7 @@ public class UploadCleanupJobTests
         all.Should().AllSatisfy(u => u.DeletedAt.Should().NotBeNull());
     }
 
-    // ── Reference-aware cleanup (bolt 033) ─────────────────────────────────────
+    // ── Reference-aware cleanup ─────────────────────────────────────
 
     private static async Task<(Task task, IStorageService storageMock, Mock<IStorageService> mock, UploadCleanupJob job)>
         BuildJobAsync(PhotoPrintDbContext db, IOptionsMonitor<UploadCleanupSettings> settings)
@@ -343,7 +343,7 @@ public class UploadCleanupJobTests
     [Fact]
     public async Task Cleanup_deletes_cached_thumbnail_file_alongside_original()
     {
-        // BUG-2 (review 042-v1): a previewed-then-expired upload has a second persistent file
+        // A previewed-then-expired upload has a second persistent file
         // (its cached thumbnail). Cleanup must delete it too, or it leaks on disk forever.
         var db = CreateDb();
         var upload = MakeUpload(DateTimeOffset.UtcNow.AddHours(-25));
@@ -381,7 +381,7 @@ public class UploadCleanupJobTests
     [Fact]
     public async Task Cleanup_agedCloudUpload_deletesAllThreeKeysFromCloudTier()
     {
-        // F2 (review 043-v1): an aged, promoted (Cloud) upload past ReferencedRetentionDays.
+        // An aged, promoted (Cloud) upload past ReferencedRetentionDays.
         // Deletes must route to the CLOUD tier and cover all THREE persistent objects
         // (original + thumbnail + large preview). The pre-fix code resolved the local default
         // (a no-op on disk) and never touched LargePreviewPath, orphaning the cloud blobs.
@@ -414,9 +414,9 @@ public class UploadCleanupJobTests
     [Fact]
     public async Task Cleanup_cloudRowWithCloudDisabled_skipsItAndStillCleansLocalBatch()
     {
-        // F2 (review 043-v3) + D38 (review 043-v5): cloud was enabled, an upload was promoted (Cloud),
+        // Cloud was enabled, an upload was promoted (Cloud),
         // then Storage:Provider reverted to local, so For(Cloud) would throw. The unroutable Cloud row
-        // must not be deleted, and must not block cleanup of the local batch. Since D38 the exclusion
+        // must not be deleted, and must not block cleanup of the local batch. Since the query-level fix the exclusion
         // is at the QUERY level (the row never enters the batch), so For(Cloud) is never called for it.
         var db = CreateDb();
         var cloudUpload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400)); // oldest → first in batch
@@ -442,7 +442,7 @@ public class UploadCleanupJobTests
     [Fact]
     public async Task Cleanup_manyUnroutableCloudRows_doNotStarveLocalOrphanCleanup()
     {
-        // D38 (review 043-v5): with the cloud tier disabled and >= BatchSize aged Cloud rows, the
+        // With the cloud tier disabled and >= BatchSize aged Cloud rows, the
         // pre-fix code fetched the oldest BatchSize (all Cloud), skipped them post-fetch, and never
         // advanced the OrderBy/Take window to a local orphan sorted after them → local cleanup
         // wedged every sweep. The query-level exclusion must let the batch reach the routable orphan.
@@ -508,7 +508,7 @@ public class UploadCleanupJobTests
             Times.Once);
     }
 
-    // ── D50 class-sweep (micro-review A4, review 043-v7): the referenced-retention branch
+    // ── Shared-upload class-sweep: the referenced-retention branch
     //    must not delete uploads a live or in-window order still needs ────────────────────
 
     private static async Task SeedOrderRefAsync(
@@ -554,7 +554,7 @@ public class UploadCleanupJobTests
     {
         // An aged (past ReferencedRetentionDays) upload whose referencing order is still
         // Paid (awaiting fulfilment): deleting it would truncate that order's fulfilment ZIP —
-        // the same shared-upload data-loss class as D50, at a third site.
+        // the same shared-upload data-loss class, at a third site.
         var db = CreateDb();
         var upload = MakeUpload(DateTimeOffset.UtcNow.AddDays(-400));
         await db.Uploads.AddAsync(upload);

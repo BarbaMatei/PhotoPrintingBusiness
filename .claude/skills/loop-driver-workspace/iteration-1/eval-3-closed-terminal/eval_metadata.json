@@ -1,0 +1,11 @@
+{
+  "eval_id": 3,
+  "eval_name": "closed-terminal",
+  "prompt": "What's next for 015-sameday-shipping in the review loop? Status question only; no pass or workflow may be launched.",
+  "assertions": [
+    {"text": "report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)"},
+    {"text": "report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings"},
+    {"text": "report.md mentions the pre-enable checklist as the binding gate for the dormant feature"},
+    {"text": "the main repo git tree is unchanged after the run (grader checks git status)"}
+  ]
+}

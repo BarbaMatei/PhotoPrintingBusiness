@@ -62,10 +62,10 @@ public class SamedayClientAwbTests
         await sut.CreateAwbAsync(req);
 
         var body = script.Recorded[0].BodyText();
-        // D1: the idempotency key must be the per-order number, never the shop-wide pickup point.
+        // The idempotency key must be the per-order number, never the shop-wide pickup point.
         body.Should().Contain("\"clientInternalReference\":\"FT-20260001\"");
         body.Should().NotContain("\"clientInternalReference\":\"PP1\"");
-        // D5: the delivery-type service id and the locker OOH id are on the wire.
+        // The delivery-type service id and the locker OOH id are on the wire.
         body.Should().Contain("\"service\":7");
         body.Should().Contain("\"lockerLastMile\":\"LCK-42\"");
     }

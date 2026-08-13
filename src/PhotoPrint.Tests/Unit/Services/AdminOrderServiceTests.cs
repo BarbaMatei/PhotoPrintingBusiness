@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -11,8 +12,10 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Sameday;
+using PhotoPrint.Tests.Helpers;
 using Stripe;
 
 namespace PhotoPrint.Tests.Unit.Services;
@@ -34,10 +37,12 @@ public class AdminOrderServiceTests
 
     private readonly AdminOrderService _sut;
 
+    private readonly string _dbName = $"AdminOrderSvc_{Guid.NewGuid():N}";
+
     public AdminOrderServiceTests()
     {
         var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseInMemoryDatabase($"AdminOrderSvc_{Guid.NewGuid():N}")
+            .UseInMemoryDatabase(_dbName)
             .Options;
         _db = new PhotoPrintDbContext(options);
 
@@ -52,7 +57,7 @@ public class AdminOrderServiceTests
                .ReturnsAsync(PurgeOutcome.Empty);
 
         // Router resolves each tier to its own fake store; the ZIP read routes by
-        // Upload.StorageLocation (F1, review 043-v1). Cloud tier on so purge-on-cancel (F17)
+        // Upload.StorageLocation. Cloud tier on so purge-on-cancel
         // runs — the purger mock returns Empty.
         _router.SetupGet(r => r.CloudEnabled).Returns(true);
         _router.SetupGet(r => r.Local).Returns(_localStore.Object);
@@ -63,8 +68,11 @@ public class AdminOrderServiceTests
         _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
 
-        _sut = new AdminOrderService(
-            _db,
+        _sut = BuildService(_db);
+    }
+
+    private AdminOrderService BuildService(PhotoPrintDbContext db) =>
+        new(db,
             _emailSvc.Object,
             _euPlatesc.Object,
             _stripeClient.Object,
@@ -74,7 +82,6 @@ public class AdminOrderServiceTests
             _hub.Object,
             _awbNotifier.Object,
             NullLogger<AdminOrderService>.Instance);
-    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -173,7 +180,7 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task GetOrdersAsync_TiedCreatedAt_PagesDeterministicallyKeepingItemsPerOrder()
     {
-        // F2 (review 042-v8): the admin list is OrderByDescending(CreatedAt) + Skip/Take +
+        // The admin list is OrderByDescending(CreatedAt) + Skip/Take +
         // Include(Items) under the global SplitQuery default. With no unique tiebreaker, a page
         // boundary splitting orders that share a CreatedAt can page the parent and the Items child
         // inconsistently on Postgres -> an order returns with missing items. ThenBy(Id) makes the
@@ -262,6 +269,52 @@ public class AdminOrderServiceTests
 
         _emailSvc.Verify(e => e.FireOrderShippedEmail(It.IsAny<Order>()), Times.Once);
         _emailSvc.Verify(e => e.FireOrderDeliveredEmail(It.IsAny<Order>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_PrintingToShipped_RecordsProcessingDurationOnce()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+        order.PaidAt = DateTimeOffset.UtcNow.AddHours(-2);
+        await _db.SaveChangesAsync();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrderProcessingDurationSeconds);
+
+        await _sut.UpdateStatusAsync(order.Id, "Shipped", null, null);
+
+        metrics.Measurements.Should().HaveCount(1);
+        metrics.Measurements[0].Value.Should().BeApproximately(7200, 120);
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_Shipped_RecordsNoDurationWhenTheCommitFails()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Printing);
+        order.PaidAt = DateTimeOffset.UtcNow.AddHours(-2);
+        await _db.SaveChangesAsync();
+
+        using var failingDb = new PhotoPrintDbContext(
+            new DbContextOptionsBuilder<PhotoPrintDbContext>()
+                .UseInMemoryDatabase(_dbName)
+                .AddInterceptors(new ThrowOnSaveInterceptor())
+                .Options);
+        var sut = BuildService(failingDb);
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrderProcessingDurationSeconds);
+
+        var act = () => sut.UpdateStatusAsync(order.Id, "Shipped", null, null);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        metrics.Measurements.Should().BeEmpty(
+            "a shipment that never committed must not sit in a cumulative histogram forever");
+    }
+
+    private sealed class ThrowOnSaveInterceptor : SaveChangesInterceptor
+    {
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+            => throw new OperationCanceledException();
     }
 
     [Fact]
@@ -372,7 +425,7 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task UpdateStatusAsync_ShipWithCloudTierOff_DoesNotInvokePurger()
     {
-        // D57 (review 043-v7): with the supported Provider=local config the ship path called
+        // With the supported Provider=local config the ship path called
         // the purger ungated and its self-refusal logged an Error on EVERY ship — chronic
         // false-alarm noise. The ship path now gates on CloudEnabled like the cancel path;
         // the archive-on-but-cloud-off mismatch is surfaced by the recovery scanners instead.
@@ -447,8 +500,8 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task UpdateStatusAsync_ProductionCompletePurgeThrows_TransitionStillCommittedAndNotified()
     {
-        // F4 (review 043-v3): the production-complete purge is best-effort, like its cancel sibling
-        // (F17). A purge throw must NOT 500 the PATCH after Shipped is already committed + emailed +
+        // The production-complete purge is best-effort, like its cancel sibling
+        // A purge throw must NOT 500 the PATCH after Shipped is already committed + emailed +
         // broadcast — the recovery sweep backstops it. Removing the try/catch reddens this.
         var order = await SeedOrderAsync(OrderStatus.Printing);
         _purger.Setup(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()))
@@ -465,7 +518,7 @@ public class AdminOrderServiceTests
             p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    // ── StreamZipAsync (F1, review 043-v1) ────────────────────────────────────
+    // ── StreamZipAsync ────────────────────────────────────
 
     [Fact]
     public async Task StreamZipAsync_PromotedCloudOrder_ReadsOriginalsFromCloudTier()
@@ -542,7 +595,7 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task StreamZipAsync_CloudOriginalWithCloudDisabled_FailsBeforeWritingAnyBody()
     {
-        // F9 (review 043-v3): cloud was reverted to local while a Cloud-located original is
+        // Cloud was reverted to local while a Cloud-located original is
         // un-purged. For(Cloud) is unroutable. The pre-fix code threw mid-stream — after the ZIP
         // headers + earlier entries were committed to Response.Body — handing the admin a truncated
         // ZIP with no clean error. The fix fails BEFORE writing any response byte.
@@ -675,7 +728,7 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task CancelOrderAsync_TriggersOriginalPurge()
     {
-        // F17 (review 043-v1): a cancelled/refunded order's cloud original must be purged
+        // A cancelled/refunded order's cloud original must be purged
         // (owner decision). The purger self-refuses when cloud/archive is off, so cancel
         // always fires it and the purger decides.
         var order = await SeedOrderAsync(OrderStatus.Paid);
@@ -690,7 +743,7 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task CancelOrderAsync_CloudTierOff_DoesNotTriggerPurge()
     {
-        // Gate's false branch (F17 hardening, review 043-v1): on a local-only deployment there is
+        // Gate's false branch: on a local-only deployment there is
         // nothing to purge and the purger's cloud-off refusal logs at Error, so cancel must skip
         // the call entirely rather than false-alarm.
         var router = new Mock<IStorageRouter>();
@@ -712,7 +765,7 @@ public class AdminOrderServiceTests
     [Fact]
     public async Task CancelOrderAsync_PurgeThrows_OrderStillCancelledAndExceptionSwallowed()
     {
-        // F5 (review 043-v3): the purge-on-cancel try/catch (F17) must keep a purge failure from
+        // The purge-on-cancel try/catch must keep a purge failure from
         // failing the already-committed cancel + refund. Removing the try/catch reddens this.
         var order = await SeedOrderAsync(OrderStatus.Paid);
         _purger.Setup(p => p.PurgeOrderOriginalsAsync(order.Id, It.IsAny<CancellationToken>()))

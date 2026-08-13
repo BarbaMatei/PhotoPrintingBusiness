@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
@@ -80,11 +82,15 @@ public class WebhooksController : ControllerBase
         catch (StripeException ex)
         {
             _logger.LogWarning("Stripe webhook signature invalid: {Message}", ex.Message);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.SignatureInvalid);
             return BadRequest("Invalid Stripe signature.");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Stripe webhook event parse error");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
             return BadRequest("Could not parse Stripe event.");
         }
 
@@ -141,6 +147,8 @@ public class WebhooksController : ControllerBase
         if (!EuPlatescService.ValidateIpnSignature(fields, secretKey))
         {
             _logger.LogWarning("EuPlatesc IPN signature validation failed");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.SignatureInvalid);
             return Content("<epayment>error</epayment>", "text/plain");
         }
 
@@ -149,6 +157,8 @@ public class WebhooksController : ControllerBase
             !Guid.TryParse(invoiceIdStr, out var orderId))
         {
             _logger.LogWarning("EuPlatesc IPN: missing or invalid invoice_id");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Failed);
             return Content("<epayment>error</epayment>", "text/plain");
         }
 
@@ -156,6 +166,8 @@ public class WebhooksController : ControllerBase
         if (order == null)
         {
             _logger.LogWarning("EuPlatesc IPN: order {OrderId} not found", orderId);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.OrderNotFound);
             return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
         }
 
@@ -168,6 +180,8 @@ public class WebhooksController : ControllerBase
                 _logger.LogWarning(
                     "EuPlatesc IPN amount mismatch: expected {Expected}, received {Received} for order {OrderId}",
                     expected, amountStr, orderId);
+                RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                    MetricNames.WebhookResultValues.AmountMismatch);
                 return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
             }
         }
@@ -182,19 +196,43 @@ public class WebhooksController : ControllerBase
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
             await _db.SaveChangesAsync(cancellationToken);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Ok);
             await BroadcastNewOrderAsync(order, cancellationToken);
             await FireOrderConfirmedEmailAsync(order, cancellationToken);
-            // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
-            // the worker picks up and uploads asynchronously (ADR-010).
+            // Enqueue cloud promotion off the hot path. Returns immediately;
+            // the worker picks up and uploads asynchronously.
             await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
-            // Bolt 037: enqueue Sameday AWB creation off the hot path.
+            // Enqueue Sameday AWB creation off the hot path.
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
+        }
+        else if (action == "0" && OrderStatusMachine.HasBeenPaid(order.Status))
+        {
+            // Duplicate IPN for an already-paid order — Stripe-equivalent duplicate path.
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Duplicate);
         }
         else if (action != "0" && order.Status == OrderStatus.AwaitingPayment)
         {
             OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
             await _db.SaveChangesAsync(cancellationToken);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Failed);
+        }
+        else
+        {
+            if (action == "0")
+                _logger.LogError(
+                    "EuPlatesc IPN: paid notification for order {OrderId} in status {Status} — customer charged, order not Paid, manual reconciliation required",
+                    orderId, order.Status);
+            else
+                _logger.LogWarning(
+                    "EuPlatesc IPN: action {Action} for order {OrderId} in status {Status} — no transition applied",
+                    action, orderId, order.Status);
+
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
+                MetricNames.WebhookResultValues.Failed);
         }
 
         return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
@@ -207,6 +245,8 @@ public class WebhooksController : ControllerBase
         if (string.IsNullOrEmpty(paymentIntentId))
         {
             _logger.LogWarning("Stripe webhook: payment_intent.succeeded but no PaymentIntent ID found");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
             return;
         }
 
@@ -215,43 +255,89 @@ public class WebhooksController : ControllerBase
         {
             _logger.LogWarning(
                 "Stripe webhook: PaymentIntent {Id} not linked to any order", paymentIntentId);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.OrderNotFound);
             return;
         }
 
         // Idempotency: silently ignore if already paid
-        if (order.Status == OrderStatus.Paid)
+        if (OrderStatusMachine.HasBeenPaid(order.Status))
+        {
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Duplicate);
             return;
+        }
 
         if (order.Status == OrderStatus.AwaitingPayment)
         {
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(ct);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Ok);
             await BroadcastNewOrderAsync(order, ct);
             await FireOrderConfirmedEmailAsync(order, ct);
-            // Bolt 051: enqueue cloud promotion off the hot path. Returns immediately;
-            // the worker picks up and uploads asynchronously (ADR-010).
+            // Enqueue cloud promotion off the hot path. Returns immediately;
+            // the worker picks up and uploads asynchronously.
             await _photoPromoter.EnqueueAsync(order.Id, ct);
-            // Bolt 037: enqueue Sameday AWB creation off the hot path.
+            // Enqueue Sameday AWB creation off the hot path.
             // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+        }
+        else
+        {
+            _logger.LogError(
+                "Stripe webhook: payment_intent.succeeded for order {OrderId} in status {Status} — customer charged, order not Paid, manual reconciliation required",
+                order.Id, order.Status);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
         }
     }
 
     private async Task HandleStripePaymentFailedAsync(string? paymentIntentId, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(paymentIntentId))
+        {
+            _logger.LogWarning("Stripe webhook: payment_intent.payment_failed but no PaymentIntent ID found");
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.Failed);
             return;
+        }
 
         var order = await _orderService.GetByPaymentIntentIdAsync(paymentIntentId, ct);
         if (order == null)
+        {
+            _logger.LogWarning(
+                "Stripe webhook: PaymentIntent {Id} not linked to any order", paymentIntentId);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.OrderNotFound);
             return;
+        }
 
         if (order.Status == OrderStatus.AwaitingPayment)
         {
             OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
             await _db.SaveChangesAsync(ct);
         }
+        else
+        {
+            _logger.LogWarning(
+                "Stripe webhook: payment_intent.payment_failed for order {OrderId} in status {Status} — no transition applied",
+                order.Id, order.Status);
+        }
+
+        RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+            MetricNames.WebhookResultValues.Failed);
+    }
+
+    private static void RecordPaymentWebhook(string processor, string result)
+    {
+        FotoMetrics.PaymentWebhook.Add(1,
+            new TagList
+            {
+                { MetricNames.Labels.Processor, processor },
+                { MetricNames.Labels.Result,    result },
+            });
     }
 
     private async Task BroadcastNewOrderAsync(Order order, CancellationToken ct)

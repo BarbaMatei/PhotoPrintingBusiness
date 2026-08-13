@@ -103,15 +103,16 @@ public sealed class AwbRetryJob : BackgroundService
                 "sameday.awb.retry-sweep enqueued={Count}", insideWindow.Count);
         }
 
-        // Outside the give-up window → one-shot Error log per order id.
+        // Outside the give-up window → one-shot Error log per order id. Printing is included
+        // because an order advanced before its label existed is exactly the case nothing recovers.
         var outsideWindow = await db.Orders
             .AsNoTracking()
-            .Where(o => o.Status == OrderStatus.Paid
+            .Where(o => (o.Status == OrderStatus.Paid || o.Status == OrderStatus.Printing)
                         && o.AwbNumber == null
                         && o.PaidAt != null
                         && o.PaidAt <= giveUpThreshold
                         && o.PaidAt > queryFloor)
-            .Select(o => new { o.Id, o.PaidAt })
+            .Select(o => new { o.Id, o.PaidAt, o.Status })
             .ToListAsync(ct);
 
         foreach (var row in outsideWindow)
@@ -119,8 +120,8 @@ public sealed class AwbRetryJob : BackgroundService
             if (_giveUp.MarkOnce(row.Id))
             {
                 _logger.LogError(
-                    "sameday.awb.give-up order_id={OrderId} paid_at={PaidAt:o}",
-                    row.Id, row.PaidAt);
+                    "sameday.awb.give-up order_id={OrderId} status={Status} paid_at={PaidAt:o}",
+                    row.Id, row.Status, row.PaidAt);
             }
         }
     }

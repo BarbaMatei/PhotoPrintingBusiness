@@ -2,7 +2,7 @@ namespace PhotoPrint.API.Services.Sameday;
 
 /// <summary>
 /// Opaque bearer token issued by Sameday's <c>/api/authenticate</c> endpoint.
-/// Cached in-process for its lifetime minus a safety window (ADR-013).
+/// Cached in-process for its lifetime minus a safety window.
 ///
 /// <see cref="ToString"/> is overridden to exclude <see cref="Value"/>: the
 /// project's structured-logger emits records via their <c>ToString</c>

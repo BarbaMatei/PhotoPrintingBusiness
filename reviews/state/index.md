@@ -1,0 +1,65 @@
+---
+type: review-index
+updated: 2026-08-11
+---
+
+# Review Index
+
+Two tables: one row per target, one row per pass. A defect's detail lives on its target's
+ledger, never here; lessons and cross-target numbers in [rationale.md](../notes/rationale.md). Pass
+rows are append-only — the trimmed prose is in this file's git history. `New H/M/L/C` counts
+new 🔴/🟠/🟡/⚪. Closed and dormant targets live under `archive/`.
+
+## Targets at a glance
+
+| Target | State |
+|---|---|
+| 044-045 observability | Closed 2026-08-10 on owner sign-off at `a4eb7e5`, archived the same day: six passes, five fix rounds. <br> No certification pass ran — the v5 round was patch-grade — so no commit has been searched blind since v1 at `5cac465`, and the `db-parity` and `frontend-ux` lenses stay owed, not waived. <br> Residue: 🟠 PPW-381 is owner-parked, because SLO 1 carries no route or host filter, so ~8,640 self-monitoring requests a day hold availability at or above ~94.5%; the approved fix needs .NET 9. <br> Two 🟠 closed at `fixed`, never `verified`: PPW-352's concurrent double-click leg has no guard and no test, and PPW-380 was never re-verified after v4 repaired its guard. 13 🟡/⚪ rows stand `open`, 54 rolled into the backlog. <br> Re-arms on a new 🔴, a fix-caused 🟠 regression, or a reopened fix in these files. Resolutions v2–v5: [v2](../archive/044-045-observability/resolution-v2.md) · [v3](../archive/044-045-observability/resolution-v3.md) · [v4](../archive/044-045-observability/resolution-v4.md) · [v5](../archive/044-045-observability/resolution-v5.md) |
+| review system (meta) | Open, never archived: v1 on 2026-07-29 (14 standing, 13 fixed), v2 on 2026-08-12 (21 findings) with its fix round resolved the same day at `5245b81`. <br> v3 verification 2026-08-12: all 18 fixes held and flipped to `verified`, 0 reopened; SF14 (seeded run 2) and SF24 stay deferred, SF31 wont-fix by owner ruling, SF36 (⚪ fix-links untested) named and open. <br> Next: owner call on SF14; the loop is otherwise quiet. Ids here are the `SF<n>` of the system reviews ([ledger](../system/ledger.md)), outside the `PPW-<n>` sequence, because `reviews/system/` is out of the doc contracts' scope. |
+| 015 sameday shipping | Closed 2026-07-29 on owner sign-off at `5734021`, archived 2026-08-10: certified at v5, then a 41-fix round, a v6 verification that reopened 4 fixes, and a v6 test-only round that closed all of them. <br> No blinded pass ran after that round, so nothing has searched the fixed code. <br> Residue: PPW-329–PPW-335 backlogged, 4 deferred (PPW-262, PPW-279, PPW-311, PPW-320), 2 wont-fix. <br> The pre-enable checklist is the gate, not this closure: PPW-284's vendor idempotency is unconfirmed, PPW-262's Postgres DDL has never been executed, PPW-320's service ids are still `7`. <br> Dormant behind two false flags; re-arms on a new 🔴, a fix-caused 🟠 regression, or a reopened fix. |
+| 043 cloud storage | Certified and closed 2026-07-22 at `ac97e42` by the v9 single pass, archived 2026-08-10: no serious defect survived. <br> Residue: 34 rows backlogged, 12 deferred (🟠 PPW-186, PPW-202, PPW-209, PPW-234), 3 wont-fix (🟠 PPW-233, because EuPlatesc removal is planned). <br> Holds a certification, so it is under watch: a later serious finding in the certified code is a post-cert escape, moves the folder back out, and re-arms the loop. |
+| 042 thumbnail cache | Closed 2026-08-11 on retroactive owner sign-off, archived the same day: quiet since v9 at `bd0d5fd` on 2026-07-14. <br> No certification pass ran — the risk tiers post-date the loop. <br> Residue: 30 rows backlogged, worst the two 🟠 — PPW-85, where the cache-fill write races the cleanup job and strands a thumbnail, and PPW-93, where the one-frame decode cap is proven only through the internal helper. <br> Re-arms on a new 🔴, a fix-caused 🟠 regression, or a reopened fix. |
+| 035 payment idempotency | Closed 2026-08-11 on retroactive owner sign-off, archived the same day: the resolution loop completed at v10 on 2026-07-04. <br> No certification pass ran — the protocol post-dates the loop, and v7's `approved` verdict was later shown premature. <br> Residue: 6 rows backlogged, worst 🟠 PPW-36, the Postgres production path that no test exercises; 2 wont-fix. <br> Re-arms on a new 🔴, a fix-caused 🟠 regression, or a reopened fix. |
+
+## Passes
+
+| Date | Target | Pass | Verdict | New H/M/L/C | Outcome | Files |
+|---|---|---|---|---|---|---|
+| 2026-08-12 | system | v3 verification (anchored, independent; main agent + 1 diff reviewer) | approve-with-followups | 0/0/0/1 | All 18 fixed findings held, 0 reopened — every fixture-backed fix went red on revert with clean attribution and green on restore; SF14/SF24 deferrals and the SF31 ruling affirmed; SF36 named (fix-links.mjs has no automated test) | [ledger](../system/ledger.md) |
+| 2026-08-12 | system | v2 fix round (descheduled; 2 micro-reviews) | — (resolved) | 0/0/0/0 | 18 of 21 findings fixed with red-first fixture tests, SF14 and SF24 deferred, SF31 owner-ruled wont-fix; 27 min active, 6 min blocked. Awaits an independent verification pass at `5245b81` | [resolution](../system/review-v2/resolution-v2.md) · [ledger](../system/ledger.md) |
+| 2026-08-12 | system | v2 system review (blinded from v1; main agent + 2 independent checkers + reconciler) | approve-with-followups | 0/7/10/4 | Second meta-review: 21 findings — SF16 reopened (dead certification-watch check), SF14 re-found with the no-saturation numbers, SF17–SF35 minted; scorecard ~5.1/10. Repair round recommended before further building | [review](../system/review-v2/review-v2.md) · [summary](../system/review-v2/summary-v2.md) |
+| 2026-08-10 | 044 | v6 verification (anchored, main-agent only) | approve-with-followups | 0/0/0/1 |
+| 2026-08-07 | 044 | v5 verification (anchored, 3 cluster lenses) | approve-with-followups | 0/0/3/0 |
+| 2026-08-06 | 044 | v4 verification (anchored, 3 cluster lenses) | approve-with-followups | 0/4/10/4 |
+| 2026-08-05 | 044 | v3 verification (anchored, 3 cluster lenses + 1 deferral checker) | request-changes | 1/10/14/4 |
+| 2026-08-05 | 044 | v2 verification (anchored, 6 cluster lenses) | approve-with-followups | 0/11/14/9 |
+| 2026-07-31 | 044 | v1 discovery (full, 9 of 11 manifest lenses) | request-changes | 9/14/9/7 |
+| 2026-07-29 | system | v1 system review (main agent + 2 independent checkers) | approve-with-followups | 0/5/5/4 | First review of the review system: 14 findings stand of 16 raised, 2 refuted by an independent defense checker (SF10, SF11). Worst SF14 — certified twice under a stop rule whose gating experiment never ran; roll-ups: ~32.85M pass tokens, 125 serious named, 234 fixes verified against 6 reopened (2.6%) | [review](../system/review-v1/review-v1.md) · [summary](../system/review-v1/summary-v1.md) |
+| 2026-07-29 | 015 | v6 fix round (test-only) + **loop closed** | — (owner sign-off) | 0/0/0/0 |
+| 2026-07-29 | 015 | v6 verification | approve-with-followups | 0/0/1/6 |
+| 2026-07-28 | 015 | v5 certification (single-pass deviation) | approve-with-followups | 0/12/16/7 |
+| 2026-07-27 | 015 | v4 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-27 | 015 | v3 certification pair (2 blinded full passes) | request-changes | 3/8/1/0 |
+| 2026-07-27 | 015 | v2 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-27 | 015 | v1 discovery (full 11-lens) | request-changes | 5/15/15/6 |
+| 2026-07-22 | 043 | v9 certification (single-pass deviation) | approve-with-followups | 0/3/4/1 |
+| 2026-07-22 | 043 | v8 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-22 | 043 | v7 certification pair | request-changes | 1/11/17/5 |
+| 2026-07-22 | 043 | v6 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-20 | 043 | v5 delta | approve-with-followups | 0/3/9/1 |
+| 2026-07-20 | 043 | v4 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-14 | 043 | v3 delta (+ owed frontend pass) | approve-with-followups | 0/6/10/0 |
+| 2026-07-14 | 043 | v2 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-14 | 043 | v1 discovery (lean, 5 lenses) | request-changes | 1/7/10/0 |
+| 2026-07-14 | 042 | v9 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-14 | 042 | v8 discovery (3rd full pass) | approve-with-followups | 0/5/7/1 |
+| 2026-07-14 | 042 | v7 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-14 | 042 | v6 discovery (2nd full pass) | approve-with-followups | 0/6/14/4 |
+| 2026-07-14 | 042 | v5 verification | approve-with-followups | 0/0/0/0 |
+| 2026-07-14 | 042 | v4 discovery (1st scripted full pass) | approve-with-followups | 0/10/11/7 |
+| 2026-07-14 | 042 | v1–v3 (initial review + follow-ups) | approve-with-followups | 3/8/14/3 (v1 set) | 26 fixes verified at v2. Three of the four v3 follow-ups verified; the fourth was routed to 043 | [review] · [resolution](../archive/042-thumbnail-cache/resolution-v2.md) |
+| 2026-07-04 | 035 | v8–v10 (fresh audit + verification) | approve-with-followups | 0/2/9/7 (v8) | The v8 fresh audit found defects in code v7 had called clean: 16 new ledger rows. Its resolution records 14 fixed and 4 deferred, 0 left open | [review] · [resolution](../archive/035-payment-idempotency/resolution-v8.md) |
+| 2026-06-19 | 035 | v1–v7 (pre-system loop) | approved (v7 — verdict later shown premature) | 1/6/5/3 (v1 set) | Pre-system loop: 15 findings at v1 — 12 verified, 2 wont-fix, 1 backlogged. This is the loop that taught the two-loops split ([rationale](../notes/rationale.md)) | [review] · [resolution](../archive/035-payment-idempotency/resolution-v5.md) |
+
+System improvements backlog: moved to
+[self-driving-loop-design.md](../notes/self-driving-loop-design.md) (tools table + backlog).

@@ -7,7 +7,7 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// BUG-6 (review 035-v3): OrderNumberService must work on SQLite — the Development-env
+/// OrderNumberService must work on SQLite — the Development-env
 /// provider (appsettings.Development.json → DatabaseProvider=Sqlite). Before the fix,
 /// GenerateAsync's else-branch ran Postgres-only SQL (`DO $$ … nextval`) that throws on
 /// SQLite, so local order creation 500'd. These run against a REAL SQLite database (not

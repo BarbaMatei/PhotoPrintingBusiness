@@ -6,7 +6,7 @@ using PhotoPrint.API.DTOs.Payments;
 namespace PhotoPrint.Tests.Integration;
 
 /// <summary>
-/// QUAL-4 (review 035-v5): the payment-endpoint POST builders were duplicated across
+/// The payment-endpoint POST builders were duplicated across
 /// <see cref="PaymentControllerIntegrationTests"/> and <see cref="PaymentIdempotencyRelationalTests"/>
 /// (build an <see cref="HttpRequestMessage"/>, attach the JSON body + the
 /// <c>Idempotency-Key</c> header, send). Centralized here as <see cref="HttpClient"/>

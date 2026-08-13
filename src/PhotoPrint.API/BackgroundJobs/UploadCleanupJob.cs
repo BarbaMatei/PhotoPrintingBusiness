@@ -77,8 +77,8 @@ public class UploadCleanupJob : BackgroundService
         var referencedCutoff = now.AddDays(-settings.ReferencedRetentionDays);
         var archiveCutoff = now.AddMonths(-_archiveSettings.RetentionMonths);
 
-        // The referenced branch is the same shared-upload destructive class the D50 guards
-        // closed in OriginalPurger/ArchiveRetentionJob (review 043-v7 class-sweep): age alone
+        // The referenced branch is the same shared-upload destructive class the live-order guards
+        // closed in OriginalPurger/ArchiveRetentionJob: age alone
         // must not delete an upload a live order still needs to fulfil ({Paid, Printing}) or
         // an in-window paid order is still entitled to view. Excluded rows re-qualify once
         // every referencing order is complete and past the archive window.
@@ -97,7 +97,7 @@ public class UploadCleanupJob : BackgroundService
             // Exclude unroutable Cloud rows in the QUERY, not after: For(Cloud) would throw with
             // the cloud tier off, but skipping post-fetch let >=BatchSize aged Cloud rows re-fill
             // the OrderBy/Take window every sweep and starve local-orphan cleanup indefinitely
-            // (D38, review 043-v5; the wedge the F2/043-v3 post-fetch skip missed at scale).
+            // (the wedge a post-fetch skip misses at scale).
             .Where(u => cloudEnabled || u.StorageLocation != StorageLocation.Cloud)
             .Where(retentionExpired)
             .OrderBy(u => u.UploadedAt)
@@ -111,24 +111,23 @@ public class UploadCleanupJob : BackgroundService
             // Route deletes to the tier that owns this upload's bytes. A promoted (Cloud)
             // upload's blobs live in the object store; resolving the local default no-oped
             // on disk and orphaned the cloud objects with no row left to reclaim them
-            // (F2, review 043-v1). Cloud rows only reach here when the cloud tier is enabled
+            // Cloud rows only reach here when the cloud tier is enabled
             // (excluded above otherwise), so For(Cloud) never throws.
             var store = router.For(upload.StorageLocation);
 
-            // Bolt 052: FilePath may have been nulled by the original-purge already. If
+            // FilePath may have been nulled by the original-purge already. If
             // so, the cloud blob is gone; only the row needs the soft-delete bookkeeping.
             if (upload.FilePath is { } filePath)
                 fileErrors += await TryDeleteAsync(store, filePath, "original", ct);
 
-            // Bolt 042 adds a second persistent file per upload (the cached thumbnail).
+            // Adds a second persistent file per upload (the cached thumbnail).
             // Delete it too, otherwise a previewed-then-expired upload leaves its thumbnail
-            // on disk forever — the row is soft-deleted so no path ever revisits it (BUG-2).
+            // on disk forever — the row is soft-deleted so no path ever revisits it.
             if (upload.ThumbnailPath is not null)
                 fileErrors += await TryDeleteAsync(store, upload.ThumbnailPath, "thumbnail", ct);
 
             // Bolt 043/051 adds a third persistent object for promoted uploads (the large
             // preview). It was never deleted here, so an aged Cloud upload leaked it
-            // (F2, review 043-v1).
             if (upload.LargePreviewPath is not null)
                 fileErrors += await TryDeleteAsync(store, upload.LargePreviewPath, "large-preview", ct);
 
@@ -139,8 +138,8 @@ public class UploadCleanupJob : BackgroundService
             await db.SaveChangesAsync(ct);
 
         // Observability: the Cloud rows excluded above are silently out of the batch, so surface how
-        // many aged Cloud uploads can't be reclaimed while the cloud tier is off (D38 keeps the F2
-        // ops signal that the query filter would otherwise drop). Only runs when cloud is disabled.
+        // many aged Cloud uploads can't be reclaimed while the cloud tier is off (keeps the ops
+        // signal that the query filter would otherwise drop). Only runs when cloud is disabled.
         if (!cloudEnabled)
         {
             var unroutable = await db.Uploads

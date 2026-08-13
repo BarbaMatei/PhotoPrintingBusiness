@@ -3,14 +3,14 @@ namespace PhotoPrint.API.Services;
 /// <summary>
 /// Owns naming policy for object/file keys in storage. The adapter does byte persistence;
 /// keys are generated here so the same scheme is reproducible from the same row data —
-/// crucial for intent-024 promotion + backfill (see ADR-007).
+/// crucial for intent-024 promotion + backfill.
 /// </summary>
 /// <remarks>
 /// Key conventions (Option 2):
 /// <list type="bullet">
 ///   <item><c>uploads/{yyyy}/{MM}/{uploadId:N}{ext}</c> — original photo, partitioned by upload month.</item>
-///   <item><c>thumbs/{uploadId:N}.jpg</c> — 300 px cached thumbnail (bolt 042).</item>
-///   <item><c>previews/{uploadId:N}.jpg</c> — ~2000 px large web preview (bolt 051).</item>
+///   <item><c>thumbs/{uploadId:N}.jpg</c> — 300 px cached thumbnail.</item>
+///   <item><c>previews/{uploadId:N}.jpg</c> — ~2000 px large web preview.</item>
 /// </list>
 /// Keys are deterministic from the Upload row, so the migrator/backfill never needs a
 /// stored lookup to recompute them. No <c>ownerId</c> appears in the path — authorization

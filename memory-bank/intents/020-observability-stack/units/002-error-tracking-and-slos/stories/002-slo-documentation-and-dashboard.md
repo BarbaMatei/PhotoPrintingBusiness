@@ -2,11 +2,11 @@
 id: 002-slo-documentation-and-dashboard
 unit: 002-error-tracking-and-slos
 intent: 020-observability-stack
-status: draft
+status: complete
 priority: should
-created: 2026-05-25T10:35:00Z
+created: 2026-05-25T10:35:00.000Z
 assigned_bolt: 045-error-tracking-and-slos
-implemented: false
+implemented: true
 ---
 
 # Story: 002-slo-documentation-and-dashboard
@@ -22,9 +22,16 @@ implemented: false
 - [ ] `memory-bank/operations/slos.md` documents:
   - Availability ≥ 99.5% (rolling 30 d)
   - p95 checkout latency ≤ 1.5 s on `POST /api/payments/stripe/intent`
-  - Payment-webhook success ≥ 99.9% (`payment_webhook_total{result="ok"}` / total)
-  - AWB auto-creation ≥ 98% (intent 015)
-  - ANAF submission success ≥ 99% (intent 016)
+  - Payment-webhook success ≥ 99.9% (`ok` + `duplicate` over all results except `signature_invalid`
+    — amended 2026-08-05: a correctly-answered duplicate is a success by the SLO's own definition,
+    and an anonymous bad signature is not a request this app failed)
+  - AWB auto-creation ≥ 98% (`ok` over all results except `skipped` and `retry_later` — amended
+    2026-08-06: a `skipped` outcome means no label was needed at all, and `retry_later` is counted
+    once per attempt, so keeping it would score an order that succeeded on its third try as 1 of 3
+    and flag the retry loop the 2% budget exists to protect. `orphaned` — a billable label the
+    order no longer references — stays in the denominator as the failure it is)
+  - ANAF submission success ≥ 99% (`accepted` over all statuses except `pending` — amended
+    2026-08-06: a submission still in flight is not yet a failure)
 - [ ] `ops/dashboards/fototipar-overview.json` provides a Grafana dashboard JSON with: RPS, latency p50/p95/p99, error rate, orders/day, payment-webhook success, AWB success, ANAF status.
 - [ ] README link added under Operations section.
 

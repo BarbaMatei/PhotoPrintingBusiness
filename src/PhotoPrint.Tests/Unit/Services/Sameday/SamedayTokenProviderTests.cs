@@ -7,7 +7,7 @@ using PhotoPrint.API.Services.Sameday;
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
-/// Token provider behaviour (ADR-013). Exercises cache-hit / cache-miss /
+/// Token provider behaviour. Exercises cache-hit / cache-miss /
 /// expiry / invalidate / thundering-herd. <see cref="FakeTimeProvider"/> is
 /// used to step time forward deterministically.
 /// </summary>
@@ -105,7 +105,7 @@ public class SamedayTokenProviderTests
     public async Task Concurrent_first_calls_result_in_exactly_one_fetch()
     {
         // Thundering-herd guard: 50 simultaneous first-time callers must share
-        // a single AuthenticateAsync call (ADR-013).
+        // a single AuthenticateAsync call.
         var clock = new FakeTimeProvider(T0);
         var slowGate = new TaskCompletionSource<SamedayToken>(TaskCreationOptions.RunContinuationsAsynchronously);
         var fetchedCount = 0;

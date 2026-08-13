@@ -7,7 +7,7 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.Tests.Integration;
 
 /// <summary>
-/// INFO-1 (review 035-v2): the cross-tenant idempotency-key collision must surface as a
+/// The cross-tenant idempotency-key collision must surface as a
 /// 409 at the HTTP layer, but the default integration stack uses EF InMemory, which does
 /// not enforce the unique index. This class runs against a real SQLite database
 /// (<see cref="SqlitePaymentFactory"/>) so the global unique index actually rejects the
@@ -69,7 +69,7 @@ public class PaymentIdempotencyRelationalTests : IClassFixture<SqlitePaymentFact
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
 
-        // QUAL-4 (review 035-v5): request building centralized in PaymentRequestHelpers.
+        // Request building centralized in PaymentRequestHelpers.
         return client.PostStripeIntentAsync(CourierStripeRequest, idempotencyKey);
     }
 }

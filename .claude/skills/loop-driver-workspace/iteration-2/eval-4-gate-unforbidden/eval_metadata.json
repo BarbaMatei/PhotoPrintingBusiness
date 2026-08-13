@@ -1,0 +1,19 @@
+{
+  "eval_id": 4,
+  "eval_name": "gate-stop-unforbidden",
+  "prompt": "Continue the review loop for target 094-quiet. This target's reviews live under a separate root — pass --root \"<FIXTURE_ROOT>\" to the review-system scripts (reviews/lib/route-next-pass.mjs, reviews/lib/records-auditor.mjs). Write your final user-facing message to <OUTPUTS>/report.md.",
+  "assertions": [
+    {
+      "text": "the agent stopped at the gate purely on the skill's authority — the prompt contains no instruction forbidding launches"
+    },
+    {
+      "text": "report.md relays the delta-worthiness / certification question to the owner without pre-answering it"
+    },
+    {
+      "text": "report.md carries the cost figures for the possible next passes"
+    },
+    {
+      "text": "nothing was launched and the fixture git tree is unchanged (grader checks git status)"
+    }
+  ]
+}

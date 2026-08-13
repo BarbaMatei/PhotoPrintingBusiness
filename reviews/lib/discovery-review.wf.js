@@ -106,8 +106,9 @@ const DELTA_NOTE = PASSTYPE === 'delta'
 // Shared hints seeded into EVERY lens — a recall aid, but agreement on these topics is not
 // independent evidence (the dedup agent flags findings these hints planted).
 const HINTS = `dual database — SQLite for local/dev/test, PostgreSQL for prod; tests use the EF
-InMemory provider (so migration DDL is usually NOT exercised). Storage is behind IStorageService
-(local today; a cloud provider is a planned follow-up). Auth supports logged-in users AND anonymous guests.`
+InMemory provider (so migration DDL is usually NOT exercised). Storage is two-tier — every upload
+read/write/delete routes via IStorageRouter.For(upload.StorageLocation) (local + S3-compatible
+cloud); never assume local disk. Auth supports logged-in users AND anonymous guests.`
 
 const BASE = `You are ONE lens in a multi-lens DISCOVERY code review of the feature branch under review.
 Repo root / working dir: "${REPO}". Target: ${TARGET}.
@@ -122,7 +123,9 @@ DISCOVERY SCOPE — ${EXPLORE}${DELTA_NOTE}
 CHANGED FILES:
 ${CHANGED}
 
-BLINDING (critical): do NOT read anything under the "reviews/" directory. This is an unbiased blinded pass.
+BLINDING (critical): do NOT read anything under the "reviews/" directory, and do NOT run any git
+history command (git log, git show, git blame, git reflog) or read commit messages — commits carry
+finding ids. This is an unbiased blinded pass.
 
 PROJECT CONTEXT: ${HINTS}
 
@@ -228,7 +231,7 @@ const DEDUP_SCHEMA = {
           severity: { type: 'string', enum: ['high', 'medium', 'low', 'cleanup'] },
           canonicalTitle: { type: 'string' },
           hinted: { type: 'boolean', description: 'true if the finding topic was planted by the shared PROJECT CONTEXT hints rather than discovered from the code alone' },
-          matchesDecided: { type: 'string', description: 'D# of the KNOWN DECIDED ITEM this group re-raises (same root cause at the same site), else ""' },
+          matchesDecided: { type: 'string', description: 'Ledger id (PPW-<n>) of the KNOWN DECIDED ITEM this group re-raises (same root cause at the same site), else ""' },
         },
         required: ['memberIds', 'representativeId', 'severity', 'canonicalTitle', 'hinted', 'matchesDecided'],
       },
@@ -241,9 +244,15 @@ const GUARD_SCHEMA = {
   properties: { guardExists: { type: 'boolean' }, evidence: { type: 'string', description: '<= 80 words: the guard (file:line) or why none' } },
   required: ['guardExists', 'evidence'],
 }
+// filesTouched + testShape feed the findings file's Fix brief (fix rounds start warm from it).
 const TRACE_SCHEMA = {
   type: 'object', additionalProperties: false,
-  properties: { traceConstructible: { type: 'boolean' }, trace: { type: 'string', description: '<= 80 words: the concrete failing steps, or why impossible' } },
+  properties: {
+    traceConstructible: { type: 'boolean' },
+    trace: { type: 'string', description: '<= 80 words: the concrete failing steps, or why impossible' },
+    filesTouched: { type: 'array', items: { type: 'string' }, description: 'the file:line sites the trace walked, <= 6' },
+    testShape: { type: 'string', description: '<= 40 words, only when constructible: the regression test that would redden (name + arrange/act/assert)' },
+  },
   required: ['traceConstructible', 'trace'],
 }
 
@@ -253,7 +262,7 @@ const findingCtx = (f) => `A code-review finding to adversarially check. Repo ro
 FINDING — ${f.title}
   file: ${f.file}:${f.line ?? '?'}  severity: ${f.severity}  (independently raised by ${f.convergence} lens(es))
   failure scenario: ${f.failureScenario}
-Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/. Keep your answer <= 80 words.`
+Judge whether this is REAL against the code — read ${f.file} and its direct collaborators yourself. Do NOT read anything under reviews/, and do NOT run git history commands (git log, git show, git blame) or read commit messages. Keep your answer <= 80 words.`
 
 let guardRuns = 0, traceRuns = 0, reraiseSkips = 0, budgetSkips = 0
 // Serious findings keep the session model; cheaper tiers carry the low-stakes checks.
@@ -266,7 +275,7 @@ const guardAgent = (f, i) => {
 }
 const traceAgent = (f, i) => {
   traceRuns++
-  return agent(findingCtx(f) + `\n\nROLE: skeptic — try to CONSTRUCT a concrete failing execution from the real code (inputs/state/timing -> the claimed wrong result). traceConstructible=true with the steps if you can; false with the reason if impossible.`,
+  return agent(findingCtx(f) + `\n\nROLE: skeptic — try to CONSTRUCT a concrete failing execution from the real code (inputs/state/timing -> the claimed wrong result). traceConstructible=true with the steps if you can; false with the reason if impossible. Also return filesTouched (the file:line sites you walked, <= 6) and, when constructible, testShape (<= 40 words: the regression test that would redden).`,
     { label: `trace#${i}`, phase: 'Verify', schema: TRACE_SCHEMA, ...skepticOpts(f) })
 }
 
@@ -274,7 +283,7 @@ const traceAgent = (f, i) => {
 async function verifyFinding(f, i) {
   // #5: a re-raise of a decided ledger item was already judged real once — skip skeptics, attach
   // the prior decision. Never suppressed: the synthesizer re-judges the DECISION with this pass's
-  // framing (3 of 5 recorded re-raises overturned the prior call).
+  // framing (the first 5 recorded re-raises overturned 3 prior calls; later ones mostly re-affirm).
   if (f.matchesDecided) {
     reraiseSkips++
     return { ...f, verdict: 're-raise', guardEvidence: `(skeptics skipped — re-raise of ${f.matchesDecided})`, traceEvidence: `(prior decision: ${f.priorDecision || 'see ledger'})` }
@@ -299,9 +308,9 @@ async function verifyFinding(f, i) {
   // Trace-first: a built trace settles it; the guard-hunt runs only when no trace builds,
   // so the two can never contradict.
   const trace = await traceAgent(f, i)
-  if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(guard-hunt skipped; trace built)', traceEvidence: trace.trace }
+  if (trace?.traceConstructible) return { ...f, verdict: 'confirmed', guardEvidence: '(guard-hunt skipped; trace built)', traceEvidence: trace.trace, filesTouched: trace.filesTouched, testShape: trace.testShape }
   const guard = await guardAgent(f, i)
-  return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)' }
+  return { ...f, verdict: guard?.guardExists ? 'refuted' : 'plausible', guardEvidence: guard?.evidence ?? '(skeptic failed)', traceEvidence: trace?.trace ?? '(skeptic failed)', filesTouched: trace?.filesTouched, testShape: trace?.testShape }
 }
 
 const SEV_RANK = { high: 3, medium: 2, low: 1, cleanup: 0 }
@@ -332,10 +341,10 @@ if (!flat.length) { log('No findings.'); return lensResults.filter(Boolean).map(
 const digest = flat.map(f => `#${f.id} [${f.lens}] ${f.severity} ${f.file}:${f.line ?? '?'} — ${f.title}`).join('\n')
 // #5: decided ledger items — only this post-lens agent ever sees them, so blinding holds.
 const decidedBlock = DECIDED.length
-  ? `\n\nKNOWN DECIDED ITEMS (terminal-status ledger rows — each already judged real and decided in a prior pass):\n${DECIDED.map(d => `${d.dId} [${d.status}] ${d.file || ''} — ${d.title}${d.decision ? ` | decision: ${d.decision}` : ''}`).join('\n')}\nIf a group re-raises one of these — SAME root cause at the SAME site, not merely the same theme — set matchesDecided to its D#. Match conservatively: when unsure, leave it "". Matching never suppresses a finding; it only attaches the prior decision.`
+  ? `\n\nKNOWN DECIDED ITEMS (terminal-status ledger rows — each already judged real and decided in a prior pass):\n${DECIDED.map(d => `${d.dId} [${d.status}] ${d.file || ''} — ${d.title}${d.decision ? ` | decision: ${d.decision}` : ''}`).join('\n')}\nIf a group re-raises one of these — SAME root cause at the SAME site, not merely the same theme — set matchesDecided to its ledger id. Match conservatively: when unsure, leave it "". Matching never suppresses a finding; it only attaches the prior decision.`
   : ''
 const recon = await agent(
-  `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, SQLite/Postgres parity, the cloud-provider follow-up, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nSet matchesDecided="" for every group unless the KNOWN DECIDED ITEMS block below says otherwise.${decidedBlock}\n\nFINDINGS:\n${digest}`,
+  `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, SQLite/Postgres parity, two-tier storage routing / StorageLocation, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nSet matchesDecided="" for every group unless the KNOWN DECIDED ITEMS block below says otherwise.${decidedBlock}\n\nFINDINGS:\n${digest}`,
   { label: 'dedup', phase: 'Dedup', schema: DEDUP_SCHEMA })
 
 // Build canonical findings from groups; fall back to no-dedup if the dedup agent failed.
@@ -350,7 +359,7 @@ if (recon?.groups?.length) {
     const members = ids.map(id => flat[id])
     const sev = [g.severity, ...members.map(m => m.severity)].sort((x, y) => SEV_RANK[y] - SEV_RANK[x])[0]
     const lenses = [...new Set(members.map(m => m.lens))]
-    // A matchesDecided that names no real ledger row (hallucinated D#) is dropped -> skeptics run.
+    // A matchesDecided that names no real ledger row (hallucinated id) is dropped -> skeptics run.
     const prior = g.matchesDecided ? DECIDED.find(d => d.dId === g.matchesDecided) : null
     canonical.push({ ...rep, severity: sev, title: g.canonicalTitle || rep.title, hinted: !!g.hinted, matchesDecided: prior ? g.matchesDecided : '', priorDecision: prior ? `${prior.dId} ${prior.status}${prior.decision ? `: ${prior.decision}` : ''}` : '', convergence: lenses.length, agreeingLenses: lenses, memberCount: members.length })
   }

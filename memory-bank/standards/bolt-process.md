@@ -39,6 +39,12 @@ Scan `standards/decision-index.md` "Read when" lines first — then, by what the
 This is the same characteristics-to-attention mapping the review manifest uses to pick lenses —
 used here to *prevent* what the lenses would otherwise be paid to find.
 
+**Backlog sweep (mandatory, same sitting):** read `reviews/state/backlog.md` and filter for rows
+whose Area the bolt touches. Each match is either pulled into the bolt's scope or explicitly
+re-deferred with a one-line note on the row naming this bolt — never silently skipped. A row
+pulled in is fixed under the normal rules (regression test, ledger write-back to its home
+target, then the row is removed).
+
 ## Stage 2 — required sections in ddd-02
 
 The historically-present sections (architecture pattern, contracts, API design, persistence,

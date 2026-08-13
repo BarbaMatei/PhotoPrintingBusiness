@@ -11,7 +11,7 @@ namespace PhotoPrint.API.BackgroundJobs;
 /// Periodic retention sweep — deletes large preview + thumbnail blobs from cloud for
 /// uploads whose parent order paid more than <see cref="ArchiveSettings.RetentionMonths"/>
 /// months ago. The original is purged separately (bolt 052, story 001 / <see cref="OriginalPurger"/>);
-/// this job is story 002. Retention anchor is <c>Order.PaidAt</c> — see ADR-012.
+/// this job is story 002. Retention anchor is <c>Order.PaidAt</c>.
 /// <para>Per-upload idempotent: a row with both preview keys already null is filtered out
 /// by the query. Failed deletes are retried implicitly on the next tick.</para>
 /// </summary>
@@ -81,11 +81,11 @@ public class ArchiveRetentionJob : BackgroundService
 
         var cutoff = DateTimeOffset.UtcNow.AddMonths(-_settings.RetentionMonths);
 
-        // Anchor on Order.PaidAt — see ADR-012. Cancelled orders included naturally because
+        // Anchor on Order.PaidAt. Cancelled orders included naturally because
         // they had a non-null PaidAt before status changed; we don't filter by status here.
         // Second clause: a cart-reused upload can back multiple orders — expiring it because
         // ANY referencing order aged out deleted previews a NEWER paid order was still entitled
-        // to view (D50, review 043-v7). Delete only when no referencing order is in-window.
+        // to view. Delete only when no referencing order is in-window.
         var rows = await db.Uploads
             .Where(u => u.StorageLocation == StorageLocation.Cloud)
             .Where(u => u.LargePreviewPath != null || u.ThumbnailPath != null)
@@ -141,7 +141,7 @@ public class ArchiveRetentionJob : BackgroundService
 
         // Audit only after the durable commit: emitting inside the loop fired ArchiveExpired
         // for rows whose key-null update then failed to persist — duplicate/false audit
-        // records re-emitted every tick (D56, review 043-v7).
+        // records re-emitted every tick.
         foreach (var id in expired)
             _logger.LogInformation(
                 "ArchiveExpired upload_id={UploadId} retention_months={Months}",

@@ -5,8 +5,7 @@ namespace PhotoPrint.Tests;
 
 /// <summary>
 /// The canonical cart entity graph (Product + active ProductSize + PricingTier +
-/// ProductFinish + Upload + CartItem) for one user or guest. Hoisted here (QUAL-3, review
-/// 035-v8) because OrderServiceTests, OrderServiceIdempotencyConcurrencyTests and
+/// ProductFinish + Upload + CartItem) for one user or guest. Hoisted here because OrderServiceTests, OrderServiceIdempotencyConcurrencyTests and
 /// PaymentFactory each hand-rolled the identical graph and had already drifted — one omitted
 /// <c>CartItem.SizeId</c> while the SQLite fixtures set it. <see cref="Build"/> returns the
 /// entities so each fixture adds them to ITS OWN context (InMemory / shared-SQLite / WAF

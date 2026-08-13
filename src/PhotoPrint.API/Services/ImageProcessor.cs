@@ -20,21 +20,21 @@ public class ImageProcessor : IImageProcessor
 
     /// <summary>
     /// Reject images whose total pixel area exceeds this — decompression-bomb defence
-    /// (bolt 042, BUG-1). A per-axis cap misses the total-pixel bomb: a 25000×25000 image
+    /// A per-axis cap misses the total-pixel bomb: a 25000×25000 image
     /// passes any 25000-per-axis check yet decodes to ~625 MP ≈ 2.5 GB. An area cap bounds
-    /// the decode allocation instead. Sized (NEW-1, review 042-v2) to accept legitimate
+    /// the decode allocation instead. Sized to accept legitimate
     /// large-format prints (A1 @ 300 DPI ≈ 70 MP) and high-res camera originals: 100 MP
     /// decodes to ~400 MB RGBA, comfortably under the 512 MB allocator backstop
     /// (Program.cs), while a 625 MP+ bomb is still rejected here at Identify.
     /// </summary>
     public const long MaxDecodePixels = 100_000_000; // 100 MP
 
-    /// <summary>Shared message so both decode sites report the rejection identically (QUAL-3).</summary>
+    /// <summary>Shared message so both decode sites report the rejection identically.</summary>
     public const string DimensionsExceededMessage = "Image dimensions exceed limits.";
 
     /// <summary>
     /// Single source of truth for the pixel-area limit, used at the upload-time check and
-    /// both derived-image decode sites (QUAL-3). Uses a <see langword="long"/> multiply so the
+    /// both derived-image decode sites. Uses a <see langword="long"/> multiply so the
     /// product of two large <see langword="int"/> dimensions cannot overflow.
     /// </summary>
     public static bool ExceedsDecodeLimits(int widthPx, int heightPx)
@@ -43,9 +43,9 @@ public class ImageProcessor : IImageProcessor
     private readonly ILogger<ImageProcessor> _logger;
     private readonly ImageDecodeLimiter _decodeLimiter;
 
-    // Bolt 043 (ADR-008): no IStorageService dependency. The caller routes via
+    // No IStorageService dependency. The caller routes via
     // IStorageRouter and hands the processor an open source stream. The decode limiter
-    // (bolt 042, M3/review 042-v4) is retained: it bounds total in-flight decode memory
+    // is retained: it bounds total in-flight decode memory
     // process-wide regardless of which tier the source stream came from.
     public ImageProcessor(ILogger<ImageProcessor> logger, ImageDecodeLimiter decodeLimiter)
     {
@@ -83,13 +83,13 @@ public class ImageProcessor : IImageProcessor
         Stream source, int maxDimension, int jpegQuality, bool neverUpscale, CancellationToken ct)
     {
         // Bound concurrent decodes process-wide: hold a slot for the whole read+decode so total
-        // in-flight decode memory is capped regardless of request rate (M3, review 042-v4).
+        // in-flight decode memory is capped regardless of request rate.
         using var slot = await _decodeLimiter.AcquireAsync(ct);
 
         Image image;
         try
         {
-            // Reject pixel bombs before the full decode allocates pixel buffers (bolt 042, BUG-1).
+            // Reject pixel bombs before the full decode allocates pixel buffers.
             // Identify reads only header metadata, so it needs no frame cap; the load below does.
             if (source.CanSeek)
                 source.Position = 0;
@@ -107,7 +107,7 @@ public class ImageProcessor : IImageProcessor
             // replaced ops-side is unreadable here — IdentifyAsync/LoadAsync throw
             // UnknownImageFormatException (unrecognised) or InvalidImageContentException
             // (recognised but broken), both deriving from ImageFormatException. Surface it as a
-            // clean 422, not a raw 500 (BUG-4, review 042-v1); mirror GetInfoAsync's logging.
+            // clean 422, not a raw 500; mirror GetInfoAsync's logging.
             // DecompressionBombException is not an ImageFormatException, so the bomb path above
             // propagates uncaught.
             _logger.LogWarning(ex, "Failed to decode image stream.");
@@ -138,14 +138,14 @@ public class ImageProcessor : IImageProcessor
 
     // MaxFrames = 1 caps a multi-frame (APNG/GIF/WebP) bomb: without it a small-canvas file with
     // thousands of near-identical frames materialises frames × canvas × 4 bytes on decode. This
-    // app only ever needs one still frame (bolt 042, BUG-1). Extracted + internal so a test can
-    // prove the cap holds — it can't be observed in the single-frame JPEG output (M11, review 042-v4).
+    // app only ever needs one still frame. Extracted + internal so a test can
+    // prove the cap holds — it can't be observed in the single-frame JPEG output.
     //
     // Decode is pinned to Rgba32 (4 B/px). The non-generic Image.LoadAsync auto-selects the source's
     // pixel type, so a 16-bit source decodes to Rgba64 (8 B/px) and a legitimate ~72 MP deep-colour
     // print (< the 100 MP cap) blows the 512 MB allocator backstop. Forcing Rgba32 bounds any
     // ≤100 MP decode to ≤400 MB and loses nothing the 8-bit JPEG output could carry
-    // (F7/D77, review 042-v8). Returns Task<Image> (not Task<Image<Rgba32>>, which is not assignable
+    // Returns Task<Image> (not Task<Image<Rgba32>>, which is not assignable
     // to it) via async/await so the reflection test's (Task<Image>) cast still holds.
     internal static async Task<Image> LoadSingleFrameAsync(Stream stream, CancellationToken ct = default)
         => await Image.LoadAsync<Rgba32>(new DecoderOptions { MaxFrames = 1 }, stream, ct);

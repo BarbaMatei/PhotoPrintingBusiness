@@ -33,7 +33,7 @@ public class MimeValidatorTests
         _sut.DetectMimeType(stream).Should().Be("image/png");
     }
 
-    // ── HEIC/HEIF — no longer accepted (M5, review 042-v4) ─────────────────────
+    // ── HEIC/HEIF — no longer accepted ─────────────────────
     // The stack has no HEIF decoder, so accepting HEIC only buffered+wrote a file that then
     // failed at decode with a confusing 422. Reject it up front until a decoder is integrated.
 
@@ -57,7 +57,7 @@ public class MimeValidatorTests
         _sut.DetectMimeType(stream).Should().BeNull();
     }
 
-    // INPUT-1 (review 042-v1): a plain ISO-BMFF container (MP4/MOV/M4A) also starts with
+    // A plain ISO-BMFF container (MP4/MOV/M4A) also starts with
     // "ftyp" but is NOT a HEIF image; it must be rejected by magic bytes, not accepted and
     // written to disk only to fail later at decode.
     [Theory]

@@ -14,7 +14,7 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// BUG-1 (review 035-v1) regression tests for the concurrent same-key race. These run
+/// Regression tests for the concurrent same-key race. These run
 /// against a REAL SQLite database rather than the EF InMemory provider on purpose: the
 /// bug is "the losing INSERT violates the unique index and throws an unhandled
 /// DbUpdateException → 500", and InMemory does not enforce unique indexes, so it can
@@ -60,7 +60,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
             Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
     }
 
-    // BUG-4: the REAL OrderNumberService (SQLite COUNT+1 branch) — the mock's always-unique
+    // The REAL OrderNumberService (SQLite COUNT+1 branch) — the mock's always-unique
     // Interlocked.Increment masked the concurrent order-number collision this exercises.
     private static OrderService NewServiceWithRealNumberService(PhotoPrintDbContext db)
     {
@@ -71,12 +71,12 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
             Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
     }
 
-    // QUAL-4 (review 035-v8): build the concurrent "winner" by running the REAL
+    // Build the concurrent "winner" by running the REAL
     // CreateFromCartAsync on a second context, so its totals + items come from the service
     // (same cart + same 20.00 shipping mock the caller uses) instead of hand-copied magic
     // numbers that silently drift from the pricing math and flip replay↔409 for the wrong
     // reason. Only the OrderNumber is pinned — it is the control knob for WHICH index the
-    // caller collides on (distinct → idempotency only; equal → order-number first, BUG-4).
+    // caller collides on (distinct → idempotency only; equal → order-number first).
     private async Task<Order> InjectWinnerViaRealFlowAsync(Guid userId, string key, string orderNumber)
     {
         using var winnerDb = NewContext();
@@ -114,7 +114,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var userId = await SeedUserAsync(); // SQLite enforces the CartItem/Upload → User FKs
         using var db = NewContext();
 
-        // QUAL-3 (review 035-v8): shared canonical cart graph — see TestCartSeed.
+        // Shared canonical cart graph — see TestCartSeed.
         var graph = TestCartSeed.Build(userId: userId, unitPrice: unitPrice, quantity: quantity);
         graph.AddTo(db);
         await db.SaveChangesAsync();
@@ -147,8 +147,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var svc = NewService(db);
 
         // Before the fix this surfaced as an unhandled DbUpdateException (500). It must
-        // now be a clean 409 (and must not disclose the other tenant's order). OBS-1
-        // (review 035-v8): the cross-tenant path throws the distinct IdempotencyKeyTaken
+        // now be a clean 409 (and must not disclose the other tenant's order).
+        // The cross-tenant path throws the distinct IdempotencyKeyTaken
         // subtype (still a ConflictException → 409) so the abuse signal is observable.
         await Assert.ThrowsAsync<IdempotencyKeyTakenException>(
             () => svc.CreateFromCartAsync(callerId, null, MakeRequest(), key));
@@ -160,14 +160,14 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     [Fact]
     public async Task CreateFromCart_UnrelatedDbFailure_PropagatesHonestly_NotMaskedAs409()
     {
-        // BUG-1 (review 035-v5) + BUG-4 (v8): the recovery catches ONLY the two known unique
+        // The recovery catches ONLY the two known unique
         // indexes — idempotency (resolve the winner) and order-number (regenerate + retry).
         // Any OTHER DbUpdateException must propagate honestly, never be masked as an
         // idempotency 409 (the old AnyAsync inference did exactly that). Here the INSERT fails
         // on an UNRELATED foreign key — Easybox delivery pointing at a non-existent locker —
         // which matches neither `when` filter, so it surfaces as a DbUpdateException.
         //
-        // (Before BUG-4 this test used an order-number collision as its "unrelated" failure;
+        // (Before the order-number fix this test used an order-number collision as its "unrelated" failure;
         // that is now a handled/retryable transient, so the unrelated case is an FK violation.)
         var (callerId, _, _) = await SeedCartAsync();
         const string key = "free-key-unrelated-fk"; // key is free — not the failure cause
@@ -192,7 +192,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         // Deterministically inject the canonical double-submit race: just before the caller's
         // INSERT executes, a concurrent request with the SAME key + owner + logical request
         // commits first, so the caller loses the unique-index race. The winner is built via
-        // the REAL flow (QUAL-4) — its totals/items match the caller's by construction — with
+        // the REAL flow — its totals/items match the caller's by construction — with
         // a DISTINCT order number so the caller collides only on the idempotency index.
         Order? winner = null;
         var interceptor = new WinnerInjectingInterceptor(
@@ -215,7 +215,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     [Fact]
     public async Task CreateFromCart_StaleKeyReuse_FreesOldAndInsertsNew_NoWithinBatchCollision()
     {
-        // BUG-3 (review 035-v8): the stale-key free and the new-order INSERT now flush in a
+        // The stale-key free and the new-order INSERT now flush in a
         // SINGLE SaveChanges → one transaction on a real relational provider. This proves
         // EF's unique-index-aware ordering emits the UPDATE (free) before the INSERT, so
         // they do NOT collide on ix_orders_idempotency_key inside the one batch.
@@ -246,7 +246,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     [Fact]
     public async Task CreateFromCart_StaleKeyReuse_InsertFails_FreeRollsBack_KeyPreserved()
     {
-        // BUG-3 (review 035-v8): if the new-order INSERT fails, the stale-key free must roll
+        // If the new-order INSERT fails, the stale-key free must roll
         // back WITH it (they share one transaction now) — otherwise the stale row loses its
         // key with no replacement, so a later retry finds no holder and the key stops
         // deduping. Before the fix the free committed in its own save, so the key was gone;
@@ -278,7 +278,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     [Fact]
     public async Task SqliteIdempotencyCollision_SurfacesUniqueExtendedCode_AndColumnName()
     {
-        // BUG-1 (review 035-v8): IsIdempotencyKeyViolation classifies the SQLite arm off the
+        // IsIdempotencyKeyViolation classifies the SQLite arm off the
         // EXTENDED result code SQLITE_CONSTRAINT_UNIQUE (2067) plus the column name in the
         // message (tied to nameof(Order.IdempotencyKey)). Pin both premises here so a
         // Microsoft.Data.Sqlite upgrade that re-words the message or changes the code fails
@@ -306,7 +306,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     [Fact]
     public async Task CreateFromCart_ConcurrentSameKey_OrderNumberCollidesFirst_RecoversToReplay_NotServerError()
     {
-        // BUG-4 (review 035-v8): on SQLite the OrderNumber is a racy COUNT+1, so a same-key
+        // On SQLite the OrderNumber is a racy COUNT+1, so a same-key
         // concurrent double-submit can collide on ix_orders_order_number FIRST (it is created
         // before the idempotency index, so SQLite reports it first). That collision is NOT an
         // idempotency violation, so pre-fix it propagated as a 500 instead of replaying the
@@ -318,7 +318,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
 
         // The caller (Orders count == 0) will generate this number via the real service; the
         // winner is pinned to the SAME number, so the caller's INSERT hits the order-number
-        // index before the idempotency one. Winner totals/items come from the real flow (QUAL-4).
+        // index before the idempotency one. Winner totals/items come from the real flow.
         var collidingNumber = OrderNumberService.FormatOrderNumber(DateTime.UtcNow.Year, 1);
 
         Order? winner = null;
@@ -353,7 +353,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     };
 
     /// <summary>Aborts any SaveChanges that includes a new Order INSERT — used to simulate
-    /// the new-order INSERT failing mid-flight (BUG-3), so the test can assert the stale-key
+    /// the new-order INSERT failing mid-flight, so the test can assert the stale-key
     /// free rolled back with it rather than committing on its own.</summary>
     private sealed class ThrowOnOrderInsertInterceptor : SaveChangesInterceptor
     {

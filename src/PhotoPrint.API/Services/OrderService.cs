@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
@@ -6,6 +7,7 @@ using PhotoPrint.API.DTOs.Orders;
 using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services;
 
@@ -31,11 +33,11 @@ public class OrderService : IOrderService
         _storageSettings = storageSettings.Value;
     }
 
-    // ── Idempotency (bolt 035) ────────────────────────────────────────────────
+    // ── Idempotency ────────────────────────────────────────────────
 
     private static readonly TimeSpan IdempotencyWindow = TimeSpan.FromHours(24);
 
-    // BUG-4 (review 035-v8): the non-Postgres OrderNumber generator is a racy COUNT, so a
+    // The non-Postgres OrderNumber generator is a racy COUNT, so a
     // concurrent insert can pick a duplicate number. That is transient — regenerate and retry
     // a bounded number of times before letting a genuine, persistent clash surface.
     private const int MaxOrderNumberRetries = 3;
@@ -96,21 +98,21 @@ public class OrderService : IOrderService
         var shippingCostRon = shipping.CostRon;
         var total = subtotal + shippingCostRon;
 
-        // 2b. Idempotency resolution (bolt 035). Only when a key is supplied.
+        // 2b. Idempotency resolution. Only when a key is supplied.
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
             // Single round-trip for THIS caller's row holding the key — fresh or stale
-            // (QUAL-1: replaces the old two-query fresh-then-stale pattern). Scoped to
-            // the caller so another tenant's key can never be resolved here (SEC-1).
+            // (replaces the old two-query fresh-then-stale pattern). Scoped to
+            // the caller so another tenant's key can never be resolved here.
             var holder = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
             if (holder is not null)
             {
-                // Fresh match for this caller → replay or (on divergence) 409 (QUAL-1).
+                // Fresh match for this caller → replay or (on divergence) 409.
                 if (IsFresh(holder))
                     return ReplayOrConflict(holder, request, total, orderItems);
 
                 // Stale (>24h) row this caller owns still holds the key. Null it on the
-                // in-memory entity WITHOUT an intermediate save (BUG-3, review 035-v8), so
+                // in-memory entity WITHOUT an intermediate save, so
                 // the free (UPDATE) and the new-order INSERT below flush in ONE
                 // SaveChanges → one transaction. EF Core's unique-index-aware command
                 // ordering emits the UPDATE before the INSERT, so they do not collide on
@@ -157,10 +159,10 @@ public class OrderService : IOrderService
         // any OTHER DbUpdateException (FK, NOT NULL) matches neither `when` filter and
         // propagates honestly — we never infer the cause from a follow-up AnyAsync probe.
         //
-        //  • ix_orders_idempotency_key (BUG-1): a concurrent request with the SAME key won
+        //  • ix_orders_idempotency_key: a concurrent request with the SAME key won
         //    the race between our resolution above and this save → resolve the winner
         //    (replay / 409) instead of a 500. Terminal — no retry.
-        //  • ix_orders_order_number (BUG-4, review 035-v8): the non-Postgres OrderNumber is a
+        //  • ix_orders_order_number: the non-Postgres OrderNumber is a
         //    racy COUNT (OrderNumberService's SQLite branch), so two concurrent inserts can
         //    pick the SAME number. That is transient and unrelated to idempotency —
         //    regenerate the number and retry the (still-tracked) order rather than 500.
@@ -171,6 +173,23 @@ public class OrderService : IOrderService
             try
             {
                 await _db.SaveChangesAsync(ct);
+
+                // Observability: orders_created_total{processor,status}.
+                // Status is "created" — the order is in AwaitingPayment; the Paid
+                // transition is observed via payment_webhook_total at the webhook handlers.
+                var processorLabel = order.PaymentProcessor switch
+                {
+                    PaymentProcessor.Stripe    => MetricNames.ProcessorValues.Stripe,
+                    PaymentProcessor.EuPlatesc => MetricNames.ProcessorValues.EuPlatesc,
+                    _                          => "unknown",
+                };
+                FotoMetrics.OrdersCreated.Add(1,
+                    new TagList
+                    {
+                        { MetricNames.Labels.Processor, processorLabel },
+                        { MetricNames.Labels.Status,    MetricNames.OrderStatusValues.Created },
+                    });
+
                 return new OrderCreationResult(order, WasIdempotentReplay: false);
             }
             catch (DbUpdateException ex) when (hasKey && IsIdempotencyKeyViolation(ex))
@@ -181,21 +200,21 @@ public class OrderService : IOrderService
                 var candidateItems = order.Items.ToList();
                 DetachFailedInsert(order);
 
-                // Same caller won the race → replay it (or 409 if the request diverged) (QUAL-1).
+                // Same caller won the race → replay it (or 409 if the request diverged).
                 var winner = await FindKeyHolderAsync(idempotencyKey!, userId, guestSessionId, ct);
                 if (winner is not null && IsFresh(winner))
                     return ReplayOrConflict(winner, request, total, candidateItems);
 
                 // The constraint error already proves the key is taken, but this caller owns
                 // no (fresh) row for it → it is held by a *different* caller (global unique
-                // index). Replaying would disclose another tenant's order (SEC-1) → clean 409.
+                // index). Replaying would disclose another tenant's order → clean 409.
                 // Thrown as a DISTINCT type (subtype of ConflictException) so the middleware
-                // can emit the reserved cross-tenant abuse signal for triage (OBS-1, v8).
+                // can emit the reserved cross-tenant abuse signal for triage.
                 throw new IdempotencyKeyTakenException();
             }
             catch (DbUpdateException ex) when (attempt < MaxOrderNumberRetries && IsOrderNumberViolation(ex))
             {
-                // Transient number-generation race (BUG-4): regenerate and retry the SAME
+                // Transient number-generation race: regenerate and retry the SAME
                 // order — it is still tracked as Added after the failed save, so assigning a
                 // fresh number and looping re-attempts the INSERT (no detach/rebuild needed).
                 order.OrderNumber = await _orderNumberService.GenerateAsync(ct);
@@ -208,9 +227,9 @@ public class OrderService : IOrderService
     /// of the idempotency unique index (<see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/>)
     /// — as opposed to any other constraint. Inspecting the provider error lets the catch
     /// handle ONLY a real key collision and rethrow everything else, instead of inferring the
-    /// cause from a follow-up query (BUG-1, review 035-v5).
+    /// cause from a follow-up query.
     ///
-    /// BUG-1 (review 035-v8) hardened both arms against silent regressions:
+    /// Hardened both arms against silent regressions:
     /// <list type="bullet">
     /// <item>Postgres matches <see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/> (the
     /// same constant the index is named with) so a rename is a compile break, not a fall-through.</item>
@@ -235,7 +254,7 @@ public class OrderService : IOrderService
     /// True iff <paramref name="ex"/> is the database rejecting the INSERT because of the
     /// OrderNumber unique index (<see cref="PhotoPrintDbContext.OrderNumberIndexName"/>).
     /// Only the non-Postgres COUNT-based generator can produce a duplicate number under
-    /// concurrency (BUG-4, review 035-v8), and that is transient — the caller regenerates
+    /// concurrency, and that is transient — the caller regenerates
     /// and retries. Same provider-error inspection (and same compile-break coupling) as
     /// <see cref="IsIdempotencyKeyViolation"/>.
     /// </summary>
@@ -266,14 +285,14 @@ public class OrderService : IOrderService
         _db.Entry(order).State = EntityState.Detached;
     }
 
-    // ── Idempotency helpers (bolt 035) ─────────────────────────────────────────
+    // ── Idempotency helpers ─────────────────────────────────────────
 
     /// <summary>True while <paramref name="holder"/> is inside the 24h idempotency window.</summary>
     private static bool IsFresh(Order holder)
         => holder.CreatedAt > DateTimeOffset.UtcNow - IdempotencyWindow;
 
     /// <summary>
-    /// Shared resolution for a fresh holder of the caller's key (QUAL-1, review 035-v5):
+    /// Shared resolution for a fresh holder of the caller's key:
     /// replay it, or throw <see cref="IdempotencyConflictException"/> if the candidate
     /// request diverges. Used by both the pre-INSERT lookup and the post-collision
     /// recovery, which were near-duplicate blocks. (Named for what it does; the review
@@ -294,13 +313,13 @@ public class OrderService : IOrderService
     /// The single order (if any) currently holding <paramref name="key"/> for the
     /// supplied caller — fresh OR stale; callers branch on the 24h window in memory.
     /// Scoped to <paramref name="userId"/> / <paramref name="guestSessionId"/> so a
-    /// caller can only ever see their own order (SEC-1). Items are included for the
-    /// divergence comparison (BUG-3).
+    /// caller can only ever see their own order. Items are included for the
+    /// divergence comparison.
     /// </summary>
     private Task<Order?> FindKeyHolderAsync(
         string key, Guid? userId, Guid? guestSessionId, CancellationToken ct)
     {
-        // SEC-1 (review 035-v5): defense-in-depth. With both identities null the scope
+        // Defense-in-depth. With both identities null the scope
         // predicate below collapses to `o.GuestSessionId == null`, which matches every
         // authenticated user's order — a borrowed key could then resolve an arbitrary
         // user's order/secret. The payment endpoints' dual-auth guarantees exactly one
@@ -320,8 +339,8 @@ public class OrderService : IOrderService
     /// <summary>
     /// Returns the names of the fields that diverge between an existing order and a
     /// candidate request. Empty list = same logical request (replay-eligible).
-    /// `ShippingAddress` is intentionally excluded (see ADR-005); the cart items ARE
-    /// compared (BUG-3) — without that, two carts with identical totals but different
+    /// `ShippingAddress` is intentionally excluded; the cart items ARE
+    /// compared — without that, two carts with identical totals but different
     /// photos would silently replay the wrong order's images.
     /// </summary>
     private static IReadOnlyList<string> DivergentFields(
@@ -341,7 +360,7 @@ public class OrderService : IOrderService
     /// Order-independent signature of a set of order items (product + upload + quantity).
     /// Two requests with the same total but different photos/quantities produce
     /// different signatures, so a reused key correctly 409s instead of replaying the
-    /// wrong order (BUG-3).
+    /// wrong order.
     /// </summary>
     private static string ItemsSignature(IEnumerable<OrderItem> items)
         => string.Join("|", items
@@ -372,8 +391,7 @@ public class OrderService : IOrderService
     {
         var query = _db.Orders
             .Where(o => o.UserId == userId)
-            // Unique tiebreaker so Skip/Take paging stays stable when CreatedAt ties (F2 class sweep,
-            // review 042-v8). This query projects Items.Sum (one correlated query, not a split
+            // Unique tiebreaker so Skip/Take paging stays stable when CreatedAt ties. This query projects Items.Sum (one correlated query, not a split
             // Include), so it can't drop items like the admin list — but paging must still be total.
             .OrderByDescending(o => o.CreatedAt)
             .ThenBy(o => o.Id);
@@ -452,7 +470,7 @@ public class OrderService : IOrderService
             items);
     }
 
-    // ── GetOrderPhotosAsync (bolt 053) ────────────────────────────────────────
+    // ── GetOrderPhotosAsync ────────────────────────────────────────
 
     public async Task<OrderPhotosDto> GetOrderPhotosAsync(
         Guid orderId, Guid userId, CancellationToken ct = default)
@@ -478,7 +496,7 @@ public class OrderService : IOrderService
         // Filter: only live (not soft-deleted), Cloud-promoted uploads with BOTH blob keys
         // still present. UploadCleanupJob soft-deletes a row but leaves its path fields set,
         // so without the DeletedAt check this presigned URLs for already-deleted blobs —
-        // broken thumbnails the refresh can't fix (D52, review 043-v7). A row mid-retention
+        // broken thumbnails the refresh can't fix. A row mid-retention
         // with one key nulled is excluded — the lightbox would otherwise fail on click.
         var viewable = order.Items
             .Select(i => i.Upload)
@@ -503,7 +521,7 @@ public class OrderService : IOrderService
 
     // ── Price helper (mirrors CartService.ResolveUnitPrice) ───────────────────
 
-    // QUAL-2 (review 035-v8): the tier bracket-matching is shared with CartService via
+    // The tier bracket-matching is shared with CartService via
     // PricingTierResolver. This call site keeps its own semantics — the tiers of the item's
     // ACTIVE sizes, matched against that item's own quantity — which is deliberately NOT the
     // same basis CartService uses (a size's tiers vs. the per-group total copies). The old

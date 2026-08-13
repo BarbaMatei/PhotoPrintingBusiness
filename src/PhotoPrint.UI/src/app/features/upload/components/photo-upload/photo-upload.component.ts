@@ -15,7 +15,7 @@ export interface FileValidationError {
 
 export const MAX_FILE_SIZE_BYTES = 52_428_800; // 50 MB
 export const MAX_UPLOAD_COUNT = 100;
-// HEIC dropped (M5, review 042-v4): the API stack has no HEIF decoder, so a .heic upload only
+// HEIC dropped: the API stack has no HEIF decoder, so a.heic upload only
 // fails later at decode. Re-add '.heic' here and in the accept attr / hint once decode lands.
 export const ACCEPTED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png']);
 

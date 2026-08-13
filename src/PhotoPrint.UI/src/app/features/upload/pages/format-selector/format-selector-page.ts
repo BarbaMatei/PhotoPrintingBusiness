@@ -43,7 +43,7 @@ import { PhotoLightboxComponent } from '../../../../shared/components/photo-ligh
   styleUrl: './format-selector-page.scss',
 })
 export class FormatSelectorPage implements OnInit, OnDestroy {
-  /** Single source for the user-facing upload-failure message (C2, review 042-v4). */
+  /** Single source for the user-facing upload-failure message. */
   private readonly UPLOAD_ERROR = 'Eroare la încărcarea fișierului.';
 
   private readonly productService = inject(ProductService);
@@ -123,7 +123,7 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
     this.storageKey = `photoprint-uploads-${id}`;
 
     // Pre-create an anonymous guest session for not-logged-in users so the first
-    // upload is accepted. ensureGuestSession() also runs per upload, so an expired
+    // upload is accepted. ensureGuestSession also runs per upload, so an expired
     // or cleared token self-heals on the next attempt.
     this.ensureGuestSession().subscribe({ error: () => { /* non-fatal */ } });
 
@@ -183,7 +183,7 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
   }
 
   /** In-flight anonymous-session init, shared so concurrent callers don't each mint a
-   *  session (FE-1). Reset once it settles so a later expiry can re-init. */
+   *  session. Reset once it settles so a later expiry can re-init. */
   private guestInit$: Observable<void> | null = null;
 
   /** Logged-in users and guests with a token proceed immediately; a guest with no
@@ -196,10 +196,10 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
       return of(void 0);
     }
     // Dedup concurrent inits: ngOnInit pre-creates a session, and an eager user dropping
-    // files before it resolves would otherwise fire a second init (getGuestToken() is a
+    // files before it resolves would otherwise fire a second init (getGuestToken is a
     // synchronous localStorage read that stays null until the first init lands) — minting a
     // duplicate session and orphaning uploads. Share one in-flight request; finalize resets
-    // the field so a later expiry re-inits (FE-1).
+    // the field so a later expiry re-inits.
     this.guestInit$ ??= this.guestAuthService.initAnonymousSession().pipe(
       tap(res =>
         this.guestAuthService.storeSession({
@@ -223,14 +223,14 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
       clientIds.forEach(id =>
         this.updateUpload(id, { status: 'error', error: this.UPLOAD_ERROR }));
 
-    // F3 (review 042-v6): capture guest-ness BEFORE the request. A logged-in user whose JWT
-    // expires mid-upload 401s; the interceptor then runs logout()+navigate, flipping
+    // Capture guest-ness BEFORE the request. A logged-in user whose JWT
+    // expires mid-upload 401s; the interceptor then runs logout+navigate, flipping
     // isAuthenticated to false. If we re-checked here we'd see "not authenticated", mint a
     // throwaway anonymous guest, and retry — silently orphaning the upload from the user's
     // account. Only self-heal when the caller was already a guest at send time.
     const wasGuest = !this.authService.isAuthenticated();
 
-    // FE-2: a stale-but-present guest token isn't caught by ensureGuestSession (it only
+    // A stale-but-present guest token isn't caught by ensureGuestSession (it only
     // checks presence, not expiry — the token is an opaque id, so expiry can't be read
     // client-side), so the upload goes out stale and 401s; the interceptor then clears the
     // token. Re-init a fresh session and retry the upload exactly once so the self-heal is
@@ -395,9 +395,9 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
    *  interceptor clears the token; re-init a fresh session and retry ONCE, so a refresh with
    *  an expired session doesn't wipe the whole restored grid. Only a genuine 404 drops the
    *  entry; transient failures (5xx/network, or a still-failing retry) keep it visible for a
-   *  later refresh (FE-4/NEW-2). */
+   *  later refresh. */
   private fetchPreviewWithRetry(uploadId: string, clientId: string, isRetry: boolean): void {
-    // F3 (review 042-v6): capture guest-ness before the request — see performUpload. A
+    // Capture guest-ness before the request — see performUpload. A
     // logged-in user with an expired JWT must not be re-attributed to a throwaway guest by the
     // preview self-heal; only guests re-init.
     const wasGuest = !this.authService.isAuthenticated();
@@ -407,7 +407,7 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
         const status = err instanceof HttpErrorResponse ? err.status : null;
         if (wasGuest && !isRetry && status === 401) {
           // Expired guest token on refresh: the interceptor cleared it. Re-init and retry
-          // once before deciding anything (FE-4). If re-init itself fails, keep the entry.
+          // once before deciding anything. If re-init itself fails, keep the entry.
           this.ensureGuestSession().subscribe({
             next: () => this.fetchPreviewWithRetry(uploadId, clientId, true),
             error: () => { /* couldn't re-init now — keep it, a later refresh retries (NEW-2) */ },
@@ -417,13 +417,13 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
         // Drop the entry when it is permanently un-fetchable AND un-cartable: a 404 (gone), a
         // 403 (a re-init minted a new guest session that no longer owns this upload), or a
         // still-401 after the re-init retry. Keeping it preview-less would let the user cart an
-        // orphan that then 403s at checkout (M8, review 042-v4).
+        // orphan that then 403s at checkout.
         if (status === 404 || status === 403 || (isRetry && status === 401)) {
           this.dropRestoredEntry(clientId);
           return;
         }
         // Transient failure (5xx / network): keep the completed upload visible (without a
-        // preview) rather than erasing work; a later refresh retries (NEW-2, review 042-v2).
+        // preview) rather than erasing work; a later refresh retries.
       },
     });
   }
@@ -440,7 +440,7 @@ export class FormatSelectorPage implements OnInit, OnDestroy {
   }
 
   /** Frees the blob URLs getPreviewBlob created, so they don't accumulate in memory for the
-   *  tab's lifetime across restores/removals/navigation (C1, review 042-v4). */
+   *  tab's lifetime across restores/removals/navigation (C1). */
   private revokeAllPreviews(): void {
     for (const u of this.uploads()) this.revokePreview(u);
   }

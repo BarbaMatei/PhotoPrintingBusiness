@@ -3,7 +3,7 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.API.Services;
 
 /// <summary>
-/// Shared unit-price tier resolution (QUAL-2, review 035-v8). <see cref="CartService"/> and
+/// Shared unit-price tier resolution. <see cref="CartService"/> and
 /// <see cref="OrderService"/> pick the applicable pricing tier by the same rule — the
 /// highest-<c>MinQuantity</c> tier that brackets the quantity, falling back to the
 /// highest-<c>MinQuantity</c> tier overall, or <c>0</c> when no tiers exist.

@@ -13,7 +13,7 @@ namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
 /// Unit tests for <see cref="OriginalPurger"/> — the intent-024 story-001 orchestrator.
-/// Exercises Confirmed-Delete-Then-Update (mirror of ADR-011), per-upload idempotency,
+/// Exercises Confirmed-Delete-Then-Update (mirror), per-upload idempotency,
 /// partial-failure semantics, and the cloud-off / archive-disabled refusal posture.
 /// </summary>
 public class OriginalPurgerTests
@@ -293,7 +293,7 @@ public class OriginalPurgerTests
         (await db.Uploads.FindAsync(bad.Id))!.FilePath.Should().NotBeNull();
     }
 
-    // ── D50 (review 043-v7): shared uploads across orders ─────────────────────
+    // ── Shared uploads across orders ─────────────────────
 
     [Fact]
     public async Task PurgeOrderOriginals_UploadSharedWithLiveOrder_IsSkippedNotDeleted()

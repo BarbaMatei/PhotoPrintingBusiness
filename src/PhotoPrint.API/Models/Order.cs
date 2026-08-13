@@ -30,13 +30,13 @@ public class Order
     public const int MaxAwbLabelUrlLength = 2048;
 
     /// <summary>URL to the Sameday-hosted PDF shipping label, populated alongside
-    /// <see cref="AwbNumber"/> when the AWB workflow (bolt 037) successfully creates
+    /// <see cref="AwbNumber"/> when the AWB workflow successfully creates
     /// the AWB. Nullable: existing orders + orders whose AWB creation has not yet
     /// succeeded have no label URL.</summary>
     public string? AwbLabelUrl { get; set; }
 
     /// <summary>UTC timestamp of the most recent successful tracking poll against
-    /// Sameday for <see cref="AwbNumber"/>. Updated by the tracking job (bolt 037)
+    /// Sameday for <see cref="AwbNumber"/>. Updated by the tracking job
     /// on every successful poll; nullable until the first successful poll.</summary>
     public DateTimeOffset? LastTrackingSyncAt { get; set; }
 
@@ -46,10 +46,10 @@ public class Order
     /// TTL so a crashed worker cannot strand the order.</summary>
     public DateTimeOffset? AwbClaimedAt { get; set; }
 
-    // ── Idempotency (bolt 035) ───────────────────────────────────────────────
+    // ── Idempotency ───────────────────────────────────────────────
     /// <summary>Client-supplied Idempotency-Key bound to this order. Set once at
     /// creation, never modified — except nulled when a stale (&gt;24h) row's key is
-    /// reused by a new request from its <b>original owner</b> (REQ-1: reclamation is
+    /// reused by a new request from its <b>original owner</b> (reclamation is
     /// owner-scoped, so a stale key stays reserved on the global unique index against
     /// other callers — see ddd-01/ddd-02 + migration comment).</summary>
     public string? IdempotencyKey { get; set; }

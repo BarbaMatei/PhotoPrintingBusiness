@@ -22,6 +22,67 @@ builder.Configuration.AddJsonFile(
 // ── Logging ──────────────────────────────────────────────────────────────────
 builder.AddSerilogLogging();
 
+// ── Error tracking (Sentry, intent 020 bolt 045) ─────────────────────────────
+// Master flag mirrors the Sameday two-stage rollout: Enabled=false → SDK never
+// constructed, boot is byte-identical to baseline. The DSN never lives in
+// appsettings.json — provide via user-secrets/env vars.
+builder.Services.Configure<PhotoPrint.API.Configuration.SentrySettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.SentrySettings>,
+    PhotoPrint.API.Validators.SentrySettingsValidator>();
+builder.Services
+    .AddOptions<PhotoPrint.API.Configuration.SentrySettings>()
+    .ValidateOnStart();
+
+var sentryEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName)
+    .GetValue<bool>("Enabled");
+
+if (sentryEnabled)
+{
+    var sentryConfig = builder.Configuration
+        .GetSection(PhotoPrint.API.Configuration.SentrySettings.SectionName)
+        .Get<PhotoPrint.API.Configuration.SentrySettings>()!;
+
+    builder.WebHost.UseSentry(o =>
+    {
+        o.Dsn              = sentryConfig.Dsn;
+        o.Environment      = sentryConfig.Environment ?? builder.Environment.EnvironmentName;
+        o.Release          = sentryConfig.Release ?? Environment.GetEnvironmentVariable("GIT_COMMIT_SHA");
+        o.SampleRate       = (float)sentryConfig.SampleRate;
+        o.TracesSampleRate = sentryConfig.TracesSampleRate;
+        o.SendDefaultPii   = false;
+
+        // TracesSampleRate alone is only consulted when nothing else decided, and an inbound
+        // sentry-trace counts as deciding — so this must return a value on every call.
+        o.TracesSampler    = _ => sentryConfig.TracesSampleRate;
+
+
+        // The SDK discards its diagnostic logger when Debug is false, silently dropping every
+        // event on a 429; the configured flag picks the level below instead of switching it off.
+        o.Debug            = true;
+        o.DiagnosticLevel  = sentryConfig.Debug
+            ? Sentry.SentryLevel.Debug
+            : Sentry.SentryLevel.Warning;
+        PhotoPrint.API.Configuration.SentryDataScrubbers.Register(o);
+    });
+
+    builder.Services.AddScoped<PhotoPrint.API.Middleware.SentryScopeEnricherMiddleware>();
+}
+
+// ── Observability (OTel traces + Prometheus metrics) ─────────────────────────
+// Enabled=false wires nothing. When on, /metrics is gated by an IP allow-list and
+// traces go to OTLP; without an endpoint they go nowhere outside Development.
+builder.Services.AddObservability(builder.Configuration, builder.Environment);
+
+var observabilityEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.ObservabilitySettings.SectionName)
+    .GetValue<bool>("Enabled");
+var metricsPath = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.ObservabilitySettings.SectionName)
+    .GetValue<string>("Metrics:PrometheusEndpoint") ?? "/metrics";
+
 // ── Database ─────────────────────────────────────────────────────────────────
 var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
@@ -30,7 +91,7 @@ builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
     // Default to split queries so multi-collection Includes don't trigger a cartesian
     // explosion (and silence the MultipleCollectionInclude warning). No effect on the
     // InMemory provider used in tests.
-    // QUAL-5 (review 042-v1): the split-query option is intentionally repeated in both
+    // The split-query option is intentionally repeated in both
     // arms — the UseSqlite/UseNpgsql calls differ, so a shared helper would save only the
     // one option line and obscure the provider branch. Not worth extracting.
     if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
@@ -85,7 +146,7 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IAdminProductService, PhotoPr
 
 // ── Photo Upload + Storage (bolt 043: two-tier router + S3 adapter) ───────────
 // Cap ImageSharp's largest single allocation as defence-in-depth against decompression
-// bombs (bolt 042, story 003 AC#1 / review 042-v1). The per-image pixel-area guard
+// bombs (bolt 042, story 003 AC#1 /). The per-image pixel-area guard
 // (ImageProcessor.ExceedsDecodeLimits) is the primary control; this bounds any decode that
 // slips past it — a 2.5 GB bomb allocation throws InvalidMemoryOperationException instead of
 // OOM-ing the process. 512 MB sits just above a legitimate max-size (100 MP ≈ 400 MB) decode.
@@ -93,7 +154,7 @@ SixLabors.ImageSharp.Configuration.Default.MemoryAllocator =
     SixLabors.ImageSharp.Memory.MemoryAllocator.Create(
         new SixLabors.ImageSharp.Memory.MemoryAllocatorOptions { AllocationLimitMegabytes = 512 });
 
-// Bound concurrent image decodes process-wide (bolt 042, M3/F1, review 042-v4/v6). Each
+// Bound concurrent image decodes process-wide (bolt 042, M3/F1). Each
 // ~100 MP decode is ~400 MB, so an unbounded burst of concurrent first previews can OOM the
 // box even under the per-image caps. Derive the default from both CPU and host memory; ops can
 // override via ImageProcessing:MaxConcurrentDecodes.
@@ -126,7 +187,7 @@ builder.Services.AddScoped<PhotoPrint.API.Services.ICartService, PhotoPrint.API.
 // ── Shipping ──────────────────────────────────────────────────────────────────
 // Sameday integration (intent 015, bolt 036). The flag is read once at boot:
 //   - Sameday:Enabled = false → StaticShippingService (today's behaviour, default).
-//   - Sameday:Enabled = true  → SamedayShippingService + typed HttpClient + auth
+//   - Sameday:Enabled = true → SamedayShippingService + typed HttpClient + auth
 //                                handler. Flipping back to false produces a
 //                                byte-identical fallback (intent goal).
 builder.Services.AddSingleton<TimeProvider>(_ => TimeProvider.System);
@@ -216,7 +277,7 @@ if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
 else
 {
     // ── Postgres (production): apply EF migrations at boot ────────────────────
-    // Guarded by IsNpgsql() so the Testing host (InMemory) and any non-relational
+    // Guarded by IsNpgsql so the Testing host (InMemory) and any non-relational
     // provider are a no-op; only a real PostgreSQL connection triggers migration.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
@@ -228,7 +289,7 @@ else
     }
 }
 
-// ── Seed-only mode: dotnet run --seed  /  dotnet run --seed-dev ──────────────
+// ── Seed-only mode: dotnet run --seed / dotnet run --seed-dev ──────────────
 if (args.Contains("--seed") || args.Contains("--seed-dev"))
 {
     using var scope = app.Services.CreateScope();
@@ -281,7 +342,7 @@ app.UseSecurityBaselines();      // 4th: HSTS, HTTPS, security headers, CORS, ra
 
 app.UseResponseCaching();        // 5th: serve cached responses for catalog endpoints
 
-// ── Static SPA assets (D1: combined image serves the built Angular app) ───────
+// ── Static SPA assets (the combined image serves the built Angular app) ───────
 // Registered only when wwwroot exists (the production image bundles the SPA there);
 // skipped in API-only local dev / tests so StaticFileMiddleware doesn't warn.
 if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot")))
@@ -293,6 +354,57 @@ if (Directory.Exists(Path.Combine(builder.Environment.ContentRootPath, "wwwroot"
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Sentry scope enrichment: stamps every event captured during the request with
+// correlation_id + user_id. Registered after auth so the user claim is populated;
+// the middleware is a no-op when the SDK isn't initialized.
+if (sentryEnabled)
+    app.UseSentryScopeEnricher();
+
+// ── /metrics endpoint — gated by scrape port + IP allow-list ──────
+// Registered conditionally so the endpoint is absent (not just 403) when
+// Observability:Enabled=false. The gate middleware runs before the Prometheus
+// exporter; wrong listener sees 404, non-allowed IPs see 403 + empty body.
+if (observabilityEnabled)
+{
+    var observabilitySettings = app.Services
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.ObservabilitySettings>>()
+        .Value;
+    var metricsSettings = observabilitySettings.Metrics;
+
+    if (!ObservabilityExtensions.TracingWired(observabilitySettings, app.Environment))
+    {
+        app.Logger.LogWarning(
+            "observability.tracing.disabled environment={Environment} — no Observability:Otlp:Endpoint, "
+            + "so metrics are exported and traces are not; console spans are a Development-only fallback",
+            app.Environment.EnvironmentName);
+    }
+
+    if (metricsSettings.ScrapePort == 0)
+    {
+        app.Logger.LogWarning(
+            "observability.metrics.scrape_port_unset path={Path} — served on every listener; behind a "
+            + "reverse proxy set Observability:Metrics:ScrapePort to a port the edge does not route",
+            metricsPath);
+    }
+
+    app.UseWhen(
+        ctx => ctx.Request.Path.StartsWithSegments(metricsPath, StringComparison.OrdinalIgnoreCase),
+        branch => branch.UseMiddleware<PhotoPrint.API.Middleware.MetricsEndpointIpAllowListMiddleware>());
+    app.UseOpenTelemetryPrometheusScrapingEndpoint(metricsPath);
+}
+
+// Synthetic-throw endpoint — exists only in the "Testing" environment for
+// SentryIntegrationTests. Never reachable in Development or Production.
+if (app.Environment.IsEnvironment("Testing"))
+{
+    app.MapGet("/__test/throw",
+        () => { throw new InvalidOperationException("synthetic-test-exception"); });
+    app.MapGet("/__test/throw-mapped-502",
+        () => { throw new PhotoPrint.API.Exceptions.BadGatewayException("synthetic-mapped-502"); });
+    app.MapGet("/__test/throw-mapped-404",
+        () => { throw new PhotoPrint.API.Exceptions.NotFoundException("synthetic-mapped-404"); });
+}
 
 app.MapControllers();
 app.MapHub<AdminOrderHub>("/hubs/admin-orders");

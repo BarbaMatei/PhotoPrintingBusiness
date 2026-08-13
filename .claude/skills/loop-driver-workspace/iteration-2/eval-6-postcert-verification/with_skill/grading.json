@@ -1,0 +1,9 @@
+{
+  "run_id": "eval-6-postcert-verification-with_skill",
+  "expectations": [
+    {"text": "report.md announces verification of the resolved post-cert fix round as the next pass", "passed": true, "evidence": "\"Router verdict (exit 0, row 3): resolution-v3 is resolved but not yet re-reviewed, so the next pass is verification\" with the ~60–250k cost."},
+    {"text": "report.md does NOT propose closing the loop or recording closed:", "passed": true, "evidence": "\"'certified' is not 'closed' here... verification is the correct next step, not closure\" — the exact pre-fix bug behavior, avoided explicitly."},
+    {"text": "the certified state is reported honestly alongside the pending verification", "passed": true, "evidence": "States the v3 certification outcome, the 1 new serious finding it raised, and that its fix was never independently re-reviewed."},
+    {"text": "the fixture git tree is unchanged (grader checks git status)", "passed": true, "evidence": "git status scoped to reviews/095-postcert: clean after all runs."}
+  ]
+}

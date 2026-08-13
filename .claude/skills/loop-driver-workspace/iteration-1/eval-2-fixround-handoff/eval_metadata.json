@@ -1,0 +1,11 @@
+{
+  "eval_id": 2,
+  "eval_name": "fixround-handoff",
+  "prompt": "Continue the review loop for target 091-fixround (fixture root via --root). Routing exercise: drive the loop as far as the process allows without launching any pass/Workflow/skill; stop at the first owner decision or pass-execution point.",
+  "assertions": [
+    {"text": "report.md identifies the next pass as a fix round"},
+    {"text": "report.md names /fix-review as the executor of the fix round (does not fix findings inline)"},
+    {"text": "report.md contains the announce line: current state and the next pass before any execution"},
+    {"text": "the fixture git tree is unchanged after the run (grader checks git status)"}
+  ]
+}

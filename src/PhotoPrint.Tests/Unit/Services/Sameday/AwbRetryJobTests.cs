@@ -226,6 +226,26 @@ public class AwbRetryJobTests : IDisposable
     }
 
     [Fact]
+    public async Task Gives_up_on_an_order_advanced_past_paid_before_its_label_existed()
+    {
+        var advanced = SeedPaidOrder(paidAt: T0.AddHours(-25), status: OrderStatus.Printing);
+
+        var clock = new FakeTimeProvider(T0);
+        var queue = new TestQueue();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var giveUp = new AwbGiveUpRegistry(cache);
+        var sut = Build(queue, giveUp, clock);
+
+        await RunOneTickAsync(sut);
+
+        giveUp.MarkOnce(advanced.Id).Should().BeFalse(
+            "an admin moving the order on is not a reason for the only never-got-a-label alarm "
+                + "to go silent");
+        queue.Enqueued.Should().BeEmpty(
+            "AWB creation still refuses any status but Paid, so re-enqueuing would only churn");
+    }
+
+    [Fact]
     public async Task Does_not_enqueue_orders_in_non_Paid_status()
     {
         SeedPaidOrder(paidAt: T0.AddHours(-1), status: OrderStatus.Cancelled);

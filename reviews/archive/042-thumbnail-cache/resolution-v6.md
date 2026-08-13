@@ -1,143 +1,97 @@
 ---
 type: resolution
 target: 042-thumbnail-cache
-answers_review: review-v6.md
 version: 6
-branch: feat/bolt-042-thumbnail-cache
+answers: review-v6.md
 status: resolved
 fixed_commit: 79c2eda
-opened: 2026-07-14
 closed: 2026-07-14
-findings:
-  F1:  { status: fixed, commit: 548663f, note: "Decode-limiter default now min(cores, availableRAM / 512 MB-per-decode) via ImageDecodeLimiter.RecommendedMaxConcurrentDecodes(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes, ProcessorCount); bounds summed in-flight decode memory to host RAM. 3 unit tests (low-RAM→memory-bound, ample-RAM→core-bound, tiny-RAM→never<1)." }
-  F2:  { status: fixed, commit: 069f5ea, note: "clearGuestToken() now drops only the guestToken field and keeps checkout contact info under the same guestSession key; removes the whole entry only when nothing but the token remains. 2 auth.service.spec tests (preserve contact / remove-when-token-only)." }
-  F3:  { status: fixed, commit: 39b0098, note: "Capture wasGuest = !isAuthenticated() BEFORE the request in performUpload + fetchPreviewWithRetry; self-heal (re-init guest + retry) runs only when wasGuest. Expired logged-in user no longer minted a throwaway guest. 2 format-selector.spec tests (upload + preview), revert-verified red." }
-  F4:  { status: deferred, commit: null, note: "Same class as v5 V5-1 / ledger D31 — accepted, deferred to the bolt-043 orphan sweep. Durable fix is the atomic ExecuteUpdate the review names; not done now because the InMemory test provider can't run ExecuteUpdate (same reason M1 used a liveness re-read). See decisions." }
-  F5:  { status: fixed, commit: 6b7ce09, note: "Middleware now emits uploads.decompression_bomb.rejected (source=allocator_backstop) for InvalidMemoryOperationException, alongside the pixel-guard branch (tagged source=pixel_guard); ops alerting on the reserved event catch backstop-tripped bombs too. Test asserts the event + source." }
-  F6:  { status: fixed, commit: 6e577fd, note: "Added HEIC removal as bundled-scope Change D in bolt.md with retroactive AC (415 on ISO-BMFF ftyp content; UI drops .heic), mirroring B/C. Doc-only." }
-  F7:  { status: fixed, commit: 79c2eda, note: "test-walkthrough now states shipped `private, max-age=2592000` (was the opposite `public…immutable`, contradicting SEC-1/D1) + Private=true assertion; reconciled the point-in-time 460/+3 count with the v1–v6→v6-resolution test growth (531/409 at v6, 535/413 after). Doc-only." }
-  F8:  { status: deferred, commit: null, note: "D28 re-raise — non-seekable cloud stream at UploadsController.cs:155; latent until the bolt-043 cloud IStorageService lands. No non-seekable stream exists today. Deferral stands (bolt-043)." }
-  F9:  { status: deferred, commit: null, note: "D66 — ExistsAsync has no production caller; it's a bolt-043 cloud seam. Documenting/dropping it belongs with the 043 provider work. Deferred to bolt-043." }
-  F10: { status: deferred, commit: null, note: "D71 — cleanup-job thumbnail-delete-failure still soft-deletes the row; same orphan-sweep family as F4/D31. Deferred to bolt-043." }
-  F11: { status: deferred, commit: null, note: "D79 — GetInfoAsync broad catch collapses storage/IO faults + cancellation into 422. New low; next discovery pass / observability follow-up. Deferred." }
-  F12: { status: deferred, commit: null, note: "D77 — pixel-area cap is bytes-per-pixel-blind; legit 16-bit large PNGs 422. Input-validation refinement, no data loss. Deferred to next pass." }
-  F13: { status: deferred, commit: null, note: "D75 — File.Move move-target race; Windows-dev-only, prod Linux rename is atomic. Deferred to next pass." }
-  F14: { status: deferred, commit: null, note: "D76 — cache-hit GET read-share vs cleanup delete race; Windows-dev-only, prod Linux unlinks. Deferred to next pass." }
-  F15: { status: deferred, commit: null, note: "D68 — limiter saturation/queue unobservable. Observability follow-up; deferred to next pass." }
-  F16: { status: deferred, commit: null, note: "D72 — staggered parallel-preview 401s can churn sessions; grid outcome unchanged, wasteful only. Deferred to next pass." }
-  F17: { status: deferred, commit: null, note: "D67 — extra AnyAsync round-trip on cache-miss preview; removed only by F4's atomic ExecuteUpdate, which is deferred with F4. Deferred (paired with F4)." }
-  F18: { status: fixed, commit: 39b0098, note: "The logged-in-401-during-upload coverage gap (D73) is closed by the F3 regression tests: format-selector.spec now asserts a logged-in 401 (upload + preview) mints no guest session and fires no retry. Byproduct of the F3 fix." }
-  F19: { status: deferred, commit: null, note: "D74 — onFilesAccepted initial guest-init error path untested. Separate coverage gap, not in the v6 recommendation set. Deferred to next pass." }
-  F20: { status: deferred, commit: null, note: "D80 — implementation-plan.md AC still lists public/immutable + 25000×25000 axis cap. Same drift family as F7 but a different file; not in the v6 recommendation set. Deferred to next pass (cheap doc fix)." }
-  F21: { status: deferred, commit: null, note: "D69 — no test pins slot release on a throwing decode; plausible/latent (using var releases today). Deferred to next pass." }
-  F22: { status: deferred, commit: null, note: "D70 — exact-type 422 mapping proven only by an injected instance; plausible/latent (3.1.11 throws the concrete type). Deferred to next pass." }
-  F23: { status: deferred, commit: null, note: "D78 — null-Identify fail-open; dead today (3.1.11 throws, never returns null). Deferred to next pass." }
-  F24: { status: deferred, commit: null, note: "D23 re-raise — Npgsql migration DDL arm unexercised (InMemory tests). Standing 3-env/Testcontainers deferral." }
-  F25: { status: deferred, commit: null, note: "D23 re-raise — SQLite-typed snapshot vs Npgsql varchar(512); phantom AlterColumn only under a design-time provider switch the project never does. Standing 3-env deferral." }
-  F26: { status: deferred, commit: null, note: "D81 — bomb-alert log template duplicated across controller + middleware. Note: F5 added a third emit site of the same event name, so the hoist-to-constant is now marginally more valuable. Cleanup, deferred to next pass." }
-  F27: { status: deferred, commit: null, note: "D82 — dropRestoredEntry duplicates onRemoveUpload. Cleanup, deferred to next pass." }
-  F28: { status: deferred, commit: null, note: "D83 — client_aborted branch reads Items[\"CorrelationId\"] directly instead of GetCorrelationId(). Trivial cleanup in the same file F5 touched; left deferred to keep the v6 scope disciplined. Deferred to next pass." }
-  F29: { status: deferred, commit: null, note: "D84 — storage save/delete traces at Debug never emit under the Information floor. Cleanup, deferred to next pass." }
 ---
 
-# Resolution — Bolt 042: Thumbnail Cache (answers review-v6)
-
-Fixer-owned; one row per finding ID from [review-v6.md](review-v6.md). No blockers, verdict
-`approve-with-followups`. IDs are pass-local to v6 and map to canonical `D#` in [ledger.md](ledger.md).
-
-## Scope of this resolution
-
-Driven by review-v6's **Recommendation** section: fix the runtime/data-loss mediums **F1, F2, F3, F5**
-plus the two cheap doc fixes **F6, F7**; defer **F4** and **F8** to bolt-043. The remaining long-tail
-(F9–F29 Lows/Cleanups) is left for the next blinded discovery pass the review asks for — recorded as
-`deferred` here with rationale, not silently dropped. **F18** flipped to `fixed` because the F3
-regression tests are exactly the coverage it asked for (byproduct, same commit).
-
-Suites after the fixes: **.NET 535/535, frontend 413/413** (both were 531/409 at v6; +4 .NET, +4 FE
-from the F1/F5/F2/F3 regression tests).
+# Resolution v6 — 042-thumbnail-cache
 
 ## Findings
 
-| ID | Sev | Status | Commit | How |
-|----|-----|--------|--------|-----|
-| F1 | 🟠 | fixed | 548663f | Default decode slots = min(cores, availableRAM / 512 MB); +3 unit tests |
-| F2 | 🟠 | fixed | 069f5ea | clearGuestToken drops only the token, preserves contact info; +2 tests |
-| F3 | 🟠 | fixed | 39b0098 | Capture guest-ness before the request; self-heal only for real guests; +2 tests |
-| F4 | 🟠 | deferred | — | bolt-043 orphan sweep (D31); atomic ExecuteUpdate blocked by InMemory provider |
-| F5 | 🟠 | fixed | 6b7ce09 | Emit bomb event (source=allocator_backstop) for InvalidMemoryOperationException; +1 test |
-| F6 | 🟠 | fixed | 6e577fd | HEIC removal documented as bundled-scope Change D + AC |
-| F7 | 🟠 | fixed | 79c2eda | Walkthrough Cache-Control corrected to shipped `private`; test counts reconciled |
-| F8 | 🟠 | deferred | — | bolt-043 cloud provider (D28); non-seekable stream latent until 043 |
-| F9 | 🟡 | deferred | — | D66 — bolt-043 cloud seam (ExistsAsync) |
-| F10 | 🟡 | deferred | — | D71 — orphan-sweep family, bolt-043 |
-| F11 | 🟡 | deferred | — | D79 — GetInfoAsync fault/cancel conflation; next pass |
-| F12 | 🟡 | deferred | — | D77 — bytes-per-pixel budget; next pass |
-| F13 | 🟡 | deferred | — | D75 — Windows-only move race; next pass |
-| F14 | 🟡 | deferred | — | D76 — Windows-only delete race; next pass |
-| F15 | 🟡 | deferred | — | D68 — limiter observability; next pass |
-| F16 | 🟡 | deferred | — | D72 — parallel-preview session churn; next pass |
-| F17 | 🟡 | deferred | — | D67 — extra round-trip, removed by F4's fix (paired) |
-| F18 | 🟡 | fixed | 39b0098 | Logged-in-401 coverage — closed by the F3 tests |
-| F19 | 🟡 | deferred | — | D74 — guest-init error path untested; next pass |
-| F20 | 🟡 | deferred | — | D80 — plan AC drift (different file than F7); next pass |
-| F21 | 🟡 | deferred | — | D69 — slot-release test; next pass |
-| F22 | 🟡 | deferred | — | D70 — exact-type mapping test; next pass |
-| F23 | 🟡 | deferred | — | D78 — null-Identify fail-open (dead today); next pass |
-| F24 | 🟡 | deferred | — | D23 — Npgsql DDL; 3-env/Testcontainers |
-| F25 | 🟡 | deferred | — | D23 — snapshot parity; 3-env |
-| F26 | ⚪ | deferred | — | D81 — bomb-log template dup (now 3 sites after F5) |
-| F27 | ⚪ | deferred | — | D82 — dropRestoredEntry dup |
-| F28 | ⚪ | deferred | — | D83 — client_aborted correlation-id accessor |
-| F29 | ⚪ | deferred | — | D84 — Debug-level storage traces |
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| PPW-112 | fixed | `548663f` | The limiter's default is now the smaller of the core count and available memory divided by a 512 MB allowance per decode, which bounds the summed in-flight decode memory to the host. Three unit tests. |
+| PPW-99 | fixed | `069f5ea` | Clearing the guest token now drops only the token field and keeps the checkout contact details under the same stored key, removing the whole entry only when nothing but the token remains. Two tests. |
+| PPW-114 | fixed | `39b0098` | Guest status is captured before the request on both the upload and preview paths, and the self-heal runs only for a real guest, so an expired signed-in session no longer mints a guest. Two tests, red on revert. |
+| PPW-85 | deferred | — | The same class as the residual accepted last round. Deferred to the cloud-storage orphan sweep. The durable conditional update cannot run on the in-memory test provider. See Decisions. |
+| PPW-113 | fixed | `6b7ce09` | The middleware emits the reserved bomb event for the allocator's memory exception, tagged with the guard that caught it, alongside the pixel-guard branch. The test asserts the event and the tag. |
+| PPW-115 | fixed | `6e577fd` | The HEIC removal is recorded in the bolt as a bundled change with a retroactive criterion, mirroring the other two. Document only. |
+| PPW-116 | fixed | `79c2eda` | The test walkthrough now states the shipped private 30-day directive rather than its opposite, plus the assertion that pins it, and its test counts were reconciled with the real growth. Document only. |
+| PPW-79 | deferred | — | The stream's length is read with no check that the stream can rewind, and no such stream exists today. Latent until the cloud provider lands. The deferral stands. |
+| PPW-117 | deferred | — | The existence check has no production caller; it is a seam for the cloud provider. Documenting it or dropping it belongs with that work. |
+| PPW-122 | deferred | — | A failed thumbnail delete still soft-deletes the row, which is the same orphan family as PPW-85 and PPW-82. Deferred with them. |
+| PPW-130 | deferred | — | The broad catch collapses storage faults, input-output errors and cancellation into one unreadable-image answer. A new low; deferred to the next pass. |
+| PPW-128 | deferred | — | The pixel-area cap is blind to bytes per pixel, so legitimate large 16-bit images are refused. An input-validation refinement with no data loss. Deferred to the next pass. |
+| PPW-126 | deferred | — | The move onto the shared key can fail on Windows. Production runs Linux, where the rename is atomic. Deferred to the next pass. |
+| PPW-127 | deferred | — | A cache-hit read holds the file open and the cleanup delete then fails on Windows. Production runs Linux, which unlinks regardless. Deferred to the next pass. |
+| PPW-119 | deferred | — | Limiter saturation and queue depth are unobservable. An observability follow-up; deferred to the next pass. |
+| PPW-123 | deferred | — | Staggered parallel preview 401s can churn sessions. The grid's outcome is unchanged and the cost is waste. Deferred to the next pass. |
+| PPW-118 | deferred | — | The extra round-trip the PPW-85 re-read costs disappears only with the conditional update deferred alongside it. Paired with PPW-85. |
+| PPW-124 | fixed | `39b0098` | The coverage gap is closed by the PPW-114 regression tests, which assert that a signed-in 401 on the upload and preview paths mints no guest session and fires no retry. |
+| PPW-125 | deferred | — | The guest-init error path when files are dropped is untested. A separate coverage gap, outside this round's recommended set. Deferred to the next pass. |
+| PPW-131 | deferred | — | The implementation plan still lists the public directive and the per-axis cap. Same drift family as PPW-116 but a different file, and outside the recommended set. Deferred. |
+| PPW-120 | deferred | — | No test pins the decode slot's release on a throwing decode. Latent, since today's code releases it. Deferred to the next pass. |
+| PPW-121 | deferred | — | The exact-type mapping to 422 is proven only by an injected instance. Latent, since the shipped library throws that concrete type. Deferred to the next pass. |
+| PPW-129 | deferred | — | The fail-open branch when the identify call returns null is dead today, because the shipped library throws instead of returning null. Deferred to the next pass. |
+| PPW-74 | deferred | — | Raised twice this pass: the Postgres arm of the migration is unexercised, and the model snapshot carries the SQLite type. The standing three-environment deferral. |
+| PPW-132 | deferred | — | The bomb-alert template is duplicated across the controller and the middleware. The PPW-113 fix added a third site, which makes extracting it worth marginally more. Cleanup, deferred. |
+| PPW-133 | deferred | — | `dropRestoredEntry` duplicates `onRemoveUpload`. Cleanup, deferred to the next pass. |
+| PPW-134 | deferred | — | The client-abort branch reads the raw correlation-id item instead of the accessor. Trivial cleanup in the file PPW-113 touched; left deferred to keep this round's scope. See Decisions. |
+| PPW-135 | deferred | — | Storage save and delete traces sit at Debug under an Information floor, so they never emit. Cleanup, deferred to the next pass. |
 
-## Decisions / deferrals (attached, not suppressed)
+## Scope
 
-- **F4 → deferred (D31 / bolt-043 orphan sweep).** The review's durable fix is a conditional atomic
-  write — `UPDATE … SET ThumbnailPath WHERE Id=@id AND DeletedAt IS NULL` via `ExecuteUpdate`, deleting
-  the just-written file on 0 rows. The InMemory provider the integration tests run on cannot execute
-  `ExecuteUpdate` (this is exactly why the v4 M1 fix used a liveness re-read, not `ExecuteUpdate`), so
-  landing the durable fix now would ship untestable in this suite. This is the same accepted-deferral
-  class as v5 V5-1 and belongs with the bolt-043 orphan sweep, where a real provider is in play. **F17**
-  (the extra `AnyAsync` round-trip the M1 re-read costs) is folded into the same deferral — it only
-  disappears with F4's `ExecuteUpdate`.
-- **F8 → deferred (D28 / bolt-043).** `stream.Length` at `UploadsController.cs:155` assumes a seekable
-  stream. No non-seekable stream exists today (only `FileStream` + the in-memory fake), so it's latent
-  until the bolt-043 cloud provider. Design constraint for 043.
-- **F18 → fixed via the F3 commit.** F18 asked for a logged-in-401-during-upload test asserting no guest
-  session is minted. The F3 regression tests add exactly that (upload + restored-preview paths). Recorded
-  as fixed against the F3 commit rather than left open, since the coverage it names now exists.
-- **F2 residual (surfaced for the re-reviewer).** The fix stops the *interceptor* from wiping contact
-  info. It does not change `format-selector`'s `ensureGuestSession`, which on a re-init still calls
-  `storeSession({...empty contact})` — so an upload-page re-init would overwrite preserved contact info.
-  This is out of F2's scenario (contact info is entered at checkout via `guest-checkout-form`, not on the
-  upload page) and pre-existing, but noting it: fully preserving contact across an upload-page re-init,
-  and the "checkout surfaces a re-auth notice" UX the review also mentions, are follow-ups (not the
-  localStorage-wipe F2 fixes). Cart re-association after token expiry is a server-side concern beyond the
-  FE fix.
-- **F5 ↔ F26 interaction.** F5 adds a third emit site of `uploads.decompression_bomb.rejected` (now:
-  batch path in the controller, pixel-guard + allocator-backstop in the middleware). This makes F26's
-  "hoist the event name/template to a shared constant" marginally more valuable; recorded so the next
-  pass weights it accordingly. Not fixed here (cleanup, out of the v6 recommendation set).
-- **F28 → deferred despite being in a file I touched.** F5 edited `ExceptionHandlerMiddleware.cs`, and
-  F28 (client-abort branch reading `Items["CorrelationId"]` instead of `GetCorrelationId()`) is a
-  one-line cleanup in the same file. Left deferred to keep the v6 change set to the recommended scope;
-  trivially batchable in the next cleanup sweep.
-- **F20 → deferred (D80).** Same doc-drift family as F7 but in `implementation-plan.md`, which the v6
-  recommendation did not list. Cheap; folded into the next pass with the other doc reconciliations.
-- **Long tail (F9–F17, F19, F21–F29) → deferred.** Per the review's own disposition, the feature is
-  **not saturated** and wants another blinded discovery pass; these Lows/Cleanups (Windows-dev-only
-  races, latent version-bump/subtype risks, observability polish, cleanups) are the long tail that pass
-  will re-weigh. None is a data-loss or runtime-break at prod; deferring them is deliberate, not a miss.
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A — Memory-aware limiter default (`548663f`) | PPW-112 | `ImageDecodeLimiter.cs`, `Program.cs` | not needed (one default computed from host memory) |
+| B — Guest session reach (`069f5ea`, `39b0098`) | PPW-99, PPW-114, PPW-124 | `UI/…/guest-auth.service.ts`, `UI/…/format-selector-page.ts` | not needed (one field-level write and one captured flag) |
+| C — Bomb event on the backstop branch (`6b7ce09`) | PPW-113 | `Middleware/ExceptionHandlerMiddleware.cs` | not needed (one emit site beside an existing one) |
+| D — Documents (`6e577fd`, `79c2eda`) | PPW-115, PPW-116 | `memory-bank/…/bolt.md`, `memory-bank/…/test-walkthrough.md` | not needed (documents only) |
+| E — Left undone this round | PPW-85, PPW-79, PPW-117, PPW-118, PPW-119, PPW-120, PPW-121, PPW-122, PPW-123, PPW-125, PPW-126, PPW-127, PPW-128, PPW-129, PPW-130, PPW-131, PPW-132, PPW-133, PPW-134, PPW-135, PPW-74 | — | not needed (no code changed) |
 
-## Hand back — next step is a re-review
+## Decisions
 
-The six recommended findings (F1, F2, F3, F5, F6, F7) are `fixed` with regression tests (F3
-revert-verified red; F1/F2/F5 assert the new behavior; F6/F7 doc-only). F18 is covered by F3's tests.
-F4/F8 and the long tail are `deferred` with rationale above. Resolution is **`resolved`** at
-`fixed_commit: 79c2eda`.
+### The orphan race stays deferred to the cloud-storage sweep (PPW-85, PPW-118)
 
-Per the loop contract I do **not** self-verify. The next step is a **verification re-review** against
-`79c2eda` — revert-and-rerun each `fixed` finding's regression test, judge the doc fixes and deferral
-rationales — producing `review-v7.md`, which is what flips the held findings to `verified` (or reopens
-them). Note the review also asks for a separate **blinded discovery pass** to test saturation; that is a
-distinct activity from verifying these fixes.
+The durable fix is a conditional update that sets the path only while the row is live, deleting the
+just-written file on no match. The in-memory provider the integration tests run on cannot execute one. That is
+exactly why the previous round used a liveness re-read. Landing it now would ship code this suite
+cannot test. It belongs with the cloud-storage orphan sweep, where a real provider is in play.
+PPW-118, the extra round-trip that re-read costs, disappears only with the same change and is folded into
+the same deferral.
+
+### One finding was reclassified as fixed by another fix
+
+PPW-124 asked for a test proving a signed-in 401 during upload mints no guest session. The PPW-114 regression
+tests add exactly that, on both the upload and the restored-preview paths, so it is recorded as fixed
+against that commit rather than left open.
+
+### The contact-details fix has a residual outside its own scenario
+
+The fix stops the interceptor wiping contact details. It does not change what the upload page does when it
+re-inits a session. That path still writes the stored entry with empty contact fields. An upload-page
+re-init would therefore overwrite what was preserved. That is outside this finding's scenario, since
+contact details are entered at checkout rather than on the upload page, and it predates the fix. It is
+recorded here for the re-reviewer rather than fixed quietly.
+
+### The new emit site raises the value of a deferred cleanup (PPW-113, PPW-132)
+
+The PPW-113 fix adds a third place emitting the reserved bomb event: the batch route in the controller, and
+both the pixel guard and the allocator backstop in the middleware. That makes extracting the event name
+to one constant worth more than when PPW-132 was raised. Recorded so the next pass weighs it accordingly.
+
+### A one-line cleanup in a touched file was still deferred
+
+The PPW-113 fix edited the middleware, and PPW-134 is a one-line change in the same file. It was left deferred
+to keep this round's change set to the recommended scope, and it batches trivially into a later cleanup
+sweep.
+
+### The long tail is deferred deliberately, not missed
+
+The review judged that the search was not complete and asked for another blinded pass. The remaining low and
+cleanup findings — development-only races, latent test gaps, observability polish and duplication — are
+the tail that pass will re-weigh. None is a data-loss or a runtime break in production.

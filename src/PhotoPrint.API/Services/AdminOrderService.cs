@@ -10,6 +10,7 @@ using PhotoPrint.API.DTOs.Orders;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
@@ -80,7 +81,7 @@ public class AdminOrderService : IAdminOrderService
         // default (Program.cs) the parent page and the Items child run as separate round-trips; a
         // non-unique ORDER BY (CreatedAt ties) can resolve the tie differently between them on
         // Postgres under concurrency, so a paged order comes back with missing Items. Id makes the
-        // order total (F2, review 042-v8).
+        // order total.
         query = query.OrderByDescending(o => o.CreatedAt).ThenBy(o => o.Id);
 
         var total = await query.CountAsync(ct);
@@ -116,12 +117,19 @@ public class AdminOrderService : IAdminOrderService
 
         OrderStatusMachine.Transition(order, newStatus);
 
+        double? processingSeconds = null;
+
         if (newStatus == OrderStatus.Shipped)
         {
             // Preserve a machine-created AWB/tracking URL when the admin form omits it.
             if (!string.IsNullOrWhiteSpace(awbNumber)) order.AwbNumber = awbNumber;
             if (!string.IsNullOrWhiteSpace(trackingUrl)) order.TrackingUrl = trackingUrl;
             order.ShippedAt = DateTimeOffset.UtcNow;
+
+            // PaidAt should always be set for an order reaching Shipped, but guard
+            // anyway — the admin's manual force-Shipped path is a rare edge case.
+            if (order.PaidAt is not null)
+                processingSeconds = (order.ShippedAt.Value - order.PaidAt.Value).TotalSeconds;
         }
         else if (newStatus == OrderStatus.Delivered && order.DeliveredAt is null)
         {
@@ -137,6 +145,10 @@ public class AdminOrderService : IAdminOrderService
 
         await _db.SaveChangesAsync(ct);
 
+        // Cumulative histogram: a shipment that never committed can never be un-observed.
+        if (processingSeconds is { } seconds)
+            FotoMetrics.OrderProcessingDuration.Record(seconds);
+
         if (newStatus == OrderStatus.Shipped)
             _orderEmailService.FireOrderShippedEmail(order);
         else if (newStatus == OrderStatus.Delivered)
@@ -150,18 +162,18 @@ public class AdminOrderService : IAdminOrderService
         await _hub.Clients.All.SendAsync(
             "OrderStatusChanged", orderId, order.Status.ToString(), ct);
 
-        // Bolt 052: when the order enters the configured production-complete status
+        // When the order enters the configured production-complete status
         // (default Shipped), purge each upload's cloud original. Synchronous — adds
         // ~50–100 ms per upload to this admin PATCH but keeps the lifecycle ordering
         // simple. Gated on archive-on + cloud-on like the cancel path: with the supported
         // Provider=local config the purger's self-refusal logged an Error on EVERY ship
-        // (chronic false alarm, D57 review 043-v7). The archive-on-but-cloud-off mismatch
+        // (chronic false alarm). The archive-on-but-cloud-off mismatch
         // stays visible via the purge recovery scanner's boot-time cloud-tier-off log and
         // UploadCleanupJob's hourly unroutable-count warning when Cloud rows accumulate.
         if (_archiveSettings.IsProductionCompleteStatus(newStatus)
             && _archiveSettings.Enabled && _storageRouter.CloudEnabled)
         {
-            // Best-effort, mirroring the cancel path (F4, review 043-v3): the transition is already
+            // Best-effort, mirroring the cancel path: the transition is already
             // committed + emailed + broadcast, so a purge hiccup (transient DB load, client-disconnect
             // cancellation) must not 500 the PATCH. The periodic recovery sweep backstops a miss.
             try
@@ -192,7 +204,7 @@ public class AdminOrderService : IAdminOrderService
         // Fail before writing any response bytes if the ZIP cannot be produced completely. A
         // Cloud-located original with the cloud tier disabled is unroutable — For(Cloud) would throw
         // mid-stream, after the headers + earlier entries are already committed to Response.Body,
-        // handing the admin a truncated ZIP with no clean error (F9, review 043-v3).
+        // handing the admin a truncated ZIP with no clean error.
         if (!_storageRouter.CloudEnabled &&
             order.Items.Any(i => i.Upload?.FilePath is not null &&
                                  i.Upload.StorageLocation == StorageLocation.Cloud))
@@ -220,7 +232,7 @@ public class AdminOrderService : IAdminOrderService
 
             await using var entryStream = entry.Open();
             // Route by the upload's tier — a promoted (Cloud) order's original lives in the
-            // object store, not on local disk, once promotion has run (F1, review 043-v1).
+            // object store, not on local disk, once promotion has run.
             await using var fileStream = await _storageRouter
                 .For(item.Upload.StorageLocation)
                 .GetStreamAsync(item.Upload.FilePath, ct);
@@ -276,7 +288,7 @@ public class AdminOrderService : IAdminOrderService
 
         _orderEmailService.FireOrderCancelledEmail(order, reason);
 
-        // Bolt 052 / F17 (review 043-v1): a cancelled/refunded order's cloud original must be
+        // A cancelled/refunded order's cloud original must be
         // purged too (owner decision — minimise storage/GDPR exposure). Runs after the refund so
         // it never delays the money path. Best-effort cleanup: gated on the cloud tier + archive
         // being on (cancel with cloud off has nothing to purge, and the purger's refusal logs at

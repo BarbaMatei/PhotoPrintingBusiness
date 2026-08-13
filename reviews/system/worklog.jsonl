@@ -1,0 +1,32 @@
+{"t":"2026-08-12T15:30:01+03:00","ev":"round-start","round":2}
+{"t":"2026-08-12T15:30:01+03:00","ev":"triage-done","clusters":6,"checks_needed":0,"pre_cleared":0,"gates":1}
+{"t":"2026-08-12T15:30:01+03:00","ev":"gate-open","reason":"batched owner decisions for round 2"}
+{"t":"2026-08-12T15:36:29+03:00","ev":"gate-closed","reason":"owner: all as proposed; SF31 wont-fix (stockpile until owner-called sweep)"}
+{"t":"2026-08-12T15:41:56+03:00","ev":"test-run","kind":"red","filter":"lib/tests/run-tests.mjs","passed":36,"failed":5,"duration_s":0}
+{"t":"2026-08-12T15:44:56+03:00","ev":"test-run","kind":"green","filter":"lib/tests/run-tests.mjs","passed":41,"failed":0,"duration_s":0}
+{"t":"2026-08-12T15:46:48+03:00","ev":"finding","id":"SF16","status":"fixed","commit":"fa5eda0"}
+{"t":"2026-08-12T15:46:48+03:00","ev":"finding","id":"SF18","status":"fixed","commit":"fa5eda0"}
+{"t":"2026-08-12T15:46:48+03:00","ev":"finding","id":"SF23","status":"fixed","commit":"fa5eda0"}
+{"t":"2026-08-12T15:46:48+03:00","ev":"finding","id":"SF32","status":"fixed","commit":"fa5eda0"}
+{"t":"2026-08-12T15:46:48+03:00","ev":"finding","id":"SF21","status":"fixed","commit":"866c843"}
+{"t":"2026-08-12T15:46:49+03:00","ev":"finding","id":"SF20","status":"fixed","commit":"ff3e64f"}
+{"t":"2026-08-12T15:46:49+03:00","ev":"finding","id":"SF26","status":"fixed","commit":"9c2bc31"}
+{"t":"2026-08-12T15:46:49+03:00","ev":"micro-review-dispatched","cluster":"1-lib"}
+{"t":"2026-08-12T15:47:50+03:00","ev":"finding","id":"SF17","status":"fixed","commit":"a59faac"}
+{"t":"2026-08-12T15:49:37+03:00","ev":"finding","id":"SF19","status":"fixed","commit":"152de93"}
+{"t":"2026-08-12T15:49:37+03:00","ev":"finding","id":"SF27","status":"fixed","commit":"152de93"}
+{"t":"2026-08-12T15:49:37+03:00","ev":"finding","id":"SF28","status":"fixed","commit":"152de93"}
+{"t":"2026-08-12T15:49:37+03:00","ev":"finding","id":"SF29","status":"fixed","commit":"152de93"}
+{"t":"2026-08-12T15:49:37+03:00","ev":"finding","id":"SF35","status":"fixed","commit":"152de93"}
+{"t":"2026-08-12T15:52:35+03:00","ev":"finding","id":"SF30","status":"fixed","commit":"cc46bc7"}
+{"t":"2026-08-12T15:52:35+03:00","ev":"finding","id":"SF33","status":"fixed","commit":"222f765"}
+{"t":"2026-08-12T15:52:35+03:00","ev":"finding","id":"SF34","status":"fixed","commit":"1528576"}
+{"t":"2026-08-12T15:53:46+03:00","ev":"test-run","kind":"red","filter":"lib/tests/run-tests.mjs","passed":43,"failed":1,"duration_s":0}
+{"t":"2026-08-12T15:54:36+03:00","ev":"test-run","kind":"green","filter":"lib/tests/run-tests.mjs","passed":44,"failed":0,"duration_s":0}
+{"t":"2026-08-12T15:54:41+03:00","ev":"finding","id":"SF22","status":"fixed","commit":"87c9c75"}
+{"t":"2026-08-12T15:55:41+03:00","ev":"micro-review-returned","cluster":"1-lib","found":4}
+{"t":"2026-08-12T16:02:33+03:00","ev":"micro-review-returned","cluster":"2-6-final","found":6}
+{"t":"2026-08-12T16:03:21+03:00","ev":"round-end","round":2}
+{"t":"2026-08-12T16:03:22+03:00","ev":"test-run","kind":"final","filter":"lib/tests/run-tests.mjs","passed":44,"failed":0,"duration_s":0}
+{"t":"2026-08-12T16:04:30+03:00","ev":"doc-gate","verdict":"state clean; per-target gate + judge out of scope for the uncontracted system target"}
+{"t":"2026-08-12T17:00:01+03:00","ev":"pass-records-done","pass":3,"type":"verification","note":"hand-driven pass, no loop-driver launch stamp; ledger flips + metrics line + index row written, auditor and state gate clean"}

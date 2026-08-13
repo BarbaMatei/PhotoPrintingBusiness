@@ -7,7 +7,9 @@ using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.DTOs.Shipping;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services;
 
@@ -36,9 +38,9 @@ public class OrderServiceTests : IDisposable
             .Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
 
-        // Bolt 053: OrderService now depends on storage for the photos endpoint. Default
+        // OrderService now depends on storage for the photos endpoint. Default
         // to cloud-tier-off so existing tests don't accidentally exercise the new path;
-        // bolt-053 photos tests construct their own SUT with cloud enabled.
+        // Photos tests construct their own SUT with cloud enabled.
         _storageRouterMock = new Mock<IStorageRouter>();
         _storageRouterMock.SetupGet(r => r.CloudEnabled).Returns(false);
 
@@ -60,7 +62,7 @@ public class OrderServiceTests : IDisposable
     {
         var userId = Guid.NewGuid();
 
-        // QUAL-3 (review 035-v8): shared canonical cart graph — see TestCartSeed.
+        // Shared canonical cart graph — see TestCartSeed.
         var graph = TestCartSeed.Build(userId: userId, unitPrice: unitPrice, quantity: quantity);
         graph.AddTo(_db);
         await _db.SaveChangesAsync();
@@ -202,7 +204,7 @@ public class OrderServiceTests : IDisposable
         Assert.Equal("guest@test.com", order.GuestEmail);
     }
 
-    // ── Idempotency (bolt 035) ──────────────────────────────────────────────────
+    // ── Idempotency ──────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateFromCart_SameKey_SameRequest_ReplaysOriginalOrder()
@@ -210,7 +212,7 @@ public class OrderServiceTests : IDisposable
         var (userId, _, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
         const string key = "idem-key-001";
 
-        // Reuse the SAME request instance — MakeRequest() randomizes EasyboxLockerId
+        // Reuse the SAME request instance — MakeRequest randomizes EasyboxLockerId
         // per call, which would otherwise register as a divergent field.
         var request = MakeRequest();
         var first = await _service.CreateFromCartAsync(userId, null, request, key);
@@ -247,7 +249,7 @@ public class OrderServiceTests : IDisposable
     [Fact]
     public async Task CreateFromCart_SameKey_SameTotalDifferentItems_ThrowsConflictNamingItems()
     {
-        // BUG-3: with uniform per-unit pricing, a different photo at the same qty has
+        // With uniform per-unit pricing, a different photo at the same qty has
         // an identical total. Total parity alone must NOT authorize a replay, or the
         // reused key silently ships the wrong order's images.
         var (userId, productId, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
@@ -299,8 +301,8 @@ public class OrderServiceTests : IDisposable
         Assert.Equal(2, await _db.Orders.CountAsync());
     }
 
-    // ── SEC-1: idempotency resolution scoped to the caller (tenant isolation) ────
-    // QUAL-1 (review 035-v8): GetByIdempotencyKeyAsync was removed as dead production code,
+    // ── Idempotency resolution scoped to the caller (tenant isolation) ────
+    // GetByIdempotencyKeyAsync was removed as dead production code,
     // so these behaviors are now asserted through the only real entry point,
     // CreateFromCartAsync. The stale-window and cross-tenant cases are covered by
     // CreateFromCart_StaleKey_* and CreateFromCart_OtherTenantsKey_* below (previously
@@ -309,7 +311,7 @@ public class OrderServiceTests : IDisposable
     [Fact]
     public async Task CreateFromCart_BothIdentitiesNull_Throws_DoesNotResolveArbitraryOrder()
     {
-        // SEC-1 (review 035-v5): an idempotency resolution with neither a user nor a guest
+        // An idempotency resolution with neither a user nor a guest
         // identity must be rejected by FindKeyHolderAsync's guard rather than silently
         // collapsing to "any guestless order" (which would disclose an arbitrary user's
         // order/secret). The cart's items are guest-null, so a both-null call reaches the
@@ -366,7 +368,7 @@ public class OrderServiceTests : IDisposable
         var staleOrder = new Order
         {
             OrderNumber = "FT-STALE-2",
-            UserId = userId,                 // the caller's OWN stale row (SEC-1: only own keys are freed)
+            UserId = userId,                 // the caller's OWN stale row (only own keys are freed)
             IdempotencyKey = key,
             CreatedAt = DateTimeOffset.UtcNow.AddHours(-25),
             ShippingAddress = new ShippingAddressSnapshot
@@ -608,7 +610,7 @@ public class OrderServiceTests : IDisposable
     [Fact]
     public async Task GetOrderPhotosAsync_SoftDeletedUpload_ExcludedFromResults()
     {
-        // D52 (review 043-v7): UploadCleanupJob soft-deletes the row and deletes its cloud
+        // UploadCleanupJob soft-deletes the row and deletes its cloud
         // blobs but leaves the path fields set; without a DeletedAt filter this endpoint
         // presigned URLs for the deleted blobs — broken thumbnails/lightbox that the
         // one-shot refresh cannot recover.
@@ -653,5 +655,54 @@ public class OrderServiceTests : IDisposable
             It.IsAny<string>(),
             It.Is<TimeSpan>(t => t == TimeSpan.FromMinutes(90)),
             It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    // ── orders_created_total emission ─────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateFromCartAsync_RecordsOrdersCreatedWithTheRequestedProcessor()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        await _service.CreateFromCartAsync(
+            userId, null, MakeRequest(PaymentProcessor.EuPlatesc));
+
+        var recorded = metrics.For(
+            MetricNames.Instruments.OrdersCreatedTotal,
+            (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
+            (MetricNames.Labels.Status, MetricNames.OrderStatusValues.Created));
+        Assert.Single(recorded);
+        Assert.Equal(1, recorded[0].Value);
+        Assert.Equal(
+            new[] { MetricNames.Labels.Processor, MetricNames.Labels.Status },
+            recorded[0].Tags.Keys.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.Empty(metrics.ContractViolations());
+    }
+
+    [Fact]
+    public async Task CreateFromCartAsync_IdempotentReplay_DoesNotDoubleCountOrdersCreated()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        var request = MakeRequest();
+        var key = Guid.NewGuid().ToString();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        await _service.CreateFromCartAsync(userId, null, request, key);
+        await _service.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.Single(metrics.Measurements);
+    }
+
+    [Fact]
+    public async Task CreateFromCartAsync_EmptyCart_RecordsNoOrdersCreated()
+    {
+        var userId = Guid.NewGuid();
+        using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
+
+        await Assert.ThrowsAsync<BadRequestException>(
+            () => _service.CreateFromCartAsync(userId, null, MakeRequest(), default));
+
+        Assert.Empty(metrics.Measurements);
     }
 }

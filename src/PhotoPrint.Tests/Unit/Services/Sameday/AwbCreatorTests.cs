@@ -8,7 +8,9 @@ using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services.Sameday;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
@@ -139,7 +141,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Returns_Skipped_when_AwbNumber_already_populated()
     {
-        // ADR-015 load-bearing pre-check. Removing the IsNullOrWhiteSpace guard breaks this.
+        // Load-bearing pre-check. Removing the IsNullOrWhiteSpace guard breaks this.
         var order = SeedOrder(awbNumber: "RO12345678");
         using var db = CreateDb();
         var client = new Mock<ISamedayClient>(MockBehavior.Strict);
@@ -502,6 +504,93 @@ public class AwbCreatorTests : IDisposable
         outcome.Should().BeOfType<AwbCreationOutcome.RetryLater>()
             .Which.PreserveClaim.Should().BeTrue();
         ReadBack(order.Id).AwbClaimedAt.Should().Be(Now);
+    }
+
+    // ── Outcome metric ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Records_an_ok_outcome_on_the_awb_counter()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var sut = Build(db, ClientReturning());
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Ok))
+            .Should().HaveCount(1);
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_orphaned_label_records_its_own_outcome_rather_than_skipped()
+    {
+        var order = SeedOrder();
+
+        var client = new Mock<ISamedayClient>();
+        client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
+            .Returns<AwbCreationRequest, CancellationToken>((_, _) =>
+            {
+                SetStatus(order.Id, OrderStatus.Cancelled);
+                return Task.FromResult(new AwbCreationResult("RO-ORPHAN", "https://x/y.pdf", 1m));
+            });
+
+        using var db = CreateDb();
+        var sut = Build(db, client);
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        await sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Orphaned))
+            .Should().HaveCount(1,
+                "a billable label nothing references is a real failure SLO 4 has to see, and "
+                    + "`skipped` is excluded from both sides of that ratio — recording it there "
+                    + "would make ops' worst AWB outcome the one the panel cannot show");
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Skipped))
+            .Should().BeEmpty();
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_thrown_db_failure_records_an_error_outcome_and_rethrows()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        // Kills the :memory: database under the creator, standing in for an unreachable Postgres.
+        _connection.Close();
+
+        var act = () => sut.CreateForOrderAsync(order.Id, attempt: 1);
+
+        await act.Should().ThrowAsync<Exception>();
+        metrics.For(MetricNames.Instruments.AwbCreationTotal,
+                (MetricNames.Labels.Result, MetricNames.AwbResultValues.Error))
+            .Should().HaveCount(1,
+                "an outage that produces no outcome must still reach the SLO denominator");
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Shutdown_cancellation_records_no_outcome()
+    {
+        var order = SeedOrder();
+        using var db = CreateDb();
+        var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
+
+        var act = () => sut.CreateForOrderAsync(order.Id, attempt: 1, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        metrics.Measurements.Should().BeEmpty(
+            "draining in-flight jobs on every deploy would permanently depress the AWB SLO");
     }
 
     private void SetStatus(Guid id, OrderStatus status)

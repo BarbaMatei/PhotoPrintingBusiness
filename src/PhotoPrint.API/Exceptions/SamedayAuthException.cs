@@ -3,7 +3,7 @@ namespace PhotoPrint.API.Exceptions;
 /// <summary>
 /// Sameday rejected our credentials. Either a 401 returned by /api/authenticate,
 /// or a second 401 returned by an operational call AFTER a fresh token was
-/// attached (see ADR-014). Caller contract: stop retrying — the credentials
+/// attached. Caller contract: stop retrying — the credentials
 /// need to change, not the request.
 /// </summary>
 public sealed class SamedayAuthException : SamedayException

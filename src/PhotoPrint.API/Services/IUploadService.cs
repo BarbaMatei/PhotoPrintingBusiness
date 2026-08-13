@@ -5,7 +5,7 @@ namespace PhotoPrint.API.Services;
 /// <summary>
 /// Result of <see cref="IUploadService.GetPreviewAsync"/> — the upload's id, the storage tier
 /// owning its bytes, and the thumbnail key. The controller dispatches stream-vs-302 based on
-/// <see cref="Location"/> (bolt 043, ADR-008).
+/// <see cref="Location"/>.
 /// </summary>
 public record PreviewLocation(Guid UploadId, StorageLocation Location, string ThumbnailKey);
 

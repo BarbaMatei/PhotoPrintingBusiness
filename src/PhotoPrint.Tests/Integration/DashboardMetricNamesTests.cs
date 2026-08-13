@@ -1,0 +1,444 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using FluentAssertions;
+using PhotoPrint.API.Observability;
+
+namespace PhotoPrint.Tests.Integration;
+
+/// <summary>
+/// The dashboard and the API agree on metric names only by convention, and a panel querying a
+/// name nothing emits renders "No Data" rather than failing — so nothing notices. This scrapes
+/// a real exposition after emitting one observation per instrument and holds every dashboard
+/// query's metric name against it.
+/// </summary>
+[Collection(ObservabilityHostCollection.Name)]
+public class DashboardMetricNamesTests
+{
+    // PromQL identifiers that are never metric names. Everything else an expression mentions
+    // outside a label matcher, a duration or a string has to exist in the exposition.
+    private static readonly HashSet<string> PromQlKeywords = new(StringComparer.Ordinal)
+    {
+        "sum", "avg", "min", "max", "count", "count_values", "quantile", "topk", "bottomk",
+        "stddev", "stdvar", "group", "rate", "irate", "increase", "delta", "idelta", "deriv",
+        "histogram_quantile", "by", "without", "on", "ignoring", "group_left", "group_right",
+        "le", "offset", "and", "or", "unless", "bool",
+    };
+
+    private static readonly string[] GuardedSuccessSelectors =
+    [
+        "payment_webhook_total{result=\"ok\"}",
+        "payment_webhook_total{result=\"duplicate\"}",
+        "awb_creation_total{result=\"ok\"}",
+        "invoice_anaf_status_total{status=\"accepted\"}",
+    ];
+
+    [Fact]
+    public async Task Every_dashboard_query_names_a_metric_the_api_actually_exposes()
+    {
+        var exposed = await ExposedSeriesNamesAsync();
+
+        var queried = DashboardMetricNames();
+
+        queried.Should().NotBeEmpty("the dashboard is the thing under test");
+        queried.Should().OnlyContain(
+            name => exposed.Contains(name),
+            "a panel that queries a name nothing emits is permanently No Data. Exposed: "
+                + string.Join(", ", exposed.Where(n => !n.StartsWith("process_runtime")).Order()));
+    }
+
+    [Fact]
+    public async Task Every_slo_query_names_a_metric_the_api_actually_exposes()
+    {
+        // slos.md is maintained separately from the dashboard, and an SLO whose query names a
+        // metric nothing emits reads as 100% healthy rather than as broken.
+        var exposed = await ExposedSeriesNamesAsync();
+
+        var queried = SloMetricNames();
+
+        queried.Should().NotBeEmpty("slos.md is the thing under test");
+        queried.Should().OnlyContain(name => exposed.Contains(name));
+    }
+
+    [Fact]
+    public async Task Every_queried_label_exists_on_the_series_it_filters()
+    {
+        // Checking only metric names lets a renamed label or label value empty a panel while the
+        // build stays green, which is the same silent drift the name check exists to stop.
+        var exposedLabels = await ExposedSeriesLabelsAsync();
+
+        var usages = DashboardQueries().Concat(SloQueries())
+            .SelectMany(LabelUsagesIn)
+            .Distinct()
+            .ToList();
+
+        usages.Should().NotBeEmpty("the queries filter on labels, so there is something to check");
+
+        var unverifiable = new List<string>();
+
+        foreach (var (metric, label, value) in usages)
+        {
+            exposedLabels.Should().ContainKey(
+                metric,
+                $"'{metric}' is queried with a label matcher but the exposition carries no labelled "
+                    + "series for it — either nothing emitted it or the scrape came back empty");
+            exposedLabels[metric].Should().Contain(
+                label,
+                $"'{metric}' is queried with a '{label}' matcher but the exposition carries "
+                    + $"[{string.Join(", ", exposedLabels[metric].Order())}]");
+
+            if (value is null) continue;
+
+            // Framework instruments have no declared value set, so theirs are named below instead.
+            if (!MetricNames.LabelContract.TryGetValue(metric, out var declared)
+                || !declared.TryGetValue(label, out var allowed))
+            {
+                unverifiable.Add($"{metric}.{label}=\"{value}\"");
+                continue;
+            }
+
+            allowed.Should().Contain(
+                value,
+                $"'{metric}{{{label}=\"{value}\"}}' is queried but MetricNames declares only "
+                    + $"[{string.Join(", ", allowed)}]");
+        }
+
+        unverifiable.Distinct().Order().Should().Equal(
+            [
+                "http_server_request_duration_seconds_bucket.http_request_method=\"POST\"",
+                "http_server_request_duration_seconds_bucket.http_route=\"api/payments/stripe/intent\"",
+            ],
+            "these literal values name framework labels with no declared value set, so nothing can "
+                + "hold them against the app — a new one has to be a deliberate choice, not a silent gap");
+    }
+
+    [Fact]
+    public void A_route_template_label_value_is_not_read_as_a_metric_name()
+    {
+        var names = MetricNamesIn(
+            "sum(rate(http_server_request_duration_seconds_bucket"
+            + "{http_route=\"api/orders/{id}/payments\",http_request_method=\"POST\"}[5m]))");
+
+        names.Should().Equal(
+            ["http_server_request_duration_seconds_bucket"],
+            "a label value is not a metric reference, however many braces it contains — reading "
+                + "one as a name fails the build against a metric called 'payments'");
+    }
+
+    [Fact]
+    public void An_added_sum_term_always_carries_an_absent_series_guard()
+    {
+        var unguarded = new List<string>();
+        var addedTermsSeen = 0;
+
+        foreach (var query in DashboardQueries().Concat(SloQueries()))
+        {
+            // Label values carry slashes of their own, so brace groups go before the division split.
+            foreach (var side in StripBraceGroups(query).Split('/'))
+            {
+                var terms = side.Count(c => c == '+') + 1;
+                if (terms == 1) continue;
+
+                addedTermsSeen += terms;
+                if (Regex.Matches(side, "or\\s+vector\\(0\\)").Count < terms)
+                    unguarded.Add(query.Trim());
+            }
+        }
+
+        unguarded.Should().BeEmpty(
+            "a selector that matches nothing yields an EMPTY vector, and empty plus anything is "
+                + "empty — so an added term whose series does not exist yet blanks the whole panel "
+                + "in exactly the healthy case. Every added term needs its own `or vector(0)`, on "
+                + "either side of the division: an empty denominator blanks a panel just as an "
+                + "empty numerator does");
+
+        addedTermsSeen.Should().BeGreaterThanOrEqualTo(
+            4,
+            "both the slos.md block and the dashboard panel carry SLO 3's two-term numerator. If "
+                + "no added term is found any more — someone collapsed them to one `=~` matcher, or "
+                + "the collector stopped reaching the query — then this test has quietly stopped "
+                + "checking rather than started passing");
+    }
+
+    [Fact]
+    public void Every_hand_named_success_numerator_keeps_its_absent_series_guard()
+    {
+        var unguarded = new List<string>();
+        var missing = new List<string>();
+
+        foreach (var (source, queries) in new[]
+                 {
+                     ("slos.md", SloQueries()),
+                     ("the dashboard", DashboardQueries()),
+                 })
+        {
+            foreach (var selector in GuardedSuccessSelectors)
+            {
+                var occurrences = 0;
+
+                foreach (var query in queries)
+                {
+                    var at = query.IndexOf(selector, StringComparison.Ordinal);
+
+                    while (at >= 0)
+                    {
+                        occurrences++;
+
+                        var tail = query[(at + selector.Length)..];
+                        if (tail.Length > 24) tail = tail[..24];
+
+                        if (!Regex.IsMatch(tail, "or\\s+vector\\(0\\)"))
+                            unguarded.Add($"{selector} in {source}: {query.Trim()}");
+
+                        at = query.IndexOf(selector, at + selector.Length, StringComparison.Ordinal);
+                    }
+                }
+
+                if (occurrences == 0) missing.Add($"{selector} in {source}");
+            }
+        }
+
+        unguarded.Should().BeEmpty(
+            "a selector naming one success value by hand matches no series until that value has "
+                + "been observed once, and `sum()` over nothing is an EMPTY vector — so an "
+                + "unguarded success numerator reads \"No Data\" in exactly the case where the "
+                + "ratio should read a red 0%: a fresh process where every attempt is failing. "
+                + "The added-term rule cannot see these, because a lone `sum()` is one term");
+
+        missing.Should().BeEmpty(
+            "each selector is written in BOTH copies — slos.md and its dashboard twin — and each "
+                + "copy is read by someone: the doc by whoever writes the alert, the panel by "
+                + "whoever is on call. A selector missing from one side means that side was "
+                + "deleted, renamed or moved out of this test's reach and its guard is no longer "
+                + "checked at all. Counting both copies together would let two doc copies stand in "
+                + "for a deleted panel");
+    }
+
+    private static IEnumerable<(string Metric, string Label, string? Value)> LabelUsagesIn(string expr)
+    {
+        // A label value may contain braces (a route template), so stop at the first '}' outside quotes.
+        foreach (Match m in Regex.Matches(
+            expr, @"([a-zA-Z_][a-zA-Z0-9_]*)\s*\{((?:[^{}""]|""[^""]*"")*)\}"))
+        {
+            var metric = m.Groups[1].Value;
+            if (PromQlKeywords.Contains(metric)) continue;
+
+            foreach (Match matcher in Regex.Matches(
+                m.Groups[2].Value, "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=~|!~|!=|=)\\s*\"([^\"]*)\""))
+            {
+                var op    = matcher.Groups[2].Value;
+                var value = matcher.Groups[3].Value;
+
+                // A negative or regex matcher does not have to name a value that exists.
+                yield return (metric, matcher.Groups[1].Value,
+                    op == "=" ? value : null);
+            }
+        }
+    }
+
+    private static async Task<Dictionary<string, HashSet<string>>> ExposedSeriesLabelsAsync()
+    {
+        var body = await ScrapeAsync();
+        var labels = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var line in body.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed[0] == '#') continue;
+
+            var brace = trimmed.IndexOf('{');
+            if (brace < 0) continue;
+
+            var close = ClosingBrace(trimmed, brace);
+            if (close < 0) continue;
+
+            var series = trimmed[..brace];
+            var bag    = labels.TryGetValue(series, out var existing)
+                ? existing
+                : labels[series] = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (Match pair in Regex.Matches(
+                trimmed[(brace + 1)..close], "([a-zA-Z_][a-zA-Z0-9_]*)\\s*="))
+            {
+                bag.Add(pair.Groups[1].Value);
+            }
+        }
+
+        return labels;
+    }
+
+    private static string StripBraceGroups(string expr)
+    {
+        var stripped = new StringBuilder();
+
+        for (var i = 0; i < expr.Length; i++)
+        {
+            if (expr[i] != '{')
+            {
+                stripped.Append(expr[i]);
+                continue;
+            }
+
+            var close = ClosingBrace(expr, i);
+            if (close < 0)
+            {
+                stripped.Append(expr[i..]);
+                break;
+            }
+
+            stripped.Append(' ');
+            i = close;
+        }
+
+        return stripped.ToString();
+    }
+
+    private static int ClosingBrace(string line, int open)
+    {
+        var quoted = false;
+        for (var i = open + 1; i < line.Length; i++)
+        {
+            if (line[i] == '"' && line[i - 1] != '\\') quoted = !quoted;
+            else if (line[i] == '}' && !quoted) return i;
+        }
+
+        return -1;
+    }
+
+    private static async Task<HashSet<string>> ExposedSeriesNamesAsync()
+    {
+        var body  = await ScrapeAsync();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var line in body.Split('\n'))
+        {
+            if (!line.StartsWith("# TYPE ", StringComparison.Ordinal)) continue;
+            var parts = line.Trim().Split(' ');
+            if (parts.Length < 4) continue;
+
+            var (family, type) = (parts[2], parts[3]);
+            names.Add(family);
+            if (type is "histogram" or "summary")
+            {
+                names.Add($"{family}_bucket");
+                names.Add($"{family}_count");
+                names.Add($"{family}_sum");
+            }
+        }
+
+        return names;
+    }
+
+    private static async Task<string> ScrapeAsync()
+    {
+        using var factory = new ObservabilityEnabledLoopbackFactory();
+        using var client = factory.CreateClient();
+
+        // One observation per business instrument — an instrument that never records is absent
+        // from the exposition entirely, so an empty scrape would pass a substring check.
+        FotoMetrics.OrdersCreated.Add(1, new TagList
+        {
+            { MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe },
+            { MetricNames.Labels.Status,    MetricNames.OrderStatusValues.Created },
+        });
+        FotoMetrics.PaymentWebhook.Add(1, new TagList
+        {
+            { MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe },
+            { MetricNames.Labels.Result,    MetricNames.WebhookResultValues.Ok },
+        });
+        FotoMetrics.AwbCreation.Add(1, new TagList
+        {
+            { MetricNames.Labels.Result, MetricNames.AwbResultValues.Ok },
+        });
+        FotoMetrics.InvoiceAnafStatus.Add(1, new TagList
+        {
+            { MetricNames.Labels.Status, MetricNames.AnafStatusValues.Accepted },
+        });
+        FotoMetrics.UploadSize.Record(1024);
+        FotoMetrics.OrderProcessingDuration.Record(1.5);
+
+        // A handled request is what populates the ASP.NET Core instrumentation's histogram.
+        await client.GetAsync("/health");
+
+        return await (await client.GetAsync("/metrics")).Content.ReadAsStringAsync();
+    }
+
+    private static List<string> DashboardMetricNames() =>
+        DashboardQueries().SelectMany(MetricNamesIn).Distinct(StringComparer.Ordinal).ToList();
+
+    private static List<string> DashboardQueries()
+    {
+        var json = File.ReadAllText(
+            Path.Combine(RepoRoot(), "ops", "dashboards", "fototipar-overview.json"));
+        using var document = JsonDocument.Parse(json);
+
+        var queries = new List<string>();
+        CollectPanelQueries(document.RootElement.GetProperty("panels"), queries);
+        return queries;
+    }
+
+    // Grafana nests a row's children under the row panel, so a dashboard grouped into rows would
+    // otherwise present no queries at all and still satisfy a non-empty check.
+    private static void CollectPanelQueries(JsonElement panels, List<string> queries)
+    {
+        foreach (var panel in panels.EnumerateArray())
+        {
+            if (panel.TryGetProperty("panels", out var nested))
+                CollectPanelQueries(nested, queries);
+
+            if (!panel.TryGetProperty("targets", out var targets)) continue;
+            foreach (var target in targets.EnumerateArray())
+            {
+                if (target.TryGetProperty("expr", out var expr) && expr.GetString() is { } q)
+                    queries.Add(q);
+            }
+        }
+    }
+
+    private static List<string> SloMetricNames() =>
+        SloQueries().SelectMany(MetricNamesIn).Distinct(StringComparer.Ordinal).ToList();
+
+    private static List<string> SloQueries()
+    {
+        var text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "memory-bank", "operations", "slos.md"));
+
+        return Regex.Matches(text, "```\\r?\\n(.*?)```", RegexOptions.Singleline)
+            .Select(block => block.Groups[1].Value)
+            .ToList();
+    }
+
+    private static IEnumerable<string> MetricNamesIn(string expr)
+    {
+        // Label matchers, durations and strings all carry identifiers that are not metric
+        // names, so they go before the identifiers are read.
+        var stripped = StripBraceGroups(expr);
+        stripped = Regex.Replace(stripped, "\\[[^\\]]*\\]", " ");
+        stripped = Regex.Replace(stripped, "\"[^\"]*\"", " ");
+
+        foreach (Match m in Regex.Matches(stripped, "[a-zA-Z_][a-zA-Z0-9_]*"))
+        {
+            if (PromQlKeywords.Contains(m.Value)) continue;
+
+            // A function call is not a metric reference.
+            var after = stripped.AsSpan(m.Index + m.Length).TrimStart();
+            if (after.Length > 0 && after[0] == '(') continue;
+
+            yield return m.Value;
+        }
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "ops", "dashboards", "fototipar-overview.json")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+
+        throw new InvalidOperationException("repo root not found from " + AppContext.BaseDirectory);
+    }
+}
