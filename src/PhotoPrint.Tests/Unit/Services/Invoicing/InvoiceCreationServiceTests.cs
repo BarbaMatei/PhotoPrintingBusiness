@@ -119,6 +119,32 @@ public class InvoiceCreationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Order_overload_creates_invoice_without_reloading_the_order()
+    {
+        var order = await SeedPaidOrderAsync(total: 26.00m);
+
+        var invoice = await _sut.CreateForOrderAsync(order);
+        await _db.SaveChangesAsync();
+
+        invoice.Should().NotBeNull();
+        invoice!.OrderId.Should().Be(order.Id);
+        invoice.InvoiceNumber.Should().Be("FT-2026-00001");
+    }
+
+    [Fact]
+    public async Task Order_overload_replay_returns_same_row_and_does_not_allocate_new_number()
+    {
+        var order = await SeedPaidOrderAsync();
+
+        var first = await _sut.CreateForOrderAsync(order);
+        await _db.SaveChangesAsync();
+        var second = await _sut.CreateForOrderAsync(order);
+
+        second!.Id.Should().Be(first!.Id);
+        (await _db.Invoices.CountAsync(i => i.OrderId == order.Id)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task Sequential_orders_get_monotone_numbers_within_same_year()
     {
         var a = await SeedPaidOrderAsync();

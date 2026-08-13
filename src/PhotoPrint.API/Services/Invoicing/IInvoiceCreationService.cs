@@ -22,4 +22,7 @@ public interface IInvoiceCreationService
     /// exist (a defensive guard; callers shouldn't reach this path).
     /// </summary>
     Task<Invoice?> CreateForOrderAsync(Guid orderId, CancellationToken ct = default);
+
+    /// <summary>Same idempotent-create contract, for a caller that already holds the tracked <see cref="Order"/>.</summary>
+    Task<Invoice?> CreateForOrderAsync(Order order, CancellationToken ct = default);
 }

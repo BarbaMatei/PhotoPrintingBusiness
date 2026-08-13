@@ -69,7 +69,7 @@ public class AdminOrderServiceTests
 
         _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
-        _invoiceCreator.Setup(c => c.CreateForOrderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+        _invoiceCreator.Setup(c => c.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
                         .ReturnsAsync((PhotoPrint.API.Models.Invoice?)null);
 
         _sut = BuildService(_db);
@@ -402,7 +402,7 @@ public class AdminOrderServiceTests
             n => n.NotifyPaidAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _emailSvc.Verify(e => e.FireOrderConfirmedEmail(It.IsAny<Order>()), Times.Once);
         _invoiceCreator.Verify(
-            c => c.CreateForOrderAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
+            c => c.CreateForOrderAsync(It.Is<Order>(o => o.Id == order.Id), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -415,7 +415,7 @@ public class AdminOrderServiceTests
         await _sut.UpdateStatusAsync(order.Id, "Printing", null, null);
 
         _invoiceCreator.Verify(
-            c => c.CreateForOrderAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+            c => c.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ── Bolt 052: original-purge hook on production-complete transition ──────

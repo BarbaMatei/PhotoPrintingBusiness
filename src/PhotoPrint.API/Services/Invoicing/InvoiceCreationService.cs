@@ -54,6 +54,25 @@ public sealed class InvoiceCreationService : IInvoiceCreationService
             return null;
         }
 
+        return await CreateForLoadedOrderAsync(order, ct);
+    }
+
+    public async Task<Invoice?> CreateForOrderAsync(Order order, CancellationToken ct = default)
+    {
+        var existing = await _db.Invoices.FirstOrDefaultAsync(i => i.OrderId == order.Id, ct);
+        if (existing is not null)
+        {
+            _logger.LogInformation(
+                "invoice.creation.idempotent-replay order_id={OrderId} invoice_id={InvoiceId}",
+                order.Id, existing.Id);
+            return existing;
+        }
+
+        return await CreateForLoadedOrderAsync(order, ct);
+    }
+
+    private async Task<Invoice?> CreateForLoadedOrderAsync(Order order, CancellationToken ct)
+    {
         var issuedAt = order.PaidAt ?? _clock.GetUtcNow();
         var number = await _numbering.NextNumberAsync(
             _vatSettings.InvoiceSeries, issuedAt.Year, ct);
@@ -76,7 +95,7 @@ public sealed class InvoiceCreationService : IInvoiceCreationService
 
         _logger.LogInformation(
             "invoice.creation.allocated order_id={OrderId} invoice_number={InvoiceNumber}",
-            orderId, invoice.InvoiceNumber);
+            order.Id, invoice.InvoiceNumber);
 
         return invoice;
     }

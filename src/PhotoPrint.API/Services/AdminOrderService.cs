@@ -145,7 +145,7 @@ public class AdminOrderService : IAdminOrderService
             // Offline / manual reconciliation — PaidAt is what the AWB retry sweep
             // keys off, so it must be stamped like the webhook Paid path does.
             order.PaidAt = DateTimeOffset.UtcNow;
-            await _invoiceCreator.CreateForOrderAsync(order.Id, ct);
+            await _invoiceCreator.CreateForOrderAsync(order, ct);
         }
 
         await _db.SaveChangesAsync(ct);

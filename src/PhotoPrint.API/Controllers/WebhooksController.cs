@@ -383,7 +383,7 @@ public class WebhooksController : ControllerBase
         const int maxInvoiceNumberRetries = 3;
         for (var attempt = 0; ; attempt++)
         {
-            var invoice = await _invoiceCreator.CreateForOrderAsync(order.Id, ct);
+            var invoice = await _invoiceCreator.CreateForOrderAsync(order, ct);
             if (invoice is not null && _db.Entry(invoice).State != EntityState.Added)
             {
                 // The existing-row check found an already-committed invoice — nothing was tracked to save, so no exception to catch.
