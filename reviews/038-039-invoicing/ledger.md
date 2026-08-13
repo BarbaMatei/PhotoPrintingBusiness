@@ -10,31 +10,31 @@ updated: 2026-08-13
 
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
-| PPW-469 | 🔴 | v1 | Invoice PDF retrieval bypasses IStorageRouter, always reads local disk | `Controllers/InvoicesController.cs:22` | open | `e724528` |
-| PPW-470 | 🔴 | v1 | Invoice PDF generation/upload bypasses IStorageRouter, always writes local disk (ADR-008) | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:156` | open | `e724528` |
-| PPW-471 | 🔴 | v1 | Invoice creation is check-then-act with no DB uniqueness — concurrent webhooks can mint two fiscal invoices | `Services/Invoicing/InvoiceCreationService.cs:40` | open | `e724528` |
-| PPW-472 | 🔴 | v1 | InvoicePdfReadyNotifier never sends an email regardless of the flag, logs a false "sent" event | `Services/Invoicing/InvoicePdfReadyNotifier.cs:40` | open | `e724528` |
-| PPW-473 | 🔴 | v1 | Guest checkouts can never retrieve their invoice — JWT-only auth on the endpoint | `Controllers/InvoicesController.cs:16` | open | `e724528` |
-| PPW-474 | 🔴 | v1 | Orders marked Paid via admin manual reconciliation never get an Invoice row | `Services/AdminOrderService.cs:139` | open | `e724528` |
-| PPW-475 | 🔴 | v1 | ANAF upload success + DB commit failure is indistinguishable from never-uploaded | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:175` | open | `e724528` |
-| PPW-476 | 🔴 | v1 | No claim/lease on Pending invoices — multi-replica double-submits to ANAF and double-emails | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:120` | open | `e724528` |
-| PPW-477 | 🔴 | v1 | No control-character filtering on customer name/address before UBL XML serialization | `Services/Invoicing/InvoiceXmlBuilder.cs:119` | open | `e724528` |
-| PPW-478 | 🔴 | v1 | UBL invoice-line amounts are gross, not tax-exclusive — lines won't reconcile with the document total | `Services/Invoicing/InvoiceXmlBuilder.cs:230` | open | `e724528` |
-| PPW-479 | 🟠 | v1 | Admin invoice list `Page` param is unbounded — int32 overflow can reach `Skip()` | `Controllers/AdminInvoicesController.cs:57` | open | `e724528` |
-| PPW-480 | 🟠 | v1 | Admin "retry" resubmits byte-identical XML — can never fix the failure it exists for | `Services/Invoicing/InvoiceLifecycle.cs:106` | open | `e724528` |
-| PPW-481 | 🟠 | v1 | `AnafSettings` docstring's "byte-identical to baseline" claim is false when disabled | `Configuration/AnafSettings.cs:7` | open | `e724528` |
-| PPW-482 | 🟠 | v1 | `AdminInvoicesController`'s audit-logging doc-comment is false; the one logged action omits the admin id | `Controllers/AdminInvoicesController.cs:14` | open | `e724528` |
-| PPW-483 | 🟠 | v1 | Redundant Order re-query on every paid webhook in `InvoiceCreationService` | `Services/Invoicing/InvoiceCreationService.cs:49` | open | `e724528` |
-| PPW-484 | 🟠 | v1 | `InvoiceUploadJob` worker reloads the full Order graph even when only the ANAF step remains | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:246` | open | `e724528` |
-| PPW-485 | 🟠 | v1 | Checkout field-length caps are wider than the legal XML limits, with no truncation | `Validators/Payments/CreateOrderRequestValidator.cs:61` | open | `e724528` |
-| PPW-486 | 🟠 | v1 | Per-row catch collapses auth failure, network failure, and code bugs into one generic log event | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:91` | open | `e724528` |
-| PPW-487 | 🟠 | v1 | Unrecognized ANAF status string is silently treated as "still processing", raw value never logged | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:232` | open | `e724528` |
-| PPW-488 | 🟠 | v1 | No domain-tagged log for "customer charged, order not committed" in `WebhooksController` | `Controllers/WebhooksController.cs:205` | open | `e724528` |
-| PPW-489 | 🟠 | v1 | Polly retries the non-idempotent ANAF upload POST on ambiguous-outcome errors | `Services/Invoicing/Anaf/AnafResilienceHandler.cs:33` | open | `e724528` |
-| PPW-490 | 🟠 | v1 | SQLite invoice numbering's MAX+1 has no transaction/lock despite the comment's safety claim | `Services/Invoicing/SqliteInvoiceNumberingService.cs:41` | open | `e724528` |
-| PPW-491 | 🟠 | v1 | `InvoiceUploadJob` has zero tests despite being the most stateful new logic | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:1` | open | `e724528` |
-| PPW-492 | 🟠 | v1 | Webhook tests stub invoice creation to always return null; nothing asserts it runs or that failure is handled | `Tests/Unit/Controllers/WebhooksControllerMetricsTests.cs:58` | open | `e724528` |
-| PPW-493 | 🟠 | v1 | `PostgresInvoiceNumberingService` — the only prod numbering path — has no test coverage | `Services/Invoicing/PostgresInvoiceNumberingService.cs:1` | open | `e724528` |
+| PPW-469 | 🔴 | v1 | Invoice PDF retrieval bypasses IStorageRouter, always reads local disk | `Controllers/InvoicesController.cs:22` | verified | `11dfb8e` |
+| PPW-470 | 🔴 | v1 | Invoice PDF generation/upload bypasses IStorageRouter, always writes local disk (ADR-008) | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:156` | verified | `11dfb8e` |
+| PPW-471 | 🔴 | v1 | Invoice creation is check-then-act with no DB uniqueness — concurrent webhooks can mint two fiscal invoices | `Services/Invoicing/InvoiceCreationService.cs:40` | verified | `11dfb8e` |
+| PPW-472 | 🔴 | v1 | InvoicePdfReadyNotifier never sends an email regardless of the flag, logs a false "sent" event | `Services/Invoicing/InvoicePdfReadyNotifier.cs:40` | verified | `11dfb8e` |
+| PPW-473 | 🔴 | v1 | Guest checkouts can never retrieve their invoice — JWT-only auth on the endpoint | `Controllers/InvoicesController.cs:16` | verified | `11dfb8e` |
+| PPW-474 | 🔴 | v1 | Orders marked Paid via admin manual reconciliation never get an Invoice row | `Services/AdminOrderService.cs:139` | verified | `11dfb8e` |
+| PPW-475 | 🔴 | v1 | ANAF upload success + DB commit failure is indistinguishable from never-uploaded | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:175` | verified | `11dfb8e` |
+| PPW-476 | 🔴 | v1 | No claim/lease on Pending invoices — multi-replica double-submits to ANAF and double-emails | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:120` | verified | `11dfb8e` |
+| PPW-477 | 🔴 | v1 | No control-character filtering on customer name/address before UBL XML serialization | `Services/Invoicing/InvoiceXmlBuilder.cs:119` | verified | `11dfb8e` |
+| PPW-478 | 🔴 | v1 | UBL invoice-line amounts are gross, not tax-exclusive — lines won't reconcile with the document total | `Services/Invoicing/InvoiceXmlBuilder.cs:230` | verified | `11dfb8e` |
+| PPW-479 | 🟠 | v1 | Admin invoice list `Page` param is unbounded — int32 overflow can reach `Skip()` | `Controllers/AdminInvoicesController.cs:57` | verified | `11dfb8e` |
+| PPW-480 | 🟠 | v1 | Admin "retry" resubmits byte-identical XML — can never fix the failure it exists for | `Services/Invoicing/InvoiceLifecycle.cs:106` | verified | `11dfb8e` |
+| PPW-481 | 🟠 | v1 | `AnafSettings` docstring's "byte-identical to baseline" claim is false when disabled | `Configuration/AnafSettings.cs:7` | open | `11dfb8e` |
+| PPW-482 | 🟠 | v1 | `AdminInvoicesController`'s audit-logging doc-comment is false; the one logged action omits the admin id | `Controllers/AdminInvoicesController.cs:14` | verified | `11dfb8e` |
+| PPW-483 | 🟠 | v1 | Redundant Order re-query on every paid webhook in `InvoiceCreationService` | `Services/Invoicing/InvoiceCreationService.cs:49` | open | `11dfb8e` |
+| PPW-484 | 🟠 | v1 | `InvoiceUploadJob` worker reloads the full Order graph even when only the ANAF step remains | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:246` | verified | `11dfb8e` |
+| PPW-485 | 🟠 | v1 | Checkout field-length caps are wider than the legal XML limits, with no truncation | `Validators/Payments/CreateOrderRequestValidator.cs:61` | verified | `11dfb8e` |
+| PPW-486 | 🟠 | v1 | Per-row catch collapses auth failure, network failure, and code bugs into one generic log event | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:91` | verified | `11dfb8e` |
+| PPW-487 | 🟠 | v1 | Unrecognized ANAF status string is silently treated as "still processing", raw value never logged | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:232` | verified | `11dfb8e` |
+| PPW-488 | 🟠 | v1 | No domain-tagged log for "customer charged, order not committed" in `WebhooksController` | `Controllers/WebhooksController.cs:205` | verified | `11dfb8e` |
+| PPW-489 | 🟠 | v1 | Polly retries the non-idempotent ANAF upload POST on ambiguous-outcome errors | `Services/Invoicing/Anaf/AnafResilienceHandler.cs:33` | wont-fix | `11dfb8e` |
+| PPW-490 | 🟠 | v1 | SQLite invoice numbering's MAX+1 has no transaction/lock despite the comment's safety claim | `Services/Invoicing/SqliteInvoiceNumberingService.cs:41` | verified | `11dfb8e` |
+| PPW-491 | 🟠 | v1 | `InvoiceUploadJob` has zero tests despite being the most stateful new logic | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:1` | verified | `11dfb8e` |
+| PPW-492 | 🟠 | v1 | Webhook tests stub invoice creation to always return null; nothing asserts it runs or that failure is handled | `Tests/Unit/Controllers/WebhooksControllerMetricsTests.cs:58` | verified | `11dfb8e` |
+| PPW-493 | 🟠 | v1 | `PostgresInvoiceNumberingService` — the only prod numbering path — has no test coverage | `Services/Invoicing/PostgresInvoiceNumberingService.cs:1` | fixed | `11dfb8e` |
 | PPW-494 | 🟡 | v1 | Cloned retry `HttpRequestMessage` in `AnafAuthHandler` is never disposed | `Services/Invoicing/Anaf/AnafAuthHandler.cs:43` | backlog | `e724528` |
 | PPW-495 | 🟡 | v1 | `status=""` is rejected by the query validator but treated as "no filter" by the controller | `Validators/Invoices/AdminInvoiceListQueryValidator.cs:19` | backlog | `e724528` |
 | PPW-496 | 🟡 | v1 | No backfill path for orders already Paid before this deploy | `Controllers/AdminInvoicesController.cs:1` | backlog | `e724528` |
@@ -47,6 +47,9 @@ updated: 2026-08-13
 | PPW-503 | ⚪ | v1 | `PostgresInvoiceNumberingService` interpolates the sequence name into raw SQL with no in-service validation | `Services/Invoicing/PostgresInvoiceNumberingService.cs:43` | backlog | `e724528` |
 | PPW-504 | ⚪ | v1 | `OrderDetailDto` grew 3 required fields with no lens covering the frontend contract | `DTOs/Orders/OrderDetailDto.cs:5` | backlog | `e724528` |
 | PPW-505 | 🟡 | v1 | Fiscal-year numbering constraint can disagree between Postgres and .NET at a Dec 31/Jan 1 boundary | `Migrations/20260603101910_AddVatAndInvoices.cs:111` | backlog | `e724528` |
+| PPW-506 | 🟠 | v2 | Config comment and rollout runbook still promise the customer invoice email that does not exist | `docs/DEPLOYMENT.md:1409` | open | `11dfb8e` |
+| PPW-507 | 🟡 | v2 | New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation | `Configuration/AnafSettings.cs:44` | open | `11dfb8e` |
+| PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | open | `11dfb8e` |
 
 ## Details
 
@@ -57,6 +60,7 @@ updated: 2026-08-13
 - **Suggested fix:** Inject `IStorageRouter` in both files; route via `router.CloudEnabled ? router.Cloud : router.Local`, matching every other two-tier caller. **Test shape:** integration test with `Storage:Provider=S3`, seed `PdfStoragePath` only in the S3 fake; GET invoice; assert 404+Retry-After, not an unhandled 500. Not trigger-list-shaped (DI wiring only) — no approach-check run.
 - **History:**
   - v1: found — raised independently by 2 lenses (correctness + completeness-critic)
+  - v2: verified @`11dfb8e` — revert-and-rerun (router read forced back to `Local`): only `GetInvoiceAsync_CloudEnabled_ReadsFromCloudAdapterNotLocal` went red, 7 siblings green. No other site injects `IStorageService` directly
 
 ### PPW-470 — Invoice PDF generation/upload bypasses IStorageRouter, always writes local disk (ADR-008)
 
@@ -65,6 +69,7 @@ updated: 2026-08-13
 - **Suggested fix:** Same fix as PPW-469 — one `IStorageRouter` change covers both read and write sites; fix as one cluster. **Test shape:** with `Storage:Provider=S3`, assert PDF bytes land in `IStorageRouter.Cloud`, not `.Local`. Not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 2 lenses (requirements + quality) — same root cause as PPW-469, same fix cluster
+  - v2: verified @`11dfb8e` — revert-and-rerun (job storage forced back to `Local`): only `UploadPendingAsync_CloudEnabled_SavesPdfToCloudAdapterNotLocal` went red, 12 siblings green
 
 ### PPW-471 — Invoice creation is check-then-act with no DB uniqueness — concurrent webhooks can mint two fiscal invoices
 
@@ -74,6 +79,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 3 lenses (correctness + security + race)
   - v1: approach-check run — revised (catch site corrected to WebhooksController; replay-signal and migration pre-flight added)
+  - v2: verified @`11dfb8e` — revert-and-rerun (`.IsUnique()` dropped from the OrderId index): only `ConcurrentDeliveriesForSameOrder_LoserGetsClassifiableViolation_ExactlyOneInvoicePersists` went red. Two residuals: the approach-check's Postgres duplicate-row pre-flight before `Program.cs:387` `Migrate()` was never implemented (unreachable on this deploy — the Invoices table itself is new), and no test drives the controller's own OrderId-violation catch or asserts the four side effects fire once, which was the stated test shape
 
 ### PPW-472 — InvoicePdfReadyNotifier never sends an email regardless of the flag, logs a false "sent" event
 
@@ -82,6 +88,7 @@ updated: 2026-08-13
 - **Suggested fix:** Implement the two documented integration points from `ddd-02-technical-design.md` (attach PDF to the order-confirmation email; send a real follow-up email in `NotifyAsync`) — or, if not shipping this round, change the log line so it doesn't claim `sent` and flag the settings docstring as not-yet-implemented. **Test shape:** inject a mock `IEmailService`, flag=true, call `NotifyAsync`, assert a send was invoked. Not trigger-list-shaped as a doc/log-only interim fix; becomes trigger-list-shaped only if a real email integration ships this round (new external call, not a background job/cache/retry) — no approach-check run yet, pending the owner's choice of scope.
 - **History:**
   - v1: found — raised independently by 2 lenses (requirements + observability)
+  - v2: verified @`11dfb8e` — revert-and-rerun on the notifier: only `When_flag_enabled_notifier_does_not_claim_it_sent_anything` went red. The code leg holds; the identical false promise survives in the config and deployment docs — PPW-506
 
 ### PPW-473 — Guest checkouts can never retrieve their invoice — JWT-only auth on the endpoint
 
@@ -90,6 +97,7 @@ updated: 2026-08-13
 - **Suggested fix:** Switch to `[Authorize(Policy = GuestSessionExtensions.DualAuthPolicy)]` and check ownership against both `UserId` and `GuestSessionId`, matching `CartController`/`PaymentsController`. **Test shape:** guest order (UserId=null, GuestSessionId=X), GET invoice with `X-Guest-Token` and no JWT → expect 200/404-pending, not 401. Not trigger-list-shaped (reusing an existing auth pattern).
 - **History:**
   - v1: found — raised independently by 1 lens (requirements)
+  - v2: verified @`11dfb8e` — revert-and-rerun: `GetInvoiceAsync_GuestOwnsOrder_ReturnsFile` and `GetInvoiceAsync_GuestSessionDoesNotMatch_ReturnsForbid` went red, 6 siblings green. Residual: the `DualAuthPolicy` attribute itself is exercised by no test — the unit tests bypass authorization
 
 ### PPW-474 — Orders marked Paid via admin manual reconciliation never get an Invoice row
 
@@ -98,6 +106,7 @@ updated: 2026-08-13
 - **Suggested fix:** Call `CreateForOrderAsync(order.Id, ct)` inside the same Paid branch, before `SaveChangesAsync`, mirroring the webhook handlers. **Test shape:** `UpdateStatusAsync(orderId, "Paid", ...)` with a mocked `IInvoiceCreationService`; assert it's called once. Not trigger-list-shaped (mirrors an existing call pattern).
 - **History:**
   - v1: found — raised independently by 1 lens (requirements)
+  - v2: verified @`11dfb8e` — revert-and-rerun (creation call deleted): only `UpdateStatusAsync_AwaitingPaymentToPaid_StampsPaidAtAndEnqueuesAwb` went red, 34 siblings green. Residual: this sibling save site has no unique-violation catch, unlike the webhook path
 
 ### PPW-475 — ANAF upload success + DB commit failure is indistinguishable from never-uploaded
 
@@ -107,6 +116,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (observability)
   - v1: approach-check run — revised (catch scoped correctly; regression test required)
+  - v2: verified @`11dfb8e` — revert-and-rerun: only `UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyAndRethrows` went red, 12 siblings green
 
 ### PPW-476 — No claim/lease on Pending invoices — multi-replica double-submits to ANAF and double-emails
 
@@ -116,6 +126,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (race)
   - v1: approach-check run — revised (claim-release, TTL sizing, migration gotcha, test fixture, residual note added)
+  - v2: verified @`11dfb8e` — revert-and-rerun (claim-lost guard deleted): only `UploadPendingAsync_RowAlreadyClaimedWithinTtl_SkipsWithoutCallingAnaf` went red. TTL is sized right (10 min against a worst-case pass of roughly 2 min of ANAF retries) and `anaf.upload-job.claim-lost` is the signal, but the new key is absent from config and deployment docs — PPW-507
 
 ### PPW-477 — No control-character filtering on customer name/address before UBL XML serialization
 
@@ -125,6 +136,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (input-validation), not independently confirmed: guard evidence real, originally-claimed crash mechanism disproven by trace, corrected mechanism confirmed by approach-check
   - v1: approach-check run — revised (scope widened per above)
+  - v2: verified @`11dfb8e` — two legs, both red on revert: neutralising `TextValidation.HasNoXmlInvalidChars` reddened 7 validator tests; disarming the Step 1-2 and `AnafUnreachableException` catches reddened `UploadPendingAsync_XmlBuildThrows_...` and `UploadPendingAsync_AnafUnreachable_...`. Residual: the approach-check also required a sanitize net inside `InvoiceXmlBuilder` and `InvoicePdfDocument` for legacy rows — neither got one
 
 ### PPW-478 — UBL invoice-line amounts are gross, not tax-exclusive — lines won't reconcile with the document total
 
@@ -134,6 +146,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found by a supplemental correctness pass, dispatched this pass to close PPW-497's gap — checked directly against the code, not by a manifest lens
   - v1: approach-check run — revised (derivation site and rounding-consistency corrected)
+  - v2: verified @`11dfb8e` — revert-and-rerun: `Line_extension_amount_is_net_not_gross` and `Sum_of_line_extension_amounts_reconciles_exactly_with_header_net_total` went red, 11 siblings green
 
 ### PPW-479 — Admin invoice list `Page` param is unbounded — int32 overflow can reach `Skip()`
 
@@ -142,6 +155,7 @@ updated: 2026-08-13
 - **Suggested fix:** Add an upper bound on `Page`, or compute the offset in `long`/checked arithmetic and clamp before `Skip`. **Test shape:** `GET ?page=2147483647&size=100` → expect 422, not 500. Not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 1 lens (correctness)
+  - v2: verified @`11dfb8e` — revert-and-rerun: only `PageNearIntMax_FailsValidation` went red
 
 ### PPW-480 — Admin "retry" resubmits byte-identical XML — can never fix the failure it exists for
 
@@ -151,6 +165,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (requirements)
   - v1: approach-check run — revised (PdfStoragePath clear dropped; logging added)
+  - v2: verified @`11dfb8e` — revert-and-rerun: both `Retry_from_terminal_state_resets_to_Pending_and_clears_fields` cases went red, 7 siblings green
 
 ### PPW-481 — `AnafSettings` docstring's "byte-identical to baseline" claim is false when disabled
 
@@ -159,6 +174,7 @@ updated: 2026-08-13
 - **Suggested fix:** Update the docstring to state plainly that the Invoice row and the customer endpoint are also live while `Enabled=false` — only the ANAF wire calls are skipped. Doc-only; not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 1 lens (requirements)
+  - v2: REOPENED @`11dfb8e` — the replacement docstring is false in a new way. It claims the "XML/PDF build" stays live while `Anaf:Enabled=false`, but `InvoiceUploadJob` is the only caller of `IInvoiceXmlBuilder`/`IInvoicePdfRenderer` and is registered only inside `Program.cs:299` `if (anafEnabled)`. The original false claim also survives verbatim at `appsettings.json:95` ("production-identical to baseline")
 
 ### PPW-482 — `AdminInvoicesController`'s audit-logging doc-comment is false; the one logged action omits the admin id
 
@@ -167,6 +183,7 @@ updated: 2026-08-13
 - **Suggested fix:** Add `User.GetUserIdOrNull()`-tagged Information logs on all three actions (pattern already used in `InvoicesController`). Not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 2 lenses (requirements + observability)
+  - v2: verified @`11dfb8e` — revert-and-rerun: all three of `ListAsync_LogsAdminUserId`, `GetXmlAsync_LogsAdminUserId`, `RetryAsync_LogsAdminUserId` went red
 
 ### PPW-483 — Redundant Order re-query on every paid webhook in `InvoiceCreationService`
 
@@ -175,6 +192,7 @@ updated: 2026-08-13
 - **Suggested fix:** Overload `CreateForOrderAsync` to accept the already-loaded `Order`. Not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 1 lens (quality)
+  - v2: REOPENED @`11dfb8e` — the regression test cannot go red for the defect it names. Reintroducing the re-query (the `Order` overload delegating to the `Guid` overload) left all 6 `InvoiceCreationServiceTests` green: `Order_overload_creates_invoice_without_reloading_the_order` asserts only that an invoice is created, never that the Orders table went unqueried. PPW-484 used SQL logging for the same claim
 
 ### PPW-484 — `InvoiceUploadJob` worker reloads the full Order graph even when only the ANAF step remains
 
@@ -183,6 +201,7 @@ updated: 2026-08-13
 - **Suggested fix:** Only load Order with includes when Steps 1–2 still need it. Not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 1 lens (quality)
+  - v2: verified @`11dfb8e` — revert-and-rerun (`needsOrder` forced true): only `UploadPendingAsync_XmlAndPdfAlreadyBuilt_SkipsOrderReloadAndProceedsToUpload` went red, 12 siblings green
 
 ### PPW-485 — Checkout field-length caps are wider than the legal XML limits, with no truncation
 
@@ -191,6 +210,7 @@ updated: 2026-08-13
 - **Suggested fix:** Cap/truncate to CIUS-RO limits before XML build, or validate at checkout so bad data never reaches an unfixable Paid+Invoice state. Not trigger-list-shaped (validation only).
 - **History:**
   - v1: found — raised independently by 1 lens (input-validation)
+  - v2: verified @`11dfb8e` — revert-and-rerun (truncation neutralised, caps restored): 6 tests went red across the validator and the XML builder, 33 siblings green
 
 ### PPW-486 — Per-row catch collapses auth failure, network failure, and code bugs into one generic log event
 
@@ -200,6 +220,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (observability)
   - v1: approach-check run — revised (repeat-escalation dropped; Sentry capture added)
+  - v2: verified @`11dfb8e` — revert-and-rerun: only `ProcessBatchAsync_AnafAuthFails_LogsDistinctlyAndCapturesToSentry` went red. Residual: `IHub` is registered only when `Sentry:Enabled=true`, so with Sentry off the capture no-ops and no metric backs it
 
 ### PPW-487 — Unrecognized ANAF status string is silently treated as "still processing", raw value never logged
 
@@ -208,6 +229,7 @@ updated: 2026-08-13
 - **Suggested fix:** Log the raw `stare` value at Warning when `MapStatus` can't classify it; log `Unknown` distinctly from `InProgress` in the job. Not trigger-list-shaped (log line + switch-branch differentiation, no new catch/retry/job).
 - **History:**
   - v1: found — raised independently by 1 lens (observability)
+  - v2: verified @`11dfb8e` — revert-and-rerun: `GetStatus_unrecognized_stare_logs_the_raw_value_at_warning` and `PollSubmittedAsync_UnrecognizedStatus_LogsDistinctlyFromInProgressAndDoesNotTransition` went red, 21 siblings green
 
 ### PPW-488 — No domain-tagged log for "customer charged, order not committed" in `WebhooksController`
 
@@ -217,6 +239,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (observability)
   - v1: approach-check run — revised (catch type narrowed; pre-transition status snapshot added)
+  - v2: verified @`11dfb8e` — revert-and-rerun (exhausted catch disarmed): only `SaveOrderPaidWithInvoiceAsync_InvoiceNumberCollisionExhaustsRetries_LogsManualReconciliationAndReturnsFalse` went red. The catch also swallows the exception, which changes the webhook's answer to the processor — PPW-508
 
 ### PPW-489 — Polly retries the non-idempotent ANAF upload POST on ambiguous-outcome errors
 
@@ -226,6 +249,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (race)
   - v1: approach-check run — revised (proposed mitigation is a no-op for the described case; routed to owner decision)
+  - v2: newly affirmed @`11dfb8e` — `AnafResilienceHandler.cs` is byte-identical since `e724528`; `AnafSpvClient.cs` changed only by the +5-line unrecognized-status warning in `GetStatusAsync`, off the upload path. The upload POST still carries no idempotency key and is still retried on ambiguous outcomes. Ruling stands
 
 ### PPW-490 — SQLite invoice numbering's MAX+1 has no transaction/lock despite the comment's safety claim
 
@@ -235,6 +259,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (race)
   - v1: approach-check run — revised (catch site and mechanism corrected; unified with PPW-471's fix)
+  - v2: verified @`11dfb8e` — revert-and-rerun (retry budget set to 0): only `SaveOrderPaidWithInvoiceAsync_InvoiceNumberCollision_RetriesWithFreshNumber` went red, 3 siblings green
 
 ### PPW-491 — `InvoiceUploadJob` has zero tests despite being the most stateful new logic
 
@@ -243,6 +268,7 @@ updated: 2026-08-13
 - **Suggested fix:** Add unit tests for `ProcessOneAsync` covering partial completion, the backoff-budget boundary, and 200-with-Errors handling. Test-only; not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 1 lens (completeness-critic), not independently confirmed — a real coverage gap, not a wrong-output claim, so there was no trace to build against it
+  - v2: verified @`11dfb8e` — mutation-and-rerun (`IsBudgetExhausted` forced false): only `PollSubmittedAsync_RejectedBudgetExhausted_MarksFailedNotRejected` went red, 12 siblings green
 
 ### PPW-492 — Webhook tests stub invoice creation to always return null; nothing asserts it runs or that failure is handled
 
@@ -251,6 +277,7 @@ updated: 2026-08-13
 - **Suggested fix:** Add a test asserting `CreateForOrderAsync` is called on the Paid transition, and one where it throws, asserting the order stays `AwaitingPayment` (not silently marked Paid). Test-only; not trigger-list-shaped.
 - **History:**
   - v1: found — raised independently by 1 lens (completeness-critic)
+  - v2: verified @`11dfb8e` — mutation-and-rerun (invoice creation short-circuited out of the save path): both `Stripe_succeeded_for_an_awaiting_order_invokes_invoice_creation` and `Stripe_succeeded_when_invoice_creation_throws_leaves_order_awaiting_payment_in_the_database` went red, 14 siblings green
 
 ### PPW-493 — `PostgresInvoiceNumberingService` — the only prod numbering path — has no test coverage
 
@@ -260,6 +287,7 @@ updated: 2026-08-13
 - **History:**
   - v1: found — raised independently by 1 lens (completeness-critic)
   - v1: broadened by a supplemental db-parity check (the "tests-coverage"/"db-parity" lenses named in the manifest were dropped by a key typo and never ran this pass — see PPW-497): the same untested-Postgres-only-DDL gap also covers the raw-SQL `CREATE SEQUENCE`/composite unique index at `Migrations/20260603101910_AddVatAndInvoices.cs:103-114` — no test anywhere executes this migration's Postgres path
+  - v2: NOT verified, stays `fixed` @`11dfb8e` — the three `[SkippableFact]` tests skip on this machine (no Postgres server; `psql` is installed but nothing listens on 5432), so no red-green proof exists. The gate is real: `ci.yml` runs a `postgres:16-alpine` service and sets `ConnectionStrings__Default` on the test step, so first execution is this PR's CI. The broadened half of the finding is untouched — no test executes the migration's Postgres DDL
 
 ### PPW-494 — Cloned retry `HttpRequestMessage` in `AnafAuthHandler` is never disposed
 
@@ -356,3 +384,27 @@ updated: 2026-08-13
 - **Suggested fix:** Confirm with the owner whether the SPA order-detail view should surface the new fields; file a follow-up frontend bolt if so.
 - **History:**
   - v1: found by the completeness-critic lens — not independently checked (cleanup findings get no skeptic); ⚪, entered ledger as `backlog` per README router
+
+### PPW-506 — Config comment and rollout runbook still promise the customer invoice email that does not exist
+
+- **What:** PPW-472's fix corrected the C# docstring to say no email is sent, but the two documents an operator actually reads still say the opposite. `appsettings.json`'s `Invoicing` comment says "Flip to true after the production inspection week"; the deployment flag table repeats it; and the rollout runbook's step 6 states that after the flip "Customers now receive the PDF attached to order-confirmation emails ... or via a follow-up 'your invoice is ready' email". No send path exists.
+- **Evidence:** `docs/DEPLOYMENT.md:1409,1309`; `appsettings.json:107`; `Services/Invoicing/InvoicePdfReadyNotifier.cs:40-45`.
+- **Suggested fix:** Say in all three places what the corrected docstring says — the flag currently changes nothing customer-visible — or gate the runbook step behind the email integration landing. Doc-only.
+- **History:**
+  - v2: found by the verification pass asking whether PPW-472's fix held as a class; the code leg held, the doc leg did not
+
+### PPW-507 — New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation
+
+- **What:** PPW-476's claim/lease introduced an operational knob whose value decides how long a crashed worker strands an invoice. It exists only as a C# default of 10; `appsettings.json`'s `Anaf` block does not list it, the deployment flag table and env-var block do not mention it, and no validator bounds it — a zero or negative value is silently clamped to 1 minute in code, below the pipeline's own duration.
+- **Evidence:** `Configuration/AnafSettings.cs:44`; `appsettings.json:94-105`; `docs/DEPLOYMENT.md:1306-1309,1376-1381`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:132`.
+- **Suggested fix:** Add the key to `appsettings.json` with its default, add a row to the deployment flag table naming what happens if it is set below one pass, and bound it in the ANAF settings validator.
+- **History:**
+  - v2: found by the verification pass's new-surface check on PPW-476's added mechanism — sized default, signal and failure-mode tests are present; documentation is the missing leg
+
+### PPW-508 — Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate`
+
+- **What:** PPW-488 asked for a domain-tagged log on the "customer charged, order not committed" path. The fix also swallows the `DbUpdateException` and returns false, so the handler skips its side effects, records the webhook as `duplicate`, and answers 200. Before the fix the exception propagated to a 500 and the processor retried, which a fresh invoice number would very likely have satisfied; now the order stays `AwaitingPayment` with no retry and the label hides the failure from the webhook error rate.
+- **Evidence:** `Controllers/WebhooksController.cs:414-421,204-206,284-286`; `Observability/MetricNames.cs:53-58`.
+- **Suggested fix:** Keep the log, then rethrow (or answer 500) so the processor's own retry still runs; if the swallow is deliberate, label the metric `failed`, not `duplicate`. Reachable only on the SQLite numbering path — Postgres `nextval()` cannot collide — so dev-grade impact today.
+- **History:**
+  - v2: found by the verification pass's regression check on PPW-488's fix diff — a behaviour change the finding did not ask for and the resolution's Decisions block does not mention

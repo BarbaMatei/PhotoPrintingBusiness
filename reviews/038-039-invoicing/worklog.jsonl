@@ -41,3 +41,15 @@
 {"t":"2026-08-13T14:50:45+03:00","ev":"round-end","round":1}
 {"t":"2026-08-13T15:08:16+03:00","ev":"doc-gate","verdict":"approve","round":1}
 {"t":"2026-08-13T15:09:40+03:00","ev":"test-run","kind":"final","filter":"Controllers|Services.Invoicing|AdminOrderServiceTests|Validators|PostgresInvoiceNumberingServiceIntegrationTests","passed":180,"failed":0,"skipped":3,"note":"true cross-namespace final run before hand-back; earlier test-run stamps in this round covered only individual clusters"}
+{"t":"2026-08-13T15:26:03+03:00","ev":"pass-launch","pass":2,"type":"verification","commit":"7cde815","code_tip":"11dfb8e","note":"independent verification of resolution-v1; fresh session, not the fixer. Stamp is the first hard-evidenced moment of the pass (baseline test run); the doc-reading prefix before it is unstamped"}
+{"t":"2026-08-13T15:26:24+03:00","ev":"test-run","kind":"baseline","filter":"Unit.Controllers|Unit.Services.Invoicing|AdminOrderServiceTests|Unit.Validators|PostgresInvoiceNumberingServiceIntegrationTests","passed":180,"failed":0,"skipped":3}
+{"t":"2026-08-13T15:27:00+03:00","ev":"test-run","kind":"revert-and-rerun","note":"21 scoped runs, one per fixed finding leg; every run reddened exactly the predicted test set with zero collateral","red_runs":21,"green_runs":1}
+{"t":"2026-08-13T15:41:00+03:00","ev":"check-dispatched","target":"PPW-489","note":"anchored judgment-item checker on AnafResilienceHandler.cs + AnafSpvClient.cs delta since e724528"}
+{"t":"2026-08-13T15:42:00+03:00","ev":"check-returned","target":"PPW-489","verdict":"stands","tokens":30516}
+{"t":"2026-08-13T15:44:00+03:00","ev":"finding","id":"PPW-483","status":"reopened","note":"regression test cannot go red — reintroducing the re-query left all 6 InvoiceCreationServiceTests green"}
+{"t":"2026-08-13T15:45:00+03:00","ev":"finding","id":"PPW-481","status":"reopened","note":"replacement docstring claims the XML/PDF build stays live with Anaf:Enabled=false; the sole caller is registered only when enabled"}
+{"t":"2026-08-13T15:46:00+03:00","ev":"finding","id":"PPW-493","status":"fixed","note":"not verified — SkippableFact cannot run locally (no Postgres server); gated on CI, which does provide one"}
+{"t":"2026-08-13T15:47:00+03:00","ev":"finding","id":"PPW-506","status":"open","sev":"medium","note":"new — config comment and rollout runbook still promise the customer invoice email PPW-472 documented as absent"}
+{"t":"2026-08-13T15:47:30+03:00","ev":"finding","id":"PPW-507","status":"open","sev":"low","note":"new — Anaf:ClaimTtlMinutes undocumented and unvalidated"}
+{"t":"2026-08-13T15:48:00+03:00","ev":"finding","id":"PPW-508","status":"open","sev":"low","note":"new — exhausted numbering retries now answer the processor 200 and count as duplicate"}
+{"t":"2026-08-13T15:51:21+03:00","ev":"pass-records-done","pass":2,"verdict":"approve-with-followups","verified":21,"reopened":2}
