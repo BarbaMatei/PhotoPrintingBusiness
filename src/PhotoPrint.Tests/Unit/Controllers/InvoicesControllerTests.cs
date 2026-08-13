@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using PhotoPrint.API.Authentication;
 using PhotoPrint.API.Controllers;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
@@ -24,10 +25,11 @@ public class InvoicesControllerTests
                 .Options);
     }
 
-    private static Order MakeOrder(Guid id, Guid userId) => new()
+    private static Order MakeOrder(Guid id, Guid? userId = null, Guid? guestSessionId = null) => new()
     {
         Id = id,
         UserId = userId,
+        GuestSessionId = guestSessionId,
         OrderNumber = $"ORD-{id:N}",
         ShippingAddress = new ShippingAddressSnapshot
         {
@@ -36,21 +38,23 @@ public class InvoicesControllerTests
         },
     };
 
-    private static InvoicesController MakeController(PhotoPrintDbContext db, IStorageRouter router, Guid userId)
-    {
-        var controller = new InvoicesController(db, router)
+    private static InvoicesController MakeController(PhotoPrintDbContext db, IStorageRouter router, Guid userId) =>
+        MakeControllerWithClaim(db, router, new Claim(ClaimTypes.NameIdentifier, userId.ToString()));
+
+    private static InvoicesController MakeGuestController(PhotoPrintDbContext db, IStorageRouter router, Guid guestSessionId) =>
+        MakeControllerWithClaim(db, router, new Claim(GuestAuthenticationHandler.GuestSessionIdClaimType, guestSessionId.ToString()));
+
+    private static InvoicesController MakeControllerWithClaim(PhotoPrintDbContext db, IStorageRouter router, Claim claim) =>
+        new(db, router)
         {
             ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext
                 {
-                    User = new ClaimsPrincipal(new ClaimsIdentity(
-                        [new Claim(ClaimTypes.NameIdentifier, userId.ToString())], authenticationType: "Test")),
+                    User = new ClaimsPrincipal(new ClaimsIdentity([claim], authenticationType: "Test")),
                 },
             },
         };
-        return controller;
-    }
 
     [Fact]
     public async Task GetInvoiceAsync_CloudEnabled_ReadsFromCloudAdapterNotLocal()
@@ -113,5 +117,61 @@ public class InvoicesControllerTests
 
         result.Should().BeOfType<FileStreamResult>();
         local.Verify(s => s.GetStreamAsync("invoices/2026/FT-2026-00002.pdf", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_GuestOwnsOrder_ReturnsFile()
+    {
+        var guestSessionId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, guestSessionId: guestSessionId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00003",
+            PdfStoragePath = "invoices/2026/FT-2026-00003.pdf",
+        });
+        await _db.SaveChangesAsync();
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync("invoices/2026/FT-2026-00003.pdf", It.IsAny<CancellationToken>()))
+             .ReturnsAsync(new MemoryStream([1, 2, 3]));
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+
+        var controller = MakeGuestController(_db, router.Object, guestSessionId);
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>();
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_DifferentUserOwnsOrder_ReturnsForbid()
+    {
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, Guid.NewGuid()));
+        await _db.SaveChangesAsync();
+
+        var controller = MakeController(_db, Mock.Of<IStorageRouter>(), Guid.NewGuid());
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_GuestSessionDoesNotMatch_ReturnsForbid()
+    {
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, guestSessionId: Guid.NewGuid()));
+        await _db.SaveChangesAsync();
+
+        var controller = MakeGuestController(_db, Mock.Of<IStorageRouter>(), Guid.NewGuid());
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<ForbidResult>();
     }
 }

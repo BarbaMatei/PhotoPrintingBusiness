@@ -13,7 +13,7 @@ namespace PhotoPrint.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/orders/{orderId:guid}/invoice")]
-[Authorize]
+[Authorize(Policy = GuestSessionExtensions.DualAuthPolicy)]
 public sealed class InvoicesController : ControllerBase
 {
     private readonly PhotoPrintDbContext _db;
@@ -39,16 +39,19 @@ public sealed class InvoicesController : ControllerBase
     public async Task<IActionResult> GetInvoiceAsync(Guid orderId, CancellationToken ct)
     {
         var userId = User.GetUserIdOrNull();
-        if (userId is null) return Unauthorized();
+        var guestSessionId = User.GetGuestSessionIdOrNull();
 
         var order = await _db.Orders
             .AsNoTracking()
             .Where(o => o.Id == orderId)
-            .Select(o => new { o.Id, o.UserId })
+            .Select(o => new { o.Id, o.UserId, o.GuestSessionId })
             .FirstOrDefaultAsync(ct);
 
         if (order is null) return NotFound();
-        if (order.UserId != userId.Value) return Forbid();
+
+        var owns = (userId is not null && order.UserId == userId.Value) ||
+                   (guestSessionId is not null && order.GuestSessionId == guestSessionId.Value);
+        if (!owns) return Forbid();
 
         var invoice = await _db.Invoices
             .AsNoTracking()
