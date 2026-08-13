@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Invoices;
+using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services.Invoicing;
 
@@ -70,6 +71,10 @@ public sealed class AdminInvoicesController : ControllerBase
                     i.LastError))
             .ToListAsync(ct);
 
+        _logger.LogInformation(
+            "admin.invoice.list admin_user_id={AdminUserId} status={Status} page={Page} size={Size} total={Total}",
+            User.GetUserIdOrNull(), query.Status, query.Page, query.Size, total);
+
         return Ok(new
         {
             items,
@@ -121,8 +126,8 @@ public sealed class AdminInvoicesController : ControllerBase
         }
 
         _logger.LogInformation(
-            "admin.invoice.retry invoice_id={InvoiceId} from={From}",
-            invoiceId, snapshot.AnafStatus);
+            "admin.invoice.retry admin_user_id={AdminUserId} invoice_id={InvoiceId} from={From}",
+            User.GetUserIdOrNull(), invoiceId, snapshot.AnafStatus);
 
         return Ok(new
         {
@@ -149,6 +154,10 @@ public sealed class AdminInvoicesController : ControllerBase
 
         if (invoice is null || string.IsNullOrEmpty(invoice.XmlPayload))
             return NotFound();
+
+        _logger.LogInformation(
+            "admin.invoice.xml-download admin_user_id={AdminUserId} invoice_id={InvoiceId}",
+            User.GetUserIdOrNull(), invoiceId);
 
         var bytes = Encoding.UTF8.GetBytes(invoice.XmlPayload);
         return File(bytes, "application/xml", fileDownloadName: $"{invoice.InvoiceNumber}.xml");
