@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services.Invoicing;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
@@ -40,19 +41,19 @@ public class InvoicePdfReadyNotifierTests
     }
 
     [Fact]
-    public async Task When_flag_enabled_notifier_runs_send_path()
+    public async Task When_flag_enabled_notifier_does_not_claim_it_sent_anything()
     {
-        // For v1 the "send" path is a log line + Task.CompletedTask
-        // (see InvoicePdfReadyNotifier — actual MailKit attachment integration
-        // is in scope for the GA flip, not for the inspection-week artefact).
-        // This test pins that the enabled branch is reached without exception.
+        var logs = new LogCapture();
         var sut = new InvoicePdfReadyNotifier(
             Options.Create(new InvoicingSettings
             {
                 CustomerEmailAttachments = new CustomerEmailAttachmentSettings { Enabled = true },
             }),
-            NullLogger<InvoicePdfReadyNotifier>.Instance);
+            logs.LoggerFor<InvoicePdfReadyNotifier>());
 
         await sut.NotifyAsync(new Invoice { Id = Guid.NewGuid() }, new Order { Id = Guid.NewGuid() });
+
+        logs.Records.Should().ContainSingle(r => r.Message.StartsWith("invoice.pdf-ready.no-email-integration", StringComparison.Ordinal));
+        logs.Records.Should().NotContain(r => r.Message.Contains("invoice.pdf-ready.sent", StringComparison.Ordinal));
     }
 }

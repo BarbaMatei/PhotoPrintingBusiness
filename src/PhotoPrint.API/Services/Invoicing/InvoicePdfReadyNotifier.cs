@@ -37,18 +37,9 @@ public sealed class InvoicePdfReadyNotifier
             return Task.CompletedTask;
         }
 
-        // Email composition + send is intentionally minimal in v1: the
-        // existing OrderEmailService runs Razor templates over a model
-        // record, and integrating an attachment requires extending
-        // IEmailService.SendTemplatedAsync. That extension is in scope
-        // for the dual-write GA flip, not for bolt 039's first delivery.
-        //
-        // For the inspection week the flag stays off and this branch
-        // is unreachable; once the flag is flipped, the follow-up step
-        // is to wire the actual MailKit / SendGrid attachment.
-
-        _logger.LogInformation(
-            "invoice.pdf-ready.sent invoice_id={InvoiceId} order_id={OrderId}",
+        // No email integration exists yet, so nothing is actually sent here.
+        _logger.LogWarning(
+            "invoice.pdf-ready.no-email-integration invoice_id={InvoiceId} order_id={OrderId} — flag enabled but no send is implemented",
             invoice.Id, order.Id);
 
         return Task.CompletedTask;

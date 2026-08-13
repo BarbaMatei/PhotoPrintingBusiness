@@ -17,8 +17,7 @@ public sealed class InvoicingSettings
 /// Default <c>false</c>: the full pipeline runs (XML build, ANAF upload,
 /// PDF render, storage write) but the PDF is NOT attached to the
 /// order-confirmation email and no follow-up "Invoice ready" email is sent.
-/// After the production inspection week, flip to <c>true</c> to surface
-/// invoices to customers.
+/// Flipping to <c>true</c> does not yet send anything — no email attachment integration exists.
 /// </summary>
 public sealed class CustomerEmailAttachmentSettings
 {
