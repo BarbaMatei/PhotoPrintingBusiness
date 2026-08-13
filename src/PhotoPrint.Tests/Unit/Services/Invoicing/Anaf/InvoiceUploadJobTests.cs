@@ -11,6 +11,7 @@ using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Invoicing.Anaf;
+using PhotoPrint.Tests.Helpers;
 using Xunit;
 
 namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
@@ -61,7 +62,7 @@ public class InvoiceUploadJobTests
         public required Mock<IAnafSpvClient> AnafClient { get; init; }
     }
 
-    private static Harness Build(string dbName, bool cloudEnabled)
+    private static Harness Build(string dbName, bool cloudEnabled, LogCapture? logCapture = null)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -102,7 +103,9 @@ public class InvoiceUploadJobTests
                 sp.GetRequiredService<IServiceScopeFactory>(),
                 Options.Create(new AnafSettings()),
                 TimeProvider.System,
-                sp.GetRequiredService<ILogger<InvoiceUploadJob>>(),
+                logCapture is null
+                    ? sp.GetRequiredService<ILogger<InvoiceUploadJob>>()
+                    : logCapture.LoggerFor<InvoiceUploadJob>(),
             ],
             culture: null)!;
 
@@ -166,5 +169,40 @@ public class InvoiceUploadJobTests
         await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
         h.Local.Verify(s => s.SaveAsync(It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyAndRethrows()
+    {
+        var dbName = $"InvoiceUpload_{Guid.NewGuid():N}";
+        var logs = new LogCapture();
+        var h = Build(dbName, cloudEnabled: false, logs);
+        var orderId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+
+        using (var seed = CreateDb(dbName))
+        {
+            var order = MakeOrder(orderId);
+            order.Id = orderId;
+            seed.Orders.Add(order);
+            var invoice = MakeInvoice(orderId);
+            invoice.Id = invoiceId;
+            seed.Invoices.Add(invoice);
+            await seed.SaveChangesAsync();
+        }
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("upload-1", DateTimeOffset.UtcNow));
+        h.Lifecycle.Setup(l => l.MarkSubmittedAsync(invoiceId, "upload-1", It.IsAny<CancellationToken>()))
+                   .ThrowsAsync(new InvalidOperationException("transient DB failure"));
+
+        var act = () => InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Error &&
+                 r.Message.StartsWith("anaf.upload-job.submitted-but-not-recorded", StringComparison.Ordinal) &&
+                 r.Message.Contains(invoiceId.ToString()) &&
+                 r.Message.Contains("upload-1"));
     }
 }

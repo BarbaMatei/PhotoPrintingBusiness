@@ -173,12 +173,22 @@ public sealed class InvoiceUploadJob : BackgroundService
             var xmlBytes = Encoding.UTF8.GetBytes(invoice.XmlPayload!);
             var result = await anafClient.UploadAsync(xmlBytes, ct);
 
-            var ok = await lifecycle.MarkSubmittedAsync(invoiceId, result.UploadId, ct);
+            bool ok;
+            try
+            {
+                ok = await lifecycle.MarkSubmittedAsync(invoiceId, result.UploadId, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // ANAF already has this invoice — only the local status write failed.
+                _logger.LogError(ex,
+                    "anaf.upload-job.submitted-but-not-recorded invoice_id={InvoiceId} anaf_upload_id={AnafUploadId}",
+                    invoiceId, result.UploadId);
+                throw;
+            }
 
             if (ok) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Pending);
-            // Note: the meter tracks observed-status transitions; "pending"
-            // is the moment we crossed from build to upload-attempted. The
-            // accepted/rejected/failed observations land during polling.
+            // The meter tracks status transitions; accepted/rejected/failed land during polling.
         }
         catch (AnafUploadException ex)
         {
