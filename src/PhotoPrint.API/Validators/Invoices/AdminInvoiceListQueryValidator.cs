@@ -9,8 +9,8 @@ public sealed class AdminInvoiceListQueryValidator : AbstractValidator<AdminInvo
     public AdminInvoiceListQueryValidator()
     {
         RuleFor(q => q.Page)
-            .GreaterThanOrEqualTo(1)
-            .WithMessage("page must be ≥ 1.");
+            .InclusiveBetween(1, 1_000_000)
+            .WithMessage("page must be between 1 and 1,000,000.");
 
         RuleFor(q => q.Size)
             .InclusiveBetween(1, 100)
