@@ -4,11 +4,6 @@ using PhotoPrint.API.Validators;
 
 namespace PhotoPrint.Tests.Unit.Configuration;
 
-/// <summary>
-/// Boot-time validation for <see cref="AnafSettings"/>. Every rule is gated
-/// by <c>Enabled=true</c> so the disabled-by-default path stays byte-identical
-/// to baseline (intent goal).
-/// </summary>
 public class AnafSettingsValidatorTests
 {
     private static AnafSettings ValidEnabled(string certPath) => new()
@@ -85,6 +80,28 @@ public class AnafSettingsValidatorTests
         var result = _sut.Validate(null, s);
         result.Failed.Should().BeTrue();
         result.Failures.Should().Contain(f => f.Contains("Anaf:PollIntervalMinutes"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]      // one minute is shorter than one pipeline pass
+    [InlineData(-5)]
+    [InlineData(1441)]
+    public void ClaimTtlMinutes_out_of_range_fails(int minutes)
+    {
+        using var temp = TempCertFile.Create();
+        var s = ValidEnabled(temp.Path);
+        s.ClaimTtlMinutes = minutes;
+        var result = _sut.Validate(null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("Anaf:ClaimTtlMinutes"));
+    }
+
+    [Fact]
+    public void ClaimTtlMinutes_default_is_accepted()
+    {
+        using var temp = TempCertFile.Create();
+        _sut.Validate(null, ValidEnabled(temp.Path)).Failed.Should().BeFalse();
     }
 
     [Fact]

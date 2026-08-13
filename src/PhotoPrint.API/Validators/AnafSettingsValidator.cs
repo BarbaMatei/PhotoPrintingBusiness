@@ -3,14 +3,7 @@ using PhotoPrint.API.Configuration;
 
 namespace PhotoPrint.API.Validators;
 
-/// <summary>
-/// Fails fast at boot when <see cref="AnafSettings"/> is misconfigured.
-/// Every rule is guarded by <c>options.Enabled</c> so the disabled path
-/// stays a no-op (intent goal: production-identical when the integration is
-/// switched off). When enabled, the PKCS#12 cert file existence is checked
-/// — boot rather than first-request is the right place to surface a missing
-/// cert.
-/// </summary>
+// Every rule is guarded by options.Enabled, so a disabled deploy boots with unvalidated ANAF config — the worker that would read it is not registered either.
 public sealed class AnafSettingsValidator : IValidateOptions<AnafSettings>
 {
     public ValidateOptionsResult Validate(string? name, AnafSettings options)
@@ -48,6 +41,9 @@ public sealed class AnafSettingsValidator : IValidateOptions<AnafSettings>
 
         if (options.MaxBatchSize is < 1 or > 500)
             failures.Add("Anaf:MaxBatchSize must be between 1 and 500.");
+
+        if (options.ClaimTtlMinutes is < 2 or > 1440)
+            failures.Add("Anaf:ClaimTtlMinutes must be between 2 and 1440 — below 2 a second worker can reclaim an invoice while the first is still mid-pass.");
 
         if (options.BackoffHours is null || options.BackoffHours.Length == 0)
             failures.Add("Anaf:BackoffHours must contain at least one entry.");

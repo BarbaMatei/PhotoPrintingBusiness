@@ -1310,6 +1310,8 @@ VAT computation runs **unconditionally**; ANAF submission is gated by a master f
 
 **Why three flags, not one:** the rollout posture for regulated work is "exercise the pipeline against real production data, but don't expose the customer-visible side effect until you've inspected the output." The dual-write flag is the seam.
 
+**One tuning knob worth knowing (multi-replica deploys):** `Anaf:ClaimTtlMinutes` / `Anaf__ClaimTtlMinutes`, default `10`. When a worker picks up a `Pending` invoice it stamps a claim; this is how long that claim holds before another replica may reclaim the row. Set it **above** the duration of one full pass (XML build + PDF render + storage write + a 30 s ANAF upload timeout) or two replicas can work the same invoice at once and submit it twice — ANAF's own invoice-number dedupe is then the only thing preventing a duplicate. Set it too high and a replica that crashes mid-pass strands its invoice for that long. The validator rejects anything outside `2`–`1440`; single-replica deploys can leave the default alone.
+
 ### 15.3 Seller fiscal identity
 
 Every UBL XML and PDF embeds the seller's fiscal identity. The `Seller:` config section is read at boot and validated by [`SellerSettingsValidator`](../src/PhotoPrint.API/Validators/SellerSettingsValidator.cs). A typo here invalidates every emitted invoice — fail fast at startup.
@@ -1375,6 +1377,7 @@ Anaf__CertPath=/etc/photoprint/secrets/anaf.p12
 Anaf__CertPassword=<from-provider-sms>
 Anaf__PollIntervalMinutes=30
 Anaf__MaxBatchSize=50
+Anaf__ClaimTtlMinutes=10
 Anaf__BackoffHours__0=1
 Anaf__BackoffHours__1=4
 Anaf__BackoffHours__2=16
