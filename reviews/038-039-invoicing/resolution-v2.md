@@ -31,13 +31,18 @@ closed: 2026-08-14
 
 ## Decisions
 
-### Two 🟡 pulled in against the router's default (PPW-507, PPW-508)
+### Config knob pulled in against the router's default (PPW-507)
 
-The router sends new 🟡 to the ledger backlog, not a fix round, so only the three 🟠 were in
-scope. No owner ruling arrived at this round's gate. The fixer pulled both 🟡 in anyway:
-PPW-507 touches the same two files as cluster A, so deferring it meant editing them twice, and
-PPW-508 is a regression the previous round's own fix introduced. Recorded here for the owner to
-overrule; the ledger rows carry the same note.
+The router sends a new minor finding to the ledger backlog, not a fix round, so this row was
+out of scope and no owner ruling arrived at this round's gate. The fixer pulled it in anyway,
+because it edits the same two files as cluster A and deferring it meant touching them twice.
+Recorded for the owner to overrule; the ledger row carries the same note.
+
+### Fix-caused regression pulled in against the router's default (PPW-508)
+
+Out of scope for the same reason, and pulled in for a different one: this is a behaviour change
+the previous round's own fix introduced, so leaving it parked would have shipped a regression
+the loop had already found. Recorded for the owner to overrule.
 
 ### Rethrowing was refused in favour of relabelling (PPW-508)
 
@@ -55,7 +60,7 @@ micro-review found it missed `UpdatedAt`, which `OrderStatusMachine.Transition` 
 same bug the next added field would reintroduce. `Entry(order).ReloadAsync` discards every
 uncommitted mutation instead, and a test now pins `UpdatedAt` alongside the other fields.
 
-### Sites left for the re-reviewer
+### Records left as point-in-time, not corrected (PPW-506)
 
 Two ADR/design records still describe the customer-email flag as gating a real send:
 `adr-022-dual-write-rollout-via-feature-flag.md` and `ddd-02-technical-design.md`. Both are

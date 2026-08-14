@@ -75,3 +75,4 @@
 {"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-507","status":"fixed","commit":"7458454"}
 {"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"01fbdaf"}
 {"t":"2026-08-14T11:13:06+03:00","ev":"round-end","round":2}
+{"t":"2026-08-14T11:25:23+03:00","ev":"doc-gate","round":2,"verdict":"approve","note":"disapproved once on Decisions heading shape (multi-id heading, count and severity glyph in a title, one heading with no id); fixed and re-judged"}
