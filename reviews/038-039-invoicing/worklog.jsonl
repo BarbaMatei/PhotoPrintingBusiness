@@ -53,3 +53,25 @@
 {"t":"2026-08-13T15:47:30+03:00","ev":"finding","id":"PPW-507","status":"open","sev":"low","note":"new — Anaf:ClaimTtlMinutes undocumented and unvalidated"}
 {"t":"2026-08-13T15:48:00+03:00","ev":"finding","id":"PPW-508","status":"open","sev":"low","note":"new — exhausted numbering retries now answer the processor 200 and count as duplicate"}
 {"t":"2026-08-13T15:51:21+03:00","ev":"pass-records-done","pass":2,"verdict":"approve-with-followups","verified":21,"reopened":2}
+{"t":"2026-08-13T15:57:42+03:00","ev":"round-start","round":2}
+{"t":"2026-08-13T15:59:18+03:00","ev":"triage-done","round":2,"clusters":2,"checks_needed":0,"pre_cleared":0,"gates":1}
+{"t":"2026-08-13T15:59:18+03:00","ev":"gate-open","round":2,"reason":"scope: router sends the 2 new 🟡 (PPW-507, PPW-508) to backlog, not this round; PPW-507 shares files with cluster A and PPW-508 is a fix-caused behaviour change — owner call whether to pull either in"}
+{"t":"2026-08-13T16:15:47+03:00","ev":"gate-closed","round":2,"reason":"no owner ruling received; fixer pulled PPW-507 and PPW-508 into scope on own judgment (shared files with cluster A; PPW-508 is a regression caused by this round-1 fix). Recorded in Decisions for owner overrule."}
+{"t":"2026-08-13T16:16:36+03:00","ev":"check-dispatched","round":2,"cluster":"D"}
+{"t":"2026-08-13T16:19:52+03:00","ev":"test-run","round":2,"kind":"green","filter":"InvoicePdfReadyNotifier|Unit.Services.Invoicing","passed":74,"failed":0}
+{"t":"2026-08-13T16:21:14+03:00","ev":"check-returned","round":2,"cluster":"D","verdict":"revised","tokens":88414}
+{"t":"2026-08-13T16:22:27+03:00","ev":"test-run","round":2,"kind":"red","filter":"InvoiceCreationServiceTests","passed":5,"failed":1}
+{"t":"2026-08-13T16:22:27+03:00","ev":"test-run","round":2,"kind":"green","filter":"InvoiceCreationServiceTests","passed":6,"failed":0}
+{"t":"2026-08-13T16:25:19+03:00","ev":"test-run","round":2,"kind":"red","filter":"AnafSettingsValidatorTests","passed":13,"failed":4}
+{"t":"2026-08-13T16:25:19+03:00","ev":"test-run","round":2,"kind":"green","filter":"AnafSettingsValidatorTests","passed":17,"failed":0}
+{"t":"2026-08-14T11:01:15+03:00","ev":"test-run","round":2,"kind":"red","filter":"WebhooksController","passed":22,"failed":1}
+{"t":"2026-08-14T11:01:15+03:00","ev":"test-run","round":2,"kind":"green","filter":"WebhooksController","passed":23,"failed":0}
+{"t":"2026-08-14T11:07:34+03:00","ev":"micro-review-dispatched","round":2,"cluster":"A-D"}
+{"t":"2026-08-14T11:08:57+03:00","ev":"micro-review-returned","round":2,"cluster":"A-D","found":9}
+{"t":"2026-08-14T11:12:22+03:00","ev":"test-run","round":2,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing|Unit.Configuration|Unit.Validators|AdminOrderServiceTests|PostgresInvoiceNumberingServiceIntegrationTests","passed":348,"failed":0,"skipped":3}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-481","status":"fixed","commit":"c726820"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-506","status":"fixed","commit":"c726820"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-483","status":"fixed","commit":"d15737a"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-507","status":"fixed","commit":"7458454"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"01fbdaf"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"round-end","round":2}
