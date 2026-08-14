@@ -71,11 +71,13 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
                 ? NullLogger<WebhooksController>.Instance
                 : logCapture.LoggerFor<WebhooksController>());
 
-    private static Task<bool> InvokeSaveAsync(WebhooksController controller, Order order, OrderStatus statusBeforeTransition)
+    private static async Task<string> InvokeSaveAsync(WebhooksController controller, Order order, OrderStatus statusBeforeTransition)
     {
         var method = typeof(WebhooksController).GetMethod("SaveOrderPaidWithInvoiceAsync",
             BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Task<bool>)method.Invoke(controller, [order, statusBeforeTransition, CancellationToken.None])!;
+        var task = (Task)method.Invoke(controller, [order, statusBeforeTransition, CancellationToken.None])!;
+        await task;
+        return task.GetType().GetProperty("Result")!.GetValue(task)!.ToString()!;
     }
 
     private static InvoiceCreationService MakeInvoiceCreator(PhotoPrintDbContext db, IInvoiceNumberingService numbering) =>
@@ -139,9 +141,9 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         var order = await dbLoser.Orders.FirstAsync(o => o.Id == orderId);
         var controller = MakeController(dbLoser, MakeInvoiceCreator(dbLoser, new FixedInvoiceNumbering()));
 
-        var created = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
+        var outcome = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
-        created.Should().BeFalse();
+        outcome.Should().Be("AlreadyInvoiced");
         using var verify = CreateDb();
         (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(1);
     }
@@ -169,9 +171,9 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         var numbering = new SequenceInvoiceNumbering(1, 2);
         var controller = MakeController(db, MakeInvoiceCreator(db, numbering));
 
-        var created = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
+        var outcome = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
-        created.Should().BeTrue();
+        outcome.Should().Be("Created");
         numbering.CallCount.Should().Be(2);
         using var verify = CreateDb();
         var mine = await verify.Invoices.FirstAsync(i => i.OrderId == orderId);
@@ -201,9 +203,11 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         var logs = new LogCapture();
         var controller = MakeController(db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()), logs);
 
-        var created = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
+        var outcome = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
-        created.Should().BeFalse();
+        outcome.Should().Be("NumberExhausted");
+        order.Status.Should().Be(OrderStatus.AwaitingPayment, "the uncommitted Paid transition must be rolled back");
+        order.PaidAt.Should().BeNull();
         logs.Records.Should().ContainSingle(
             r => r.Level == LogLevel.Error &&
                  r.Message.StartsWith("invoice.creation.number-collision-exhausted", StringComparison.Ordinal) &&
@@ -211,6 +215,20 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
                  r.Message.Contains(nameof(OrderStatus.AwaitingPayment)));
         using var verify = CreateDb();
         (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
+    }
+
+    // "duplicate" sits in SLO 3's success numerator, so mislabelling the exhausted path inflates the SLO instead of burning budget.
+    [Theory]
+    [InlineData("Created", "ok")]
+    [InlineData("AlreadyInvoiced", "duplicate")]
+    [InlineData("NumberExhausted", "failed")]
+    public void ResultLabelFor_maps_each_outcome_to_its_slo_label(string outcomeName, string expectedLabel)
+    {
+        var enumType = typeof(WebhooksController).GetNestedType("PaidSaveOutcome", BindingFlags.NonPublic)!;
+        var method = typeof(WebhooksController).GetMethod("ResultLabelFor",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+
+        method.Invoke(null, [Enum.Parse(enumType, outcomeName)]).Should().Be(expectedLabel);
     }
 
     private sealed class AlwaysSameInvoiceNumbering : IInvoiceNumberingService

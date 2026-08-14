@@ -201,9 +201,9 @@ public class WebhooksController : ControllerBase
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
-            var created = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, cancellationToken);
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                created ? MetricNames.WebhookResultValues.Ok : MetricNames.WebhookResultValues.Duplicate);
+            var outcome = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, cancellationToken);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc, ResultLabelFor(outcome));
+            var created = outcome == PaidSaveOutcome.Created;
             if (created)
             {
                 await BroadcastNewOrderAsync(order, cancellationToken);
@@ -282,9 +282,9 @@ public class WebhooksController : ControllerBase
             var statusBeforeTransition = order.Status;
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
-            var created = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, ct);
-            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
-                created ? MetricNames.WebhookResultValues.Ok : MetricNames.WebhookResultValues.Duplicate);
+            var outcome = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, ct);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe, ResultLabelFor(outcome));
+            var created = outcome == PaidSaveOutcome.Created;
             if (created)
             {
                 await BroadcastNewOrderAsync(order, ct);
@@ -380,7 +380,16 @@ public class WebhooksController : ControllerBase
     }
 
     // Returns true only when THIS call created the invoice, so the caller's post-save side effects never repeat for a losing delivery.
-    private async Task<bool> SaveOrderPaidWithInvoiceAsync(Order order, OrderStatus statusBeforeTransition, CancellationToken ct)
+    private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
+
+    private static string ResultLabelFor(PaidSaveOutcome outcome) => outcome switch
+    {
+        PaidSaveOutcome.Created => MetricNames.WebhookResultValues.Ok,
+        PaidSaveOutcome.AlreadyInvoiced => MetricNames.WebhookResultValues.Duplicate,
+        _ => MetricNames.WebhookResultValues.Failed,
+    };
+
+    private async Task<PaidSaveOutcome> SaveOrderPaidWithInvoiceAsync(Order order, OrderStatus statusBeforeTransition, CancellationToken ct)
     {
         const int maxInvoiceNumberRetries = 3;
         for (var attempt = 0; ; attempt++)
@@ -389,12 +398,12 @@ public class WebhooksController : ControllerBase
             if (invoice is not null && _db.Entry(invoice).State != EntityState.Added)
             {
                 // The existing-row check found an already-committed invoice — nothing was tracked to save, so no exception to catch.
-                return false;
+                return PaidSaveOutcome.AlreadyInvoiced;
             }
             try
             {
                 await _db.SaveChangesAsync(ct);
-                return true;
+                return PaidSaveOutcome.Created;
             }
             catch (DbUpdateException ex) when (IsInvoiceOrderIdViolation(ex))
             {
@@ -402,7 +411,7 @@ public class WebhooksController : ControllerBase
                 _logger.LogInformation(
                     "invoice.creation.duplicate-race order_id={OrderId} — a concurrent delivery already created this order's invoice",
                     order.Id);
-                return false;
+                return PaidSaveOutcome.AlreadyInvoiced;
             }
             catch (DbUpdateException ex) when (attempt < maxInvoiceNumberRetries && IsInvoiceNumberViolation(ex))
             {
@@ -417,7 +426,13 @@ public class WebhooksController : ControllerBase
                 _logger.LogError(ex,
                     "invoice.creation.number-collision-exhausted order_id={OrderId} previous_status={PreviousStatus} — customer charged, order not Paid, manual reconciliation required",
                     order.Id, statusBeforeTransition);
-                return false;
+                HttpContext?.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(ex);
+
+                // The uncommitted Paid transition stays on the scoped context; roll it back so no later SaveChanges commits a Paid order with no invoice.
+                order.Status = statusBeforeTransition;
+                order.PaidAt = null;
+                order.EuPlatescTransactionId = null;
+                return PaidSaveOutcome.NumberExhausted;
             }
         }
     }
