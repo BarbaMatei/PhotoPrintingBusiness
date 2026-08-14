@@ -118,7 +118,10 @@ denominator is diluted by self-monitoring traffic (see the status note). Recorde
 
 **Action on breach:** any single failed webhook that didn't recover via the
 provider's automatic retry should produce an alert. We do not wait for the
-SLO to breach — webhook failures are immediate red flags.
+SLO to breach — webhook failures are immediate red flags. Note one `failed`
+case never gets a provider retry: an invoice number that could not be
+allocated answers the processor `200`, so the order sits at `AwaitingPayment`
+with the customer charged until someone reconciles it by hand.
 
 ---
 

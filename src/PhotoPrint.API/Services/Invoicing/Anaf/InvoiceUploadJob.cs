@@ -129,7 +129,7 @@ public sealed class InvoiceUploadJob : BackgroundService
         var notifier    = sp.GetRequiredService<InvoicePdfReadyNotifier>();
 
         var claimedAt = _clock.GetUtcNow();
-        var claimTtl = TimeSpan.FromMinutes(Math.Max(1, _settings.ClaimTtlMinutes));
+        var claimTtl = TimeSpan.FromMinutes(Math.Max(2, _settings.ClaimTtlMinutes));
         var claimed = await db.Invoices
             .Where(i => i.Id == invoiceId
                         && i.AnafStatus == InvoiceAnafStatus.Pending

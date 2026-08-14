@@ -379,7 +379,7 @@ public class WebhooksController : ControllerBase
         _orderEmailService.FireOrderConfirmedEmail(order);
     }
 
-    // Returns true only when THIS call created the invoice, so the caller's post-save side effects never repeat for a losing delivery.
+    // Only Created runs the caller's post-save side effects, so they never repeat for a losing delivery.
     private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
 
     private static string ResultLabelFor(PaidSaveOutcome outcome) => outcome switch
@@ -428,10 +428,17 @@ public class WebhooksController : ControllerBase
                     order.Id, statusBeforeTransition);
                 HttpContext?.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(ex);
 
-                // The uncommitted Paid transition stays on the scoped context; roll it back so no later SaveChanges commits a Paid order with no invoice.
-                order.Status = statusBeforeTransition;
-                order.PaidAt = null;
-                order.EuPlatescTransactionId = null;
+                // Reload rather than unwind field by field: the uncommitted Paid transition stays on the scoped context otherwise, and a later SaveChanges would commit a Paid order with no invoice.
+                try
+                {
+                    await _db.Entry(order).ReloadAsync(ct);
+                }
+                catch (Exception reloadEx) when (reloadEx is not OperationCanceledException)
+                {
+                    _logger.LogWarning(reloadEx,
+                        "invoice.creation.rollback-reload-failed order_id={OrderId}", order.Id);
+                }
+
                 return PaidSaveOutcome.NumberExhausted;
             }
         }

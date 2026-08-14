@@ -1410,7 +1410,7 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md).
 
-1. **Pre-flight (config only).** All `Anaf__*` env vars set with `Anaf__Enabled=false`. `Invoicing__CustomerEmailAttachments__Enabled=false`. Cert file at `/etc/photoprint/secrets/anaf.p12`. Deploy. Verify boot succeeds (the validator runs even when disabled). Verify no `Anaf` log lines appear at Information level.
+1. **Pre-flight (config only).** All `Anaf__*` env vars set with `Anaf__Enabled=false`. `Invoicing__CustomerEmailAttachments__Enabled=false`. Cert file at `/etc/photoprint/secrets/anaf.p12`. Deploy. Verify boot succeeds — note this proves nothing about the ANAF values themselves: every rule in `AnafSettingsValidator` is guarded by `Enabled`, so they are first checked at the stage-1 flip. Verify no `Anaf` log lines appear at Information level.
 
 2. **Schema sanity.** Bolt 038's migration is **already applied** if you ran the standard deploy flow (§7). Confirm via:
    ```sql
@@ -1524,7 +1524,7 @@ The Sentry section (§13.8) covers exception alerts. For invoicing-specific sign
 | `invoice_anaf_status_total{status="failed"}` rate > 0 in 1h | Prometheus | Page — every Failed invoice is a manual-remediation candidate. |
 | `invoice_anaf_status_total{status="rejected"}` rate > 5/day | Prometheus | Investigate. A sustained Rejected rate means a misconfiguration (Seller, VAT rate) is rejecting everything. |
 | Cert expiry < 30 days | Manual / OpenSSL cron | Renew at the provider. New cert → new env var → restart. |
-| Days-since-`Anaf__Enabled` flip with `CustomerEmailAttachments=false` > 14 | Manual | Either flip the customer email flag on or document why the inspection extended. |
+| Days-since-`Anaf__Enabled` flip with `CustomerEmailAttachments=false` > 14 | Manual | Document why the inspection extended. Flipping the flag on is not yet an option — no email send path exists (§15.7 step 6). |
 | Quarter end | Calendar | Run the gap audit query (§15.8). |
 
 **Cert expiry monitoring** (manual cron, no metric for this):

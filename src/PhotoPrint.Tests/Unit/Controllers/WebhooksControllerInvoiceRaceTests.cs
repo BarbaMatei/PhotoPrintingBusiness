@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -54,7 +55,24 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         },
     };
 
-    private static WebhooksController MakeController(PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator, LogCapture? logCapture = null)
+    private static WebhooksController MakeController(
+        PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator,
+        LogCapture? logCapture = null, Sentry.IHub? hub = null)
+    {
+        var controller = MakeBareController(db, invoiceCreator, logCapture);
+        var services = new ServiceCollection();
+        if (hub is not null) services.AddSingleton(hub);
+        controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+            {
+                RequestServices = services.BuildServiceProvider(),
+            },
+        };
+        return controller;
+    }
+
+    private static WebhooksController MakeBareController(PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator, LogCapture? logCapture = null)
         => new(
             Mock.Of<IOrderService>(),
             Mock.Of<IStripeSignatureVerifier>(),
@@ -201,13 +219,20 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         using var db = CreateDb();
         var order = await db.Orders.FirstAsync(o => o.Id == orderId);
         var logs = new LogCapture();
-        var controller = MakeController(db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()), logs);
+        var hub = new Mock<Sentry.IHub>();
+        hub.SetupGet(h => h.IsEnabled).Returns(true);
+        var controller = MakeController(db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()), logs, hub.Object);
 
+        var updatedAtBefore = order.UpdatedAt;
         var outcome = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
         outcome.Should().Be("NumberExhausted");
         order.Status.Should().Be(OrderStatus.AwaitingPayment, "the uncommitted Paid transition must be rolled back");
         order.PaidAt.Should().BeNull();
+        order.UpdatedAt.Should().Be(updatedAtBefore, "the rollback must undo every field Transition touched, not just Status");
+        hub.Verify(h => h.CaptureEvent(
+            It.Is<Sentry.SentryEvent>(e => e.Exception is DbUpdateException),
+            It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
         logs.Records.Should().ContainSingle(
             r => r.Level == LogLevel.Error &&
                  r.Message.StartsWith("invoice.creation.number-collision-exhausted", StringComparison.Ordinal) &&
