@@ -13,6 +13,7 @@ using PhotoPrint.API.Controllers;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
@@ -57,9 +58,10 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
 
     private static WebhooksController MakeController(
         PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator,
-        LogCapture? logCapture = null, Sentry.IHub? hub = null)
+        LogCapture? logCapture = null, Sentry.IHub? hub = null,
+        IOrderService? orderService = null, IStripeSignatureVerifier? stripeVerifier = null)
     {
-        var controller = MakeBareController(db, invoiceCreator, logCapture);
+        var controller = MakeBareController(db, invoiceCreator, logCapture, orderService, stripeVerifier);
         var services = new ServiceCollection();
         if (hub is not null) services.AddSingleton(hub);
         controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
@@ -72,10 +74,12 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         return controller;
     }
 
-    private static WebhooksController MakeBareController(PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator, LogCapture? logCapture = null)
+    private static WebhooksController MakeBareController(
+        PhotoPrintDbContext db, IInvoiceCreationService invoiceCreator, LogCapture? logCapture = null,
+        IOrderService? orderService = null, IStripeSignatureVerifier? stripeVerifier = null)
         => new(
-            Mock.Of<IOrderService>(),
-            Mock.Of<IStripeSignatureVerifier>(),
+            orderService ?? Mock.Of<IOrderService>(),
+            stripeVerifier ?? Mock.Of<IStripeSignatureVerifier>(),
             Mock.Of<IEuPlatescService>(),
             db,
             Mock.Of<IOrderEmailService>(),
@@ -223,13 +227,10 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         hub.SetupGet(h => h.IsEnabled).Returns(true);
         var controller = MakeController(db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()), logs, hub.Object);
 
-        var updatedAtBefore = order.UpdatedAt;
         var outcome = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment);
 
+        // The rollback and the metric label are asserted by the endpoint-driven test below; from here the transition was never applied, so they would pass vacuously.
         outcome.Should().Be("NumberExhausted");
-        order.Status.Should().Be(OrderStatus.AwaitingPayment, "the uncommitted Paid transition must be rolled back");
-        order.PaidAt.Should().BeNull();
-        order.UpdatedAt.Should().Be(updatedAtBefore, "the rollback must undo every field Transition touched, not just Status");
         hub.Verify(h => h.CaptureEvent(
             It.Is<Sentry.SentryEvent>(e => e.Exception is DbUpdateException),
             It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
@@ -238,6 +239,61 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
                  r.Message.StartsWith("invoice.creation.number-collision-exhausted", StringComparison.Ordinal) &&
                  r.Message.Contains(order.Id.ToString()) &&
                  r.Message.Contains(nameof(OrderStatus.AwaitingPayment)));
+        using var verify = CreateDb();
+        (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
+    }
+
+    // Drives the real endpoint, not the helper: the label the handler records and the rollback of the applied transition are only observable from out here.
+    [Fact]
+    public async Task StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid()
+    {
+        var winnerOrderId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        using (var seed = CreateDb())
+        {
+            seed.Orders.Add(MakeOrder(winnerOrderId));
+            seed.Orders.Add(MakeOrder(orderId));
+            await seed.SaveChangesAsync();
+        }
+        using (var winner = CreateDb())
+        {
+            await MakeInvoiceCreator(winner, new AlwaysSameInvoiceNumbering()).CreateForOrderAsync(winnerOrderId);
+            await winner.SaveChangesAsync();
+        }
+
+        using var db = CreateDb();
+        var order = await db.Orders.FirstAsync(o => o.Id == orderId);
+        var updatedAtBefore = order.UpdatedAt;
+
+        var orderService = new Mock<IOrderService>();
+        orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_exhaust", It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(order);
+        var verifier = new Mock<IStripeSignatureVerifier>();
+        verifier.Setup(v => v.ConstructEvent(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(new Stripe.Event { Type = "payment_intent.succeeded" });
+
+        var controller = MakeController(
+            db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()),
+            orderService: orderService.Object, stripeVerifier: verifier.Object);
+        controller.ControllerContext.HttpContext.Request.Body =
+            new MemoryStream(System.Text.Encoding.UTF8.GetBytes("{\"data\":{\"object\":{\"id\":\"pi_exhaust\"}}}"));
+
+        using var metrics = new MetricCapture(MetricNames.Instruments.PaymentWebhookTotal);
+
+        await controller.StripeWebhookAsync(default);
+
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
+                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Failed))
+            .Should().HaveCount(1, "a charge whose invoice number never allocated must burn SLO budget, not read as a duplicate");
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Duplicate))
+            .Should().BeEmpty();
+        metrics.ContractViolations().Should().BeEmpty();
+
+        order.Status.Should().Be(OrderStatus.AwaitingPayment, "the applied Paid transition must be rolled back");
+        order.PaidAt.Should().BeNull();
+        order.UpdatedAt.Should().Be(updatedAtBefore, "the rollback must undo every field Transition touched");
         using var verify = CreateDb();
         (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
     }

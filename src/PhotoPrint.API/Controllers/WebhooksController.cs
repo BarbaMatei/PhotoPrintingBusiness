@@ -433,8 +433,9 @@ public class WebhooksController : ControllerBase
                 {
                     await _db.Entry(order).ReloadAsync(ct);
                 }
-                catch (Exception reloadEx) when (reloadEx is not OperationCanceledException)
+                catch (Exception reloadEx)
                 {
+                    // Catches cancellation too: letting anything escape here skips the caller's RecordPaymentWebhook, losing the charge from the SLO entirely.
                     _logger.LogWarning(reloadEx,
                         "invoice.creation.rollback-reload-failed order_id={OrderId}", order.Id);
                 }
