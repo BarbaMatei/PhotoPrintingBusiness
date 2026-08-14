@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 038-039-invoicing
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 # Ledger — 038-039-invoicing
@@ -22,9 +22,9 @@ updated: 2026-08-13
 | PPW-478 | 🔴 | v1 | UBL invoice-line amounts are gross, not tax-exclusive — lines won't reconcile with the document total | `Services/Invoicing/InvoiceXmlBuilder.cs:230` | verified | `11dfb8e` |
 | PPW-479 | 🟠 | v1 | Admin invoice list `Page` param is unbounded — int32 overflow can reach `Skip()` | `Controllers/AdminInvoicesController.cs:57` | verified | `11dfb8e` |
 | PPW-480 | 🟠 | v1 | Admin "retry" resubmits byte-identical XML — can never fix the failure it exists for | `Services/Invoicing/InvoiceLifecycle.cs:106` | verified | `11dfb8e` |
-| PPW-481 | 🟠 | v1 | `AnafSettings` docstring's "byte-identical to baseline" claim is false when disabled | `Configuration/AnafSettings.cs:7` | fixed | `f366c8a` |
+| PPW-481 | 🟠 | v1 | `AnafSettings` docstring's "byte-identical to baseline" claim is false when disabled | `Configuration/AnafSettings.cs:7` | verified | `08e7746` |
 | PPW-482 | 🟠 | v1 | `AdminInvoicesController`'s audit-logging doc-comment is false; the one logged action omits the admin id | `Controllers/AdminInvoicesController.cs:14` | verified | `11dfb8e` |
-| PPW-483 | 🟠 | v1 | Redundant Order re-query on every paid webhook in `InvoiceCreationService` | `Services/Invoicing/InvoiceCreationService.cs:49` | fixed | `f366c8a` |
+| PPW-483 | 🟠 | v1 | Redundant Order re-query on every paid webhook in `InvoiceCreationService` | `Services/Invoicing/InvoiceCreationService.cs:49` | verified | `08e7746` |
 | PPW-484 | 🟠 | v1 | `InvoiceUploadJob` worker reloads the full Order graph even when only the ANAF step remains | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:246` | verified | `11dfb8e` |
 | PPW-485 | 🟠 | v1 | Checkout field-length caps are wider than the legal XML limits, with no truncation | `Validators/Payments/CreateOrderRequestValidator.cs:61` | verified | `11dfb8e` |
 | PPW-486 | 🟠 | v1 | Per-row catch collapses auth failure, network failure, and code bugs into one generic log event | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:91` | verified | `11dfb8e` |
@@ -47,9 +47,11 @@ updated: 2026-08-13
 | PPW-503 | ⚪ | v1 | `PostgresInvoiceNumberingService` interpolates the sequence name into raw SQL with no in-service validation | `Services/Invoicing/PostgresInvoiceNumberingService.cs:43` | backlog | `e724528` |
 | PPW-504 | ⚪ | v1 | `OrderDetailDto` grew 3 required fields with no lens covering the frontend contract | `DTOs/Orders/OrderDetailDto.cs:5` | backlog | `e724528` |
 | PPW-505 | 🟡 | v1 | Fiscal-year numbering constraint can disagree between Postgres and .NET at a Dec 31/Jan 1 boundary | `Migrations/20260603101910_AddVatAndInvoices.cs:111` | backlog | `e724528` |
-| PPW-506 | 🟠 | v2 | Config comment and rollout runbook still promise the customer invoice email that does not exist | `docs/DEPLOYMENT.md:1409` | fixed | `f366c8a` |
-| PPW-507 | 🟡 | v2 | New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation | `Configuration/AnafSettings.cs:44` | fixed | `f366c8a` |
-| PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | fixed | `f366c8a` |
+| PPW-506 | 🟠 | v2 | Config comment and rollout runbook still promise the customer invoice email that does not exist | `docs/DEPLOYMENT.md:1409` | verified | `08e7746` |
+| PPW-507 | 🟡 | v2 | New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation | `Configuration/AnafSettings.cs:44` | verified | `08e7746` |
+| PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | open | `08e7746` |
+| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | open | `08e7746` |
+| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | open | `08e7746` |
 
 ## Details
 
@@ -176,6 +178,7 @@ updated: 2026-08-13
   - v1: found — raised independently by 1 lens (requirements)
   - v2: REOPENED @`11dfb8e` — the replacement docstring is false in a new way. It claims the "XML/PDF build" stays live while `Anaf:Enabled=false`, but `InvoiceUploadJob` is the only caller of `IInvoiceXmlBuilder`/`IInvoicePdfRenderer` and is registered only inside `Program.cs:299` `if (anafEnabled)`. The original false claim also survives verbatim at `appsettings.json:95` ("production-identical to baseline")
   - v2: fix round — docstring now states the real behaviour: Invoice row created, no XML or PDF built, download endpoint always 404s. Swept the same claim out of appsettings.json, the flag table, the validator docstring and the pre-flight step
+  - v3: verified @`08e7746` — every clause checked against code, not against the resolution. `InvoiceUploadJob` is the only caller of `IInvoiceXmlBuilder`/`IInvoicePdfRenderer` and is registered only inside `Program.cs:299`; `InvoicesController.GetInvoiceAsync` returns 404 + `Retry-After` whenever `PdfStoragePath` is empty, which it always is with the flag off. Class check found one site the sweep missed — PPW-509
 
 ### PPW-482 — `AdminInvoicesController`'s audit-logging doc-comment is false; the one logged action omits the admin id
 
@@ -195,6 +198,7 @@ updated: 2026-08-13
   - v1: found — raised independently by 1 lens (quality)
   - v2: REOPENED @`11dfb8e` — the regression test cannot go red for the defect it names. Reintroducing the re-query (the `Order` overload delegating to the `Guid` overload) left all 6 `InvoiceCreationServiceTests` green: `Order_overload_creates_invoice_without_reloading_the_order` asserts only that an invoice is created, never that the Orders table went unqueried. PPW-484 used SQL logging for the same claim
   - v2: fix round — test now captures EF SQL and asserts no `FROM "Orders"` query. Proven red by reintroducing the delegation the verification pass used, then green
+  - v3: verified @`08e7746` — revert-and-rerun (Order overload delegating to the Guid overload): only `Order_overload_creates_invoice_without_reloading_the_order` went red, 29 siblings green. Class check clean — both production callers (`WebhooksController.cs:397`, `AdminOrderService.cs:148`) use the Order overload; only tests reach the Guid one
 
 ### PPW-484 — `InvoiceUploadJob` worker reloads the full Order graph even when only the ANAF step remains
 
@@ -395,6 +399,7 @@ updated: 2026-08-13
 - **History:**
   - v2: found by the verification pass asking whether PPW-472's fix held as a class; the code leg held, the doc leg did not
   - v2: fix round — corrected the config comment, the flag table, rollout step 6, both rollback paths, the alert-table row and the notifier docstring. ADR-022 and ddd-02 left as point-in-time bolt records; `decision-index.md` corrected because it is a standard
+  - v3: verified @`08e7746` — each corrected claim checked against `InvoicePdfReadyNotifier`, which logs `invoice.pdf-ready.suppressed` when the flag is off and `invoice.pdf-ready.no-email-integration` when it is on, and sends nothing either way; the log names quoted in rollout step 6 match. Two disagreements recorded, not disputed: the fix round's claim to have corrected every operator-facing site is wrong (PPW-509), and leaving ADR-022 frozen is right only if the docs stop citing it as current (PPW-510)
 
 ### PPW-507 — New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation
 
@@ -404,6 +409,7 @@ updated: 2026-08-13
 - **History:**
   - v2: found by the verification pass's new-surface check on PPW-476's added mechanism — sized default, signal and failure-mode tests are present; documentation is the missing leg
   - v2: fix round — key added to appsettings.json, bounded 2–1440 in AnafSettingsValidator with 5 new tests, and documented with its failure mode in the deployment flag section; the job's own floor was raised from 1 to 2 to match
+  - v3: verified @`08e7746` — revert-and-rerun (validator bound deleted): only the 4 `ClaimTtlMinutes_out_of_range_fails` cases went red, 26 siblings green. The job's raised floor is inert, not a regression: all 16 `InvoiceUploadJobTests` and `InvoicePdfReadyNotifierTests` stay green, every test uses 10, and the validator rejects anything under 2 whenever the worker is registered at all
 
 ### PPW-508 — Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate`
 
@@ -413,3 +419,20 @@ updated: 2026-08-13
 - **History:**
   - v2: found by the verification pass's regression check on PPW-488's fix diff — a behaviour change the finding did not ask for and the resolution's Decisions block does not mention
   - v2: fix round — relabelled to `failed` via a three-state PaidSaveOutcome; the approach-check refuted the drafted rethrow because `duplicate` sits in SLO 3's success numerator and an escaping throw records no metric at all (PPW-397). Rollback now reloads the entity rather than unwinding fields, after the micro-review found `UpdatedAt` was missed
+  - v3: REOPENED @`08e7746` — the source is right, two of its three legs cannot go red. Relabel: putting both call sites back to `created ? ok : duplicate` while keeping the helper reintroduces the exact defect and leaves all 23 webhook controller tests green, measured; `ResultLabelFor_maps_each_outcome_to_its_slo_label` only invokes the private helper by reflection, and nothing asserts the label the handler records. Rollback: the test invokes `SaveOrderPaidWithInvoiceAsync` directly and never applies the Paid transition first, so `Status`, `PaidAt` and `UpdatedAt` are already at their rolled-back values — deleting the whole `ReloadAsync` block leaves the test green, measured, including the `UpdatedAt` assertion the micro-review added to pin it. Sentry capture holds: removing it reddens exactly one test. Third defect in the same mechanism: the rollback's catch excludes `OperationCanceledException`, so a cancelled token during the reload escapes the helper and `RecordPaymentWebhook` never runs — the PPW-397 hole the approach-check refused a rethrow to avoid
+
+### PPW-509 — `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally
+
+- **What:** The settings docstring reads "the full pipeline runs (XML build, ANAF upload, PDF render, storage write)". That is false whenever `Anaf:Enabled` is false, which is the shipped default. It now contradicts the `AnafSettings` docstring in the same assembly, which PPW-481's fix corrected to say no XML or PDF is built. `Program.cs`'s registration comment makes the weaker version of the same claim, calling only the upload pipeline conditional.
+- **Evidence:** `Configuration/InvoicingSettings.cs:15-20`; `Configuration/AnafSettings.cs:3-7`; `Program.cs:281-283,299`.
+- **Suggested fix:** Cut the pipeline sentence from the settings docstring and keep the sentence PPW-472 added, which is true. Reword the `Program.cs` comment to say the builders are registered but only the worker calls them. Doc-only.
+- **History:**
+  - v3: found by the verification pass's class check on PPW-481 and PPW-506 — the false sentence is original bolt-039 text, not fix-caused, but two fix rounds edited this file and left it. The fix round's claim to have corrected every operator-facing site does not hold
+
+### PPW-510 — ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority
+
+- **What:** ADR-022 still says the flag gates a real customer email and that XML build, ANAF upload, PDF render and storage write run regardless of it. Both statements are false. Keeping the ADR frozen as a bolt record is the right convention, but three live documents route a reader to it: the deployment guide's flag table cites it for the flag, its rollout section opens "per ADR-022", and the decision index tells the reader to open the ADR when flipping the flag "to recall what side effect is gated". The ADR carries no marker saying it is out of date.
+- **Evidence:** `memory-bank/bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md:54-70`; `docs/DEPLOYMENT.md:1309,1411`; `memory-bank/standards/decision-index.md:43`.
+- **Suggested fix:** Either add one superseded line at the head of the ADR pointing at the decision index, or drop the "use this ADR to recall what side effect is gated" clause and the two citations that present it as current. Doc-only.
+- **History:**
+  - v3: found by the verification pass reviewing the fix round's decision to keep ADR-022 and ddd-02 as point-in-time records. The decision is agreed; the routing into it is the defect

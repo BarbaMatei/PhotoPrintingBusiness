@@ -76,3 +76,21 @@
 {"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"01fbdaf"}
 {"t":"2026-08-14T11:13:06+03:00","ev":"round-end","round":2}
 {"t":"2026-08-14T11:25:23+03:00","ev":"doc-gate","round":2,"verdict":"approve","note":"disapproved once on Decisions heading shape (multi-id heading, count and severity glyph in a title, one heading with no id); fixed and re-judged"}
+{"t":"2026-08-14T11:33:00+03:00","ev":"pass-launch","pass":3,"type":"verification","commit":"08e7746","note":"anchored per-fix check of resolution v2; worktree reset from a stale c09675d to 08e7746 before any reading"}
+{"t":"2026-08-14T11:36:12+03:00","ev":"test-run","pass":3,"kind":"baseline","filter":"InvoiceCreationServiceTests|AnafSettingsValidatorTests|WebhooksControllerInvoiceRaceTests","passed":30,"failed":0}
+{"t":"2026-08-14T11:38:40+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-483","note":"Order overload delegated back to the Guid overload","passed":29,"failed":1}
+{"t":"2026-08-14T11:40:31+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-507","note":"ClaimTtlMinutes bound deleted from AnafSettingsValidator","passed":26,"failed":4}
+{"t":"2026-08-14T11:42:09+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-508","note":"ResultLabelFor NumberExhausted mapped back to duplicate","passed":45,"failed":1}
+{"t":"2026-08-14T11:43:55+03:00","ev":"test-run","pass":3,"kind":"green","finding":"PPW-508","note":"both call sites reverted to created ? ok : duplicate, helper kept — defect reintroduced, nothing red","passed":23,"failed":0}
+{"t":"2026-08-14T11:45:20+03:00","ev":"test-run","pass":3,"kind":"green","finding":"PPW-508","note":"whole ReloadAsync rollback deleted — nothing red","passed":23,"failed":0}
+{"t":"2026-08-14T11:46:48+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-508","note":"Sentry capture removed","passed":22,"failed":1}
+{"t":"2026-08-14T11:48:05+03:00","ev":"test-run","pass":3,"kind":"final","note":"all sources restored","passed":46,"failed":0}
+{"t":"2026-08-14T11:49:30+03:00","ev":"test-run","pass":3,"kind":"final","filter":"InvoiceUploadJobTests|InvoicePdfReadyNotifierTests","note":"collateral check on the claim-TTL floor change","passed":16,"failed":0}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-481","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-483","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-506","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-507","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-508","status":"open","note":"reopened — two of three legs stay green when the defect is reintroduced"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-509","status":"open","note":"new — settings docstring still claims the pipeline runs unconditionally"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-510","status":"open","note":"new — ADR-022 frozen while three live docs cite it as current"}
+{"t":"2026-08-14T11:56:00+03:00","ev":"pass-records-done","pass":3,"verdict":"approve-with-followups"}
