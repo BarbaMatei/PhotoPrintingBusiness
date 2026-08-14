@@ -102,3 +102,16 @@
 {"t":"2026-08-14T12:23:26+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"0a250b9"}
 {"t":"2026-08-14T12:23:26+03:00","ev":"round-end","round":3}
 {"t":"2026-08-14T12:26:45+03:00","ev":"doc-gate","round":3,"verdict":"approve"}
+{"t":"2026-08-14T12:27:30+03:00","ev":"pass-launch","pass":4,"type":"verification","commit":"0a250b9","note":"anchored per-leg check of resolution v3; worktree reset from a stale c09675d to 8237945 before any reading. Test-run stamps up to 12:45 are reconstructed to the minute from run order, anchored on the 12:39:33 assertion timestamp the partial-unwind revert printed"}
+{"t":"2026-08-14T12:32:10+03:00","ev":"test-run","pass":4,"kind":"baseline","filter":"Unit.Controllers.WebhooksController","passed":24,"failed":0}
+{"t":"2026-08-14T12:34:20+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 1, Stripe call site put back to created ? ok : duplicate","passed":23,"failed":1}
+{"t":"2026-08-14T12:36:40+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 1, EuPlatesc call site put back alone — defect reintroduced, nothing red, so the sibling site is unproven","passed":24,"failed":0}
+{"t":"2026-08-14T12:38:30+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 2, whole ReloadAsync block deleted — reddens on Status","passed":23,"failed":1}
+{"t":"2026-08-14T12:39:40+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 2, partial unwind of Status and PaidAt only — reddens on UpdatedAt, so that pin is live","passed":23,"failed":1}
+{"t":"2026-08-14T12:41:30+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 3 probe added, cancellation forced from the Sentry hub callback — passes with the fix in place","passed":9,"failed":0}
+{"t":"2026-08-14T12:42:40+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 3 probe against the pre-fix catch filter — OperationCanceledException escapes ReloadAsync, so a cheap test does exist","passed":8,"failed":1}
+{"t":"2026-08-14T12:44:20+03:00","ev":"test-run","pass":4,"kind":"red","note":"class check, RecordPaymentWebhook no-oped — 14 of 24 redden, only the assert-absence test survives","passed":10,"failed":14}
+{"t":"2026-08-14T12:45:40+03:00","ev":"test-run","pass":4,"kind":"final","filter":"Unit.Controllers.WebhooksController","note":"probe removed, all sources restored","passed":24,"failed":0}
+{"t":"2026-08-14T12:46:50+03:00","ev":"finding","id":"PPW-508","status":"open","note":"reopened — label and rollback legs hold, cancellation leg has no test and the reason given for that is false"}
+{"t":"2026-08-14T12:51:20+03:00","ev":"doc-gate","pass":4,"verdict":"approve"}
+{"t":"2026-08-14T12:52:00+03:00","ev":"pass-records-done","pass":4,"verdict":"approve-with-followups","verified":0,"reopened":1}
