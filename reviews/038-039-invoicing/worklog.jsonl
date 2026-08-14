@@ -94,3 +94,10 @@
 {"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-509","status":"open","note":"new — settings docstring still claims the pipeline runs unconditionally"}
 {"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-510","status":"open","note":"new — ADR-022 frozen while three live docs cite it as current"}
 {"t":"2026-08-14T11:56:00+03:00","ev":"pass-records-done","pass":3,"verdict":"approve-with-followups"}
+{"t":"2026-08-14T12:13:46+03:00","ev":"round-start","round":3}
+{"t":"2026-08-14T12:21:57+03:00","ev":"test-run","round":3,"kind":"red","filter":"WebhooksController (label reintroduced)","passed":23,"failed":1}
+{"t":"2026-08-14T12:21:57+03:00","ev":"test-run","round":3,"kind":"red","filter":"WebhooksController (rollback removed)","passed":23,"failed":1}
+{"t":"2026-08-14T12:21:57+03:00","ev":"test-run","round":3,"kind":"green","filter":"WebhooksController","passed":24,"failed":0}
+{"t":"2026-08-14T12:23:26+03:00","ev":"test-run","round":3,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing|Unit.Configuration","passed":278,"failed":0}
+{"t":"2026-08-14T12:23:26+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"0a250b9"}
+{"t":"2026-08-14T12:23:26+03:00","ev":"round-end","round":3}
