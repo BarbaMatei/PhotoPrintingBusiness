@@ -58,7 +58,7 @@ if (gateKind === 'delta-worthiness') {
   }
   const metricsPath = join(dir, 'metrics.jsonl')
   const hasCert = existsSync(metricsPath) && readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
-    .some(l => { try { return JSON.parse(l).type === 'certification' } catch { return false } })
+    .some(l => { try { const e = JSON.parse(l); return e.outcome === 'certified' || /^certification/.test(e.subtype ?? '') } catch { return false } })
   say('ACTION', 'auto')
   say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')
   say('REASON', 'patch-grade by the mechanical half of the rule (no high-severity id fixed); loop quiet — certification proceeds on the standing owner approval (2026-08-20)')

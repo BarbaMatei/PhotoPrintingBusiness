@@ -1,1 +1,1 @@
-{"target":"909-certified-target","pass":1,"type":"certification","date":"2026-08-20","commit":"eeeeee1","verdict":"approved","outcome":"certified","new_findings":{"high":0,"medium":0,"low":0,"cleanup":0},"reopened":0,"verified":0}
+{"target":"909-certified-target","pass":1,"type":"discovery","subtype":"certification-single","date":"2026-08-20","commit":"eeeeee1","verdict":"approved","outcome":"certified","new_findings":{"high":0,"medium":0,"low":0,"cleanup":0},"reopened":0,"verified":0}
