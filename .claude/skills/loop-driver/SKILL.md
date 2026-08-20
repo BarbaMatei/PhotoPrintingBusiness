@@ -137,8 +137,9 @@ Everything else in this skill still applies per pass — audit, records, doc gat
 Consulting the written policy is not pre-answering a gate: the delegation is the owner's
 standing decision, and any gate kind without one stops the run. There is no token or pass
 limit on an unattended run — the owner removed them on purpose; do not invent one. The
-run stops early only when it needs something no rule can supply: a fixer question only
-the owner can answer, records that stay broken after one repair, or an unknown gate kind.
+run stops early only when it needs something no rule can supply: a policy `stop`
+(including an unknown gate kind), a fixer question only the owner can answer, records
+that stay broken after one repair, or the no-progress guard.
 
 **Open the run.** Append `run-start` to the worklog. Announce in one line: target, state,
 and that the run drives to close — certification included — reporting every decision at
@@ -148,9 +149,12 @@ the end.
 
 1. Audit + route as in step 1. Auditor red → one repair attempt; still red → end the run.
 2. Router exit 0: append `pass-launch` as usual and execute the pass in a subagent
-   (table below).
+   (table below). If a fix-round subagent reports a decision blocking a 🔴 fix (the
+   `/fix-review` skill's Blocker exception), end the run with that question in the report.
 3. Router exit 2/3: run `node reviews/lib/autonomy-policy.mjs <target> decide
-   <GATE_KIND>`. `ACTION: auto` → append `gate-parked` (`{kind, default, reason}`) and
+   <GATE_KIND>` — in an unattended run, an exit 3 always goes to the policy this way and
+   is never hand-routed from the README table (step 1's manual fallback does not apply
+   here). `ACTION: auto` → append `gate-parked` (`{kind, default, reason}`) and
    take the printed `NEXT`: a pass name is executed like a router answer (back to 2);
    `close the loop` executes section 6's close sequence — the standing approval is the
    owner's word it requires. `ACTION: stop` → end the run with the gate's question in
@@ -167,7 +171,7 @@ the records, never from the subagent's prose):
 | Pass | How |
 |---|---|
 | full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
-| verification | run `node reviews/lib/verify-fixes.mjs <target>` yourself, then one subagent for the runbook's judgment items, its three per-cluster questions, and the records — given the script's JSON output, the resolution, and the fix diff |
+| verification | first commit any pending `reviews/<target>/` record appends (worklog/metrics/ledger) — one records commit, `docs(review): …` subject, because `verify-fixes.mjs` refuses a dirty tree by design; then run `node reviews/lib/verify-fixes.mjs <target>` yourself, then one subagent for the runbook's judgment items, its three per-cluster questions, and the records — given the script's JSON output, the resolution, and the fix diff |
 | fix round | one subagent instructed to load the `/fix-review` skill and follow its **Unattended variant** section |
 
 The session-model guard still applies: on a Fable session, discovery-scale launches

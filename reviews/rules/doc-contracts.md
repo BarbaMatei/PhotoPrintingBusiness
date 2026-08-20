@@ -123,7 +123,8 @@ Allowed system terms. Anything else must be everyday English.
   the run-end report.
 - **unattended run** — one driver run driving the loop to close under the written policy
   (`lib/autonomy-policy.mjs`) and the owner's standing approval, stopping only for a
-  question only the owner can answer, broken records, or the no-progress guard.
+  policy stop (including an unknown gate kind), a question only the owner can answer,
+  broken records, or the no-progress guard.
 - **parked** — a gate decision taken by written default during an unattended run,
   awaiting the owner's ruling in the run-end report.
 - **approach-check** — an adversarial pre-implementation check of a fix's design (trigger list in the `/fix-review` skill).

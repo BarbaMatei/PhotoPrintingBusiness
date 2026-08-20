@@ -48,8 +48,9 @@ certification and close included — as if the owner approved each step:
   `gate-parked` worklog event, and lists every parked item in the run-end report for the
   owner's ruling.
 - A run has no token or pass limit (owner decision 2026-08-20). It ends at `loop CLOSED`,
-  a policy `stop`, a fixer question only the owner can answer, or the no-progress guard —
-  a pass repeating without recording anything.
+  a policy `stop`, a fixer question only the owner can answer, records that stay broken
+  after one repair attempt, or the no-progress guard — a pass repeating without
+  recording anything.
 - Passes execute in subagents; the driver only routes, records, and reports. A killed run
   resumes by repeating the same phrase — the router reads state from the records alone.
 
