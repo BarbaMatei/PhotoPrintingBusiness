@@ -118,7 +118,9 @@ Allowed system terms. Anything else must be everyday English.
 - **quiet / re-arm** — the loop has nothing serious open / a new serious event restarts it.
 - **patch-grade / delta-worthy** — a fix round too small to need a delta discovery / big enough to need one.
 - **post-cert escape** — a defect found later that existed in certified code.
-- **owner gate** — a stop where only the owner's decision continues the loop.
+- **owner gate** — a stop where only the owner's decision continues the loop. During an
+  unattended run the written policy answers routine gates and the decision is parked for
+  the run-end report.
 - **unattended run** — one driver run driving the loop to close under the written policy
   (`lib/autonomy-policy.mjs`) and the owner's standing approval, stopping only for a
   question only the owner can answer, broken records, or the no-progress guard.

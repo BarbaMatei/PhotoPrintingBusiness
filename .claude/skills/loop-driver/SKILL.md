@@ -64,6 +64,7 @@ router prints both; repeat them, don't re-derive). What "hold" means, precisely:
 - **Certification-grade launches and loop closures: never in the same breath.** Stop and
   wait for the explicit go-ahead, every time — these are the owner deciding to spend
   millions of tokens or to end a loop, and the recorded deviations cluster exactly here.
+  Inside an unattended run, the standing approval is that go-ahead (see "Unattended runs").
 
 **Session-model guard:** discovery-scale fan-outs launched from a Fable session have died on
 the session limit mid-run (recorded in runbook-discovery, Launch). If the current session is
