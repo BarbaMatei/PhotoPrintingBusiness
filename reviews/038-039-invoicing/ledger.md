@@ -53,6 +53,44 @@ updated: 2026-08-20
 | PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | open | `08e7746` |
 | PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | open | `08e7746` |
 | PPW-511 | 🟡 | v5 | EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | open | `07b0c1b` |
+| PPW-512 | 🔴 | v6 | Easybox orders emit e-Factura with empty mandatory buyer address elements | `Services/Invoicing/InvoiceXmlBuilder.cs:121` | open | `1c217f4` |
+| PPW-513 | 🔴 | v6 | uq_invoices_series_year_number index expression is not IMMUTABLE, so Postgres aborts Migrate() at prod boot | `Migrations/20260603101910_AddVatAndInvoices.cs:112` | open | `1c217f4` |
+| PPW-514 | 🔴 | v6 | Exhausted-retry rollback reload discards the processor transaction id and the Error log omits it | `Controllers/WebhooksController.cs:427` | open | `1c217f4` |
+| PPW-515 | 🔴 | v6 | ANAF client-side timeout escapes as OperationCanceledException and stops the upload worker, unreachable by tests | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:81` | open | `1c217f4` |
+| PPW-516 | 🟠 | v6 | Exhausted invoice-number retry answers the payment processor 200, killing its last retry | `Controllers/WebhooksController.cs:304` | open | `1c217f4` |
+| PPW-517 | 🟠 | v6 | Invoice PDF tier is chosen from the live CloudEnabled flag with no per-row StorageLocation, so a Provider flip orphans stored PDFs | `Controllers/InvoicesController.cs:68` | open | `1c217f4` |
+| PPW-518 | 🟠 | v6 | Admin manual mark-Paid inserts an Invoice with none of the webhook path's unique-violation protections, and its creation is fully mocked in tests | `Services/AdminOrderService.cs:148` | open | `1c217f4` |
+| PPW-519 | 🟠 | v6 | RetryAsync wipes XmlPayload, destroying the submitted-XML snapshot and diverging it from the kept PDF | `Services/Invoicing/InvoiceLifecycle.cs:120` | open | `1c217f4` |
+| PPW-520 | 🟠 | v6 | Per-line PriceAmount x InvoicedQuantity no longer equals LineExtensionAmount, and nothing asserts it | `Services/Invoicing/InvoiceXmlBuilder.cs:219` | open | `1c217f4` |
+| PPW-521 | 🟠 | v6 | InvoiceAddressFormatter.Truncate throws NRE on a null City/Street that the validators accept | `Services/Invoicing/InvoiceAddressFormatter.cs:12` | open | `1c217f4` |
+| PPW-522 | 🟠 | v6 | Unbuildable invoice stays Pending forever and starves the upload batch | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:206` | open | `1c217f4` |
+| PPW-523 | 🟠 | v6 | Missing invoice PDF blob surfaces as an unlogged generic 500 with no distinct event | `Controllers/InvoicesController.cs:69` | open | `1c217f4` |
+| PPW-524 | 🟠 | v6 | The whole invoicing feature has no SPA consumer and no lens covered the frontend | `Controllers/InvoicesController.cs:1` | open | `1c217f4` |
+| PPW-525 | 🟠 | v6 | Guest invoice access is defeated by the unchanged guest-session lifetime and the never-implemented order transfer | `Controllers/InvoicesController.cs:52` | open | `1c217f4` |
+| PPW-526 | 🟠 | v6 | EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:205` | open | `1c217f4` |
+| PPW-527 | 🟠 | v6 | Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook | `Controllers/WebhooksController.cs:390` | open | `1c217f4` |
+| PPW-528 | 🟠 | v6 | Charged-but-unpaid order emits the same metric label as a routine card decline | `Controllers/WebhooksController.cs:389` | open | `1c217f4` |
+| PPW-529 | 🟠 | v6 | No test applies the migration chain — the unique-index DDL is only ever proven via EnsureCreated from the model | `Tests/Integration/PostgresInvoiceNumberingServiceIntegrationTests.cs:79` | open | `1c217f4` |
+| PPW-530 | 🟠 | v6 | MakeInvoiceOrderIdUnique creates the unique index with no dedupe step, so duplicate rows fail prod boot | `Migrations/20260813093709_MakeInvoiceOrderIdUnique.cs:17` | open | `1c217f4` |
+| PPW-531 | 🟠 | v6 | Unique-violation classifiers cover only 2 of 3 Invoices unique indexes and their Npgsql arms are untested | `Controllers/WebhooksController.cs:460` | open | `1c217f4` |
+| PPW-532 | 🟠 | v6 | One ANAF credential failure fans out into up to 50 Error logs and Sentry captures per tick | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:85` | open | `1c217f4` |
+| PPW-533 | 🟠 | v6 | ANAF auth failures leave LastError blank, so the admin invoice list shows no reason | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:82` | open | `1c217f4` |
+| PPW-534 | 🟠 | v6 | invoice.creation.allocated is logged pre-commit on every retry attempt, so logs show phantom invoice numbers | `Services/Invoicing/InvoiceCreationService.cs:96` | open | `1c217f4` |
+| PPW-535 | 🟡 | v6 | Truncate can split a UTF-16 surrogate pair, wedging the invoice in Pending forever | `Services/Invoicing/InvoiceAddressFormatter.cs:13` | backlog | `1c217f4` |
+| PPW-536 | 🟡 | v6 | RetryAsync resets every ANAF field except ClaimedAt, which the success path never releases either | `Services/Invoicing/InvoiceLifecycle.cs:117` | backlog | `1c217f4` |
+| PPW-537 | 🟡 | v6 | Residual reconciliation is unguarded — negative line amount, silently absorbed snapshot mismatch, crash on an empty line list | `Services/Invoicing/InvoiceXmlBuilder.cs:213` | backlog | `1c217f4` |
+| PPW-538 | 🟡 | v6 | Upload batch query ignores ClaimedAt, unlike the existing AWB claim precedent | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:65` | backlog | `1c217f4` |
+| PPW-539 | 🟡 | v6 | New ClaimedAt column and unique index never land on an existing dev SQLite database | `Program.cs:358` | backlog | `1c217f4` |
+| PPW-540 | 🟡 | v6 | Postgres numbering tests draw a random year and assert absolute sequence values, so they collide and leak sequences | `Tests/Integration/PostgresInvoiceNumberingServiceIntegrationTests.cs:16` | backlog | `1c217f4` |
+| PPW-541 | 🟡 | v6 | claim-lost log asserts "another worker" for causes it cannot distinguish | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:141` | backlog | `1c217f4` |
+| PPW-542 | 🟡 | v6 | submitted-but-not-recorded logs Error twice and gets no Sentry capture | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:226` | backlog | `1c217f4` |
+| PPW-543 | 🟡 | v6 | LastError is persisted before the exception is logged, so a DB blip loses the root cause | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:206` | backlog | `1c217f4` |
+| PPW-544 | ⚪ | v6 | New Must rules have no WithMessage, so 400s carry English default messages | `Validators/Payments/CreateOrderRequestValidator.cs:32` | backlog | `1c217f4` |
+| PPW-545 | ⚪ | v6 | CreateForOrderAsync(Guid) has no production caller left | `Services/Invoicing/IInvoiceCreationService.cs:24` | backlog | `1c217f4` |
+| PPW-546 | ⚪ | v6 | Retry pre-read pulls the whole XmlPayload from the DB just to log its length | `Services/Invoicing/InvoiceLifecycle.cs:104` | backlog | `1c217f4` |
+| PPW-547 | ⚪ | v6 | data-stack standard never mentions the Invoices table it must describe | `memory-bank/standards/data-stack.md:55` | backlog | `1c217f4` |
+| PPW-548 | ⚪ | v6 | ADR-023/decision-index still credit CAS for multi-replica safety, now superseded by the ClaimedAt lease | `memory-bank/standards/decision-index.md:34` | backlog | `1c217f4` |
+| PPW-549 | ⚪ | v6 | Unknown ANAF status warns twice and the job's line drops the diagnostic fields | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:309` | backlog | `1c217f4` |
 
 ## Details
 
@@ -449,3 +487,310 @@ updated: 2026-08-20
 - **Suggested fix:** Record the removal as one work item, and until it lands add one line to `definition-of-done.md` class 2 naming EuPlatesc coverage as an accepted divergence with its expiry. `system-architecture.md` still presents EuPlatesc as a current payment backend, so it needs the same line — CLAUDE.md requires a standard to be updated in the change that alters what it describes. Docs and tracking only; no code change, and the removal ruling itself is not in question.
 - **History:**
   - v5: found by the verification pass checking whether the owner ruling that dropped PPW-508 EuPlatesc leg is recorded anywhere as work. It is not, and the standard that mandates the coverage still reads as if it were being met
+
+### PPW-512 — Easybox orders emit e-Factura with empty mandatory buyer address elements
+
+- **What:** Customer picks Easybox: CheckoutStateService.setEasyboxContact sends street/number/city/county/postalCode = "". CreateOrderRequestValidator's Easybox branch has no NotEmpty on those fields, and BuildCustomerParty embeds ShippingAddress unconditionally, so the XML carries empty StreetName/CityName/PostalZone (BT-50/BT-52) and ANAF rejects every locker order's invoice.
+- **Evidence:** `src/PhotoPrint.UI/src/app/core/services/checkout-state.service.ts:42`; `Validators/Payments/CreateOrderRequestValidator.cs:31`; `Services/OrderService.cs:156`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:178`; `Services/Invoicing/InvoiceXmlBuilder.cs:115`; `Services/Invoicing/InvoiceAddressFormatter.cs:10`
+- **Suggested fix:** Fall back to order.EasyboxLocker's address/city/postal code when ShippingAddress is blank (or require the fields for Easybox), and reject a blank buyer address in the builder. Suggested test: InvoiceXmlBuilder_EasyboxOrderWithLockerOnlyAddress_EmitsBuyerAddress: arrange Easybox order, ShippingAddress with recipient/phone only; act Build; assert StreetName, CityName, PostalZone all non-empty.
+- **History:**
+  - v6: found by the delta pass — raised by correctness (convergence 1), verdict confirmed
+
+### PPW-513 — uq_invoices_series_year_number index expression is not IMMUTABLE, so Postgres aborts Migrate() at prod boot
+
+- **What:** IssuedAt is timestamptz, and EXTRACT(YEAR FROM timestamptz) is STABLE (timezone-dependent), not IMMUTABLE. On the first Postgres boot, Program.cs Database.Migrate() runs this Sql() and Postgres raises "functions in index expression must be marked IMMUTABLE"; the migration rolls back, the API fails to start, and the two new migrations never apply.
+- **Evidence:** `Migrations/20260603101910_AddVatAndInvoices.cs:111`; `Migrations/20260603101910_AddVatAndInvoices.cs:63`; `Migrations/20260603101910_AddVatAndInvoices.cs:103`; `Program.cs:383`; `Tests/Integration/PostgresInvoiceNumberingServiceIntegrationTests.cs:66`
+- **Suggested fix:** Make the expression immutable: EXTRACT(YEAR FROM ("IssuedAt" AT TIME ZONE 'UTC'))::int, and cover it with a migrate-on-Postgres test. Suggested test: SkippableFact on PostgresFixture: Migrations_ApplyCleanlyToPostgres — arrange a fresh Npgsql context on the CI Postgres, act db.Database.Migrate(), assert no throw (currently throws PostgresException 42P17 IMMUTABLE).
+- **History:**
+  - v6: found by the delta pass — raised by db-parity (convergence 1), verdict confirmed
+
+### PPW-514 — Exhausted-retry rollback reload discards the processor transaction id and the Error log omits it
+
+- **What:** EuPlatesc IPN pays order X; the invoice-number retry exhausts. The reload at line 434 discards the in-memory EuPlatescTransactionId, and the Error log carries only order_id plus previous_status (always AwaitingPayment, so no information). The ep_id of the captured charge then exists nowhere in our logs or DB.
+- **Evidence:** `Controllers/WebhooksController.cs:199`; `Controllers/WebhooksController.cs:203`; `Controllers/WebhooksController.cs:423`; `Controllers/WebhooksController.cs:434`; `Services/OrderService.cs:395`; `Services/Invoicing/InvoiceCreationService.cs:60`
+- **Suggested fix:** Log ep_id / PaymentIntent id, order_number and amount in this Error line (drop the tautological previous_status) before the reload discards them. Suggested test: ExhaustedInvoiceRetry_PreservesProcessorTransactionId: arrange EuPlatesc IPN (ep_id=EP123) with numbering always returning a colliding number; act POST /api/webhooks/euplatesc; assert order.EuPlatescTransactionId or the exhausted log line contains "EP123".
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
+
+### PPW-515 — ANAF client-side timeout escapes as OperationCanceledException and stops the upload worker, unreachable by tests
+
+- **What:** ANAF SPV hangs; the 30s HttpClient timeout throws TaskCanceledException. AnafSpvClient catches only HttpRequestException; every new catch filters `is not OperationCanceledException`; the batch loop rethrows. It escapes ExecuteAsync -> default StopHost -> API shuts down. Job tests call ProcessBatchAsync by reflection and never simulate a timeout.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:81`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:96`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:216`; `Services/Invoicing/Anaf/AnafSpvClient.cs:53`; `Services/Invoicing/Anaf/AnafResilienceHandler.cs:38`; `Program.cs:317`
+- **Suggested fix:** In AnafSpvClient wrap SendAsync's OperationCanceledException as AnafUnreachableException when the caller token is not cancelled; add a ScriptedHttpMessageHandler test that throws TaskCanceledException. Suggested test: ProcessBatchAsync_ClientTimesOut_DoesNotPropagate: fake IAnafSpvClient.UploadAsync throws new TaskCanceledException("timeout", new TimeoutException()); invoke ProcessBatchAsync with an uncancelled token; assert no exception escapes and the invoice records LastError and releases its claim.
+- **History:**
+  - v6: found by the delta pass — raised by tests-coverage (convergence 1), verdict confirmed
+
+### PPW-516 — Exhausted invoice-number retry answers the payment processor 200, killing its last retry
+
+- **What:** Four consecutive InvoiceNumber collisions (SQLite MAX+1 path, or any provider under load) previously let DbUpdateException escape to ExceptionHandlerMiddleware -> 500 -> Stripe/EuPlatescu redelivers and the transient collision clears. Now it returns NumberExhausted, the handler still returns 200/`BuildIpnResponse`, and the charge stays permanently unpaid with only a log + Sentry event.
+- **Evidence:** `Controllers/WebhooksController.cs:423 (exhausted branch returns NumberExhausted)`; `Controllers/WebhooksController.cs:434 (ReloadAsync discards Paid transition)`; `Controllers/WebhooksController.cs:136 (return Ok() regardless of outcome)`; `Controllers/WebhooksController.cs:247 (EuPlatesc BuildIpnResponse 200)`; `Services/Invoicing/PostgresInvoiceNumberingService.cs:47 (CREATE SEQUENCE START 1)`; `Services/Invoicing/SqliteInvoiceNumberingService.cs:35 (unlocked MAX+1)`
+- **Suggested fix:** On NumberExhausted return a 5xx (or EuPlatescu's error body) so the processor redelivers, instead of acking success. Suggested test: StripeWebhook_WhenInvoiceNumberRetriesExhausted_DoesNotAckDelivery: arrange numbering to return a colliding number every call; POST a signed payment_intent.succeeded to the real endpoint; assert 5xx (retryable) and order still AwaitingPayment.
+- **History:**
+  - v6: found by the delta pass — raised by correctness (convergence 1), verdict confirmed
+  - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: v2 approach-check refuted a rethrow and the owner-side ruling stood: an escaping throw records no metric at all (PPW-397), every EuPlatesc branch answers a signed ack, and duplicate sat in SLO 3 success numerator. Resolved by relabelling to failed, deliberately keeping the 200.
+
+### PPW-517 — Invoice PDF tier is chosen from the live CloudEnabled flag with no per-row StorageLocation, so a Provider flip orphans stored PDFs
+
+- **What:** PDFs written by InvoiceUploadJob while Storage:Provider=local; operator flips to S3. Every existing invoice now resolves to the cloud adapter, the key is absent, and GetStreamAsync throws (500, not 404). Uploads avoid this via Upload.StorageLocation + IStorageRouter.For; Invoice has no such column, and tests only cover cloud-on/cloud-off within one process.
+- **Evidence:** `Controllers/InvoicesController.cs:68`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:125`; `Models/Invoice.cs:44`; `Services/S3StorageService.cs:119`; `Middleware/ExceptionHandlerMiddleware.cs:10`; `Controllers/UploadsController.cs:185`
+- **Suggested fix:** Add Invoice.StorageLocation stamped at write time and read via _storageRouter.For(invoice.StorageLocation); map a missing object to 404. Suggested test: InvoicesControllerTests.GetInvoiceAsync_KeyMissingInActiveTier_Returns404: arrange CloudEnabled=true, invoice row with PdfStoragePath, cloud GetStreamAsync throws FileNotFoundException; act GET; assert NotFoundResult with Retry-After — currently the exception escapes.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, completeness-critic, tests-coverage (convergence 3), verdict confirmed
+
+### PPW-518 — Admin manual mark-Paid inserts an Invoice with none of the webhook path's unique-violation protections, and its creation is fully mocked in tests
+
+- **What:** Admin marks a late-webhook order Paid while the real webhook delivery commits its invoice in between load and SaveChanges. Postgres raises 23505 on ix_invoices_order_id; AdminOrderService has no classifier or retry, so SaveChanges throws, the admin gets a 500 and the whole status change is lost — the webhook path handles the same collision gracefully.
+- **Evidence:** `Services/AdminOrderService.cs:148`
+- **Suggested fix:** Share the webhook's violation classification/retry helper (or catch the OrderId violation and treat it as already-invoiced) in the admin mark-paid path.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, completeness-critic, tests-coverage, db-parity (convergence 4), verdict confirmed
+
+### PPW-519 — RetryAsync wipes XmlPayload, destroying the submitted-XML snapshot and diverging it from the kept PDF
+
+- **What:** Ops inspects a Rejected invoice, clicks Retry: XmlPayload is set to null. GET /api/admin/invoices/{id}/xml — the endpoint whose stated purpose is inspecting what went to ANAF — now 404s until the next worker tick (up to 30 min), and permanently if the rebuild then throws (null City, missing ShippingAddress).
+- **Evidence:** `Services/Invoicing/InvoiceLifecycle.cs:120`
+- **Suggested fix:** Keep the payload in a separate column/log before nulling it, or clear it only after the rebuild succeeds.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, completeness-critic, tests-coverage (convergence 3), verdict confirmed
+  - v6: re-raises a decided item, PPW-480. Prior decision, verbatim: v1 fix round cleared XmlPayload deliberately, per a vetted approach-check, so a retry rebuilds the XML rather than resubmitting a stale payload; PdfStoragePath was left untouched.
+
+### PPW-520 — Per-line PriceAmount x InvoicedQuantity no longer equals LineExtensionAmount, and nothing asserts it
+
+- **What:** The suite's own fixture (quantity 3, gross 21.00) now emits LineExtensionAmount 17.65 with PriceAmount 5.88 — 5.88x3 = 17.64. The residual reconciliation test only checks the header sum; no test asserts line-level consistency and no CIUS-RO/EN16931 schema or validator runs anywhere, so ANAF is the first validator to see it.
+- **Evidence:** `Services/Invoicing/InvoiceXmlBuilder.cs:219`
+- **Suggested fix:** Assert PriceAmount x quantity == LineExtensionAmount (or emit BaseQuantity), and add an offline XSD/Schematron check over a built document.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, completeness-critic, tests-coverage (convergence 3), verdict confirmed
+
+### PPW-521 — InvoiceAddressFormatter.Truncate throws NRE on a null City/Street that the validators accept
+
+- **What:** ShippingAddressSnapshot.City is `string = null!`; FluentValidation MaximumLength and Must(HasNoXmlInvalidChars) both pass on null and Easybox has no NotEmpty. POST an order omitting "city" -> City is null -> Truncate(addr.City, 50) dereferences .Length -> NullReferenceException in the worker. Pre-delta `new XElement(..., addr.City)` tolerated null.
+- **Evidence:** `Services/Invoicing/InvoiceAddressFormatter.cs:12`; `Services/Invoicing/InvoiceXmlBuilder.cs:121`; `Validators/Payments/CreateOrderRequestValidator.cs:35`; `Program.cs:113`; `Filters/ValidationFilter.cs:11`; `Models/ShippingAddressSnapshot.cs:8`
+- **Suggested fix:** Take `string?` in Truncate and return string.Empty for null/short input; add NotNull/NotEmpty on the Easybox address fields.
+- **History:**
+  - v6: found by the delta pass — raised by correctness (convergence 1), verdict plausible
+
+### PPW-522 — Unbuildable invoice stays Pending forever and starves the upload batch
+
+- **What:** An invoice whose XML/PDF build always throws (null City NRE, missing ShippingAddress) now gets RecordPendingErrorAsync + claim release and stays Pending with no escalation to Failed. Its old CreatedAt sorts first in `OrderBy(CreatedAt).Take(MaxBatchSize)`; once 50 such rows exist, no newly paid order is ever submitted to ANAF.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:62`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:206`; `Services/Invoicing/InvoiceLifecycle.cs:44`; `Services/Invoicing/InvoiceLifecycle.cs:84`; `Services/Invoicing/InvoiceXmlBuilder.cs:116`; `Controllers/AdminInvoicesController.cs:105`
+- **Suggested fix:** Escalate a repeated build failure to Failed (reuse the BackoffHours budget check), or exclude rows whose LastError is set and UpdatedAt is recent from the batch query. Suggested test: InvoiceUploadJobTests "starved_batch_never_reaches_newer_invoice": MaxBatchSize=1; invoice A (older CreatedAt, xmlBuilder throws) + invoice B (newer, buildable). Run two ticks. Assert UploadAsync never called for B, and A never MarkFailed.
+- **History:**
+  - v6: found by the delta pass — raised by correctness (convergence 1), verdict confirmed
+
+### PPW-523 — Missing invoice PDF blob surfaces as an unlogged generic 500 with no distinct event
+
+- **What:** Storage:Provider flips to S3 after invoices were rendered to local disk. Every customer download throws FileNotFoundException here; unmapped, it becomes a 500 whose only log is the middleware's generic "Unhandled exception" line with no invoice id or storage key, plus a Sentry event per request — indistinguishable from a real S3 outage.
+- **Evidence:** `Controllers/InvoicesController.cs:69`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:125`; `Services/S3StorageService.cs:119`; `Services/LocalStorageService.cs:74`; `Middleware/ExceptionHandlerMiddleware.cs:11`; `Middleware/ExceptionHandlerMiddleware.cs:139`
+- **Suggested fix:** Catch FileNotFoundException, log a distinct Warning with invoice_id and key (mirroring UploadService's uploads.original.missing_file), and return 404 with Retry-After. Suggested test: GetInvoice_WhenPdfBlobMissing_Returns404: seed owned order + Invoice with PdfStoragePath set to a key absent from the configured store; GET /api/orders/{id}/invoice; assert 404 (today 500) and a distinct invoices.pdf_blob_missing log event.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
+
+### PPW-524 — The whole invoicing feature has no SPA consumer and no lens covered the frontend
+
+- **What:** grep for invoice|factur across src/PhotoPrint.UI/src/app returns zero non-spec hits. Customer download, admin list, retry and XML endpoints have no caller, so the new dual-auth and admin audit logging can never be exercised in the product; a shipped bolt delivers no user-visible invoicing.
+- **Evidence:** `Controllers/InvoicesController.cs:16`; `Controllers/InvoicesController.cs:40`; `Controllers/AdminInvoicesController.cs:19`; `Controllers/AdminInvoicesController.cs:92`; `Controllers/AdminInvoicesController.cs:145`; `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:63`
+- **Suggested fix:** Confirm with the owner whether UI is a later bolt; if so record it explicitly, otherwise add the customer download link and admin invoice page.
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic (convergence 1), verdict plausible
+
+### PPW-525 — Guest invoice access is defeated by the unchanged guest-session lifetime and the never-implemented order transfer
+
+- **What:** GuestSession.IsValid = !IsExpired && !IsClaimed with a 7-day TTL; GuestSessionService.ClaimAsync leaves "Order transfer: deferred" so Order.UserId stays null. A guest who registers, or waits 8 days, gets 401/403 forever on their own invoice PDF that must be retained for years.
+- **Evidence:** `Controllers/InvoicesController.cs:52`; `Models/GuestSession.cs:16`; `Services/GuestSessionService.cs:53`; `Authentication/GuestAuthenticationHandler.cs:44`; `BackgroundJobs/GuestSessionCleanupJob.cs:52`; `Extensions/ClaimsPrincipalExtensions.cs:12`
+- **Suggested fix:** Transfer Order.UserId (and clear GuestSessionId) in ClaimAsync, or authorise invoice reads by a long-lived per-order token instead of the guest session. Suggested test: GetInvoice_AfterGuestClaimsSession_ReturnsPdfToRegisteredUser: arrange guest order+invoice PDF, call ClaimAsync(G, U), act GET /api/orders/{id}/invoice with U's JWT, assert 200 — currently 403 (and 401 with the guest token).
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic (convergence 1), verdict confirmed
+
+### PPW-526 — EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test
+
+- **What:** Only the Stripe leg is driven end to end. Inject "EuPlatesc records Ok regardless of outcome", or leave EuPlatescTransactionId set after the rollback, and no test goes red — its metrics tests stub CreateForOrderAsync to return null, so AlreadyInvoiced/NumberExhausted never occur there.
+- **Evidence:** `Controllers/WebhooksController.cs:205`; `Controllers/WebhooksController.cs:385`; `Controllers/WebhooksController.cs:392`; `Tests/Unit/Controllers/WebhooksControllerMetricsTests.cs:59`; `Tests/Unit/Controllers/WebhooksControllerInvoiceRaceTests.cs:252`; `Tests/Integration/PaymentControllerIntegrationTests.cs:541`
+- **Suggested fix:** Mirror StripeWebhook_WhenInvoiceNumberRetriesExhaust_... for EuPlatescIpnAsync: assert the failed label and that Status, PaidAt and EuPlatescTransactionId are all rolled back. Suggested test: EuPlatesc_ipn_when_invoice_number_retries_exhaust: seed a rival invoice with AlwaysSameInvoiceNumbering on SQLite, POST signed action=0 IPN; assert metric label failed (no duplicate/ok), order back to AwaitingPayment, PaidAt and EuPlatescTransactionId null.
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic, tests-coverage (convergence 2), verdict confirmed
+  - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: Owner ruled 2026-08-20 that EuPlatesc is being removed and only Stripe will remain, so this coverage was waived rather than written; PPW-511 records that the removal is tracked nowhere.
+
+### PPW-527 — Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook
+
+- **What:** Numbering service down, or an FK/NOT NULL DbUpdateException, throws out of SaveOrderPaidWithInvoiceAsync — no catch matches, RecordPaymentWebhook never runs, the charge vanishes from the SLO metric. The new test Stripe_succeeded_when_invoice_creation_throws... pins that escape and asserts DB state only, never the metric.
+- **Evidence:** `Controllers/WebhooksController.cs:397`; `Controllers/WebhooksController.cs:403`; `Controllers/WebhooksController.cs:286`; `Controllers/WebhooksController.cs:122`; `Services/Invoicing/PostgresInvoiceNumberingService.cs:59`; `Tests/Unit/Controllers/WebhooksControllerMetricsTests.cs:356`
+- **Suggested fix:** Wrap the helper call so any exception records a failed webhook metric before rethrowing, and assert the metric in that test. Suggested test: Reuse Stripe_succeeded_when_invoice_creation_throws...: arrange same (creator throws), add `using var metrics = Capture()`, act, then assert metrics.For(PaymentWebhookTotal, Result=Failed) has count 1 — currently empty.
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic (convergence 1), verdict confirmed
+
+### PPW-528 — Charged-but-unpaid order emits the same metric label as a routine card decline
+
+- **What:** Invoice numbering breaks; every paid webhook charges the customer, leaves the order AwaitingPayment and emits result=failed — the identical label emitted for every payment_intent.payment_failed and every EuPlatesc non-zero action. In the Grafana webhook panel the incident hides inside normal decline volume; no alertable series isolates it.
+- **Evidence:** `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:389`; `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:423`; `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:342`; `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:302`; `d:\photo printing website\src\PhotoPrint.API\Observability\MetricNames.cs:58`; `d:\photo printing website\src\PhotoPrint.API\Services\Invoicing\SqliteInvoiceNumberingService.cs:6`
+- **Suggested fix:** Add a distinct WebhookResultValues entry (e.g. invoice_number_exhausted) to MetricNames and LabelContract, use it here, and graph/alert on it separately. Suggested test: WebhookMetricsTests.ExhaustedInvoiceNumberEmitsDistinctResult: arrange colliding invoice number + AwaitingPayment order; act POST /api/webhooks/stripe payment_intent.succeeded with a MeterListener; assert result tag differs from the payment_failed decline's "failed".
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
+
+### PPW-529 — No test applies the migration chain — the unique-index DDL is only ever proven via EnsureCreated from the model
+
+- **What:** PostgresFixture opens a Npgsql context and calls only CREATE SEQUENCE/nextval — no Migrate() or EnsureCreated. A CI run is green against a real Postgres while the Invoices DDL (new unique index, ClaimedAt timestamptz, the expression index above) is never executed; the first prod boot is still the first execution.
+- **Evidence:** `Tests/Integration/PostgresInvoiceNumberingServiceIntegrationTests.cs:79`; `Tests/Unit/Data/UploadThumbnailPathMigrationTests.cs:48`; `Migrations/20260603101910_AddVatAndInvoices.cs:103`; `Migrations/20260813102545_AddInvoiceClaimedAt.cs:14`; `Program.cs:387`; `.github/workflows/ci.yml:74`
+- **Suggested fix:** Add an IAsyncLifetime that runs db.Database.Migrate() once against the CI container (and a test asserting ix_invoices_order_id is unique via pg_index). Suggested test: PostgresMigrationChainTests.Migrate_OnPostgres_CreatesInvoicesSchema: SkippableFact on the CI Postgres; act db.Database.Migrate(); assert uq_invoices_series_year_number in pg_indexes and ClaimedAt is timestamptz. Reddens today with 42P17 "functions in index expression must be marked IMMUTABLE".
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic, tests-coverage, db-parity (convergence 3), verdict confirmed
+
+### PPW-530 — MakeInvoiceOrderIdUnique creates the unique index with no dedupe step, so duplicate rows fail prod boot
+
+- **What:** Any environment whose Invoices table already holds two rows for one OrderId — possible precisely because the index was non-unique before this fix — fails CREATE UNIQUE INDEX. Migrations run at boot in prod, so the API never starts. No test applies the chain to a DB pre-seeded with duplicates.
+- **Evidence:** `Migrations/20260813093709_MakeInvoiceOrderIdUnique.cs:17`; `Migrations/20260603101910_AddVatAndInvoices.cs:93`; `Program.cs:387`; `Services/Invoicing/InvoiceCreationService.cs:39`; `Services/Invoicing/InvoiceCreationService.cs:61`
+- **Suggested fix:** Delete-or-report duplicates in Up before CreateIndex, and add a test that migrates to the previous migration, inserts two invoices for one order, then migrates to head. Suggested test: MigrationChain_DedupesInvoicesBeforeUniqueIndex: arrange a Postgres (Testcontainers) migrated to 20260728105412, insert two Invoices sharing one OrderId; act Migrate(); assert no throw and one row survives. Reddens today with 23505.
+- **History:**
+  - v6: found by the delta pass — raised by tests-coverage (convergence 1), verdict confirmed
+
+### PPW-531 — Unique-violation classifiers cover only 2 of 3 Invoices unique indexes and their Npgsql arms are untested
+
+- **What:** On Postgres a duplicate (Series, year, Number) insert can report constraint uq_invoices_series_year_number (a Postgres-only expression index). Both classifiers return false, the DbUpdateException escapes the paid-webhook handler as a 500 with no retry and no metric label. Race tests only run SQLite, so the whole PostgresException arm is unexercised.
+- **Evidence:** `Controllers/WebhooksController.cs:460`; `Controllers/WebhooksController.cs:202`; `Services/Invoicing/InvoiceCreationService.cs:76`; `Services/Invoicing/InvoiceNumber.cs:11`; `Migrations/20260603101910_AddVatAndInvoices.cs:112`; `Tests/Unit/Controllers/WebhooksControllerInvoiceRaceTests.cs:31`
+- **Suggested fix:** Treat uq_invoices_series_year_number as an InvoiceNumber violation too, and add a Postgres-backed test that provokes a real 23505 for each index.
+- **History:**
+  - v6: found by the delta pass — raised by tests-coverage, db-parity (convergence 2), verdict plausible
+
+### PPW-532 — One ANAF credential failure fans out into up to 50 Error logs and Sentry captures per tick
+
+- **What:** The ANAF cert expires. Each of up to MaxBatchSize=50 pending invoices throws AnafAuthException, so every tick emits 50 identical Error logs and 50 Sentry captures for one root cause. Sentry rate-limits and, per the note in Program.cs, silently drops events on 429 — including unrelated errors.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:62`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:85`; `Services/Invoicing/Anaf/AnafSpvClient.cs:60`; `Services/Invoicing/Anaf/AnafAuthHandler.cs:50`; `Configuration/AnafSettings.cs:27`; `Program.cs:62`
+- **Suggested fix:** Break out of the batch loop on the first AnafAuthException (or capture once per tick behind a flag) and let the next tick retry. Suggested test: InvoiceUploadJobTests.Auth_failure_reports_once_per_tick: seed 3 Pending invoices, IAnafSpvClient.UploadAsync always throws AnafAuthException, run one tick, assert IHub.CaptureEvent/CaptureException invoked once (currently 3) and one Error log.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
+
+### PPW-533 — ANAF auth failures leave LastError blank, so the admin invoice list shows no reason
+
+- **What:** Credentials are revoked; every pending invoice hits this catch. Unlike the upload-errors, unreachable and build-failed branches, it never calls RecordPendingErrorAsync, so the admin list shows rows stuck Pending with an empty LastError column — the ops-facing surface says nothing while nothing progresses for days.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:82`; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:235`; `Services/Invoicing/Anaf/AnafSpvClient.cs:60`; `Services/Invoicing/InvoiceLifecycle.cs:44`; `Controllers/AdminInvoicesController.cs:71`; `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:341`
+- **Suggested fix:** Call lifecycle.RecordPendingErrorAsync(row.Id, ex.Message) in the AnafAuthException catch so the admin list shows why the invoice is stuck. Suggested test: Extend InvoiceUploadJobTests.ProcessBatchAsync_AnafAuthFails...: after InvokeProcessBatchAsync with UploadAsync throwing AnafAuthException, read the seeded invoice from SQLite and assert LastError is non-empty (and ClaimedAt released). Reddens today.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
+
+### PPW-534 — invoice.creation.allocated is logged pre-commit on every retry attempt, so logs show phantom invoice numbers
+
+- **What:** A number collision retries three times: four "invoice.creation.allocated invoice_number=..." lines are logged, each before SaveChanges, three for numbers never persisted and possibly issued to another order. The retry, exhausted and duplicate-race lines omit invoice_number, so a gap-free-numbering audit built from logs shows phantom and double-issued numbers.
+- **Evidence:** `Services/Invoicing/InvoiceCreationService.cs:94`; `Services/Invoicing/InvoiceCreationService.cs:96`; `Controllers/WebhooksController.cs:392`; `Controllers/WebhooksController.cs:420`; `Controllers/WebhooksController.cs:427`; `Tests/Unit/Controllers/WebhooksControllerInvoiceRaceTests.cs:210`
+- **Suggested fix:** Log allocation after the successful commit (or mark it provisional), and include invoice_number in the collision-retry, exhausted and duplicate-race lines. Suggested test: Extend WebhooksControllerInvoiceRaceTests exhaust case: arrange winner invoice + AlwaysSameInvoiceNumbering, act webhook, assert logs contain exactly one "invoice.creation.allocated" (currently 4) while only the winner's invoice row exists.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
+
+### PPW-535 — Truncate can split a UTF-16 surrogate pair, wedging the invoice in Pending forever
+
+- **What:** Buyer name 201 chars with an emoji straddling index 200: value[..200] leaves a lone surrogate, XmlTextWriter.Save throws, the worker records LastError, releases the claim, and retries the same failure every tick forever. All three truncation tests use plain 'a'/'b'/'c'.
+- **Evidence:** `Services/Invoicing/InvoiceAddressFormatter.cs:13`
+- **Suggested fix:** Back off to a full code point (and strip lone surrogates) when truncating; add a surrogate-pair boundary test.
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic (convergence 1), verdict unverified-low
+
+### PPW-536 — RetryAsync resets every ANAF field except ClaimedAt, which the success path never releases either
+
+- **What:** UploadPendingAsync leaves ClaimedAt set when submission succeeds (only the error paths release it). An admin retry within Anaf:ClaimTtlMinutes (default 10) of that claim flips status to Pending but leaves the stale timestamp, so the job's claim WHERE matches nothing and logs claim-lost — the retry silently does nothing for a whole poll interval (default 30 min).
+- **Evidence:** `Services/Invoicing/InvoiceLifecycle.cs:117`
+- **Suggested fix:** Add .SetProperty(i => i.ClaimedAt, (DateTimeOffset?)null) to RetryAsync, and release the claim on the success path too.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, db-parity (convergence 2), verdict unverified-low
+
+### PPW-537 — Residual reconciliation is unguarded — negative line amount, silently absorbed snapshot mismatch, crash on an empty line list
+
+- **What:** An order whose snapshot disagrees with its items — e.g. a pre-bolt-038 backfilled row with NetTotalRon=0 (per AddVatAndInvoices' backfill note) — gives rate 0, netTotals = gross per line, residual = -TotalRon. `netTotals[^1] += residual` silently writes a negative LineExtensionAmount and negative PriceAmount instead of failing loudly.
+- **Evidence:** `Services/Invoicing/InvoiceXmlBuilder.cs:213`
+- **Suggested fix:** Throw when |residual| exceeds a few bani (or when any adjusted net goes negative) rather than folding an arbitrary delta into the last line.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, tests-coverage (convergence 2), verdict unverified-low
+
+### PPW-538 — Upload batch query ignores ClaimedAt, unlike the existing AWB claim precedent
+
+- **What:** With a backlog larger than MaxBatchSize, every replica selects the same head rows and skips them as claim-lost, so extra replicas add no throughput. A revoked cert makes AnafAuthException fire once per row: up to 50 Sentry events and 50 auth attempts per tick. AwbRetryJob filters AwbClaimedAt inside its query.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:65`
+- **Suggested fix:** Add the ClaimedAt/TTL predicate to the batch query, and break out of the batch loop on the first AnafAuthException.
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic (convergence 1), verdict unverified-low
+
+### PPW-539 — New ClaimedAt column and unique index never land on an existing dev SQLite database
+
+- **What:** A developer with an existing photoPrint-dev.db: EnsureCreated() no-ops and the self-heal only counts 5 core tables, so Invoices lacks ClaimedAt. Every Invoices query (webhook existing-invoice check, admin list, PDF download) then fails with SQLite "no such column: i.ClaimedAt" until the file is deleted.
+- **Evidence:** `Program.cs:358`
+- **Suggested fix:** Extend the startup completeness check to probe pragma_table_info('Invoices') for ClaimedAt and drop/recreate (or ALTER) when missing.
+- **History:**
+  - v6: found by the delta pass — raised by db-parity (convergence 1), verdict unverified-low
+
+### PPW-540 — Postgres numbering tests draw a random year and assert absolute sequence values, so they collide and leak sequences
+
+- **What:** RandomYear() picks from 1000 values and sequences persist for the container's life. If SequentialCalls draws 3117 while YearRolls draws 3116 (yearB = 3117), the second test's first call returns 2 and the assertion fails — a ~1%-per-run flake that a re-run "fixes", eroding trust in the only Postgres proof.
+- **Evidence:** `Tests/Integration/PostgresInvoiceNumberingServiceIntegrationTests.cs:16`
+- **Suggested fix:** Make the sequence key unique per test (unique uppercase series letters, or DROP SEQUENCE in a finally) instead of relying on an unused random year.
+- **History:**
+  - v6: found by the delta pass — raised by tests-coverage, db-parity (convergence 2), verdict unverified-low
+
+### PPW-541 — claim-lost log asserts "another worker" for causes it cannot distinguish
+
+- **What:** An admin retries a Rejected invoice; InvoiceLifecycle.RetryAsync clears every field except ClaimedAt, so a worker restart inside the TTL skips the row and logs "another worker holds a fresh claim" on a single-replica deployment. The operator hunts a second worker that does not exist; a deleted row or a status change logs the same sentence.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:141`
+- **Suggested fix:** Clear ClaimedAt in InvoiceLifecycle.RetryAsync, and log the row's actual ClaimedAt and status in claim-lost rather than asserting a cause.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict unverified-low
+
+### PPW-542 — submitted-but-not-recorded logs Error twice and gets no Sentry capture
+
+- **What:** MarkSubmittedAsync's DB write fails after ANAF accepted the upload. This Error is logged, then rethrown, so the batch loop logs a second Error (row-failed) for the same incident — double-counted by any log-based alert — while this worst partial state (ANAF holds the invoice, row stays Pending, next tick re-uploads) gets no Sentry capture and no metric.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:226`
+- **Suggested fix:** Log once (don't rethrow after logging) and capture this partial state to Sentry or a dedicated metric, as the auth branch does.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict unverified-low
+
+### PPW-543 — LastError is persisted before the exception is logged, so a DB blip loses the root cause
+
+- **What:** The PDF renderer throws; RecordPendingErrorAsync on this line then fails because the DB connection dropped. The renderer exception is never logged — only the batch loop's row-failed with the DB exception — and ReleaseClaimAsync on line 208 never runs, so the row is skipped for a full TTL with no clue to the real cause.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:206`
+- **Suggested fix:** Log the caught exception before persisting LastError, and wrap the RecordPendingErrorAsync call in its own try/catch so the claim release still runs.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict unverified-low
+
+### PPW-544 — New Must rules have no WithMessage, so 400s carry English default messages
+
+- **What:** A control character in Street returns FluentValidation's default "The specified condition was not met for 'Street'." in an otherwise Romanian API surface; the SPA shows English text. Same for Number, Block, City, County, PostalCode, RecipientName.
+- **Evidence:** `Validators/Payments/CreateOrderRequestValidator.cs:32`
+- **Suggested fix:** Add a Romanian .WithMessage("... conține caractere nevalide.") to each HasNoXmlInvalidChars rule, as UpdateAccountValidator already does.
+- **History:**
+  - v6: found by the delta pass — raised by correctness (convergence 1), verdict unverified-cleanup
+
+### PPW-545 — CreateForOrderAsync(Guid) has no production caller left
+
+- **What:** Both webhook paths and AdminOrderService now use the Order overload; the Guid overload is exercised only by InvoiceCreationServiceTests, so its order-missing guard and idempotency path are dead code that future callers may pick up believing it is the supported entry point.
+- **Evidence:** `Services/Invoicing/IInvoiceCreationService.cs:24`
+- **Suggested fix:** Delete the Guid overload and its interface member, or document it as test-only.
+- **History:**
+  - v6: found by the delta pass — raised by correctness, completeness-critic (convergence 2), verdict unverified-cleanup
+
+### PPW-546 — Retry pre-read pulls the whole XmlPayload from the DB just to log its length
+
+- **What:** Each admin retry selects i.XmlPayload — a full UBL invoice document, hundreds of KB — over the wire so it can log XmlPayload?.Length, immediately discarding it.
+- **Evidence:** `Services/Invoicing/InvoiceLifecycle.cs:104`
+- **Suggested fix:** Project the length instead: .Select(i => new { XmlLength = i.XmlPayload!.Length, i.LastError }) — both providers translate it to length().
+- **History:**
+  - v6: found by the delta pass — raised by db-parity (convergence 1), verdict unverified-cleanup
+
+### PPW-547 — data-stack standard never mentions the Invoices table it must describe
+
+- **What:** The DB standard lists "Entities (17 DbSets)" without Invoice (the context now has 18) and has zero mentions of invoicing: not the new unique index on OrderId, not the ClaimedAt claim column, not the only SEQUENCE and only raw-SQL expression index in the schema. The next agent reading it for DB routing misses the whole invoicing surface.
+- **Evidence:** `memory-bank/standards/data-stack.md:55`
+- **Suggested fix:** Add Invoice to the entity list and a short invoicing paragraph covering the sequence, the expression index, the unique indexes and ClaimedAt.
+- **History:**
+  - v6: found by the delta pass — raised by db-parity (convergence 1), verdict unverified-cleanup
+
+### PPW-548 — ADR-023/decision-index still credit CAS for multi-replica safety, now superseded by the ClaimedAt lease
+
+- **What:** A future agent reads the decision index, designs against "CAS gives multi-replica safety", and removes or duplicates the ClaimedAt claim. CLAUDE.md requires the standard stating a contract to be updated in the same change; the code comment was rewritten but the index was not.
+- **Evidence:** `memory-bank/standards/decision-index.md:34`
+- **Suggested fix:** Update the ADR-023 summary (and note the Anaf:ClaimTtlMinutes lease alongside ADR-015's Orders.AwbClaimedAt precedent).
+- **History:**
+  - v6: found by the delta pass — raised by completeness-critic (convergence 1), verdict unverified-cleanup
+
+### PPW-549 — Unknown ANAF status warns twice and the job's line drops the diagnostic fields
+
+- **What:** ANAF returns an unmapped "stare". AnafSpvClient line 134 warns with the stare value and the job warns again without it, so one event produces two Warnings; the job's line carries neither stare nor AnafUploadId, and no metric or Failed escalation exists, so the invoice re-polls forever with no countable signal.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:309`
+- **Suggested fix:** Drop the job's duplicate warning or include stare and AnafUploadId, and count unknown statuses on the ANAF status metric.
+- **History:**
+  - v6: found by the delta pass — raised by observability (convergence 1), verdict unverified-cleanup

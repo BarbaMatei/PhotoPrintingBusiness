@@ -134,3 +134,5 @@
 {"t":"2026-08-20T15:07:10+03:00","ev":"finding","id":"PPW-511","status":"open","note":"new - the removal that two coverage waivers rest on is tracked nowhere, and definition-of-done class 2 still mandates the coverage"}
 {"t":"2026-08-20T15:09:30+03:00","ev":"doc-gate","pass":5,"verdict":"approve"}
 {"t":"2026-08-20T15:10:00+03:00","ev":"pass-records-done","pass":5,"verdict":"approve-with-followups","verified":1,"reopened":0}
+{"t":"2026-08-20T15:17:06+03:00","ev":"pass-launch","pass":6,"type":"delta-discovery"}
+{"t":"2026-08-20T15:43:42+03:00","ev":"pass-records-done","pass":6}
