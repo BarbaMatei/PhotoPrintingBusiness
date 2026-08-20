@@ -93,11 +93,15 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
                 ? NullLogger<WebhooksController>.Instance
                 : logCapture.LoggerFor<WebhooksController>());
 
-    private static async Task<string> InvokeSaveAsync(WebhooksController controller, Order order, OrderStatus statusBeforeTransition)
+    private static Task<string> InvokeSaveAsync(WebhooksController controller, Order order, OrderStatus statusBeforeTransition)
+        => InvokeSaveAsync(controller, order, statusBeforeTransition, CancellationToken.None);
+
+    private static async Task<string> InvokeSaveAsync(
+        WebhooksController controller, Order order, OrderStatus statusBeforeTransition, CancellationToken ct)
     {
         var method = typeof(WebhooksController).GetMethod("SaveOrderPaidWithInvoiceAsync",
             BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var task = (Task)method.Invoke(controller, [order, statusBeforeTransition, CancellationToken.None])!;
+        var task = (Task)method.Invoke(controller, [order, statusBeforeTransition, ct])!;
         await task;
         return task.GetType().GetProperty("Result")!.GetValue(task)!.ToString()!;
     }
@@ -296,6 +300,46 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         order.UpdatedAt.Should().Be(updatedAtBefore, "the rollback must undo every field Transition touched");
         using var verify = CreateDb();
         (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
+    }
+
+    // A throw escaping the rollback would skip RecordPaymentWebhook, dropping a real charge out of the SLO — the hole a rethrow was refused to avoid.
+    [Fact]
+    public async Task SaveOrderPaidWithInvoiceAsync_WhenRollbackReloadIsCancelled_StillReturnsWithoutThrowing()
+    {
+        var winnerOrderId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        using (var seed = CreateDb())
+        {
+            seed.Orders.Add(MakeOrder(winnerOrderId));
+            seed.Orders.Add(MakeOrder(orderId));
+            await seed.SaveChangesAsync();
+        }
+        using (var winner = CreateDb())
+        {
+            await MakeInvoiceCreator(winner, new AlwaysSameInvoiceNumbering()).CreateForOrderAsync(winnerOrderId);
+            await winner.SaveChangesAsync();
+        }
+
+        using var db = CreateDb();
+        var order = await db.Orders.FirstAsync(o => o.Id == orderId);
+        var logs = new LogCapture();
+        using var cts = new CancellationTokenSource();
+
+        // CaptureEvent fires immediately before the reload, so cancelling from it lands the token inside ReloadAsync.
+        var hub = new Mock<Sentry.IHub>();
+        hub.SetupGet(h => h.IsEnabled).Returns(true);
+        hub.Setup(h => h.CaptureEvent(It.IsAny<Sentry.SentryEvent>(), It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()))
+           .Callback(() => cts.Cancel())
+           .Returns(Sentry.SentryId.Empty);
+
+        var controller = MakeController(
+            db, MakeInvoiceCreator(db, new AlwaysSameInvoiceNumbering()), logs, hub.Object);
+
+        var outcome = await InvokeSaveAsync(controller, order, OrderStatus.AwaitingPayment, cts.Token);
+
+        outcome.Should().Be("NumberExhausted", "the caller must still get an outcome so it can record the metric");
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("invoice.creation.rollback-reload-failed", StringComparison.Ordinal));
     }
 
     // "duplicate" sits in SLO 3's success numerator, so mislabelling the exhausted path inflates the SLO instead of burning budget.
