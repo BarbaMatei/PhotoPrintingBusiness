@@ -108,10 +108,11 @@ namespace PhotoPrint.API.Migrations
             // SEQUENCE primitive might lose (e.g. operator error during restore).
             // Expression index — EF Core's CreateIndex doesn't support expression
             // columns, so this lives as raw SQL.
+            // AT TIME ZONE is required: EXTRACT on a bare timestamptz is only STABLE, and an index expression must be IMMUTABLE.
             migrationBuilder.Sql(
                 "CREATE UNIQUE INDEX \"uq_invoices_series_year_number\" " +
                 "ON \"Invoices\"(\"Series\", " +
-                "(EXTRACT(YEAR FROM \"IssuedAt\")::int), \"Number\");");
+                "(EXTRACT(YEAR FROM (\"IssuedAt\" AT TIME ZONE 'UTC'))::int), \"Number\");");
 
             // Seed the current-year sequence per ADR-020. Subsequent years are
             // auto-created by PostgresInvoiceNumberingService on first call via
