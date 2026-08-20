@@ -146,5 +146,9 @@ if (L.verdict === 'request-changes' || serious > 0) {
   say(`ROUTER: open serious findings with no resolution answering review-v${N} (row 2).`)
   finish(0, 'fix round', null)
 }
+if ((L.type === 'discovery' || L.type === 'delta-discovery') && serious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes') {
+  say('ROUTER: discovery-type pass clean (0 serious, 0 reopened) — loop quiet (row 6).')
+  finish(2, null, `certification — ALWAYS needs the owner's explicit go-ahead outside an unattended run: first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'certification-go-ahead')
+}
 say('ROUTER: no row matched mechanically — decide from the README router with the facts above.')
 finish(3, null, null, 'no-row-matched')

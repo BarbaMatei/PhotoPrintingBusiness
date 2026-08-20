@@ -43,11 +43,21 @@ const runCmd = c => spawnSync(c, { cwd: REPO, encoding: 'utf8', shell: true, tim
 const versions = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
 if (!versions.length) { console.error(`no resolution file in ${dir}`); process.exit(2) }
 const N = Math.max(...versions)
-const rows = [...readFileSync(join(dir, `resolution-v${N}.md`), 'utf8')
-  .matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|\s*`?([0-9a-f]{7,40})`?\s*\|/gm)]
+const resolutionText = readFileSync(join(dir, `resolution-v${N}.md`), 'utf8')
+const rows = [...resolutionText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|\s*`?([0-9a-f]{7,40})`?\s*\|/gm)]
   .map(m => ({ id: m[1], commit: m[2] }))
   .filter(r => !only || only.has(r.id))
 if (!rows.length) { console.error(`resolution-v${N}.md has no matching fixed rows`); process.exit(2) }
+
+const resolutionFm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(resolutionText)?.[1] ?? ''
+const fixedCommit = /^fixed_commit:\s*(.+?)\s*$/m.exec(resolutionFm)?.[1]
+if (fixedCommit) {
+  const fc = git('rev-parse', fixedCommit)
+  const head = git('rev-parse', 'HEAD')
+  if (fc.status === 0 && head.status === 0 && fc.stdout.trim() !== head.stdout.trim()) {
+    console.error(`warning: HEAD is not the resolution's fixed_commit ${fixedCommit} — reverts run against current HEAD; red-run attribution may be weaker`)
+  }
+}
 
 if (git('status', '--porcelain').stdout.trim() !== '') {
   console.error('the tree is dirty — verification reverts files and restores with reset --hard; commit or stash first')

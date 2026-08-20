@@ -28,6 +28,12 @@ if (!dir) { console.error(`no reviews folder for "${target}"`); process.exit(1) 
 const say = (k, v) => console.log(`${k}: ${v}`)
 const stop = reason => { say('ACTION', 'stop'); say('REASON', reason); process.exit(0) }
 
+function hasCertification(targetDir) {
+  const metricsPath = join(targetDir, 'metrics.jsonl')
+  return existsSync(metricsPath) && readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
+    .some(l => { try { const e = JSON.parse(l); return e.outcome === 'certified' || /^certification/.test(e.subtype ?? '') } catch { return false } })
+}
+
 if (gateKind === 'loop-close') {
   say('ACTION', 'auto')
   say('NEXT', 'close the loop')
@@ -56,12 +62,17 @@ if (gateKind === 'delta-worthiness') {
     say('REASON', `the fix round fixed high-severity ${hit.join(', ')} — delta-worthy by the mechanical half of the rule`)
     process.exit(0)
   }
-  const metricsPath = join(dir, 'metrics.jsonl')
-  const hasCert = existsSync(metricsPath) && readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
-    .some(l => { try { const e = JSON.parse(l); return e.outcome === 'certified' || /^certification/.test(e.subtype ?? '') } catch { return false } })
+  const hasCert = hasCertification(dir)
   say('ACTION', 'auto')
   say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')
   say('REASON', 'patch-grade by the mechanical half of the rule (no high-severity id fixed); loop quiet — certification proceeds on the standing owner approval (2026-08-20)')
+  process.exit(0)
+}
+if (gateKind === 'certification-go-ahead') {
+  const hasCert = hasCertification(dir)
+  say('ACTION', 'auto')
+  say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')
+  say('REASON', 'loop quiet — certification proceeds on the standing owner approval (2026-08-20)')
   process.exit(0)
 }
 stop(`gate "${gateKind}" has no written delegation — fail closed`)
