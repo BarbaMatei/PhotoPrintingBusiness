@@ -177,12 +177,11 @@ public class OrderService : IOrderService
         //  • ix_orders_idempotency_key: a concurrent request with the SAME key won
         //    the race between our resolution above and this save → resolve the winner
         //    (replay / 409) instead of a 500. Terminal — no retry.
-        //  • ix_orders_order_number: the non-Postgres OrderNumber is a
-        //    racy COUNT (OrderNumberService's SQLite branch), so two concurrent inserts can
-        //    pick the SAME number. That is transient and unrelated to idempotency —
-        //    regenerate the number and retry the (still-tracked) order rather than 500.
-        //    Bounded, so a genuine persistent number clash still surfaces. Postgres uses a
-        //    per-year sequence, so this branch is effectively SQLite/dev-only.
+        //  • ix_orders_order_number: on InMemory the OrderNumber comes from a racy COUNT,
+        //    so two concurrent inserts can pick the SAME number. That is transient and
+        //    unrelated to idempotency — regenerate the number and retry the (still-tracked)
+        //    order rather than 500. Bounded, so a genuine persistent clash still surfaces.
+        //    Postgres uses a per-year sequence and cannot hit this.
         for (var attempt = 0; ; attempt++)
         {
             try
@@ -244,21 +243,12 @@ public class OrderService : IOrderService
     /// handle ONLY a real key collision and rethrow everything else, instead of inferring the
     /// cause from a follow-up query.
     ///
-    /// Hardened both arms against silent regressions:
-    /// <list type="bullet">
-    /// <item>Postgres matches <see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/> (the
-    /// same constant the index is named with) so a rename is a compile break, not a fall-through.</item>
-    /// <item>SQLite has no structured constraint name, so it keys off the <b>extended</b> result
-    /// code <c>SQLITE_CONSTRAINT_UNIQUE</c> (2067 — narrower than the generic <c>SQLITE_CONSTRAINT</c>
-    /// 19) plus the column name via <c>nameof</c>, so a column rename also breaks at compile time.</item>
-    /// </list>
+    /// Matching <see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/> — the same constant the
+    /// index is named with — makes a rename a compile break rather than a silent fall-through.
     /// </summary>
     private static bool IsIdempotencyKeyViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
-            Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
-                sqlite.Message.Contains(nameof(Order.IdempotencyKey), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.IdempotencyKeyIndexName,
@@ -268,7 +258,7 @@ public class OrderService : IOrderService
     /// <summary>
     /// True iff <paramref name="ex"/> is the database rejecting the INSERT because of the
     /// OrderNumber unique index (<see cref="PhotoPrintDbContext.OrderNumberIndexName"/>).
-    /// Only the non-Postgres COUNT-based generator can produce a duplicate number under
+    /// Only the InMemory COUNT-based generator can produce a duplicate number under
     /// concurrency, and that is transient — the caller regenerates
     /// and retries. Same provider-error inspection (and same compile-break coupling) as
     /// <see cref="IsIdempotencyKeyViolation"/>.
@@ -276,9 +266,6 @@ public class OrderService : IOrderService
     private static bool IsOrderNumberViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
-            Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
-                sqlite.Message.Contains(nameof(Order.OrderNumber), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.OrderNumberIndexName,

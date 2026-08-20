@@ -119,7 +119,7 @@ property is one extra `WHERE` clause already in the design.
 | **Redis-backed leader election (advisory lock per order id)** | Eliminates duplicate calls entirely. Aligns with bolt 046's planned target architecture. | Requires Redis (not yet in project). Bolt 037 blocks on bolt 046. Adds a new operational dependency. | Premature. Bolt 046 will land this; until then, the cost of duplicate calls is zero (vendor + re-check absorb it). |
 | **`Orders.ClaimedBy` column + TTL** | Pure SQL — no new infra. Visible in the DB so debugging is easy. | New column + index. Stale-claim recovery is its own state machine. Doubles the per-job latency (UPDATE-then-call-then-UPDATE). | More machinery than the problem warrants. Vendor-side idempotency already does the work. |
 | **Single-replica deployment** | Trivially correct. | Imposes a deployment-topology constraint via this one feature. Defeats the scale story. | Wrong direction; intent 015 should not foreclose scaling. |
-| **`SELECT … FOR UPDATE` skip-locked enqueue** | Database-native. No new infra. | Postgres-specific (we'd need a fallback for SQLite-dev or accept divergence). Per-row pessimistic locking is heavier than necessary. | Vendor + app re-check already give us the same result with less code. |
+| **`SELECT … FOR UPDATE` skip-locked enqueue** | Database-native. No new infra. | Postgres-specific (we'd need a fallback for PostgreSQL-dev or accept divergence). Per-row pessimistic locking is heavier than necessary. | Vendor + app re-check already give us the same result with less code. |
 
 ## Consequences
 

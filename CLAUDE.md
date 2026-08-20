@@ -5,11 +5,11 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
 
 ## Constraints that bite when unknown
 
-- **Dual database.** SQLite in dev (via `EnsureCreated` — migrations never run in dev),
-  PostgreSQL 16 in prod (migrations at boot), EF InMemory as the integration-test default.
-  Nothing currently proves migrations/SQL against Postgres. Details + test implications:
-  `memory-bank/standards/data-stack.md` — read it before touching entities, queries, or
-  migrations.
+- **PostgreSQL 16 everywhere.** Every environment runs Npgsql and applies the migration
+  chain at boot (`Database.Migrate()`); EF InMemory is the integration-test default, and
+  relational tests get a throwaway Postgres database via `PostgresTestDatabase`. Details +
+  test implications: `memory-bank/standards/data-stack.md` — read it before touching
+  entities, queries, or migrations.
 - **Two-tier storage.** Every upload read/write/delete must route via
   `IStorageRouter.For(upload.StorageLocation)` — never assume local disk. See
   system-architecture.md (storage section) and ADR-007/008/011.

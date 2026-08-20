@@ -1,7 +1,6 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,20 +23,11 @@ namespace PhotoPrint.Tests.Unit.Controllers;
 
 public class WebhooksControllerInvoiceRaceTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database = new();
 
-    public WebhooksControllerInvoiceRaceTests()
-    {
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-        using var db = CreateDb();
-        db.Database.EnsureCreated();
-    }
+    public void Dispose() => _database.Dispose();
 
-    public void Dispose() => _connection.Dispose();
-
-    private PhotoPrintDbContext CreateDb() =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>().UseSqlite(_connection).Options);
+    private PhotoPrintDbContext CreateDb() => _database.NewContext();
 
     private static Order MakeOrder(Guid id) => new()
     {
@@ -116,7 +106,7 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         return (bool)method.Invoke(null, [ex])!;
     }
 
-    // One shared SQLite connection can't run true concurrent transactions, so the race is forced by ordering the calls directly.
+    // The race is forced by ordering the calls directly rather than by real concurrency.
     [Fact]
     public async Task ConcurrentDeliveriesForSameOrder_LoserGetsClassifiableViolation_ExactlyOneInvoicePersists()
     {

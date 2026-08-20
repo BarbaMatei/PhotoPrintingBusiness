@@ -222,7 +222,7 @@ Audience: the owner and bolt-opening agents. One line per row, keyed by
 | `edge` | proxy, endpoint exposure, rate limiting, health and metrics gating |
 | `observability` | metrics, tracing, Sentry, SLOs, dashboards |
 | `jobs` | background jobs, retries, sweeps |
-| `data` | EF, migrations, dual-provider parity |
+| `data` | EF, migrations, schema fidelity |
 | `tests` | test infrastructure: flakes, helpers, coverage gaps whose fix is test-only |
 | `records` | docs, memory-bank, process records |
 

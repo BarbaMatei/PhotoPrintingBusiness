@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.API.BackgroundJobs;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
@@ -337,20 +338,15 @@ public class ArchiveRetentionJobTests
     }
 
     [Fact]
-    public async Task SweepAsync_D50Query_TranslatesOnSqlite()
+    public async Task SweepAsync_CandidateQuery_TranslatesToSql()
     {
-        // The InMemory provider runs LINQ-to-objects and proves nothing about SQL translation
-        // (data-stack parity rule). The shared-upload fix added a second correlated NOT-EXISTS to the
-        // candidate query; an untranslatable shape throws at ToListAsync regardless of rows,
-        // so an empty-DB sweep on real SQLite pins translatability. Filtering semantics are
-        // covered by SweepAsync_UploadSharedWithInWindowOrder_IsNotExpired (InMemory); the
-        // full relational-graph seeding belongs to the deferred Testcontainers track.
-        using var conn = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
-        conn.Open();
-        var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(conn).Options;
-        using var db = new PhotoPrintDbContext(options);
-        db.Database.EnsureCreated();
+        // The InMemory provider runs LINQ-to-objects and proves nothing about SQL translation.
+        // The shared-upload fix added a second correlated NOT-EXISTS to the candidate query; an
+        // untranslatable shape throws at ToListAsync regardless of rows, so an empty-database
+        // sweep pins translatability. Filtering semantics are covered by
+        // SweepAsync_UploadSharedWithInWindowOrder_IsNotExpired (InMemory).
+        using var database = new PostgresTestDatabase();
+        using var db = database.NewContext();
 
         var cloud = new Mock<IStorageService>(MockBehavior.Strict);
         var sut = BuildSut(db, Router(true, cloud).Object);

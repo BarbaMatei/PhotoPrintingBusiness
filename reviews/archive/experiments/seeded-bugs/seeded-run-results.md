@@ -75,7 +75,7 @@ long tail (migration, log level, dead code) rode on 2–4 lenses.
 Both passes also surfaced genuine pre-existing issues that are NOT seeds (set aside per protocol,
 not counted in recall): the global-unique-index cross-tenant oracle (the real accepted-deferred
 P10), decimal truncation in `(long)(TotalRon*100)`, EuPlatesc recovery-replay URL rebuild
-(deferred BUG-2), `OrderNumber` `HasMaxLength(20)` configured twice, the SQLite order-number
+(deferred BUG-2), `OrderNumber` `HasMaxLength(20)` configured twice, the PostgreSQL order-number
 global-count (no per-year reset), and gateway-502 absent from `ProducesResponseType`. A couple
 (double HasMaxLength, the 502 doc gap) look genuinely new and worth a real ticket.
 

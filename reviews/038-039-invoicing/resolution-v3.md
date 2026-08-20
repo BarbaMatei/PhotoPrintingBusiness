@@ -29,7 +29,7 @@ closed: 2026-08-14
 The previous round asserted the label by invoking the private `ResultLabelFor` through
 reflection, and asserted the rollback from a test that never applied the transition it was
 meant to undo. Both passed whether or not the fix existed. The replacement drives
-`StripeWebhookAsync` end to end on SQLite and reads the metric through `MetricCapture`, so the
+`StripeWebhookAsync` end to end on PostgreSQL and reads the metric through `MetricCapture`, so the
 label the handler actually records is what gets asserted. Each leg was proven red separately —
 putting the `duplicate` mislabel back reddens it, and so does deleting the reload block — then
 green once restored.

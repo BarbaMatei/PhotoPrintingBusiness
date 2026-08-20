@@ -32,7 +32,7 @@ The verification pass measured the cheap route and this round implemented it: th
 mock already in the file captures immediately before the reload, so cancelling a token source
 from its callback lands cancellation inside `ReloadAsync`. Restoring the old
 `when (reloadEx is not OperationCanceledException)` filter reddens it with the exception
-escaping through `SqliteCommand.ExecuteReaderAsync`; removing the filter turns it green. Forty-six
+escaping through `NpgsqlCommand.ExecuteReaderAsync`; removing the filter turns it green. Forty-six
 lines, existing helpers only.
 
 ### The EuPlatesc coverage gap is dropped, not fixed (PPW-508)

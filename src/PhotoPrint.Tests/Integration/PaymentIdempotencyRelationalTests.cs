@@ -9,16 +9,16 @@ namespace PhotoPrint.Tests.Integration;
 /// <summary>
 /// The cross-tenant idempotency-key collision must surface as a
 /// 409 at the HTTP layer, but the default integration stack uses EF InMemory, which does
-/// not enforce the unique index. This class runs against a real SQLite database
-/// (<see cref="SqlitePaymentFactory"/>) so the global unique index actually rejects the
+/// not enforce the unique index. This class runs against a real PostgreSQL database
+/// (<see cref="PostgresPaymentFactory"/>) so the global unique index actually rejects the
 /// second tenant's INSERT and the controller maps it to 409 — the production-realistic
 /// behavior the InMemory test can't reach.
 /// </summary>
-public class PaymentIdempotencyRelationalTests : IClassFixture<SqlitePaymentFactory>
+public class PaymentIdempotencyRelationalTests : IClassFixture<PostgresPaymentFactory>
 {
-    private readonly SqlitePaymentFactory _factory;
+    private readonly PostgresPaymentFactory _factory;
 
-    // Courier delivery avoids the Order → EasyboxLocker FK (SQLite enforces it), so the
+    // Courier delivery avoids the Order → EasyboxLocker FK (PostgreSQL enforces it), so the
     // only constraint the second tenant's INSERT can violate is the unique idempotency index.
     private static readonly CreateOrderRequest CourierStripeRequest = new(
         PaymentProcessor: PaymentProcessor.Stripe,
@@ -30,7 +30,7 @@ public class PaymentIdempotencyRelationalTests : IClassFixture<SqlitePaymentFact
             County = "Ilfov", PostalCode = "010101", RecipientName = "Test", Phone = "0700000000",
         });
 
-    public PaymentIdempotencyRelationalTests(SqlitePaymentFactory factory) => _factory = factory;
+    public PaymentIdempotencyRelationalTests(PostgresPaymentFactory factory) => _factory = factory;
 
     [Fact]
     public async Task CreateStripeIntent_SecondTenantReusesAnothersKey_Returns409_OnRealUniqueIndex()

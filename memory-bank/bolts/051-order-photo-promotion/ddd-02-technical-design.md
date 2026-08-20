@@ -121,8 +121,8 @@ dotnet run --project src/PhotoPrint.API -- backfill-archive [--dry-run]
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
-| `Upload.LargePreviewPath` | `varchar(512)` (Postgres) / `TEXT` (SQLite) | YES | NULL | Mirrors `ThumbnailPath`. Populated by promoter; null while `StorageLocation = Local`. |
-| `Upload.OriginalPurgedAt` | `timestamptz` (Postgres) / `TEXT` (SQLite) | YES | NULL | Written by unit-002 post-printing purge. Column exists now so a single migration covers both fields. |
+| `Upload.LargePreviewPath` | `varchar(512)` (Postgres) / `TEXT` (PostgreSQL) | YES | NULL | Mirrors `ThumbnailPath`. Populated by promoter; null while `StorageLocation = Local`. |
+| `Upload.OriginalPurgedAt` | `timestamptz` (Postgres) / `TEXT` (PostgreSQL) | YES | NULL | Written by unit-002 post-printing purge. Column exists now so a single migration covers both fields. |
 
 Both columns are `nullable` ⇒ no default-value back-fill ⇒ migration is **instant** on existing rows. Equivalent on both providers (no provider-specific quirks; same pattern bolt 043 used for `StorageLocation`).
 

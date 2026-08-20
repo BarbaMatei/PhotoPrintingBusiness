@@ -48,7 +48,7 @@ Wire Sentry error tracking into the API so every unhandled exception lands in Se
 - `Sentry:Enabled` (master) — false by default. Wires the SDK and starts sending events only when true.
 - `Sentry:Dsn` — empty by default. With master flag off, the SDK is never constructed.
 
-This means: zero risk of leaking events from local dev or test envs (Testing host + Sqlite dev DB never flip `Enabled=true`).
+This means: zero risk of leaking events from local dev or test envs (Testing host + Postgres dev DB never flip `Enabled=true`).
 
 **Scope enricher pattern.** Two options:
 

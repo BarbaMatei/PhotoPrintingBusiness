@@ -38,7 +38,7 @@ caller-supplied keys made the new code drop in cleanly).
 - ✅ `Upload.LargePreviewPath varchar(512) NULL` added (migration `AddUploadArchiveFields`).
 - ✅ `Upload.OriginalPurgedAt timestamptz NULL` added (same migration).
 - ✅ EF Core configuration via Fluent API (`UploadConfiguration` — no data annotations; ADR-002).
-- ✅ Migration applies cleanly on both providers (Postgres types written into the migration file by hand because the scaffold ran against SQLite; SQLite never executes this migration — it uses `EnsureCreated` from the model).
+- ✅ Migration applies cleanly against PostgreSQL, with store types matching the model.
 - ✅ `Upload.StorageLocation` from bolt 043 left intact; not re-added.
 
 ### Story 002 — Large Preview Generation
@@ -71,7 +71,7 @@ caller-supplied keys made the new code drop in cleanly).
 
 ## Test Patterns Used
 
-- **InMemory EF provider** for any test that needed a `DbContext` (`OrderPhotoPromoterTests`, `PromotionRecoveryScannerTests`). Same pattern bolt 042/043 used; the SQLite-only DateTimeOffset converter doesn't apply on InMemory, so `DateTimeOffset` works natively.
+- **InMemory EF provider** for any test that needed a `DbContext` (`OrderPhotoPromoterTests`, `PromotionRecoveryScannerTests`). Same pattern bolt 042/043 used; the Postgres-only DateTimeOffset converter doesn't apply on InMemory, so `DateTimeOffset` works natively.
 - **`Mock<IStorageService>` strict-mode for the cloud adapter** in the promoter tests — flushes any unexpected call into a test failure, which is what we want for a "no cloud activity when not paid" assertion.
 - **Real ImageSharp encode/decode** in `ImageProcessorLargePreviewTests` — no mocking of the image pipeline; the test exercises the real codec path on small synthetic images.
 - **Forged JPEG SOF0 marker** in `BombSizedSource_Throws` — a 50-byte JPEG with the header rewritten to claim 26000×26000 dimensions, so the guard rejects before any decode allocation.

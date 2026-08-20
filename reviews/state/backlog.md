@@ -26,7 +26,7 @@ translate through [archive/id-map.md](../archive/id-map.md).
 | ID | Target | Sev | What | Area |
 |---|---|---|---|---|
 | PPW-12 | 035-payment-idempotency | 🟡 | The ddd-02 design sketch puts conflict resolution in the controller, the code puts it in the order service | `records` |
-| PPW-20 | 035-payment-idempotency | 🟡 | Model snapshot is SQLite-flavored — next Npgsql migration scaffolds a phantom diff | `data` |
+| PPW-20 | 035-payment-idempotency | 🟡 | Model snapshot is Npgsql-typed — next Npgsql migration scaffolds a phantom diff | `data` |
 | PPW-32 | 035-payment-idempotency | ⚪ | The controller saves through the database context itself rather than through the order service | `payments` |
 | PPW-36 | 035-payment-idempotency | 🟠 | Entire Postgres production DB path is unexercised by tests — deferred to the migration/3-env phase | `data` |
 | PPW-39 | 035-payment-idempotency | 🟡 | Global single-column idempotency-key uniqueness = cross-tenant existence oracle + key-squatting; durable fix needs a per-tenant composite index (migration) | `payments` |
@@ -127,7 +127,7 @@ translate through [archive/id-map.md](../archive/id-map.md).
 | PPW-390 | 044-045-observability | 🟡 | The documented `Sentry__Debug=true` verbosity knob is inert under Serilog's Information floor | `records` |
 | PPW-391 | 044-045-observability | 🟡 | No volume ceiling on the new Sentry capture site | `observability` |
 | PPW-393 | 044-045-observability | 🟡 | §13.10 still says a No-Data panel means a name mismatch, contradicting the accepted panel-8 decision | `records` |
-| PPW-394 | 044-045-observability | 🟡 | AWB shutdown carve-out matches only `OperationCanceledException`; tests run on SQLite, prod is Postgres | `shipping` |
+| PPW-394 | 044-045-observability | 🟡 | AWB shutdown carve-out matches only `OperationCanceledException`; tests run on PostgreSQL, prod is Postgres | `shipping` |
 | PPW-395 | 044-045-observability | 🟡 | `CapturingSentryTransport.Payloads` is an unsynchronized `List` across threads | `tests` |
 | PPW-396 | 044-045-observability | 🟡 | `wrong_listener` and `not_allowed` denials share one 512-entry log budget | `edge` |
 | PPW-397 | 044-045-observability | 🟡 | A throw escaping a webhook endpoint records no metric at all — sibling class resolved the opposite way | `payments` |

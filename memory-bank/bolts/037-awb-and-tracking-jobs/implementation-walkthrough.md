@@ -74,7 +74,7 @@ now-implemented methods).
 ### Migration
 
 - `Migrations/20260602190046_AddOrderShippedAtAndDeliveredAt.cs` —
-  scaffolded against SQLite, hand-edited to Postgres
+  scaffolded against PostgreSQL, hand-edited to Postgres
   `timestamp with time zone`. Same pattern as the previous bolt's
   migrations.
 - `Migrations/20260602190046_AddOrderShippedAtAndDeliveredAt.Designer.cs`
@@ -107,7 +107,7 @@ now-implemented methods).
 - `Models/Order.cs` — added `ShippedAt: DateTimeOffset?` and
   `DeliveredAt: DateTimeOffset?`.
 - `Data/PhotoPrintDbContext.cs` — added EF mapping for both
-  (existing SQLite Unix-ms converter loop covers them automatically).
+  (existing PostgreSQL Unix-ms converter loop covers them automatically).
 - `Services/AdminOrderService.cs` — sets `ShippedAt` when admin
   transitions to `Shipped`; sets `DeliveredAt` (if still null) when
   admin transitions manually to `Delivered`. Tracking job sets

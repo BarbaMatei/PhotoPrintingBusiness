@@ -83,9 +83,9 @@ Routing: Romanian slugs, everything lazy (`loadComponent`/`loadChildren`); heavy
 - Naming: `Method_Scenario_ExpectedOutcome`. Arrange-Act-Assert.
 - Integration tests use the `WebApplicationFactory<Program>` family (`AuthFactory` base →
   feature factories). **Default DB is EF InMemory** — it cannot enforce unique indexes or
-  check constraints; for relational behavior use the `SqlitePaymentFactory` pattern (real
-  SQLite on a shared in-memory connection). See data-stack.md *"what the test matrix can and
-  cannot prove"*.
+  check constraints; for relational behavior use the `PostgresPaymentFactory` pattern, or
+  `PostgresTestDatabase` for a unit-level throwaway database. See data-stack.md
+  *"what the test matrix proves"*.
 - Real-S3 tests are `[SkippableFact]` gated on `STORAGE_TEST_*` env vars (set in CI's MinIO
   step; skipped locally unless you run MinIO).
 - **The mocking rule (definition-of-done class 5): mock only at system boundaries** — network,

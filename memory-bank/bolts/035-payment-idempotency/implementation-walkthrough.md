@@ -32,7 +32,7 @@ End-to-end idempotent payment-intent creation. A repeat `POST` with the same `Id
 ### Deviations from Design
 
 1. **EuPlatesc redirect URL is persisted, not reconstructed.** Stage 2 assumed the URL was deterministically reproducible. It is not — `BuildInitiateUrl` embeds `DateTime.UtcNow` + a random nonce. So replay returns the **stored** `Order.EuPlatescRedirectUrl` instead of rebuilding. This is the option story 003 explicitly left open ("persist… or reconstruct"); persisting is the only way to honour the "same redirect URL" AC literally. Added `Order.EuPlatescRedirectUrl` for this.
-2. **Migration is SQLite-flavoured (`TEXT`, plain unique index).** `dotnet ef` resolved the SQLite design-time provider (dev default `DatabaseProvider: Sqlite`), matching the project's entire existing migration history (e.g. `AddFinishNameToCartItem` is also `TEXT`). `TEXT` is valid on Postgres; a plain unique index on a nullable column allows multiple NULLs on both providers, so it is behaviourally equivalent to the filtered index. The `HasFilter` optimisation is expressed in the DbContext model config for Postgres runtime/EnsureCreated.
+2. **Migration store types drifted from the model (`TEXT`, plain unique index).** `TEXT` is valid on PostgreSQL, and a plain unique index on a nullable column allows multiple NULLs, so it was behaviourally equivalent to the filtered index. The `HasFilter` optimisation is expressed in the DbContext model config. *(Superseded: the chain was later re-scaffolded under Npgsql as a single baseline.)*
 
 ### Dependencies Added
 

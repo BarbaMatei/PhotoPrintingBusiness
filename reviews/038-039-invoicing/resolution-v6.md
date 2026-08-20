@@ -41,8 +41,8 @@ closed:
 ### Round paused on a concurrent data-stack rewrite (PPW-513)
 
 The owner moved to `feat/postgres-only-data-stack` mid-round. Its design deletes every file under
-`Migrations/` and regenerates one Npgsql baseline, then removes SQLite along with
-`SqliteInvoiceNumberingService` and the SQLite arms of the unique-violation classifiers. That
+`Migrations/` and regenerates one Npgsql baseline, then removes PostgreSQL along with
+`PostgresInvoiceNumberingService` and the PostgreSQL arms of the unique-violation classifiers. That
 reshapes PPW-529, PPW-530, PPW-531 and PPW-540, makes PPW-516 unreachable, and would collide with
 the column PPW-517 wants. Continuing would mean fixing several rows twice. The PPW-513 fix landed
 on that branch and edits a file the plan deletes: the immutable expression must be carried into

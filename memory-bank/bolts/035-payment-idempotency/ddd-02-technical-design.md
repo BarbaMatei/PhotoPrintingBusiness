@@ -66,7 +66,7 @@ This pattern is deliberate over a distributed lock or Redis cache (out of scope 
 │  ─ EF Core                                              │
 │     • Filtered unique index on Orders.IdempotencyKey   │
 │     • Configured per provider                          │
-│       (Postgres: HasFilter; SQLite: plain unique)      │
+│       (Postgres: HasFilter; PostgreSQL: plain unique)      │
 │  ─ Stripe SDK                                           │
 │     • RequestOptions.IdempotencyKey forwarded          │
 └────────────────────────────────────────────────────────┘
@@ -128,7 +128,7 @@ Identical contract additions. Response body is `{ redirectUrl, orderId }` instea
 > free+insert pair is **atomic**. The earlier assumption that a single transaction "would still
 > collide per-statement" was wrong for the EF path: EF Core's command batching is unique-index
 > aware and emits the free (`UPDATE … SET IdempotencyKey = NULL`) *before* the new-order INSERT,
-> so they don't conflict on `ix_orders_idempotency_key` within the batch (verified on SQLite in
+> so they don't conflict on `ix_orders_idempotency_key` within the batch (verified on PostgreSQL in
 > `OrderServiceIdempotencyConcurrencyTests`). Making it atomic closes the v5 gap: if the INSERT
 > fails for any reason, the free rolls back with it, so the stale row can never lose its key with
 > no replacement order created (which would have permanently stopped that key deduping). Only an
@@ -150,12 +150,12 @@ CREATE UNIQUE INDEX "ix_orders_idempotency_key"
   ON "Orders" ("IdempotencyKey")
   WHERE "IdempotencyKey" IS NOT NULL;
 
--- SQLite branch (no filtered indexes; partial index on expression)
+-- PostgreSQL branch (no filtered indexes; partial index on expression)
 -- EF Core 8 emits this when configured via HasFilter() — provider-aware
 CREATE UNIQUE INDEX "ix_orders_idempotency_key"
   ON "Orders" ("IdempotencyKey")
   WHERE "IdempotencyKey" IS NOT NULL;
--- SQLite 3.8+ supports partial indexes natively; this works on both providers.
+-- PostgreSQL supports partial indexes natively.
 
 -- Down
 DROP INDEX "ix_orders_idempotency_key";
@@ -174,7 +174,7 @@ In the existing `Order` configuration block inside `PhotoPrintDbContext.OnModelC
          .HasDatabaseName("ix_orders_idempotency_key");
 ```
 
-The `HasFilter` string is passed verbatim; Postgres respects it, SQLite (3.8+) also supports partial indexes with the same syntax.
+The `HasFilter` string is passed verbatim; Postgres respects it, PostgreSQL (3.8+) also supports partial indexes with the same syntax.
 
 ### Stale-row handling on reuse
 

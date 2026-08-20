@@ -37,7 +37,7 @@ closed: 2026-07-14
 | PPW-120 | deferred | — | No test pins the decode slot's release on a throwing decode. Latent, since today's code releases it. Deferred to the next pass. |
 | PPW-121 | deferred | — | The exact-type mapping to 422 is proven only by an injected instance. Latent, since the shipped library throws that concrete type. Deferred to the next pass. |
 | PPW-129 | deferred | — | The fail-open branch when the identify call returns null is dead today, because the shipped library throws instead of returning null. Deferred to the next pass. |
-| PPW-74 | deferred | — | Raised twice this pass: the Postgres arm of the migration is unexercised, and the model snapshot carries the SQLite type. The standing three-environment deferral. |
+| PPW-74 | deferred | — | Raised twice this pass: the Postgres arm of the migration is unexercised, and the model snapshot carries the PostgreSQL type. The standing three-environment deferral. |
 | PPW-132 | deferred | — | The bomb-alert template is duplicated across the controller and the middleware. The PPW-113 fix added a third site, which makes extracting it worth marginally more. Cleanup, deferred. |
 | PPW-133 | deferred | — | `dropRestoredEntry` duplicates `onRemoveUpload`. Cleanup, deferred to the next pass. |
 | PPW-134 | deferred | — | The client-abort branch reads the raw correlation-id item instead of the accessor. Trivial cleanup in the file PPW-113 touched; left deferred to keep this round's scope. See Decisions. |

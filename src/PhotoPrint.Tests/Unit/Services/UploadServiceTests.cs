@@ -105,7 +105,7 @@ public class UploadServiceTests
     public async Task UploadAsync_OverlongFileName_IsTruncatedToColumnLength()
     {
         // HasMaxLength(260) sizes the column but never truncates — an
-        // over-length client filename passed InMemory/SQLite tests yet failed on prod
+        // over-length client filename passed the InMemory tests yet failed on
         // Postgres with a 22001 string-truncation -> 500. Truncate at the service boundary.
         var longName = new string('a', 300) + ".jpg";
 

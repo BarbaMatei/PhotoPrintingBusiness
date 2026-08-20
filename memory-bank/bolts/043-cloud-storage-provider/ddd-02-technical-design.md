@@ -112,7 +112,7 @@ UploadsController.GetPreview(id):
 |-------|--------|-------|
 | Uploads | `StorageLocation` (int/enum, default `0 = Local`, NOT NULL) | added by this bolt's migration; consumed by router + preview |
 
-Migration authored SQLite-typed (snapshot remains SQLite-flavoured — see DEPLOYMENT.md §7 follow-up); valid on Postgres. `FilePath`/`ThumbnailPath` already exist (bolt 042); `LargePreviewPath` is added later by bolt 051.
+Migration authored Npgsql-typed (snapshot remains Npgsql-typed — see DEPLOYMENT.md §7 follow-up); valid on Postgres. `FilePath`/`ThumbnailPath` already exist (bolt 042); `LargePreviewPath` is added later by bolt 051.
 
 ## `StorageSettings` (bound from `Storage:`)
 

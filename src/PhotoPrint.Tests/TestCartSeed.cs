@@ -7,8 +7,8 @@ namespace PhotoPrint.Tests;
 /// The canonical cart entity graph (Product + active ProductSize + PricingTier +
 /// ProductFinish + Upload + CartItem) for one user or guest. Hoisted here because OrderServiceTests, OrderServiceIdempotencyConcurrencyTests and
 /// PaymentFactory each hand-rolled the identical graph and had already drifted — one omitted
-/// <c>CartItem.SizeId</c> while the SQLite fixtures set it. <see cref="Build"/> returns the
-/// entities so each fixture adds them to ITS OWN context (InMemory / shared-SQLite / WAF
+/// <c>CartItem.SizeId</c> while the relational fixtures set it. <see cref="Build"/> returns the
+/// entities so each fixture adds them to ITS OWN context (InMemory / PostgreSQL / WAF
 /// scope); <see cref="CartGraph.AddTo"/> is the shared insert.
 /// </summary>
 internal static class TestCartSeed
@@ -45,7 +45,7 @@ internal static class TestCartSeed
             GuestSessionId = guestSessionId,
             UploadId = upload.Id,
             ProductId = product.Id,
-            SizeId = size.Id, // set consistently — required under real FK enforcement (SQLite)
+            SizeId = size.Id, // set consistently — required under real FK enforcement
             Quantity = quantity,
         };
 

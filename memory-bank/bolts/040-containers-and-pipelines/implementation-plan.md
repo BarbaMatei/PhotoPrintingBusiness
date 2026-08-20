@@ -27,7 +27,7 @@ deployed to production — with all secrets/config supplied as environment varia
 - Projects: `src/PhotoPrint.API`, `src/PhotoPrint.Tests`, `src/PhotoPrint.UI`.
 - Angular uses the **`@angular/build:application`** builder → production output is **`dist/PhotoPrint.UI/browser`**, not `dist/photo-print-ui`.
 - **The API does not serve the SPA today** — no `UseStaticFiles`/`MapFallbackToFile` in `Program.cs`. Baking the UI into `wwwroot` (story 001) is a *new* choice (see Decision D1).
-- A **`DatabaseProvider`** config switch already exists (Postgres default / SQLite dev). Compose + env matrix must set it explicitly.
+- A **`DatabaseProvider`** config switch already exists (Postgres default / PostgreSQL). Compose + env matrix must set it explicitly.
 - Bolt 041 already shipped `.gitignore` secret discipline, `secrets/`, `gen-dev-keys.{sh,ps1}`, and a standalone `secret-scan.yml`. This bolt builds on those (see Decision D4).
 
 ### Dependencies

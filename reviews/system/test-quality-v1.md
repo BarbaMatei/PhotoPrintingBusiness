@@ -32,7 +32,7 @@ review record, this file is immutable once committed; respond in a resolution or
    all. Order creation, intent creation, its error message, and card confirmation — the
    money path in the SPA — have zero real assertions.
 2. **Prod boot is on a provably broken migration path and the suite cannot see it**
-   (TQ2). Nothing runs the migration chain on Postgres, and the chain mixes SQLite and
+   (TQ2). Nothing runs the migration chain on Postgres, and the chain mixes PostgreSQL and
    Npgsql column types, including `AlterColumn` casts Postgres has no cast for. The
    verifier confirmed and sharpened data-stack.md's warning: `Database.Migrate()` at
    first Postgres boot fails before the app serves a request, with all 1,029 tests green.
@@ -87,12 +87,12 @@ Anchors (what moved each grade):
    (its HttpOnly/SameSite attributes asserted nowhere); eight UI component specs stub all
    of the component's own services with `vi.fn()` literals.
 3. **Environment fidelity 3.** ~57 of 1,029 backend tests reach a relational engine (all
-   SQLite), exactly 1 drives HTTP relationally, 0 touch Postgres — while prod boot's
+   PostgreSQL), exactly 1 drives HTTP relationally, 0 touch Postgres — while prod boot's
    `Migrate()` is on a path the DDL evidence says fails outright (TQ2). Eight of the
    nine unique indexes that ARE the app's concurrency mechanism have no duplicate-insert
    test. The InMemory default holds row sets production forbids. UI: chart assertions
    impossible in jsdom; one suite fires real HTTP at localhost:5052. The honest
-   disclosure in data-stack.md and the existing SQLite fixture pattern are what keep
+   disclosure in data-stack.md and the existing PostgreSQL fixture pattern are what keep
    this at 3 rather than 2.
 4. **Failure-mode coverage 4.** Strong where someone cared (upload bomb guards, the
    idempotency collision matrix, guest claim 400s). But: the auth rate limiters
@@ -113,7 +113,7 @@ Anchors (what moved each grade):
    RateLimitIntegrationTests leaks an undisposed host per test that manufactures exactly
    that load.
 7. **Architecture & maintainability 5.** One well-built spine (the five-deep factory
-   chain, SqlitePaymentFactory, deliberate de-duplications with narrated rationale) next
+   chain, PostgresPaymentFactory, deliberate de-duplications with narrated rationale) next
    to: ten copy-pasted host-config roots already diverged, four no-op email fakes under
    four names, five hand-rolled JWT builders drifted to a role the domain does not
    define, a documented factory base class that does not exist, ~111 WAF host boots per
@@ -149,7 +149,7 @@ erosion pattern.
 | TQ# | Sev | Finding | Verifier outcome |
 |---|---|---|---|
 | TQ1 | 🔴 | Payment-step spec's only behavioral test asserts its own mock exists (`expect(paymentService.createStripeIntent).toBeDefined()`, [payment-step.spec.ts:85](../../src/PhotoPrint.UI/src/app/features/checkout/pages/payment-step.spec.ts#L85)); async Stripe init never awaited; no `payment.service.spec.ts` exists; intent creation, error branch, `payWithStripe` covered by zero assertions | CONFIRMED 🔴 (3 independent finders, 3 independent confirmations) |
-| TQ2 | 🔴 | Nothing applies the migration chain to Postgres and the chain is provider-inconsistent — prod boot `Migrate()` fails (uncastable `AlterColumn`s: timestamptz→INTEGER, bool→TEXT, decimal→TEXT in [20260521094335_AddUploadsTable.cs](../../src/PhotoPrint.API/Migrations/)) while all 1,029 tests stay green; only migration test is SQLite ([UploadThumbnailPathMigrationTests.cs:48](../../src/PhotoPrint.Tests/Unit/Data/UploadThumbnailPathMigrationTests.cs#L48)) | CONFIRMED 🔴 — verifier corrected the failing statement but found earlier, more certain failures; sharpens data-stack.md's standing warning |
+| TQ2 | 🔴 | Nothing applies the migration chain to Postgres and the chain is provider-inconsistent — prod boot `Migrate()` fails (uncastable `AlterColumn`s: timestamptz→INTEGER, bool→TEXT, decimal→TEXT in [20260521094335_AddUploadsTable.cs](../../src/PhotoPrint.API/Migrations/)) while all 1,029 tests stay green; only migration test is PostgreSQL ([UploadMigrationSchemaTests.cs:48](../../src/PhotoPrint.Tests/Unit/Data/UploadMigrationSchemaTests.cs#L48)) | CONFIRMED 🔴 — verifier corrected the failing statement but found earlier, more certain failures; sharpens data-stack.md's standing warning |
 | TQ3 | 🔴 | Every rate-limit test runs against a limiter the test factory wrote: `PostConfigure<RateLimiterOptions>` overwrites `GlobalLimiter` in every host ([SecurityBaselineFactory.cs:71](../../src/PhotoPrint.Tests/Integration/SecurityBaselineFactory.cs#L71)); the production limiter could be deleted or set to 1,000,000 with CI green; the login brute-force policy has no test at all | CONFIRMED 🔴 |
 | TQ4 | 🔴 | The `X-Correlation-Id` response header is asserted nowhere: the test named for it iterates a helper whose body is `yield break;` and asserts a flag its own delegate set ([CorrelationIdMiddlewareTests.cs:85,140](../../src/PhotoPrint.Tests/Unit/Middleware/CorrelationIdMiddlewareTests.cs#L85)); deleting the middleware's `OnStarting` block leaves the whole project green | CONFIRMED 🔴 |
 
@@ -174,7 +174,7 @@ erosion pattern.
 
 - TQ17 🟡 Claim endpoint never asserts *which* user the session was bound to; only the
   jti-vs-sub misread is invisible ([GuestSessionControllerIntegrationTests.cs:162](../../src/PhotoPrint.Tests/Integration/GuestSessionControllerIntegrationTests.cs#L162)).
-- TQ18 🟡 Cross-tenant idempotency asserted 200 on InMemory and 409 on SQLite for the
+- TQ18 🟡 Cross-tenant idempotency asserted 200 on InMemory and 409 on PostgreSQL for the
   identical sequence; the 200 is a provider artifact the file does not label
   ([PaymentControllerIntegrationTests.cs:108](../../src/PhotoPrint.Tests/Integration/PaymentControllerIntegrationTests.cs#L108)).
 
@@ -268,7 +268,7 @@ bodies. Not enumerated here; they ride along with the clusters above during fixe
 Ordered by (risk retired ÷ effort). R1–R4 retire the criticals.
 
 1. **R1 — Unshadow Postgres.** Point the factories at CI's postgres:16 when the env var
-   is present (`SqlitePaymentFactory`-style opt-in), and add one migration-chain test on
+   is present (`PostgresPaymentFactory`-style opt-in), and add one migration-chain test on
    Npgsql. This retires TQ2, the Npgsql classifier arms, the sequence path, and starts
    paying down dimension 3. The container already runs; this is config, not
    infrastructure.

@@ -182,8 +182,6 @@ for `(series, year)`, atomically and gap-free.
   sequence is created idempotently per `(series, year)` pair via raw
   SQL in the migration; `CREATE IF NOT EXISTS` semantics so re-running
   is safe.
-- **SQLite (dev) path**: `MAX(Number) + 1` inside a transaction on a
-  serial-write database; safe because SQLite is single-writer.
 
 **Gap-free invariant** — this is the load-bearing legal property:
 
@@ -262,7 +260,7 @@ repository-light convention (intent 001).
 ### Stories coverage check
 
 - ✅ Story **001 (VAT fields + computation)** — `Order` extension, `VatBreakdown` value object, `VatCalculator` domain helper, VAT-inclusive formula, configuration source for rate, snapshot semantics.
-- ✅ Story **002 (Invoice entity + numbering)** — `Invoice` aggregate root with full column set, `InvoiceNumber` value object with format invariants, `IInvoiceNumberingService` contract with gap-free promise, Postgres-vs-SQLite implementation split, rollback-gap mitigation.
+- ✅ Story **002 (Invoice entity + numbering)** — `Invoice` aggregate root with full column set, `InvoiceNumber` value object with format invariants, `IInvoiceNumberingService` contract with gap-free promise, Postgres-vs-PostgreSQL implementation split, rollback-gap mitigation.
 
 ### Open invariants (resolved before Stage 4)
 

@@ -28,7 +28,7 @@ implemented_at: 2026-05-25T11:35:00Z
 ## Technical Notes
 
 - File: `src/PhotoPrint.Tests/Integration/BackgroundJobs/UploadCleanupJobTests.cs`
-- Use the existing `IntegrationTestFixture` (Testcontainers Postgres if available; SQLite fallback acceptable for this case).
+- Use the existing `IntegrationTestFixture` (Testcontainers Postgres if available; PostgreSQL fallback acceptable for this case).
 - Inject `IClock` for time control: production binds `SystemClock`; test binds `FakeClock`.
 - Three test methods: `Cleanup_skips_upload_referenced_by_cart`, `Cleanup_skips_upload_referenced_by_order_item`, `Cleanup_deletes_orphan_upload`.
 
@@ -44,7 +44,7 @@ implemented_at: 2026-05-25T11:35:00Z
 
 | Scenario | Expected Behavior |
 |----------|-------------------|
-| Test runs on SQLite (no JSONB) | Use minimal schema seed; do not rely on Postgres-only types |
+| Test runs on PostgreSQL (no JSONB) | Use minimal schema seed; do not rely on Postgres-only types |
 | File system isolation | Test fixture creates and disposes a per-test temp dir |
 
 ## Out of Scope

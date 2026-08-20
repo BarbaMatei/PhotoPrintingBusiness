@@ -37,9 +37,9 @@ public sealed class IdempotencyKeyFilter : IActionFilter
         var key = string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
 
         // Enforce the documented 1..80 length here. Without this an
-        // over-length key passes dev/test (SQLite ignores varchar(80)) and then fails the
-        // prod Postgres INSERT with a truncation DbUpdateException → a 500 for what is a
-        // client input error. Reject it up front with a 400 instead.
+        // over-length key passes the InMemory tests (which ignore varchar(80)) and then
+        // fails the Postgres INSERT with a truncation DbUpdateException → a 500 for what is
+        // a client input error. Reject it up front with a 400 instead.
         if (key is not null && key.Length > MaxKeyLength)
             throw new BadRequestException(
                 $"Idempotency-Key must be at most {MaxKeyLength} characters.");

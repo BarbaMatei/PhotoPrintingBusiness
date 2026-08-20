@@ -6,7 +6,7 @@
 
 FotoTipar is a monolithic **ASP.NET Core 8 REST API** (`src/PhotoPrint.API`) with an
 **Angular 21 SPA** (`src/PhotoPrint.UI`, standalone/zoneless, SPA-only — no SSR). Persistence is
-**dual-provider** (SQLite dev / PostgreSQL 16 prod — see [data-stack.md](data-stack.md)); file
+**PostgreSQL 16** in every environment (see [data-stack.md](data-stack.md)); file
 storage is **two-tier** (local disk + S3-compatible cloud). Real-time admin notifications via
 SignalR. The API can serve the built SPA from `wwwroot` (`MapFallbackToFile`).
 
@@ -17,9 +17,9 @@ SignalR. The API can serve the built SPA from `wwwroot` (`MapFallbackToFile`).
 └────────────┘                         └───────────┬─────────────────┘
                      ┌────────────┬────────────────┼──────────────┬───────────────┐
                ┌─────▼─────┐ ┌────▼─────┐ ┌────────▼───────┐ ┌────▼────┐ ┌────────▼──────┐
-               │ SQLite dev│ │ Local    │ │ S3-compatible  │ │ Stripe  │ │ SMTP (dev)    │
-               │ Postgres  │ │ disk     │ │ cloud (R2/S3/  │ │ EuPlat- │ │ SendGrid(prod)│
-               │ 16 (prod) │ │ (tier 1) │ │ MinIO, tier 2) │ │ esc     │ │ via EmailQueue│
+               │ PostgreSQL│ │ Local    │ │ S3-compatible  │ │ Stripe  │ │ SMTP (dev)    │
+               │ 16        │ │ disk     │ │ cloud (R2/S3/  │ │ EuPlat- │ │ SendGrid(prod)│
+               │ (Npgsql)  │ │ (tier 1) │ │ MinIO, tier 2) │ │ esc     │ │ via EmailQueue│
                └───────────┘ └──────────┘ └────────────────┘ └─────────┘ └───────────────┘
 ```
 

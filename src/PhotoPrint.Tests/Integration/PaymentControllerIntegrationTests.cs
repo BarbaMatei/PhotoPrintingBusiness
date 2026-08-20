@@ -151,7 +151,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     public async Task CreateStripeIntent_OverLengthIdempotencyKey_Returns400()
     {
         // A key longer than the documented 80-char ceiling must be rejected at the
-        // filter with a 400, not accepted (dev/SQLite) or 500'd (prod Postgres truncation).
+        // filter with a 400, not accepted silently or 500'd by a Postgres truncation error.
         // The cart is seeded so a passing request would otherwise be a 200 — the 400 is
         // attributable to the length check, not an empty cart.
         var (userId, token) = await _factory.SeedUserWithJwtAsync();

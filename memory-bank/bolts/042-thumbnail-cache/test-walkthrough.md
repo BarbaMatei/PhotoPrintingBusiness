@@ -36,7 +36,7 @@ created: 2026-05-27T11:45:00Z
 
 ### Issues Found
 
-- None new. (The pre-existing SQLite-typed migration snapshot is documented in the walkthrough + DEPLOYMENT.md §7; not in scope here.)
+- None new. (The pre-existing Npgsql-typed migration snapshot is documented in the walkthrough + DEPLOYMENT.md §7; not in scope here.)
 
 ### Notes
 

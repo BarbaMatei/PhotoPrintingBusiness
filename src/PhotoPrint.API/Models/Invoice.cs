@@ -25,8 +25,8 @@ public class Invoice
     public string Series { get; set; } = string.Empty;
 
     /// <summary>The numeric portion of <see cref="InvoiceNumber"/>, e.g.
-    /// <c>1</c> for <c>"FT-2026-00001"</c>. Denormalised so SQLite's
-    /// <c>MAX + 1</c> path stays trivial (ADR-020).</summary>
+    /// <c>1</c> for <c>"FT-2026-00001"</c>. Denormalised so the
+    /// per-series-and-year uniqueness index can be expressed directly.</summary>
     public int Number { get; set; }
 
     /// <summary>Legal issue date — derived from <see cref="Order.PaidAt"/>,

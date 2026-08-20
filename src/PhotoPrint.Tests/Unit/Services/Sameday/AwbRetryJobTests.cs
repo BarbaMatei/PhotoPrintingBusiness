@@ -1,11 +1,11 @@
 using System.Reflection;
 using FluentAssertions;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.API.BackgroundJobs;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
@@ -15,29 +15,24 @@ using PhotoPrint.API.Services.Sameday;
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
-/// Unit tests for <see cref="AwbRetryJob"/>. Uses SQLite (not the EF InMemory
+/// Unit tests for <see cref="AwbRetryJob"/>. Uses a real PostgreSQL database (not EF InMemory
 /// provider) so the sweep's date arithmetic and the fresh-claim exclusion run
 /// as real SQL, not LINQ-to-objects. The <c>RunOneTickAsync</c> private method
 /// is invoked via reflection.
 /// </summary>
 public class AwbRetryJobTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database = new();
 
     public AwbRetryJobTests()
     {
-        _connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=False");
-        _connection.Open();
-        using var db = CreateDb();
-        db.Database.EnsureCreated();
+        // FK enforcement off: these exercise the retry sweep, not referential integrity.
+        _database.DropAllForeignKeys();
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose() => _database.Dispose();
 
-    private PhotoPrintDbContext CreateDb() =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
-            .Options);
+    private PhotoPrintDbContext CreateDb() => _database.NewContext();
 
     private IServiceScopeFactory BuildScopes()
     {

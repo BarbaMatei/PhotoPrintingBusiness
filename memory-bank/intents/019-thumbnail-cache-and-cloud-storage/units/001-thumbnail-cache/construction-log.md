@@ -55,4 +55,4 @@ last_updated: 2026-05-27T11:45:00Z
 - Intent 019 has a second unit (`002-cloud-storage-provider` / bolt 043) still to do — this bolt
   completes only unit 001, so **intent 019 stays open**.
 - Completed manually (deterministic cascade; `bolt-complete.cjs` is unrunnable here — `fs-extra`/`js-yaml` not installed). Bolt + 3 stories + unit-brief → complete; `requirements.md` left unchanged (intent not fully complete).
-- Migration note: scaffolding under Npgsql produced a destructive 86 KB diff (the snapshot is SQLite-typed from bolt 035), so the migration was authored under SQLite (`TEXT`, valid on Postgres). Whole-history fix remains the follow-up in `docs/DEPLOYMENT.md` §7.
+- Migration note: scaffolding under Npgsql produced a destructive 86 KB diff (the snapshot is Npgsql-typed from bolt 035), so the migration was authored under PostgreSQL (`TEXT`, valid on Postgres). Whole-history fix remains the follow-up in `docs/DEPLOYMENT.md` §7.

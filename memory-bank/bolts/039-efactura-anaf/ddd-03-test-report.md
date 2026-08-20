@@ -34,7 +34,7 @@ created: 2026-06-03T14:00:00Z
   - Format pinned: `invoices/{yyyy}/{MM}/{InvoiceNumber}.pdf` (ADR-007)
   - **UTC partitioning invariant**: an invoice issued 2027-01-01 00:30 in UTC+02 (= 2026-12-31 22:30 UTC) lands in the `2026/12/` bucket. A customer near midnight on New Year's Eve doesn't straddle two object-lifecycle buckets.
 
-- [x] `src/PhotoPrint.Tests/Unit/Services/Invoicing/InvoiceLifecycleTests.cs` (9 cases across 8 methods, in-memory SQLite per ADR-016)
+- [x] `src/PhotoPrint.Tests/Unit/Services/Invoicing/InvoiceLifecycleTests.cs` (9 cases across 8 methods, a throwaway PostgreSQL database per ADR-016)
   - `MarkSubmitted` from `Pending` → sets `Submitted`, writes `AnafUploadId`, clears `LastError`
   - `MarkSubmitted` from wrong state (Accepted) → CAS loses, returns false, row untouched
   - `RecordPendingError` keeps status Pending but writes the error message (200-with-errors path)
@@ -135,7 +135,7 @@ Two issues surfaced and were resolved during Stage 5:
   - **ADR-022 (dual-write flag)** — `InvoicePdfReadyNotifierTests.Default_settings_have_attachments_disabled` pins the default; flipping to `true` without a config change fails the test
   - **ADR-007 (caller-supplied storage keys)** — `InvoiceStorageKeysTests` pins the literal format
   - **ADR-019 (AwayFromZero rounding)** — inherited from bolt 038's tests; bolt 039 never re-rounds (verified by code review)
-- **The Postgres path has no direct unit tests for the numbering call site** — bolt 038's tests cover `IInvoiceNumberingService` contract via SQLite; the production Postgres `nextval()` atomicity is a Postgres guarantee, not our code.
+- **The Postgres path has no direct unit tests for the numbering call site** — bolt 038's tests cover `IInvoiceNumberingService` contract via PostgreSQL; the production Postgres `nextval()` atomicity is a Postgres guarantee, not our code.
 - **No XSD validation in the suite**: the bundled UBL-Invoice-2.1.xsd + CIUS-RO patch are ANAF-hosted assets we don't yet vendor in the repo. The element-by-element XML tests cover the equivalent validation surface; live XSD validation can be added if it surfaces ANAF rejections our tests don't catch.
 - **No InvoiceUploadJob test**: covered by acceptance-criteria notes above. The worker is orchestration over already-tested building blocks; a dedicated test would require either a Testcontainers Postgres or complex scope mocking.
 

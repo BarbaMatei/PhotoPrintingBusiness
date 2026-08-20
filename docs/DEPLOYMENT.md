@@ -157,24 +157,16 @@ docker compose -f docker-compose.prod.yml up -d
 ## 7. Database migrations — READ BEFORE FIRST DEPLOY
 
 The API applies **EF Core migrations automatically at boot** when it connects to
-PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). SQLite
-dev uses `EnsureCreated()` instead. So a normal deploy needs no manual migration step.
+PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). Every
+environment — local dev included — uses that same path, so a normal deploy needs no
+manual migration step.
 
-> ⚠️ **Known gap to resolve before the first real Postgres deploy.**
-> Most migrations are Npgsql-native (`uuid`, `character varying`, `timestamp with time zone`),
-> but the newest one — `20260527075359_AddOrderIdempotencyKey` — was generated under the
-> **SQLite** provider (`TEXT` columns, a plain — not partial — unique index). `TEXT` is a
-> valid Postgres type so boot won't crash, but the migration history is provider-inconsistent.
-> **Before deploying to Postgres**, verify migrations apply against a real PG instance and,
-> ideally, regenerate that migration under Npgsql:
-> ```sh
-> # against a scratch Postgres, with the prod provider:
-> DatabaseProvider=Postgres ConnectionStrings__Default="Host=...;..." \
->   dotnet ef database update --project src/PhotoPrint.API
-> ```
-> If it applies cleanly and the unique index behaves as intended (Postgres allows multiple
-> NULLs in a unique index, which matches the nullable idempotency key), you're good. This is
-> tracked as a follow-up; it is not a containers/pipelines deliverable.
+There is a single migration, `20260820133204_InitialPostgres`, scaffolded under the Npgsql
+design-time provider: `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial
+unique index on `Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox
+locker seed rows, the `uq_invoices_series_year_number` expression index, and the
+`invoice_seq_ft_2026` sequence. It has been applied against a real PostgreSQL 16 instance
+from an empty database.
 
 Seeding the product catalog (first deploy only):
 ```sh
@@ -218,7 +210,7 @@ backwards-compatible migrations.
 | Caddy can't get a cert | DNS not pointing at the VM yet, or port 80/443 blocked | Fix DNS/firewall; use the staging `acme_ca` line in `Caddyfile` while testing. |
 | API exits on boot with `OptionsValidationException` | A required secret (Stripe/EuPlatesc/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
 | `docker compose pull` 403/denied | GHCR package private and host not logged in | `docker login ghcr.io` with a PAT that has `read:packages`. |
-| Migration error on first PG connect | The SQLite-flavored migration (see §7) | Verify/regenerate per §7 against a scratch Postgres first. |
+| Migration error on first PG connect | Role lacks DDL rights, or a partially-created schema | Confirm the role owns the database, then re-run against a scratch Postgres per §7. |
 | Uploaded images vanish on redeploy | `Storage` not on a volume | Confirm the `apidata:/app/Storage` volume in `docker-compose.prod.yml`. |
 | Site shows API 404 instead of the app | UI not built into `wwwroot` (image built without the UI stage) | Rebuild with the standard `Dockerfile`; the `ui-build` stage populates `wwwroot`. |
 
@@ -1291,7 +1283,7 @@ legal values.
 For every paid order the API:
 
 1. **Computes a VAT breakdown** ([`VatCalculator`](../src/PhotoPrint.API/Services/VatCalculator.cs)) at order creation (bolt 038). The 3 columns `Order.NetTotalRon`, `Order.VatRon`, `Order.VatRate` are snapshotted from `Vat:Rate` at the moment of creation and never re-derived. Legal trail = the rate that was in effect when the customer paid.
-2. **Allocates an invoice number** inside the payment webhook's existing transaction (bolt 039), via `IInvoiceNumberingService.NextNumberAsync("FT", year)`. Postgres uses `nextval()` on a per-`(series, year)` `SEQUENCE`; SQLite (dev) uses `MAX + 1`. The number is `FT-YYYY-NNNNN`. See [ADR-020](../memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md) for the gap-on-rollback trade-off and the quarterly audit (§15.8).
+2. **Allocates an invoice number** inside the payment webhook's existing transaction (bolt 039), via `IInvoiceNumberingService.NextNumberAsync("FT", year)`, which uses `nextval()` on a per-`(series, year)` `SEQUENCE`. The number is `FT-YYYY-NNNNN`. See [ADR-020](../memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md) for the gap-on-rollback trade-off and the quarterly audit (§15.8).
 3. **Inserts the `Invoice` row** in the same transaction as the Order → Paid transition. The Invoice is the frozen legal artefact; the Order can be modified later (admin notes, status corrections) but the Invoice's monetary snapshot is immutable.
 4. **Builds a UBL 2.1 + CIUS-RO compliant XML payload** ([`InvoiceXmlBuilder`](../src/PhotoPrint.API/Services/Invoicing/InvoiceXmlBuilder.cs)) asynchronously via `InvoiceUploadJob`. Stored on `Invoice.XmlPayload`.
 5. **Renders a customer-facing PDF** ([`InvoicePdfRenderer`](../src/PhotoPrint.API/Services/Invoicing/InvoicePdfRenderer.cs)) via QuestPDF; stores it via `IStorageService` at `invoices/yyyy/MM/{InvoiceNumber}.pdf`. See [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md) for why QuestPDF over PuppeteerSharp.

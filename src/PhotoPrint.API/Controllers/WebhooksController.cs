@@ -448,9 +448,6 @@ public class WebhooksController : ControllerBase
     private static bool IsInvoiceOrderIdViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
-            Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
-                sqlite.Message.Contains(nameof(PhotoPrint.API.Models.Invoice.OrderId), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.InvoiceOrderIdIndexName,
@@ -460,9 +457,6 @@ public class WebhooksController : ControllerBase
     private static bool IsInvoiceNumberViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
-            Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
-                sqlite.Message.Contains(nameof(PhotoPrint.API.Models.Invoice.InvoiceNumber), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.InvoiceNumberIndexName,

@@ -10,6 +10,5 @@ namespace PhotoPrint.API.Data;
 public static class DbProviders
 {
     public const string Postgres = "Npgsql.EntityFrameworkCore.PostgreSQL";
-    public const string Sqlite = "Microsoft.EntityFrameworkCore.Sqlite";
     public const string InMemory = "Microsoft.EntityFrameworkCore.InMemory";
 }

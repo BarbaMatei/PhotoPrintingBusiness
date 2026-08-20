@@ -25,7 +25,7 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 
 **Backend** (`PhotoPrint.API.csproj`):
 - .NET 8, C# 12, ASP.NET Core 8 Web API
-- EF Core 8 (Code-First, Npgsql provider for Postgres, SQLite for dev)
+- EF Core 8 (Code-First, Npgsql provider for PostgreSQL)
 - FluentValidation 11.3, Serilog 10, SignalR, RazorLight 2.3
 - SixLabors.ImageSharp 3.1, Stripe.net 46.3, MailKit 4.16, SendGrid 9.29
 
@@ -33,7 +33,7 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 - Angular 21.2, TypeScript 5.9, RxJS 7.8, Vitest (test runner)
 - `@stripe/stripe-js` 9.6, `@microsoft/signalr` 10, `leaflet` 1.9, `chart.js` 4.5
 
-**Database**: PostgreSQL 16 (prod) / SQLite (dev fallback with DateTimeOffset→Unix ms value converter)
+**Database**: PostgreSQL 16 (Npgsql, every environment)
 
 ---
 

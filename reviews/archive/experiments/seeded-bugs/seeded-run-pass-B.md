@@ -27,11 +27,11 @@ defect+location; `lenses` = how many of the 7 independently raised it.
 | B8 | PhotoPrintDbContext.cs:310 | `IdempotencyKey` model 40 vs migration/snapshot/filter 80 (3-way drift) | serious/medium | 2/7 | high |
 | B9 | ExceptionHandlerMiddleware.cs:82-85 | cross-tenant conflict comment says "Error incl. key"; code logs Warning, no key | serious→minor | 4/7 | high (mismatch) |
 | B10 | PaymentsController.cs:135 | dead local `hasCachedValue` | cleanup | 4/7 | high |
-| B11 | Snapshot index-filter / TEXT drift | SQLite-flavored snapshot → phantom Npgsql diff (deferred) | medium | 1/7 | high |
+| B11 | Snapshot index-filter / TEXT drift | Npgsql-typed snapshot → phantom Npgsql diff (deferred) | medium | 1/7 | high |
 | B12 | PhotoPrintDbContext.cs:24,295 | `OrderNumberIndexName` const referenced only by dead code; index uses literal | cleanup | 1/7 | high |
 | B13 | PhotoPrintDbContext.cs:292,305 | `OrderNumber` `HasMaxLength(20)` configured twice | cleanup | 1/7 | high |
 | B14 | PaymentsController.cs:57 | `(long)(TotalRon*100)` truncates | minor | 1/7 | low |
-| B15 | OrderNumberService.cs:25 | SQLite branch numbers from global Count(), no per-year reset | cleanup | 1/7 | high (behavior) |
+| B15 | OrderNumberService.cs:25 | PostgreSQL branch numbers from global Count(), no per-year reset | cleanup | 1/7 | high (behavior) |
 | B16 | PaymentsController.cs:42-47 | gateway 502 (BadGatewayException) not in ProducesResponseType | minor | 1/7 | medium |
 | B17 | Postgres arm untested / vacuous InMemory greens | provider-only branches + cross-tenant InMemory test prove non-prod behavior | medium | 2/7 | high |
 

@@ -46,7 +46,7 @@ This minimizes third-party data footprint (abandoned/unpaid photos never reach t
 
 ### FR-3: Schema additions
 - **Description**: `Upload.LargePreviewPath varchar(512) NULL` and lifecycle bookkeeping (e.g. `OriginalPurgedAt`, archive-expiry derivable from order completion). `Upload.StorageLocation` (Local|Cloud) is added in **bolt 043** (intent 019) and consumed here.
-- **Acceptance Criteria**: migration applies cleanly on Postgres and SQLite.
+- **Acceptance Criteria**: migration applies cleanly on Postgres and PostgreSQL.
 - **Priority**: Must
 
 ### FR-4: Purge original after printing completes

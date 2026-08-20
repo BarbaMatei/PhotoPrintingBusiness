@@ -131,9 +131,9 @@ For our scale and call path, `SEQUENCE` is the right primitive:
 - **Rare gaps require explanation.** Operations runs the quarterly
   audit and writes an accountant note for any gap. This is
   procedural work, not automated.
-- **Postgres-coupled.** SQLite (dev) uses a separate `MAX + 1`
-  implementation. Two code paths to test (mitigated: both implement
-  `IInvoiceNumberingService` and share the same call-site contract).
+- **Postgres-coupled.** The numbering strategy is tied to PostgreSQL
+  sequences; there is no provider-neutral fallback (mitigated: it sits
+  behind `IInvoiceNumberingService`).
 - **The unique index is "defence in depth" not "primary mechanism."**
   A reviewer might wonder why we have both `SEQUENCE` and a unique
   constraint; the answer is the unique constraint covers the
@@ -168,7 +168,7 @@ For our scale and call path, `SEQUENCE` is the right primitive:
   alternative is then the right answer; the migration would be a
   one-shot data move plus a code swap.
 
-- **Risk: SQLite dev path drifts from Postgres.** Two
+- **Risk: PostgreSQL path drifts from Postgres.** Two
   implementations of `IInvoiceNumberingService` means two test
   paths. Mitigation: shared contract tests that both implementations
   satisfy (Stage 5 will detail).

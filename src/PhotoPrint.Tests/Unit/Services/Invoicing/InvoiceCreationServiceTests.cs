@@ -1,38 +1,32 @@
 using FluentAssertions;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services.Invoicing;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
 /// <summary>
-/// Verifies the bolt-038-meets-bolt-039 hand-off: bolt 039's
-/// <see cref="InvoiceCreationService"/> consumes bolt 038's numbering
-/// service + VAT snapshot, producing an Invoice row at the Paid transition.
+/// Verifies the invoicing hand-off: <see cref="InvoiceCreationService"/> consumes the
+/// numbering service + VAT snapshot, producing an Invoice row at the Paid transition.
 /// </summary>
 public class InvoiceCreationServiceTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database = new();
     private readonly PhotoPrintDbContext _db;
-    private readonly SqliteInvoiceNumberingService _numbering;
+    private readonly PostgresInvoiceNumberingService _numbering;
     private readonly InvoiceCreationService _sut;
     private readonly DateTimeOffset _now = new(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
 
     public InvoiceCreationServiceTests()
     {
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-        var opts = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
-            .Options;
-        _db = new PhotoPrintDbContext(opts);
-        _db.Database.EnsureCreated();
-        _numbering = new SqliteInvoiceNumberingService(_db);
+        _db = _database.NewContext();
+        _numbering = NewNumbering(_db);
         _sut = new InvoiceCreationService(
             _db,
             _numbering,
@@ -41,15 +35,18 @@ public class InvoiceCreationServiceTests : IDisposable
             new LoggerFactory().CreateLogger<InvoiceCreationService>());
     }
 
+    private static PostgresInvoiceNumberingService NewNumbering(PhotoPrintDbContext db) =>
+        new(db, NullLogger<PostgresInvoiceNumberingService>.Instance);
+
     private PhotoPrintDbContext CreateSqlLoggingDb(List<string> sqlLog) =>
         new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
+            .UseNpgsql(_database.ConnectionString)
             .LogTo(sqlLog.Add, LogLevel.Information)
             .Options);
 
     private InvoiceCreationService MakeSut(PhotoPrintDbContext db) =>
         new(db,
-            new SqliteInvoiceNumberingService(db),
+            NewNumbering(db),
             Options.Create(new VatSettings { InvoiceSeries = "FT", Rate = 0.19m }),
             new FakeClock(_now),
             new LoggerFactory().CreateLogger<InvoiceCreationService>());
@@ -57,7 +54,7 @@ public class InvoiceCreationServiceTests : IDisposable
     public void Dispose()
     {
         _db.Dispose();
-        _connection.Dispose();
+        _database.Dispose();
     }
 
     private async Task<Order> SeedPaidOrderAsync(decimal total = 26.00m)

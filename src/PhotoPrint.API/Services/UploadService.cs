@@ -120,8 +120,7 @@ public class UploadService : IUploadService
             // '\' as a separator on Windows, so on the Linux server a crafted name like
             // "C:\evil\x.jpg" would pass through unsanitised — strip both '/' and '\'.
             // Then cap to the column length: HasMaxLength(260) sizes the column but never
-            // truncates, so an over-length name 201s on InMemory/SQLite yet 22001-500s on
-            // prod Postgres.
+            // truncates, so an over-length name 201s on InMemory yet 22001-500s on Postgres.
             OriginalFileName = SanitizeFileName(originalFileName),
             ContentType     = mimeType,
             WidthPx         = imageInfo.WidthPx,

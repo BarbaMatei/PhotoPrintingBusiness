@@ -1,7 +1,7 @@
 using FluentAssertions;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services.Invoicing;
@@ -10,25 +10,19 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
 /// <summary>
 /// CAS transition tests for <see cref="InvoiceLifecycle"/> (ADR-016). Uses
-/// in-memory SQLite (NOT EF InMemory) because <c>ExecuteUpdateAsync</c> is
+/// a real PostgreSQL database (NOT EF InMemory) because <c>ExecuteUpdateAsync</c> is
 /// what we're verifying — it doesn't translate cleanly under EF InMemory.
 /// </summary>
 public class InvoiceLifecycleTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database = new();
     private readonly PhotoPrintDbContext _db;
     private readonly InvoiceLifecycle _sut;
     private readonly DateTimeOffset _now = new(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
 
     public InvoiceLifecycleTests()
     {
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-        var opts = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
-            .Options;
-        _db = new PhotoPrintDbContext(opts);
-        _db.Database.EnsureCreated();
+        _db = _database.NewContext();
         _sut = new InvoiceLifecycle(
             _db,
             new FakeClock(_now),
@@ -38,7 +32,7 @@ public class InvoiceLifecycleTests : IDisposable
     public void Dispose()
     {
         _db.Dispose();
-        _connection.Dispose();
+        _database.Dispose();
     }
 
     private async Task<Guid> SeedInvoiceAsync(

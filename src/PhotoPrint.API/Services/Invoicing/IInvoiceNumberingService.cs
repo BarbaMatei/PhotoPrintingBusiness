@@ -5,10 +5,6 @@ namespace PhotoPrint.API.Services.Invoicing;
 /// <c>(series, year)</c> partition. See ADR-020 for the load-bearing
 /// trade-off (Postgres SEQUENCE vs counter-table) and the operational
 /// mitigation for the rare rollback-gap case.
-///
-/// Implementations are provider-aware: <c>PostgresInvoiceNumberingService</c>
-/// uses <c>nextval()</c>; <c>SqliteInvoiceNumberingService</c> uses
-/// <c>MAX + 1</c> inside a transaction (single-writer DB makes this safe).
 /// </summary>
 public interface IInvoiceNumberingService
 {

@@ -16,11 +16,9 @@ public class OrderNumberService : IOrderNumberService
     {
         var year = DateTime.UtcNow.Year;
 
-        // Non-Postgres providers have no per-year sequence: InMemory (tests) and SQLite
-        // (local/dev — appsettings.Development.json sets DatabaseProvider=Sqlite) both use
-        // a simple count-based number. The unique index on OrderNumber is the backstop;
-        // these providers don't carry production write-concurrency.
-        if (_db.Database.ProviderName is DbProviders.InMemory or DbProviders.Sqlite)
+        // InMemory (tests) has no sequence support, so it falls back to a count-based
+        // number; the unique index on OrderNumber is the backstop.
+        if (_db.Database.ProviderName is DbProviders.InMemory)
         {
             var count = await _db.Orders.CountAsync(ct);
             return FormatOrderNumber(year, count + 1);

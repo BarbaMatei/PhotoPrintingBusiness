@@ -11,7 +11,7 @@ created: 2026-06-03T04:30:00Z
 **Migration + pure-helper + thin-service**, behind no feature flag (this
 is a structural change to the legal contract of every order; flag-gating
 it would create two-modes-of-truth confusion). Provider-aware
-implementation for the numbering service because Postgres and SQLite have
+implementation for the numbering service because Postgres and PostgreSQL have
 fundamentally different concurrency primitives for monotone counters.
 
 Rationale:
@@ -52,7 +52,7 @@ Rationale:
 │                    CREATE + sequence-seed for current year)   │
 │                  IInvoiceNumberingService (interface)        │
 │                  PostgresInvoiceNumberingService             │
-│                  SqliteInvoiceNumberingService               │
+│                  PostgresInvoiceNumberingService               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -69,7 +69,7 @@ src/PhotoPrint.API/
 │   └── Invoicing/                              ← new folder
 │       ├── IInvoiceNumberingService.cs
 │       ├── PostgresInvoiceNumberingService.cs
-│       ├── SqliteInvoiceNumberingService.cs
+│       ├── PostgresInvoiceNumberingService.cs
 │       └── InvoiceNumber.cs                    ← value object
 ├── DTOs/Orders/
 │   └── OrderDetailDto.cs                       ← MODIFIED (+ VAT fields)
@@ -250,10 +250,10 @@ strategy from the story's edge-case table holds:
   sequence's current value — gaps explained in an accountant-facing
   report.
 
-#### `SqliteInvoiceNumberingService`
+#### `PostgresInvoiceNumberingService`
 
-SQLite has no `SEQUENCE`. Strategy: `SELECT MAX(Number)` for the
-`(series, year)` partition, increment by one, write atomically. SQLite
+PostgreSQL has no `SEQUENCE`. Strategy: `SELECT MAX(Number)` for the
+`(series, year)` partition, increment by one, write atomically. PostgreSQL
 is single-writer so the entire `MAX + INSERT` sequence inside a
 transaction is naturally serialised.
 
@@ -274,7 +274,7 @@ Pseudocode:
     return new InvoiceNumber(series, year, next);
 ```
 
-**Wait — that doesn't parse cleanly.** SQLite's JSON functions vary;
+**Wait — that doesn't parse cleanly.** PostgreSQL's JSON functions vary;
 parsing `InvoiceNumber` strings to extract the number is fragile. Two
 options:
 
@@ -288,9 +288,9 @@ So `Invoice` actually has one more column:
 |---|---|---|
 | `Number` | `int NOT NULL` | The numeric portion of `InvoiceNumber`. Redundant with the full string but cheap to maintain and trivial to query. |
 
-Both providers fill this column at insert time. Postgres uses
-`nextval()`; SQLite uses `MAX + 1`. The full `InvoiceNumber` string is
+`Number` is filled at insert time from `nextval()`. The full `InvoiceNumber` string is
 assembled at insert time and persisted alongside.
+
 
 ### Application layer: OrderService change
 
@@ -436,7 +436,7 @@ call via the same `IF NOT EXISTS` clause.
 | **Numbering is gap-free under normal flow** | Postgres `nextval()` + same-transaction insert. Out-of-band gaps (transaction rollback) flagged for quarterly audit, not eliminated. |
 | **Numbering is gap-free under concurrent Paid transitions** | `nextval()` is atomic; no two transactions ever see the same value. Test: 100 concurrent callers, assert 100 distinct numbers in `[1..100]`. |
 | **Schema migrations are reversible** | EF migration's `Down()` drops the columns and the table. The sequence is dropped via raw SQL in the migration's `Down`. The Down path acknowledges data loss (the new columns can't be reconstructed). |
-| **SQLite dev path works** | Provider check at DI time → `SqliteInvoiceNumberingService`; `MAX + 1` in transaction. Same `Invoice.Number` column means parity in queries. |
+| **Numbering path works** | `PostgresInvoiceNumberingService` resolved at DI time; `nextval()` inside the caller's transaction. |
 
 ### Integration Points
 
@@ -472,11 +472,11 @@ builder.Services.AddSingleton<
     PhotoPrint.API.Validators.VatSettingsValidator>();
 builder.Services.AddOptions<PhotoPrint.API.Configuration.VatSettings>().ValidateOnStart();
 
-if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+if (dbProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddScoped<
         PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
-        PhotoPrint.API.Services.Invoicing.SqliteInvoiceNumberingService>();
+        PhotoPrint.API.Services.Invoicing.PostgresInvoiceNumberingService>();
 }
 else
 {
@@ -492,10 +492,10 @@ else
 |---|---|
 | Unit (pure helper) | `VatCalculatorTests` — `(100, 0.19) → (84.03, 15.97, 100)`; `(0, 0.19) → (0, 0, 0)`; rounding boundaries (e.g. `1.005` → up); property test that `net + vat ≈ total` ±0.01. |
 | Unit (validator) | `VatSettingsValidatorTests` — rate ∈ (0,1), series matches the regex. |
-| Unit (numbering — Postgres) | Mocked-DbContext-free: hard to exercise `nextval()` without a real Postgres. Either:  (a) integration test against a `Testcontainers.PostgreSql` instance, or  (b) testing-host that uses SQLite path only. **Chosen: (b)** — SQLite path covers the contract, Postgres path is verified by a single integration test below. |
-| Unit (numbering — SQLite) | `SqliteInvoiceNumberingServiceTests` — sequential allocation; 100-thread concurrency test that asserts 100 distinct numbers in `[1..100]`; year crossover starts a new sequence at 1. |
+| Unit (numbering — Postgres) | Mocked-DbContext-free: hard to exercise `nextval()` without a real Postgres. Either:  (a) integration test against a `Testcontainers.PostgreSql` instance, or  (b) testing-host that uses PostgreSQL path only. **Chosen: (b)** — PostgreSQL path covers the contract, Postgres path is verified by a single integration test below. |
+| Unit (numbering — PostgreSQL) | `PostgresInvoiceNumberingServiceIntegrationTests` — sequential allocation; 100-thread concurrency test that asserts 100 distinct numbers in `[1..100]`; year crossover starts a new sequence at 1. |
 | Integration (OrderService) | The existing `OrderService` tests are extended to assert the new VAT columns are populated correctly for various subtotals. |
-| Integration (migration smoke) | `Testing` environment runs through the migration; existing tests already test boot-with-migration on SQLite. |
+| Integration (migration smoke) | `Testing` environment runs through the migration; existing tests already test boot-with-migration on PostgreSQL. |
 
 ### Open design questions (resolved before Stage 4)
 

@@ -46,7 +46,7 @@ The 25 High and Medium defects collapse into 7 choices. Counts and PPW-#s are ex
 - PPW-499 — ⚪ — `AnafAuthHandler.CloneAsync` duplicates `SamedayAuthHandler`'s logic verbatim.
 - PPW-500 — ⚪ — response-status classification duplicated between `AnafSpvClient.UploadAsync` and `GetStatusAsync`.
 - PPW-501 — ⚪ — buyer-name fallback logic duplicated between `InvoiceXmlBuilder` and the PDF renderer.
-- PPW-502 — ⚪ — invoice entity config uses a literal `"Sqlite"` string instead of the `DbProviders.Sqlite` constant.
+- PPW-502 — ⚪ — invoice entity config uses a literal `"Postgres"` string instead of the `DbProviders.Postgres` constant.
 - PPW-503 — ⚪ — `PostgresInvoiceNumberingService` interpolates the sequence name into raw SQL with no in-service validation.
 - PPW-504 — ⚪ — `OrderDetailDto` grew 3 required fields with no lens covering the frontend contract.
 

@@ -764,7 +764,7 @@ but no DDL.
 | **XML builder** | xUnit + `XmlDocument.Validate` against `UBL-Invoice-2.1.xsd` (resource-embedded) | Required UBL business terms present; guest-buyer edge case omits BT-48; zero-line throws |
 | **PDF renderer** | xUnit + QuestPDF document tree assertions | Document contains seller name, buyer name, invoice number, totals string match (ro-RO formatting); page count > 0 |
 | **ANAF client** | xUnit + WireMock | Happy-path upload returns `UploadId`; 401 retries once via `AnafAuthHandler`; status parser correctly maps each `stare` value |
-| **Worker** | xUnit + EF InMemory (rejected — use in-memory SQLite to cover real LINQ translation, mirroring bolt 038's lesson) + Mocked `IAnafSpvClient` | One tick processes a `Pending` invoice → `Submitted`; CAS race simulated by pre-mutating row; backoff-exhausted invoice escalates to `Failed` |
+| **Worker** | xUnit + EF InMemory (rejected — use a throwaway PostgreSQL database to cover real LINQ translation, mirroring bolt 038's lesson) + Mocked `IAnafSpvClient` | One tick processes a `Pending` invoice → `Submitted`; CAS race simulated by pre-mutating row; backoff-exhausted invoice escalates to `Failed` |
 | **Customer endpoint** | xUnit + WAF (`WebApplicationFactory`) | 200 with PDF bytes when owner; 403 when not owner; 404 when row missing; cache header present |
 | **Admin endpoints** | xUnit + WAF | Pagination respected; 409 on retry for `Submitted` status (per ADR-004) |
 | **Sequence concurrency** | Already covered by bolt 038's tests | — |

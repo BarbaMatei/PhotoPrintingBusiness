@@ -84,20 +84,13 @@ var metricsPath = builder.Configuration
     .GetValue<string>("Metrics:PrometheusEndpoint") ?? "/metrics";
 
 // ── Database ─────────────────────────────────────────────────────────────────
-var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
 {
     var connStr = builder.Configuration.GetConnectionString("Default");
     // Default to split queries so multi-collection Includes don't trigger a cartesian
     // explosion (and silence the MultipleCollectionInclude warning). No effect on the
     // InMemory provider used in tests.
-    // The split-query option is intentionally repeated in both
-    // arms — the UseSqlite/UseNpgsql calls differ, so a shared helper would save only the
-    // one option line and obscure the provider branch. Not worth extracting.
-    if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
-        options.UseSqlite(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
-    else
-        options.UseNpgsql(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+    options.UseNpgsql(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -223,10 +216,9 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IStripeSignatureVerifier, Pho
 builder.Services.AddScoped<PhotoPrint.API.Services.IEuPlatescService, PhotoPrint.API.Services.EuPlatescService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderService, PhotoPrint.API.Services.OrderService>();
 
-// ── Invoicing (intent 016 / bolt 038) ─────────────────────────────────────────
+// ── Invoicing ─────────────────────────────────────────────────────────────────
 // VAT calculation + invoice numbering. No master flag — VAT is unconditional
-// for legal compliance. Numbering service is provider-aware (Postgres SEQUENCE
-// per ADR-020; SQLite MAX+1 in single-writer mode).
+// for legal compliance.
 builder.Services.Configure<PhotoPrint.API.Configuration.VatSettings>(
     builder.Configuration.GetSection(PhotoPrint.API.Configuration.VatSettings.SectionName));
 builder.Services.AddSingleton<
@@ -234,18 +226,9 @@ builder.Services.AddSingleton<
     PhotoPrint.API.Validators.VatSettingsValidator>();
 builder.Services.AddOptions<PhotoPrint.API.Configuration.VatSettings>().ValidateOnStart();
 
-if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddScoped<
-        PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
-        PhotoPrint.API.Services.Invoicing.SqliteInvoiceNumberingService>();
-}
-else
-{
-    builder.Services.AddScoped<
-        PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
-        PhotoPrint.API.Services.Invoicing.PostgresInvoiceNumberingService>();
-}
+builder.Services.AddScoped<
+    PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
+    PhotoPrint.API.Services.Invoicing.PostgresInvoiceNumberingService>();
 
 // ── Invoicing (intent 016 / bolt 039 — e-Factura/ANAF) ────────────────────────
 // Seller fiscal identity (always validated — embedded in every invoice).
@@ -339,45 +322,10 @@ builder.Services.AddResponseCaching();
 
 var app = builder.Build();
 
-// ── SQLite: auto-create schema (bypasses Postgres-specific migrations) ────────
-if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+// ── Apply EF migrations at boot ───────────────────────────────────────────────
+// Guarded by IsNpgsql so the Testing host (InMemory) is a no-op; only a real
+// PostgreSQL connection triggers migration.
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
-    var schemaLog = scope.ServiceProvider.GetRequiredService<ILogger<PhotoPrintDbContext>>();
-
-    bool created = db.Database.EnsureCreated();
-
-    if (!created)
-    {
-        // DB already existed — verify the schema is complete.
-        // A previous startup may have created only a subset of tables if EnsureCreated
-        // was interrupted; detect this by checking for tables added after the 11 early ones.
-        var conn = db.Database.GetDbConnection();
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table'" +
-            " AND name IN ('Uploads','CartItems','Orders','OrderItems','EasyboxLockers')";
-        var present = Convert.ToInt64(cmd.ExecuteScalar());
-        conn.Close();
-
-        if (present < 5)
-        {
-            schemaLog.LogWarning(
-                "SQLite schema is incomplete ({Present}/5 core tables). " +
-                "Dropping and recreating the dev database — all local data will be lost.",
-                present);
-            db.Database.EnsureDeleted();
-            db.Database.EnsureCreated();
-        }
-    }
-}
-else
-{
-    // ── Postgres (production): apply EF migrations at boot ────────────────────
-    // Guarded by IsNpgsql so the Testing host (InMemory) and any non-relational
-    // provider are a no-op; only a real PostgreSQL connection triggers migration.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
     if (db.Database.IsNpgsql())

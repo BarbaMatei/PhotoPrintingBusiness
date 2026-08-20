@@ -20,7 +20,7 @@ closed: 2026-07-14
 | PPW-152 | fixed | `cc69025` | The purge recovery scanner became a periodic background service, boot sweep plus every six hours by default. See Decisions for the alternative that was rejected. |
 | PPW-153 | fixed | `d15b9af` | The preview cache lifetime is derived from the presign setting; a controller test asserts 1800 seconds for a 30-minute setting. Part b, the lightbox URL signed at page load, is deferred and carries the ledger id PPW-154. |
 | PPW-155 | fixed | `3d97258` | In-flight promotions are tracked and drained before the concurrency gate is disposed. Test: shutdown with a gated in-flight promotion blocks until it finishes. |
-| PPW-156 | fixed | `3326607` | The SQLite migration-chain test asserts the original-path column is nullable. The Postgres arm stays with the three-environment work, as the finding said. |
+| PPW-156 | fixed | `3326607` | The PostgreSQL migration-chain test asserts the original-path column is nullable. The Postgres arm stays with the three-environment work, as the finding said. |
 | PPW-157 | fixed | `881547f` | The controller catches the missing local thumbnail and re-resolves once, redirecting to cloud or returning 404. Unit tests cover both outcomes. |
 | PPW-158 | deferred | — | No event de-duplication and no row version exist anywhere in the API. The fix needs a schema change that belongs to the payment-idempotency work. See Decisions. |
 | PPW-159 | wont-fix | — | 403 for a non-owner is the codebase-wide convention and order identifiers are unguessable. See Decisions. |

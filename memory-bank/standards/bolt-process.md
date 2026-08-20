@@ -27,7 +27,7 @@ Scan `standards/decision-index.md` "Read when" lines first — then, by what the
 
 | If the bolt touches… | Read before designing |
 |---|---|
-| DB schema / migration | `data-stack.md` (dual-provider rules) · D-o-D class 2 |
+| DB schema / migration | `data-stack.md` (PostgreSQL + migration rules) · D-o-D class 2 |
 | Storage (files, keys, tiers) | ADR-007/008/009/011 · system-architecture storage section |
 | Money / payments / orders | ADR-004/005 · D-o-D classes 4, 7 |
 | Auth, guest sessions, interceptors | `api-conventions.md` auth headers · D-o-D class 11 |

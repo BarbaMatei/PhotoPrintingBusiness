@@ -47,7 +47,7 @@ future reconciler tool can be scored against known-correct matches before being 
 
 | Canonical | v1 | v5 | v8 | Evidence |
 |---|---|---|---|---|
-| **P01b** — model snapshot is SQLite-flavored → phantom diff on next Npgsql scaffold | BUG-5 (residual half) | DB-1 | DB-2 | resolution-v5 DB-1 says literally "= BUG-5 v1 residual"; v8.DB-2 marked "known/deferred" via the migration breadcrumb |
+| **P01b** — model snapshot is Npgsql-typed → phantom diff on next Npgsql scaffold | BUG-5 (residual half) | DB-1 | DB-2 | resolution-v5 DB-1 says literally "= BUG-5 v1 residual"; v8.DB-2 marked "known/deferred" via the migration breadcrumb |
 
 Every other pair that looks like a match is a *related-but-distinct* ruling — see the hard
 cases below. That's the eval set's core lesson: naive file/theme matching over-merges badly.
@@ -63,7 +63,7 @@ findable) · `present, missed` = findable, not found · `not yet` = didn't exist
 | # | Problem | v1 | v5 | v8 | Born | Final status |
 |---|---------|----|----|----|------|--------------|
 | P01a | Migration not provider-aware (Npgsql needs varchar + filtered index) | BUG-5 (fixed half) | fixed pre | fixed pre | bolt | verified (2f1872c) |
-| P01b | Snapshot SQLite-flavored → phantom scaffold diff | BUG-5 (residual) | DB-1 | DB-2 | bolt | accepted-deferred (migration/deploy phase) |
+| P01b | Snapshot Npgsql-typed → phantom scaffold diff | BUG-5 (residual) | DB-1 | DB-2 | bolt | accepted-deferred (migration/deploy phase) |
 | P02 | No Postgres in test matrix at all (migration DDL never run; Npgsql arm untested) | ~ T8 test-gap row, no ID ("Critical") | ~ noted in QUAL-5 + verify notes, no ID | DB-1 🟠 | bolt tests | accepted-deferred |
 | P03 | `StripeClientSecret varchar(255)` zero headroom → prod-only 500 | present, missed *(unverified)* | DB-2 🟠 | fixed pre | pre-bolt/bolt | verified (varchar 512) |
 
@@ -73,8 +73,8 @@ findable) · `present, missed` = findable, not found · `not yet` = didn't exist
 |---|---------|----|----|----|------|--------------|
 | P04 | Concurrent same-key INSERT → unhandled 500 | **BUG-1 🔴** | fixed pre | fixed pre | bolt | verified |
 | P05 | Recovery catch too broad — infers cause via `AnyAsync` | not yet (created by P04's fix) | BUG-1 | fixed pre | fix (v1 round) | verified |
-| P06 | SQLite violation detection via message substring | not yet | not yet (created by P05's fix) | BUG-1 (×5 lens convergence) | fix (v5 round) | verified (shared const + code 2067) |
-| P07 | OrderNumber collision in same-key race → 500 (SQLite count-based numbering) | not yet (SQLite count branch added v4) | present, missed — **pre-dismissed in v4 resolution note as "not a new finding"** | BUG-4 | fix (v4 round, BUG-6) | verified (bounded retry) — the dismissal was overturned |
+| P06 | PostgreSQL violation detection via message substring | not yet | not yet (created by P05's fix) | BUG-1 (×5 lens convergence) | fix (v5 round) | verified (shared const + code 2067) |
+| P07 | OrderNumber collision in same-key race → 500 (PostgreSQL count-based numbering) | not yet (PostgreSQL count branch added v4) | present, missed — **pre-dismissed in v4 resolution note as "not a new finding"** | BUG-4 | fix (v4 round, BUG-6) | verified (bounded retry) — the dismissal was overturned |
 
 ### Tenant scoping / key namespace
 
@@ -149,9 +149,9 @@ findable) · `present, missed` = findable, not found · `not yet` = didn't exist
 
 | # | Problem | Raised | Born | Final status |
 |---|---------|--------|------|--------------|
-| P47 | Cross-tenant 409 test vacuous on InMemory (index not enforced) | v2 INFO-1 | bolt tests | verified (SqlitePaymentFactory; proven non-vacuous) |
+| P47 | Cross-tenant 409 test vacuous on InMemory (index not enforced) | v2 INFO-1 | bolt tests | verified (PostgresPaymentFactory; proven non-vacuous) |
 | — | Stale cross-tenant key → 409 accepted consequence | v2 INFO-2 | = **P11** (same problem; INFO-2 is its first record) | wont-fix (v2) → re-raised as v8.REQ-1 → documented |
-| P48 | OrderNumberService had no SQLite branch → dev 500s | v3 BUG-6 | pre-existing, exposed by P47's fix | verified |
+| P48 | OrderNumberService had no PostgreSQL branch → dev 500s | v3 BUG-6 | pre-existing, exposed by P47's fix | verified |
 | P49 | P12's refactor dropped P16's grep-able TODO token | v3 DOC-4 | **fix regression** | verified (restored) |
 | P50 | P34's doc edit incomplete — sketch still showed client key | v6 DOC-3 | **fix regression** | verified (3faaae6) |
 
@@ -161,7 +161,7 @@ These are the pairs where naive matching (same file, same theme) gives the wrong
 Over-merging any of them inflates overlap and would make the loop stop early:
 
 1. **v5.BUG-1 vs v8.BUG-1 — DISTINCT.** Same catch block, same finding ID string, different
-   defect: v5 = catch infers cause too broadly; v8 = the *fix's* SQLite substring matching is
+   defect: v5 = catch infers cause too broadly; v8 = the *fix's* PostgreSQL substring matching is
    fragile. Generation N+1 of a chain, not a re-find.
 2. **v5.DOC-1 vs v8.BUG-3 — DISTINCT.** Same code fact (two-save free+insert). v5 asserted
    "the doc is wrong about it"; v8 asserted "the behavior itself is a crash-window bug."
@@ -193,7 +193,7 @@ Over-merging any of them inflates overlap and would make the loop stop early:
 
 ## Fix-residual chains (causal lineage — link, don't merge)
 
-- **Classification:** P04 (no catch) → P05 (catch too broad) → P06 (SQLite substring) + P07 (OrderNumber sibling)
+- **Classification:** P04 (no catch) → P05 (catch too broad) → P06 (PostgreSQL substring) + P07 (OrderNumber sibling)
 - **Scoping:** P08 (unscoped lookup) → P09 (predicate degeneracy) + P11 (owner-only reclaim, deliberate)
 - **Filter:** P12 (duplication → filter created) → P13 (length) → P14 (trim)
 - **Conflict observability:** P27 (event missing, fixed scoped) → P28 (excluded half)

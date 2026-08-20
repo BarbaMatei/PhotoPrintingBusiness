@@ -32,7 +32,7 @@ real HTTP, no real timers in the unit boundary.
 | `SamedayClientTrackingTests.cs` | 21 | Vendor-status-code → `TrackingState` mapping table (16 cases including case-insensitive + unknown fallback). Plus error matrix + observedAt fallback. |
 | `AwbInfrastructureTests.cs` | 8 | `AwbJobQueue` round-trip, `AwbGiveUpRegistry` + `TrackingStopRegistry` MarkOnce dedup, `NullAwbCreationNotifier` no-op, `AwbCreationNotifier` enqueue contract. |
 | `AwbRetryJobTests.cs` | 5 | Inside / outside 24-h window, give-up dedup across two ticks, non-Paid skip, already-AwbNumber skip. |
-| `ShipmentTrackingJobTests.cs` | 6 | Delivered transition + email enqueue, **ADR-016 race-lost path pinned**, non-terminal state updates only `LastTrackingSyncAt`, interval-skip, polling-stopped, monotonic invariant on `LastTrackingSyncAt`. Uses SQLite (not EF InMemory) because `ExecuteUpdateAsync` is the CAS primitive. |
+| `ShipmentTrackingJobTests.cs` | 6 | Delivered transition + email enqueue, **ADR-016 race-lost path pinned**, non-terminal state updates only `LastTrackingSyncAt`, interval-skip, polling-stopped, monotonic invariant on `LastTrackingSyncAt`. Uses PostgreSQL (not EF InMemory) because `ExecuteUpdateAsync` is the CAS primitive. |
 | `SamedaySettingsValidatorTests.cs` *(extended)* | +6 | Jobs-disabled skips all Jobs rules; zero retry interval / max-concurrent > 50 / empty backoff / negative backoff entry; full valid Jobs is valid. |
 | `SamedayClientTests.cs` *(modified)* | 3 rewritten | The bolt-036 `throws NotImplementedException` stubs replaced with happy-path smoke tests for the now-implemented `CreateAwbAsync`, `GetLabelPdfAsync`, `GetTrackingAsync`. |
 

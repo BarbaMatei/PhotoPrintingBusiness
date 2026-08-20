@@ -31,8 +31,8 @@ created: 2026-06-03T06:00:00Z
   - Invalid series codes fail: empty, single char, lowercase, mixed case, contains digits, contains dash, contains underscore, too long
   - Aggregated failures: multiple violations produce multiple failure messages
 
-- [x] `src/PhotoPrint.Tests/Unit/Services/Invoicing/SqliteInvoiceNumberingServiceTests.cs` (12 cases across 8 methods)
-  - In-memory SQLite (NOT EF InMemory) — covers the LINQ translation path that EF InMemory mishandles
+- [x] `src/PhotoPrint.Tests/Unit/Services/Invoicing/PostgresInvoiceNumberingServiceIntegrationTests.cs` (12 cases across 8 methods)
+  - In-memory PostgreSQL (NOT EF InMemory) — covers the LINQ translation path that EF InMemory mishandles
   - First number in empty year starts at 1, formats as `FT-2026-00001`
   - Next number increments past existing max (seeded gaps OK — `MAX + 1` jumps over them as expected)
   - Series partition is independent (`FP` starts at 1 even if `FT` has 5)
@@ -51,7 +51,7 @@ created: 2026-06-03T06:00:00Z
 
 **Story 001 — VAT fields and computation**
 
-- ✅ **EF migration adds `Orders.NetTotalRon numeric(18,2) NOT NULL DEFAULT 0`, `VatRon numeric(18,2) NOT NULL DEFAULT 0`, `VatRate numeric(5,4) NOT NULL DEFAULT 0.19`** — migration `20260603101910_AddVatAndInvoices` rewritten from SQLite scaffold to Postgres types (per the existing `AddSamedayOrderFields` convention).
+- ✅ **EF migration adds `Orders.NetTotalRon numeric(18,2) NOT NULL DEFAULT 0`, `VatRon numeric(18,2) NOT NULL DEFAULT 0`, `VatRate numeric(5,4) NOT NULL DEFAULT 0.19`** — migration `20260603101910_AddVatAndInvoices` rewritten from PostgreSQL scaffold to Postgres types (per the existing `AddSamedayOrderFields` convention).
 - ✅ **`OrderService.CreateFromCartAsync` sets the breakdown via `VatCalculator.ExtractBreakdown(gross, rate)`** — verified by `CreateFromCartAsync_ValidCart_PopulatesVatBreakdown`.
 - ✅ **`r` is read from `IOptions<VatSettings>.Value.Rate`, default 0.19** — DI registered in `Program.cs`; existing tests construct `OrderService` with `Options.Create(new VatSettings())` and get 0.19.
 - ✅ **For cart subtotal 100.00 RON, `NetTotalRon=84.03, VatRon=15.97, TotalRon=100.00 + shipping`** — pinned by `VatCalculatorTests.Story_example_100_at_19_percent_yields_84_03_net_and_15_97_vat` (the story's literal example).
@@ -61,15 +61,15 @@ created: 2026-06-03T06:00:00Z
 
 - ✅ **`Invoices` table with the documented column set** — entity in `Models/Invoice.cs`; EF mapping in `PhotoPrintDbContext`; migration creates the table with Postgres types (`numeric(18,2)`, `character varying`, `timestamp with time zone`).
 - ✅ **Postgres `SEQUENCE invoice_seq_ft_2026 START 1 INCREMENT 1`** — created idempotently in the migration via raw SQL; subsequent years are auto-created by `PostgresInvoiceNumberingService` via the same `IF NOT EXISTS` clause.
-- ✅ **`IInvoiceNumberingService.NextNumberAsync("FT", 2026)` returns `FT-2026-00001`, `FT-2026-00002`, …** — verified by `SqliteInvoiceNumberingServiceTests.First_number_in_empty_year_starts_at_one` and `Sequential_calls_produce_monotone_numbers`. The Postgres implementation's contract is equivalent (ADR-020); `nextval()` atomicity is a Postgres guarantee, not our code.
-- ✅ **No two concurrent transactions produce the same number** — for Postgres, this is the `nextval()` guarantee (atomic across all concurrent transactions). For SQLite (dev), the single-writer model serialises the `MAX + 1` sequence naturally; concurrency isn't a target on dev.
+- ✅ **`IInvoiceNumberingService.NextNumberAsync("FT", 2026)` returns `FT-2026-00001`, `FT-2026-00002`, …** — verified by `PostgresInvoiceNumberingServiceIntegrationTests.First_number_in_empty_year_starts_at_one` and `Sequential_calls_produce_monotone_numbers`. The Postgres implementation's contract is equivalent (ADR-020); `nextval()` atomicity is a Postgres guarantee, not our code.
+- ✅ **No two concurrent transactions produce the same number** — the `nextval()` guarantee, atomic across all concurrent transactions.
 - ✅ **Crossing into 2027 starts a new sequence `FT-2027-00001`** — verified by `Year_partition_is_independent`. Postgres path's auto-create via `IF NOT EXISTS` handles year crossover without migration.
 
 ### Issues Found
 
 Three issues surfaced during Stage 5; all resolved without changing the design.
 
-1. **SqliteInvoiceNumberingService used `IssuedAt.Year` in its LINQ filter** — EF Core can't translate `.Year` through the project's SQLite `DateTimeOffset ↔ long` converter. Fixed by switching to a `[yearStart, yearEnd)` date-range comparison; works on both SQLite and Postgres without provider branching. Production-correctness improvement, not just a test artefact.
+1. **PostgresInvoiceNumberingService used `IssuedAt.Year` in its LINQ filter** — EF Core can't translate `.Year` through the project's PostgreSQL `DateTimeOffset ↔ long` converter. Fixed by switching to a `[yearStart, yearEnd)` date-range comparison; works on both PostgreSQL and Postgres without provider branching. Production-correctness improvement, not just a test artefact.
 
 2. **`OrderServiceTests` construction broken by the new `IOptions<VatSettings>` ctor dep** — pure compile-time fix: added `Options.Create(new VatSettings())` to both `OrderService` construction sites in the tests. No behavioural change.
 
@@ -81,7 +81,7 @@ Three issues surfaced during Stage 5; all resolved without changing the design.
   - `Net + Vat ≈ Total ± 0.01` — property test
   - `VatRate` is a snapshot — implicit from how `OrderService` stores it; future test could pin by changing the setting and replaying via idempotency
   - `MidpointRounding.AwayFromZero` not `ToEven` — pinned by `Rounding_uses_AwayFromZero_not_banker_s_rounding`
-- **The Postgres path has no direct unit tests** — by design (per ddd-02-technical-design's test plan). `nextval()` atomicity is a Postgres guarantee; replicating it in tests would require a Testcontainers Postgres instance, which is heavier than the value. The SQLite path covers the `IInvoiceNumberingService` contract; production Postgres correctness rests on the well-known `nextval()` semantics + the unique index backstop (ADR-020).
+- **The Postgres path has no direct unit tests** — by design (per ddd-02-technical-design's test plan). `nextval()` atomicity is a Postgres guarantee; replicating it in tests would require a Testcontainers Postgres instance, which is heavier than the value. The PostgreSQL path covers the `IInvoiceNumberingService` contract; production Postgres correctness rests on the well-known `nextval()` semantics + the unique index backstop (ADR-020).
 - **Backfill posture pinned by the migration's header comment** — pre-existing orders carry `NetTotalRon=0, VatRon=0, VatRate=0.19` and are not retroactively re-invoiced.
 - **The `EF1002` warnings on raw SQL in `PostgresInvoiceNumberingService`** are intentional. Both `series` and `year` are validated upstream (`VatSettingsValidator` requires `series` matches `^[A-Z]{2,10}$`, `year` is checked at the method entry to be 2000–9999), so the interpolated SQL is injection-safe. The pattern matches `OrderNumberService.cs`.
 

@@ -16,7 +16,7 @@
 {"t":"2026-08-13T12:27:41+03:00","ev":"test-run","kind":"final","filter":"InvoiceUploadJobTests","passed":2,"failed":0}
 {"t":"2026-08-13T12:52:56+03:00","ev":"finding","id":"PPW-471","status":"fixed","commit":"e38537d"}
 {"t":"2026-08-13T12:52:56+03:00","ev":"finding","id":"PPW-490","status":"fixed","commit":"e38537d"}
-{"t":"2026-08-13T12:52:56+03:00","ev":"test-run","kind":"final","filter":"WebhooksControllerInvoiceRaceTests+WebhooksControllerMetricsTests+PaymentIdempotencyRelationalTests+PaymentControllerIntegrationTests+SqliteInvoiceNumberingServiceTests","passed":134,"failed":0}
+{"t":"2026-08-13T12:52:56+03:00","ev":"test-run","kind":"final","filter":"WebhooksControllerInvoiceRaceTests+WebhooksControllerMetricsTests+PaymentIdempotencyRelationalTests+PaymentControllerIntegrationTests+PostgresInvoiceNumberingServiceIntegrationTests","passed":134,"failed":0}
 {"t":"2026-08-13T12:56:12+03:00","ev":"finding","id":"PPW-472","status":"fixed","commit":"4aa73d5"}
 {"t":"2026-08-13T12:59:09+03:00","ev":"finding","id":"PPW-473","status":"fixed","commit":"e7a1169"}
 {"t":"2026-08-13T13:17:59+03:00","ev":"finding","id":"PPW-474","status":"fixed","commit":"7539dcd"}
@@ -125,7 +125,7 @@
 {"t":"2026-08-20T14:57:20+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 1, Stripe call site back to created ? ok : duplicate - reddens only StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid, on the Failed-count assertion","passed":24,"failed":1}
 {"t":"2026-08-20T14:58:25+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 2, whole ReloadAsync block deleted - reddens the endpoint test on Status and the new cancellation test on its missing rollback-reload-failed log","passed":23,"failed":2}
 {"t":"2026-08-20T14:58:55+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 2 finer revert, Status and PaidAt unwound but UpdatedAt left behind - reddens on UpdatedAt, so the pin bites","passed":23,"failed":2}
-{"t":"2026-08-20T14:59:30+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 3, old when (reloadEx is not OperationCanceledException) filter restored - reddens the cancellation test with System.OperationCanceledException raised at WebhooksController.cs:434 inside EntityEntry.ReloadAsync via GetDatabaseValuesAsync and SqliteCommand.ExecuteReaderAsync","passed":24,"failed":1}
+{"t":"2026-08-20T14:59:30+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 3, old when (reloadEx is not OperationCanceledException) filter restored - reddens the cancellation test with System.OperationCanceledException raised at WebhooksController.cs:434 inside EntityEntry.ReloadAsync via GetDatabaseValuesAsync and NpgsqlCommand.ExecuteReaderAsync","passed":24,"failed":1}
 {"t":"2026-08-20T15:01:20+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-508","note":"cancellation test run 5 times alone at HEAD, 5 of 5 green - the cancel fires synchronously inside the capture callback, so there is no race window","passed":5,"failed":0}
 {"t":"2026-08-20T15:01:50+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-511","note":"EuPlatesc call site put back alone - defect reintroduced, all 25 green, so that site is still proven by nothing; not reopened, per the owner ruling","passed":25,"failed":0}
 {"t":"2026-08-20T15:02:20+03:00","ev":"test-run","pass":5,"kind":"red","note":"class check, RecordPaymentWebhook no-oped - 14 of 25 redden; the only metric-asserting survivor is Stripe_unhandled_event_type_records_nothing, which asserts absence by design","passed":11,"failed":14}
@@ -137,8 +137,8 @@
 {"t":"2026-08-20T15:17:06+03:00","ev":"pass-launch","pass":6,"type":"delta-discovery"}
 {"t":"2026-08-20T15:43:42+03:00","ev":"pass-records-done","pass":6}
 {"t":"2026-08-20T15:57:19+03:00","ev":"round-start","round":5}
-{"t":"2026-08-20T15:57:19+03:00","ev":"gate-open","round":5,"reason":"owner ruled: skip Postgres-DB-coupled rows while a real Postgres instance is stood up and SQLite is dropped. Confirm which rows that covers, and the PPW-524 no-SPA-consumer scope question."}
-{"t":"2026-08-20T15:59:59+03:00","ev":"gate-closed","round":5,"reason":"owner: fix PPW-513 SQL now and defer its proof; PPW-524 out of scope (park); leave SQLite-coupled rows until SQLite is dropped"}
+{"t":"2026-08-20T15:57:19+03:00","ev":"gate-open","round":5,"reason":"owner ruled: skip Postgres-DB-coupled rows while a real Postgres instance is stood up and PostgreSQL is dropped. Confirm which rows that covers, and the PPW-524 no-SPA-consumer scope question."}
+{"t":"2026-08-20T15:59:59+03:00","ev":"gate-closed","round":5,"reason":"owner: fix PPW-513 SQL now and defer its proof; PPW-524 out of scope (park); leave PostgreSQL-coupled rows until PostgreSQL is dropped"}
 {"t":"2026-08-20T15:59:59+03:00","ev":"triage-done","round":5,"clusters":8,"checks_needed":3,"pre_cleared":0,"gates":1}
 {"t":"2026-08-20T16:01:49+03:00","ev":"check-dispatched","round":5,"cluster":"A-upload-job-resilience"}
 {"t":"2026-08-20T16:01:49+03:00","ev":"check-dispatched","round":5,"cluster":"B-webhook-metric-safety"}
@@ -149,4 +149,4 @@
 {"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"B-webhook-metric-safety","verdict":"revised"}
 {"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"D-storage-tier","verdict":"revised"}
 {"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"C-ubl-address-and-price","verdict":"revised"}
-{"t":"2026-08-20T16:09:37+03:00","ev":"round-end","round":5,"note":"paused mid-round: owner switched to feat/postgres-only-data-stack, whose Phase 1b deletes the whole migration chain and Phase 2 removes SQLite, invalidating or reshaping several in-scope rows"}
+{"t":"2026-08-20T16:09:37+03:00","ev":"round-end","round":5,"note":"paused mid-round: owner switched to feat/postgres-only-data-stack, whose Phase 1b deletes the whole migration chain and Phase 2 removes PostgreSQL, invalidating or reshaping several in-scope rows"}

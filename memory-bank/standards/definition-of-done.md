@@ -49,11 +49,11 @@ key scheme, status code) requires enumerating ALL existing consumers — grep, d
 updating or explicitly clearing each. *(043 F1/F2 — the only High of the bolt; 035 OrderNumber
 collision lived outside the diff.)*
 
-**2. Second-path symmetry.** Anything with two implementations or two user types — SQLite/
-Postgres, local/cloud storage, Stripe/EuPlatesc, logged-in/guest — gets every behavior either
+**2. Second-path symmetry.** Anything with two implementations or two user types — InMemory/
+PostgreSQL, local/cloud storage, Stripe/EuPlatesc, logged-in/guest — gets every behavior either
 verified symmetric or documented divergent. Exception contracts must be uniform across
 implementations of one interface. *(043 F3: S3 threw `AmazonS3Exception` where local threw
-`FileNotFoundException` → preview 500s; 042 D23: migration DDL diverges by provider.)*
+`FileNotFoundException` → preview 500s; 042 D23: DDL that only one provider exercised.)*
 
 **3. Bounded resources.** Every allocation, queue, concurrency level, and accepted input has a
 cap derived from the real constraint (RAM, disk, not CPU count by default), configurable with
@@ -67,7 +67,7 @@ closed or accepted in writing. *(042 D5→D34/D35 chain; 043 F8 TOCTOU; ADR-011 
 
 **5. Failure modes have tests — "green ≠ proven".** For every failure mode the code can hit:
 which test goes red if this bug is injected? Mock only at system boundaries (network, external
-APIs, clock) — the real component (real ImageSharp, real SQLite) must run in at least one test
+APIs, clock) — the real component (real ImageSharp, a real PostgreSQL database) must run in at least one test
 of its guards. Each suite states what it *cannot* prove and where that gap is covered.
 *(042 D25: the real ImageProcessor was mocked in ALL tests — 490 greens proved nothing about
 image handling; 043 F14–F16/F18 were all "branch exists, no test".)*

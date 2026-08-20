@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,31 +14,25 @@ using PhotoPrint.Tests.Helpers;
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
-/// Full outcome-matrix for <see cref="AwbCreator"/>. Uses SQLite (not the EF
+/// Full outcome-matrix for <see cref="AwbCreator"/>. Uses a real PostgreSQL database (not EF
 /// InMemory provider) because the guarded persist runs <c>ExecuteUpdateAsync</c>,
 /// which InMemory doesn't support; the read-backs go through a FRESH context so
 /// a missing/last-writer-wins persist reddens the test.
 /// </summary>
 public class AwbCreatorTests : IDisposable
 {
-    private readonly SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database = new();
 
     public AwbCreatorTests()
     {
         // FK enforcement off: these exercise AWB-creation logic, not referential
         // integrity, so an OrderItem can reference a synthetic product/upload id.
-        _connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=False");
-        _connection.Open();
-        using var db = CreateDb();
-        db.Database.EnsureCreated();
+        _database.DropAllForeignKeys();
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose() => _database.Dispose();
 
-    private PhotoPrintDbContext CreateDb() =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
-            .Options);
+    private PhotoPrintDbContext CreateDb() => _database.NewContext();
 
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
 
@@ -233,9 +226,7 @@ public class AwbCreatorTests : IDisposable
         client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
             .Returns<AwbCreationRequest, CancellationToken>((_, _) =>
             {
-                using var cmd = _connection.CreateCommand();
-                cmd.CommandText = "DROP TABLE Orders;";
-                cmd.ExecuteNonQuery();
+                _database.BreakOrdersTable();
                 return Task.FromResult(new AwbCreationResult("RO-LOST", "https://x/y.pdf", 1m));
             });
 
@@ -476,7 +467,7 @@ public class AwbCreatorTests : IDisposable
             .ReturnsAsync(() =>
             {
                 // Break the DB between the vendor call and the persist.
-                _connection.Close();
+                _database.BreakOrdersTable();
                 return new AwbCreationResult("RO12345678", "https://sameday/labels/abc.pdf", 18.50m);
             });
         var sut = Build(db, client);
@@ -563,8 +554,8 @@ public class AwbCreatorTests : IDisposable
         var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));
         using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
 
-        // Kills the :memory: database under the creator, standing in for an unreachable Postgres.
-        _connection.Close();
+        // Stands in for an unreachable database under the creator.
+        _database.BreakOrdersTable();
 
         var act = () => sut.CreateForOrderAsync(order.Id, attempt: 1);
 

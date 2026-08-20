@@ -14,7 +14,7 @@ closed: 2026-06-19
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-1 | fixed | `2093302` | Catch the unique-index violation on insert: the same owner replays, another caller gets a clean 409, anything else is rethrown. The regression tests run on real SQLite, because the in-memory provider does not enforce the index. |
+| PPW-1 | fixed | `2093302` | Catch the unique-index violation on insert: the same owner replays, another caller gets a clean 409, anything else is rethrown. The regression tests run on real PostgreSQL, because the in-memory provider does not enforce the index. |
 | PPW-2 | fixed | `2093302` | The keyed lookup and the stale-key free both filter on user id or guest session id. Unit, controller and integration tests prove a second caller receives neither the order nor its Stripe secret. |
 | PPW-3 | fixed | `2093302` | An order-independent signature of product, upload and quantity joins the divergence comparison, so a same-total different-items request is refused and names the items. |
 | PPW-4 | fixed | `b52f4b6` | A searchable follow-up marker sits on the missing-key warning, tracking the later change to a 400. |
@@ -22,16 +22,16 @@ closed: 2026-06-19
 | PPW-6 | fixed | `0b0fa04` | An action filter reads the header once, normalises a blank key to none, warns when it is missing and stashes it. Both endpoints read it back through one accessor. |
 | PPW-7 | fixed | `0b0fa04` | One generic method holds resolve, replay, compute, persist and respond; both processors are thin adapters over it. |
 | PPW-8 | fixed | `b52f4b6` | Stripe is keyed by the order id instead of the caller's key, so retries of one order still share a key while distinct orders never do. |
-| PPW-9 | fixed | `2f1872c` | The migration branches on the active provider: Postgres gets sized text and the filtered index, and the SQLite output is byte-identical. The snapshot half stays open; it is PPW-20. |
+| PPW-9 | fixed | `2f1872c` | The migration branches on the active provider: Postgres gets sized text and the filtered index, and the PostgreSQL output is byte-identical. The snapshot half stays open; it is PPW-20. |
 | PPW-10 | fixed | `2093302` | The comment now names both database engines. |
 | PPW-11 | fixed | `b52f4b6` | Reworded to say that multiple nulls are permitted. |
 | PPW-12 | deferred | — | Historical design sketch. The deviation is already written up in the walkthrough, so correcting the sketch is low-value churn; batched into a later documents pass. |
 | PPW-13 | wont-fix | — | Kept. The type carries the divergent-field payload, and the PPW-1 fix now also throws the plain conflict type, so the two coexist meaningfully. |
 | PPW-14 | fixed | `b52f4b6` | One accessor and one shared key constant replace the raw reads in the controller and the exception middleware, and the setter in the correlation middleware. |
 | PPW-15 | wont-fix | — | Kept. The order must exist before the gateway call so a crash during it is recoverable, and the PPW-1 fix preserves that ordering. |
-| PPW-16 | fixed | `b6198b6` | A real SQLite factory builds the schema and drives the cross-caller scenario over HTTP, reaching the refusal the in-memory provider cannot produce. |
+| PPW-16 | fixed | `b6198b6` | A real PostgreSQL factory builds the schema and drives the cross-caller scenario over HTTP, reaching the refusal the in-memory provider cannot produce. |
 | PPW-17 | wont-fix | — | Kept. An expired key blocked for a second caller is the accepted price of one global key index; it is safe and discloses nothing. It resolves only with owner-plus-key uniqueness. |
-| PPW-18 | fixed | `3415ec7` | SQLite joins the count-based branch and the Postgres sequence path is byte-identical. A new test drives the real service against a real SQLite database, and the test fake is gone. |
+| PPW-18 | fixed | `3415ec7` | PostgreSQL joins the count-based branch and the Postgres sequence path is byte-identical. A new test drives the real service against a real PostgreSQL database, and the test fake is gone. |
 | PPW-19 | fixed | `650f615` | The searchable marker and the document pointer are back in the filter's missing-key branch; the log call is untouched. |
 
 ## Scope
@@ -42,8 +42,8 @@ closed: 2026-06-19
 | B — Gateway keying, the tracking marker, the correlation accessor and two comments (`b52f4b6`) | PPW-4, PPW-8, PPW-11, PPW-14 | `Controllers/PaymentsController.cs`, `Middleware/…`, `Data/PhotoPrintDbContext.cs` | not recorded (predates approach-checks) |
 | C — The key filter and the shared replay method (`0b0fa04`) | PPW-6, PPW-7 | `Filters/IdempotencyKeyFilter.cs`, `Controllers/PaymentsController.cs` | not recorded (predates approach-checks) |
 | D — Provider-aware migration (`2f1872c`) | PPW-9 | `Migrations/20260527075359_AddOrderIdempotencyKey.cs` | not recorded (predates approach-checks) |
-| E — The real-database cross-caller test (`b6198b6`) | PPW-16 | `Tests/…/SqlitePaymentFactory.cs`, `Tests/…/PaymentIdempotencyRelationalTests.cs` | not recorded (predates approach-checks) |
-| F — Order numbers on SQLite (`3415ec7`) | PPW-18 | `Services/OrderNumberService.cs`, `Tests/…/OrderNumberServiceSqliteTests.cs` | not recorded (predates approach-checks) |
+| E — The real-database cross-caller test (`b6198b6`) | PPW-16 | `Tests/…/PostgresPaymentFactory.cs`, `Tests/…/PaymentIdempotencyRelationalTests.cs` | not recorded (predates approach-checks) |
+| F — Order numbers on PostgreSQL (`3415ec7`) | PPW-18 | `Services/OrderNumberService.cs`, `Tests/…/OrderNumberServicePostgresTests.cs` | not recorded (predates approach-checks) |
 | G — The restored tracking marker (`650f615`) | PPW-19 | `Filters/IdempotencyKeyFilter.cs` | not recorded (predates approach-checks) |
 | H — Left undone this round | PPW-12, PPW-13, PPW-15, PPW-17 | — | not needed (no code changed) |
 
@@ -64,11 +64,11 @@ somebody else's order. Per-owner uniqueness would need two filtered partial inde
 columns, which is the same dual-database complexity PPW-9 is about, for a collision that is vanishingly
 unlikely with random keys. The price of that choice is recorded as PPW-17.
 
-### The concurrency tests run on real SQLite rather than the in-memory provider
+### The concurrency tests run on real PostgreSQL rather than the in-memory provider
 
 The in-memory provider does not enforce unique indexes, so it cannot reproduce this race at all. The
-tests use a shared-connection SQLite database and a one-shot save interceptor to inject the winning
-request deterministically. That is why a SQLite test package was added to the test project.
+tests use a shared-connection PostgreSQL database and a one-shot save interceptor to inject the winning
+request deterministically. That is why a PostgreSQL test package was added to the test project.
 
 ### The stale-key free became owner-scoped, and one existing test was retargeted
 
@@ -78,9 +78,9 @@ scenario. That tightens the test to the secure behaviour rather than weakening i
 
 ### The migration was edited in place instead of adding a new one
 
-Safe here: the SQLite output is byte-identical, development databases are created directly rather than
+Safe here: the PostgreSQL output is byte-identical, development databases are created directly rather than
 migrated, and no Postgres database has applied it before deployment. The model snapshot stays
-SQLite-flavoured, so scaffold-time drift is reduced rather than removed.
+Npgsql-typed, so scaffold-time drift is reduced rather than removed.
 
 ### Two rows were kept rather than fixed (PPW-13, PPW-15)
 
@@ -91,6 +91,6 @@ what makes a crash during the gateway call recoverable.
 ### The test fake that made PPW-16 pass was hiding a real defect (PPW-16, PPW-18)
 
 The new real-database factory could not run without faking the order-number service, because that service
-had no SQLite branch. The fake made the test green while papering over a break in the documented local
+had no PostgreSQL branch. The fake made the test green while papering over a break in the documented local
 development path. Removing it is what turned PPW-18 into a finding, and the factory now drives the real
 service end to end.

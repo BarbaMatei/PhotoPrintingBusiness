@@ -16,8 +16,8 @@ closed: 2026-08-13
 |---|---|---|---|
 | PPW-469 | fixed | `04eb38e` | InvoicesController now injects IStorageRouter, reads via CloudEnabled?Cloud:Local; new tests prove cloud vs local routing |
 | PPW-470 | fixed | `f8daa1e` | InvoiceUploadJob's PDF save now resolves via IStorageRouter the same way; new tests (reflection-invoked UploadPendingAsync) prove routing |
-| PPW-471 | fixed | `e38537d` | Unique index on Invoices.OrderId + provider-specific violation catch at both WebhooksController SaveChangesAsync sites; side effects gated behind a "did this call create it" signal; new SQLite-backed race tests |
-| PPW-490 | fixed | `e38537d` | Same fix site as PPW-471: catch + retry on the InvoiceNumber unique-violation; corrected the misleading SqliteInvoiceNumberingService doc comment; new test forces the collision deterministically |
+| PPW-471 | fixed | `e38537d` | Unique index on Invoices.OrderId + provider-specific violation catch at both WebhooksController SaveChangesAsync sites; side effects gated behind a "did this call create it" signal; new Postgres-backed race tests |
+| PPW-490 | fixed | `e38537d` | Same fix site as PPW-471: catch + retry on the InvoiceNumber unique-violation; corrected the misleading PostgresInvoiceNumberingService doc comment; new test forces the collision deterministically |
 | PPW-472 | fixed | `4aa73d5` | Owner ruling: ship flag off, documented honestly. NotifyAsync no longer claims "sent"; InvoicingSettings docstring corrected; test now asserts the honest log line, not just no-throw |
 | PPW-473 | fixed | `e7a1169` | Switched to DualAuthPolicy + ownership check against both UserId and GuestSessionId, matching Cart/Payments/Uploads; new tests cover guest-owns, wrong-user, wrong-guest-session |
 | PPW-474 | fixed | `7539dcd` | AdminOrderService now calls CreateForOrderAsync in the same Paid branch, before SaveChangesAsync, mirroring the webhook handlers; new test asserts the call, another asserts no double-create on a later transition |
@@ -45,7 +45,7 @@ closed: 2026-08-13
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
 | A — storage routing bypasses | PPW-469, PPW-470 | `Controllers/InvoicesController.cs`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs` | not needed (DI wiring only) |
-| B — invoice-duplication and numbering race | PPW-471, PPW-490 | `Services/Invoicing/InvoiceCreationService.cs`, `Controllers/WebhooksController.cs`, `Services/Invoicing/SqliteInvoiceNumberingService.cs`, migration | needed: ledger History (revised — catch site corrected to WebhooksController; one fix site covers both findings) |
+| B — invoice-duplication and numbering race | PPW-471, PPW-490 | `Services/Invoicing/InvoiceCreationService.cs`, `Controllers/WebhooksController.cs`, `Services/Invoicing/PostgresInvoiceNumberingService.cs`, migration | needed: ledger History (revised — catch site corrected to WebhooksController; one fix site covers both findings) |
 | C — email-sent flag honesty | PPW-472 | `Services/Invoicing/InvoicePdfReadyNotifier.cs`, `Configuration/InvoicingSettings.cs` | not needed (owner gate: ship flag off, document honestly) |
 | D — guest invoice access | PPW-473 | `Controllers/InvoicesController.cs` | not needed (reuses existing DualAuthPolicy pattern) |
 | E — admin-paid invoice creation | PPW-474 | `Services/AdminOrderService.cs` | not needed (mirrors existing webhook call) |
@@ -82,7 +82,7 @@ doc/log-text correction, not a behavior change with a failure mode to cover.
 
 Adding the atomic claim required `ExecuteUpdateAsync`, which EF Core's InMemory provider does
 not support. The whole `InvoiceUploadJob` test harness moved from `UseInMemoryDatabase` to a
-real SQLite connection, matching the project's established pattern for anything provider-sensitive.
+real PostgreSQL connection, matching the project's established pattern for anything provider-sensitive.
 
 ### Approach-check outcome: drop repeat-escalation, add Sentry capture (PPW-486)
 
