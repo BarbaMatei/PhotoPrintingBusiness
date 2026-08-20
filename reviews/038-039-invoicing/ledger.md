@@ -528,6 +528,7 @@ updated: 2026-08-20
 - **History:**
   - v6: found by the delta pass — raised by correctness (convergence 1), verdict confirmed
   - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: v2 approach-check refuted a rethrow and the owner-side ruling stood: an escaping throw records no metric at all (PPW-397), every EuPlatesc branch answers a signed ack, and duplicate sat in SLO 3 success numerator. Resolved by relabelling to failed, deliberately keeping the 200.
+  - v6: correction to the line above, which is labelled verbatim but paraphrases. PPW-508s v2 History line reads: "relabelled to `failed` via a three-state PaidSaveOutcome; the approach-check refuted the drafted rethrow because `duplicate` sits in SLO 3s success numerator and an escaping throw records no metric at all (PPW-397)".
 
 ### PPW-517 — Invoice PDF tier is chosen from the live CloudEnabled flag with no per-row StorageLocation, so a Provider flip orphans stored PDFs
 
@@ -553,6 +554,7 @@ updated: 2026-08-20
 - **History:**
   - v6: found by the delta pass — raised by correctness, completeness-critic, tests-coverage (convergence 3), verdict confirmed
   - v6: re-raises a decided item, PPW-480. Prior decision, verbatim: v1 fix round cleared XmlPayload deliberately, per a vetted approach-check, so a retry rebuilds the XML rather than resubmitting a stale payload; PdfStoragePath was left untouched.
+  - v6: correction to the line above, which is labelled verbatim but paraphrases. PPW-480 states its decision in its Suggested-fix line: "Clear `Invoice.XmlPayload` in `RetryAsync`s existing atomic update so the next tick rebuilds it", with "approach-check: revised (drop the `PdfStoragePath` clear; add pre-clear logging)".
 
 ### PPW-520 — Per-line PriceAmount x InvoicedQuantity no longer equals LineExtensionAmount, and nothing asserts it
 
@@ -610,6 +612,7 @@ updated: 2026-08-20
 - **History:**
   - v6: found by the delta pass — raised by completeness-critic, tests-coverage (convergence 2), verdict confirmed
   - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: Owner ruled 2026-08-20 that EuPlatesc is being removed and only Stripe will remain, so this coverage was waived rather than written; PPW-511 records that the removal is tracked nowhere.
+  - v6: correction to the line above, which is labelled verbatim but paraphrases. The ruling is recorded in the v4 resolution and on the PPW-511 row; PPW-508 carries no quotable History line for it.
 
 ### PPW-527 — Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook
 

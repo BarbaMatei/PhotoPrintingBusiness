@@ -42,18 +42,21 @@ decisions-needed: 4
 
 ## Reasons to doubt
 
-- **Six of eleven lenses did not run** — the delta cap is five. `security`, `requirements`,
-  `quality`, `input-validation`, `race` and `frontend-ux` never searched this work.
+- **Six of eleven lenses did not run** — the cap for this pass type is five
+  ([runbook-discovery.md](../runbooks/runbook-discovery.md)). `security`, `requirements`,
+  `quality`, `input-validation`, `race` and `frontend-ux` never searched this work
+  ([review-v6.md](review-v6.md) frontmatter).
 - **The client side has never been reviewed at all**, across six passes ([PPW-524](ledger.md)).
-- **A delta pass cannot certify** — its verdict is capped by design. Clean here means "this diff
-  is clean", never "the feature is clean".
+- **This pass type cannot certify** — its verdict is capped by design
+  ([README](../README.md)). Clean here means "this diff is clean", never "the feature is clean".
 - **New findings per pass are not decaying**: 37 at v1, 38 here, after four rounds of fixing
   ([metrics.jsonl](metrics.jsonl)).
 - **PPW-521, PPW-524 and PPW-531 are `plausible`, not `confirmed`**, and the 15 minor rows got no
-  adversarial check, per this pass's budget rules.
+  adversarial check, per this pass's budget rules ([metrics.jsonl](metrics.jsonl)).
 - **Blinding was weaker than intended.** The prior-findings list reached the deduplication step
-  as a file path, not inline; it reported zero re-raises where synthesis found three by hand, so
-  the file was probably never read. Overlap counts from this pass are not trustworthy.
+  as a file path, not inline; it reported zero re-raises where synthesis found three by hand
+  (PPW-516, PPW-519, PPW-526 on the [ledger](ledger.md)), so the file was probably never read.
+  Overlap counts from this pass are not trustworthy ([metrics.jsonl](metrics.jsonl) notes).
 
 ## Filed automatically
 

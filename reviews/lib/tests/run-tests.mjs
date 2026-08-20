@@ -10,6 +10,8 @@
 import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { REVIEWS, REPO } from '../paths.mjs'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
@@ -158,6 +160,43 @@ const firstLine = out => out.split('\n')[0]
 {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '909-certified-target', 'decide', 'mystery-gate'])
   check('policy fails closed on an unknown gate kind', r.out.includes('ACTION: stop'), r.out.trim())
+}
+
+// ---------- verify-fixes: revert-and-rerun against a throwaway repo ----------
+{
+  const T = mkdtempSync(join(tmpdir(), 'verify-fixes-'))
+  const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8' })
+  g('init', '-q', '-b', 'main')
+  g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
+  mkdirSync(join(T, 'src', 'app'), { recursive: true })
+  mkdirSync(join(T, 'src', 'PhotoPrint.Tests', 'Unit'), { recursive: true })
+  writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'buggy\n')
+  g('add', '.'); g('commit', '-qm', 'base')
+  writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'fixed\n')
+  writeFileSync(join(T, 'src', 'PhotoPrint.Tests', 'Unit', 'CalcTests.cs'), 'test body\n')
+  g('add', '.'); g('commit', '-qm', 'fix')
+  const sha = g('rev-parse', '--short', 'HEAD').stdout.trim()
+  mkdirSync(join(T, 'reviews', '950-verify-target'), { recursive: true })
+  writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
+    `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${sha}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9501 | fixed | \`${sha}\` | fixture fix |\n`)
+  g('add', '.'); g('commit', '-qm', 'resolution')
+  const redGreen = `node -e "process.exit(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')?1:0)"`
+
+  const dry = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--dry-run'])
+  check('verify-fixes dry-run derives the plan', dry.code === 0 && dry.out.includes('calc.txt') && dry.out.includes('PhotoPrint.Tests.Unit.CalcTests'), dry.out.trim())
+
+  const live = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
+  check('verify-fixes proves red-then-green and reports held', live.code === 0 && live.out.includes('"verdict":"held"') && live.out.includes('SUMMARY: 1/1 held'), live.out.trim())
+  check('verify-fixes leaves the tree clean', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
+
+  const neverRed = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', 'node -e "process.exit(0)"'])
+  check('verify-fixes reopens a fix whose test never goes red', neverRed.code === 1 && neverRed.out.includes('"verdict":"test-never-red"'), neverRed.out.trim())
+
+  writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'dirty\n')
+  const dirty = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
+  check('verify-fixes refuses a dirty tree', dirty.code === 2, `exit ${dirty.code}: ${dirty.out.trim()}`)
+  g('checkout', '--', '.')
+  rmSync(T, { recursive: true, force: true })
 }
 
 if (failures.length) {
