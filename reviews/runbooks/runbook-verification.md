@@ -18,6 +18,9 @@ feature clean?".
 2. **Revert-and-rerun every `fixed` finding:** revert the fix (source only), its regression
    test must go red with clean attribution and zero collateral; restore, green. A fix whose
    test cannot go red is not verified — reopen it.
+   `node reviews/lib/verify-fixes.mjs <target>` runs this step mechanically and prints one
+   verdict line per fix; `test-never-red`, `revert-failed` and `green-failed` rows come back
+   to you for a reopen or a hand check.
 3. **Judgment items** (doc fixes; `wont-fix` / `deferred` / `disputed` rationales): first run
    `git diff <last-affirmed-commit>..HEAD -- <cited files>` yourself. Unchanged → record
    "unchanged since `<commit>`, stands" with **no agent**. Changed → one anchored Explore
