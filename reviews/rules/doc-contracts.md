@@ -119,6 +119,11 @@ Allowed system terms. Anything else must be everyday English.
 - **patch-grade / delta-worthy** — a fix round too small to need a delta discovery / big enough to need one.
 - **post-cert escape** — a defect found later that existed in certified code.
 - **owner gate** — a stop where only the owner's decision continues the loop.
+- **unattended run** — one driver run driving the loop to close under the written policy
+  (`lib/autonomy-policy.mjs`) and the owner's standing approval, stopping only for a
+  question only the owner can answer, broken records, or the no-progress guard.
+- **parked** — a gate decision taken by written default during an unattended run,
+  awaiting the owner's ruling in the run-end report.
 - **approach-check** — an adversarial pre-implementation check of a fix's design (trigger list in the `/fix-review` skill).
 - **micro-review** — the anchored per-cluster diff review a fix round dispatches on its own work.
 - **reconciliation** — after the blinded pass, matching its finds to ledger rows and

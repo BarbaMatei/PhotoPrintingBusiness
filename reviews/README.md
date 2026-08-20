@@ -30,7 +30,31 @@ recorded owner-visible decision. **Certified means exactly that — not zero def
 Standing instruction: *"Continue the review loop for `<target>`"* → the **`loop-driver`**
 skill: it audits the records, reads the router mechanically, and states the pass type and
 expected cost in one line before any discovery-scale launch; **certification always waits
-for an explicit owner go-ahead**.
+for an explicit owner go-ahead** — an unattended run's opening instruction is that go-ahead
+(standing approval 2026-08-20, "Unattended runs" below).
+
+### Unattended runs
+
+*"Run the review loop unattended for `<target>`"* drives the whole remaining loop —
+certification and close included — as if the owner approved each step:
+
+- The instruction is a **standing approval** (owner decision 2026-08-20): it is the
+  explicit go-ahead for certification-grade launches and the owner's word for the close,
+  for that run. Outside an unattended run, both wait for the owner exactly as before.
+- [lib/autonomy-policy.mjs](lib/autonomy-policy.mjs) is the written delegation. At every
+  router gate the driver asks it; the answer is `auto` (take the written default,
+  continue) or `stop`. A gate it does not know stops the run.
+- Every delegated decision is **parked**: the driver takes the written default, appends a
+  `gate-parked` worklog event, and lists every parked item in the run-end report for the
+  owner's ruling.
+- A run has no token or pass limit (owner decision 2026-08-20). It ends at `loop CLOSED`,
+  a policy `stop`, a fixer question only the owner can answer, or the no-progress guard —
+  a pass repeating without recording anything.
+- Passes execute in subagents; the driver only routes, records, and reports. A killed run
+  resumes by repeating the same phrase — the router reads state from the records alone.
+
+The loop-driver skill owns the sequence; the fixer's side lives in the `/fix-review`
+skill's unattended variant.
 
 ## Entry tiers — does a change get the loop at all?
 

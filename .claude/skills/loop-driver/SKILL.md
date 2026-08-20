@@ -2,7 +2,8 @@
 name: loop-driver
 description: >-
   Drive the review loop for a target: mechanically pick the next pass, announce its cost,
-  stop at every owner gate, run it, and leave the records clean — one pass per invocation.
+  stop at every owner gate, run it, and leave the records clean — one pass per invocation,
+  or drive the whole loop under the written policy when the owner says "unattended".
   Use this whenever the user says "continue the review loop for <target>", "drive the loop",
   "next pass for <target>", "what's next for <target>", "keep the loop going", or names a
   review target and asks to review/re-review/certify/verify it — even if they don't say the
@@ -123,6 +124,60 @@ what the router says comes next with its cost. Then **stop** — unless the owne
 **"until a gate"** this invocation, in which case loop back to step 1 and continue,
 still stopping at every exit-2/3 gate and before every discovery-scale launch.
 
+## Unattended runs — "run the review loop unattended for <target>"
+
+The "until a gate" mode, extended by the written delegation in
+`reviews/lib/autonomy-policy.mjs`. One run = the whole remaining loop, driven to
+`loop CLOSED`, certification included. The owner's "unattended" instruction is the
+standing approval (2026-08-20): it is the explicit go-ahead the Never list requires for
+certification-grade launches and the owner's word for the close — the run behaves as if
+the owner approved each step, and reports every delegated decision at the end.
+Everything else in this skill still applies per pass — audit, records, doc gate.
+Consulting the written policy is not pre-answering a gate: the delegation is the owner's
+standing decision, and any gate kind without one stops the run. There is no token or pass
+limit on an unattended run — the owner removed them on purpose; do not invent one. The
+run stops early only when it needs something no rule can supply: a fixer question only
+the owner can answer, records that stay broken after one repair, or an unknown gate kind.
+
+**Open the run.** Append `run-start` to the worklog. Announce in one line: target, state,
+and that the run drives to close — certification included — reporting every decision at
+the end.
+
+**Each iteration:**
+
+1. Audit + route as in step 1. Auditor red → one repair attempt; still red → end the run.
+2. Router exit 0: append `pass-launch` as usual and execute the pass in a subagent
+   (table below).
+3. Router exit 2/3: run `node reviews/lib/autonomy-policy.mjs <target> decide
+   <GATE_KIND>`. `ACTION: auto` → append `gate-parked` (`{kind, default, reason}`) and
+   take the printed `NEXT`: a pass name is executed like a router answer (back to 2);
+   `close the loop` executes section 6's close sequence — the standing approval is the
+   owner's word it requires. `ACTION: stop` → end the run with the gate's question in
+   the report.
+4. No-progress guard: if the routed pass repeats the previous pass type and
+   `metrics.jsonl` gained no line in between, end the run — a pass is not recording.
+   This is a breakage detector, not a limit.
+5. Router prints `loop CLOSED` → the run is done; close it out.
+
+**Pass execution — always in subagents in this mode** (the driver only routes, records,
+and reports; subagents return a summary of at most 20 lines, and state is re-read from
+the records, never from the subagent's prose):
+
+| Pass | How |
+|---|---|
+| full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
+| verification | run `node reviews/lib/verify-fixes.mjs <target>` yourself, then one subagent for the runbook's judgment items, its three per-cluster questions, and the records — given the script's JSON output, the resolution, and the fix diff |
+| fix round | one subagent instructed to load the `/fix-review` skill and follow its **Unattended variant** section |
+
+The session-model guard still applies: on a Fable session, discovery-scale launches
+proceed resume-ready, and the workflow runId goes into the worklog event.
+
+**Close the run.** Append `run-end` (`{passes, parked}`). Report in one message: each
+pass with its one-line outcome, every parked item (kind, the default taken, what needs
+the owner's ruling), and how the run ended (loop closed, or the question it stopped on).
+This report is the batched owner sitting — each ruling made on it is recorded where that
+round's rules say (resolution `Decisions`, ledger rows, the backlog).
+
 ## 6 · Closing a loop — the owner said "close it"
 
 Archiving is the last step of recording the close, in exactly this order (README, Files &
@@ -143,8 +198,10 @@ re-armed pass runs.
 ## Never
 
 - Launch a certification-grade pass without an explicit go-ahead given in this invocation.
+  An unattended run's opening instruction is that go-ahead (standing approval 2026-08-20).
 - Close a loop yourself — `closed:` goes into the ledger frontmatter only on the owner's
-  word, and the index row records how it closed.
+  word, and the index row records how it closed. An unattended run carries that word
+  (standing approval 2026-08-20); the close is reported at run end.
 - Mark anything `verified` while being the fixer, outside the written test-only exemption.
 - Edit a `review-v*.md`, skip a record, or hand back with the auditor red.
 - Create a `reviews/<target>/` folder except by executing a pass the owner requested for
