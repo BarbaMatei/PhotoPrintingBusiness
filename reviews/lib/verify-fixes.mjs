@@ -55,6 +55,13 @@ if (git('status', '--porcelain').stdout.trim() !== '') {
 }
 
 const isTest = p => /^src\/PhotoPrint\.Tests\//.test(p) || /\.spec\.ts$/.test(p)
+const restoreOrDie = id => {
+  const r = git('reset', '--hard', 'HEAD')
+  if (r.status !== 0 || git('status', '--porcelain').stdout.trim() !== '') {
+    console.error(`FATAL: restore failed after reverting ${id} — check the tree by hand`)
+    process.exit(2)
+  }
+}
 const results = []
 for (const row of rows) {
   const res = { id: row.id, verdict: null, commit: row.commit, filters: [], red_exits: [], green_exits: [] }
@@ -80,16 +87,12 @@ for (const row of rows) {
     else if (git('checkout', `${row.commit}^`, '--', f).status !== 0) reverted = false
   }
   if (!reverted) {
-    git('reset', '--hard', 'HEAD')
+    restoreOrDie(row.id)
     res.verdict = 'revert-failed'
     continue
   }
   for (const c of cmds) res.red_exits.push(runCmd(c).status ?? -1)
-  const restore = git('reset', '--hard', 'HEAD')
-  if (restore.status !== 0 || git('status', '--porcelain').stdout.trim() !== '') {
-    console.error(`FATAL: restore failed after reverting ${row.id} — check the tree by hand`)
-    process.exit(2)
-  }
+  restoreOrDie(row.id)
   if (!res.red_exits.some(x => x !== 0)) { res.verdict = 'test-never-red'; continue }
   for (const c of cmds) res.green_exits.push(runCmd(c).status ?? -1)
   res.verdict = res.green_exits.every(x => x === 0) ? 'held' : 'green-failed'
