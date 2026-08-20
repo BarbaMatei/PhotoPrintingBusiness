@@ -6,7 +6,7 @@ description: >-
   findings of a review: phrases like "fix the review findings", "address the blockers
   in review X", "resolve the open findings", "apply the review feedback", or right after
   a /code-review or multi-lens review produces a review-v<n>.md + resolution-v<n>.md
-  under reviews/. Runs the round descheduled: triage first, one batched owner gate, then
+  under reviews/. Runs the round descheduled: triage first, one batched owner gate (parked instead when the run is unattended), then
   clusters — approach-checks, test runs, and micro-reviews execute in the background while
   the fixer works. Fixes findings blocker-first WITH the regression tests the review asked
   for, records each fix in the resolution file and the worklog, commits per finding
@@ -144,6 +144,27 @@ that need no check; fold each verdict in when it returns (`check-returned`), and
 the resolution note that the check ran and what it flagged. If you later deviate from a
 checked or pre-cleared approach, a new check is needed **only if the deviation itself is
 trigger-list-shaped**.
+
+### Unattended variant — a fix round inside an unattended run
+
+Applies only when the driver's instruction says the round is unattended. Everything in
+this skill still applies except stage 0b:
+
+- **No owner gate.** Each triage-collected decision is parked instead: append
+  `gate-parked` (`{kind: "fixer-decision", default, reason}`) to the worklog, take the
+  conservative default, and record the parked question plus the default taken in this
+  round's `Decisions`.
+- **Conservative defaults.** A finding needing an owner ruling (a wont-fix intent, a
+  capability removal, a scope question) is set `deferred` with a note starting `parked:`
+  — never `wont-fix`, never silently fixed. A defect noticed outside the finding set is
+  parked the same way in `Decisions`; no backlog row is minted, because routing it is
+  the owner's ruling.
+- **Blocker exception.** A decision that blocks a 🔴 fix ends the round: leave
+  `status: in-progress`, append `round-end`, and hand the driver the question — the run
+  stops with it.
+- Hand-back is unchanged: renderer, auditor, doc gate, index row. `status: resolved` is
+  legal with parked findings — `deferred` is a terminal status, and the run-end report
+  carries every parked item to the owner.
 
 ### Per cluster (rigor scaling unchanged: 🔴/🟠 get every step; 🟡/⚪ batched, class-swept)
 
