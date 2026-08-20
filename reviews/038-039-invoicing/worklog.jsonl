@@ -115,3 +115,8 @@
 {"t":"2026-08-14T12:46:50+03:00","ev":"finding","id":"PPW-508","status":"open","note":"reopened — label and rollback legs hold, cancellation leg has no test and the reason given for that is false"}
 {"t":"2026-08-14T12:51:20+03:00","ev":"doc-gate","pass":4,"verdict":"approve"}
 {"t":"2026-08-14T12:52:00+03:00","ev":"pass-records-done","pass":4,"verdict":"approve-with-followups","verified":0,"reopened":1}
+{"t":"2026-08-14T13:35:40+03:00","ev":"round-start","round":4}
+{"t":"2026-08-20T14:51:06+03:00","ev":"test-run","round":4,"kind":"red","filter":"WebhooksController (OCE filter restored)","passed":24,"failed":1}
+{"t":"2026-08-20T14:51:06+03:00","ev":"test-run","round":4,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing","passed":114,"failed":0}
+{"t":"2026-08-20T14:51:44+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"07b0c1b"}
+{"t":"2026-08-20T14:51:44+03:00","ev":"round-end","round":4}
