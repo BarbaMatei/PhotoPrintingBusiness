@@ -58,10 +58,11 @@ const fm = (file, key) => {
 }
 const out = []
 const say = s => out.push(s)
-function finish(code, next, gate) {
-  if (next) say(`NEXT: ${next}${COST[next.toLowerCase().replace(/ \(.*$/, '')] ? '' : ''}`)
+function finish(code, next, gate, kind) {
+  if (next) say(`NEXT: ${next}`)
   for (const [k, v] of Object.entries(COST)) if (next && next.toLowerCase().startsWith(k)) say(`COST: ${v}`)
   if (gate) say(`GATE: ${gate}`)
+  if (kind) say(`GATE_KIND: ${kind}`)
   console.log(out.join('\n'))
   process.exit(code)
 }
@@ -88,10 +89,10 @@ if (!reviews.length) { say('STATE: folder exists, no review-v1.md'); say('ROUTER
 const N = Math.max(...reviews)
 
 const metricsPath = join(t.dir, 'metrics.jsonl')
-if (!existsSync(metricsPath)) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null) }
+if (!existsSync(metricsPath)) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null, 'no-metrics') }
 const allLines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
 const lines = allLines.filter(l => !l.correction_for)
-if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null) }
+if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null, 'records-broken') }
 const L = lines[lines.length - 1]
 // Corrections are authoritative but not machine-applied here — surface the ones that
 // correct the latest line: round-keyed for a fix-round line, pass-keyed for a pass line.
@@ -118,7 +119,7 @@ say(`STATE: latest resolution v${RN || '—'}${rStatus ? ` (${rStatus}${rCommit 
 // 015's post-cert round is the precedent — its verification reopened 4 fixes.
 if (L.outcome === 'certified' && L.pass === N && (!RN || RN < N)) {
   say('ROUTER: certification passed on the latest pass; no post-cert fix round is pending.')
-  finish(2, null, `close the loop (record \`closed:\` in the ledger frontmatter + index row, README note ²) — owner decision`)
+  finish(2, null, `close the loop (record \`closed:\` in the ledger frontmatter + index row, README note ²) — owner decision`, 'loop-close')
 }
 
 // Latest pass is a verification: its results decide. This branch must run before the
@@ -129,7 +130,7 @@ if (L.type === 'verification') {
   if (serious > 0) { say('ROUTER: verification surfaced new serious findings (last row).'); finish(0, 'fix round', null) }
   say('ROUTER: verification clean (0 reopened, 0 new serious).')
   say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
-  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`)
+  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'delta-worthiness')
 }
 // A fix round exists for the latest review and is resolved → verification.
 if (RN === N && rStatus === 'resolved') {
@@ -146,4 +147,4 @@ if (L.verdict === 'request-changes' || serious > 0) {
   finish(0, 'fix round', null)
 }
 say('ROUTER: no row matched mechanically — decide from the README router with the facts above.')
-finish(3, null, null)
+finish(3, null, null, 'no-row-matched')

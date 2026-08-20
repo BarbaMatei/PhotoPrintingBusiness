@@ -101,6 +101,17 @@ const firstLine = out => out.split('\n')[0]
     r.out.includes('ROUTER: verification clean (0 reopened, 0 new serious).') && r.out.includes('GATE:'), r.out.trim())
 }
 
+// ---------- route-next-pass: gate kinds ----------
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '909-certified-target'])
+  check('router exits 2 on a certified target with no pending fix round', r.code === 2, `exit ${r.code}`)
+  check('router names the loop-close gate kind', r.out.includes('GATE_KIND: loop-close'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '904-clean-verification'])
+  check('router names the delta-worthiness gate kind', r.out.includes('GATE_KIND: delta-worthiness'), r.out.trim())
+}
+
 // ---------- records auditor: smoke run against the real repo ----------
 {
   const r = run('records-auditor.mjs', ['044-045-observability'])
