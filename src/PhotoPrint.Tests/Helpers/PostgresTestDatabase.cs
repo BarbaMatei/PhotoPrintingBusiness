@@ -4,11 +4,6 @@ using PhotoPrint.API.Data;
 
 namespace PhotoPrint.Tests.Helpers;
 
-/// <summary>
-/// A throwaway PostgreSQL database scoped to one test class: created on construction with the
-/// migration chain applied, dropped on <see cref="Dispose"/>. Every context handed out points at
-/// the same database, so tests that need two contexts observe each other's writes.
-/// </summary>
 public sealed class PostgresTestDatabase : IDisposable
 {
     public const string ConnectionEnvVar = "POSTGRES_TEST_CONNECTION";
@@ -71,6 +66,32 @@ public sealed class PostgresTestDatabase : IDisposable
                 FROM pg_constraint WHERE contype = 'f'
               LOOP
                 EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.conname);
+              END LOOP;
+            END $$;
+            """;
+
+        Execute(sql);
+    }
+
+    public void TruncateAllTables()
+    {
+        const string sql = """
+            DO $$
+            DECLARE tables text; s record;
+            BEGIN
+              SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+                INTO tables
+                FROM pg_tables
+               WHERE schemaname = 'public' AND tablename <> '__EFMigrationsHistory';
+
+              IF tables IS NOT NULL THEN
+                EXECUTE 'TRUNCATE TABLE ' || tables || ' RESTART IDENTITY CASCADE';
+              END IF;
+
+              -- No table column owns the numbering sequences, so RESTART IDENTITY skips them.
+              FOR s IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public'
+              LOOP
+                EXECUTE format('ALTER SEQUENCE %I.%I RESTART', s.schemaname, s.sequencename);
               END LOOP;
             END $$;
             """;

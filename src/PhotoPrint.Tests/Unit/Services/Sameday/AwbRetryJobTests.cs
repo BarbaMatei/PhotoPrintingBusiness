@@ -20,17 +20,19 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 /// as real SQL, not LINQ-to-objects. The <c>RunOneTickAsync</c> private method
 /// is invoked via reflection.
 /// </summary>
-public class AwbRetryJobTests : IDisposable
+public class AwbRetryJobTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
 
-    public AwbRetryJobTests()
+    public AwbRetryJobTests(PostgresTestDatabase database)
     {
+        _database = database;
+        database.TruncateAllTables();
+
         // FK enforcement off: these exercise the retry sweep, not referential integrity.
         _database.DropAllForeignKeys();
     }
 
-    public void Dispose() => _database.Dispose();
 
     private PhotoPrintDbContext CreateDb() => _database.NewContext();
 

@@ -21,11 +21,16 @@ namespace PhotoPrint.Tests.Unit.Services;
 /// never reproduce it. PostgreSQL enforces <c>ix_orders_idempotency_key</c>, which is what
 /// makes these tests meaningful.
 /// </summary>
-public class OrderServiceIdempotencyConcurrencyTests : IDisposable
+public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
 
-    public void Dispose() => _database.Dispose();
+    public OrderServiceIdempotencyConcurrencyTests(PostgresTestDatabase database)
+    {
+        _database = database;
+        database.TruncateAllTables();
+    }
+
 
     private PhotoPrintDbContext NewContext(params IInterceptor[] interceptors)
     {

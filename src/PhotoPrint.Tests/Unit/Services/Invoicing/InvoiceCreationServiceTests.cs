@@ -15,16 +15,19 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 /// Verifies the invoicing hand-off: <see cref="InvoiceCreationService"/> consumes the
 /// numbering service + VAT snapshot, producing an Invoice row at the Paid transition.
 /// </summary>
-public class InvoiceCreationServiceTests : IDisposable
+public class InvoiceCreationServiceTests : IClassFixture<PostgresTestDatabase>, IDisposable
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
     private readonly PhotoPrintDbContext _db;
     private readonly PostgresInvoiceNumberingService _numbering;
     private readonly InvoiceCreationService _sut;
     private readonly DateTimeOffset _now = new(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
 
-    public InvoiceCreationServiceTests()
+    public InvoiceCreationServiceTests(PostgresTestDatabase database)
     {
+        _database = database;
+        database.TruncateAllTables();
+
         _db = _database.NewContext();
         _numbering = NewNumbering(_db);
         _sut = new InvoiceCreationService(
@@ -54,7 +57,6 @@ public class InvoiceCreationServiceTests : IDisposable
     public void Dispose()
     {
         _db.Dispose();
-        _database.Dispose();
     }
 
     private async Task<Order> SeedPaidOrderAsync(decimal total = 26.00m)

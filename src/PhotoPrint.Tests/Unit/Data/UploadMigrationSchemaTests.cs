@@ -10,11 +10,16 @@ namespace PhotoPrint.Tests.Unit.Data;
 /// broken column definition would ship green. These apply the real migration chain to a
 /// PostgreSQL database and assert the resulting Uploads columns.
 /// </summary>
-public class UploadMigrationSchemaTests : IDisposable
+public class UploadMigrationSchemaTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
 
-    public void Dispose() => _database.Dispose();
+    public UploadMigrationSchemaTests(PostgresTestDatabase database)
+    {
+        _database = database;
+        database.TruncateAllTables();
+    }
+
 
     private (string type, bool notNull)? Column(string columnName)
     {

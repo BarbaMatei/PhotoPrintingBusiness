@@ -18,9 +18,17 @@ using Xunit;
 
 namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
 
-public class InvoiceUploadJobTests
+public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
 {
     private static int _seedNumber;
+
+    private readonly PostgresTestDatabase _database;
+
+    public InvoiceUploadJobTests(PostgresTestDatabase database)
+    {
+        _database = database;
+        database.TruncateAllTables();
+    }
 
     private static PhotoPrintDbContext CreateDb(PostgresTestDatabase database, Action<string>? sqlLog = null)
     {
@@ -29,8 +37,6 @@ public class InvoiceUploadJobTests
         if (sqlLog is not null) builder.LogTo(sqlLog, LogLevel.Information);
         return new(builder.Options);
     }
-
-    private static PostgresTestDatabase OpenDatabase() => new();
 
     private static Order MakeOrder(Guid id) => new()
     {
@@ -303,7 +309,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_CloudEnabled_SavesPdfToCloudAdapterNotLocal()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: true);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
@@ -319,7 +325,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_CloudDisabled_SavesPdfToLocalAdapter()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
@@ -334,7 +340,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyAndRethrows()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
@@ -357,7 +363,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_RowAlreadyClaimedWithinTtl_SkipsWithoutCallingAnaf()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false, claimTtlMinutes: 10);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database, claimedAt: DateTimeOffset.UtcNow.AddMinutes(-2));
 
@@ -369,7 +375,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_ClaimExpired_ProceedsAndReclaims()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false, claimTtlMinutes: 10);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database, claimedAt: DateTimeOffset.UtcNow.AddMinutes(-20));
 
@@ -384,7 +390,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_AnafRejectsWithContentErrors_ReleasesClaimForPromptRetry()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
@@ -401,7 +407,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_AnafUnreachable_RecordsErrorAndReleasesClaim()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
@@ -419,7 +425,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_XmlBuildThrows_RecordsErrorAndReleasesClaimWithoutCallingAnaf()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database, xmlPayload: null);
         h.XmlBuilder.Setup(b => b.Build(It.IsAny<Order>(), It.IsAny<Invoice>(), It.IsAny<SellerSettings>()))
@@ -437,7 +443,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_XmlAndPdfAlreadyBuilt_SkipsOrderReloadAndProceedsToUpload()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var sqlLines = new List<string>();
         var h = Build(database, cloudEnabled: false, sqlLog: sqlLines.Add);
         var orderId = Guid.NewGuid();
@@ -464,7 +470,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AnafAuthFails_LogsDistinctlyAndCapturesToSentry()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
@@ -487,7 +493,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task PollSubmittedAsync_UnrecognizedStatus_LogsDistinctlyFromInProgressAndDoesNotTransition()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs);
         var (_, invoiceId) = SeedOrderAndInvoice(
@@ -509,7 +515,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task PollSubmittedAsync_RejectedWithinBackoffBudget_MarksRejectedNotFailed()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
         var h = Build(database, cloudEnabled: false, clock: new FakeClock(now), backoffHours: [1, 4]);
         var (_, invoiceId) = SeedOrderAndInvoice(
@@ -528,7 +534,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task PollSubmittedAsync_RejectedBudgetExhausted_MarksFailedNotRejected()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
         var h = Build(database, cloudEnabled: false, clock: new FakeClock(now), backoffHours: [1, 4]);
         var (_, invoiceId) = SeedOrderAndInvoice(
@@ -555,7 +561,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task RunTickAsync_TimeoutSurfacingAsCancellation_DoesNotEscapeAndStopTheHost()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs);
         var (_, _) = SeedOrderAndInvoice(database);
@@ -573,7 +579,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task RunTickAsync_RealShutdown_StillPropagates()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false);
         SeedOrderAndInvoice(database);
         using var cts = new CancellationTokenSource();
@@ -589,7 +595,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task UploadPendingAsync_UploadTimesOut_CountsTheUnknownOutcomeAndLeavesTheClaimToExpire()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs, realLifecycle: true);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
@@ -705,7 +711,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthFailsForEveryRow_LogsOnceAndSummarisesTheRest()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs);
         for (var i = 0; i < 4; i++)
@@ -728,7 +734,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthStillFailingOnTheNextTick_DoesNotPageASecondTime()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs);
         var (_, invoiceId) = SeedOrderAndInvoice(
@@ -757,7 +763,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthStillFailingAfterTheAlertWindowExpires_PagesAgain()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
@@ -780,7 +786,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthStillFailingOnTheNextTickOfASlowPoll_DoesNotPageASecondTime()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
@@ -809,7 +815,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthOutageAtTheSlowestLegalPoll_PagesAgainInsideTheSubmissionDeadline()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
@@ -838,7 +844,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthOutageAtTheFastestLegalPoll_KeepsTheTwoHourFloor()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var logs = new LogCapture();
         var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
@@ -866,7 +872,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_AuthFailsOnASubmittedRow_RecordsTheReasonOnThatRow()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var h = Build(database, cloudEnabled: false, realLifecycle: true);
         var (_, invoiceId) = SeedOrderAndInvoice(
             database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
@@ -886,7 +892,7 @@ public class InvoiceUploadJobTests
     [Fact]
     public async Task ProcessBatchAsync_RowThatJustFailed_IsSkippedUntilItsCooldownExpires()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
         var h = Build(database, cloudEnabled: false, clock: new FakeClock(now));
 

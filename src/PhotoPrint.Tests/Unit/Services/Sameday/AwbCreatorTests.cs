@@ -19,18 +19,27 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 /// which InMemory doesn't support; the read-backs go through a FRESH context so
 /// a missing/last-writer-wins persist reddens the test.
 /// </summary>
-public class AwbCreatorTests : IDisposable
+public class AwbCreatorTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
+    private PostgresTestDatabase _database;
 
-    public AwbCreatorTests()
+    public AwbCreatorTests(PostgresTestDatabase database)
     {
+        _database = database;
+        database.TruncateAllTables();
         // FK enforcement off: these exercise AWB-creation logic, not referential
         // integrity, so an OrderItem can reference a synthetic product/upload id.
-        _database.DropAllForeignKeys();
+        database.DropAllForeignKeys();
     }
 
-    public void Dispose() => _database.Dispose();
+    private PostgresTestDatabase UseIsolatedDatabase()
+    {
+        var own = new PostgresTestDatabase();
+        own.DropAllForeignKeys();
+        _database = own;
+
+        return own;
+    }
 
     private PhotoPrintDbContext CreateDb() => _database.NewContext();
 
@@ -219,6 +228,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Returns_transient_RetryLater_when_the_persist_fails_after_a_successful_create()
     {
+        using var isolated = UseIsolatedDatabase();
         var order = SeedOrder();
 
         // The vendor AWB is created, then the DB write fails (table gone mid-call).
@@ -458,6 +468,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Preserves_the_claim_when_the_persist_fails_after_the_vendor_created_the_AWB()
     {
+        using var isolated = UseIsolatedDatabase();
         // The AWB is created and billed but the DB write throws: the claim must be held so the
         // re-attempt waits out the TTL rather than re-calling the vendor in ~30 s for a 2nd label.
         var order = SeedOrder();
@@ -549,6 +560,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task A_thrown_db_failure_records_an_error_outcome_and_rethrows()
     {
+        using var isolated = UseIsolatedDatabase();
         var order = SeedOrder();
         using var db = CreateDb();
         var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));

@@ -13,15 +13,18 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 /// a real PostgreSQL database (NOT EF InMemory) because <c>ExecuteUpdateAsync</c> is
 /// what we're verifying — it doesn't translate cleanly under EF InMemory.
 /// </summary>
-public class InvoiceLifecycleTests : IDisposable
+public class InvoiceLifecycleTests : IClassFixture<PostgresTestDatabase>, IDisposable
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
     private readonly PhotoPrintDbContext _db;
     private readonly InvoiceLifecycle _sut;
     private readonly DateTimeOffset _now = new(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
 
-    public InvoiceLifecycleTests()
+    public InvoiceLifecycleTests(PostgresTestDatabase database)
     {
+        _database = database;
+        database.TruncateAllTables();
+
         _db = _database.NewContext();
         _sut = new InvoiceLifecycle(
             _db,
@@ -32,7 +35,6 @@ public class InvoiceLifecycleTests : IDisposable
     public void Dispose()
     {
         _db.Dispose();
-        _database.Dispose();
     }
 
     private async Task<Guid> SeedInvoiceAsync(

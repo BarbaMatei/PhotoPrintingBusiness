@@ -7,11 +7,16 @@ using Xunit;
 
 namespace PhotoPrint.Tests.Integration;
 
-public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposable
+public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
 
-    public void Dispose() => _database.Dispose();
+    public PostgresInvoiceNumberingServiceIntegrationTests(PostgresTestDatabase database)
+    {
+        _database = database;
+        database.TruncateAllTables();
+    }
+
 
     private static int RandomYear() => Random.Shared.Next(3000, 3999);
 

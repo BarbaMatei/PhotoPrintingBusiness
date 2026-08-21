@@ -21,11 +21,16 @@ using Xunit;
 
 namespace PhotoPrint.Tests.Unit.Controllers;
 
-public class WebhooksControllerInvoiceRaceTests : IDisposable
+public class WebhooksControllerInvoiceRaceTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
 
-    public void Dispose() => _database.Dispose();
+    public WebhooksControllerInvoiceRaceTests(PostgresTestDatabase database)
+    {
+        _database = database;
+        database.TruncateAllTables();
+    }
+
 
     private PhotoPrintDbContext CreateDb() => _database.NewContext();
 
