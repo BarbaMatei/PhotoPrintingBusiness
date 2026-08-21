@@ -122,6 +122,7 @@ public class AdminOrderService : IAdminOrderService
         OrderStatusMachine.Transition(order, newStatus);
 
         double? processingSeconds = null;
+        var savedWithInvoice = false;
 
         if (newStatus == OrderStatus.Shipped)
         {
@@ -145,10 +146,12 @@ public class AdminOrderService : IAdminOrderService
             // Offline / manual reconciliation — PaidAt is what the AWB retry sweep
             // keys off, so it must be stamped like the webhook Paid path does.
             order.PaidAt = DateTimeOffset.UtcNow;
-            await _invoiceCreator.CreateForOrderAsync(order, ct);
+            await SaveWithInvoiceAsync(order, ct);
+            savedWithInvoice = true;
         }
 
-        await _db.SaveChangesAsync(ct);
+        if (!savedWithInvoice)
+            await _db.SaveChangesAsync(ct);
 
         // Cumulative histogram: a shipment that never committed can never be un-observed.
         if (processingSeconds is { } seconds)
@@ -405,5 +408,36 @@ public class AdminOrderService : IAdminOrderService
             order.DeliveredAt,
             order.InternalNotes,
             items);
+    }
+
+    // Mirrors the webhook Paid path: a concurrent delivery or a taken number must not turn an
+    // admin status change into an unhandled 500.
+    private async Task SaveWithInvoiceAsync(Order order, CancellationToken ct)
+    {
+        const int maxNumberRetries = 3;
+        for (var attempt = 0; ; attempt++)
+        {
+            var invoice = await _invoiceCreator.CreateForOrderAsync(order, ct);
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return;
+            }
+            catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsOrderIdViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                _logger.LogInformation(
+                    "admin.order.invoice-already-created order_id={OrderId}", order.Id);
+                await _db.SaveChangesAsync(ct);
+                return;
+            }
+            catch (DbUpdateException ex) when (attempt < maxNumberRetries && InvoiceUniqueViolation.IsNumberViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                _logger.LogWarning(
+                    "admin.order.invoice-number-collision-retry order_id={OrderId} attempt={Attempt}",
+                    order.Id, attempt);
+            }
+        }
     }
 }

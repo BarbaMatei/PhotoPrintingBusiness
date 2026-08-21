@@ -447,22 +447,8 @@ public class WebhooksController : ControllerBase
     }
 
     private static bool IsInvoiceOrderIdViolation(DbUpdateException ex)
-        => ex.InnerException switch
-        {
-            Npgsql.PostgresException pg =>
-                pg.SqlState == "23505" /* unique_violation */ &&
-                pg.ConstraintName == PhotoPrintDbContext.InvoiceOrderIdIndexName,
-            _ => false,
-        };
+        => InvoiceUniqueViolation.IsOrderIdViolation(ex);
 
     private static bool IsInvoiceNumberViolation(DbUpdateException ex)
-        => ex.InnerException switch
-        {
-            // Both indexes guard the same thing — a number already taken — so a retry with a fresh number is the answer to either.
-            Npgsql.PostgresException pg =>
-                pg.SqlState == "23505" /* unique_violation */ &&
-                (pg.ConstraintName == PhotoPrintDbContext.InvoiceNumberIndexName ||
-                 pg.ConstraintName == PhotoPrintDbContext.InvoiceSeriesYearNumberIndexName),
-            _ => false,
-        };
+        => InvoiceUniqueViolation.IsNumberViolation(ex);
 }

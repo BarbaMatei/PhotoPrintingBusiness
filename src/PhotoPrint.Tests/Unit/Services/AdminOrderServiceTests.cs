@@ -862,4 +862,60 @@ public class AdminOrderServiceTests
         total.Should().Be(1);
         items.Single().Status.Should().Be("Paid");
     }
+
+    // ── Manual mark-Paid shares the webhook's invoice protections ─────────────
+
+    // Real Postgres and a real creator: EF InMemory raises no unique violation, so a mock would pass regardless.
+    [Fact]
+    public async Task UpdateStatusAsync_ManualPaid_RetriesATakenInvoiceNumberInsteadOfThrowing()
+    {
+        using var database = new PostgresTestDatabase();
+        var takenOrderId = Guid.NewGuid();
+        var targetOrderId = Guid.NewGuid();
+
+        using (var seed = database.NewContext())
+        {
+            seed.Orders.Add(TestOrders.Make(takenOrderId));
+            var target = TestOrders.Make(targetOrderId);
+            target.Status = OrderStatus.AwaitingPayment;
+            seed.Orders.Add(target);
+            await seed.SaveChangesAsync();
+            seed.Invoices.Add(TestOrders.MakeInvoice(takenOrderId, number: 500));
+            await seed.SaveChangesAsync();
+        }
+
+        using var db = database.NewContext();
+        var numbering = new CollidingThenFreeNumbering(collideWith: 500, thenUse: 501);
+        var realCreator = new InvoiceCreationService(
+            db, numbering, Options.Create(new VatSettings { InvoiceSeries = "FT", Rate = 0.19m }),
+            TimeProvider.System, NullLogger<InvoiceCreationService>.Instance);
+
+        var sut = new AdminOrderService(
+            db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object, _router.Object,
+            _purger.Object, Options.Create(new ArchiveSettings()), _hub.Object,
+            _awbNotifier.Object, realCreator, NullLogger<AdminOrderService>.Instance);
+
+        await sut.UpdateStatusAsync(targetOrderId, "Paid", null, null);
+
+        using var verify = database.NewContext();
+        var invoice = await verify.Invoices.FirstAsync(i => i.OrderId == targetOrderId);
+        invoice.Number.Should().Be(501, "the taken number must be retried, not thrown on");
+        (await verify.Orders.FirstAsync(o => o.Id == targetOrderId)).PaidAt.Should().NotBeNull();
+    }
+
+    private sealed class CollidingThenFreeNumbering : IInvoiceNumberingService
+    {
+        private readonly int _collideWith;
+        private readonly int _thenUse;
+        private int _calls;
+
+        public CollidingThenFreeNumbering(int collideWith, int thenUse)
+        {
+            _collideWith = collideWith;
+            _thenUse = thenUse;
+        }
+
+        public Task<InvoiceNumber> NextNumberAsync(string series, int year, CancellationToken ct = default)
+            => Task.FromResult(new InvoiceNumber(series, year, _calls++ == 0 ? _collideWith : _thenUse));
+    }
 }
