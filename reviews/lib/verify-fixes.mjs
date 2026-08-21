@@ -11,7 +11,9 @@
 //          [--test-cmd-api "<tpl with {filter}>"] [--test-cmd-ui "<tpl with {name}>"]
 // Output: one JSON line per row {id, verdict, commit, filters, red_exits, green_exits},
 // then "SUMMARY: <held>/<total> held". Verdicts: held · test-never-red · no-test ·
-// test-only · unreachable-commit · revert-failed · green-failed · rename-in-fix · dry-run.
+// test-only · unreachable-commit · unparsable-commit · revert-failed · green-failed ·
+// rename-in-fix · dry-run. A row's Commit cell may list several commits; all of them are
+// reverted together, back to the parent of the first.
 // Exit: 0 all held · 1 any other verdict · 2 dirty tree or usage error.
 import { readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -44,8 +46,12 @@ const versions = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).fi
 if (!versions.length) { console.error(`no resolution file in ${dir}`); process.exit(2) }
 const N = Math.max(...versions)
 const resolutionText = readFileSync(join(dir, `resolution-v${N}.md`), 'utf8')
-const rows = [...resolutionText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|\s*`?([0-9a-f]{7,40})`?\s*\|/gm)]
-  .map(m => ({ id: m[1], commit: m[2] }))
+// A fix may span several commits (the micro-review follow-up is the common case), so the Commit
+// cell can list more than one. Take every sha in the cell and never skip a `fixed` row silently:
+// a row whose cell holds no sha is reported, because under-coverage in a verifier reads as a pass.
+const rows = [...resolutionText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|([^|]*)\|/gm)]
+  .map(m => ({ id: m[1], commits: m[2].match(/[0-9a-f]{7,40}/g) ?? [] }))
+  .map(r => ({ ...r, commit: r.commits.join(', ') }))
   .filter(r => !only || only.has(r.id))
 if (!rows.length) { console.error(`resolution-v${N}.md has no matching fixed rows`); process.exit(2) }
 
@@ -76,13 +82,17 @@ const results = []
 for (const row of rows) {
   const res = { id: row.id, verdict: null, commit: row.commit, filters: [], red_exits: [], green_exits: [] }
   results.push(res)
-  if (git('cat-file', '-e', row.commit).status !== 0 ||
-      git('merge-base', '--is-ancestor', row.commit, 'HEAD').status !== 0) { res.verdict = 'unreachable-commit'; continue }
-  const entries = git('show', '--name-status', '--format=', row.commit).stdout
-    .split('\n').filter(l => l.trim()).map(l => l.split('\t'))
+  if (!row.commits.length) { res.verdict = 'unparsable-commit'; continue }
+  if (row.commits.some(c => git('cat-file', '-e', c).status !== 0 ||
+      git('merge-base', '--is-ancestor', c, 'HEAD').status !== 0)) { res.verdict = 'unreachable-commit'; continue }
+  const entries = row.commits.flatMap(c => git('show', '--name-status', '--format=', c).stdout
+    .split('\n').filter(l => l.trim()).map(l => l.split('\t')))
   if (entries.some(e => e[0].startsWith('R'))) { res.verdict = 'rename-in-fix'; continue }
-  const tests = entries.filter(e => isTest(e[1])).map(e => e[1])
-  const source = entries.filter(e => !isTest(e[1]))
+  const base = `${row.commits[0]}^`
+  const uniq = new Map()
+  for (const e of entries) uniq.set(e[1], e[0])
+  const tests = [...uniq.keys()].filter(isTest)
+  const source = [...uniq.entries()].filter(([f]) => !isTest(f)).map(([f, st]) => [st, f])
   if (!tests.length) { res.verdict = 'no-test'; continue }
   if (!source.length) { res.verdict = 'test-only'; continue }
   const cmds = tests.map(p => p.endsWith('.cs')
@@ -92,9 +102,10 @@ for (const row of rows) {
   if (dryRun) { res.verdict = 'dry-run'; res.plan = { source: source.map(e => e[1]), tests }; continue }
 
   let reverted = true
-  for (const [st, f] of source) {
-    if (st === 'A') { try { rmSync(join(REPO, f)) } catch { reverted = false } }
-    else if (git('checkout', `${row.commit}^`, '--', f).status !== 0) reverted = false
+  for (const [, f] of source) {
+    const existedBefore = git('cat-file', '-e', `${base}:${f}`).status === 0
+    if (!existedBefore) { try { rmSync(join(REPO, f)) } catch { reverted = false } }
+    else if (git('checkout', base, '--', f).status !== 0) reverted = false
   }
   if (!reverted) {
     restoreOrDie(row.id)

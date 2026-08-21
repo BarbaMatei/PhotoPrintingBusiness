@@ -293,6 +293,20 @@ commit: abc1234
   const dirty = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
   check('verify-fixes refuses a dirty tree', dirty.code === 2, `exit ${dirty.code}: ${dirty.out.trim()}`)
   g('checkout', '--', '.')
+
+  // A fix that took a follow-up commit lists both in the Commit cell; reverting only the first
+  // would leave the follow-up's code in place and the test green for the wrong reason.
+  writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'fixed and polished\n')
+  g('add', '.'); g('commit', '-qm', 'follow-up')
+  const sha2 = g('rev-parse', '--short', 'HEAD').stdout.trim()
+  writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
+    `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${sha2}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9501 | fixed | \`${sha}\`, \`${sha2}\` | fixture fix with a follow-up |\n| PPW-9502 | fixed | — | fixture row whose cell names no commit |\n`)
+  g('add', '.'); g('commit', '-qm', 'resolution with two commits')
+  const multi = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
+  check('verify-fixes covers a row whose Commit cell lists two commits', multi.out.includes('"id":"PPW-9501"') && multi.out.includes('"verdict":"held"'), multi.out.trim())
+  check('verify-fixes never skips a fixed row it cannot parse', multi.out.includes('"id":"PPW-9502"') && multi.out.includes('"verdict":"unparsable-commit"'), multi.out.trim())
+  check('verify-fixes counts both rows in its summary', multi.out.includes('SUMMARY: 1/2 held') && multi.code === 1, `exit ${multi.code}: ${multi.out.trim()}`)
+  check('verify-fixes leaves the tree clean after a multi-commit revert', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
   rmSync(T, { recursive: true, force: true })
 }
 
