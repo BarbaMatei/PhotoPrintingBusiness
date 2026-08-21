@@ -366,7 +366,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                     "anaf.upload-job.upload-outcome-unknown invoice_id={InvoiceId} outcomes={Outcomes} max={Max}",
                     invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
             }
-            // The claim is left to expire: it delays no tick — the per-row cooldown does that — but it does keep a second replica out of a row whose ANAF answer nobody has. Parking clears it.
+            // The claim is left to expire: it keeps a second replica out of a row whose ANAF answer nobody has. What gates the next attempt is whichever is longer, this TTL or the per-row cooldown — at the defaults the cooldown, so the hold costs nothing. Parking clears it.
         }
         // AnafAuthException propagates to the batch loop's catch — the claim just holds through its TTL.
     }

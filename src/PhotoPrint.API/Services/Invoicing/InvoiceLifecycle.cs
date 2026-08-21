@@ -172,6 +172,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
                 .SetProperty(i => i.LastError,    (string?)null)
                 .SetProperty(i => i.XmlPayload,   (string?)null)
                 .SetProperty(i => i.UnknownUploadOutcomes, 0)
+                .SetProperty(i => i.ClaimedAt,    (DateTimeOffset?)null)
                 .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),
                 ct);
         return LogAndReturn(invoiceId, expected, InvoiceAnafStatus.Pending, affected);

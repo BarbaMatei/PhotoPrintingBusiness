@@ -207,6 +207,22 @@ public class InvoiceLifecycleTests : IDisposable
         fresh.ClaimedAt.Should().BeNull("a parked row is nobody's to hold");
     }
 
+    // The count and the park are two statements, so a row can be left counted-but-not-parked; the next attempt has to finish the job.
+    [Fact]
+    public async Task RecordUnknownUploadOutcome_on_a_count_already_past_the_budget_still_parks()
+    {
+        var id = await SeedInvoiceAsync(InvoiceAnafStatus.Pending);
+        await _db.Invoices.Where(i => i.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.UnknownUploadOutcomes, 5));
+
+        var outcome = await _sut.RecordUnknownUploadOutcomeAsync(
+            id, "no answer", "budget spent", maxOutcomes: 3, CancellationToken.None);
+
+        outcome.Parked.Should().BeTrue();
+        var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
+        fresh.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+    }
+
     // The upload runs outside any transaction, so an admin retry or another worker can move the row while it is in flight.
     [Fact]
     public async Task RecordUnknownUploadOutcome_on_a_row_that_left_Pending_counts_nothing()
@@ -229,13 +245,16 @@ public class InvoiceLifecycleTests : IDisposable
     {
         var id = await SeedInvoiceAsync(InvoiceAnafStatus.Failed, lastError: "outcome unknown");
         await _db.Invoices.Where(i => i.Id == id)
-            .ExecuteUpdateAsync(s => s.SetProperty(i => i.UnknownUploadOutcomes, 3));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.UnknownUploadOutcomes, 3)
+                .SetProperty(i => i.ClaimedAt, (DateTimeOffset?)_now));
 
         var ok = await _sut.RetryAsync(id, InvoiceAnafStatus.Failed, CancellationToken.None);
 
         ok.Should().BeTrue();
         var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
         fresh.UnknownUploadOutcomes.Should().Be(0);
+        fresh.ClaimedAt.Should().BeNull("the operator's retry has to hand the row to the next tick, not to a stale claim");
     }
 
     [Fact]
