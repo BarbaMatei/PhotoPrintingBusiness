@@ -77,8 +77,7 @@ public sealed class InvoicesController : ControllerBase
         }
         catch (FileNotFoundException ex)
         {
-            // Distinct from the not-yet-rendered 404 above: the row claims a key that no longer resolves,
-            // which is an operator problem, not something the caller should retry.
+            // Distinct from the not-yet-rendered 404 above: the key no longer resolves, so retrying cannot help.
             _logger.LogError(ex,
                 "invoice.pdf.blob-missing order_id={OrderId} invoice_number={InvoiceNumber} key={Key} cloud_enabled={CloudEnabled}",
                 orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, _storageRouter.CloudEnabled);

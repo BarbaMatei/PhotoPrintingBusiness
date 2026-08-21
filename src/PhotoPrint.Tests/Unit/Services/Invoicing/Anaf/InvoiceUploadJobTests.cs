@@ -535,6 +535,38 @@ public class InvoiceUploadJobTests
             "a Submitted row is the dominant auth-failure case, and the admin list shows LastError");
     }
 
+    // Without a cooldown the oldest broken invoice heads every batch forever, starving healthy rows.
+    [Fact]
+    public async Task ProcessBatchAsync_RowThatJustFailed_IsSkippedUntilItsCooldownExpires()
+    {
+        using var database = new PostgresTestDatabase();
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now));
+
+        var (_, justFailedId) = SeedOrderAndInvoice(database, createdAt: now.AddDays(-9));
+        var (_, healthyId) = SeedOrderAndInvoice(database, createdAt: now.AddMinutes(-1));
+
+        using (var seed = database.NewContext())
+        {
+            var row = await seed.Invoices.FirstAsync(i => i.Id == justFailedId);
+            row.LastError = "order has zero items";
+            row.UpdatedAt = now.AddSeconds(-30);   // well inside the 30-minute poll cadence
+            await seed.SaveChangesAsync();
+        }
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("upload-1", now));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = database.NewContext();
+        var skipped = await verify.Invoices.FirstAsync(i => i.Id == justFailedId);
+        var worked = await verify.Invoices.FirstAsync(i => i.Id == healthyId);
+
+        skipped.ClaimedAt.Should().BeNull("a row inside its cooldown must not be claimed again");
+        worked.ClaimedAt.Should().NotBeNull("the healthy row must still get its turn");
+    }
+
     private sealed class FakeClock : TimeProvider
     {
         private readonly DateTimeOffset _now;

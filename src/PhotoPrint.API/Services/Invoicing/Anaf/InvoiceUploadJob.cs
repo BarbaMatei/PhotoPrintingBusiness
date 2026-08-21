@@ -72,8 +72,13 @@ public sealed class InvoiceUploadJob : BackgroundService
             var pendingStatus   = InvoiceAnafStatus.Pending;
             var submittedStatus = InvoiceAnafStatus.Submitted;
 
+            // A row that just failed gets a cooldown, or the oldest broken invoice heads every batch
+            // forever and starves the healthy ones out of a batch capped at MaxBatchSize.
+            var retryNotBefore = _clock.GetUtcNow() - TimeSpan.FromMinutes(Math.Max(2, _settings.PollIntervalMinutes));
+
             var batch = await db.Invoices
-                .Where(i => i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
+                .Where(i => (i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
+                            && (i.LastError == null || i.UpdatedAt == null || i.UpdatedAt < retryNotBefore))
                 .OrderBy(i => i.CreatedAt)
                 .Take(_settings.MaxBatchSize)
                 .Select(i => new { i.Id, i.OrderId, i.AnafStatus })
