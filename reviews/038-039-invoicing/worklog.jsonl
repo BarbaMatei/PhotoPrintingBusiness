@@ -306,3 +306,5 @@
 {"t":"2026-08-21T17:17:02+03:00","ev":"doc-gate","verdict":"approve","round":9,"note":"two independent judges agreed; the single defect (PPW-557 affirmed at its pre-micro-review commit) is corrected in 74e23f3"}
 {"t":"2026-08-21T17:17:02+03:00","ev":"pass-launch","pass":10,"type":"verification"}
 {"t":"2026-08-21T17:34:16+03:00","ev":"pass-records-done","pass":10,"type":"verification"}
+{"t":"2026-08-21T18:48:03+03:00","ev":"run-start","note":"third unattended run: certification, single pass on the owner ruling"}
+{"t":"2026-08-21T18:48:03+03:00","ev":"pass-launch","pass":11,"type":"certification","subtype":"certification-single","commit":"de673a5"}
