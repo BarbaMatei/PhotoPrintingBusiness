@@ -80,6 +80,12 @@ public sealed class InvoicesController : ControllerBase
         FileNotFoundException? miss = null;
         var tiersTried = 0;
 
+        void RecordMiss(FileNotFoundException ex)
+        {
+            // Keep whichever miss names a bucket-level fault: S3 maps a missing BUCKET to the same 404 as a missing key.
+            if (miss?.InnerException is null) miss = ex;
+        }
+
         try
         {
             tiersTried++;
@@ -87,7 +93,7 @@ public sealed class InvoicesController : ControllerBase
         }
         catch (FileNotFoundException ex)
         {
-            miss = ex;
+            RecordMiss(ex);
         }
 
         if (stream is null && stampedIsReachable && _storageRouter.CloudEnabled)
@@ -106,14 +112,13 @@ public sealed class InvoicesController : ControllerBase
             }
             catch (FileNotFoundException ex)
             {
-                miss = ex;
+                RecordMiss(ex);
             }
         }
 
         if (stream is null)
         {
             // Distinct from the not-yet-rendered 404 above: the key no longer resolves, so retrying cannot help.
-            // miss_cause carries the adapter's inner reason, because S3 maps a missing BUCKET to the same 404.
             _logger.LogError(miss,
                 "invoice.pdf.blob-missing order_id={OrderId} invoice_number={InvoiceNumber} key={Key} cloud_enabled={CloudEnabled} tiers_tried={TiersTried} miss_cause={MissCause}",
                 orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, _storageRouter.CloudEnabled,
