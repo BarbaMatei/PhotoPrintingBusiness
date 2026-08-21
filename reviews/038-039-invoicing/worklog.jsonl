@@ -220,3 +220,4 @@
 {"t":"2026-08-21T11:09:33+03:00","ev":"doc-gate","verdict":"disapprove","round":1,"reason":"index Passes row 90 words against a 50-word cap; metrics tests field counted the v6 round's runs and the correction line wrongly claimed every other field was correct"}
 {"t":"2026-08-21T11:09:33+03:00","ev":"doc-gate","verdict":"approve","round":2,"reason":"row trimmed to 50 words, two accurate correction lines (runtime, tests), base_commit null upheld as the precedent for a round answering a verification pass"}
 {"t":"2026-08-21T11:15:04+03:00","ev":"pass-launch","pass":7,"type":"verification"}
+{"t":"2026-08-21T11:27:30+03:00","ev":"pass-records-done","pass":7,"type":"verification"}
