@@ -18,11 +18,14 @@ public sealed class InvoicesController : ControllerBase
 {
     private readonly PhotoPrintDbContext _db;
     private readonly IStorageRouter _storageRouter;
+    private readonly ILogger<InvoicesController> _logger;
 
-    public InvoicesController(PhotoPrintDbContext db, IStorageRouter storageRouter)
+    public InvoicesController(
+        PhotoPrintDbContext db, IStorageRouter storageRouter, ILogger<InvoicesController> logger)
     {
         _db = db;
         _storageRouter = storageRouter;
+        _logger = logger;
     }
 
     /// <summary>
@@ -66,7 +69,24 @@ public sealed class InvoicesController : ControllerBase
         }
 
         var store = _storageRouter.CloudEnabled ? _storageRouter.Cloud : _storageRouter.Local;
-        var stream = await store.GetStreamAsync(invoice.PdfStoragePath, ct);
+
+        Stream stream;
+        try
+        {
+            stream = await store.GetStreamAsync(invoice.PdfStoragePath, ct);
+        }
+        catch (FileNotFoundException ex)
+        {
+            // Distinct from the not-yet-rendered 404 above: the row claims a key that no longer resolves,
+            // which is an operator problem, not something the caller should retry.
+            _logger.LogError(ex,
+                "invoice.pdf.blob-missing order_id={OrderId} invoice_number={InvoiceNumber} key={Key} cloud_enabled={CloudEnabled}",
+                orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, _storageRouter.CloudEnabled);
+            return Problem(
+                title: "Invoice PDF unavailable",
+                detail: "The invoice record points at a file that is no longer in storage.",
+                statusCode: StatusCodes.Status404NotFound);
+        }
 
         Response.Headers["Cache-Control"] = "private, max-age=31536000, immutable";
         return File(

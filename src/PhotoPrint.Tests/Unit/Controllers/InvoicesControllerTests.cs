@@ -3,12 +3,14 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using PhotoPrint.API.Authentication;
 using PhotoPrint.API.Controllers;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 using Xunit;
 
 namespace PhotoPrint.Tests.Unit.Controllers;
@@ -38,14 +40,14 @@ public class InvoicesControllerTests
         },
     };
 
-    private static InvoicesController MakeController(PhotoPrintDbContext db, IStorageRouter router, Guid userId) =>
-        MakeControllerWithClaim(db, router, new Claim(ClaimTypes.NameIdentifier, userId.ToString()));
+    private static InvoicesController MakeController(PhotoPrintDbContext db, IStorageRouter router, Guid userId, LogCapture? logs = null) =>
+        MakeControllerWithClaim(db, router, new Claim(ClaimTypes.NameIdentifier, userId.ToString()), logs);
 
     private static InvoicesController MakeGuestController(PhotoPrintDbContext db, IStorageRouter router, Guid guestSessionId) =>
         MakeControllerWithClaim(db, router, new Claim(GuestAuthenticationHandler.GuestSessionIdClaimType, guestSessionId.ToString()));
 
-    private static InvoicesController MakeControllerWithClaim(PhotoPrintDbContext db, IStorageRouter router, Claim claim) =>
-        new(db, router)
+    private static InvoicesController MakeControllerWithClaim(PhotoPrintDbContext db, IStorageRouter router, Claim claim, LogCapture? logs = null) =>
+        new(db, router, logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
         {
             ControllerContext = new ControllerContext
             {
@@ -173,5 +175,44 @@ public class InvoicesControllerTests
         var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
 
         result.Should().BeOfType<ForbidResult>();
+    }
+
+    // Must stay distinguishable from the not-yet-rendered 404 that tells the caller to retry.
+    [Fact]
+    public async Task GetInvoiceAsync_BlobIsMissing_LogsADistinctEventAndDoesNotInviteARetry()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00042",
+            Series = "FT",
+            Number = 42,
+            IssuedAt = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero),
+            PdfStoragePath = "invoices/2026/FT-2026-00042.pdf",
+        });
+        await _db.SaveChangesAsync();
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("gone"));
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+
+        var logs = new LogCapture();
+        var controller = MakeController(_db, router.Object, userId, logs);
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<ObjectResult>()
+            .Which.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+        controller.Response.Headers.Should().NotContainKey("Retry-After");
+        logs.Records.Should().ContainSingle(
+            r => r.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
+                 r.Message.StartsWith("invoice.pdf.blob-missing", StringComparison.Ordinal) &&
+                 r.Message.Contains("FT-2026-00042"));
     }
 }
