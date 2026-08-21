@@ -372,6 +372,49 @@ public class WebhooksControllerMetricsTests
         persisted.PaidAt.Should().BeNull();
     }
 
+    // Only classified outcomes used to reach the metric; anything else escaped first, so a charged
+    // customer vanished from the payment SLO entirely.
+    [Fact]
+    public async Task Stripe_succeeded_when_invoice_creation_fails_unclassified_still_records_the_webhook()
+    {
+        var order = SeedOrder(OrderStatus.AwaitingPayment);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_boom2", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        _invoiceCreator.Setup(i => i.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+                       .ThrowsAsync(new InvalidOperationException("numbering service unavailable"));
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_boom2");
+        using var metrics = Capture();
+
+        var act = () => _sut.StripeWebhookAsync(default);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
+                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Failed))
+            .Should().HaveCount(1, "a charge whose invoice never committed must enter the SLO denominator");
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Stripe_succeeded_when_the_request_is_cancelled_records_nothing()
+    {
+        var order = SeedOrder(OrderStatus.AwaitingPayment);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_cancel", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        _invoiceCreator.Setup(i => i.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+                       .ThrowsAsync(new OperationCanceledException());
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_cancel");
+        using var metrics = Capture();
+
+        var act = () => _sut.StripeWebhookAsync(default);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal)
+            .Should().BeEmpty("a deploy or client abort is not a payment failure");
+    }
+
     // ── The deliberate exception: routine Stripe event types stay out ─────────
 
     [Fact]

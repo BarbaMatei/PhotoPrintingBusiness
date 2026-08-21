@@ -201,7 +201,7 @@ public class WebhooksController : ControllerBase
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
             order.EuPlatescTransactionId = transactionId;
-            var outcome = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, cancellationToken);
+            var outcome = await SaveOrderPaidRecordingFailuresAsync(order, statusBeforeTransition, MetricNames.ProcessorValues.EuPlatesc, cancellationToken);
             RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc, ResultLabelFor(outcome));
             var created = outcome == PaidSaveOutcome.Created;
             if (created)
@@ -282,7 +282,7 @@ public class WebhooksController : ControllerBase
             var statusBeforeTransition = order.Status;
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
             order.PaidAt = DateTimeOffset.UtcNow;
-            var outcome = await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, ct);
+            var outcome = await SaveOrderPaidRecordingFailuresAsync(order, statusBeforeTransition, MetricNames.ProcessorValues.Stripe, ct);
             RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe, ResultLabelFor(outcome));
             var created = outcome == PaidSaveOutcome.Created;
             if (created)
@@ -381,6 +381,26 @@ public class WebhooksController : ControllerBase
 
     // Only Created runs the caller's post-save side effects, so they never repeat for a losing delivery.
     private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
+
+    // An unclassified failure used to escape before RecordPaymentWebhook, dropping a charged customer out of the SLO.
+    private async Task<PaidSaveOutcome> SaveOrderPaidRecordingFailuresAsync(
+        Order order, OrderStatus statusBeforeTransition, string processor, CancellationToken ct)
+    {
+        try
+        {
+            return await SaveOrderPaidWithInvoiceAsync(order, statusBeforeTransition, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Left unrecorded on purpose: a deploy or a client abort is not a payment failure, matching AwbCreator.
+            throw;
+        }
+        catch (Exception)
+        {
+            RecordPaymentWebhook(processor, MetricNames.WebhookResultValues.Failed);
+            throw;
+        }
+    }
 
     private static string ResultLabelFor(PaidSaveOutcome outcome) => outcome switch
     {
