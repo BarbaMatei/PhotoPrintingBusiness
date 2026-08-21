@@ -96,7 +96,7 @@ updated: 2026-08-21
 | PPW-552 | 🟡 | v6 | PPW-515's fix orphaned `AnafUnreachableException`'s XML doc comment | `Services/Invoicing/Anaf/AnafExceptions.cs:32-47` | backlog | `2979ea0` |
 | PPW-553 | 🟠 | v7 | The 2 h ANAF auth-outage window has no floor tied to PollIntervalMinutes, so a validator-legal interval above it defeats the dedup | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:17` | verified | `2daf61e` |
 | PPW-554 | 🟡 | v7 | The bucket-versus-key miss-cause preference has no regression test | `Controllers/InvoicesController.cs:83-87` | backlog | `0ec6497` |
-| PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | fixed | `c2275a3` |
+| PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | fixed | `78900b6` |
 | PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | fixed | `7ad27df` |
 | PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | fixed | `d3ae1e7` |
 | PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | open | `c8d6bb4` |
