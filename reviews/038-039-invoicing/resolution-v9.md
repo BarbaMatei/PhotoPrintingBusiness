@@ -19,6 +19,9 @@ closed:
 | PPW-559 | fixed | `12dac3a`, `25f2097`, `d3ae1e7` | uploads ANAF never confirmed are counted on the row, which parks as `Failed` at `Anaf:MaxUnknownUploadOutcomes` (3) where the admin retry reaches it and resets both count and claim. New surface: the column, the setting, one lifecycle method |
 | PPW-565 | fixed | `8d7a5e6` | the migration test now asserts `HasPendingModelChanges()` is false, so drift adding no column fails a run; proven red with a throwaway `Invoice` property. The relocated Sameday base class is covered through both subclasses |
 | PPW-566 | fixed | `35bde0e` | classifier tested through a real client and stub handler, split by cause on upload and poll, plus one test that no wire outcome escapes unclassified. The per-attempt timeout is deliberately not built |
+| PPW-564 | fixed | `c9ffae4`, `6527bcb` | gates on the invoice entity's tracked state as well as on the index violation, and reloads instead of saving again, so the winner's PaidAt still matches the invoice; email and notification skipped. New surface: the outcome enum, the reload |
+| PPW-567 | fixed | `ba8e628`, `6527bcb` | exhausted retries log the order number, total and payment handles at Error, capture to Sentry, roll the transition back and answer 409. New surface: the optional IHub, the terminal catch, the rollback whose own reload failure is swallowed |
+| PPW-568 | fixed | `573dfb8` | every branch of the loop is now covered in one Postgres-backed class; the two branch tests shipped in the commits whose fix they guard, this one relocates the happy-retry test and adds the container-resolution test |
 
 ## Scope
 
@@ -27,10 +30,12 @@ closed:
 | A — anonymous webhook body cap | PPW-558 | `Controllers/WebhooksController.cs`, `Controllers/PaymentsController.cs`, `Filters/DetectLegacyShippingCostFilter.cs`, `Middleware/ExceptionHandlerMiddleware.cs`, `Observability/MetricNames.cs`, `memory-bank/operations/metrics.md` | not needed (review pre-check `revised`, adopted) |
 | B — ANAF unknown-outcome upload | PPW-559, PPW-566 | `Services/Invoicing/Anaf/InvoiceUploadJob.cs`, `Services/Invoicing/InvoiceLifecycle.cs`, `Models/Invoice.cs`, `Configuration/AnafSettings.cs`, `Validators/AnafSettingsValidator.cs`, `Migrations/*`, `docs/DEPLOYMENT.md`, `memory-bank/operations/metrics.md` | not needed (both review pre-checks `revised`, adopted) |
 | C — model-versus-plan drift guard | PPW-565 | `Tests/Integration/MigrationChainTests.cs` | not needed (adds one assertion; not trigger-list-shaped) |
+| D — admin manual-Paid invoice race | PPW-564, PPW-567, PPW-568 | `Services/AdminOrderService.cs`, `Controllers/AdminOrdersController.cs`, `Tests/Unit/Services/AdminOrderServicePaidRaceTests.cs`, `Tests/Unit/Services/AdminOrderServiceTests.cs`, `docs/DEPLOYMENT.md`, `memory-bank/operations/metrics.md`, `UI/features/admin/pages/state-machine/admin-state-machine-page.ts` | not needed (PPW-564's review pre-check `revised`, adopted; it settles the whole cluster, exhausted branch included) |
 
 Out of scope this round by the driver's decision, untouched: PPW-557 (owner decision pending,
 stays `open`), PPW-561/562/563 (owner must choose the depth; peer work in flight on
-`chore/faster-relational-tests`), PPW-564/567/568 (next round).
+`chore/faster-relational-tests`). Cluster D landed in a later part of the same round, after
+clusters A to C.
 
 ## Decisions
 
@@ -130,4 +135,80 @@ and 3 of those proven red against the old readings. The two wrong values stay in
 with a correction line each, because the metrics schema says a wrong line is corrected and never
 edited. Recorded here because this round's commit carries the change; the review system is its own
 target, so any further tracking of these belongs there, not on a `PPW-<n>`.
+
+### The reload replaces the second save, and only two side effects are suppressed (PPW-564)
+
+The pre-check corrected two things about the drafted approach and both mattered. The window the
+finding named — the unique-index violation — is the narrower one: the creation service's existence
+query returns a winner's committed invoice as an *unchanged* entity, so nothing throws and the
+admin's own `PaidAt` is committed anyway. The gate is therefore on the entity's tracked state as
+well as in the catch. And the reload has to *replace* the second `SaveChangesAsync`, not follow it,
+or it re-reads the value it was meant to drop. Suppressed: the confirmation email and the paid
+notification. Kept: the SignalR broadcast, the purge hook and the 200 response, because the order
+really is Paid — just not by this request. The path gets its own `PaidSaveOutcome` because the
+webhook's is private to that controller and pinned by a test that reflects on it. Proven against
+real PostgreSQL: EF InMemory has no unique index and the violation classifier only matches the
+Npgsql error, so the drafted test would have passed without the fix — the pre-check named that too.
+
+### The exhausted branch answers 409, and its rollback may not throw (PPW-567)
+
+Four number collisions used to let the raw `DbUpdateException` escape as a 500 with the order still
+tracked Paid and nothing captured. It now mirrors the webhook's terminal catch: an Error line
+carrying the order number, total and both payment identifiers, a Sentry capture, a reload that
+discards the uncommitted transition, and a `ConflictException` so the endpoint answers 409 rather
+than a Paid-looking 200 — `ProducesResponseType` updated, and §15.10 of the deployment guide now
+tells an operator what the log line means and to check the sequence against `MAX("Number")` before
+asking for a retry. Two deliberate choices: the rollback swallows its own reload failure, because a
+throw there would turn the conflict into an unexplained 500; and the Sentry hub is an *optional*
+constructor dependency, since Sentry registers no hub unless `Sentry:Enabled` — one test resolves
+the service from a container with no hub registered, so a missing registration cannot break boot.
+No metric: this endpoint has none today, and adding an instrument is wider than the finding asked.
+
+### PPW-568's branch tests ship in the commits whose fix they guard (PPW-568)
+
+Its own commit could only carry what was left: relocating the happy-retry test into the new
+Postgres-backed class and adding the container-resolution test. The already-invoiced and exhausted
+branch tests are in `c9ffae4` and `ba8e628`, because a regression test landing a commit later than
+its fix leaves one commit where the tree is green for the wrong reason. All five branch tests now
+share one migrated database instead of two, and the EF-InMemory class keeps only the tests that do
+not need a real unique index.
+
+### Class swept, one sibling examined and left (PPW-564)
+
+`OrderService.cs:185` holds the third `SaveChangesAsync` retry loop in the codebase, and its
+exhaustion also escapes untyped. Left alone on purpose: nothing is charged on that path (the order
+is being created, not paid), the loop's own comment states that the escape is the intended signal
+for a persistent clash, and on PostgreSQL the per-year sequence cannot reach it. The two
+invoice-creating Paid paths are now both gated on an outcome — the webhook's Stripe and EuPlatesc
+branches already were.
+
+### Cluster D's micro-review: eight gaps folded in (PPW-564, PPW-567)
+
+The side-effect gate was a negation, so a fourth outcome member added later would have mailed a
+second confirmation; it now reads `paidOutcome is null or Created`, like the webhook's. The
+entity-state gate tests for `Unchanged` rather than "not Added", so an untracked invoice cannot be
+mistaken for a committed winner. `AbandonToWinnerAsync`'s reload was the one unprotected await
+left: a cancelled read would have turned a benign lost race into a 500 plus a Sentry capture for an
+order that *is* Paid, so it now swallows and logs `admin.order.abandon-reload-failed`, with a test.
+The pre-insert window emitted no log at all; both windows now log `admin.order.invoice-already-created`
+with a `window=` field, asserted on either side. The 409 message was English in a Romanian product.
+Docs: the deployment row no longer implies a Sentry page when `Sentry:Enabled=false` is the shipped
+default and it names the API-only call, `metrics.md` records that the admin path enters no meter,
+and the in-product admin state-machine page no longer claims the transition is webhook-only, that
+every invalid transition answers 400, or that a confirmation email always goes out.
+
+### Parked from cluster D's micro-review
+
+- The admin path emits no metric, so its exhausted outcome is invisible to the SLO the webhook's
+  `failed` label feeds. A new instrument means a `MetricNames` contract entry and a dashboard row —
+  wider than the finding asked; the gap is now stated in `metrics.md` instead.
+- `maxNumberRetries = 3` is a second copy of the webhook's ceiling. Both predate this round and
+  neither derives from a named constraint, so hoisting it is a refactor of the sibling, not a fix.
+- The admin panel has no `AwaitingPayment` entry in `NEXT_STATUSES`, so this transition is reachable
+  only through the API, and the order-detail page collapses every failure into one Romanian sentence,
+  discarding the 409's detail. Both are questions about what the panel should offer — an owner call.
+- `docs/stories/epic-5-admin/US-504/backend-admin-api.instructions.md` still documents 200/400 only;
+  story instruction files are build-time specs rather than maintained references, so left alone.
+- The container-resolution test builds its own `ServiceCollection`: it proves the optional hub
+  parameter resolves, not that `Program.cs`'s registration still injects the real hub.
 
