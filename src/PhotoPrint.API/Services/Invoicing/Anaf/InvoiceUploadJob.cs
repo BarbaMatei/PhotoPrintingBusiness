@@ -297,11 +297,19 @@ public sealed class InvoiceUploadJob : BackgroundService
         {
             // No retry can repair the order behind it, so re-attempting only hides a paid order behind a permanent 404.
             var parked = await lifecycle.ParkUnbuildableAsync(invoiceId, NotBuildableMessage(ex), ct);
-            if (parked) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+            if (parked)
+            {
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+            }
+            else
+            {
+                // A lost CAS must still leave a reason on the row, or the admin list shows a stuck invoice with none.
+                await lifecycle.RecordPendingErrorAsync(invoiceId, NotBuildableMessage(ex), ct);
+                await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+            }
             _logger.LogError(ex,
                 "anaf.upload-job.not-buildable invoice_id={InvoiceId} order_id={OrderId} parked={Parked} — retrying repeats this failure until the order data is corrected",
                 invoiceId, orderId, parked);
-            if (!parked) await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
             return;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -263,6 +263,24 @@ public class InvoiceUploadJobTests
     }
 
     [Fact]
+    public async Task ProcessBatchAsync_ParkLosesItsCas_StillRecordsTheReasonAndReleasesTheClaim()
+    {
+        using var database = OpenDatabase();
+        var (_, invoiceId) = SeedLockerOrderWithNoBuyerAddress(database);
+        var h = Build(database, cloudEnabled: false, realXmlBuilder: true);
+        h.Lifecycle.Setup(l => l.ParkUnbuildableAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                   .ReturnsAsync(false);
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(
+            invoiceId, It.Is<string>(m => m.Contains("cannot be built")), It.IsAny<CancellationToken>()), Times.Once);
+        using var db = CreateDb(database);
+        var row = await db.Invoices.AsNoTracking().FirstAsync(i => i.Id == invoiceId);
+        row.ClaimedAt.Should().BeNull();
+    }
+
+    [Fact]
     public async Task ProcessBatchAsync_ParkedForNoBuyerAddress_IsNotPickedUpAgainOnTheNextTick()
     {
         using var database = OpenDatabase();

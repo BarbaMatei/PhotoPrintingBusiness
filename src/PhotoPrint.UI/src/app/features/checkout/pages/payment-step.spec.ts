@@ -15,7 +15,16 @@ const DELIVERY_STATE: DeliveryState = {
   method: 'Easybox',
   lockerId: 'l1',
   lockerName: 'Box A',
-  shippingAddress: null,
+  shippingAddress: {
+    street: 'Str. Buyer',
+    number: '10',
+    block: '',
+    city: 'Cluj-Napoca',
+    county: 'Cluj',
+    postalCode: '400100',
+    recipientName: 'Ana Pop',
+    phone: '0712345678',
+  },
   shippingCostRon: 20,
 };
 

@@ -100,7 +100,7 @@ describe('DeliveryStep', () => {
     expect(btn.disabled).toBe(true);
   });
 
-  it('Selecting Easybox + locker but no contact keeps Continue disabled', () => {
+  it('Selecting Easybox + locker but no fiscal address keeps Continue disabled', () => {
     const fixture = createFixture();
     flushCosts();
     selectEasybox(fixture);

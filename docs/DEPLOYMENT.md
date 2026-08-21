@@ -1437,6 +1437,10 @@ Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-d
                                                         ← Warning, ~every 2nd tick (see below)
    anaf.upload-job.auth-failure-skipped count=N          ← Warning, when the batch had other rows
    ```
+   If an order cannot produce an invoice at all, the shape is one line and the row is parked, not retried:
+   ```
+   anaf.upload-job.not-buildable invoice_id=… order_id=… parked=True   ← Error, once; see the retry note in §15.2
+   ```
    The Error is deliberately rate-limited to one page per **alert window**: without it a multi-day
    outage pages every poll interval. That window is four poll intervals with a two-hour floor, so
    it is 2 h at the default 30-minute cadence and it widens with `Anaf__PollIntervalMinutes` —

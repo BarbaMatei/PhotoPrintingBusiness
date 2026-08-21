@@ -418,6 +418,7 @@ export class DeliveryStep implements OnInit {
 
   private prefillFromSavedAddress(): void {
     const c = this.addressForm;
+    if (c.value.street && c.value.city && c.value.postalCode) return;
     this.accountService
       .getAddresses()
       .pipe(take(1), catchError(() => of([] as SavedAddressDto[])))

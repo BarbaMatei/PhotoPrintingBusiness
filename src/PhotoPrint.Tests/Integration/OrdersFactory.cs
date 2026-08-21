@@ -51,13 +51,13 @@ public class OrdersFactory : PaymentFactory
             }
             : new ShippingAddressSnapshot
             {
-                RecipientName = "",
-                Street = "",
-                Number = "",
-                City = "",
-                County = "",
-                PostalCode = "",
-                Phone = "",
+                RecipientName = "Locker Recipient",
+                Street = "Str. Locker",
+                Number = "2",
+                City = "Cluj-Napoca",
+                County = "Cluj",
+                PostalCode = "400002",
+                Phone = "0700000002",
             };
 
         EasyboxLocker? locker = null;
