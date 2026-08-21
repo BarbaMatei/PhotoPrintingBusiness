@@ -216,6 +216,7 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
 
         using var db = CreateDb();
         var order = await db.Orders.FirstAsync(o => o.Id == orderId);
+        order.EuPlatescTransactionId = "EP-RECONCILE-1";
         var logs = new LogCapture();
         var hub = new Mock<Sentry.IHub>();
         hub.SetupGet(h => h.IsEnabled).Returns(true);
@@ -228,11 +229,13 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         hub.Verify(h => h.CaptureEvent(
             It.Is<Sentry.SentryEvent>(e => e.Exception is DbUpdateException),
             It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
+        // The charge's own identifiers must survive: the reload below wipes them from the entity.
         logs.Records.Should().ContainSingle(
             r => r.Level == LogLevel.Error &&
                  r.Message.StartsWith("invoice.creation.number-collision-exhausted", StringComparison.Ordinal) &&
                  r.Message.Contains(order.Id.ToString()) &&
-                 r.Message.Contains(nameof(OrderStatus.AwaitingPayment)));
+                 r.Message.Contains(order.OrderNumber) &&
+                 r.Message.Contains("EP-RECONCILE-1"));
         using var verify = CreateDb();
         (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
     }

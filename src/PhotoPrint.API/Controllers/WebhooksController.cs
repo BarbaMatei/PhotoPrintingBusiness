@@ -423,9 +423,10 @@ public class WebhooksController : ControllerBase
             catch (DbUpdateException ex) when (IsInvoiceNumberViolation(ex))
             {
                 if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                // Logged before the reload below discards them: these are the only handles on a real charge.
                 _logger.LogError(ex,
-                    "invoice.creation.number-collision-exhausted order_id={OrderId} previous_status={PreviousStatus} — customer charged, order not Paid, manual reconciliation required",
-                    order.Id, statusBeforeTransition);
+                    "invoice.creation.number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} euplatesc_transaction_id={EuPlatescTransactionId} — customer charged, order not Paid, manual reconciliation required",
+                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId, order.EuPlatescTransactionId);
                 HttpContext?.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(ex);
 
                 // Reload rather than unwind field by field: the uncommitted Paid transition stays on the scoped context otherwise, and a later SaveChanges would commit a Paid order with no invoice.
