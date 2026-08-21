@@ -97,3 +97,13 @@ unreachable through the non-nullable interface, so no guard was added.
 ### Round scope (PPW-552)
 
 PPW-552 is 🟡 and entered the ledger as `backlog` at reconciliation, so it is not in this round.
+
+### Owner rulings on the two items parked at this round's gate
+
+Given 2026-08-21, after the unattended run reported them.
+
+- The unguarded blob read in the admin order ZIP export, `Services/AdminOrderService.cs:244`:
+  routed to the backlog as `PPW-555`, area `orders`. It is the class PPW-550 fixed for
+  invoices, and worse there, because the response has already begun.
+- Whether the ANAF job's explicit Sentry capture is redundant now that Error logs ship
+  events: no change. The duplicate is harmless and removing it risks losing the alert.

@@ -103,3 +103,17 @@ would satisfy the check while defeating its purpose, so none was made, and the a
 left untouched. The error is left standing and recorded in the metrics notes, and it clears the
 moment the owner authorises a push. Round 7's line passed the same check only because of one of
 those unauthorised pushes.
+
+The owner authorised the push on 2026-08-21 and the branch was pushed to `origin`; the auditor
+reports no error for this target since.
+
+### Owner rulings on the two items parked at this round's gate
+
+Given 2026-08-21, after the unattended run reported them.
+
+- `ShipmentTrackingJob.cs:22`, a flat 30-minute alert window against a
+  `TrackingIntervalMinutes` with no maximum: routed to the backlog as `PPW-556`, area `jobs`.
+  It is the class PPW-553 fixed for the ANAF job, and unbounded here.
+- Whether to narrow `Anaf:PollIntervalMinutes` in the validator: no change. The shipped
+  formula already holds for every value the validator accepts, and tightening it would refuse
+  configuration that boots today.
