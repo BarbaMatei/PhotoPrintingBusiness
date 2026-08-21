@@ -26,6 +26,8 @@ const dir = join(ROOT, 'reviews', target)
 if (!existsSync(dir)) fail(`no reviews/${target}/`)
 
 function fail(m) { console.error(`ERROR   ${m}`); process.exit(1) }
+// Fixers write pre_cleared either as a count or as the list of ids it counts.
+const preClearedCount = v => Number.isFinite(v) ? v : Array.isArray(v) ? v.length : 0
 const note = m => console.log(`note    ${m}`)
 
 // ---------- locate the round ----------
@@ -53,8 +55,9 @@ if (!findings.size) for (const m of fm.matchAll(/^ {2}([A-Za-z]+-?\d+(?:–[A-Za
   findings.set(m[1], { status: m[2], commit, note: noteTxt })
 }
 if (!findings.size) fail('no "## Findings" table rows and no frontmatter findings map')
-const resStatus = /^status:\s*(\S+)/m.exec(fm)?.[1] ?? 'open'
-const fixedCommitRaw = /^fixed_commit:\s*(\S+)/m.exec(fm)?.[1] ?? 'null'
+const resStatus = /^status:[ \t]*(\S+)/m.exec(fm)?.[1] ?? 'open'
+// \s would cross the newline and read the NEXT key's name as the value of an empty one.
+const fixedCommitRaw = /^fixed_commit:[ \t]*(\S*)/m.exec(fm)?.[1] || 'null'
 const fixedCommit = fixedCommitRaw === 'null' ? null : fixedCommitRaw.replace(/"/g, '')
 
 const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', backlog: 'deferred', disputed: 'disputed', 'false-positive': 'false_positive' }
@@ -119,7 +122,7 @@ const line = {
   base_commit: baseCommit, fixed_commit: fixedCommit,
   findings: tallies,
   tests: { invocations: testRuns.length, red_runs: testRuns.filter(e => e.kind === 'red').length, green_runs: testRuns.filter(e => e.kind === 'green').length, final: finals.length ? { passed: finals[finals.length - 1].passed ?? null, failed: finals[finals.length - 1].failed ?? null } : null },
-  approach_checks: { pre_cleared_consumed: Number.isFinite(triage?.pre_cleared) ? triage.pre_cleared : 0, run: by('check-dispatched').length, tokens: Number.isFinite(checkTokens) && checksReturned.length ? checkTokens : null },
+  approach_checks: { pre_cleared_consumed: preClearedCount(triage?.pre_cleared), run: by('check-dispatched').length, tokens: Number.isFinite(checkTokens) && checksReturned.length ? checkTokens : null },
   micro_reviews: { count: microD, follow_up_fixes: microFound },
   cost: { agents: by('check-dispatched').length + microD, tokens: null },
   runtime: { started, ended, active_s: activeS, blocked_s: blockedS, idle_s: idleS, blocked },
