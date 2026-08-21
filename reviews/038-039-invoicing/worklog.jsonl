@@ -150,3 +150,44 @@
 {"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"D-storage-tier","verdict":"revised"}
 {"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"C-ubl-address-and-price","verdict":"revised"}
 {"t":"2026-08-20T16:09:37+03:00","ev":"round-end","round":5,"note":"paused mid-round: owner switched to feat/postgres-only-data-stack, whose Phase 1b deletes the whole migration chain and Phase 2 removes PostgreSQL, invalidating or reshaping several in-scope rows"}
+{"t":"2026-08-21T08:07:59+03:00","ev":"round-start","round":7,"note":"resumed after the SQLite drop; owner asked for the round to run to completion"}
+{"t":"2026-08-21T08:07:59+03:00","ev":"test-run","round":7,"kind":"red","filter":"RunTickAsync","passed":1,"failed":1}
+{"t":"2026-08-21T08:08:00+03:00","ev":"test-run","round":7,"kind":"green","filter":"InvoiceUploadJobTests","passed":16,"failed":0}
+{"t":"2026-08-21T08:12:01+03:00","ev":"test-run","round":7,"kind":"red","filter":"InvoiceNumberCollisionExhaustsRetries","passed":0,"failed":1}
+{"t":"2026-08-21T08:14:40+03:00","ev":"test-run","round":7,"kind":"red","filter":"InvoiceXmlBuilderTests","passed":14,"failed":3}
+{"t":"2026-08-21T08:21:48+03:00","ev":"test-run","round":7,"kind":"red","filter":"ProcessBatchAsync_AuthFails","passed":0,"failed":2}
+{"t":"2026-08-21T08:21:48+03:00","ev":"test-run","round":7,"kind":"green","filter":"InvoiceUploadJobTests|InvoiceLifecycleTests","passed":27,"failed":0}
+{"t":"2026-08-21T08:27:43+03:00","ev":"test-run","round":7,"kind":"red","filter":"CompositeSeriesYearNumberViolation","passed":0,"failed":1}
+{"t":"2026-08-21T08:27:43+03:00","ev":"test-run","round":7,"kind":"green","filter":"RaceTests|MigrationChainTests|InvoiceCreationServiceTests","passed":19,"failed":0}
+{"t":"2026-08-21T08:32:47+03:00","ev":"test-run","round":7,"kind":"red","filter":"GetInvoiceAsync_BlobIsMissing","passed":0,"failed":1}
+{"t":"2026-08-21T08:37:33+03:00","ev":"test-run","round":7,"kind":"red","filter":"RowThatJustFailed","passed":0,"failed":1}
+{"t":"2026-08-21T08:44:44+03:00","ev":"test-run","round":7,"kind":"red","filter":"UpdateStatusAsync_ManualPaid_Retries","passed":0,"failed":1}
+{"t":"2026-08-21T08:53:41+03:00","ev":"test-run","round":7,"kind":"red","filter":"unclassified_still_records","passed":1,"failed":1}
+{"t":"2026-08-21T08:55:59+03:00","ev":"test-run","round":7,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing|AdminOrderServiceTests|Unit.Configuration|Unit.Validators|MigrationChainTests","passed":366,"failed":0}
+{"t":"2026-08-21T08:57:02+03:00","ev":"finding","id":"PPW-512","status":"fixed","commit":"8b79a5a"}
+{"t":"2026-08-21T08:57:02+03:00","ev":"finding","id":"PPW-513","status":"fixed","commit":"8917f9f"}
+{"t":"2026-08-21T08:57:02+03:00","ev":"finding","id":"PPW-514","status":"fixed","commit":"6aabff9"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-515","status":"fixed","commit":"42e5988"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-517","status":"fixed","commit":"67df511"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-518","status":"fixed","commit":"084c579"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-521","status":"fixed","commit":"8917f9f"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-522","status":"fixed","commit":"03f71c5"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-523","status":"fixed","commit":"7e4a215"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-527","status":"fixed","commit":"b108c25"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-529","status":"fixed","commit":"8aea0b7"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-531","status":"fixed","commit":"8aea0b7"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-532","status":"fixed","commit":"5300b78"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-533","status":"fixed","commit":"5300b78"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-534","status":"fixed","commit":"8aea0b7"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-535","status":"fixed","commit":"8917f9f"}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-516","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-520","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-524","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-525","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-528","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-519","status":"disputed","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-526","status":"wont-fix","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-530","status":"false-positive","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"round-end","round":7}
+{"t":"2026-08-21T08:07:59+03:00","ev":"round-start","round":6,"note":"correction: the resumed round was stamped round 7 above, but it answers resolution-v6. Same span, correct number; the round-7 events stay as written because the worklog is append-only."}
+{"t":"2026-08-21T08:57:07+03:00","ev":"round-end","round":6}
