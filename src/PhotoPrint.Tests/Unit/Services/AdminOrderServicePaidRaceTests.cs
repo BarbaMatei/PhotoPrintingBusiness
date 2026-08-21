@@ -251,6 +251,24 @@ public class AdminOrderServicePaidRaceTests : IDisposable
         (await verify.Orders.FirstAsync(o => o.Id == orderId)).PaidAt.Should().BeNull();
     }
 
+    [Fact]
+    public async Task ManualPaid_RetriesATakenInvoiceNumberInsteadOfThrowing()
+    {
+        await SeedInvoicedOrderAsync(number: 500);
+        var orderId = await SeedAwaitingPaymentAsync();
+
+        using var db = _database.NewContext();
+        var sut = BuildService(db, RealCreator(db, new CollidingThenFreeNumbering(collideWith: 500, thenUse: 501)));
+
+        await sut.UpdateStatusAsync(orderId, "Paid", null, null);
+
+        using var verify = _database.NewContext();
+        var invoice = await verify.Invoices.FirstAsync(i => i.OrderId == orderId);
+        invoice.Number.Should().Be(501, "the taken number must be retried, not thrown on");
+        (await verify.Orders.FirstAsync(o => o.Id == orderId)).PaidAt.Should().NotBeNull();
+        _email.Verify(e => e.FireOrderConfirmedEmail(It.IsAny<Order>()), Times.Once);
+    }
+
     // Sentry registers its hub only when Sentry:Enabled, so the container has to build this service without one.
     [Fact]
     public void TheServiceStillResolvesWithNoSentryHubRegistered()
@@ -330,6 +348,22 @@ public class AdminOrderServicePaidRaceTests : IDisposable
             CallCount++;
             return Task.FromResult(new InvoiceNumber(series, year, _number));
         }
+    }
+
+    private sealed class CollidingThenFreeNumbering : IInvoiceNumberingService
+    {
+        private readonly int _collideWith;
+        private readonly int _thenUse;
+        private int _calls;
+
+        public CollidingThenFreeNumbering(int collideWith, int thenUse)
+        {
+            _collideWith = collideWith;
+            _thenUse = thenUse;
+        }
+
+        public Task<InvoiceNumber> NextNumberAsync(string series, int year, CancellationToken ct = default)
+            => Task.FromResult(new InvoiceNumber(series, year, _calls++ == 0 ? _collideWith : _thenUse));
     }
 
     // Cancels the token the moment a named line is logged, landing the cancellation inside the call that follows it.
