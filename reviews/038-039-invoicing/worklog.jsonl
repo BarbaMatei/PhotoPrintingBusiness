@@ -303,3 +303,5 @@
 {"t":"2026-08-21T16:56:02+03:00","ev":"test-run","kind":"final","filter":"checkout-state.service|delivery-step|payment-step|review-step|guest-auth.service|account.service","passed":69,"failed":0,"duration_s":8}
 {"t":"2026-08-21T16:58:06+03:00","ev":"round-end","round":9,"note":"part 3 of 3: cluster E closed PPW-557 on the owner ruling; round total 8 fixed, 0 deferred; resolution set resolved at 78900b6"}
 {"t":"2026-08-21T17:00:15+03:00","ev":"doc-gate","round":9,"lint":"clean (038-039-invoicing v9 and state)","auditor":"0 errors, 2 warnings (a superseded findings tally and the pre-existing pass-6 pair)","note":"resolution set resolved at 78900b6; seven correction lines appended for round 9 because the renderer refuses a second fix-round line; PPW-557 ledger row flipped to fixed with two appended History lines"}
+{"t":"2026-08-21T17:17:02+03:00","ev":"doc-gate","verdict":"approve","round":9,"note":"two independent judges agreed; the single defect (PPW-557 affirmed at its pre-micro-review commit) is corrected in 74e23f3"}
+{"t":"2026-08-21T17:17:02+03:00","ev":"pass-launch","pass":10,"type":"verification"}
