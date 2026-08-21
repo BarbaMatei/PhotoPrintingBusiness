@@ -302,6 +302,7 @@ if (anafEnabled)
         .AddHttpMessageHandler<PhotoPrint.API.Services.Invoicing.Anaf.AnafAuthHandler>()
         .AddHttpMessageHandler<PhotoPrint.API.Services.Invoicing.Anaf.AnafResilienceHandler>();
 
+    builder.Services.AddSingleton<PhotoPrint.API.Services.Invoicing.Anaf.AnafOutageRegistry>();
     builder.Services.AddHostedService<PhotoPrint.API.Services.Invoicing.Anaf.InvoiceUploadJob>();
 }
 

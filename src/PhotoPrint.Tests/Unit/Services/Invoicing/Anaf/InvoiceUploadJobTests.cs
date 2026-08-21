@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -93,7 +94,8 @@ public class InvoiceUploadJobTests
     private static Harness Build(
         PostgresTestDatabase database, bool cloudEnabled,
         LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
-        TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false)
+        TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false,
+        AnafOutageRegistry? outages = null)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -148,6 +150,7 @@ public class InvoiceUploadJobTests
                     ClaimTtlMinutes = claimTtlMinutes,
                     BackoffHours = backoffHours ?? new AnafSettings().BackoffHours,
                 }),
+                outages ?? new AnafOutageRegistry(new MemoryCache(new MemoryCacheOptions())),
                 clock ?? TimeProvider.System,
                 logCapture is null
                     ? sp.GetRequiredService<ILogger<InvoiceUploadJob>>()
@@ -514,6 +517,58 @@ public class InvoiceUploadJobTests
             It.IsAny<Sentry.SentryEvent>(), It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
         logs.Records.Should().ContainSingle(
             r => r.Message.StartsWith("anaf.upload-job.auth-failure-skipped", StringComparison.Ordinal));
+    }
+
+    // A credential outage lasts days, so paging once per poll interval re-reports it ~48 times a day.
+    [Fact]
+    public async Task ProcessBatchAsync_AuthStillFailingOnTheNextTick_DoesNotPageASecondTime()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var h = Build(database, cloudEnabled: false, logs);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.Records.Count(r => r.Level == LogLevel.Error &&
+                                r.Message.StartsWith("anaf.upload-job.auth-failed", StringComparison.Ordinal))
+            .Should().Be(1, "one outage is one page, however many ticks it spans");
+        h.Hub.Verify(hub => hub.CaptureEvent(
+            It.IsAny<Sentry.SentryEvent>(), It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Warning &&
+                 r.Message.StartsWith("anaf.upload-job.auth-outage-continues", StringComparison.Ordinal),
+            "with the page suppressed this is the only per-tick trace that the outage is still live");
+        h.Lifecycle.Verify(l => l.RecordErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<InvoiceAnafStatus>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    // The window is a heartbeat, not a mute: a credential nobody has fixed must page again.
+    [Fact]
+    public async Task ProcessBatchAsync_AuthStillFailingAfterTheAlertWindowExpires_PagesAgain()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
+        var h = Build(database, cloudEnabled: false, logs, outages: new AnafOutageRegistry(cache));
+        SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+        cacheClock.UtcNow = cacheClock.UtcNow.AddHours(2).AddMinutes(1);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.Records.Count(r => r.Level == LogLevel.Error &&
+                                r.Message.StartsWith("anaf.upload-job.auth-failed", StringComparison.Ordinal))
+            .Should().Be(2, "an outage that outlives the alert window has to be re-reported");
     }
 
     [Fact]

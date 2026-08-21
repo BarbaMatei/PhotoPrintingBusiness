@@ -1427,6 +1427,19 @@ Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-d
    ```
    Verify the row's `AnafStatus=Accepted`, `XmlPayload` non-null, `PdfStoragePath` non-null. **Run for 1 day in sandbox to flush any wire-protocol surprises.**
 
+   If the credentials are wrong (the common stage-1 failure), the shape is:
+   ```
+   anaf.upload-job.auth-failed invoice_id=…              ← Error + Sentry, ONCE per 2 h per replica
+   anaf.upload-job.auth-outage-continues invoice_id=… alert_window_minutes=120
+                                                        ← Warning, every tick the outage lasts
+   anaf.upload-job.auth-failure-skipped count=N          ← Warning, when the batch had other rows
+   ```
+   The Error is deliberately rate-limited to one page per 2 h window: without it a multi-day
+   outage pages every poll interval. **Silence is not recovery** — the per-tick
+   `auth-outage-continues` Warning is what tells them apart, and each affected row also carries
+   the reason in `Invoices.LastError` (visible in the admin invoice list). The window is
+   per-process, so N replicas page up to N times per window and a restart re-pages immediately.
+
 4. **Stage 2 — production flip with customer emails OFF (dual-write inspection week).** In production:
    ```bash
    Anaf__Enabled=true

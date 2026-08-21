@@ -13,19 +13,25 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 // Multi-replica safety relies on the per-row ClaimedAt+TTL claim below, plus ANAF's own InvoiceNumber dedupe as a crash-window fallback.
 public sealed class InvoiceUploadJob : BackgroundService
 {
+    // Sized to outlast a poll tick yet stay well inside the BackoffHours budget (85 h by default), after which the invoice is Failed and the page is moot.
+    private static readonly TimeSpan AuthOutageAlertWindow = TimeSpan.FromHours(2);
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly AnafSettings _settings;
+    private readonly AnafOutageRegistry _outages;
     private readonly TimeProvider _clock;
     private readonly ILogger<InvoiceUploadJob> _logger;
 
     public InvoiceUploadJob(
         IServiceScopeFactory scopeFactory,
         IOptions<AnafSettings> settings,
+        AnafOutageRegistry outages,
         TimeProvider clock,
         ILogger<InvoiceUploadJob> logger)
     {
         _scopeFactory = scopeFactory;
         _settings = settings.Value;
+        _outages = outages;
         _clock = clock;
         _logger = logger;
     }
@@ -116,9 +122,19 @@ public sealed class InvoiceUploadJob : BackgroundService
                     if (!authFailed)
                     {
                         authFailed = true;
-                        // Urgent (expiring cert / revoked credential) — no per-replica-safe counter backs "escalate after N tries", so treat as urgent on first sight.
-                        _logger.LogError(ex, "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
-                        perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
+                        if (_outages.MarkOutageOnce("auth", AuthOutageAlertWindow))
+                        {
+                            // Urgent (expiring cert / revoked credential) — no per-replica-safe counter backs "escalate after N tries", so treat as urgent on first sight.
+                            _logger.LogError(ex, "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
+                            perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
+                        }
+                        else
+                        {
+                            // With the page suppressed, this is the operator's only per-tick evidence that the outage has not recovered.
+                            _logger.LogWarning(
+                                "anaf.upload-job.auth-outage-continues invoice_id={InvoiceId} alert_window_minutes={WindowMinutes}",
+                                row.Id, AuthOutageAlertWindow.TotalMinutes);
+                        }
                     }
                     else
                     {

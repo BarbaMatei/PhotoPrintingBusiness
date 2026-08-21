@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 
-namespace PhotoPrint.API.Services.Sameday;
+namespace PhotoPrint.API.Services;
 
 /// <summary>
 /// Shared "log this once" dedup backed by <see cref="IMemoryCache"/>. Resets across process
