@@ -510,6 +510,8 @@ updated: 2026-08-21
   - v6: found by the delta pass — raised by db-parity (convergence 1), verdict confirmed
   - v6: fix round — expression pinned to UTC; the fix carried into the regenerated InitialPostgres baseline and every Postgres-backed test now migrates through it
   - v6: verified @`2979ea0` — revert-and-rerun (isolated worktree, commit `8917f9f`) reddened `InvoiceAddressFormatterTests`, restore greened it
+  - v6: the line above misattributes the proof. Commit `8917f9f` carries three findings, and `InvoiceAddressFormatterTests` covers only string truncation, so it cannot detect a migration defect
+  - v6: re-proven by hand at the baseline the fix now lives in — dropping `AT TIME ZONE 'UTC'` from `Migrations/20260820133204_InitialPostgres.cs:743` failed all 3 `MigrationChainTests` inside `Migrate()`; restoring it returned 3 of 3 green
 
 ### PPW-514 — Exhausted-retry rollback reload discards the processor transaction id and the Error log omits it
 
@@ -675,6 +677,7 @@ updated: 2026-08-21
   - v6: found by the delta pass — raised by completeness-critic, tests-coverage, db-parity (convergence 3), verdict confirmed
   - v6: fix round — PostgresTestDatabase migrates, so every Postgres test applies the real chain; three tests pin that and the composite index
   - v6: verified @`2979ea0` — revert-and-rerun (isolated worktree, commit `8aea0b7`) reddened its three named test classes (`TestOrders`, `MigrationChainTests`, `WebhooksControllerInvoiceRaceTests`), restore greened them
+  - v6: naming correction — `TestOrders` is a fixture helper and holds no tests of its own; the tests that reddened are `MigrationChainTests` and `WebhooksControllerInvoiceRaceTests`
 
 ### PPW-530 — MakeInvoiceOrderIdUnique creates the unique index with no dedupe step, so duplicate rows fail prod boot
 
@@ -695,6 +698,7 @@ updated: 2026-08-21
   - v6: found by the delta pass — raised by tests-coverage, db-parity (convergence 2), verdict plausible
   - v6: fix round — the composite index is classified as a number collision, proven by a real violation naming the constraint
   - v6: verified @`2979ea0` — revert-and-rerun (isolated worktree, commit `8aea0b7`) reddened its three named test classes (`TestOrders`, `MigrationChainTests`, `WebhooksControllerInvoiceRaceTests`), restore greened them
+  - v6: naming correction — `TestOrders` is a fixture helper and holds no tests of its own; the tests that reddened are `MigrationChainTests` and `WebhooksControllerInvoiceRaceTests`
 
 ### PPW-532 — One ANAF credential failure fans out into up to 50 Error logs and Sentry captures per tick
 
@@ -725,6 +729,7 @@ updated: 2026-08-21
   - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
   - v6: fix round — renamed to invoice.creation.number-attempted, because a retry may discard the logged number
   - v6: verified @`2979ea0` — revert-and-rerun (isolated worktree, commit `8aea0b7`) reddened its three named test classes (`TestOrders`, `MigrationChainTests`, `WebhooksControllerInvoiceRaceTests`), restore greened them; note: the collision-retry, exhausted and duplicate-race log lines still omit invoice_number
+  - v6: naming correction — `TestOrders` is a fixture helper and holds no tests of its own; the tests that reddened are `MigrationChainTests` and `WebhooksControllerInvoiceRaceTests`
 
 ### PPW-535 — Truncate can split a UTF-16 surrogate pair, wedging the invoice in Pending forever
 

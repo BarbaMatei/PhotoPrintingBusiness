@@ -194,3 +194,4 @@
 {"t":"2026-08-21T09:18:35+03:00","ev":"run-start"}
 {"t":"2026-08-21T09:19:18+03:00","ev":"pass-launch","pass":6,"type":"verification"}
 {"t":"2026-08-21T09:45:55+03:00","ev":"pass-records-done","pass":6,"verdict":"approve-with-followups","verified":16,"reopened":0}
+{"t":"2026-08-21T10:07:49+03:00","ev":"doc-gate","verdict":"disapprove","round":1,"reason":"PPW-513 proof misattributed by verify-fixes on a bundled fix commit; two wording defects"}
