@@ -26,6 +26,9 @@ public interface IInvoiceLifecycle
     /// 200-with-errors response so it appears in the admin list.</summary>
     Task<bool> RecordPendingErrorAsync(Guid invoiceId, string errorMessage, CancellationToken ct = default);
 
+    /// <summary>Records an error against a row in <paramref name="expected"/>, for failures that can strike either a Pending or a Submitted invoice.</summary>
+    Task<bool> RecordErrorAsync(Guid invoiceId, string errorMessage, InvoiceAnafStatus expected, CancellationToken ct = default);
+
     /// <summary>Submitted → Accepted on a successful ANAF status poll.</summary>
     Task<bool> MarkAcceptedAsync(Guid invoiceId, CancellationToken ct = default);
 

@@ -83,9 +83,21 @@ public sealed class InvoiceUploadJob : BackgroundService
 
             _logger.LogInformation("anaf.upload-job.batch size={Count}", batch.Count);
 
+            // One dead credential fails every row, so the first auth failure silences the rest of the tick.
+            var authFailed = false;
+            var skippedAfterAuthFailure = 0;
+
             foreach (var row in batch)
             {
                 if (ct.IsCancellationRequested) break;
+
+                if (authFailed && row.AnafStatus == InvoiceAnafStatus.Submitted)
+                {
+                    // Polling is pure ANAF work, so it cannot succeed; a Pending row still has local XML/PDF work worth doing.
+                    skippedAfterAuthFailure++;
+                    continue;
+                }
+
                 using var perRowScope = _scopeFactory.CreateScope();
                 try
                 {
@@ -94,10 +106,19 @@ public sealed class InvoiceUploadJob : BackgroundService
                 catch (OperationCanceledException) { throw; }
                 catch (AnafAuthException ex)
                 {
-                    // Urgent (expiring cert / revoked credential) — no retry counter backs "escalate after N tries" per-replica-safely, so treat as urgent on first sight.
-                    _logger.LogError(ex,
-                        "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
-                    perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
+                    await RecordAuthFailureAsync(perRowScope.ServiceProvider, row.Id, row.AnafStatus, ex, ct);
+
+                    if (!authFailed)
+                    {
+                        authFailed = true;
+                        // Urgent (expiring cert / revoked credential) — no per-replica-safe counter backs "escalate after N tries", so treat as urgent on first sight.
+                        _logger.LogError(ex, "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
+                        perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
+                    }
+                    else
+                    {
+                        skippedAfterAuthFailure++;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -105,11 +126,34 @@ public sealed class InvoiceUploadJob : BackgroundService
                         "anaf.upload-job.row-failed invoice_id={InvoiceId}", row.Id);
                 }
             }
+
+            if (skippedAfterAuthFailure > 0)
+            {
+                _logger.LogWarning(
+                    "anaf.upload-job.auth-failure-skipped count={Count} — one credential failure, not {Count} incidents",
+                    skippedAfterAuthFailure, skippedAfterAuthFailure);
+            }
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogError(ex, "anaf.upload-job.batch-failed");
+        }
+    }
+
+    private async Task RecordAuthFailureAsync(
+        IServiceProvider sp, Guid invoiceId, InvoiceAnafStatus status, Exception ex, CancellationToken ct)
+    {
+        try
+        {
+            // Without this the admin list shows a stuck invoice with no reason at all.
+            var lifecycle = sp.GetRequiredService<IInvoiceLifecycle>();
+            await lifecycle.RecordErrorAsync(invoiceId, ex.Message, status, ct);
+        }
+        catch (Exception recordEx) when (recordEx is not OperationCanceledException)
+        {
+            _logger.LogWarning(recordEx,
+                "anaf.upload-job.auth-error-not-recorded invoice_id={InvoiceId}", invoiceId);
         }
     }
 

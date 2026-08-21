@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Configuration;
@@ -18,6 +19,8 @@ namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
 
 public class InvoiceUploadJobTests
 {
+    private static int _seedNumber;
+
     private static PhotoPrintDbContext CreateDb(PostgresTestDatabase database, Action<string>? sqlLog = null)
     {
         var builder = new DbContextOptionsBuilder<PhotoPrintDbContext>()
@@ -90,7 +93,7 @@ public class InvoiceUploadJobTests
     private static Harness Build(
         PostgresTestDatabase database, bool cloudEnabled,
         LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
-        TimeProvider? clock = null, int[]? backoffHours = null)
+        TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -118,7 +121,14 @@ public class InvoiceUploadJobTests
         services.AddScoped(_ => pdfRenderer.Object);
         services.AddScoped(_ => router.Object);
         services.AddScoped(_ => anafClient.Object);
-        services.AddScoped(_ => lifecycle.Object);
+        // A mocked lifecycle cannot see a CAS that refuses, so tests about persisted state use the real one.
+        if (realLifecycle)
+            services.AddScoped<IInvoiceLifecycle>(p => new InvoiceLifecycle(
+                p.GetRequiredService<PhotoPrintDbContext>(),
+                clock ?? TimeProvider.System,
+                NullLogger<InvoiceLifecycle>.Instance));
+        else
+            services.AddScoped(_ => lifecycle.Object);
         services.AddScoped(_ => hub.Object);
         services.AddScoped<IOptions<SellerSettings>>(_ => Options.Create(new SellerSettings()));
         services.AddScoped<IOptions<InvoicingSettings>>(_ => Options.Create(new InvoicingSettings()));
@@ -164,6 +174,9 @@ public class InvoiceUploadJobTests
         seed.Orders.Add(order);
         var invoice = MakeInvoice(orderId, xmlPayload);
         invoice.Id = invoiceId;
+        // Distinct number per seed: uq_invoices_series_year_number rejects a repeat within the year.
+        invoice.Number = Interlocked.Increment(ref _seedNumber);
+        invoice.InvoiceNumber = $"FT-2026-{invoice.Number:D5}";
         invoice.AnafStatus = status;
         invoice.ClaimedAt = claimedAt;
         invoice.AnafUploadId = anafUploadId;
@@ -478,6 +491,48 @@ public class InvoiceUploadJobTests
         using var verify = database.NewContext();
         var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
         claimedAt.Should().NotBeNull("re-uploading could file the same invoice twice");
+    }
+
+    // One dead credential is one incident, not one per row in the batch.
+    [Fact]
+    public async Task ProcessBatchAsync_AuthFailsForEveryRow_LogsOnceAndSummarisesTheRest()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var h = Build(database, cloudEnabled: false, logs);
+        for (var i = 0; i < 4; i++)
+            SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Submitted, anafUploadId: $"upload-{i}");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.Records.Count(r => r.Message.StartsWith("anaf.upload-job.auth-failed", StringComparison.Ordinal))
+            .Should().Be(1, "four rows failing on one credential is one incident");
+        h.Hub.Verify(hub => hub.CaptureEvent(
+            It.IsAny<Sentry.SentryEvent>(), It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()), Times.Once);
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("anaf.upload-job.auth-failure-skipped", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_AuthFailsOnASubmittedRow_RecordsTheReasonOnThatRow()
+    {
+        using var database = new PostgresTestDatabase();
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = database.NewContext();
+        var lastError = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.LastError).FirstAsync();
+        lastError.Should().NotBeNullOrEmpty(
+            "a Submitted row is the dominant auth-failure case, and the admin list shows LastError");
     }
 
     private sealed class FakeClock : TimeProvider

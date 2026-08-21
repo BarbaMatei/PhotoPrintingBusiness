@@ -54,6 +54,19 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
         return LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Pending, affected);
     }
 
+    public async Task<bool> RecordErrorAsync(
+        Guid invoiceId, string errorMessage, InvoiceAnafStatus expected, CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var affected = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == expected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.LastError, (string?)errorMessage)
+                .SetProperty(i => i.UpdatedAt, (DateTimeOffset?)now),
+                ct);
+        return LogAndReturn(invoiceId, expected, expected, affected);
+    }
+
     public async Task<bool> MarkAcceptedAsync(Guid invoiceId, CancellationToken ct = default)
     {
         var now = _clock.GetUtcNow();
