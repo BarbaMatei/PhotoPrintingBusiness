@@ -10,7 +10,7 @@ using PhotoPrint.API.Observability;
 
 namespace PhotoPrint.API.Services.Invoicing.Anaf;
 
-// Multi-replica safety relies on the per-row ClaimedAt+TTL claim below, plus ANAF's own InvoiceNumber dedupe as a crash-window fallback.
+// Multi-replica safety is the per-row ClaimedAt+TTL claim below. Nothing here can tell a duplicate filing from a first one, so an upload whose outcome ANAF never confirmed is counted on the row and capped instead of retried for ever.
 public sealed class InvoiceUploadJob : BackgroundService
 {
     // A row that just failed sits out one poll interval, so consecutive auth attempts on it are up to two intervals apart; four clears that with margin, the floor keeps the window positive (MemoryCache rejects a non-positive expiry, and the throw would land inside the auth catch), and the validator's 1440-minute ceiling on the interval caps the widest window at 96 h — inside the 5-business-day submission deadline.
@@ -23,6 +23,7 @@ public sealed class InvoiceUploadJob : BackgroundService
     private readonly TimeProvider _clock;
     private readonly ILogger<InvoiceUploadJob> _logger;
     private readonly int _pollIntervalMinutes;
+    private readonly int _maxUnknownUploadOutcomes;
     private readonly TimeSpan _authOutageAlertWindow;
 
     public InvoiceUploadJob(
@@ -38,6 +39,7 @@ public sealed class InvoiceUploadJob : BackgroundService
         _clock = clock;
         _logger = logger;
         _pollIntervalMinutes = Math.Max(1, _settings.PollIntervalMinutes);
+        _maxUnknownUploadOutcomes = Math.Max(1, _settings.MaxUnknownUploadOutcomes);
         _authOutageAlertWindow = AuthOutageAlertWindowFor(_pollIntervalMinutes);
     }
 
@@ -342,14 +344,30 @@ public sealed class InvoiceUploadJob : BackgroundService
         }
         catch (AnafUploadTimeoutException ex)
         {
-            // Claim deliberately NOT released: ANAF may hold this invoice already, so hold the row until the TTL expires rather than re-uploading on the next tick.
-            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
-            _logger.LogError(ex,
-                "anaf.upload-job.upload-outcome-unknown invoice_id={InvoiceId} — held until the claim expires",
-                invoiceId);
+            var outcome = await lifecycle.RecordUnknownUploadOutcomeAsync(
+                invoiceId, ex.Message, BudgetSpentMessage(ex), _maxUnknownUploadOutcomes, ct);
+
+            if (outcome.Parked)
+            {
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+                _logger.LogError(ex,
+                    "anaf.upload-job.blind-repost-budget-spent invoice_id={InvoiceId} outcomes={Outcomes} max={Max} — parked as Failed, reconcile the invoice number in ANAF SPV",
+                    invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
+            }
+            else
+            {
+                _logger.LogError(ex,
+                    "anaf.upload-job.upload-outcome-unknown invoice_id={InvoiceId} outcomes={Outcomes} max={Max}",
+                    invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
+            }
+
+            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
         }
         // AnafAuthException propagates to the batch loop's catch — the claim just holds through its TTL.
     }
+
+    private string BudgetSpentMessage(AnafUploadTimeoutException ex) =>
+        $"{ex.Message} {_maxUnknownUploadOutcomes} attempts ended without an answer, so no further upload will be made: reconcile this invoice number in ANAF SPV, then retry the invoice.";
 
     private async Task ReleaseClaimAsync(PhotoPrintDbContext db, Guid invoiceId, DateTimeOffset claimedAt, CancellationToken ct)
     {

@@ -64,6 +64,9 @@ public class Invoice
     // Reclaimable per Anaf:ClaimTtlMinutes; guards against two workers processing one row at once.
     public DateTimeOffset? ClaimedAt { get; set; }
 
+    // An upload that timed out may already be filed at ANAF under this number, so every retry of it is blind; counting them is what lets the worker stop before it files another copy.
+    public int UnknownUploadOutcomes { get; set; }
+
     public Order? Order { get; set; }
 }
 

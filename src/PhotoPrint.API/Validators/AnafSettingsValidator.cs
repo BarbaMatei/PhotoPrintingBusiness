@@ -45,6 +45,9 @@ public sealed class AnafSettingsValidator : IValidateOptions<AnafSettings>
         if (options.ClaimTtlMinutes is < 2 or > 1440)
             failures.Add("Anaf:ClaimTtlMinutes must be between 2 and 1440 — below 2 a second worker can reclaim an invoice while the first is still mid-pass.");
 
+        if (options.MaxUnknownUploadOutcomes is < 1 or > 10)
+            failures.Add("Anaf:MaxUnknownUploadOutcomes must be between 1 and 10 — below 1 a single network blip strands an invoice, and every attempt above risks another copy of the same invoice number at ANAF.");
+
         if (options.BackoffHours is null || options.BackoffHours.Length == 0)
             failures.Add("Anaf:BackoffHours must contain at least one entry.");
         else if (options.BackoffHours.Any(h => h is < 1 or > 168))

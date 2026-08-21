@@ -475,12 +475,13 @@ public class InvoiceUploadJobTests
             "a genuine shutdown must still stop the worker");
     }
 
+    // The 10-minute claim expires two ticks before the 30-minute cooldown lets the row back in, so holding it delayed nothing; the count is what bounds the blind re-posts.
     [Fact]
-    public async Task UploadPendingAsync_UploadTimesOut_HoldsTheClaimBecauseTheOutcomeIsUnknown()
+    public async Task UploadPendingAsync_UploadTimesOut_CountsTheUnknownOutcomeAndReleasesTheClaim()
     {
         using var database = new PostgresTestDatabase();
         var logs = new LogCapture();
-        var h = Build(database, cloudEnabled: false, logs);
+        var h = Build(database, cloudEnabled: false, logs, realLifecycle: true);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
         h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
@@ -488,14 +489,107 @@ public class InvoiceUploadJobTests
 
         await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
-        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         logs.Records.Should().ContainSingle(
             r => r.Message.StartsWith("anaf.upload-job.upload-outcome-unknown", StringComparison.Ordinal));
 
         using var verify = database.NewContext();
-        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
-        claimedAt.Should().NotBeNull("re-uploading could file the same invoice twice");
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.UnknownUploadOutcomes.Should().Be(1, "the row has to remember that ANAF may already hold this number");
+        row.LastError.Should().NotBeNullOrEmpty();
+        row.ClaimedAt.Should().BeNull("a claim nobody reads by the time the row returns is not a hold");
     }
+
+    // A timeout may already have filed this invoice number, so re-posting it every hour forever is a duplicate-filing machine.
+    [Fact]
+    public async Task ProcessBatchAsync_UploadKeepsTimingOut_StopsReuploadingWhenTheBlindRepostBudgetIsSpent()
+    {
+        using var database = new PostgresTestDatabase();
+        var clock = new AdvanceableClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        var logs = new LogCapture();
+        var h = Build(database, cloudEnabled: false, logs, clock: clock, realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(database);
+        var budget = new AnafSettings().MaxUnknownUploadOutcomes;
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUploadTimeoutException("upload?standard=UBL"));
+
+        for (var tick = 0; tick < budget + 2; tick++)
+        {
+            await InvokeProcessBatchAsync(h.Job);
+            clock.Advance(TimeSpan.FromMinutes(60));
+        }
+
+        h.AnafClient.Verify(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()),
+            Times.Exactly(budget),
+            "every re-post after an unknown outcome risks a second copy of the same invoice number at ANAF");
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Error &&
+                 r.Message.StartsWith("anaf.upload-job.blind-repost-budget-spent", StringComparison.Ordinal) &&
+                 r.Message.Contains(invoiceId.ToString()));
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_BlindRepostBudgetSpent_ParksTheRowWhereTheAdminRetryCanReachIt()
+    {
+        using var database = new PostgresTestDatabase();
+        var clock = new AdvanceableClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        var h = Build(database, cloudEnabled: false, clock: clock, realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(database);
+        var budget = new AnafSettings().MaxUnknownUploadOutcomes;
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUploadTimeoutException("upload?standard=UBL"));
+
+        for (var tick = 0; tick < budget; tick++)
+        {
+            await InvokeProcessBatchAsync(h.Job);
+            clock.Advance(TimeSpan.FromMinutes(60));
+        }
+
+        using var verify = database.NewContext();
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Failed,
+            "Rejected and Failed are the only states POST /api/admin/invoices/{id}/retry accepts, so this is the operator's way back in");
+        row.LastError.Should().Contain("SPV", "the operator has to know to reconcile the number before retrying");
+        row.ClaimedAt.Should().BeNull("a parked row is nobody's to hold");
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_OneInvoiceSpendingItsBudget_LeavesAnothersUntouched()
+    {
+        using var database = new PostgresTestDatabase();
+        var clock = new AdvanceableClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        var h = Build(database, cloudEnabled: false, clock: clock, realLifecycle: true);
+        var (_, doomedId) = SeedOrderAndInvoice(database);
+        var (_, healthyId) = SeedOrderAndInvoice(database, xmlPayload: "<InvoiceB/>");
+        var budget = new AnafSettings().MaxUnknownUploadOutcomes;
+        var healthyCalls = 0;
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.Is<byte[]>(b => IsHealthy(b)), It.IsAny<CancellationToken>()))
+                    .Returns(() => ++healthyCalls == 1
+                        ? Task.FromException<AnafUploadResult>(new AnafUploadTimeoutException("upload?standard=UBL"))
+                        : Task.FromResult(new AnafUploadResult("upload-b", clock.GetUtcNow())));
+        h.AnafClient.Setup(c => c.UploadAsync(It.Is<byte[]>(b => !IsHealthy(b)), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUploadTimeoutException("upload?standard=UBL"));
+
+        for (var tick = 0; tick < budget; tick++)
+        {
+            await InvokeProcessBatchAsync(h.Job);
+            clock.Advance(TimeSpan.FromMinutes(60));
+        }
+
+        using var verify = database.NewContext();
+        var doomed = await verify.Invoices.FirstAsync(i => i.Id == doomedId);
+        var healthy = await verify.Invoices.FirstAsync(i => i.Id == healthyId);
+
+        doomed.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+        healthy.AnafStatus.Should().Be(InvoiceAnafStatus.Submitted,
+            "the budget is per invoice — one row spending its own must not park a neighbour");
+        healthy.UnknownUploadOutcomes.Should().Be(1);
+    }
+
+    private static bool IsHealthy(byte[] xml) =>
+        System.Text.Encoding.UTF8.GetString(xml).Contains("InvoiceB", StringComparison.Ordinal);
 
     // One dead credential is one incident, not one per row in the batch.
     [Fact]
@@ -715,5 +809,13 @@ public class InvoiceUploadJobTests
         private readonly DateTimeOffset _now;
         public FakeClock(DateTimeOffset now) { _now = now; }
         public override DateTimeOffset GetUtcNow() => _now;
+    }
+
+    private sealed class AdvanceableClock : TimeProvider
+    {
+        private DateTimeOffset _now;
+        public AdvanceableClock(DateTimeOffset now) { _now = now; }
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan delta) => _now = _now.Add(delta);
     }
 }

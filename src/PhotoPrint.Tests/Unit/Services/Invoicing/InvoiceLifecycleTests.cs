@@ -174,6 +174,21 @@ public class InvoiceLifecycleTests : IDisposable
         fresh.PdfStoragePath.Should().Be("invoices/2026/FT-2026-00001.pdf");
     }
 
+    // Without the reset an operator's retry of a parked row would be parked again on its first tick.
+    [Fact]
+    public async Task Retry_clears_the_blind_repost_budget()
+    {
+        var id = await SeedInvoiceAsync(InvoiceAnafStatus.Failed, lastError: "outcome unknown");
+        await _db.Invoices.Where(i => i.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.UnknownUploadOutcomes, 3));
+
+        var ok = await _sut.RetryAsync(id, InvoiceAnafStatus.Failed, CancellationToken.None);
+
+        ok.Should().BeTrue();
+        var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
+        fresh.UnknownUploadOutcomes.Should().Be(0);
+    }
+
     [Fact]
     public async Task Retry_with_mismatched_expected_returns_false()
     {

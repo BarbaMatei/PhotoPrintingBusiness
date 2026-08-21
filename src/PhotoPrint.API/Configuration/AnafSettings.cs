@@ -39,4 +39,7 @@ public sealed class AnafSettings
 
     // How long one worker owns a Pending invoice before it's reclaimable — must exceed one full pass, not the poll cadence.
     public int ClaimTtlMinutes { get; set; } = 10;
+
+    // Uploads per invoice whose outcome ANAF never confirmed before the row is parked for an operator: a timeout is more often a slow success than a lost request, so each further attempt is likelier to file a duplicate than to rescue the invoice, and 3 spends ~2 h of the 5-business-day deadline.
+    public int MaxUnknownUploadOutcomes { get; set; } = 3;
 }

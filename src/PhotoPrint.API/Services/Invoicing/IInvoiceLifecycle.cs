@@ -39,7 +39,16 @@ public interface IInvoiceLifecycle
     /// <summary>Submitted → Failed (backoff budget exhausted).</summary>
     Task<bool> MarkFailedAsync(Guid invoiceId, string errorMessage, CancellationToken ct = default);
 
+    /// <summary>Counts one upload whose outcome ANAF never confirmed, and moves the row
+    /// Pending → Failed once <paramref name="maxOutcomes"/> of them have accumulated, so a
+    /// blind re-post of the same invoice number cannot repeat for ever.</summary>
+    Task<UnknownUploadOutcome> RecordUnknownUploadOutcomeAsync(
+        Guid invoiceId, string errorMessage, string budgetSpentMessage, int maxOutcomes,
+        CancellationToken ct = default);
+
     /// <summary>Rejected|Failed → Pending on an admin retry.
-    /// Clears <c>AnafUploadId</c> and <c>LastError</c>.</summary>
+    /// Clears <c>AnafUploadId</c>, <c>LastError</c> and the blind re-post count.</summary>
     Task<bool> RetryAsync(Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default);
 }
+
+public readonly record struct UnknownUploadOutcome(int Outcomes, bool Parked);

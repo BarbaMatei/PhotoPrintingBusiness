@@ -26,8 +26,11 @@ or user-secrets — never in a tracked settings file (ADR-006).
 
 ## The migration chain
 
-One migration: **`20260820133204_InitialPostgres`**, scaffolded under the Npgsql design-time
-provider. Its snapshot contains only Postgres store types — `uuid`, `timestamp with time zone`,
+Three migrations, all scaffolded under the Npgsql design-time provider: the squashed baseline
+**`20260820133204_InitialPostgres`**, then `20260821054658_AddInvoiceStorageLocation` and
+`20260821110018_AddInvoiceUnknownUploadOutcomes`, each a single `AddColumn`.
+
+The baseline's snapshot contains only Postgres store types — `uuid`, `timestamp with time zone`,
 `jsonb`, `numeric`, `character varying(n)`, `double precision`, `boolean` — and **zero**
 `TEXT`/`INTEGER`/`REAL`. It has been applied against a real PostgreSQL 16 server from an empty
 database, so the chain is proven, not merely assumed.

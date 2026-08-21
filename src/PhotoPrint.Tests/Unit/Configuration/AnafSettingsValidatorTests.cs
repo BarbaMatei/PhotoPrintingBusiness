@@ -97,6 +97,20 @@ public class AnafSettingsValidatorTests
         result.Failures.Should().Contain(f => f.Contains("Anaf:ClaimTtlMinutes"));
     }
 
+    [Theory]
+    [InlineData(0)]      // never re-posting strands an invoice on one network blip
+    [InlineData(-1)]
+    [InlineData(11)]     // each blind re-post risks another copy of the same number at ANAF
+    public void MaxUnknownUploadOutcomes_out_of_range_fails(int attempts)
+    {
+        using var temp = TempCertFile.Create();
+        var s = ValidEnabled(temp.Path);
+        s.MaxUnknownUploadOutcomes = attempts;
+        var result = _sut.Validate(null, s);
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain(f => f.Contains("Anaf:MaxUnknownUploadOutcomes"));
+    }
+
     [Fact]
     public void ClaimTtlMinutes_default_is_accepted()
     {

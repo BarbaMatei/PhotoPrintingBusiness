@@ -108,6 +108,45 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
         return LogAndReturn(invoiceId, InvoiceAnafStatus.Submitted, InvoiceAnafStatus.Failed, affected);
     }
 
+    public async Task<UnknownUploadOutcome> RecordUnknownUploadOutcomeAsync(
+        Guid invoiceId, string errorMessage, string budgetSpentMessage, int maxOutcomes,
+        CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var counted = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.UnknownUploadOutcomes, i => i.UnknownUploadOutcomes + 1)
+                .SetProperty(i => i.LastError, (string?)errorMessage)
+                .SetProperty(i => i.UpdatedAt, (DateTimeOffset?)now),
+                ct);
+
+        if (counted == 0)
+        {
+            LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Pending, counted);
+            return new UnknownUploadOutcome(0, false);
+        }
+
+        var outcomes = await _db.Invoices
+            .Where(i => i.Id == invoiceId)
+            .Select(i => i.UnknownUploadOutcomes)
+            .FirstOrDefaultAsync(ct);
+
+        if (outcomes < maxOutcomes) return new UnknownUploadOutcome(outcomes, false);
+
+        var parked = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.AnafStatus, InvoiceAnafStatus.Failed)
+                .SetProperty(i => i.LastError,  (string?)budgetSpentMessage)
+                .SetProperty(i => i.UpdatedAt,  (DateTimeOffset?)now),
+                ct);
+
+        return new UnknownUploadOutcome(
+            outcomes,
+            LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Failed, parked));
+    }
+
     public async Task<bool> RetryAsync(
         Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default)
     {
@@ -131,6 +170,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
                 .SetProperty(i => i.AnafUploadId, (string?)null)
                 .SetProperty(i => i.LastError,    (string?)null)
                 .SetProperty(i => i.XmlPayload,   (string?)null)
+                .SetProperty(i => i.UnknownUploadOutcomes, 0)
                 .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),
                 ct);
         return LogAndReturn(invoiceId, expected, InvoiceAnafStatus.Pending, affected);
