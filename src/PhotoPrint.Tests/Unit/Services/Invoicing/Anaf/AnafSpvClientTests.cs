@@ -135,6 +135,127 @@ public class AnafSpvClientTests
         script.Recorded[0].Uri!.Query.Should().Contain("id_incarcare=complex%2Fid%2042");
     }
 
+    // ── Timeout versus shutdown: the classifier the worker's claim handling reads ──
+
+    private static AnafSpvClient BuildWithHandler(HttpMessageHandler handler, TimeSpan? timeout = null)
+    {
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://anaf-test/api/") };
+        if (timeout is not null) http.Timeout = timeout.Value;
+        return new AnafSpvClient(
+            http,
+            Options.Create(new AnafSettings { Enabled = true, BaseUrl = "https://anaf-test/api/" }),
+            new FakeClock(DateTimeOffset.UtcNow),
+            new LoggerFactory().CreateLogger<AnafSpvClient>());
+    }
+
+    [Fact]
+    public async Task Upload_when_the_client_timeout_fires_is_classified_as_an_unknown_outcome()
+    {
+        var sut = BuildWithHandler(new BlockingHandler(), TimeSpan.FromMilliseconds(200));
+
+        var act = () => sut.UploadAsync(Encoding.UTF8.GetBytes("<Invoice />"));
+
+        await act.Should().ThrowAsync<AnafUploadTimeoutException>(
+            "ANAF may have taken the invoice and merely answered too slowly");
+    }
+
+    [Fact]
+    public async Task Upload_when_the_caller_cancels_propagates_the_shutdown_instead()
+    {
+        using var cts = new CancellationTokenSource();
+        var sut = BuildWithHandler(new BlockingHandler(), TimeSpan.FromMinutes(5));
+
+        var pending = sut.UploadAsync(Encoding.UTF8.GetBytes("<Invoice />"), cts.Token);
+        await cts.CancelAsync();
+
+        var act = async () => await pending;
+        await act.Should().ThrowAsync<OperationCanceledException>(
+            "a deploy must stop the worker, not leave every in-flight invoice recorded as outcome-unknown");
+    }
+
+    [Fact]
+    public async Task GetStatus_when_the_client_timeout_fires_is_classified_as_unreachable()
+    {
+        var sut = BuildWithHandler(new BlockingHandler(), TimeSpan.FromMilliseconds(200));
+
+        var act = () => sut.GetStatusAsync("upload-1");
+
+        await act.Should().ThrowAsync<AnafUnreachableException>(
+            "polling changes nothing at ANAF, so a slow poll is an outage with no ambiguity to preserve");
+    }
+
+    [Fact]
+    public async Task GetStatus_when_the_caller_cancels_propagates_the_shutdown_instead()
+    {
+        using var cts = new CancellationTokenSource();
+        var sut = BuildWithHandler(new BlockingHandler(), TimeSpan.FromMinutes(5));
+
+        var pending = sut.GetStatusAsync("upload-1", cts.Token);
+        await cts.CancelAsync();
+
+        var act = async () => await pending;
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    public enum WireOutcome { Transport, NotXml, EmptyBody, Forbidden, ServerError, Unauthorized, MissingIndex, BodyErrors }
+
+    // Anything outside these four lands in the batch loop's generic catch, which writes no LastError and releases no claim.
+    [Theory]
+    [InlineData(WireOutcome.Transport)]
+    [InlineData(WireOutcome.NotXml)]
+    [InlineData(WireOutcome.EmptyBody)]
+    [InlineData(WireOutcome.Forbidden)]
+    [InlineData(WireOutcome.ServerError)]
+    [InlineData(WireOutcome.Unauthorized)]
+    [InlineData(WireOutcome.MissingIndex)]
+    [InlineData(WireOutcome.BodyErrors)]
+    public async Task Upload_never_leaks_an_unclassified_exception(WireOutcome outcome)
+    {
+        var sut = BuildWithHandler(HandlerFor(outcome));
+
+        Exception? thrown = null;
+        try { await sut.UploadAsync(Encoding.UTF8.GetBytes("<Invoice />")); }
+        catch (Exception ex) { thrown = ex; }
+
+        thrown.Should().NotBeNull();
+        new[]
+        {
+            typeof(AnafUploadException), typeof(AnafUnreachableException),
+            typeof(AnafAuthException), typeof(AnafUploadTimeoutException),
+        }.Should().Contain(thrown!.GetType());
+    }
+
+    private static HttpMessageHandler HandlerFor(WireOutcome outcome) => outcome switch
+    {
+        WireOutcome.Transport => new ScriptedHttpMessageHandler(
+            _ => throw new HttpRequestException("connection reset")),
+        WireOutcome.NotXml => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(HttpStatusCode.OK, "definitely not xml")),
+        WireOutcome.EmptyBody => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(HttpStatusCode.OK, "")),
+        WireOutcome.Forbidden => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Empty(HttpStatusCode.Forbidden)),
+        WireOutcome.ServerError => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Empty(HttpStatusCode.ServiceUnavailable)),
+        WireOutcome.Unauthorized => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Empty(HttpStatusCode.Unauthorized)),
+        WireOutcome.MissingIndex => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(HttpStatusCode.OK, "<header data_incarcare=\"2026-06-03 11:30:00\" />")),
+        WireOutcome.BodyErrors => new ScriptedHttpMessageHandler(
+            _ => ScriptedHttpMessageHandler.Json(HttpStatusCode.OK, "<header><Errors errorMessage=\"CUI invalid\" /></header>")),
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome)),
+    };
+
+    private sealed class BlockingHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
     private sealed class FakeClock : TimeProvider
     {
         private readonly DateTimeOffset _now;
