@@ -222,3 +222,20 @@
 {"t":"2026-08-21T11:15:04+03:00","ev":"pass-launch","pass":7,"type":"verification"}
 {"t":"2026-08-21T11:27:30+03:00","ev":"pass-records-done","pass":7,"type":"verification"}
 {"t":"2026-08-21T11:35:35+03:00","ev":"doc-gate","verdict":"approve","pass":7}
+{"t":"2026-08-21T11:36:56+03:00","ev":"round-start","round":8}
+{"t":"2026-08-21T11:39:04+03:00","ev":"triage-done","round":8,"clusters":1,"checks_needed":1,"pre_cleared":0,"gates":1}
+{"t":"2026-08-21T11:39:04+03:00","ev":"check-dispatched","round":8,"cluster":"A"}
+{"t":"2026-08-21T11:39:04+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"leave the validator range as-is","reason":"narrowing Anaf:PollIntervalMinutes would refuse config that boots today — a capability removal needing an owner ruling"}
+{"t":"2026-08-21T11:44:49+03:00","ev":"check-returned","round":8,"cluster":"A","verdict":"revised","tokens":91258}
+{"t":"2026-08-21T11:44:49+03:00","ev":"test-run","round":8,"kind":"green","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":37,"failed":0,"duration_s":55,"note":"baseline before the fix, harness parameter only"}
+{"t":"2026-08-21T11:47:48+03:00","ev":"test-run","round":8,"kind":"red","filter":"FullyQualifiedName~InvoiceUploadJobTests","passed":22,"failed":2,"duration_s":90}
+{"t":"2026-08-21T11:50:39+03:00","ev":"test-run","round":8,"kind":"green","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":40,"failed":0,"duration_s":77}
+{"t":"2026-08-21T11:52:09+03:00","ev":"finding","round":8,"id":"PPW-553","status":"fixed","commit":"e782189"}
+{"t":"2026-08-21T11:52:09+03:00","ev":"micro-review-dispatched","round":8,"cluster":"A"}
+{"t":"2026-08-21T11:55:15+03:00","ev":"test-run","round":8,"kind":"final","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":40,"failed":0,"duration_s":82}
+{"t":"2026-08-21T11:55:38+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"deferred","reason":"ShipmentTrackingJob.cs:22 is a flat 30-minute outage window while SamedaySettingsValidator.cs:47-48 bounds TrackingIntervalMinutes only at >= 1, so the same class is unbounded there. Outside the finding set; routing it to the backlog is the owner ruling"}
+{"t":"2026-08-21T11:57:08+03:00","ev":"micro-review-returned","round":8,"cluster":"A","found":1}
+{"t":"2026-08-21T12:00:15+03:00","ev":"test-run","round":8,"kind":"final","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":40,"failed":0,"duration_s":121,"note":"re-run at the round tip after the micro-review follow-up"}
+{"t":"2026-08-21T12:00:15+03:00","ev":"round-end","round":8}
+{"t":"2026-08-21T12:02:38+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"do not push","reason":"the records auditor hard-fails because fixed_commit 2daf61e is reachable from no pushed ref. Clearing it needs a push of feat/bolt-038-vat-calculation, which no owner authorised; a local tag would satisfy the check while defeating its purpose. Error left standing and recorded in the metrics notes"}
+{"t":"2026-08-21T12:11:06+03:00","ev":"doc-gate","round":8,"verdict":"approve","note":"lint clean for v8 and the state files; Sonnet judge approved with 3 optional nits, one of which (unattended round -> unattended run) was applied"}
