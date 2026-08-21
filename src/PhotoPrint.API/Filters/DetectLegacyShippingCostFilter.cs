@@ -15,7 +15,7 @@ namespace PhotoPrint.API.Filters;
 /// </summary>
 public sealed class DetectLegacyShippingCostFilter : IAsyncResourceFilter
 {
-    // Buffering runs before authentication of any kind, so both numbers cap what an unauthenticated caller can make this filter hold; the buffer sits above the peek so the peek never trips it.
+    // Buffering runs before authentication of any kind, so both numbers cap what an unauthenticated caller can make this filter hold; the buffer limit sits above the peek so the peek never trips it.
     private const int PeekBytes = 64 * 1024;
     private const int BufferLimitBytes = PeekBytes + 4096;
 
@@ -31,17 +31,18 @@ public sealed class DetectLegacyShippingCostFilter : IAsyncResourceFilter
         ResourceExecutionDelegate next)
     {
         var request = context.HttpContext.Request;
-        request.EnableBuffering(bufferThreshold: PeekBytes, bufferLimit: BufferLimitBytes);
+        request.EnableBuffering(bufferLimit: BufferLimitBytes);
 
-        var buffer = new byte[PeekBytes];
-        var read = 0;
-        while (read < buffer.Length)
+        using var peek = new MemoryStream();
+        var chunk = new byte[8192];
+        while (peek.Length < PeekBytes)
         {
-            var chunk = await request.Body.ReadAsync(buffer.AsMemory(read));
-            if (chunk == 0) break;
-            read += chunk;
+            var wanted = (int)Math.Min(chunk.Length, PeekBytes - peek.Length);
+            var read = await request.Body.ReadAsync(chunk.AsMemory(0, wanted));
+            if (read == 0) break;
+            peek.Write(chunk, 0, read);
         }
-        var body = Encoding.UTF8.GetString(buffer, 0, read);
+        var body = Encoding.UTF8.GetString(peek.GetBuffer(), 0, (int)peek.Length);
         request.Body.Position = 0;
 
         if (ContainsLegacyShippingCostKey(body))

@@ -418,6 +418,28 @@ public class ExceptionHandlerMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_KestrelRejectionAskingForA5xx_KeepsTheServerErrorTreatment()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new BadHttpRequestException("HTTP version not supported.", 505);
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(500,
+            "the client-error shortcut must not become a way to skip the Sentry capture invariant");
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task InvokeAsync_KnownException_IncludesCorrelationIdFromContext()
     {
         // Arrange

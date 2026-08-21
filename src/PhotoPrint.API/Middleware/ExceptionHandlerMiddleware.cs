@@ -73,15 +73,17 @@ public class ExceptionHandlerMiddleware : IMiddleware
     {
         var correlationId = context.GetCorrelationId() ?? Guid.NewGuid().ToString();
 
-        // Kestrel rejects an oversize or malformed request with this and names the status it wants; unmapped it would be a 500 plus a Sentry capture, so anyone could turn a rejected body into an error-budget burn.
-        if (exception is BadHttpRequestException badRequest)
+        // Kestrel rejects an oversize or malformed request with this and names the status it wants; unmapped it would be a 500 plus a Sentry capture, so anyone could turn a rejected body into an error-budget burn. A 5xx it asks for still falls through, so nothing skips the capture invariant below.
+        if (exception is BadHttpRequestException badRequest
+            && badRequest.StatusCode < StatusCodes.Status500InternalServerError)
         {
             _logger.LogWarning(
                 "request.rejected status={Status} reason={Reason} path={Path} correlation_id={CorrelationId}",
                 badRequest.StatusCode, badRequest.Message, context.Request.Path, correlationId);
 
+            var reason = ReasonPhrases.GetReasonPhrase(badRequest.StatusCode);
             await WriteProblemDetailsAsync(context, badRequest.StatusCode,
-                ReasonPhrases.GetReasonPhrase(badRequest.StatusCode),
+                string.IsNullOrEmpty(reason) ? "Bad Request" : reason,
                 badRequest.Message, correlationId, exception);
             return;
         }

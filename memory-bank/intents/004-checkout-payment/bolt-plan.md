@@ -386,7 +386,7 @@ enables:
   - Returns `{ clientSecret, orderId }`
   - 400 if cart is empty
 - `POST /api/webhooks/stripe` (NO auth — Stripe webhook)
-  - ASP.NET Core: disable body buffering override on this endpoint via `[DisableRequestSizeLimit]` + read raw body via `Request.Body`
+  - ASP.NET Core: read the raw body via `Request.Body`, bounded — the endpoint is anonymous, so it caps the body in the action and carries `[RequestSizeLimit]` as the byte backstop
   - `EventUtility.ConstructEvent(rawBody, Stripe-Signature header, STRIPE_WEBHOOK_SECRET)`
   - `payment_intent.succeeded`: find Order by `PaymentIntentId`; if `Status == AwaitingPayment` → `Transition(AwaitingPayment, Paid)` → set `PaidAt = UtcNow` → `IEmailService.SendOrderConfirmedEmailAsync` (fire-and-forget)
   - `payment_intent.payment_failed`: find Order → `Transition(AwaitingPayment, PaymentFailed)`

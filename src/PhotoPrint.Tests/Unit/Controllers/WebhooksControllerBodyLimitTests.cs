@@ -110,6 +110,34 @@ public class WebhooksControllerBodyLimitTests
     }
 
     [Fact]
+    public async Task Stripe_body_arriving_one_byte_at_a_time_is_still_assembled_whole()
+    {
+        var json = "{\"data\":{\"object\":{\"id\":\"pi_drip\"}}}";
+        GivenBody(new DripStream(Encoding.UTF8.GetBytes(json)), contentLength: null);
+        _stripeVerifier
+            .Setup(v => v.ConstructEvent(json, It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(new Event { Type = "customer.created" });
+
+        var result = await _sut.StripeWebhookAsync(default);
+
+        result.Should().BeOfType<OkResult>(
+            "a socket hands over whatever it has, so the read loop has to accumulate short reads");
+    }
+
+    [Fact]
+    public void The_attribute_limit_sits_above_the_cap_the_action_enforces()
+    {
+        var declared = (long)typeof(WebhooksController)
+            .GetMethod(nameof(WebhooksController.StripeWebhookAsync))!
+            .GetCustomAttributesData()
+            .First(a => a.AttributeType == typeof(RequestSizeLimitAttribute))
+            .ConstructorArguments[0].Value!;
+
+        declared.Should().BeGreaterThan(WebhooksController.StripeMaxBodyBytes,
+            "the action owns the clean 413; the attribute is only the byte backstop under it");
+    }
+
+    [Fact]
     public async Task Stripe_oversized_body_is_counted_under_its_own_result_label()
     {
         using var capture = new MetricCapture(MetricNames.Instruments.PaymentWebhookTotal);
@@ -158,6 +186,14 @@ public class WebhooksControllerBodyLimitTests
     {
         typeof(PaymentsController).GetCustomAttribute<RequestSizeLimitAttribute>().Should().NotBeNull(
             "DetectLegacyShippingCostFilter buffers the whole body for a caller holding a free guest token");
+    }
+
+    private sealed class DripStream : MemoryStream
+    {
+        public DripStream(byte[] buffer) : base(buffer, writable: false) { }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(base.Read(buffer.Length == 0 ? buffer.Span : buffer.Span[..1]));
     }
 
     private sealed class CountingEndlessStream : Stream
