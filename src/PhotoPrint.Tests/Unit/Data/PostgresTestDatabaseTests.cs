@@ -54,6 +54,24 @@ public class PostgresTestDatabaseTests : IClassFixture<PostgresTestDatabase>
             "invoice numbering restarts each year, so a reused database must not carry the counter on");
     }
 
+    [Fact]
+    public async Task ResetForTest_DropsASequenceCreatedAtRuntime()
+    {
+        await using (var create = _database.NewContext())
+            await create.Database.ExecuteSqlRawAsync("CREATE SEQUENCE \"pp_probe_seq_2026\" START 1");
+
+        _database.ResetForTest();
+
+        await using var verify = _database.NewContext();
+        var found = await verify.Database
+            .SqlQueryRaw<string>(
+                "SELECT sequencename AS \"Value\" FROM pg_sequences WHERE sequencename = 'pp_probe_seq_2026'")
+            .ToListAsync();
+
+        found.Should().BeEmpty(
+            "a per-year sequence left behind by one test makes the next test's create a duplicate");
+    }
+
     private static async Task<long> NextInvoiceNumber(PhotoPrint.API.Data.PhotoPrintDbContext db) =>
         (await db.Database
             .SqlQueryRaw<long>("SELECT nextval('\"invoice_seq_ft_2026\"') AS \"Value\"")

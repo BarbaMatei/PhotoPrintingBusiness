@@ -251,7 +251,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     [Fact]
     public async Task ProcessBatchAsync_OrderCarriesNoBuyerAddress_ParksTheRowInsteadOfRebuildingForEver()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var (_, invoiceId) = SeedLockerOrderWithNoBuyerAddress(database);
         var h = Build(database, cloudEnabled: false, realLifecycle: true, realXmlBuilder: true);
 
@@ -271,7 +271,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     [Fact]
     public async Task ProcessBatchAsync_ParkLosesItsCas_StillRecordsTheReasonAndReleasesTheClaim()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var (_, invoiceId) = SeedLockerOrderWithNoBuyerAddress(database);
         var h = Build(database, cloudEnabled: false, realXmlBuilder: true);
         h.Lifecycle.Setup(l => l.ParkUnbuildableAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -289,7 +289,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     [Fact]
     public async Task ProcessBatchAsync_ParkedForNoBuyerAddress_IsNotPickedUpAgainOnTheNextTick()
     {
-        using var database = OpenDatabase();
+        var database = _database;
         var (_, invoiceId) = SeedLockerOrderWithNoBuyerAddress(database);
         var h = Build(database, cloudEnabled: false, realLifecycle: true, realXmlBuilder: true);
 
@@ -619,7 +619,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     [Fact]
     public async Task ProcessBatchAsync_UploadKeepsTimingOut_StopsReuploadingWhenTheBlindRepostBudgetIsSpent()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var clock = new AdvanceableClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         var logs = new LogCapture();
         var h = Build(database, cloudEnabled: false, logs, clock: clock, realLifecycle: true);
@@ -647,7 +647,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     [Fact]
     public async Task ProcessBatchAsync_BlindRepostBudgetSpent_ParksTheRowWhereTheAdminRetryCanReachIt()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var clock = new AdvanceableClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         var h = Build(database, cloudEnabled: false, clock: clock, realLifecycle: true);
         var (_, invoiceId) = SeedOrderAndInvoice(database);
@@ -673,7 +673,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     [Fact]
     public async Task ProcessBatchAsync_OneInvoiceSpendingItsBudget_LeavesAnothersUntouched()
     {
-        using var database = new PostgresTestDatabase();
+        var database = _database;
         var clock = new AdvanceableClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
         var h = Build(database, cloudEnabled: false, clock: clock, realLifecycle: true);
         var (_, doomedId) = SeedOrderAndInvoice(database);

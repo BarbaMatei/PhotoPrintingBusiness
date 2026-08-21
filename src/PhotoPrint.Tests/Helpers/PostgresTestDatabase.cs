@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using PhotoPrint.API.Data;
 
@@ -22,6 +25,8 @@ public class PostgresTestDatabase : IDisposable
     private static string? _salt;
     private static bool _swept;
     private static bool _fastResetUnavailable;
+    private static string? _migratedSequences;
+    private static string? _migrationScript;
 
     private readonly string _adminConnectionString;
     private readonly string _databaseName;
@@ -86,12 +91,13 @@ public class PostgresTestDatabase : IDisposable
         if (_fastResetUnavailable)
         {
             TruncateEverything();
+            ResetSequences();
             return;
         }
 
         const string sql = """
             DO $$
-            DECLARE t text; s record;
+            DECLARE t text;
             BEGIN
               SET LOCAL session_replication_role = replica;
 
@@ -100,13 +106,6 @@ public class PostgresTestDatabase : IDisposable
                         WHERE schemaname = 'public' AND tablename <> '__EFMigrationsHistory'
               LOOP
                 EXECUTE 'DELETE FROM ' || t;
-              END LOOP;
-
-              FOR s IN SELECT schemaname, sequencename
-                         FROM pg_sequences
-                        WHERE schemaname = 'public' AND last_value IS NOT NULL
-              LOOP
-                EXECUTE format('ALTER SEQUENCE %I.%I RESTART', s.schemaname, s.sequencename);
               END LOOP;
             END $$;
             """;
@@ -122,6 +121,30 @@ public class PostgresTestDatabase : IDisposable
             _fastResetUnavailable = true;
             TruncateEverything();
         }
+
+        ResetSequences();
+    }
+
+    private void ResetSequences()
+    {
+        // Per-year sequences are created on first use, so one left behind makes the next test's
+        // create a duplicate; only the ones the migration chain ships may survive a reset.
+        var sql = $"""
+            DO $$
+            DECLARE s record;
+            BEGIN
+              FOR s IN SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname = 'public'
+              LOOP
+                IF s.sequencename = ANY ({MigratedSequences()}) THEN
+                  EXECUTE format('ALTER SEQUENCE %I.%I RESTART', s.schemaname, s.sequencename);
+                ELSE
+                  EXECUTE format('DROP SEQUENCE %I.%I CASCADE', s.schemaname, s.sequencename);
+                END IF;
+              END LOOP;
+            END $$;
+            """;
+
+        ExecuteInternal(sql);
     }
 
     // Postgres has no per-connection FK switch, so the constraints themselves go.
@@ -311,9 +334,40 @@ public class PostgresTestDatabase : IDisposable
         using var db = new PhotoPrintDbContext(options);
 
         // A migration edited in place keeps its id while producing a different schema.
-        var schema = string.Join('|', db.Database.GetMigrations()) + db.Database.GenerateCreateScript();
+        var schema = string.Join('|', db.Database.GetMigrations()) + MigrationScript(adminConnectionString);
 
         return _fingerprint = Hash(schema, 12);
+    }
+
+    private static string MigratedSequences()
+    {
+        if (_migratedSequences is not null) return _migratedSequences;
+
+        var script = MigrationScript(
+            Environment.GetEnvironmentVariable(ConnectionEnvVar) ?? DefaultAdminConnectionString);
+
+        var names = Regex
+            .Matches(script,
+                "CREATE SEQUENCE (?:IF NOT EXISTS )?\"?([A-Za-z0-9_]+)\"?", RegexOptions.IgnoreCase)
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .Select(n => $"'{n.Replace("'", "''")}'");
+
+        return _migratedSequences = $"ARRAY[{string.Join(", ", names)}]::text[]";
+    }
+
+    private static string MigrationScript(string adminConnectionString)
+    {
+        if (_migrationScript is not null) return _migrationScript;
+
+        var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseNpgsql(adminConnectionString)
+            .Options;
+        using var db = new PhotoPrintDbContext(options);
+
+        // The migrations' own SQL, not the model's: sequences and the invoice index are raw
+        // statements the model knows nothing about.
+        return _migrationScript = db.GetService<IMigrator>().GenerateScript();
     }
 
     private static string Hash(string value, int length) =>

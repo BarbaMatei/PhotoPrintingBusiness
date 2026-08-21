@@ -158,9 +158,14 @@ Where those seconds went, and why the fixture is shaped the way it is:
   names; the stale set is swept when nothing holds its lease.
 - **`ResetForTest()` deletes rows, it does not truncate.** `TRUNCATE` rewrites every table's storage
   and flushes it, which measured 285–556 ms *on empty tables*; the delete-based reset with foreign
-  keys switched off for the wipe measured 3.1 ms. It also rewinds every used sequence, which
-  `TRUNCATE … RESTART IDENTITY` skips because no table column owns the numbering sequences. It
-  needs a superuser for `session_replication_role`; without one it falls back to truncating.
+  keys switched off for the wipe measured 3.1 ms. It needs a superuser for
+  `session_replication_role`; without one it falls back to truncating.
+- **Sequences get the same treatment as rows.** A reset rewinds the sequences the migration chain
+  ships and **drops** every other one, because `PostgresSequences.EnsureAsync` creates the per-year
+  sequences on first use: one left behind turns the next test's create into a duplicate, which is
+  exactly what the create-race tests need to be able to provoke. `TRUNCATE … RESTART IDENTITY`
+  rewinds neither, since no table column owns them. The shipped set is read out of the migration
+  script — the model's create script does not contain the raw `CREATE SEQUENCE` statements.
 - **Two escape hatches.** `ForeignKeyFreeTestDatabase` is a separate pool with the constraints
   dropped, for tests that insert a row without its parents — separate so a constraint-free schema is
   never handed to a class that expects constraints. `PostgresTestDatabase.Throwaway()` migrates a
