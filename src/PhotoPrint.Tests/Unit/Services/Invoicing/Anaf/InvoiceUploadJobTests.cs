@@ -417,6 +417,69 @@ public class InvoiceUploadJobTests
         h.Lifecycle.Verify(l => l.MarkRejectedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    private static Task InvokeRunTickAsync(InvoiceUploadJob job, CancellationToken ct)
+    {
+        var method = typeof(InvoiceUploadJob).GetMethod("RunTickAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+        return (Task)method.Invoke(job, [ct])!;
+    }
+
+    // A BackgroundService that throws stops the host, so a timeout anywhere in the tick must not escape.
+    [Fact]
+    public async Task RunTickAsync_TimeoutSurfacingAsCancellation_DoesNotEscapeAndStopTheHost()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var h = Build(database, cloudEnabled: false, logs);
+        var (_, _) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new OperationCanceledException("client timeout"));
+
+        var act = () => InvokeRunTickAsync(h.Job, CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("anaf.upload-job.tick-cancelled", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunTickAsync_RealShutdown_StillPropagates()
+    {
+        using var database = new PostgresTestDatabase();
+        var h = Build(database, cloudEnabled: false);
+        SeedOrderAndInvoice(database);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var act = () => InvokeRunTickAsync(h.Job, cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>(
+            "a genuine shutdown must still stop the worker");
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_UploadTimesOut_HoldsTheClaimBecauseTheOutcomeIsUnknown()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var h = Build(database, cloudEnabled: false, logs);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUploadTimeoutException("upload?standard=UBL"));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("anaf.upload-job.upload-outcome-unknown", StringComparison.Ordinal));
+
+        using var verify = database.NewContext();
+        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
+        claimedAt.Should().NotBeNull("re-uploading could file the same invoice twice");
+    }
+
     private sealed class FakeClock : TimeProvider
     {
         private readonly DateTimeOffset _now;

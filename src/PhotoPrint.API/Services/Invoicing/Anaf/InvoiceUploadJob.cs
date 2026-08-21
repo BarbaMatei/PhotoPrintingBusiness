@@ -41,11 +41,24 @@ public sealed class InvoiceUploadJob : BackgroundService
 
         // Tick immediately on startup so a freshly-deployed instance picks up
         // anything that accumulated while the previous instance was down.
-        await ProcessBatchAsync(stoppingToken);
+        await RunTickAsync(stoppingToken);
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
+            await RunTickAsync(stoppingToken);
+        }
+    }
+
+    private async Task RunTickAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
             await ProcessBatchAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            // A client timeout in ANAF, storage or the DB surfaces as cancellation, and a BackgroundService that throws stops the host.
+            _logger.LogWarning("anaf.upload-job.tick-cancelled — a timeout inside the tick was not a shutdown");
         }
     }
 
@@ -248,6 +261,14 @@ public sealed class InvoiceUploadJob : BackgroundService
                 "anaf.upload-job.unreachable invoice_id={InvoiceId} status={HttpStatus}",
                 invoiceId, ex.HttpStatus);
             await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+        }
+        catch (AnafUploadTimeoutException ex)
+        {
+            // Claim deliberately NOT released: ANAF may hold this invoice already, so hold the row until the TTL expires rather than re-uploading on the next tick.
+            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            _logger.LogError(ex,
+                "anaf.upload-job.upload-outcome-unknown invoice_id={InvoiceId} — held until the claim expires",
+                invoiceId);
         }
         // AnafAuthException propagates to the batch loop's catch — the claim just holds through its TTL.
     }

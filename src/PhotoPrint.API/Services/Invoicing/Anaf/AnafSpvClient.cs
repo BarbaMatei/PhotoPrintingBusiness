@@ -53,6 +53,11 @@ public sealed class AnafSpvClient : IAnafSpvClient
         {
             throw new AnafUnreachableException(endpoint, inner: ex);
         }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested || ex.InnerException is TimeoutException)
+        {
+            // Our own HttpClient timeout, not a shutdown: an upload whose outcome we never learned.
+            throw new AnafUploadTimeoutException(endpoint, ex);
+        }
 
         using var _ = response;
 
@@ -107,6 +112,11 @@ public sealed class AnafSpvClient : IAnafSpvClient
         }
         catch (HttpRequestException ex)
         {
+            throw new AnafUnreachableException(endpoint, inner: ex);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested || ex.InnerException is TimeoutException)
+        {
+            // Polling is idempotent, so a timeout here is just an outage — no ambiguity to preserve.
             throw new AnafUnreachableException(endpoint, inner: ex);
         }
 

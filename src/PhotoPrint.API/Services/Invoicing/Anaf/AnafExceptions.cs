@@ -34,6 +34,18 @@ public sealed class AnafUploadException : Exception
 /// retry budget is exhausted, request timeout). The worker logs and exits
 /// the per-row dispatch; the next tick retries on the natural schedule.
 /// </summary>
+/// <summary>An upload whose outcome is unknown: ANAF may have accepted the XML and merely answered too slowly.</summary>
+public sealed class AnafUploadTimeoutException : Exception
+{
+    public AnafUploadTimeoutException(string endpoint, Exception? inner = null)
+        : base($"ANAF endpoint {endpoint} did not answer before the client timeout; the upload outcome is unknown.", inner)
+    {
+        Endpoint = endpoint;
+    }
+
+    public string Endpoint { get; }
+}
+
 public sealed class AnafUnreachableException : Exception
 {
     public AnafUnreachableException(string endpoint, Exception? inner = null, int? httpStatus = null)
