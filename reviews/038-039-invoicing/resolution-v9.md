@@ -3,9 +3,9 @@ type: resolution
 target: 038-039-invoicing
 version: 9
 answers: review-v9.md
-status: in-progress
-fixed_commit:
-closed:
+status: resolved
+fixed_commit: 78900b6
+closed: 2026-08-21
 ---
 
 # Resolution v9 — 038-039-invoicing
@@ -14,7 +14,7 @@ closed:
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-557 | deferred | — | parked: which fiscal address a parcel-locker order may carry is an owner decision, not a fix — the pre-check refuted every code-only option. Ledger row left `open`; the owner has been asked |
+| PPW-557 | fixed | `c2275a3`, `78900b6` | locker checkout collects the same fiscal address as home delivery, required server-side too, and an unbuildable invoice parks `Failed` with a readable reason. New surface: the typed exception, one shared park, the prefill, a redirect |
 | PPW-558 | fixed | `9cc0273`, `7ad27df` | rejects >1 MB in the action with the 413-mapped exception before verifying; siblings capped. New surface: the bounded read, three byte caps, the `body_too_large` label, the Kestrel-status middleware branch |
 | PPW-559 | fixed | `12dac3a`, `25f2097`, `d3ae1e7` | uploads ANAF never confirmed are counted on the row, which parks as `Failed` at `Anaf:MaxUnknownUploadOutcomes` (3) where the admin retry reaches it and resets both count and claim. New surface: the column, the setting, one lifecycle method |
 | PPW-565 | fixed | `8d7a5e6` | the migration test now asserts `HasPendingModelChanges()` is false, so drift adding no column fails a run; proven red with a throwaway `Invoice` property. The relocated Sameday base class is covered through both subclasses |
@@ -31,11 +31,12 @@ closed:
 | B — ANAF unknown-outcome upload | PPW-559, PPW-566 | `Services/Invoicing/Anaf/InvoiceUploadJob.cs`, `Services/Invoicing/InvoiceLifecycle.cs`, `Models/Invoice.cs`, `Configuration/AnafSettings.cs`, `Validators/AnafSettingsValidator.cs`, `Migrations/*`, `docs/DEPLOYMENT.md`, `memory-bank/operations/metrics.md` | not needed (both review pre-checks `revised`, adopted) |
 | C — model-versus-plan drift guard | PPW-565 | `Tests/Integration/MigrationChainTests.cs` | not needed (adds one assertion; not trigger-list-shaped) |
 | D — admin manual-Paid invoice race | PPW-564, PPW-567, PPW-568 | `Services/AdminOrderService.cs`, `Controllers/AdminOrdersController.cs`, `Tests/Unit/Services/AdminOrderServicePaidRaceTests.cs`, `Tests/Unit/Services/AdminOrderServiceTests.cs`, `docs/DEPLOYMENT.md`, `memory-bank/operations/metrics.md`, `UI/features/admin/pages/state-machine/admin-state-machine-page.ts` | not needed (PPW-564's review pre-check `revised`, adopted; it settles the whole cluster, exhausted branch included) |
+| E — locker order has no fiscal address | PPW-557 | `Validators/Payments/CreateOrderRequestValidator.cs`, `Services/Invoicing/InvoiceAddressFormatter.cs`, `Services/Invoicing/InvoiceNotBuildableException.cs`, `Services/Invoicing/InvoiceXmlBuilder.cs`, `Services/Invoicing/InvoicePdfRenderer.cs`, `Services/Invoicing/InvoiceLifecycle.cs`, `Services/Invoicing/IInvoiceLifecycle.cs`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs`, `UI/core/services/checkout-state.service.ts`, `UI/features/checkout/pages/delivery-step.ts`, `UI/features/checkout/pages/payment-step.ts`, `docs/DEPLOYMENT.md`, `memory-bank/operations/metrics.md` | new check run (`revised`, folded in) — the review pre-check had refuted the reviewer's approach and the owner then ruled |
 
-Out of scope this round by the driver's decision, untouched: PPW-557 (owner decision pending,
-stays `open`), PPW-561/562/563 (owner must choose the depth; peer work in flight on
-`chore/faster-relational-tests`). Cluster D landed in a later part of the same round, after
-clusters A to C.
+Out of scope this round by the driver's decision, untouched: PPW-561/562/563 (owner must choose
+the depth; peer work in flight on `chore/faster-relational-tests`). Cluster D landed in a later
+part of the same round, after clusters A to C; cluster E later still, once the owner ruled on
+PPW-557.
 
 ## Decisions
 
@@ -211,4 +212,40 @@ every invalid transition answers 400, or that a confirmation email always goes o
   story instruction files are build-time specs rather than maintained references, so left alone.
 - The container-resolution test builds its own `ServiceCollection`: it proves the optional hub
   parameter resolves, not that `Program.cs`'s registration still injects the real hub.
+
+### The owner's ruling closes PPW-557, and its open edge is legal (PPW-557)
+
+Supersedes the block above, which parked the question. The owner delegated the decision; the ruling
+is to collect a real fiscal address before payment, never invent one, never fail silently after the
+charge. Locker checkout now uses the same form, validators and server rules as home delivery — one
+`addressForm`, one `AddAddressRules()` — because a laxer rule set for lockers is the drift that
+caused this; an unbuildable invoice parks `Pending → Failed` through PPW-559's own park transition,
+with a `LastError` saying a retry will not help. The open edge code cannot settle: whether Romanian
+B2C e-invoicing would also accept the locker's own postal address for orders already taken. Plainly
+— **no already-paid locker order is retro-fixed by part 1**; part 2 only makes those rows visible.
+
+### The fresh approach-check revised four things, and guest state forced two (PPW-557)
+
+No address-form *component* exists to reuse: both forms are inline `FormGroup`s colliding on
+`recipientName`/`phone`, so the second was deleted rather than a component extracted.
+`isDeliveryComplete()` only drives a CSS class, so the real gate `canContinue()` changed too, and a
+stale session dead-ended on the payment step where the new 400 reads "check that you have items in
+your cart" — that page now redirects it back, which makes `isDeliveryComplete()` load-bearing. The
+prefill fills city, county, postal code, name and phone but never the street: `SavedAddress` holds
+one `AddressLine` where the form has three fields. `guestSession` is only read and gains no field,
+so its merge is untouched; `fotoTipar_checkout` forced a locker-preserving setter, since the courier
+one nulls the locker, and a gate testing fields, since a stored state restores blanks verbatim.
+
+### Parked from cluster E, including its micro-review (PPW-557)
+
+- No path corrects an order's address, so a parked row is a visible dead end: an admin retry
+  rebuilds, throws and re-parks, once per retry. A correction path is a feature.
+- The address is write-only — `review-step.ts:43`, `OrderService.cs:444`, `AdminOrderService.cs:381`
+  and `OrderEmailService.cs:38` hide it for Easybox, so neither the customer nor an admin triaging a
+  parked invoice reads it back. Four files and one deliberate test to invert.
+- Left alone: `OrderService.cs:156` still defaults a blank snapshot (dead now both branches require
+  one); `OrderToAwbRequestMapper.cs:81` keeps the `"000000"` sentinel, right for Sameday; the
+  redirect is silent; idempotency equality still excludes `ShippingAddress` per ADR-005.
+- `docs/architecture-analysis-2026-05-25.md:310`, `docs/stories/`, `intents/014-payment-hardening`
+  and `bolts/034-shipping-cost-server-side` state the old rule and stay frozen; a backlog row is the owner's call.
 
