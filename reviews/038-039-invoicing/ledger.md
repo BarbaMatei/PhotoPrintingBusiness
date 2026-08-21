@@ -108,7 +108,7 @@ updated: 2026-08-21
 | PPW-566 | 🟠 | v9 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | verified | `f769e22` |
 | PPW-567 | 🟡 | v9 | Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid | `Services/AdminOrderService.cs:417` | verified | `f769e22` |
 | PPW-568 | 🟡 | v9 | Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not | `Services/AdminOrderService.cs:414` | verified | `f769e22` |
-| PPW-569 | 🟡 | v9 | CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded | `Services/Invoicing/PostgresInvoiceNumberingService.cs:46` | fixed | `4d6bc6d` |
+| PPW-569 | 🟡 | v9 | CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded | `Services/Invoicing/PostgresInvoiceNumberingService.cs:46` | verified | `88f5ee6` |
 | PPW-570 | 🟡 | v9 | PostgresTestDatabase contexts omit the split-query behaviour production configures | `Tests/Helpers/PostgresTestDatabase.cs:53` | backlog | `c8d6bb4` |
 | PPW-571 | 🟡 | v9 | PostgresTestDatabase.Dispose clears every Npgsql pool in the process while parallel test classes hold their own databases | `Tests/Helpers/PostgresTestDatabase.cs:99` | backlog | `c8d6bb4` |
 | PPW-572 | 🟡 | v9 | MemoryCacheOnceRegistry.MarkOnce is a non-atomic read-then-write despite promising first-caller-only | `Services/MemoryCacheOnceRegistry.cs:23` | backlog | `c8d6bb4` |
@@ -117,7 +117,7 @@ updated: 2026-08-21
 | PPW-575 | ⚪ | v9 | PostalZone is truncated with the borrowed CityNameMaxLength constant | `Services/Invoicing/InvoiceXmlBuilder.cs:122` | backlog | `c8d6bb4` |
 | PPW-576 | ⚪ | v9 | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `Controllers/InvoicesController.cs:122` | backlog | `c8d6bb4` |
 | PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
-| PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | fixed | `4d6bc6d` |
+| PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | verified | `88f5ee6` |
 
 ## Details
 
