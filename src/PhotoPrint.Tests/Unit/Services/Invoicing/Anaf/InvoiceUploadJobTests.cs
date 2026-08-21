@@ -475,9 +475,9 @@ public class InvoiceUploadJobTests
             "a genuine shutdown must still stop the worker");
     }
 
-    // The 10-minute claim expires two ticks before the 30-minute cooldown lets the row back in, so holding it delayed nothing; the count is what bounds the blind re-posts.
+    // The 10-minute claim expires two ticks before the 30-minute cooldown lets the row back in, so it never delayed the re-post; the count is what bounds the blind re-posts.
     [Fact]
-    public async Task UploadPendingAsync_UploadTimesOut_CountsTheUnknownOutcomeAndReleasesTheClaim()
+    public async Task UploadPendingAsync_UploadTimesOut_CountsTheUnknownOutcomeAndLeavesTheClaimToExpire()
     {
         using var database = new PostgresTestDatabase();
         var logs = new LogCapture();
@@ -496,7 +496,7 @@ public class InvoiceUploadJobTests
         var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
         row.UnknownUploadOutcomes.Should().Be(1, "the row has to remember that ANAF may already hold this number");
         row.LastError.Should().NotBeNullOrEmpty();
-        row.ClaimedAt.Should().BeNull("a claim nobody reads by the time the row returns is not a hold");
+        row.ClaimedAt.Should().NotBeNull("the claim keeps a second replica out of a row whose ANAF answer nobody has yet");
     }
 
     // A timeout may already have filed this invoice number, so re-posting it every hour forever is a duplicate-filing machine.

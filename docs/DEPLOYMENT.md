@@ -1372,6 +1372,7 @@ Anaf__CertPassword=<from-provider-sms>
 Anaf__PollIntervalMinutes=30
 Anaf__MaxBatchSize=50
 Anaf__ClaimTtlMinutes=10
+Anaf__MaxUnknownUploadOutcomes=3
 Anaf__BackoffHours__0=1
 Anaf__BackoffHours__1=4
 Anaf__BackoffHours__2=16

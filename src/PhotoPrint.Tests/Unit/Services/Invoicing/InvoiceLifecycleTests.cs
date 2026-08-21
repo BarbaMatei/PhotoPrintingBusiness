@@ -174,6 +174,55 @@ public class InvoiceLifecycleTests : IDisposable
         fresh.PdfStoragePath.Should().Be("invoices/2026/FT-2026-00001.pdf");
     }
 
+    [Fact]
+    public async Task RecordUnknownUploadOutcome_below_the_budget_counts_and_stays_Pending()
+    {
+        var id = await SeedInvoiceAsync(InvoiceAnafStatus.Pending);
+
+        var outcome = await _sut.RecordUnknownUploadOutcomeAsync(
+            id, "no answer", "budget spent", maxOutcomes: 3, CancellationToken.None);
+
+        outcome.Should().Be(new UnknownUploadOutcome(1, false));
+        var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
+        fresh.AnafStatus.Should().Be(InvoiceAnafStatus.Pending);
+        fresh.LastError.Should().Be("no answer");
+    }
+
+    [Fact]
+    public async Task RecordUnknownUploadOutcome_at_the_budget_parks_the_row_and_drops_its_claim()
+    {
+        var id = await SeedInvoiceAsync(InvoiceAnafStatus.Pending);
+        await _db.Invoices.Where(i => i.Id == id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.UnknownUploadOutcomes, 2)
+                .SetProperty(i => i.ClaimedAt, (DateTimeOffset?)_now));
+
+        var outcome = await _sut.RecordUnknownUploadOutcomeAsync(
+            id, "no answer", "budget spent", maxOutcomes: 3, CancellationToken.None);
+
+        outcome.Should().Be(new UnknownUploadOutcome(3, true));
+        var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
+        fresh.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+        fresh.LastError.Should().Be("budget spent");
+        fresh.ClaimedAt.Should().BeNull("a parked row is nobody's to hold");
+    }
+
+    // The upload runs outside any transaction, so an admin retry or another worker can move the row while it is in flight.
+    [Fact]
+    public async Task RecordUnknownUploadOutcome_on_a_row_that_left_Pending_counts_nothing()
+    {
+        var id = await SeedInvoiceAsync(InvoiceAnafStatus.Submitted);
+
+        var outcome = await _sut.RecordUnknownUploadOutcomeAsync(
+            id, "no answer", "budget spent", maxOutcomes: 3, CancellationToken.None);
+
+        outcome.Should().Be(new UnknownUploadOutcome(0, false));
+        var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
+        fresh.AnafStatus.Should().Be(InvoiceAnafStatus.Submitted);
+        fresh.UnknownUploadOutcomes.Should().Be(0);
+        fresh.LastError.Should().BeNull("a row that moved on must not be relabelled by a stale upload");
+    }
+
     // Without the reset an operator's retry of a parked row would be parked again on its first tick.
     [Fact]
     public async Task Retry_clears_the_blind_repost_budget()

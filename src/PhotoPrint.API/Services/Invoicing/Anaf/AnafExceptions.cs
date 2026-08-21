@@ -29,11 +29,6 @@ public sealed class AnafUploadException : Exception
     }
 }
 
-/// <summary>
-/// Thrown when ANAF is unreachable (network failure, 5xx after the Polly
-/// retry budget is exhausted, request timeout). The worker logs and exits
-/// the per-row dispatch; the next tick retries on the natural schedule.
-/// </summary>
 /// <summary>An upload whose outcome is unknown: ANAF may have accepted the XML and merely answered too slowly.</summary>
 public sealed class AnafUploadTimeoutException : Exception
 {

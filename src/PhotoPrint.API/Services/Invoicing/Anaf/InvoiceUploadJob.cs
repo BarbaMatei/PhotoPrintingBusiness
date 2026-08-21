@@ -354,14 +354,19 @@ public sealed class InvoiceUploadJob : BackgroundService
                     "anaf.upload-job.blind-repost-budget-spent invoice_id={InvoiceId} outcomes={Outcomes} max={Max} — parked as Failed, reconcile the invoice number in ANAF SPV",
                     invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
             }
+            else if (outcome.Outcomes == 0)
+            {
+                _logger.LogWarning(ex,
+                    "anaf.upload-job.upload-outcome-unknown-not-recorded invoice_id={InvoiceId} — the row left Pending while the upload was in flight",
+                    invoiceId);
+            }
             else
             {
                 _logger.LogError(ex,
                     "anaf.upload-job.upload-outcome-unknown invoice_id={InvoiceId} outcomes={Outcomes} max={Max}",
                     invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
             }
-
-            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+            // The claim is left to expire: it delays no tick — the per-row cooldown does that — but it does keep a second replica out of a row whose ANAF answer nobody has. Parking clears it.
         }
         // AnafAuthException propagates to the batch loop's catch — the claim just holds through its TTL.
     }

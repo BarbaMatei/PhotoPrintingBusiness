@@ -139,6 +139,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
             .ExecuteUpdateAsync(s => s
                 .SetProperty(i => i.AnafStatus, InvoiceAnafStatus.Failed)
                 .SetProperty(i => i.LastError,  (string?)budgetSpentMessage)
+                .SetProperty(i => i.ClaimedAt,  (DateTimeOffset?)null)
                 .SetProperty(i => i.UpdatedAt,  (DateTimeOffset?)now),
                 ct);
 
