@@ -161,7 +161,7 @@ public class AdminOrderService : IAdminOrderService
         // The order is still awaiting payment, so a 200 carrying a Paid-looking DTO would tell the admin the opposite of what happened.
         if (paidOutcome == PaidSaveOutcome.NumberExhausted)
             throw new ConflictException(
-                $"Order {order.OrderNumber} was not marked Paid: no invoice number could be allocated. The order is unchanged — retry once the numbering collision clears.");
+                $"Comanda {order.OrderNumber} nu a fost marcată ca plătită: nu s-a putut aloca un număr de factură. Comanda a rămas neschimbată — reîncearcă după verificarea seriei de facturare.");
 
         // Cumulative histogram: a shipment that never committed can never be un-observed.
         if (processingSeconds is { } seconds)
@@ -171,9 +171,9 @@ public class AdminOrderService : IAdminOrderService
             _orderEmailService.FireOrderShippedEmail(order);
         else if (newStatus == OrderStatus.Delivered)
             _orderEmailService.FireOrderDeliveredEmail(order);
-        else if (newStatus == OrderStatus.Paid && paidOutcome != PaidSaveOutcome.AlreadyInvoiced)
+        else if (newStatus == OrderStatus.Paid && paidOutcome is null or PaidSaveOutcome.Created)
         {
-            // The delivery that invoiced this order already sent both, and a second confirmation email cannot be unsent.
+            // Gated positively: a delivery that invoiced this order already sent both, and a second confirmation email cannot be unsent.
             _orderEmailService.FireOrderConfirmedEmail(order);
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
         }
@@ -433,8 +433,8 @@ public class AdminOrderService : IAdminOrderService
             var invoice = await _invoiceCreator.CreateForOrderAsync(order, ct);
 
             // The creation service's existence query returns a winner's committed row as an unchanged entity, so this window throws nothing to catch.
-            if (invoice is not null && _db.Entry(invoice).State != EntityState.Added)
-                return await AbandonToWinnerAsync(order, ct);
+            if (invoice is not null && _db.Entry(invoice).State == EntityState.Unchanged)
+                return await AbandonToWinnerAsync(order, "pre-insert", ct);
 
             try
             {
@@ -444,9 +444,7 @@ public class AdminOrderService : IAdminOrderService
             catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsOrderIdViolation(ex))
             {
                 if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
-                _logger.LogInformation(
-                    "admin.order.invoice-already-created order_id={OrderId}", order.Id);
-                return await AbandonToWinnerAsync(order, ct);
+                return await AbandonToWinnerAsync(order, "unique-index", ct);
             }
             catch (DbUpdateException ex) when (attempt < maxNumberRetries && InvoiceUniqueViolation.IsNumberViolation(ex))
             {
@@ -472,9 +470,22 @@ public class AdminOrderService : IAdminOrderService
     }
 
     // A reload, not a second save: saving here would commit the admin's own PaidAt over the one the winner's invoice was issued against.
-    private async Task<PaidSaveOutcome> AbandonToWinnerAsync(Order order, CancellationToken ct)
+    private async Task<PaidSaveOutcome> AbandonToWinnerAsync(Order order, string window, CancellationToken ct)
     {
-        await _db.Entry(order).ReloadAsync(ct);
+        _logger.LogInformation(
+            "admin.order.invoice-already-created order_id={OrderId} window={Window}", order.Id, window);
+
+        // Swallowed like the rollback's: a lost race is a benign outcome, and a failing reload here would turn it into a 500 plus a Sentry capture for an order that is Paid.
+        try
+        {
+            await _db.Entry(order).ReloadAsync(ct);
+        }
+        catch (Exception reloadEx)
+        {
+            _logger.LogWarning(reloadEx,
+                "admin.order.abandon-reload-failed order_id={OrderId}", order.Id);
+        }
+
         return PaidSaveOutcome.AlreadyInvoiced;
     }
 

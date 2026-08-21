@@ -129,7 +129,8 @@ public class AdminOrderServicePaidRaceTests : IDisposable
             RealCreator(db, new FixedNumbering(901)),
             () => CommitWebhookWinner(orderId, 900),
             beforeTheExistenceQuery: true);
-        var sut = BuildService(db, creator);
+        var logs = new LogCapture();
+        var sut = BuildService(db, creator, logs.LoggerFor<AdminOrderService>());
 
         var dto = await sut.UpdateStatusAsync(orderId, "Paid", null, null);
 
@@ -145,6 +146,10 @@ public class AdminOrderServicePaidRaceTests : IDisposable
         _clientProxy.Verify(
             c => c.SendCoreAsync("OrderStatusChanged", It.IsAny<object[]>(), It.IsAny<CancellationToken>()),
             Times.Once, "the board still has to learn the order moved");
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("admin.order.invoice-already-created", StringComparison.Ordinal) &&
+                 r.Message.Contains("window=pre-insert"),
+            "the window that throws nothing is the one with no other trace");
     }
 
     [Fact]
@@ -157,7 +162,8 @@ public class AdminOrderServicePaidRaceTests : IDisposable
             RealCreator(db, new FixedNumbering(901)),
             () => CommitWebhookWinner(orderId, 900),
             beforeTheExistenceQuery: false);
-        var sut = BuildService(db, creator);
+        var logs = new LogCapture();
+        var sut = BuildService(db, creator, logs.LoggerFor<AdminOrderService>());
 
         await sut.UpdateStatusAsync(orderId, "Paid", null, null);
 
@@ -168,6 +174,33 @@ public class AdminOrderServicePaidRaceTests : IDisposable
         invoices.Should().ContainSingle();
         invoices[0].Number.Should().Be(900, "the loser's invoice must not replace the committed one");
         invoices[0].IssuedAt.Should().Be(order.PaidAt!.Value);
+        AssertNoPaidSideEffects();
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("admin.order.invoice-already-created", StringComparison.Ordinal) &&
+                 r.Message.Contains("window=unique-index"));
+    }
+
+    // Losing the race is a benign outcome, so a failing reload must not escalate it into a 500 for an order that really is Paid.
+    [Fact]
+    public async Task ManualPaid_WhenTheAbandonReloadFails_StillSuppressesTheSideEffects()
+    {
+        var orderId = await SeedAwaitingPaymentAsync();
+
+        using var db = _database.NewContext();
+        using var cts = new CancellationTokenSource();
+        var creator = new RaceInjectingCreator(
+            RealCreator(db, new FixedNumbering(903)),
+            () => CommitWebhookWinner(orderId, 902),
+            beforeTheExistenceQuery: true);
+        var logs = new LogCapture();
+        var logger = new CancellingLogger(logs, "admin.order.invoice-already-created", cts);
+        var sut = BuildService(db, creator, logger);
+
+        var dto = await sut.UpdateStatusAsync(orderId, "Paid", null, null, cts.Token);
+
+        dto.Should().NotBeNull();
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("admin.order.abandon-reload-failed", StringComparison.Ordinal));
         AssertNoPaidSideEffects();
     }
 
