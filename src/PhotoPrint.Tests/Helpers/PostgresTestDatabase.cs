@@ -321,7 +321,11 @@ public class PostgresTestDatabase : IDisposable
         var root = Path.GetDirectoryName(typeof(PostgresTestDatabase).Assembly.Location)
                    ?? Environment.CurrentDirectory;
 
-        return _salt = Hash(root, 8);
+        // Normalised: the same directory reached as d:\… and D:/… would otherwise salt two pools,
+        // doubling the databases and leaving each one's sweep blind to the other.
+        var normalised = Path.GetFullPath(root).Replace('\\', '/').TrimEnd('/').ToLowerInvariant();
+
+        return _salt = Hash(normalised, 8);
     }
 
     private static string Fingerprint(string adminConnectionString)
