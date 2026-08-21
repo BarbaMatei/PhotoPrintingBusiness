@@ -372,8 +372,7 @@ public class WebhooksControllerMetricsTests
         persisted.PaidAt.Should().BeNull();
     }
 
-    // Only classified outcomes used to reach the metric; anything else escaped first, so a charged
-    // customer vanished from the payment SLO entirely.
+    // An unclassified failure used to escape before the metric, dropping a charged customer out of the SLO.
     [Fact]
     public async Task Stripe_succeeded_when_invoice_creation_fails_unclassified_still_records_the_webhook()
     {
