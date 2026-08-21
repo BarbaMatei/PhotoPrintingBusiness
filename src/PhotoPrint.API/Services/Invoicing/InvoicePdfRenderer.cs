@@ -16,6 +16,9 @@ public sealed class InvoicePdfRenderer : IInvoicePdfRenderer
         ArgumentNullException.ThrowIfNull(invoice);
         ArgumentNullException.ThrowIfNull(seller);
 
+        // Not inside the document tree: QuestPDF wraps anything thrown in compose, and the worker keys parking on this type.
+        InvoiceAddressFormatter.EnsureBuyerAddressUsable(order);
+
         var doc = new InvoicePdfDocument(order, invoice, seller);
         return doc.GeneratePdf();
     }

@@ -38,8 +38,10 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
         ArgumentNullException.ThrowIfNull(seller);
 
         if (order.Items.Count == 0)
-            throw new InvalidOperationException(
+            throw new InvoiceNotBuildableException(
                 $"Cannot build invoice {invoice.InvoiceNumber}: order has no items.");
+
+        InvoiceAddressFormatter.EnsureBuyerAddressUsable(order);
 
         var doc = new XDocument(
             new XDeclaration("1.0", "UTF-8", null),
@@ -112,26 +114,13 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                 : (order.ShippingAddress?.RecipientName ?? GuestBuyerName);
         var buyerName = InvoiceAddressFormatter.Truncate(rawBuyerName, InvoiceAddressFormatter.PartyNameMaxLength);
 
-        var addr = order.ShippingAddress ?? throw new InvalidOperationException(
-            "Order is missing ShippingAddress; cannot build invoice.");
+        var addr = order.ShippingAddress!;
 
         var streetName = InvoiceAddressFormatter.Truncate(
             InvoiceAddressFormatter.FormatStreetName(addr.Street, addr.Number, addr.Block),
             InvoiceAddressFormatter.StreetNameMaxLength);
         var cityName = InvoiceAddressFormatter.Truncate(addr.City, InvoiceAddressFormatter.CityNameMaxLength);
         var postalZone = InvoiceAddressFormatter.Truncate(addr.PostalCode, InvoiceAddressFormatter.CityNameMaxLength);
-
-        // A locker order records only a contact snapshot, so nothing here can supply the buyer address these mandatory elements need.
-        var missing = new[]
-        {
-            streetName.Length == 0 ? "StreetName" : null,
-            cityName.Length   == 0 ? "CityName"   : null,
-            postalZone.Length == 0 ? "PostalZone" : null,
-        }.Where(f => f is not null);
-        if (missing.Any())
-            throw new InvalidOperationException(
-                $"Order {order.OrderNumber} has no buyer address: {string.Join(", ", missing)} would be empty, " +
-                "and all three are mandatory. A locker order records only a contact snapshot.");
 
         var party = new XElement(Cac + "Party",
             new XElement(Cac + "PartyName",

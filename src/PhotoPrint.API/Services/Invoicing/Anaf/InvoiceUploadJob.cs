@@ -293,6 +293,17 @@ public sealed class InvoiceUploadJob : BackgroundService
                 await notifier.NotifyAsync(invoice, order!, ct);
             }
         }
+        catch (InvoiceNotBuildableException ex)
+        {
+            // No retry can repair the order behind it, so re-attempting only hides a paid order behind a permanent 404.
+            var parked = await lifecycle.ParkUnbuildableAsync(invoiceId, NotBuildableMessage(ex), ct);
+            if (parked) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+            _logger.LogError(ex,
+                "anaf.upload-job.not-buildable invoice_id={InvoiceId} order_id={OrderId} parked={Parked} — retrying repeats this failure until the order data is corrected",
+                invoiceId, orderId, parked);
+            if (!parked) await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+            return;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Otherwise a bad snapshot loops silently forever: no LastError, no claim release, no admin-visible signal.
@@ -370,6 +381,10 @@ public sealed class InvoiceUploadJob : BackgroundService
         }
         // AnafAuthException propagates to the batch loop's catch — the claim just holds through its TTL.
     }
+
+    private static string NotBuildableMessage(InvoiceNotBuildableException ex) =>
+        $"Invoice cannot be built and will not be retried: {ex.Message} " +
+        "Retrying repeats the same failure until the order's own data is corrected.";
 
     private string BudgetSpentMessage(AnafUploadTimeoutException ex) =>
         $"{ex.Message} {_maxUnknownUploadOutcomes} attempts ended without an answer, so no further upload will be made: reconcile this invoice number in ANAF SPV, then retry the invoice.";

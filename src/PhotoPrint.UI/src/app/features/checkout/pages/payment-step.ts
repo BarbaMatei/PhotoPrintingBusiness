@@ -159,6 +159,11 @@ export class PaymentStep implements OnInit {
   private clientSecret: string | null = null;
 
   ngOnInit(): void {
+    // Without this a stale session posts a blank address and the 400 surfaces here as "check your cart".
+    if (!this.checkoutState.isDeliveryComplete()) {
+      this.router.navigate(['/checkout/livrare']);
+      return;
+    }
     this.initStripe();
   }
 

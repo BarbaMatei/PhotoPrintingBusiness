@@ -20,23 +20,10 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
             RuleFor(x => x.EasyboxLockerId).NotNull()
                 .WithMessage("Locker ID is required for Easybox delivery");
 
-            // The locker supplies the address, but Sameday still needs a person +
-            // phone to notify — captured on the Easybox checkout step.
             RuleFor(x => x.ShippingAddress).NotNull()
-                .WithMessage("Recipient name and phone are required for Easybox delivery");
+                .WithMessage("Shipping address is required for Easybox delivery");
 
-            When(x => x.ShippingAddress != null, () =>
-            {
-                AddRecipientRules();
-                // The invoice XML always embeds ShippingAddress as the buyer's postal address, regardless of delivery type.
-                RuleFor(x => x.ShippingAddress!.Street).MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.Number).MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.City).MaximumLength(InvoiceAddressFormatter.CityNameMaxLength).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.County).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.PostalCode).MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
-                AddCombinedStreetNameRule();
-            });
+            When(x => x.ShippingAddress != null, AddAddressRules);
         });
 
         When(x => x.DeliveryType == DeliveryType.Courier, () =>
@@ -44,18 +31,21 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
             RuleFor(x => x.ShippingAddress).NotNull()
                 .WithMessage("Shipping address is required for courier delivery");
 
-            When(x => x.ShippingAddress != null, () =>
-            {
-                AddRecipientRules();
-                RuleFor(x => x.ShippingAddress!.Street).NotEmpty().MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.Number).NotEmpty().MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(InvoiceAddressFormatter.CityNameMaxLength).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.County).NotEmpty().MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
-                RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty().MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
-                AddCombinedStreetNameRule();
-            });
+            When(x => x.ShippingAddress != null, AddAddressRules);
         });
+    }
+
+    // One rule set both ways: the invoice embeds this as the buyer's address, so a laxer set for lockers cannot be invoiced.
+    private void AddAddressRules()
+    {
+        AddRecipientRules();
+        RuleFor(x => x.ShippingAddress!.Street).NotEmpty().MaximumLength(255).Must(TextValidation.HasNoXmlInvalidChars);
+        RuleFor(x => x.ShippingAddress!.Number).NotEmpty().MaximumLength(50).Must(TextValidation.HasNoXmlInvalidChars);
+        RuleFor(x => x.ShippingAddress!.Block).MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+        RuleFor(x => x.ShippingAddress!.City).NotEmpty().MaximumLength(InvoiceAddressFormatter.CityNameMaxLength).Must(TextValidation.HasNoXmlInvalidChars);
+        RuleFor(x => x.ShippingAddress!.County).NotEmpty().MaximumLength(100).Must(TextValidation.HasNoXmlInvalidChars);
+        RuleFor(x => x.ShippingAddress!.PostalCode).NotEmpty().MaximumLength(20).Must(TextValidation.HasNoXmlInvalidChars);
+        AddCombinedStreetNameRule();
     }
 
     private void AddCombinedStreetNameRule() =>

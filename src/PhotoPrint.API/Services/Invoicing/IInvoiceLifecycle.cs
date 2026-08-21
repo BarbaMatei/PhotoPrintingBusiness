@@ -46,6 +46,9 @@ public interface IInvoiceLifecycle
         Guid invoiceId, string errorMessage, string budgetSpentMessage, int maxOutcomes,
         CancellationToken ct = default);
 
+    /// <summary>Pending → Failed for an invoice no retry can build, so it stops being re-attempted.</summary>
+    Task<bool> ParkUnbuildableAsync(Guid invoiceId, string reason, CancellationToken ct = default);
+
     /// <summary>Rejected|Failed → Pending on an admin retry.
     /// Clears <c>AnafUploadId</c>, <c>LastError</c> and the blind re-post count.</summary>
     Task<bool> RetryAsync(Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default);

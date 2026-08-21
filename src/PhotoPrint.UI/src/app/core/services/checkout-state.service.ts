@@ -27,7 +27,7 @@ export class CheckoutStateService {
   }
 
   setLocker(locker: LockerDto): void {
-    // Keep any Easybox contact already entered — only switching delivery method resets it.
+    // Keep any Easybox address already entered — only switching delivery method resets it.
     this.patch({ lockerId: locker.id, lockerName: locker.name });
   }
 
@@ -35,26 +35,24 @@ export class CheckoutStateService {
     this.patch({ shippingAddress: address, lockerId: null, lockerName: null });
   }
 
-  /** Easybox recipient contact: the locker supplies the address, so the address
-   *  fields are blank, but the locker selection is preserved. */
-  setEasyboxContact(contact: { recipientName: string; phone: string }): void {
-    const address: ShippingAddressForm = {
-      street: '', number: '', block: '', city: '', county: '', postalCode: '',
-      recipientName: contact.recipientName, phone: contact.phone,
-    };
+  // Unlike the courier setter, this keeps the locker: the parcel goes there, the invoice needs the address.
+  setEasyboxAddress(address: ShippingAddressForm): void {
     this.patch({ shippingAddress: address });
   }
 
   isDeliveryComplete(): boolean {
     const s = this.state$$.value;
     if (!s.method) return false;
-    // Easybox needs the locker AND the recipient contact (set by setEasyboxContact
-    // on Continue) — otherwise the stepper would unlock payment before the contact
-    // exists and the order would 400 server-side.
-    if (s.method === 'Easybox') {
-      return !!s.lockerId && !!s.shippingAddress?.recipientName && !!s.shippingAddress?.phone;
-    }
-    return !!s.shippingAddress;
+    if (s.method === 'Easybox') return !!s.lockerId && this.hasFiscalAddress();
+    return this.hasFiscalAddress();
+  }
+
+  // A session stored before the address was collected restores blank fields, so the object being present is not enough.
+  private hasFiscalAddress(): boolean {
+    const a = this.state$$.value.shippingAddress;
+    if (!a) return false;
+    return [a.street, a.number, a.city, a.county, a.postalCode, a.recipientName, a.phone]
+      .every(v => !!v && v.trim().length > 0);
   }
 
   reset(): void {

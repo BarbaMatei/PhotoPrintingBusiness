@@ -72,7 +72,7 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | `accepted` | ANAF SPV accepted the e-Factura submission |
 | `rejected` | ANAF SPV returned a rejection (must be corrected and resubmitted) |
 | `pending` | Awaiting ANAF processing |
-| `failed` | The submission gave up: ANAF rejected it past the backoff budget, or a `Pending` upload spent its blind re-post budget (`Anaf:MaxUnknownUploadOutcomes`) after repeated unknown outcomes and was parked for manual SPV reconciliation |
+| `failed` | The submission gave up: ANAF rejected it past the backoff budget, a `Pending` upload spent its blind re-post budget (`Anaf:MaxUnknownUploadOutcomes`) after repeated unknown outcomes and was parked for manual SPV reconciliation, or the invoice could not be built at all from the order as recorded (no buyer address, no items) and was parked on the first attempt — that last case never reaches ANAF, so it counts here without a matching `pending` |
 
 ## Auto-instrumented metrics
 

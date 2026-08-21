@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { Subject } from 'rxjs';
 import { vi } from 'vitest';
@@ -38,6 +38,7 @@ describe('PaymentStep', () => {
     const mockState = {
       snapshot: DELIVERY_STATE,
       reset: vi.fn(),
+      isDeliveryComplete: vi.fn().mockReturnValue(true),
     };
     const mockCart = {
       clearCart: vi.fn().mockReturnValue(new Subject()),
@@ -83,5 +84,21 @@ describe('PaymentStep', () => {
     const fixture = createFixture();
     const paymentService = TestBed.inject(PaymentService) as unknown as { createStripeIntent: ReturnType<typeof vi.fn> };
     expect(paymentService.createStripeIntent).toBeDefined();
+  });
+
+  it('sends an incomplete delivery state back to the delivery step instead of posting it', () => {
+    const state = TestBed.inject(CheckoutStateService) as unknown as {
+      isDeliveryComplete: ReturnType<typeof vi.fn>;
+    };
+    state.isDeliveryComplete.mockReturnValue(false);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const paymentService = TestBed.inject(PaymentService) as unknown as {
+      createStripeIntent: ReturnType<typeof vi.fn>;
+    };
+
+    createFixture();
+
+    expect(navigate).toHaveBeenCalledWith(['/checkout/livrare']);
+    expect(paymentService.createStripeIntent).not.toHaveBeenCalled();
   });
 });

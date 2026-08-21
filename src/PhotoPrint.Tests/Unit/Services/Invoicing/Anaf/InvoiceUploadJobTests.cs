@@ -95,7 +95,8 @@ public class InvoiceUploadJobTests
         PostgresTestDatabase database, bool cloudEnabled,
         LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
         TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false,
-        AnafOutageRegistry? outages = null, int pollIntervalMinutes = 30)
+        AnafOutageRegistry? outages = null, int pollIntervalMinutes = 30,
+        bool realXmlBuilder = false)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -119,7 +120,11 @@ public class InvoiceUploadJobTests
 
         var services = new ServiceCollection();
         services.AddScoped(_ => CreateDb(database, sqlLog));
-        services.AddScoped(_ => xmlBuilder.Object);
+        // A mocked builder cannot show which failures are permanent, so tests about parking use the real one.
+        if (realXmlBuilder)
+            services.AddScoped<IInvoiceXmlBuilder>(_ => new InvoiceXmlBuilder());
+        else
+            services.AddScoped(_ => xmlBuilder.Object);
         services.AddScoped(_ => pdfRenderer.Object);
         services.AddScoped(_ => router.Object);
         services.AddScoped(_ => anafClient.Object);
@@ -188,6 +193,93 @@ public class InvoiceUploadJobTests
         seed.Invoices.Add(invoice);
         seed.SaveChanges();
         return (orderId, invoiceId);
+    }
+
+    // A parcel-locker checkout used to send a contact-only snapshot, so these orders exist already paid.
+    private static (Guid orderId, Guid invoiceId) SeedLockerOrderWithNoBuyerAddress(
+        PostgresTestDatabase database)
+    {
+        var orderId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        using var seed = CreateDb(database);
+
+        var product = new Product { Id = Guid.NewGuid(), Name = "Foto 10x15" };
+        var upload = new Upload { Id = Guid.NewGuid(), GuestSessionId = Guid.NewGuid() };
+        seed.Products.Add(product);
+        seed.Uploads.Add(upload);
+
+        var order = MakeOrder(orderId);
+        order.DeliveryType = DeliveryType.Easybox;
+        order.ShippingAddress = new ShippingAddressSnapshot
+        {
+            RecipientName = "Ana Pop", Phone = "0712345678",
+            Street = "", Number = "", City = "", County = "", PostalCode = "",
+        };
+        order.SubtotalRon = 21m;
+        order.TotalRon = 21m;
+        order.Items = new List<OrderItem>
+        {
+            new()
+            {
+                Quantity = 3, UnitPriceRon = 7m, LineTotalRon = 21m,
+                ProductId = product.Id, UploadId = upload.Id,
+                ProductSnapshot = new ProductSnapshot
+                {
+                    ProductName = "Foto 10x15", Size = "10x15", Finish = "Lucios",
+                },
+            },
+        };
+        seed.Orders.Add(order);
+
+        var invoice = MakeInvoice(orderId, xmlPayload: null);
+        invoice.Id = invoiceId;
+        invoice.Number = Interlocked.Increment(ref _seedNumber);
+        invoice.InvoiceNumber = $"FT-2026-{invoice.Number:D5}";
+        invoice.AnafStatus = InvoiceAnafStatus.Pending;
+        seed.Invoices.Add(invoice);
+
+        seed.SaveChanges();
+        return (orderId, invoiceId);
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_OrderCarriesNoBuyerAddress_ParksTheRowInsteadOfRebuildingForEver()
+    {
+        using var database = OpenDatabase();
+        var (_, invoiceId) = SeedLockerOrderWithNoBuyerAddress(database);
+        var h = Build(database, cloudEnabled: false, realLifecycle: true, realXmlBuilder: true);
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var db = CreateDb(database);
+        var row = await db.Invoices.AsNoTracking().FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+        row.LastError.Should().Contain("cannot be built");
+        row.LastError.Should().Contain("buyer address");
+        // Parking has to clear the claim, or the admin retry lands on a row a replica still owns.
+        row.ClaimedAt.Should().BeNull();
+        h.AnafClient.Verify(
+            c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_ParkedForNoBuyerAddress_IsNotPickedUpAgainOnTheNextTick()
+    {
+        using var database = OpenDatabase();
+        var (_, invoiceId) = SeedLockerOrderWithNoBuyerAddress(database);
+        var h = Build(database, cloudEnabled: false, realLifecycle: true, realXmlBuilder: true);
+
+        await InvokeProcessBatchAsync(h.Job);
+        using var afterFirst = CreateDb(database);
+        var parked = await afterFirst.Invoices.AsNoTracking().FirstAsync(i => i.Id == invoiceId);
+        var parkedAt = parked.UpdatedAt;
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var db = CreateDb(database);
+        var row = await db.Invoices.AsNoTracking().FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+        row.UpdatedAt.Should().Be(parkedAt);
     }
 
     [Fact]

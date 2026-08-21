@@ -119,4 +119,20 @@ public class InvoicePdfRendererTests
         var act = () => new InvoicePdfRenderer().Render(order, invoice, null!);
         act.Should().Throw<ArgumentNullException>();
     }
+
+    // QuestPDF wraps anything thrown inside compose, so this refusal has to happen before the document is built.
+    [Fact]
+    public void A_missing_buyer_address_is_refused_as_not_buildable()
+    {
+        var (order, invoice) = Fixture();
+        order.ShippingAddress = new ShippingAddressSnapshot
+        {
+            RecipientName = "Ana Pop", Phone = "0712345678",
+            Street = "", Number = "", City = "", County = "", PostalCode = "",
+        };
+
+        var act = () => new InvoicePdfRenderer().Render(order, invoice, Seller());
+
+        act.Should().Throw<InvoiceNotBuildableException>();
+    }
 }

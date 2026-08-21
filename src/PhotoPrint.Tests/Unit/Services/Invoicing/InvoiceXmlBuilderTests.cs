@@ -359,6 +359,34 @@ public class InvoiceXmlBuilderTests
             .WithMessage("*mandatory*");
     }
 
+    // The worker keys its parking on this type: a plain InvalidOperationException keeps retrying.
+    [Fact]
+    public void A_missing_buyer_address_is_refused_as_not_buildable()
+    {
+        var (order, invoice) = Fixture();
+        order.DeliveryType = DeliveryType.Easybox;
+        order.ShippingAddress = new ShippingAddressSnapshot
+        {
+            RecipientName = "Ana Pop", Phone = "0712345678",
+            Street = "", Number = "", City = "", County = "", PostalCode = "",
+        };
+
+        var act = () => new InvoiceXmlBuilder().Build(order, invoice, Seller());
+
+        act.Should().Throw<InvoiceNotBuildableException>();
+    }
+
+    [Fact]
+    public void An_order_with_no_items_is_refused_as_not_buildable_too()
+    {
+        var (order, invoice) = Fixture();
+        order.Items.Clear();
+
+        var act = () => new InvoiceXmlBuilder().Build(order, invoice, Seller());
+
+        act.Should().Throw<InvoiceNotBuildableException>();
+    }
+
     [Fact]
     public void A_complete_address_still_builds()
     {

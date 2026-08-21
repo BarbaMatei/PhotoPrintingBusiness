@@ -74,14 +74,25 @@ public class CreateOrderRequestValidatorTests
         Street = "", Number = "", City = "", County = "", PostalCode = "",
     };
 
+    private static ShippingAddressSnapshot EasyboxAddress()
+    {
+        var addr = EasyboxContact();
+        addr.Street = "Str. Test";
+        addr.Number = "1";
+        addr.City = "București";
+        addr.County = "Ilfov";
+        addr.PostalCode = "010101";
+        return addr;
+    }
+
     [Fact]
-    public void Easybox_WithLockerAndContact_Passes()
+    public void Easybox_WithLockerAndFullAddress_Passes()
     {
         var request = new CreateOrderRequest(
             PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(),
-            ShippingAddress: EasyboxContact());
+            ShippingAddress: EasyboxAddress());
 
         var result = _sut.TestValidate(request);
         result.IsValid.Should().BeTrue();
@@ -100,9 +111,24 @@ public class CreateOrderRequestValidatorTests
     }
 
     [Fact]
-    public void Easybox_WithBlankPhone_FailsOnPhone()
+    public void Easybox_WithABlankFiscalAddress_FailsOnStreetCityAndPostalCode()
     {
         var contact = EasyboxContact();
+
+        var request = new CreateOrderRequest(
+            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
+
+        var result = _sut.TestValidate(request);
+        result.ShouldHaveValidationErrorFor("ShippingAddress.Street");
+        result.ShouldHaveValidationErrorFor("ShippingAddress.City");
+        result.ShouldHaveValidationErrorFor("ShippingAddress.PostalCode");
+    }
+
+    [Fact]
+    public void Easybox_WithBlankPhone_FailsOnPhone()
+    {
+        var contact = EasyboxAddress();
         contact.Phone = "";
 
         var request = new CreateOrderRequest(

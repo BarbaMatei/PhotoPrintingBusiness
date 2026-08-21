@@ -23,7 +23,8 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         ShippingAddress: new PhotoPrint.API.Models.ShippingAddressSnapshot
         {
             RecipientName = "Test", Phone = "0700000000",
-            Street = "", Number = "", City = "", County = "", PostalCode = "",
+            Street = "Str. Test", Number = "1", City = "Cluj-Napoca",
+            County = "Cluj", PostalCode = "400100",
         });
 
     private static readonly CreateOrderRequest EuPlatescRequest = new(
@@ -316,7 +317,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
               "paymentProcessor": 0,
               "deliveryType": 0,
               "easyboxLockerId": "{{Guid.NewGuid()}}",
-              "shippingAddress": { "recipientName": "Test", "phone": "0700000000", "street": "", "number": "", "city": "", "county": "", "postalCode": "" },
+              "shippingAddress": { "recipientName": "Test", "phone": "0700000000", "street": "Str. Test", "number": "1", "city": "Cluj-Napoca", "county": "Cluj", "postalCode": "400100" },
               "shippingCostRon": -100
             }
             """;

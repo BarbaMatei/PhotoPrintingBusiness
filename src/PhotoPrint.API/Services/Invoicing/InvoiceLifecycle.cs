@@ -134,18 +134,29 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
 
         if (outcomes < maxOutcomes) return new UnknownUploadOutcome(outcomes, false);
 
+        return new UnknownUploadOutcome(
+            outcomes,
+            await ParkPendingAsFailedAsync(invoiceId, budgetSpentMessage, now, ct));
+    }
+
+    public Task<bool> ParkUnbuildableAsync(
+        Guid invoiceId, string reason, CancellationToken ct = default) =>
+        ParkPendingAsFailedAsync(invoiceId, reason, _clock.GetUtcNow(), ct);
+
+    // Failed is the only state the admin retry endpoint accepts, and the claim must go with it or that retry hits a claimed row.
+    private async Task<bool> ParkPendingAsFailedAsync(
+        Guid invoiceId, string reason, DateTimeOffset now, CancellationToken ct)
+    {
         var parked = await _db.Invoices
             .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Pending)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(i => i.AnafStatus, InvoiceAnafStatus.Failed)
-                .SetProperty(i => i.LastError,  (string?)budgetSpentMessage)
+                .SetProperty(i => i.LastError,  (string?)reason)
                 .SetProperty(i => i.ClaimedAt,  (DateTimeOffset?)null)
                 .SetProperty(i => i.UpdatedAt,  (DateTimeOffset?)now),
                 ct);
 
-        return new UnknownUploadOutcome(
-            outcomes,
-            LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Failed, parked));
+        return LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Failed, parked);
     }
 
     public async Task<bool> RetryAsync(

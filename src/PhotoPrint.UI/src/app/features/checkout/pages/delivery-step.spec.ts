@@ -112,7 +112,7 @@ describe('DeliveryStep', () => {
     expect(btn.disabled).toBe(true);
   });
 
-  it('typing the Easybox contact after selecting a locker re-enables Continue', () => {
+  it('typing the Easybox address after selecting a locker re-enables Continue', () => {
     const fixture = createFixture();
     flushCosts();
     selectEasybox(fixture);
@@ -125,7 +125,7 @@ describe('DeliveryStep', () => {
 
     // canContinue must react to form validity — a memoized computed reading form.valid (not a
     // signal) would stay disabled here.
-    comp.easyboxContactForm.setValue({ recipientName: 'Ana Pop', phone: '0712345678' });
+    comp.addressForm.setValue(FISCAL_ADDRESS);
     fixture.detectChanges();
     btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
@@ -138,7 +138,7 @@ describe('DeliveryStep', () => {
 
     const comp = fixture.componentInstance;
     comp.selectLocker(locker('l1'));
-    comp.easyboxContactForm.setValue({ recipientName: 'Ana Pop', phone: '1-2-3-4' });
+    comp.addressForm.setValue({ ...FISCAL_ADDRESS, phone: '1-2-3-4' });
     fixture.detectChanges();
 
     const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
@@ -154,7 +154,7 @@ describe('DeliveryStep', () => {
     vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     const comp = fixture.componentInstance;
     comp.selectLocker(locker('l1'));
-    comp.easyboxContactForm.setValue({ recipientName: 'Ana Pop', phone: '0712345678' });
+    comp.addressForm.setValue(FISCAL_ADDRESS);
     comp.continue();
 
     expect(state.snapshot.lockerId).toBe('l1');
@@ -253,7 +253,7 @@ describe('DeliveryStep', () => {
     const fixture = createFixture();
     flushCosts();
 
-    const c = fixture.componentInstance.easyboxContactForm;
+    const c = fixture.componentInstance.addressForm;
     expect(c.value.recipientName).toBe('Ana Pop');
     expect(c.value.phone).toBe('0712345678');
   });
@@ -263,7 +263,101 @@ describe('DeliveryStep', () => {
     expect(() => {
       const fixture = createFixture();
       flushCosts();
-      expect(fixture.componentInstance.easyboxContactForm.value.recipientName).toBeFalsy();
+      expect(fixture.componentInstance.addressForm.value.recipientName).toBeFalsy();
     }).not.toThrow();
+  });
+
+  const FISCAL_ADDRESS = {
+    street: 'Str. Buyer',
+    number: '10',
+    block: '',
+    city: 'Cluj-Napoca',
+    county: 'Cluj',
+    postalCode: '400100',
+    recipientName: 'Ana Pop',
+    phone: '0712345678',
+  };
+
+  it('the Easybox branch asks for the same fiscal address fields as home delivery', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+
+    expect(fixture.debugElement.query(By.css('#street'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('#city'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('#postalCode'))).not.toBeNull();
+  });
+
+  it('an Easybox order with a locker and a full fiscal address enables Continue and stores both', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+
+    const state = TestBed.inject(CheckoutStateService);
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const comp = fixture.componentInstance;
+    comp.selectLocker(locker('l1'));
+    comp.addressForm.setValue(FISCAL_ADDRESS);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+
+    comp.continue();
+
+    expect(state.snapshot.lockerId).toBe('l1');
+    expect(state.snapshot.shippingAddress?.street).toBe('Str. Buyer');
+    expect(state.snapshot.shippingAddress?.city).toBe('Cluj-Napoca');
+    expect(state.snapshot.shippingAddress?.postalCode).toBe('400100');
+    expect(state.snapshot.shippingAddress?.recipientName).toBe('Ana Pop');
+  });
+
+  it('an Easybox locker with a contact but a blank fiscal address keeps Continue disabled', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+
+    const comp = fixture.componentInstance;
+    comp.selectLocker(locker('l1'));
+    comp.addressForm.patchValue({ recipientName: 'Ana Pop', phone: '0712345678' });
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('prefills a signed-in customer’s default saved address, leaving the street line to them', () => {
+    // atob is what AuthService uses to read the token, so build the payload the same way.
+    const payload = btoa(JSON.stringify({
+      sub: 'u1', email: 'ana@example.ro', name: 'Ana Pop',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    }));
+    sessionStorage.setItem('access_token', `header.${payload}.signature`);
+
+    const fixture = createFixture();
+    flushCosts();
+    http.expectOne(`${environment.apiUrl}/account/addresses`).flush([
+      {
+        id: 'a1', label: 'Acasă', fullName: 'Ana Pop', phone: '0712345678',
+        addressLine: 'Str. Salvată 4', city: 'Cluj-Napoca', county: 'Cluj',
+        postalCode: '400100', isDefault: true,
+      },
+    ]);
+    fixture.detectChanges();
+
+    const form = fixture.componentInstance.addressForm;
+    expect(form.value.city).toBe('Cluj-Napoca');
+    expect(form.value.county).toBe('Cluj');
+    expect(form.value.postalCode).toBe('400100');
+    expect(form.value.street).toBeFalsy();
+    expect(form.value.number).toBeFalsy();
+  });
+
+  it('does not fetch saved addresses for a guest', () => {
+    const fixture = createFixture();
+    flushCosts();
+    fixture.detectChanges();
+    // http.verify() in afterEach fails if an /account/addresses request was made.
+    expect(fixture.componentInstance.addressForm.value.city).toBeFalsy();
   });
 });
