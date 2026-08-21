@@ -588,7 +588,7 @@ public class InvoiceUploadJobTests
                     .ThrowsAsync(new AnafAuthException("stareMesaj"));
 
         await InvokeProcessBatchAsync(h.Job);
-        // Two intervals on — a failed row sits out one tick, so this is production's widest gap between auth attempts.
+        // Two intervals of cache time: the widest gap the window must span, since the per-row cooldown delays a failed row by a tick.
         cacheClock.UtcNow = cacheClock.UtcNow.AddMinutes(360);
         await InvokeProcessBatchAsync(h.Job);
 
