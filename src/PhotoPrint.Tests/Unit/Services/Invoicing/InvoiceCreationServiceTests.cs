@@ -26,7 +26,7 @@ public class InvoiceCreationServiceTests : IClassFixture<PostgresTestDatabase>, 
     public InvoiceCreationServiceTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
 
         _db = _database.NewContext();
         _numbering = NewNumbering(_db);

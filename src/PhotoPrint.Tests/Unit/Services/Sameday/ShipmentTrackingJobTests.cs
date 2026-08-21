@@ -32,7 +32,7 @@ public class ShipmentTrackingJobTests : IClassFixture<PostgresTestDatabase>, IDi
 
     public ShipmentTrackingJobTests(PostgresTestDatabase database)
     {
-        database.TruncateAllTables();
+        database.ResetForTest();
         _scopes = new PostgresScopeFactory(database);
     }
 

@@ -27,7 +27,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     public InvoiceUploadJobTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
     }
 
     private static PhotoPrintDbContext CreateDb(PostgresTestDatabase database, Action<string>? sqlLog = null)

@@ -18,7 +18,7 @@ public class OrderNumberServicePostgresTests : IClassFixture<PostgresTestDatabas
     public OrderNumberServicePostgresTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
 
         _db = _database.NewContext();
         _service = new OrderNumberService(_db);

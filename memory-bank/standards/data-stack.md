@@ -17,7 +17,7 @@ builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
 | Production | `Database.Migrate()` at boot, guarded by `IsNpgsql()` |
 | Local development | the same `Database.Migrate()` at boot — dev and prod are schema-identical |
 | Integration tests (default) | **EF InMemory**; model-built, and relational features (unique indexes, check constraints, `jsonb`, decimal precision) are **not** enforced |
-| Relational tests | a throwaway PostgreSQL database per test class via `PhotoPrint.Tests.Helpers.PostgresTestDatabase`, with the migration chain applied |
+| Relational tests | a pooled PostgreSQL database leased per test class via `PhotoPrint.Tests.Helpers.PostgresTestDatabase`, migrated once per schema and reused across runs |
 
 Local setup: PostgreSQL 16 on `localhost:5432` with a `photoPrint` role and database. The
 connection string lives in `appsettings.Development.json` with a placeholder password; the real
@@ -127,7 +127,7 @@ public class MyRelationalTests : IClassFixture<PostgresTestDatabase>
     public MyRelationalTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
     }
 
     [Fact]
@@ -139,20 +139,37 @@ public class MyRelationalTests : IClassFixture<PostgresTestDatabase>
 }
 ```
 
-**Share the database; never build one per test.** A field initialiser
+**Take the fixture; never build a database per test.** A field initialiser
 (`private readonly PostgresTestDatabase _database = new();`) builds one per test *method*, because
-xUnit constructs the test class once per test — measured at ~3 s each on a dev box, of which
-`CREATE`/`DROP DATABASE` is about half and the migration chain the rest. `IClassFixture` makes it
-one database per class, and `TruncateAllTables()` in the constructor gives each test the clean
-slate it would otherwise have paid seconds for. Truncation also rewinds sequences, which
-`TRUNCATE … RESTART IDENTITY` leaves alone because no table column owns the numbering sequences.
-Take a private database only where a test wrecks the schema: `BreakOrdersTable()` drops a table,
-and the rest of the class would inherit the wreck.
+xUnit constructs the test class once per test — measured at ~3 s each, and 161 relational tests
+took 143 s that way. `IClassFixture` plus `ResetForTest()` in the constructor gets the same clean
+slate for ~3 ms, and the same 161 tests run in ~20 s.
 
-The fixture creates `pp_test_<guid>`, applies the migration chain, and drops the database on
-`Dispose`. Extras: `DropAllForeignKeys()` for tests that insert a row without its parents,
-`TruncateAllTables()` to reset a shared database between tests, `Execute(sql)` for schema
-surgery, and `BreakOrdersTable()` to simulate an unreachable database. It connects using
+Where those seconds went, and why the fixture is shaped the way it is:
+
+- **The databases are pooled and permanent.** The fixture leases `pp_test_<salt>_<schema>_std_<nn>`,
+  holding a Postgres advisory lock for its lifetime, and leaves the database in place on dispose.
+  The next run reuses it, so `CREATE DATABASE` + `Migrate()` is paid once per schema rather than
+  once per run. The lease is what makes concurrent runs safe: two suites at once (two worktrees, or
+  two agent sessions) take different slots, and the pool grows on demand.
+- **`<salt>` is the test assembly's directory and `<schema>` hashes the generated create script**,
+  not just the migration id list — a migration edited in place keeps its id while producing a
+  different schema, and a reused database would then be silently wrong. A schema change makes new
+  names; the stale set is swept when nothing holds its lease.
+- **`ResetForTest()` deletes rows, it does not truncate.** `TRUNCATE` rewrites every table's storage
+  and flushes it, which measured 285–556 ms *on empty tables*; the delete-based reset with foreign
+  keys switched off for the wipe measured 3.1 ms. It also rewinds every used sequence, which
+  `TRUNCATE … RESTART IDENTITY` skips because no table column owns the numbering sequences. It
+  needs a superuser for `session_replication_role`; without one it falls back to truncating.
+- **Two escape hatches.** `ForeignKeyFreeTestDatabase` is a separate pool with the constraints
+  dropped, for tests that insert a row without its parents — separate so a constraint-free schema is
+  never handed to a class that expects constraints. `PostgresTestDatabase.Throwaway()` migrates a
+  private database and drops it, for the migration-chain tests and for tests that wreck the schema
+  (`BreakOrdersTable()` drops a table, and a pooled database would carry the wreck onward).
+  `Execute(sql)` marks the database dirty, so a leased one is dropped instead of handed on.
+
+Extras: `DropAllForeignKeys()` for tests that insert a row without its parents, `Execute(sql)` for
+schema surgery, and `BreakOrdersTable()` to simulate an unreachable database. It connects using
 `POSTGRES_TEST_CONNECTION` if set, otherwise
 `Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=postgres`; the role must
 be allowed to `CREATE DATABASE`. If no server is reachable the constructor throws with that

@@ -28,7 +28,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTes
     public OrderServiceIdempotencyConcurrencyTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
     }
 
 

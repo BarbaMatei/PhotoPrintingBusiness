@@ -28,7 +28,7 @@ public class WebhooksControllerInvoiceRaceTests : IClassFixture<PostgresTestData
     public WebhooksControllerInvoiceRaceTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
     }
 
 

@@ -14,7 +14,7 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IClassFixt
     public PostgresInvoiceNumberingServiceIntegrationTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
     }
 
 

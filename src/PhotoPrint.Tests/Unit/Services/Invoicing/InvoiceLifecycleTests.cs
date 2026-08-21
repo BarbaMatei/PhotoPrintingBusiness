@@ -23,7 +23,7 @@ public class InvoiceLifecycleTests : IClassFixture<PostgresTestDatabase>, IDispo
     public InvoiceLifecycleTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
 
         _db = _database.NewContext();
         _sut = new InvoiceLifecycle(

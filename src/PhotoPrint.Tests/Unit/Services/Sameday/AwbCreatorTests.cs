@@ -19,22 +19,19 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 /// which InMemory doesn't support; the read-backs go through a FRESH context so
 /// a missing/last-writer-wins persist reddens the test.
 /// </summary>
-public class AwbCreatorTests : IClassFixture<PostgresTestDatabase>
+public class AwbCreatorTests : IClassFixture<ForeignKeyFreeTestDatabase>
 {
     private PostgresTestDatabase _database;
 
-    public AwbCreatorTests(PostgresTestDatabase database)
+    public AwbCreatorTests(ForeignKeyFreeTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
-        // FK enforcement off: these exercise AWB-creation logic, not referential
-        // integrity, so an OrderItem can reference a synthetic product/upload id.
-        database.DropAllForeignKeys();
+        database.ResetForTest();
     }
 
     private PostgresTestDatabase UseIsolatedDatabase()
     {
-        var own = new PostgresTestDatabase();
+        var own = PostgresTestDatabase.Throwaway();
         own.DropAllForeignKeys();
         _database = own;
 

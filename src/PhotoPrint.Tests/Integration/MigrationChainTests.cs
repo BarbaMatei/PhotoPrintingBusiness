@@ -12,7 +12,7 @@ public class MigrationChainTests
     [Fact]
     public async Task The_chain_applies_to_a_fresh_postgres_database_and_leaves_no_pending_migration()
     {
-        using var database = new PostgresTestDatabase();
+        using var database = PostgresTestDatabase.Throwaway();
         using var db = database.NewContext();
 
         (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
@@ -35,7 +35,7 @@ public class MigrationChainTests
     [Fact]
     public async Task The_composite_invoice_index_exists_after_migrating()
     {
-        using var database = new PostgresTestDatabase();
+        using var database = PostgresTestDatabase.Throwaway();
         using var db = database.NewContext();
 
         var found = await db.Database
@@ -51,7 +51,7 @@ public class MigrationChainTests
     [Fact]
     public async Task The_composite_invoice_index_rejects_a_repeated_series_year_number()
     {
-        using var database = new PostgresTestDatabase();
+        using var database = PostgresTestDatabase.Throwaway();
         var orderA = Guid.NewGuid();
         var orderB = Guid.NewGuid();
 

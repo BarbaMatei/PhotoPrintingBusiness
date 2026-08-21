@@ -17,7 +17,7 @@ public class UploadMigrationSchemaTests : IClassFixture<PostgresTestDatabase>
     public UploadMigrationSchemaTests(PostgresTestDatabase database)
     {
         _database = database;
-        database.TruncateAllTables();
+        database.ResetForTest();
     }
 
 
