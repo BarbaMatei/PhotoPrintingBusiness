@@ -307,6 +307,20 @@ commit: abc1234
   check('verify-fixes never skips a fixed row it cannot parse', multi.out.includes('"id":"PPW-9502"') && multi.out.includes('"verdict":"unparsable-commit"'), multi.out.trim())
   check('verify-fixes counts both rows in its summary', multi.out.includes('SUMMARY: 1/2 held') && multi.code === 1, `exit ${multi.code}: ${multi.out.trim()}`)
   check('verify-fixes leaves the tree clean after a multi-commit revert', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
+
+  // A frontend spec with no installed dependencies must not be run: the runner would fail to
+  // start in both legs, which reads as a red that reddened for the wrong reason.
+  mkdirSync(join(T, 'src', 'PhotoPrint.UI', 'src'), { recursive: true })
+  writeFileSync(join(T, 'src', 'app', 'widget.txt'), 'buggy\n')
+  writeFileSync(join(T, 'src', 'PhotoPrint.UI', 'src', 'widget.spec.ts'), 'spec body\n')
+  g('add', '.'); g('commit', '-qm', 'ui fix')
+  const uiSha = g('rev-parse', '--short', 'HEAD').stdout.trim()
+  writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
+    `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${uiSha}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9503 | fixed | \`${uiSha}\` | fixture fix carrying a frontend spec |\n`)
+  g('add', '.'); g('commit', '-qm', 'ui resolution')
+  const ui = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
+  check('verify-fixes refuses a frontend row with no installed dependencies', ui.out.includes('"verdict":"env-missing"') && ui.out.includes('node_modules'), ui.out.trim())
+  check('verify-fixes ran no test for the refused frontend row', ui.out.includes('"red_exits":[]'), ui.out.trim())
   rmSync(T, { recursive: true, force: true })
 }
 

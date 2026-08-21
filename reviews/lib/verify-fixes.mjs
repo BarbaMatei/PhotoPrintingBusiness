@@ -12,8 +12,9 @@
 // Output: one JSON line per row {id, verdict, commit, filters, red_exits, green_exits},
 // then "SUMMARY: <held>/<total> held". Verdicts: held · test-never-red · no-test ·
 // test-only · unreachable-commit · unparsable-commit · revert-failed · green-failed ·
-// rename-in-fix · dry-run. A row's Commit cell may list several commits; all of them are
-// reverted together, back to the parent of the first.
+// rename-in-fix · env-missing · dry-run. A row's Commit cell may list several commits; all of
+// them are reverted together, back to the parent of the first. A row whose tests include a
+// frontend spec needs src/PhotoPrint.UI/node_modules in this checkout, or it is not run at all.
 // Exit: 0 all held · 1 any other verdict · 2 dirty tree or usage error.
 import { readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -95,6 +96,13 @@ for (const row of rows) {
   const source = [...uniq.entries()].filter(([f]) => !isTest(f)).map(([f, st]) => [st, f])
   if (!tests.length) { res.verdict = 'no-test'; continue }
   if (!source.length) { res.verdict = 'test-only'; continue }
+  // A frontend suite cannot run without installed dependencies, and a runner that fails to start
+  // exits non-zero in BOTH legs — reading as a red that reddened for the wrong reason. Refuse.
+  if (tests.some(p => p.endsWith('.spec.ts')) && !existsSync(join(REPO, 'src', 'PhotoPrint.UI', 'node_modules'))) {
+    res.verdict = 'env-missing'
+    res.note = 'src/PhotoPrint.UI/node_modules is absent in this checkout, so the frontend suites cannot run'
+    continue
+  }
   const cmds = tests.map(p => p.endsWith('.cs')
     ? tplApi.replace('{filter}', 'PhotoPrint.Tests.' + p.replace(/^src\/PhotoPrint\.Tests\//, '').replace(/\.cs$/, '').split('/').join('.'))
     : tplUi.replace('{name}', basename(p).replace(/\.spec\.ts$/, '')))
