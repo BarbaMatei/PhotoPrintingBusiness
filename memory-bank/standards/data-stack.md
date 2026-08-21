@@ -96,8 +96,8 @@ throws. Construct from `DateTimeOffset.UtcNow` or an explicit `TimeSpan.Zero` of
 - **Soft delete:** `Upload` only (`DeletedAt`), enforced **manually per query** — there is no
   global query filter. Every new Upload query must filter `DeletedAt == null` itself.
 - **Enums:** stored as strings via `HasConversion<string>()` (`Order.Status`, `User.Role`,
-  `EmailQueue.Status`, payment/delivery/ANAF enums) — except `Upload.StorageLocation`, stored as
-  `int` with default `Local`.
+  `EmailQueue.Status`, payment/delivery/ANAF enums) — except `Upload.StorageLocation` and
+  `Invoice.StorageLocation`, both stored as `int` with default `Local`.
 - **Concurrency:** there are **no concurrency tokens** (no RowVersion/xmin anywhere).
   Correctness under concurrency comes from unique indexes + violation detection + retry. The
   named index constants `IdempotencyKeyIndexName`, `OrderNumberIndexName`,

@@ -410,8 +410,7 @@ public class AdminOrderService : IAdminOrderService
             items);
     }
 
-    // Mirrors the webhook Paid path: a concurrent delivery or a taken number must not turn an
-    // admin status change into an unhandled 500.
+    // Mirrors the webhook Paid path: a concurrent delivery or taken number must not 500 an admin status change.
     private async Task SaveWithInvoiceAsync(Order order, CancellationToken ct)
     {
         const int maxNumberRetries = 3;

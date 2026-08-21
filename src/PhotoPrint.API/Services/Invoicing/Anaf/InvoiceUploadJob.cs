@@ -254,6 +254,8 @@ public sealed class InvoiceUploadJob : BackgroundService
                 using (var ms = new MemoryStream(pdfBytes, writable: false))
                     await storage.SaveAsync(ms, key, ct);
                 invoice.PdfStoragePath = key;
+                // Stamped with the path in one save, so the row always records where its bytes went.
+                invoice.StorageLocation = storageRouter.CloudEnabled ? StorageLocation.Cloud : StorageLocation.Local;
                 invoice.UpdatedAt      = _clock.GetUtcNow();
                 await db.SaveChangesAsync(ct);
                 _logger.LogInformation(

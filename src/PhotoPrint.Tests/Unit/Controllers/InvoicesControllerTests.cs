@@ -69,6 +69,7 @@ public class InvoicesControllerTests
             OrderId = orderId,
             InvoiceNumber = "FT-2026-00001",
             PdfStoragePath = "invoices/2026/FT-2026-00001.pdf",
+            StorageLocation = StorageLocation.Cloud,
         });
         await _db.SaveChangesAsync();
 
@@ -81,6 +82,8 @@ public class InvoicesControllerTests
         router.SetupGet(r => r.CloudEnabled).Returns(true);
         router.SetupGet(r => r.Cloud).Returns(cloud.Object);
         router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
 
         var controller = MakeController(_db, router.Object, userId);
 
@@ -112,6 +115,7 @@ public class InvoicesControllerTests
         var router = new Mock<IStorageRouter>();
         router.SetupGet(r => r.CloudEnabled).Returns(false);
         router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
 
         var controller = MakeController(_db, router.Object, userId);
 
@@ -141,6 +145,7 @@ public class InvoicesControllerTests
         var router = new Mock<IStorageRouter>();
         router.SetupGet(r => r.CloudEnabled).Returns(false);
         router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
 
         var controller = MakeGuestController(_db, router.Object, guestSessionId);
 
@@ -177,6 +182,77 @@ public class InvoicesControllerTests
         result.Should().BeOfType<ForbidResult>();
     }
 
+    // Without the stamped tier a read follows the live provider flag, so flipping it orphans every PDF.
+    [Fact]
+    public async Task GetInvoiceAsync_RowStampedLocalWhileCloudIsOn_ReadsLocalNotCloud()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00007",
+            PdfStoragePath = "invoices/2026/FT-2026-00007.pdf",
+            StorageLocation = StorageLocation.Local,
+        });
+        await _db.SaveChangesAsync();
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync(new MemoryStream([1, 2, 3]));
+        var cloud = new Mock<IStorageService>();
+
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+
+        var result = await MakeController(_db, router.Object, userId)
+            .GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>();
+        local.Verify(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_RowStampedCloudWhileCloudIsOff_DoesNotThrowAndReports404()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00008",
+            PdfStoragePath = "invoices/2026/FT-2026-00008.pdf",
+            StorageLocation = StorageLocation.Cloud,
+        });
+        await _db.SaveChangesAsync();
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("not here"));
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+        // Cloud would throw InvalidOperationException if resolved; the controller must not resolve it.
+        router.SetupGet(r => r.Cloud).Throws(new InvalidOperationException("cloud tier is off"));
+
+        var logs = new LogCapture();
+        var result = await MakeController(_db, router.Object, userId, logs)
+            .GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<ObjectResult>()
+            .Which.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("invoice.pdf.blob-missing", StringComparison.Ordinal));
+    }
+
     // Must stay distinguishable from the not-yet-rendered 404 that tells the caller to retry.
     [Fact]
     public async Task GetInvoiceAsync_BlobIsMissing_LogsADistinctEventAndDoesNotInviteARetry()
@@ -201,6 +277,7 @@ public class InvoicesControllerTests
         var router = new Mock<IStorageRouter>();
         router.SetupGet(r => r.CloudEnabled).Returns(false);
         router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
 
         var logs = new LogCapture();
         var controller = MakeController(_db, router.Object, userId, logs);

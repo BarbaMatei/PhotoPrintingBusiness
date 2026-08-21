@@ -43,6 +43,9 @@ public class Invoice
     /// <summary>Storage path of the rendered PDF. Populated by bolt 039.</summary>
     public string? PdfStoragePath { get; set; }
 
+    /// <summary>Tier the PDF was written to. Without it a read follows the live provider flag, so flipping the provider orphans every stored PDF.</summary>
+    public StorageLocation StorageLocation { get; set; } = StorageLocation.Local;
+
     /// <summary>ANAF SPV upload identifier returned on submission. Populated
     /// by bolt 039's <c>InvoiceUploadJob</c>.</summary>
     public string? AnafUploadId { get; set; }

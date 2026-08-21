@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Extensions;
+using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 
 namespace PhotoPrint.API.Controllers;
@@ -59,7 +60,7 @@ public sealed class InvoicesController : ControllerBase
         var invoice = await _db.Invoices
             .AsNoTracking()
             .Where(i => i.OrderId == orderId)
-            .Select(i => new { i.InvoiceNumber, i.PdfStoragePath })
+            .Select(i => new { i.InvoiceNumber, i.PdfStoragePath, i.StorageLocation })
             .FirstOrDefaultAsync(ct);
 
         if (invoice is null || string.IsNullOrEmpty(invoice.PdfStoragePath))
@@ -68,12 +69,28 @@ public sealed class InvoicesController : ControllerBase
             return NotFound();
         }
 
-        var store = _storageRouter.CloudEnabled ? _storageRouter.Cloud : _storageRouter.Local;
+        // The stamped tier is a preference, not a guarantee: Cloud is unreachable on a local-only provider.
+        var stampedIsReachable =
+            invoice.StorageLocation == StorageLocation.Local || _storageRouter.CloudEnabled;
+        var store = stampedIsReachable
+            ? _storageRouter.For(invoice.StorageLocation)
+            : _storageRouter.Local;
 
         Stream stream;
         try
         {
             stream = await store.GetStreamAsync(invoice.PdfStoragePath, ct);
+        }
+        catch (FileNotFoundException) when (stampedIsReachable && _storageRouter.CloudEnabled)
+        {
+            // Written before the tier was recorded, or moved since: try the other tier before giving up.
+            var fallback = invoice.StorageLocation == StorageLocation.Cloud
+                ? _storageRouter.Local
+                : _storageRouter.Cloud;
+            stream = await fallback.GetStreamAsync(invoice.PdfStoragePath, ct);
+            _logger.LogWarning(
+                "invoice.pdf.tier-mismatch order_id={OrderId} invoice_number={InvoiceNumber} key={Key} stamped_tier={StampedTier}",
+                orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, invoice.StorageLocation);
         }
         catch (FileNotFoundException ex)
         {
