@@ -240,3 +240,4 @@
 {"t":"2026-08-21T12:02:38+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"do not push","reason":"the records auditor hard-fails because fixed_commit 2daf61e is reachable from no pushed ref. Clearing it needs a push of feat/bolt-038-vat-calculation, which no owner authorised; a local tag would satisfy the check while defeating its purpose. Error left standing and recorded in the metrics notes"}
 {"t":"2026-08-21T12:11:06+03:00","ev":"doc-gate","round":8,"verdict":"approve","note":"lint clean for v8 and the state files; Sonnet judge approved with 3 optional nits, one of which (unattended round -> unattended run) was applied"}
 {"t":"2026-08-21T12:13:13+03:00","ev":"pass-launch","pass":8,"type":"verification"}
+{"t":"2026-08-21T12:21:23+03:00","ev":"pass-records-done","pass":8,"type":"verification"}
