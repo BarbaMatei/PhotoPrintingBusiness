@@ -56,16 +56,17 @@ public class OrderNumberServicePostgresTests : IDisposable
     public async Task GenerateAsync_LosesTheSequenceCreateRace_StillReturnsANumber()
     {
         var year = DateTime.UtcNow.Year;
-        await using var rival = await UncommittedSequenceCreator.StartAsync(
+        await using var rival = await UncommittedRelationCreator.SequenceAsync(
             _database.ConnectionString, $"order_number_seq_{year}");
 
         var db = _database.NewContext();
+        Task<string>? generate = null;
         string? number = null;
         Exception? failure;
 
         try
         {
-            var generate = Task.Run(() => new OrderNumberService(db).GenerateAsync());
+            generate = Task.Run(() => new OrderNumberService(db).GenerateAsync());
 
             await rival.WaitUntilAnotherBackendBlocksAsync(TimeSpan.FromSeconds(10));
             await rival.CommitAsync();
@@ -74,6 +75,9 @@ public class OrderNumberServicePostgresTests : IDisposable
         }
         finally
         {
+            await rival.DisposeAsync();
+            if (generate is not null)
+                await Record.ExceptionAsync(() => generate);
             await Record.ExceptionAsync(() => db.DisposeAsync().AsTask());
         }
 

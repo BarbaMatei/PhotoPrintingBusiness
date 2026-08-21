@@ -2,15 +2,16 @@ using Npgsql;
 
 namespace PhotoPrint.Tests.Helpers;
 
-public sealed class UncommittedSequenceCreator : IAsyncDisposable
+public sealed class UncommittedRelationCreator : IAsyncDisposable
 {
     private readonly NpgsqlConnection _connection;
     private readonly NpgsqlTransaction _transaction;
     private readonly string _connectionString;
     private readonly int _creatorPid;
     private bool _committed;
+    private bool _disposed;
 
-    private UncommittedSequenceCreator(
+    private UncommittedRelationCreator(
         NpgsqlConnection connection, NpgsqlTransaction transaction, string connectionString)
     {
         _connection = connection;
@@ -19,19 +20,36 @@ public sealed class UncommittedSequenceCreator : IAsyncDisposable
         _creatorPid = connection.ProcessID;
     }
 
-    public static async Task<UncommittedSequenceCreator> StartAsync(
-        string connectionString, string sequenceName)
+    public static Task<UncommittedRelationCreator> SequenceAsync(
+        string connectionString, string sequenceName) =>
+        StartAsync(connectionString, $"CREATE SEQUENCE \"{sequenceName}\" START 1");
+
+    public static Task<UncommittedRelationCreator> TableAsync(
+        string connectionString, string tableName) =>
+        StartAsync(connectionString, $"CREATE TABLE \"{tableName}\" (id integer)");
+
+    private static async Task<UncommittedRelationCreator> StartAsync(
+        string connectionString, string ddl)
     {
         var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
         var transaction = await connection.BeginTransactionAsync();
 
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = $"CREATE SEQUENCE \"{sequenceName}\" START 1";
-        await command.ExecuteNonQueryAsync();
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = ddl;
+            await command.ExecuteNonQueryAsync();
+        }
+        catch
+        {
+            await transaction.DisposeAsync();
+            await connection.DisposeAsync();
+            throw;
+        }
 
-        return new UncommittedSequenceCreator(connection, transaction, connectionString);
+        return new UncommittedRelationCreator(connection, transaction, connectionString);
     }
 
     public async Task WaitUntilAnotherBackendBlocksAsync(TimeSpan timeout)
@@ -73,6 +91,9 @@ public sealed class UncommittedSequenceCreator : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
+        _disposed = true;
+
         if (!_committed)
             await _transaction.RollbackAsync();
 

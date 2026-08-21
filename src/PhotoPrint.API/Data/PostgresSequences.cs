@@ -17,7 +17,9 @@ public static class PostgresSequences
                 "underscores only, at most 63 characters.",
                 nameof(sequenceName));
 
-        // A concurrent CREATE SEQUENCE IF NOT EXISTS makes the loser raise 42P07, 42710 or 23505; the block's own subtransaction swallows exactly those, and only once the name really holds a sequence.
+        // A concurrent CREATE SEQUENCE IF NOT EXISTS makes the loser raise 42P07, 42710 or 23505; only a subtransaction can swallow that without aborting an enclosing transaction, and only once the name really holds a sequence.
+        // A DDL identifier cannot be a SQL parameter, so EF1002 is suppressed and SafeName is the mitigation.
+#pragma warning disable EF1002
         return database.ExecuteSqlRawAsync($"""
             DO $$ BEGIN
               CREATE SEQUENCE IF NOT EXISTS "{sequenceName}" START 1 INCREMENT 1;
@@ -30,5 +32,6 @@ public static class PostgresSequences
               END IF;
             END $$;
             """, ct);
+#pragma warning restore EF1002
     }
 }

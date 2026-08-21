@@ -53,16 +53,17 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposabl
     public async Task NextNumberAsync_LosesTheSequenceCreateRace_StillReturnsANumber()
     {
         var year = RandomYear();
-        await using var rival = await UncommittedSequenceCreator.StartAsync(
+        await using var rival = await UncommittedRelationCreator.SequenceAsync(
             _database.ConnectionString, $"invoice_seq_ft_{year}");
 
         var sut = MakeSut();
+        Task<InvoiceNumber>? allocate = null;
         InvoiceNumber number = default;
         Exception? failure;
 
         try
         {
-            var allocate = Task.Run(() => sut.NextNumberAsync("FT", year));
+            allocate = Task.Run(() => sut.NextNumberAsync("FT", year));
 
             await rival.WaitUntilAnotherBackendBlocksAsync(TimeSpan.FromSeconds(10));
             await rival.CommitAsync();
@@ -71,6 +72,9 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposabl
         }
         finally
         {
+            await rival.DisposeAsync();
+            if (allocate is not null)
+                await Record.ExceptionAsync(() => allocate);
             Record.Exception(() => sut.Dispose());
         }
 
@@ -82,11 +86,12 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposabl
     public async Task NextNumberAsync_LosesTheRaceInsideTheCallerTransaction_TransactionStaysUsable()
     {
         var year = RandomYear();
-        await using var rival = await UncommittedSequenceCreator.StartAsync(
+        await using var rival = await UncommittedRelationCreator.SequenceAsync(
             _database.ConnectionString, $"invoice_seq_ft_{year}");
 
         var db = _database.NewContext();
         var transaction = await db.Database.BeginTransactionAsync();
+        Task<InvoiceNumber>? allocate = null;
         InvoiceNumber number = default;
         Exception? failure;
 
@@ -94,7 +99,7 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposabl
         {
             var service = new PostgresInvoiceNumberingService(
                 db, NullLogger<PostgresInvoiceNumberingService>.Instance);
-            var allocate = Task.Run(() => service.NextNumberAsync("FT", year));
+            allocate = Task.Run(() => service.NextNumberAsync("FT", year));
 
             await rival.WaitUntilAnotherBackendBlocksAsync(TimeSpan.FromSeconds(10));
             await rival.CommitAsync();
@@ -108,6 +113,9 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposabl
         }
         finally
         {
+            await rival.DisposeAsync();
+            if (allocate is not null)
+                await Record.ExceptionAsync(() => allocate);
             await Record.ExceptionAsync(() => transaction.DisposeAsync().AsTask());
             await Record.ExceptionAsync(() => db.DisposeAsync().AsTask());
         }
