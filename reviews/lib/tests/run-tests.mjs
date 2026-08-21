@@ -118,6 +118,11 @@ const firstLine = out => out.split('\n')[0]
   check('router exits 2 on a clean discovery-type pass (row 6)', r.code === 2, `exit ${r.code}`)
   check('router names the certification-go-ahead gate kind', r.out.includes('GATE_KIND: certification-go-ahead'), r.out.trim())
 }
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '914-resolution-above-review'])
+  check('router picks verification when the resolved resolution outnumbers the newest review', r.code === 0 && r.out.includes('NEXT: verification'), `exit ${r.code}: ${r.out.trim()}`)
+  check('router names the resolution it routed on', r.out.includes('resolution-v2 resolved'), r.out.trim())
+}
 
 // ---------- records auditor: smoke run against the real repo ----------
 {

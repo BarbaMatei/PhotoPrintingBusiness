@@ -132,13 +132,15 @@ if (L.type === 'verification') {
   say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
   finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'delta-worthiness')
 }
-// A fix round exists for the latest review and is resolved → verification.
-if (RN === N && rStatus === 'resolved') {
-  say(`ROUTER: resolution-v${N} resolved, not yet re-reviewed (row 3).`)
+// A fix round exists for the latest review and is resolved → verification. RN can exceed N:
+// a fix round answering a verification pass raises no review file, so its resolution takes the
+// next free number while N stays at the last discovery.
+if (RN >= N && rStatus === 'resolved') {
+  say(`ROUTER: resolution-v${RN} resolved, not yet re-reviewed (row 3).`)
   finish(0, 'verification', null)
 }
-if (RN === N && rStatus && rStatus !== 'resolved') {
-  say(`ROUTER: resolution-v${N} is ${rStatus} (row 2).`)
+if (RN >= N && rStatus && rStatus !== 'resolved') {
+  say(`ROUTER: resolution-v${RN} is ${rStatus} (row 2).`)
   finish(0, 'fix round', null)
 }
 
