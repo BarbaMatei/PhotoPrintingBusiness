@@ -76,28 +76,48 @@ public sealed class InvoicesController : ControllerBase
             ? _storageRouter.For(invoice.StorageLocation)
             : _storageRouter.Local;
 
-        Stream stream;
+        Stream? stream = null;
+        FileNotFoundException? miss = null;
+        var tiersTried = 0;
+
         try
         {
+            tiersTried++;
             stream = await store.GetStreamAsync(invoice.PdfStoragePath, ct);
         }
-        catch (FileNotFoundException) when (stampedIsReachable && _storageRouter.CloudEnabled)
+        catch (FileNotFoundException ex)
+        {
+            miss = ex;
+        }
+
+        if (stream is null && stampedIsReachable && _storageRouter.CloudEnabled)
         {
             // Written before the tier was recorded, or moved since: try the other tier before giving up.
             var fallback = invoice.StorageLocation == StorageLocation.Cloud
                 ? _storageRouter.Local
                 : _storageRouter.Cloud;
-            stream = await fallback.GetStreamAsync(invoice.PdfStoragePath, ct);
-            _logger.LogWarning(
-                "invoice.pdf.tier-mismatch order_id={OrderId} invoice_number={InvoiceNumber} key={Key} stamped_tier={StampedTier}",
-                orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, invoice.StorageLocation);
+            try
+            {
+                tiersTried++;
+                stream = await fallback.GetStreamAsync(invoice.PdfStoragePath, ct);
+                _logger.LogWarning(
+                    "invoice.pdf.tier-mismatch order_id={OrderId} invoice_number={InvoiceNumber} key={Key} stamped_tier={StampedTier}",
+                    orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, invoice.StorageLocation);
+            }
+            catch (FileNotFoundException ex)
+            {
+                miss = ex;
+            }
         }
-        catch (FileNotFoundException ex)
+
+        if (stream is null)
         {
             // Distinct from the not-yet-rendered 404 above: the key no longer resolves, so retrying cannot help.
-            _logger.LogError(ex,
-                "invoice.pdf.blob-missing order_id={OrderId} invoice_number={InvoiceNumber} key={Key} cloud_enabled={CloudEnabled}",
-                orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, _storageRouter.CloudEnabled);
+            // miss_cause carries the adapter's inner reason, because S3 maps a missing BUCKET to the same 404.
+            _logger.LogError(miss,
+                "invoice.pdf.blob-missing order_id={OrderId} invoice_number={InvoiceNumber} key={Key} cloud_enabled={CloudEnabled} tiers_tried={TiersTried} miss_cause={MissCause}",
+                orderId, invoice.InvoiceNumber, invoice.PdfStoragePath, _storageRouter.CloudEnabled,
+                tiersTried, (miss?.InnerException ?? miss)?.Message);
             return Problem(
                 title: "Invoice PDF unavailable",
                 detail: "The invoice record points at a file that is no longer in storage.",

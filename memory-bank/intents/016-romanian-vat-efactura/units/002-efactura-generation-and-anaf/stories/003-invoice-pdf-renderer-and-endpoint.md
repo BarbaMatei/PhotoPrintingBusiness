@@ -45,6 +45,8 @@ implemented: true
 |----------|-------------------|
 | Customer requests invoice before render | 404 with `Retry-After: 30` |
 | Storage write fails | Job retries; invoice stays without PDF; customer gets 404 until success |
+| PDF key set but the blob is absent from the stamped tier | Falls back to the other tier once when cloud storage is on, logging `invoice.pdf.tier-mismatch` |
+| Blob absent from every candidate tier | 404 `problem+json` with NO `Retry-After` (retrying cannot help), logging `invoice.pdf.blob-missing` |
 
 ## Out of Scope
 

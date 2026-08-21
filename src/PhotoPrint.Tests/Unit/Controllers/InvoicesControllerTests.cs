@@ -292,4 +292,135 @@ public class InvoicesControllerTests
                  r.Message.StartsWith("invoice.pdf.blob-missing", StringComparison.Ordinal) &&
                  r.Message.Contains("FT-2026-00042"));
     }
+
+    [Fact]
+    public async Task GetInvoiceAsync_StampedCloudButBlobIsOnLocal_FallsBackAndLogsTheMismatch()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00050",
+            PdfStoragePath = "invoices/2026/FT-2026-00050.pdf",
+            StorageLocation = StorageLocation.Cloud,
+        });
+        await _db.SaveChangesAsync();
+
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("not in the bucket"));
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync(new MemoryStream([1, 2, 3]));
+
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+
+        var logs = new LogCapture();
+        var result = await MakeController(_db, router.Object, userId, logs)
+            .GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>();
+        cloud.Verify(s => s.GetStreamAsync("invoices/2026/FT-2026-00050.pdf", It.IsAny<CancellationToken>()), Times.Once);
+        local.Verify(s => s.GetStreamAsync("invoices/2026/FT-2026-00050.pdf", It.IsAny<CancellationToken>()), Times.Once);
+        logs.Records.Should().ContainSingle(
+            r => r.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
+                 r.Message.StartsWith("invoice.pdf.tier-mismatch", StringComparison.Ordinal) &&
+                 r.Message.Contains("FT-2026-00050"));
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_StampedLocalButBlobIsOnCloud_FallsBackAndLogsTheMismatch()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00051",
+            PdfStoragePath = "invoices/2026/FT-2026-00051.pdf",
+            StorageLocation = StorageLocation.Local,
+        });
+        await _db.SaveChangesAsync();
+
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("not on disk"));
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ReturnsAsync(new MemoryStream([1, 2, 3]));
+
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+
+        var logs = new LogCapture();
+        var result = await MakeController(_db, router.Object, userId, logs)
+            .GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>();
+        local.Verify(s => s.GetStreamAsync("invoices/2026/FT-2026-00051.pdf", It.IsAny<CancellationToken>()), Times.Once);
+        cloud.Verify(s => s.GetStreamAsync("invoices/2026/FT-2026-00051.pdf", It.IsAny<CancellationToken>()), Times.Once);
+        logs.Records.Should().ContainSingle(
+            r => r.Level == Microsoft.Extensions.Logging.LogLevel.Warning &&
+                 r.Message.StartsWith("invoice.pdf.tier-mismatch", StringComparison.Ordinal) &&
+                 r.Message.Contains("FT-2026-00051"));
+    }
+
+    // A miss on the fallback tier is still a missing blob, not a server fault.
+    [Fact]
+    public async Task GetInvoiceAsync_BlobIsMissingFromBothTiers_Returns404AndLogsBlobMissing()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00052",
+            PdfStoragePath = "invoices/2026/FT-2026-00052.pdf",
+            StorageLocation = StorageLocation.Cloud,
+        });
+        await _db.SaveChangesAsync();
+
+        var cloud = new Mock<IStorageService>();
+        cloud.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("not in the bucket"));
+        var local = new Mock<IStorageService>();
+        local.Setup(s => s.GetStreamAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+             .ThrowsAsync(new FileNotFoundException("not on disk either"));
+
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(true);
+        router.SetupGet(r => r.Cloud).Returns(cloud.Object);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Cloud)).Returns(cloud.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+
+        var logs = new LogCapture();
+        var controller = MakeController(_db, router.Object, userId, logs);
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<ObjectResult>()
+            .Which.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+        controller.Response.Headers.Should().NotContainKey("Retry-After");
+        logs.Records.Should().ContainSingle(
+            r => r.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
+                 r.Message.StartsWith("invoice.pdf.blob-missing", StringComparison.Ordinal) &&
+                 r.Message.Contains("FT-2026-00052") &&
+                 r.Message.Contains("tiers_tried=2"));
+        logs.Records.Should().NotContain(
+            r => r.Message.StartsWith("invoice.pdf.tier-mismatch", StringComparison.Ordinal));
+    }
 }

@@ -74,13 +74,20 @@ The five tentative resolutions from Stage 1 are now binding decisions.
 
 ```text
 GET  /api/orders/{orderId}/invoice
-  → 200 application/pdf   (PDF stream from IStorageService)
+  → 200 application/pdf   (PDF stream from the tier stamped on Invoice.StorageLocation)
   → 404 Not Found         (Invoice row missing OR PdfStoragePath null)
+  → 404 problem+json      (key set but the blob is gone from BOTH tiers —
+                           logs invoice.pdf.blob-missing with tiers_tried, no Retry-After)
   → 403 Forbidden         (order not owned by caller; existing ownership helper)
+  → 500                   (storage reachable-but-broken: credentials, transport, non-404 S3)
   Headers:
     Cache-Control: private, max-age=31536000, immutable
     Retry-After: 30        (only on 404 when Invoice row exists but PDF pending)
 ```
+
+The stamped tier is a preference, not a guarantee: when the blob is absent from it and the
+cloud tier is enabled, the read falls back to the other tier once and logs
+`invoice.pdf.tier-mismatch`. Only a miss on every candidate tier answers the blob-gone 404.
 
 Returns the *PDF*, not the XML — the customer never sees the UBL bytes
 by design (story 003).
