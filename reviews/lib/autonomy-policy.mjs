@@ -41,12 +41,17 @@ if (gateKind === 'loop-close') {
   process.exit(0)
 }
 if (gateKind === 'delta-worthiness') {
-  const reviews = readdirSync(dir).map(f => /^review-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-  if (!reviews.length) stop('no review file — delta-worthiness cannot be judged mechanically')
-  const N = Math.max(...reviews)
-  const resPath = join(dir, `resolution-v${N}.md`)
-  if (!existsSync(resPath)) stop(`no resolution-v${N}.md — delta-worthiness cannot be judged mechanically`)
-  const fmBlock = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, `review-v${N}.md`), 'utf8'))?.[1] ?? ''
+  // Judge the round that just ran, which is the newest resolution. A round answering a
+  // verification pass raises no review file, so it has no blocker list and is patch-grade
+  // unless its own review file says otherwise.
+  const resolutions = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
+  if (!resolutions.length) stop('no resolution file — delta-worthiness cannot be judged mechanically')
+  const RN = Math.max(...resolutions)
+  const resPath = join(dir, `resolution-v${RN}.md`)
+  const reviewPath = join(dir, `review-v${RN}.md`)
+  const fmBlock = existsSync(reviewPath)
+    ? /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(reviewPath, 'utf8'))?.[1] ?? ''
+    : ''
   const lines = fmBlock.split(/\r?\n/)
   const bi = lines.findIndex(l => /^blockers:/.test(l))
   const blockers = []
