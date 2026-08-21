@@ -13,7 +13,7 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 // Multi-replica safety relies on the per-row ClaimedAt+TTL claim below, plus ANAF's own InvoiceNumber dedupe as a crash-window fallback.
 public sealed class InvoiceUploadJob : BackgroundService
 {
-    // Sized to outlast a poll tick yet stay well inside the BackoffHours budget (85 h by default), after which the invoice is Failed and the page is moot.
+    // Sized to outlast a poll tick, or it dedups nothing, yet stay far inside the 5-business-day submission SLA, so a page nobody saw still re-fires dozens of times before the deadline.
     private static readonly TimeSpan AuthOutageAlertWindow = TimeSpan.FromHours(2);
 
     private readonly IServiceScopeFactory _scopeFactory;
