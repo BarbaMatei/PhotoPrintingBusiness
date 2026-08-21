@@ -305,3 +305,4 @@
 {"t":"2026-08-21T17:00:15+03:00","ev":"doc-gate","round":9,"lint":"clean (038-039-invoicing v9 and state)","auditor":"0 errors, 2 warnings (a superseded findings tally and the pre-existing pass-6 pair)","note":"resolution set resolved at 78900b6; seven correction lines appended for round 9 because the renderer refuses a second fix-round line; PPW-557 ledger row flipped to fixed with two appended History lines"}
 {"t":"2026-08-21T17:17:02+03:00","ev":"doc-gate","verdict":"approve","round":9,"note":"two independent judges agreed; the single defect (PPW-557 affirmed at its pre-micro-review commit) is corrected in 74e23f3"}
 {"t":"2026-08-21T17:17:02+03:00","ev":"pass-launch","pass":10,"type":"verification"}
+{"t":"2026-08-21T17:34:16+03:00","ev":"pass-records-done","pass":10,"type":"verification"}

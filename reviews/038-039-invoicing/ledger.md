@@ -96,18 +96,18 @@ updated: 2026-08-21
 | PPW-552 | 🟡 | v6 | PPW-515's fix orphaned `AnafUnreachableException`'s XML doc comment | `Services/Invoicing/Anaf/AnafExceptions.cs:32-47` | backlog | `2979ea0` |
 | PPW-553 | 🟠 | v7 | The 2 h ANAF auth-outage window has no floor tied to PollIntervalMinutes, so a validator-legal interval above it defeats the dedup | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:17` | verified | `2daf61e` |
 | PPW-554 | 🟡 | v7 | The bucket-versus-key miss-cause preference has no regression test | `Controllers/InvoicesController.cs:83-87` | backlog | `0ec6497` |
-| PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | fixed | `78900b6` |
-| PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | fixed | `7ad27df` |
-| PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | fixed | `d3ae1e7` |
+| PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | verified | `f769e22` |
+| PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | verified | `f769e22` |
+| PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | verified | `f769e22` |
 | PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | open | `c8d6bb4` |
 | PPW-561 | 🟠 | v9 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `Tests/Helpers/PostgresTestDatabase.cs:33` | open | `c8d6bb4` |
 | PPW-562 | 🟠 | v9 | PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run | `Tests/Helpers/PostgresTestDatabase.cs:25` | open | `c8d6bb4` |
 | PPW-563 | 🟠 | v9 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | open | `c8d6bb4` |
-| PPW-564 | 🟠 | v9 | Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt | `Services/AdminOrderService.cs:425` | fixed | `6527bcb` |
-| PPW-565 | 🟠 | v9 | Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml | `Migrations/PhotoPrintDbContextModelSnapshot.cs:1` | fixed | `8d7a5e6` |
-| PPW-566 | 🟠 | v9 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | fixed | `35bde0e` |
-| PPW-567 | 🟡 | v9 | Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid | `Services/AdminOrderService.cs:417` | fixed | `6527bcb` |
-| PPW-568 | 🟡 | v9 | Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not | `Services/AdminOrderService.cs:414` | fixed | `573dfb8` |
+| PPW-564 | 🟠 | v9 | Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt | `Services/AdminOrderService.cs:425` | verified | `f769e22` |
+| PPW-565 | 🟠 | v9 | Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml | `Migrations/PhotoPrintDbContextModelSnapshot.cs:1` | verified | `f769e22` |
+| PPW-566 | 🟠 | v9 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | verified | `f769e22` |
+| PPW-567 | 🟡 | v9 | Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid | `Services/AdminOrderService.cs:417` | verified | `f769e22` |
+| PPW-568 | 🟡 | v9 | Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not | `Services/AdminOrderService.cs:414` | verified | `f769e22` |
 | PPW-569 | 🟡 | v9 | CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded | `Services/Invoicing/PostgresInvoiceNumberingService.cs:46` | backlog | `c8d6bb4` |
 | PPW-570 | 🟡 | v9 | PostgresTestDatabase contexts omit the split-query behaviour production configures | `Tests/Helpers/PostgresTestDatabase.cs:53` | backlog | `c8d6bb4` |
 | PPW-571 | 🟡 | v9 | PostgresTestDatabase.Dispose clears every Npgsql pool in the process while parallel test classes hold their own databases | `Tests/Helpers/PostgresTestDatabase.cs:99` | backlog | `c8d6bb4` |
@@ -937,6 +937,7 @@ updated: 2026-08-21
   - v9 fix round: the round parked the decision, not the defect. No code moved; the row stays `open` because which fiscal address a parcel-locker order may carry is unanswered. The resolution records it as the round's parked item and stands `in-progress`
   - v9: the Evidence line's "retries every tick with no exit" overstates the cadence — the per-row cooldown at `InvoiceUploadJob.cs:96` already spaces attempts one poll interval apart, so the observed cost was a permanent 404 plus one failed build per interval. Corrected here rather than in the block, which the doc gate holds append-only
   - v9: fix round — the owner delegated the ruling and it was implemented in full: locker checkout collects the same fiscal address as home delivery through the same form and the same server rules, and an invoice that can never be built parks `Pending → Failed` with a reason saying a retry will not help, through the same transition PPW-559's budget park uses. A second approach-check ran (`revised`) after the earlier refutation. No already-paid locker order is repaired by this; whether the locker's own postal address would be legally acceptable for those is an open question for the owner
+  - v10: verified @`f769e22` — the five backend suites reddened on reverting both fix commits and greened on restore. The three frontend suites could not run in the isolated worktree, so the checkout gate was proven by hand in the main checkout: dropping the fiscal-address term from the Easybox branch of `isDeliveryComplete` failed exactly the three locker-gate tests, and restoring it returned 3 of 3 files green
 
 ### PPW-558 — Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check
 
@@ -948,6 +949,7 @@ updated: 2026-08-21
   - v9: Approach pre-check: revised (the drafted attribute alone answers 500 plus a Sentry capture, not 413, because the exception middleware maps exact types and Kestrel's oversize exception is not in the map; enforce in the action with the existing `RequestEntityTooLargeException` at a 1 MB cap — 256 KB risks rejecting a genuine event and buying a three-day Stripe retry — keep the attribute as the byte backstop that also covers a chunked body with no Content-Length, and fix two sibling sites in the same change: the EuPlatesc IPN materialises its whole form before checking its signature, and `Filters/DetectLegacyShippingCostFilter.cs:29` calls EnableBuffering with no limit on the payment endpoints, reachable with a free guest token. The drafted unit test can never pass, because the size filter never runs on a direct action call and TestHost does not surface the limit either)
   - v9 fix round: the Evidence line's read-to-end citation is off by two — at `c8d6bb4`, `:73` opens the `StreamReader` and `:75` is the `ReadToEndAsync` call. Corrected here rather than in the block, which the doc gate holds append-only
   - v9: fix round — the action reads at most 1 MB and throws the 413-mapped exception before the signature check; the EuPlatesc IPN and DetectLegacyShippingCostFilter are capped in the same change, and the middleware now answers Kestrel’s own status instead of a 500 plus a Sentry capture
+  - v10: verified @`f769e22` — revert-and-rerun over both fix commits reddened its four suites, restore greened them; the fix-diff review found no other anonymous endpoint buffering a body before authenticating
 
 ### PPW-559 — Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF
 
@@ -958,6 +960,7 @@ updated: 2026-08-21
   - v9: found by the delta pass — race, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-515, whose resolution stated "an upload timeout holds its claim rather than re-uploading"; this pass shows that claim is false, because the claim expires two ticks before the row is next considered
   - v9: Approach pre-check: revised (every field the draft names is unusable — UpdatedAt is overwritten by the error write on the line before, no ANAF-status member for a hold exists, and both named exits are absent, because admin retry rejects a Pending row and the failure transition needs a Submitted one; ClaimedAt is the only field with no other consumer, and a future-dated hold there lies to the claim-lost log. The load-bearing skip today is the 30-minute per-row cooldown, not the 10-minute claim, so releasing the claim would not change the re-post timing and a longer hold only re-times a blind re-post: fix by capping blind re-posts, giving a held row an operator exit, and settling the invoice-number dedupe premise the job's own comment asserts. A legal configuration re-posts after 2 minutes, the auth handler can replay one body up to 8 times inside a single call, and the drafted test is red for the wrong reason unless it uses the real lifecycle and an advanceable clock)
   - v9: fix round — uploads ANAF never confirmed are counted on the row, which parks as Failed at Anaf:MaxUnknownUploadOutcomes (3) where the admin retry reaches it and resets both count and claim; the claim is left to expire, because releasing it lets a co-replica re-post seconds later
+  - v10: verified @`f769e22` — revert-and-rerun over all three fix commits reddened its three suites, restore greened them; the shared park path is one method serving this row and PPW-557
 
 ### PPW-560 — Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot
 
@@ -1003,6 +1006,7 @@ updated: 2026-08-21
   - v9: found by the delta pass — race, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-518, which added this catch and its retry loop but returned void where the webhook path returns an outcome
   - v9: Approach pre-check: revised (an outcome fed only by the catch misses the wider and likelier window — the pre-save existence query returns the committed invoice as an unchanged entity, so nothing throws and the admin timestamp is committed anyway; gate on the entity's state as well. The reload must replace the second save, not follow it, or it re-reads the value it was meant to drop. A reload discards nothing legitimate on this branch, but must stay Paid-only. Suppress the email and the paid notification; keep the broadcast, the purge hook and the response. The webhook's outcome type is private and pinned by a test that reflects on it, so give this path its own, and decide the exhausted branch explicitly rather than letting a default answer 200 for an unpaid order. The drafted test cannot redden: these tests run on EF InMemory with no unique index, and the violation classifier only recognises the PostgreSQL exception, so the proof needs the real Postgres helper)
   - v9: fix round — the path has its own outcome and gates on the invoice entity being Unchanged as well as on the index violation, then reloads instead of saving a second time, so the winner’s PaidAt still matches the invoice’s issue time; the confirmation email and the paid notification are skipped, the broadcast and the response kept
+  - v10: verified @`f769e22` — revert-and-rerun reddened `AdminOrderServiceTests`, restore greened it; the review confirmed all three `PaidAt` write sites are now gated
 
 ### PPW-565 — Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml
 
@@ -1012,6 +1016,7 @@ updated: 2026-08-21
 - **History:**
   - v9: found by the delta pass — completeness-critic, convergence 1, not hinted, verdict plausible. The trace found no drift today: the pending-model-changes command reports none, the snapshot matches the newest designer file, no SQLite usage remains, and the CI variable matches the helper's name — so the live defect is the missing guard and the manifest bookkeeping, not wrong SQL. Recurs the class PPW-497 named at v1
   - v9: fix round — the migration test now asserts HasPendingModelChanges() is false, so drift that adds no column fails a run; proven red with a throwaway Invoice property, and the relocated Sameday base class is covered through both subclasses
+  - v10: verified @`f769e22` — test-only, so no revert leg applies; the review confirmed the assertion is present and fails on real drift
 
 ### PPW-566 — AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures
 
@@ -1022,6 +1027,7 @@ updated: 2026-08-21
   - v9: found by the delta pass — completeness-critic, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-515, which introduced this classifier; adjacent to PPW-489's accepted retry tolerance but not a re-raise of it, because the fix asked for here is a per-attempt timeout, not the removal of retries
   - v9: Approach pre-check: revised (the real-client classifier tests are right and needed; the per-attempt timeout is not — the outer 30-second ceiling still fires unless each attempt is capped near 5 seconds, and the rejection Polly raises is neither retried nor caught anywhere, so it escapes to the batch loop's generic catch, which writes no LastError and releases no claim: the cooldown is then bypassed and the invoice is re-posted on the very next tick, strictly worse than today. Adding it to the retry predicate instead produces duplicate posts of the same invoice number inside one call. Split the tests by cause rather than by timing, and add one asserting the client never leaks an unclassified exception; the scripted handler needs at least four canned responses, and the retry pipeline is a static field with a real delay, so the test is timing-sensitive as written)
   - v9: fix round — the classifier is tested through a real client and a stub handler, split by cause on upload and poll, plus one test that no wire outcome escapes unclassified; the per-attempt timeout is deliberately not built, because the rejection it raises escapes to a catch that releases no claim
+  - v10: verified @`f769e22` — test-only, so no revert leg applies; the review confirmed the classifier is exercised through a real client
 
 ### PPW-567 — Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid
 
@@ -1032,6 +1038,7 @@ updated: 2026-08-21
   - v9: found by the delta pass — correctness and race, convergence 2, verdict unverified-low (a delta pass runs no skeptic on 🟡). Fix-generated by PPW-518, which added this retry loop
   - v9: pulled out of the backlog and fixed in round 9's cluster D, because it is the same mechanism as PPW-564 in the same method; status moved `backlog` → `open` so verification covers it (resolution-v9, commit `ba8e628`)
   - v9: fix round — exhausted retries log the order number, total and both payment identifiers at Error, capture to Sentry through an optional hub, roll the transition back with a reload whose own failure is swallowed, and answer 409 rather than a Paid-looking 200
+  - v10: verified @`f769e22` — revert-and-rerun reddened its suite, restore greened it; the exhausted branch answers 409 and rolls back
 
 ### PPW-568 — Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not
 
@@ -1042,6 +1049,7 @@ updated: 2026-08-21
   - v9: found by the delta pass — completeness-critic, convergence 1, verdict unverified-low. Fix-generated by PPW-518; the behaviour half of the same code is PPW-567
   - v9: pulled out of the backlog and fixed in round 9's cluster D alongside PPW-564 and PPW-567; status moved `backlog` → `open` so verification covers it (resolution-v9, commit `573dfb8`)
   - v9: fix round — every branch of the loop is covered in one Postgres-backed class, AdminOrderServicePaidRaceTests: both lost-race windows, the exhausted branch, the Sentry capture, both rollback-reload failures, the happy retry, and the container resolution of the optional hub
+  - v10: verified @`f769e22` — test-only, so no revert leg applies; the review confirmed every branch is covered
 
 ### PPW-569 — CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded
 
