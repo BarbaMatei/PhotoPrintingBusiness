@@ -46,9 +46,11 @@ Restated as invariants:
   `invoice_seq_ft_2026`). Crossing into 2027 creates a fresh sequence
   starting at 1 — preserves the year-by-year audit trail
   the Fiscal Code expects.
-- The sequence is created idempotently via
-  `CREATE SEQUENCE IF NOT EXISTS` on every `NextNumberAsync` call.
-  Cheap, safe under concurrency.
+- The sequence is created idempotently on every `NextNumberAsync`
+  call, through `PostgresSequences.EnsureAsync`. Cheap, but
+  `CREATE SEQUENCE IF NOT EXISTS` is not atomic against a concurrent
+  create, so the helper wraps it in a `DO` block that swallows only the
+  duplicate-object errors.
 - The `nextval()` call MUST happen inside the same transaction that
   persists the `Invoice` row — minimises the rollback-gap window.
   No external I/O (HTTP calls to ANAF, PDF generation, email)
@@ -105,7 +107,7 @@ For our scale and call path, `SEQUENCE` is the right primitive:
 
 | Alternative | Pros | Cons | Why Rejected |
 |---|---|---|---|
-| **Postgres `SEQUENCE` per (series, year)** (chosen) | Atomic, concurrent, idiomatic, no lock contention; idempotent creation via `IF NOT EXISTS`; natural year crossover | Gaps on transaction rollback; requires operational mitigation | — |
+| **Postgres `SEQUENCE` per (series, year)** (chosen) | Atomic, concurrent, idiomatic, no lock contention; idempotent creation, guarded against the concurrent-create race; natural year crossover | Gaps on transaction rollback; requires operational mitigation | — |
 | **Counter table with `FOR UPDATE`** | Strictly gap-free (rollback unwinds increment); single primitive across providers | Row-level lock on a hot row → serialises concurrent Paid transitions; extra DB round-trip; more complex SQL; awkward under future multi-replica scale-out | Trades concurrency headroom for an audit guarantee we can replicate procedurally |
 | **Single global sequence (not per-year)** | One fewer object to manage | First invoice of 2027 would be `FT-2027-456291` (whatever the global counter is at year-end), not `FT-2027-00001` — wrong legal trail; would require a complete numbering reset on Jan 1 anyway | — |
 | **Application-side counter in Redis** | Atomic, fast, multi-replica-safe | Adds Redis as a tier-1 dependency for the Paid path; persistence story for Redis itself (RDB / AOF) becomes load-bearing for legal correctness; bolt 046 explicitly deprioritised | Wrong dependency level for legal correctness |

@@ -110,9 +110,12 @@ throws. Construct from `DateTimeOffset.UtcNow` or an explicit `TimeSpan.Zero` of
   ledger D9 / bolt-035 deferral), not a quick add.
 - **Idempotency:** `Order.IdempotencyKey`, globally-unique partial index filtered on
   `IS NOT NULL`. Known accepted residual: not tenant-scoped.
-- **Sequences:** `OrderNumberService` and `PostgresInvoiceNumberingService` both
-  `CREATE SEQUENCE IF NOT EXISTS` on first use for the current year, so a new year needs no
-  migration.
+- **Sequences:** `OrderNumberService` and `PostgresInvoiceNumberingService` both create their
+  per-year sequence on first use through `PostgresSequences.EnsureAsync`, so a new year needs no
+  migration. `CREATE SEQUENCE IF NOT EXISTS` is **not** atomic against a concurrent create — the
+  loser raises `42P07`, `42710` or `23505` on a catalogue index — so the helper runs it inside a
+  `DO` block whose exception handler swallows exactly those three, and only when the name then
+  holds a sequence. A client-side catch would not do: it leaves an enclosing transaction aborted.
 
 ## Writing a relational test
 

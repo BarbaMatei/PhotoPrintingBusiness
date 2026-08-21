@@ -4,11 +4,7 @@ using PhotoPrint.API.Data;
 namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
-/// Postgres implementation per ADR-020. Uses
-/// <c>CREATE SEQUENCE IF NOT EXISTS</c> + <c>nextval()</c> for atomic
-/// gap-tolerant numbering. The sequence is created idempotently on every
-/// call — cheap, and removes any "did the migration cover this year?"
-/// concern when the year rolls over.
+/// Postgres implementation per ADR-020.
 ///
 /// Gap-on-rollback is the documented trade-off (the sequence advances
 /// even if the calling transaction rolls back). Callers must invoke this
@@ -36,16 +32,10 @@ public sealed class PostgresInvoiceNumberingService : IInvoiceNumberingService
         if (year is < 2000 or > 9999)
             throw new ArgumentOutOfRangeException(nameof(year));
 
-        // Quoted lowercase identifier mirrors the convention in the seed
-        // migration ('invoice_seq_ft_2026'). The series is validated by
-        // VatSettingsValidator to be uppercase ASCII letters only, so the
-        // lowercase mapping is well-defined and SQL-injection-safe.
+        // Lowercase mirrors the seed migration's 'invoice_seq_ft_2026'.
         var seqName = $"invoice_seq_{series.ToLowerInvariant()}_{year}";
 
-        // Idempotent create — Postgres handles concurrent IF NOT EXISTS safely.
-        await _db.Database.ExecuteSqlRawAsync(
-            $"CREATE SEQUENCE IF NOT EXISTS \"{seqName}\" START 1 INCREMENT 1",
-            ct);
+        await PostgresSequences.EnsureAsync(_db.Database, seqName, ct);
 
         var next = await _db.Database
             .SqlQueryRaw<long>($"SELECT nextval('\"{seqName}\"') AS \"Value\"")

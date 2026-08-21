@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.Tests.Helpers;
@@ -46,6 +47,73 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IDisposabl
 
         secondInYearA.Number.Should().Be(2);
         firstInYearB.Number.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task NextNumberAsync_LosesTheSequenceCreateRace_StillReturnsANumber()
+    {
+        var year = RandomYear();
+        await using var rival = await UncommittedSequenceCreator.StartAsync(
+            _database.ConnectionString, $"invoice_seq_ft_{year}");
+
+        var sut = MakeSut();
+        InvoiceNumber number = default;
+        Exception? failure;
+
+        try
+        {
+            var allocate = Task.Run(() => sut.NextNumberAsync("FT", year));
+
+            await rival.WaitUntilAnotherBackendBlocksAsync(TimeSpan.FromSeconds(10));
+            await rival.CommitAsync();
+
+            failure = await Record.ExceptionAsync(async () => number = await allocate);
+        }
+        finally
+        {
+            Record.Exception(() => sut.Dispose());
+        }
+
+        failure.Should().BeNull("the losing caller must draw a number instead of throwing");
+        number.Number.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task NextNumberAsync_LosesTheRaceInsideTheCallerTransaction_TransactionStaysUsable()
+    {
+        var year = RandomYear();
+        await using var rival = await UncommittedSequenceCreator.StartAsync(
+            _database.ConnectionString, $"invoice_seq_ft_{year}");
+
+        var db = _database.NewContext();
+        var transaction = await db.Database.BeginTransactionAsync();
+        InvoiceNumber number = default;
+        Exception? failure;
+
+        try
+        {
+            var service = new PostgresInvoiceNumberingService(
+                db, NullLogger<PostgresInvoiceNumberingService>.Instance);
+            var allocate = Task.Run(() => service.NextNumberAsync("FT", year));
+
+            await rival.WaitUntilAnotherBackendBlocksAsync(TimeSpan.FromSeconds(10));
+            await rival.CommitAsync();
+
+            failure = await Record.ExceptionAsync(async () =>
+            {
+                number = await allocate;
+                await db.Database.ExecuteSqlRawAsync("SELECT 1");
+                await transaction.CommitAsync();
+            });
+        }
+        finally
+        {
+            await Record.ExceptionAsync(() => transaction.DisposeAsync().AsTask());
+            await Record.ExceptionAsync(() => db.DisposeAsync().AsTask());
+        }
+
+        failure.Should().BeNull("the swallowed create must leave the caller transaction usable");
+        number.Number.Should().BeGreaterThan(0);
     }
 
     [Fact]

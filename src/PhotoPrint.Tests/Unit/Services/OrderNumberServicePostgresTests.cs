@@ -53,6 +53,35 @@ public class OrderNumberServicePostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task GenerateAsync_LosesTheSequenceCreateRace_StillReturnsANumber()
+    {
+        var year = DateTime.UtcNow.Year;
+        await using var rival = await UncommittedSequenceCreator.StartAsync(
+            _database.ConnectionString, $"order_number_seq_{year}");
+
+        var db = _database.NewContext();
+        string? number = null;
+        Exception? failure;
+
+        try
+        {
+            var generate = Task.Run(() => new OrderNumberService(db).GenerateAsync());
+
+            await rival.WaitUntilAnotherBackendBlocksAsync(TimeSpan.FromSeconds(10));
+            await rival.CommitAsync();
+
+            failure = await Record.ExceptionAsync(async () => number = await generate);
+        }
+        finally
+        {
+            await Record.ExceptionAsync(() => db.DisposeAsync().AsTask());
+        }
+
+        Assert.True(failure is null, $"the losing caller threw instead of drawing a number: {failure}");
+        Assert.StartsWith($"FT-{year}", number);
+    }
+
+    [Fact]
     public async Task GenerateAsync_ConcurrentCallers_EachGetADistinctNumber()
     {
         const int concurrency = 20;
