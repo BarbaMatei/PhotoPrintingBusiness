@@ -1,11 +1,14 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
+using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
@@ -41,7 +44,9 @@ public class AdminOrderServicePaidRaceTests : IDisposable
 
     public void Dispose() => _database.Dispose();
 
-    private AdminOrderService BuildService(PhotoPrintDbContext db, IInvoiceCreationService creator)
+    private AdminOrderService BuildService(
+        PhotoPrintDbContext db, IInvoiceCreationService creator,
+        ILogger<AdminOrderService>? logger = null, Sentry.IHub? sentry = null)
         => new(
             db,
             _email.Object,
@@ -53,7 +58,8 @@ public class AdminOrderServicePaidRaceTests : IDisposable
             _hub.Object,
             _awb.Object,
             creator,
-            NullLogger<AdminOrderService>.Instance);
+            logger ?? NullLogger<AdminOrderService>.Instance,
+            sentry);
 
     private static InvoiceCreationService RealCreator(
         PhotoPrintDbContext db, IInvoiceNumberingService numbering)
@@ -73,6 +79,16 @@ public class AdminOrderServicePaidRaceTests : IDisposable
         seed.Orders.Add(order);
         await seed.SaveChangesAsync();
         return id;
+    }
+
+    private async Task SeedInvoicedOrderAsync(int number)
+    {
+        var id = Guid.NewGuid();
+        using var seed = _database.NewContext();
+        seed.Orders.Add(TestOrders.Make(id));
+        await seed.SaveChangesAsync();
+        seed.Invoices.Add(TestOrders.MakeInvoice(id, number: number));
+        await seed.SaveChangesAsync();
     }
 
     private void CommitWebhookWinner(Guid orderId, int invoiceNumber)
@@ -155,6 +171,110 @@ public class AdminOrderServicePaidRaceTests : IDisposable
         AssertNoPaidSideEffects();
     }
 
+    [Fact]
+    public async Task ManualPaid_WhenInvoiceNumberRetriesExhaust_LeavesTheOrderUnpaidAndAnswersConflict()
+    {
+        await SeedInvoicedOrderAsync(number: 700);
+        var orderId = await SeedAwaitingPaymentAsync(euTransactionId: "EP-ADMIN-RECONCILE");
+
+        using var db = _database.NewContext();
+        var numbering = new FixedNumbering(700);
+        var logs = new LogCapture();
+        var sut = BuildService(db, RealCreator(db, numbering), logs.LoggerFor<AdminOrderService>());
+
+        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null);
+
+        await act.Should().ThrowAsync<ConflictException>(
+            "a 500 tells the admin nothing and leaves the order looking Paid in the response");
+        numbering.CallCount.Should().Be(4, "three retries after the first attempt");
+
+        using var verify = _database.NewContext();
+        var order = await verify.Orders.FirstAsync(o => o.Id == orderId);
+        order.Status.Should().Be(OrderStatus.AwaitingPayment);
+        order.PaidAt.Should().BeNull();
+        (await verify.Invoices.CountAsync(i => i.OrderId == orderId)).Should().Be(0);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Error &&
+                 r.Message.StartsWith("admin.order.invoice-number-collision-exhausted", StringComparison.Ordinal) &&
+                 r.Message.Contains(order.OrderNumber) &&
+                 r.Message.Contains("100") &&
+                 r.Message.Contains("EP-ADMIN-RECONCILE"),
+            "the order number, the total and the payment handles are what a manual reconciliation needs");
+        AssertNoPaidSideEffects();
+        _clientProxy.Verify(
+            c => c.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), It.IsAny<CancellationToken>()),
+            Times.Never, "nothing moved, so nothing is broadcast");
+    }
+
+    [Fact]
+    public async Task ManualPaid_WhenInvoiceNumberRetriesExhaust_CapturesTheExceptionForTriage()
+    {
+        await SeedInvoicedOrderAsync(number: 702);
+        var orderId = await SeedAwaitingPaymentAsync();
+
+        using var db = _database.NewContext();
+        var hub = new Mock<Sentry.IHub>();
+        hub.SetupGet(h => h.IsEnabled).Returns(true);
+        var sut = BuildService(db, RealCreator(db, new FixedNumbering(702)), sentry: hub.Object);
+
+        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null);
+
+        await act.Should().ThrowAsync<ConflictException>();
+        hub.Verify(h => h.CaptureEvent(
+                It.Is<Sentry.SentryEvent>(e => e.Exception is DbUpdateException),
+                It.IsAny<Sentry.Scope>(), It.IsAny<Sentry.SentryHint>()),
+            Times.Once);
+    }
+
+    // The rollback is a mechanism of its own: a throw from its reload must not turn the conflict into an unexplained 500.
+    [Fact]
+    public async Task ManualPaid_WhenTheRollbackReloadFails_StillAnswersConflict()
+    {
+        await SeedInvoicedOrderAsync(number: 701);
+        var orderId = await SeedAwaitingPaymentAsync();
+
+        using var db = _database.NewContext();
+        using var cts = new CancellationTokenSource();
+        var logs = new LogCapture();
+        var logger = new CancellingLogger(
+            logs, "admin.order.invoice-number-collision-exhausted", cts);
+        var sut = BuildService(db, RealCreator(db, new FixedNumbering(701)), logger);
+
+        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null, cts.Token);
+
+        await act.Should().ThrowAsync<ConflictException>();
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("admin.order.rollback-reload-failed", StringComparison.Ordinal));
+
+        using var verify = _database.NewContext();
+        (await verify.Orders.FirstAsync(o => o.Id == orderId)).PaidAt.Should().BeNull();
+    }
+
+    // Sentry registers its hub only when Sentry:Enabled, so the container has to build this service without one.
+    [Fact]
+    public void TheServiceStillResolvesWithNoSentryHubRegistered()
+    {
+        var services = new ServiceCollection();
+        services.AddDbContext<PhotoPrintDbContext>(o => o.UseNpgsql(_database.ConnectionString));
+        services.AddSingleton(_email.Object);
+        services.AddSingleton(Mock.Of<IEuPlatescService>());
+        services.AddSingleton(Mock.Of<Stripe.IStripeClient>());
+        services.AddSingleton(Mock.Of<IStorageRouter>());
+        services.AddSingleton(Mock.Of<IOriginalPurger>());
+        services.AddSingleton(Options.Create(new ArchiveSettings()));
+        services.AddSingleton(_hub.Object);
+        services.AddSingleton(_awb.Object);
+        services.AddSingleton(Mock.Of<IInvoiceCreationService>());
+        services.AddSingleton<ILogger<AdminOrderService>>(NullLogger<AdminOrderService>.Instance);
+        services.AddScoped<IAdminOrderService, AdminOrderService>();
+
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<IAdminOrderService>().Should().NotBeNull();
+    }
+
     // The flag picks which side of the creation service's existence query the winner commits on, so both race windows are reachable.
     private sealed class RaceInjectingCreator : IInvoiceCreationService
     {
@@ -209,6 +329,34 @@ public class AdminOrderServicePaidRaceTests : IDisposable
         {
             CallCount++;
             return Task.FromResult(new InvoiceNumber(series, year, _number));
+        }
+    }
+
+    // Cancels the token the moment a named line is logged, landing the cancellation inside the call that follows it.
+    private sealed class CancellingLogger : ILogger<AdminOrderService>
+    {
+        private readonly LogCapture _capture;
+        private readonly string _prefix;
+        private readonly CancellationTokenSource _cts;
+
+        public CancellingLogger(LogCapture capture, string prefix, CancellationTokenSource cts)
+        {
+            _capture = capture;
+            _prefix = prefix;
+            _cts = cts;
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var message = formatter(state, exception);
+            _capture.LoggerFor<AdminOrderService>().Log(logLevel, eventId, message, exception, (m, _) => m);
+            if (message.StartsWith(_prefix, StringComparison.Ordinal)) _cts.Cancel();
         }
     }
 }

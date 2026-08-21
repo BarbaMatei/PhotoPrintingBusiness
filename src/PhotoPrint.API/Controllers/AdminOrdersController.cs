@@ -43,6 +43,7 @@ public class AdminOrdersController(IAdminOrderService adminOrderService) : Contr
     [ProducesResponseType(typeof(AdminOrderDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateStatusAsync(
         Guid id,
         [FromBody] UpdateOrderStatusRequest request,

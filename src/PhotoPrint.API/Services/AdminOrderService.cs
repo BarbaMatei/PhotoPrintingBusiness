@@ -30,6 +30,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly IAwbCreationNotifier _awbNotifier;
     private readonly IInvoiceCreationService _invoiceCreator;
     private readonly ILogger<AdminOrderService> _logger;
+    private readonly Sentry.IHub? _sentry;
 
     public AdminOrderService(
         PhotoPrintDbContext db,
@@ -42,7 +43,9 @@ public class AdminOrderService : IAdminOrderService
         IHubContext<AdminOrderHub> hub,
         IAwbCreationNotifier awbNotifier,
         IInvoiceCreationService invoiceCreator,
-        ILogger<AdminOrderService> logger)
+        ILogger<AdminOrderService> logger,
+        // No hub is registered unless Sentry:Enabled, so this cannot be a required dependency.
+        Sentry.IHub? sentry = null)
     {
         _db = db;
         _orderEmailService = orderEmailService;
@@ -55,6 +58,7 @@ public class AdminOrderService : IAdminOrderService
         _awbNotifier = awbNotifier;
         _invoiceCreator = invoiceCreator;
         _logger = logger;
+        _sentry = sentry;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -153,6 +157,11 @@ public class AdminOrderService : IAdminOrderService
 
         if (!savedWithInvoice)
             await _db.SaveChangesAsync(ct);
+
+        // The order is still awaiting payment, so a 200 carrying a Paid-looking DTO would tell the admin the opposite of what happened.
+        if (paidOutcome == PaidSaveOutcome.NumberExhausted)
+            throw new ConflictException(
+                $"Order {order.OrderNumber} was not marked Paid: no invoice number could be allocated. The order is unchanged — retry once the numbering collision clears.");
 
         // Cumulative histogram: a shipment that never committed can never be un-observed.
         if (processingSeconds is { } seconds)
@@ -413,7 +422,7 @@ public class AdminOrderService : IAdminOrderService
     }
 
     // Only Created may run the caller's Paid side effects; the webhook's own enum is private and pinned by a test that reflects on it.
-    private enum PaidSaveOutcome { Created, AlreadyInvoiced }
+    private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
 
     // Mirrors the webhook Paid path: a concurrent delivery or taken number must not 500 an admin status change.
     private async Task<PaidSaveOutcome> SaveWithInvoiceAsync(Order order, CancellationToken ct)
@@ -446,6 +455,19 @@ public class AdminOrderService : IAdminOrderService
                     "admin.order.invoice-number-collision-retry order_id={OrderId} attempt={Attempt}",
                     order.Id, attempt);
             }
+            catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsNumberViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                // Logged before the rollback discards them: on an offline reconciliation these are the only handles on the payment being recorded.
+                _logger.LogError(ex,
+                    "admin.order.invoice-number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} euplatesc_transaction_id={EuPlatescTransactionId} — order not marked Paid, manual reconciliation required",
+                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId, order.EuPlatescTransactionId);
+                // A conflict is a 4xx and the request pipeline captures only 5xx, so nothing downstream would page anyone.
+                _sentry?.CaptureException(ex);
+
+                await RollBackTransitionAsync(order, ct);
+                return PaidSaveOutcome.NumberExhausted;
+            }
         }
     }
 
@@ -454,5 +476,19 @@ public class AdminOrderService : IAdminOrderService
     {
         await _db.Entry(order).ReloadAsync(ct);
         return PaidSaveOutcome.AlreadyInvoiced;
+    }
+
+    private async Task RollBackTransitionAsync(Order order, CancellationToken ct)
+    {
+        // Reload rather than unwind field by field, and swallow a failure: the caller answers a conflict either way, and a throw here would turn it into an unexplained 500.
+        try
+        {
+            await _db.Entry(order).ReloadAsync(ct);
+        }
+        catch (Exception reloadEx)
+        {
+            _logger.LogWarning(reloadEx,
+                "admin.order.rollback-reload-failed order_id={OrderId}", order.Id);
+        }
     }
 }

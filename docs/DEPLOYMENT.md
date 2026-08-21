@@ -1541,6 +1541,7 @@ The Sentry section (§13.8) covers exception alerts. For invoicing-specific sign
 |---|---|---|
 | `invoice_anaf_status_total{status="failed"}` rate > 0 in 1h | Prometheus | Page — every Failed invoice is a manual-remediation candidate. |
 | `invoice_anaf_status_total{status="rejected"}` rate > 5/day | Prometheus | Investigate. A sustained Rejected rate means a misconfiguration (Seller, VAT rate) is rejecting everything. |
+| `admin.order.invoice-number-collision-exhausted` (Error + Sentry capture) | Logs / Sentry | The admin's mark-as-paid answered 409 and the order stayed `AwaitingPayment`, so money that arrived out of band has no invoice. The number the sequence handed out was already taken — check `invoice_seq_<series>_<year>` against `MAX("Number")` (§15.8), fix the sequence, then have the admin retry. The log line carries the order number, total and payment identifiers. |
 | Cert expiry < 30 days | Manual / OpenSSL cron | Renew at the provider. New cert → new env var → restart. |
 | Days-since-`Anaf__Enabled` flip with `CustomerEmailAttachments=false` > 14 | Manual | Document why the inspection extended. Flipping the flag on is not yet an option — no email send path exists (§15.7 step 6). |
 | Quarter end | Calendar | Run the gap audit query (§15.8). |
