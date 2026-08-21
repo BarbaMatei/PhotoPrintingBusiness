@@ -19,6 +19,19 @@ public class MigrationChainTests
         (await db.Database.GetAppliedMigrationsAsync()).Should().NotBeEmpty();
     }
 
+    // Drift that adds no column — an index, a length, a precision — is invisible to the tests below, and the next scaffolded migration would diff against the stale snapshot.
+    [Fact]
+    public void The_model_snapshot_still_matches_the_model()
+    {
+        using var db = new PhotoPrintDbContext(
+            new DbContextOptionsBuilder<PhotoPrintDbContext>()
+                .UseNpgsql("Host=localhost;Database=pp_model_comparison_only")
+                .Options);
+
+        db.Database.HasPendingModelChanges().Should().BeFalse(
+            "the model changed with no migration scaffolded, so run dotnet ef migrations add");
+    }
+
     [Fact]
     public async Task The_composite_invoice_index_exists_after_migrating()
     {
