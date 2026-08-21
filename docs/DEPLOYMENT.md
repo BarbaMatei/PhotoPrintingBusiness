@@ -1413,7 +1413,7 @@ Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-d
 
 3. **Stage 1 — sandbox flip.** In staging, point at the ANAF **sandbox** (`BaseUrl=https://api.anaf.ro/test/FCTEL/rest/`) and set `Anaf__Enabled=true`. Redeploy. Trigger a test order. Watch for:
    ```
-   invoice.creation.allocated invoice_number=FT-2026-00001
+   invoice.creation.number-attempted invoice_number=FT-2026-00001
    anaf.token.refreshed
    anaf.upload-job.batch size=1
    anaf.upload-job.xml-built invoice_id=…

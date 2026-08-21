@@ -27,6 +27,9 @@ public class PhotoPrintDbContext : DbContext
     public const string InvoiceOrderIdIndexName = "ix_invoices_order_id";
     public const string InvoiceNumberIndexName = "ix_invoices_invoice_number";
 
+    /// <summary>Raw-SQL composite index from the migration, so it has no model-side declaration to name it.</summary>
+    public const string InvoiceSeriesYearNumberIndexName = "uq_invoices_series_year_number";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {

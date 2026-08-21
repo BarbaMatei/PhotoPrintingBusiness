@@ -106,6 +106,35 @@ public class WebhooksControllerInvoiceRaceTests : IDisposable
         return (bool)method.Invoke(null, [ex])!;
     }
 
+    private static bool InvokeIsInvoiceNumberViolation(DbUpdateException ex)
+    {
+        var method = typeof(WebhooksController).GetMethod("IsInvoiceNumberViolation",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        return (bool)method.Invoke(null, [ex])!;
+    }
+
+    // Raw SQL with no model declaration, so it was the one unique index neither classifier matched.
+    [Fact]
+    public async Task CompositeSeriesYearNumberViolation_IsClassifiedAsANumberCollision()
+    {
+        var orderA = Guid.NewGuid();
+        var orderB = Guid.NewGuid();
+        using var db = CreateDb();
+        db.Orders.Add(MakeOrder(orderA));
+        db.Orders.Add(MakeOrder(orderB));
+        await db.SaveChangesAsync();
+
+        db.Invoices.Add(TestOrders.MakeInvoice(orderA, number: 700));
+        await db.SaveChangesAsync();
+        db.Invoices.Add(TestOrders.MakeInvoice(orderB, number: 700, invoiceNumber: "FT-2026-00700-dup"));
+
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+
+        InvokeIsInvoiceNumberViolation(ex).Should().BeTrue(
+            "a repeat of series+year+number is a number collision, so a fresh number is the fix");
+        InvokeIsInvoiceOrderIdViolation(ex).Should().BeFalse();
+    }
+
     // The race is forced by ordering the calls directly rather than by real concurrency.
     [Fact]
     public async Task ConcurrentDeliveriesForSameOrder_LoserGetsClassifiableViolation_ExactlyOneInvoicePersists()

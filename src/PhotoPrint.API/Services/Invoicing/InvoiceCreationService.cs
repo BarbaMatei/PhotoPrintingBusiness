@@ -94,7 +94,8 @@ public sealed class InvoiceCreationService : IInvoiceCreationService
         _db.Invoices.Add(invoice);
 
         _logger.LogInformation(
-            "invoice.creation.allocated order_id={OrderId} invoice_number={InvoiceNumber}",
+            // Pre-commit: a numbering collision retries with a fresh number, so a logged number may never reach the database.
+            "invoice.creation.number-attempted order_id={OrderId} invoice_number={InvoiceNumber}",
             order.Id, invoice.InvoiceNumber);
 
         return invoice;
