@@ -13,14 +13,17 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 // Multi-replica safety relies on the per-row ClaimedAt+TTL claim below, plus ANAF's own InvoiceNumber dedupe as a crash-window fallback.
 public sealed class InvoiceUploadJob : BackgroundService
 {
-    // Sized to outlast a poll tick, or it dedups nothing, yet stay far inside the 5-business-day submission SLA, so a page nobody saw still re-fires dozens of times before the deadline.
-    private static readonly TimeSpan AuthOutageAlertWindow = TimeSpan.FromHours(2);
+    // A row that just failed sits out one poll interval, so consecutive auth attempts on it are up to two intervals apart; four clears that with margin, the floor keeps the window positive (MemoryCache rejects a non-positive expiry, and the throw would land inside the auth catch), and the validator's 1440-minute ceiling on the interval caps the widest window at 96 h — inside the 5-business-day submission deadline.
+    private const int AuthOutageAlertWindowIntervals = 4;
+    private static readonly TimeSpan MinAuthOutageAlertWindow = TimeSpan.FromHours(2);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly AnafSettings _settings;
     private readonly AnafOutageRegistry _outages;
     private readonly TimeProvider _clock;
     private readonly ILogger<InvoiceUploadJob> _logger;
+    private readonly int _pollIntervalMinutes;
+    private readonly TimeSpan _authOutageAlertWindow;
 
     public InvoiceUploadJob(
         IServiceScopeFactory scopeFactory,
@@ -34,11 +37,19 @@ public sealed class InvoiceUploadJob : BackgroundService
         _outages = outages;
         _clock = clock;
         _logger = logger;
+        _pollIntervalMinutes = Math.Max(1, _settings.PollIntervalMinutes);
+        _authOutageAlertWindow = AuthOutageAlertWindowFor(_pollIntervalMinutes);
+    }
+
+    private static TimeSpan AuthOutageAlertWindowFor(int pollIntervalMinutes)
+    {
+        var scaled = TimeSpan.FromMinutes(AuthOutageAlertWindowIntervals * (long)pollIntervalMinutes);
+        return scaled > MinAuthOutageAlertWindow ? scaled : MinAuthOutageAlertWindow;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = TimeSpan.FromMinutes(Math.Max(1, _settings.PollIntervalMinutes));
+        var interval = TimeSpan.FromMinutes(_pollIntervalMinutes);
         using var timer = new PeriodicTimer(interval);
 
         _logger.LogInformation(
@@ -122,7 +133,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                     if (!authFailed)
                     {
                         authFailed = true;
-                        if (_outages.MarkOutageOnce("auth", AuthOutageAlertWindow))
+                        if (_outages.MarkOutageOnce("auth", _authOutageAlertWindow))
                         {
                             // Urgent (expiring cert / revoked credential) — no per-replica-safe counter backs "escalate after N tries", so treat as urgent on first sight.
                             _logger.LogError(ex, "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
@@ -132,8 +143,8 @@ public sealed class InvoiceUploadJob : BackgroundService
                         {
                             // With the page suppressed, this is the operator's only per-tick evidence that the outage has not recovered.
                             _logger.LogWarning(
-                                "anaf.upload-job.auth-outage-continues invoice_id={InvoiceId} alert_window_minutes={WindowMinutes}",
-                                row.Id, AuthOutageAlertWindow.TotalMinutes);
+                                "anaf.upload-job.auth-outage-continues invoice_id={InvoiceId} alert_window_minutes={WindowMinutes} interval_minutes={IntervalMinutes}",
+                                row.Id, _authOutageAlertWindow.TotalMinutes, _pollIntervalMinutes);
                         }
                     }
                     else

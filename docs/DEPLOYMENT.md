@@ -1429,13 +1429,20 @@ Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-d
 
    If the credentials are wrong (the common stage-1 failure), the shape is:
    ```
-   anaf.upload-job.auth-failed invoice_id=…              ← Error + Sentry, ONCE per 2 h per replica
-   anaf.upload-job.auth-outage-continues invoice_id=… alert_window_minutes=120
+   anaf.upload-job.auth-failed invoice_id=…              ← Error + Sentry, ONCE per alert window per replica
+   anaf.upload-job.auth-outage-continues invoice_id=… alert_window_minutes=120 interval_minutes=30
                                                         ← Warning, ~every 2nd tick (see below)
    anaf.upload-job.auth-failure-skipped count=N          ← Warning, when the batch had other rows
    ```
-   The Error is deliberately rate-limited to one page per 2 h window: without it a multi-day
-   outage pages every poll interval. **Silence is not recovery** — the `auth-outage-continues`
+   The Error is deliberately rate-limited to one page per **alert window**: without it a multi-day
+   outage pages every poll interval. That window is four poll intervals with a two-hour floor, so
+   it is 2 h at the default 30-minute cadence and it widens with `Anaf__PollIntervalMinutes` —
+   slowing the worker down cannot outrun the rate limit. Four, because a row that just recorded an
+   error sits out one interval, so consecutive auth attempts on it are up to two intervals apart.
+   At the validated maximum of 1440 minutes the window is 96 h, still inside the 5-business-day
+   submission deadline, so an outage nobody acts on pages at least twice before an invoice is
+   late. Both numbers are on every `auth-outage-continues` line, so the pair is checkable in the
+   logs rather than inferred. **Silence is not recovery** — the `auth-outage-continues`
    Warning is what tells them apart, and each affected row also carries the reason in
    `Invoices.LastError` (visible in the admin invoice list). Expect that Warning about every
    **other** tick (~60 min at the default cadence), not every tick: a row that just recorded an

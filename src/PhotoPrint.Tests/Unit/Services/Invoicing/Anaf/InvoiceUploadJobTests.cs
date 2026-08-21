@@ -95,7 +95,7 @@ public class InvoiceUploadJobTests
         PostgresTestDatabase database, bool cloudEnabled,
         LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
         TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false,
-        AnafOutageRegistry? outages = null)
+        AnafOutageRegistry? outages = null, int pollIntervalMinutes = 30)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -148,6 +148,7 @@ public class InvoiceUploadJobTests
                 Options.Create(new AnafSettings
                 {
                     ClaimTtlMinutes = claimTtlMinutes,
+                    PollIntervalMinutes = pollIntervalMinutes,
                     BackoffHours = backoffHours ?? new AnafSettings().BackoffHours,
                 }),
                 outages ?? new AnafOutageRegistry(new MemoryCache(new MemoryCacheOptions())),
@@ -569,6 +570,93 @@ public class InvoiceUploadJobTests
         logs.Records.Count(r => r.Level == LogLevel.Error &&
                                 r.Message.StartsWith("anaf.upload-job.auth-failed", StringComparison.Ordinal))
             .Should().Be(2, "an outage that outlives the alert window has to be re-reported");
+    }
+
+    // A window shorter than a tick puts every tick outside the previous one, which is the storm it exists to stop.
+    [Fact]
+    public async Task ProcessBatchAsync_AuthStillFailingOnTheNextTickOfASlowPoll_DoesNotPageASecondTime()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
+        var h = Build(database, cloudEnabled: false, logs,
+                      outages: new AnafOutageRegistry(cache), pollIntervalMinutes: 180);
+        SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+        // Two intervals on — a failed row sits out one tick, so this is production's widest gap between auth attempts.
+        cacheClock.UtcNow = cacheClock.UtcNow.AddMinutes(360);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.CountStartingWith("anaf.upload-job.auth-failed", LogLevel.Error)
+            .Should().Be(1, "the window has to outlast the poll interval an operator configured");
+        logs.Records.Should().ContainSingle(
+            r => r.Level == LogLevel.Warning &&
+                 r.Message.StartsWith("anaf.upload-job.auth-outage-continues", StringComparison.Ordinal) &&
+                 r.Message.Contains("alert_window_minutes=720 interval_minutes=180", StringComparison.Ordinal),
+            "the operator can only see the window outlasts a tick if both numbers are on the line");
+    }
+
+    // At the slowest legal interval the window must still expire inside the 5-business-day submission deadline.
+    [Fact]
+    public async Task ProcessBatchAsync_AuthOutageAtTheSlowestLegalPoll_PagesAgainInsideTheSubmissionDeadline()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
+        var h = Build(database, cloudEnabled: false, logs,
+                      outages: new AnafOutageRegistry(cache), pollIntervalMinutes: 1440);
+        SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+        cacheClock.UtcNow = cacheClock.UtcNow.AddHours(48);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.CountStartingWith("anaf.upload-job.auth-failed", LogLevel.Error)
+            .Should().Be(1, "two daily ticks into one outage is still one incident");
+
+        cacheClock.UtcNow = cacheClock.UtcNow.AddHours(48).AddMinutes(1);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.CountStartingWith("anaf.upload-job.auth-failed", LogLevel.Error)
+            .Should().Be(2, "96 h is inside the 5 business days ANAF allows, so the outage re-pages in time");
+    }
+
+    // The floor stops a fast cadence shrinking the window to minutes, and keeps it positive — MemoryCache rejects a non-positive expiry.
+    [Fact]
+    public async Task ProcessBatchAsync_AuthOutageAtTheFastestLegalPoll_KeepsTheTwoHourFloor()
+    {
+        using var database = new PostgresTestDatabase();
+        var logs = new LogCapture();
+        var cacheClock = new FakeSystemClock(new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero));
+        using var cache = new MemoryCache(new MemoryCacheOptions { Clock = cacheClock });
+        var h = Build(database, cloudEnabled: false, logs,
+                      outages: new AnafOutageRegistry(cache), pollIntervalMinutes: 1);
+        SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Submitted, anafUploadId: "upload-1");
+
+        h.AnafClient.Setup(c => c.GetStatusAsync("upload-1", It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafAuthException("stareMesaj"));
+
+        await InvokeProcessBatchAsync(h.Job);
+        cacheClock.UtcNow = cacheClock.UtcNow.AddMinutes(119);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.CountStartingWith("anaf.upload-job.auth-failed", LogLevel.Error)
+            .Should().Be(1, "four one-minute intervals is not an alert window");
+
+        cacheClock.UtcNow = cacheClock.UtcNow.AddMinutes(2);
+        await InvokeProcessBatchAsync(h.Job);
+
+        logs.CountStartingWith("anaf.upload-job.auth-failed", LogLevel.Error)
+            .Should().Be(2, "past the floor it is still a heartbeat, not a mute");
     }
 
     [Fact]
