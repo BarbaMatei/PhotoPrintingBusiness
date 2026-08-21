@@ -96,6 +96,27 @@ updated: 2026-08-21
 | PPW-552 | 🟡 | v6 | PPW-515's fix orphaned `AnafUnreachableException`'s XML doc comment | `Services/Invoicing/Anaf/AnafExceptions.cs:32-47` | backlog | `2979ea0` |
 | PPW-553 | 🟠 | v7 | The 2 h ANAF auth-outage window has no floor tied to PollIntervalMinutes, so a validator-legal interval above it defeats the dedup | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:17` | verified | `2daf61e` |
 | PPW-554 | 🟡 | v7 | The bucket-versus-key miss-cause preference has no regression test | `Controllers/InvoicesController.cs:83-87` | backlog | `0ec6497` |
+| PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | open | `c8d6bb4` |
+| PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | open | `c8d6bb4` |
+| PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | open | `c8d6bb4` |
+| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | open | `c8d6bb4` |
+| PPW-561 | 🟠 | v9 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `Tests/Helpers/PostgresTestDatabase.cs:33` | open | `c8d6bb4` |
+| PPW-562 | 🟠 | v9 | PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run | `Tests/Helpers/PostgresTestDatabase.cs:25` | open | `c8d6bb4` |
+| PPW-563 | 🟠 | v9 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | open | `c8d6bb4` |
+| PPW-564 | 🟠 | v9 | Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt | `Services/AdminOrderService.cs:425` | open | `c8d6bb4` |
+| PPW-565 | 🟠 | v9 | Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml | `Migrations/PhotoPrintDbContextModelSnapshot.cs:1` | open | `c8d6bb4` |
+| PPW-566 | 🟠 | v9 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | open | `c8d6bb4` |
+| PPW-567 | 🟡 | v9 | Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid | `Services/AdminOrderService.cs:417` | backlog | `c8d6bb4` |
+| PPW-568 | 🟡 | v9 | Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not | `Services/AdminOrderService.cs:414` | backlog | `c8d6bb4` |
+| PPW-569 | 🟡 | v9 | CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded | `Services/Invoicing/PostgresInvoiceNumberingService.cs:46` | backlog | `c8d6bb4` |
+| PPW-570 | 🟡 | v9 | PostgresTestDatabase contexts omit the split-query behaviour production configures | `Tests/Helpers/PostgresTestDatabase.cs:53` | backlog | `c8d6bb4` |
+| PPW-571 | 🟡 | v9 | PostgresTestDatabase.Dispose clears every Npgsql pool in the process while parallel test classes hold their own databases | `Tests/Helpers/PostgresTestDatabase.cs:99` | backlog | `c8d6bb4` |
+| PPW-572 | 🟡 | v9 | MemoryCacheOnceRegistry.MarkOnce is a non-atomic read-then-write despite promising first-caller-only | `Services/MemoryCacheOnceRegistry.cs:23` | backlog | `c8d6bb4` |
+| PPW-573 | 🟡 | v9 | data-stack standard and the deployment guide left stale by the migration squash and the provider removal | `memory-bank/standards/data-stack.md:29` | backlog | `c8d6bb4` |
+| PPW-574 | ⚪ | v9 | InvoiceAddressFormatter.Truncate with maxLength 0 indexes before the string start and throws IndexOutOfRangeException | `Services/Invoicing/InvoiceAddressFormatter.cs:20` | backlog | `c8d6bb4` |
+| PPW-575 | ⚪ | v9 | PostalZone is truncated with the borrowed CityNameMaxLength constant | `Services/Invoicing/InvoiceXmlBuilder.cs:122` | backlog | `c8d6bb4` |
+| PPW-576 | ⚪ | v9 | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `Controllers/InvoicesController.cs:122` | backlog | `c8d6bb4` |
+| PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
 
 ## Details
 
@@ -649,6 +670,7 @@ updated: 2026-08-21
   - v6: correction to the line above, which is labelled verbatim but paraphrases. The ruling is recorded in the v4 resolution and on the PPW-511 row; PPW-508 carries no quotable History line for it.
   - v6: fix round — wont-fix on the owner ruling that EuPlatesc is being removed; PPW-511 tracks that the removal is untracked
   - v6: re-affirmed @`2979ea0` — the owner ruling stands, and the untracked-removal gap stays tracked via open PPW-511
+  - v9: re-raised by the delta pass — completeness-critic, convergence 1, skeptics skipped as a decided re-raise. Prior decision, verbatim from the v6 line above: "fix round — wont-fix on the owner ruling that EuPlatesc is being removed; PPW-511 tracks that the removal is untracked". Re-affirmed at `c8d6bb4`: the ruling stands, PPW-511 is still open, and the new fact this pass adds is that both webhook legs now share one failure-metric wrapper whose EuPlatesc half answers a different response contract — still waived with the integration
 
 ### PPW-527 — Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook
 
@@ -883,6 +905,7 @@ updated: 2026-08-21
 - **Suggested fix:** Move the new one-line summary above the new class and restore the original block immediately above AnafUnreachableException.
 - **History:**
   - v6: found by the v6 verification pass's fix-diff review of clusters A/B — fix-generated by PPW-515; 🟡, entered ledger as `backlog` per README router
+  - v9: re-raised by the delta pass — correctness and completeness-critic, convergence 2, skeptics skipped as a decided re-raise. Prior decision, verbatim from the v6 line above: "🟡, entered ledger as `backlog` per README router". Re-affirmed as `backlog` at `c8d6bb4`, severity unchanged; the pass adds that the orphaned paragraph promises "the next tick retries on the natural schedule", the opposite of the hold-the-claim behaviour PPW-559 now indicts
 
 ### PPW-553 — The 2 h ANAF auth-outage window has no floor tied to PollIntervalMinutes, so a validator-legal interval above it defeats the dedup
 
@@ -902,3 +925,179 @@ updated: 2026-08-21
 - **Suggested fix:** Add one test per cause, asserting the logged event carries the adapter's inner cause for a missing bucket and for a missing key.
 - **History:**
   - v7: found by the v7 verification pass's fix-diff review — fix-generated by PPW-550's follow-up; 🟡, entered ledger as `backlog` per README router
+
+### PPW-557 — New mandatory-address guard makes every Easybox order permanently un-invoiceable
+
+- **What:** The guard PPW-512's fix added refuses a blank buyer address, but nothing fills one for a locker order, so Build() throws after the customer is charged. The PDF is never rendered, `GET /api/orders/{id}/invoice` answers 404 for ever, and the row retries every tick with no exit.
+- **Evidence:** `Services/Invoicing/InvoiceXmlBuilder.cs:131` throws; `src/PhotoPrint.UI/src/app/core/services/checkout-state.service.ts:39` sends street, city and postal code as empty strings; `Validators/Payments/CreateOrderRequestValidator.cs:32` only length-bounds them for Easybox; `Services/OrderService.cs:156` stores that snapshot verbatim; `Services/Invoicing/Anaf/InvoiceUploadJob.cs:267` builds and catches at 294; `Controllers/InvoicesController.cs:66` returns the permanent 404.
+- **Suggested fix:** Give a locker order a real fiscal buyer address before the XML is built — at order or invoice creation, not derived inside Build() — keep the guard, and unstick the rows already looping. **Files:** `InvoiceXmlBuilder.cs:131`, `Anaf/InvoiceUploadJob.cs:267`, `InvoiceLifecycle.cs:44`, `CreateOrderRequestValidator.cs:32`, `OrderService.cs:156`, `checkout-state.service.ts:39`. **Path:** Easybox checkout sends a contact-only snapshot, the order is paid, Build throws, LastError is set and the status stays Pending, the claim is released, the next tick repeats, and PdfStoragePath is never set. **Test shape:** `InvoiceXmlBuilderTests.Build_EasyboxOrder_WithContactOnlySnapshot_Succeeds` — Easybox order whose ShippingAddress carries recipient and phone only, act Build, assert no throw and a buyer PostalAddress; reddens today with "has no buyer address". **Trigger-list-shaped:** no by the list, but which address a locker order may carry is an open owner question, so the pre-check ran anyway.
+- **History:**
+  - v9: found by the delta pass — correctness, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-512, whose v6 resolution parked "what address a locker order should carry" as an owner question and shipped the guard regardless
+  - v9: Approach pre-check: refuted (EasyboxLocker carries no postal code at all and is not loaded on the invoicing path, so "fill from the locker" cannot work; the one existing locker-address derivation invents the sentinel "000000", which on a fiscal document is worse than refusing; and the drafted test would invert three tests that lock the throw in deliberately. The fix belongs upstream at order or invoice creation, must also unstick the already-looping rows through a path the admin retry cannot reach today, and must guard `Services/Invoicing/InvoicePdfDocument.cs:90`, which has no check of its own)
+
+### PPW-558 — Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check
+
+- **What:** The Stripe webhook action is anonymous and disables the request-size limit, and the handler reads the whole body into a string before the signature is verified. One unauthenticated multi-gigabyte POST can exhaust the API's memory.
+- **Evidence:** `Controllers/WebhooksController.cs:69` (anonymous plus the disabled size limit), `:73` (the body is read to end), `:84` (the signature is checked afterwards); `Extensions/SecurityExtensions.cs:59` limits requests per IP, not bytes; `Caddyfile:1` and `docker-compose.prod.yml:10` set no body maximum anywhere at the edge.
+- **Suggested fix:** Reject an oversized body inside the action, before verification, using the exception the middleware already maps to 413, and keep an attribute limit as the byte-level backstop. **Files:** `WebhooksController.cs:69`, `:73`, `:84`, `Extensions/SecurityExtensions.cs:59`, `Caddyfile:1`, `docker-compose.prod.yml:10`. **Path:** anonymous POST with a bogus signature and a multi-gigabyte body, no size cap anywhere, the body is buffered into a string, and only then is the signature rejected. **Test shape:** `WebhooksControllerTests.StripeWebhook_RejectsOversizedBody` — a body stream that never ends and no Content-Length, assert the 413-mapped exception and that the verifier was never called. **Trigger-list-shaped:** yes (adds a limiter) — approach pre-check run.
+- **History:**
+  - v9: found by the delta pass — security, convergence 1, not hinted, verdict confirmed with a built trace. Not fix-generated: the attributes date from the initial commit; it surfaced now because the `security` lens had not run on this target since v1
+  - v9: Approach pre-check: revised (the drafted attribute alone answers 500 plus a Sentry capture, not 413, because the exception middleware maps exact types and Kestrel's oversize exception is not in the map; enforce in the action with the existing `RequestEntityTooLargeException` at a 1 MB cap — 256 KB risks rejecting a genuine event and buying a three-day Stripe retry — keep the attribute as the byte backstop that also covers a chunked body with no Content-Length, and fix two sibling sites in the same change: the EuPlatesc IPN materialises its whole form before checking its signature, and `Filters/DetectLegacyShippingCostFilter.cs:29` calls EnableBuffering with no limit on the payment endpoints, reachable with a free guest token. The drafted unit test can never pass, because the size filter never runs on a direct action call and TestHost does not surface the limit either)
+
+### PPW-559 — Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF
+
+- **What:** On an upload timeout the row keeps its claim instead of releasing it, but the claim lives 10 minutes by default and the next tick is 30 minutes away. The row is re-claimed and the same invoice number is submitted to ANAF a second time, with nothing reconciling the first, unknown-outcome attempt.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:343` (the timeout branch), `:220` (the error write touches LastError and UpdatedAt only), `:94` (the batch guard); `Configuration/AnafSettings.cs:27` (claim 10 min, poll 30 min); `Services/Invoicing/Anaf/AnafSpvClient.cs:37` sends no idempotency key; `Services/Invoicing/InvoiceLifecycle.cs:44`.
+- **Suggested fix:** Persist an explicit outcome-unknown hold that outlives the poll interval and has a stated exit, instead of relying on the claim. **Files:** `Anaf/InvoiceUploadJob.cs:343`, `:220`, `:94`, `InvoiceLifecycle.cs:44`, `Configuration/AnafSettings.cs:27`, `Anaf/AnafSpvClient.cs:37`. **Path:** tick T times out and keeps the claim, tick T+30 is skipped by the per-row cooldown, tick T+60 passes both the cooldown and the expired-claim guard and re-posts the cached payload under the same invoice number. **Test shape:** `InvoiceUploadJobTests.UploadTimeout_ThenLaterTick_ReuploadsSameInvoice` — Pending invoice, client throws the upload-timeout exception, run a tick, advance the clock 60 minutes, run again, assert the upload was called once; today it is called twice. **Trigger-list-shaped:** yes (changes the claim's concurrency model and retry semantics) — approach pre-check run.
+- **History:**
+  - v9: found by the delta pass — race, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-515, whose resolution stated "an upload timeout holds its claim rather than re-uploading"; this pass shows that claim is false, because the claim expires two ticks before the row is next considered
+  - v9: Approach pre-check: revised (every field the draft names is unusable — UpdatedAt is overwritten by the error write on the line before, no ANAF-status member for a hold exists, and both named exits are absent, because admin retry rejects a Pending row and the failure transition needs a Submitted one; ClaimedAt is the only field with no other consumer, and a future-dated hold there lies to the claim-lost log. The load-bearing skip today is the 30-minute per-row cooldown, not the 10-minute claim, so releasing the claim would not change the re-post timing and a longer hold only re-times a blind re-post: fix by capping blind re-posts, giving a held row an operator exit, and settling the invoice-number dedupe premise the job's own comment asserts. A legal configuration re-posts after 2 minutes, the auth handler can replay one body up to 8 times inside a single call, and the drafted test is red for the wrong reason unless it uses the real lifecycle and an advanceable clock)
+
+### PPW-560 — Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot
+
+- **What:** A PostgreSQL database whose migration history still names the three deleted migrations sees the squashed baseline as pending. Boot migrates unconditionally, the baseline's first CREATE TABLE fails with 42P07, and the API never starts.
+- **Evidence:** `Migrations/20260820133204_InitialPostgres.cs:12` is a plain CREATE TABLE; `Program.cs:332` migrates with no applied-migrations check and no try/catch; `Tests/Integration/MigrationChainTests.cs:15` only ever migrates a fresh database; `docs/DEPLOYMENT.md:157`; `memory-bank/standards/data-stack.md:29`.
+- **Suggested fix:** Document and script a one-time migration-history reseed to the two surviving ids, or make the baseline's first steps tolerate existing objects. **Files:** `20260820133204_InitialPostgres.cs:12`, `Program.cs:332`, `Program.cs:93`, `Tests/Helpers/PostgresTestDatabase.cs:29`, `docs/DEPLOYMENT.md:157`, `memory-bank/standards/data-stack.md:29`. **Path:** a database carrying the deleted ids, boot-time Migrate, 42P07 on the first table, rolled-back migration, API down. **Test shape:** seed a migration-history row for a deleted id in a fresh test database, then Migrate and assert the failure is either handled or documented as impossible. **Trigger-list-shaped:** no (a one-time script plus documentation) — no approach pre-check run.
+- **History:**
+  - v9: found by the delta pass — correctness, db-parity and completeness-critic, convergence 3, hinted, verdict plausible. The trace found the mechanism real but the state unreachable today: no deployed PostgreSQL exists, dev ran SQLite through EnsureCreated so the deleted ids were never recorded, and every test database is created fresh — only a hand-seeded history row reproduces the abort. The runbook section naming the deleted migrations is stale either way
+
+### PPW-561 — PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry
+
+- **What:** The helper's constructor rethrows every Npgsql failure as "These tests need a reachable PostgreSQL server". A wrong password or an exhausted connection limit is reported as an unreachable server, with no retry, so a transient failure becomes a hard failure with a misleading message.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:33`, `:35` (the catch and its message), `:113` (the admin connection opens here); about 28 construction sites, e.g. `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:33`, `Tests/Unit/Services/OrderNumberServicePostgresTests.cs:14`, `Tests/Integration/ObservabilityHostCollection.cs:7`.
+- **Suggested fix:** Keep the unreachable-server message for connection-level failures only, and report the real SQLSTATE otherwise; retry only where a transient cause is real. **Files:** `PostgresTestDatabase.cs:33`, `:35`, `:113`. **Path:** a live server with wrong credentials answers 28P01, the catch relabels it "unreachable", and the developer looks in the wrong place. **Test shape:** `PostgresTestDatabaseTests.BadCredentials_ReportsAuthFailure` — a live server with a bad password, construct the helper, assert the message names authentication or the inner SQLSTATE; reddens today. **Trigger-list-shaped:** yes (adds a retry and backoff) — approach pre-check run with PPW-562 and PPW-563 as one cluster.
+- **History:**
+  - v9: found by the delta pass — correctness, convergence 1, hinted, verdict confirmed with a built trace. The trace corrected the claimed cause: the concurrent-create leg is not constructible, because nothing connects to the template database; the reachable mislabels are a bad password and an exhausted connection limit
+  - v9: Approach pre-check: revised (drop the retry entirely — the duplicate-name code cannot occur against a per-run unique database name and could never succeed on a retry of the same name, the concurrent-create code needs a session in the template database that nothing here opens, and the one genuinely transient code, too-many-connections, is caused by PPW-562 and disappears with it, while retrying a bad password or a missing privilege only makes an honest error slow. Ship the message split alone — a server that answered is reachable, so report its SQLSTATE — and wrap the migrate call, which sits outside the try and leaks a database plus its connections whenever it throws. Land together with PPW-563, whose default the message names)
+
+### PPW-562 — PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run
+
+- **What:** The helper is a plain instance field, and xUnit builds a new class instance per test, so every test creates a database, migrates the 809-line baseline with its 42 seeded rows, and drops it. That is about 100 cycles per run on a machine where a full run already saturates.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:25` (the field), `:49` (Migrate), `:99` (Dispose drops and clears pools); `Tests/Unit/Services/Invoicing/InvoiceLifecycleTests.cs:18`; `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:448`; `Migrations/20260820133204_InitialPostgres.cs:690`.
+- **Suggested fix:** Share one database per test class and reset state between tests, or create each from one already-migrated template; correct the "per test class" claim in the CI workflow and the data-stack standard. **Files:** `PostgresTestDatabase.cs:25`, `:49`, `:99`, `InvoiceLifecycleTests.cs:18`, `InvoiceUploadJobTests.cs:448`, `.github/workflows/ci.yml:73`. **Path:** one construction per test method, each a create, a full migrate and a drop, serialised against everything else on the machine. **Test shape:** count constructions in one class — a static counter asserted equal to 1 in each test; reaches 8 today in the lifecycle class. **Trigger-list-shaped:** yes (changes the test suite's concurrency model and resource budget) — approach pre-check run with PPW-561 and PPW-563 as one cluster.
+- **History:**
+  - v9: found by the delta pass — completeness-critic, convergence 1, hinted, verdict confirmed with a built trace. The trace raised the count from the claimed 53 to about 100 and added that Dispose clears every pool in the process, which compounds the cost for whatever is running in parallel
+  - v9: Approach pre-check: revised (it cannot be applied class-uniformly — one Sameday class drops the Orders table in 3 of its tests and the migration test's whole premise is a fresh database, so both need splitting or exempting, and two constructors run schema changes that must move into the shared fixture. "Reset between tests" hides two requirements: three families of standalone sequences must be restarted, including ones created lazily at run time, and the 42 seeded locker rows must survive, so truncating everything with restarted identities is the wrong primitive. The already-migrated-template variant races across parallel collections and fights connection pooling, so share per class and reset. Acceptance check: run a class twice in one process and see the two existing absolute-number tests still pass)
+
+### PPW-563 — Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose
+
+- **What:** Without the connection environment variable the helper falls back to postgres/postgres, while the repository's own compose stack starts PostgreSQL with the fototipar account. A developer running the tests against it now gets errors in about 15 test classes where the suite used to skip.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:16` (the default admin connection string), `:33` (the failure is rethrown), `:99` (process-wide pool clearing); `docker-compose.yml:15`; `Tests/Unit/Services/Invoicing/InvoiceLifecycleTests.cs:18`; `Tests/Integration/S3StorageServiceIntegrationTests.cs:47` keeps the only remaining skip guard.
+- **Suggested fix:** Match the default admin credentials to the repository's own compose stack, and scope pool clearing to this database. **Files:** `PostgresTestDatabase.cs:16`, `:33`, `:99`, `docker-compose.yml:15`. **Path:** compose starts the fototipar account, the helper connects as postgres, CREATE DATABASE fails with an authentication error, and every test in the Postgres-backed classes errors rather than skipping. **Test shape:** `PostgresTestDatabaseDefaultsTests.Default_admin_credentials_match_dev_compose` — parse the compose credentials, read the helper's default admin connection string, assert they agree; reddens today. **Trigger-list-shaped:** no (a default value and a narrower pool call) — covered by the cluster pre-check run for PPW-561 and PPW-562.
+- **History:**
+  - v9: found by the delta pass — completeness-critic, convergence 1, hinted, verdict confirmed with a built trace. The trace judged the pool-clearing half weak, because only idle connections are discarded, so parallel classes lose pooling rather than correctness; that half is PPW-571
+  - v9: Approach pre-check: revised (the compose credentials are one of three local credential sets in the repository — the gitignored development settings use a third account, which is the real dev-box convention — so defaulting to compose swaps one wrong default for another. Guess nothing: fail fast naming the environment variable and both in-repo candidates, or restore a presence-gated skip together with a CI assertion that nothing skipped, because about 117 relational tests would otherwise vanish silently on a future workflow edit. Delete the process-wide pool clear rather than scoping it, since the drop already forces disconnection and it was never needed for correctness. CI sets the variable explicitly, so no default change can break it)
+
+### PPW-564 — Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt
+
+- **What:** When the webhook wins the race, the admin save hits the invoice unique index, the catch detaches the invoice and commits anyway. The customer gets a second confirmation email, the paid-notification runs twice, and the order's paid timestamp no longer matches the invoice's issue timestamp.
+- **Evidence:** `Services/AdminOrderService.cs:119` (the order is read as awaiting payment), `:144` (the transition stamps a second timestamp), `:164` (the side effects fire), `:425` (the catch detaches and saves); `Controllers/WebhooksController.cs:412` shows the webhook's three-state outcome suppressing exactly these; `Services/Invoicing/InvoiceCreationService.cs:59`.
+- **Suggested fix:** Give the admin path the same outcome result as the webhook, and on the already-invoiced outcome drop the stale timestamp and skip the two side effects. **Files:** `AdminOrderService.cs:119`, `:144`, `:164`, `:425`, `WebhooksController.cs:412`, `InvoiceCreationService.cs:59`. **Path:** admin reads awaiting payment, the webhook commits paid plus the invoice plus its email, the admin insert violates the index, the catch commits the admin's own timestamp, and the confirmation email and paid notification fire a second time. **Test shape:** `AdminOrderServiceTests.UpdateStatus_Paid_LosesRaceToWebhook_KeepsPaidAtAndSkipsEmail` — a fake creation service commits paid plus an invoice through a second context; assert the webhook's timestamp survives and neither side effect ran. **Trigger-list-shaped:** yes (changes the concurrency model and gates events) — approach pre-check run.
+- **History:**
+  - v9: found by the delta pass — race, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-518, which added this catch and its retry loop but returned void where the webhook path returns an outcome
+  - v9: Approach pre-check: revised (an outcome fed only by the catch misses the wider and likelier window — the pre-save existence query returns the committed invoice as an unchanged entity, so nothing throws and the admin timestamp is committed anyway; gate on the entity's state as well. The reload must replace the second save, not follow it, or it re-reads the value it was meant to drop. A reload discards nothing legitimate on this branch, but must stay Paid-only. Suppress the email and the paid notification; keep the broadcast, the purge hook and the response. The webhook's outcome type is private and pinned by a test that reflects on it, so give this path its own, and decide the exhausted branch explicitly rather than letting a default answer 200 for an unpaid order. The drafted test cannot redden: these tests run on EF InMemory with no unique index, and the violation classifier only recognises the PostgreSQL exception, so the proof needs the real Postgres helper)
+
+### PPW-565 — Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml
+
+- **What:** The pass's own file manifest omitted the rewritten EF model snapshot, two designer files, a relocated Sameday base class, the dropped SQLite package in both project files and the new CI environment variable. Snapshot-versus-model drift would make the next scaffolded migration emit wrong SQL, unnoticed.
+- **Evidence:** `Migrations/PhotoPrintDbContextModelSnapshot.cs:335`; `Migrations/20260821054658_AddInvoiceStorageLocation.Designer.cs:15`; `Data/PhotoPrintDbContext.cs:402`; `src/PhotoPrint.API/PhotoPrint.API.csproj:19`; `Tests/Helpers/PostgresTestDatabase.cs:14`; `Services/Sameday/TrackingStopRegistry.cs:9`.
+- **Suggested fix:** Add a pending-model-changes assertion to the migration test so drift fails a run, and cover the relocated Sameday base class with its own tests. **Files:** `PhotoPrintDbContextModelSnapshot.cs:335`, `Tests/Integration/MigrationChainTests.cs:18`, `Data/PhotoPrintDbContext.cs:402`, `Services/Sameday/TrackingStopRegistry.cs:9`. **Path:** no lens owned these files, and no test or hook compares the snapshot with the model, so a future scaffolded migration inherits whatever drift exists. **Test shape:** assert `HasPendingModelChanges()` is false in the migration test — it needs no database and exists nowhere in the repository today. **Trigger-list-shaped:** no (adds an assertion and tests) — no approach pre-check run.
+- **History:**
+  - v9: found by the delta pass — completeness-critic, convergence 1, not hinted, verdict plausible. The trace found no drift today: the pending-model-changes command reports none, the snapshot matches the newest designer file, no SQLite usage remains, and the CI variable matches the helper's name — so the live defect is the missing guard and the manifest bookkeeping, not wrong SQL. Recurs the class PPW-497 named at v1
+
+### PPW-566 — AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures
+
+- **What:** The retry pipeline runs inside the client's own 30-second timeout, so three slow server errors end as a timeout and are labelled outcome-unknown, holding the claim, while identical fast errors are labelled unreachable and release it. No test covers either branch.
+- **Evidence:** `Services/Invoicing/Anaf/AnafSpvClient.cs:56` (the classifier); `Services/Invoicing/Anaf/AnafResilienceHandler.cs:25` (3 retries, 1+2+4 s); `Program.cs:299` (the 30 s client timeout); `Services/Invoicing/Anaf/InvoiceUploadJob.cs:343` (what the label decides); `Configuration/AnafSettings.cs:41`; `Tests/Unit/Services/Invoicing/Anaf/AnafSpvClientTests.cs:35` has six tests, none about timeout or cancellation.
+- **Suggested fix:** Test the classifier through a real client with a stub handler for both the timeout and the shutdown-cancellation branch, and give each attempt its own timeout so retry exhaustion stays a definite failure. **Files:** `AnafSpvClient.cs:56`, `AnafResilienceHandler.cs:25`, `Program.cs:299`, `Anaf/InvoiceUploadJob.cs:343`, `AnafSpvClientTests.cs:35`. **Path:** three slow 500s consume the budget, the outer timeout fires mid-backoff, the caller token is not cancelled, the label says outcome-unknown, and the row holds its claim. **Test shape:** `AnafSpvClientTests.Upload_after_retried_500s_hits_client_timeout` — a handler that always answers 500 behind the retry handler with a 2 s client timeout, assert the unreachable exception; today it throws the timeout one. **Trigger-list-shaped:** yes (changes retry semantics) — approach pre-check run with PPW-559 as one cluster.
+- **History:**
+  - v9: found by the delta pass — completeness-critic, convergence 1, not hinted, verdict confirmed with a built trace. Fix-generated by PPW-515, which introduced this classifier; adjacent to PPW-489's accepted retry tolerance but not a re-raise of it, because the fix asked for here is a per-attempt timeout, not the removal of retries
+  - v9: Approach pre-check: revised (the real-client classifier tests are right and needed; the per-attempt timeout is not — the outer 30-second ceiling still fires unless each attempt is capped near 5 seconds, and the rejection Polly raises is neither retried nor caught anywhere, so it escapes to the batch loop's generic catch, which writes no LastError and releases no claim: the cooldown is then bypassed and the invoice is re-posted on the very next tick, strictly worse than today. Adding it to the retry predicate instead produces duplicate posts of the same invoice number inside one call. Split the tests by cause rather than by timing, and add one asserting the client never leaks an unclassified exception; the scripted handler needs at least four canned responses, and the retry pipeline is a static field with a real delay, so the test is timing-sensitive as written)
+
+### PPW-567 — Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid
+
+- **What:** Four consecutive number collisions on the manual Paid path let the database exception escape as a 500. Unlike the webhook path, the order is not reloaded, so the request context still holds a Paid order, and nothing is captured for triage.
+- **Evidence:** `Services/AdminOrderService.cs:417`
+- **Suggested fix:** Mirror the webhook's terminal catch: log the order number and total, capture the exception, reload the order and answer a conflict rather than a bare 500.
+- **History:**
+  - v9: found by the delta pass — correctness and race, convergence 2, verdict unverified-low (a delta pass runs no skeptic on 🟡). Fix-generated by PPW-518, which added this retry loop
+
+### PPW-568 — Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not
+
+- **What:** The already-invoiced branch runs a second save inside a catch with no retry, and the exhausted branch escapes as a 500 with no reconciliation-grade log. Neither branch has a test, so both are free to change behaviour unnoticed.
+- **Evidence:** `Services/AdminOrderService.cs:414`
+- **Suggested fix:** Add a test per branch, and log the order number with the payment identifiers plus a capture when the retries are exhausted, as the webhook path does.
+- **History:**
+  - v9: found by the delta pass — completeness-critic, convergence 1, verdict unverified-low. Fix-generated by PPW-518; the behaviour half of the same code is PPW-567
+
+### PPW-569 — CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded
+
+- **What:** The baseline seeds only the 2026 sequence, so the first invoice of 2027 runs the create statement. Two webhook deliveries at the rollover both pass the existence check and one fails on a catalogue unique index, which is not the exception the retry loop catches, so it escapes as a 500 and the order stays unpaid.
+- **Evidence:** `Services/Invoicing/PostgresInvoiceNumberingService.cs:46`
+- **Suggested fix:** Catch the duplicate-object failure from the create and fall through to drawing the next value, and drop the comment claiming a concurrent create is safe.
+- **History:**
+  - v9: found by the delta pass — db-parity, convergence 1, verdict unverified-low. Not fix-generated: the statement dates from the bolt's own numbering commit. Adjacent to PPW-505, which covers the year-boundary constraint rather than the create
+
+### PPW-570 — PostgresTestDatabase contexts omit the split-query behaviour production configures
+
+- **What:** Production registers PostgreSQL with split queries; the test helper does not. Every Postgres-backed test therefore runs one joined query where production issues several non-atomic ones, so a multi-collection include with a row limit can return mismatched children in production and never in a test.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:53`
+- **Suggested fix:** Mirror the production registration in the helper by setting the same query-splitting behaviour.
+- **History:**
+  - v9: found by the delta pass — db-parity, convergence 1, hinted, verdict unverified-low
+
+### PPW-571 — PostgresTestDatabase.Dispose clears every Npgsql pool in the process while parallel test classes hold their own databases
+
+- **What:** Test collections run in parallel and 16 classes use this helper. When one class finishes it discards the pooled connections of every other Postgres-backed class still running, which produces order-dependent flakes that a rerun hides.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:99`
+- **Suggested fix:** Clear only this database's pool — one data source per instance, disposed with it, or a pool clear scoped to this connection string.
+- **History:**
+  - v9: found by the delta pass — race, convergence 1, hinted, verdict unverified-low. This is the half the PPW-563 trace judged weak, kept separate because its fix is its own
+
+### PPW-572 — MemoryCacheOnceRegistry.MarkOnce is a non-atomic read-then-write despite promising first-caller-only
+
+- **What:** Two callers with the same key can both see nothing cached and both be told they are first, so a once-only alert pages twice. All three current subclasses run on single background loops, so it is latent — but the base is now a shared abstraction any request-path caller will trust.
+- **Evidence:** `Services/MemoryCacheOnceRegistry.cs:23`
+- **Suggested fix:** Make the mark atomic, and state the real guarantee in the interface documentation instead of promising the first call only.
+- **History:**
+  - v9: found by the delta pass — race, convergence 1, verdict unverified-low. Not fix-generated: the mechanism came with the Sameday tracking registry; PPW-551's fix only moved the base out of that namespace, which widened who may rely on it
+
+### PPW-573 — data-stack standard and the deployment guide left stale by the migration squash and the provider removal
+
+- **What:** Both documents still say the chain holds a single migration, while it now holds two. Both compose files still set a database-provider variable the application no longer reads, so an operator who changes it sees no effect.
+- **Evidence:** `memory-bank/standards/data-stack.md:29`; `docs/DEPLOYMENT.md:164`; `docker-compose.yml:44`; `docker-compose.prod.yml:34`
+- **Suggested fix:** Name both migrations in both documents, and delete the dead provider entries from both compose files.
+- **History:**
+  - v9: found by the delta pass — completeness-critic, convergence 1, verdict unverified-low. Distinct from PPW-547, which covers the same standard's missing invoicing content; overlaps PPW-577 on the dead provider entries, so fix them once
+
+### PPW-574 — InvoiceAddressFormatter.Truncate with maxLength 0 indexes before the string start and throws IndexOutOfRangeException
+
+- **What:** A non-empty value with a maximum length of 0 reaches the surrogate check with an index of minus one and throws instead of returning an empty string. Unreachable today, because every caller passes a positive constant, but the method is now advertised as tolerant of edges.
+- **Evidence:** `Services/Invoicing/InvoiceAddressFormatter.cs:20`
+- **Suggested fix:** Return an empty string when the maximum length is zero or less, before the surrogate check.
+- **History:**
+  - v9: found by the delta pass — correctness, convergence 1, verdict unverified-cleanup. Fix-generated by PPW-535, whose surrogate-pair guard introduced the index
+
+### PPW-575 — PostalZone is truncated with the borrowed CityNameMaxLength constant
+
+- **What:** The request validator bounds a postal code to 20 characters, but the XML builder truncates it with the 50-character city constant. The constant states the wrong limit, and a legacy or admin-seeded 60-character code is silently cut to 50 rather than to 20 or rejected.
+- **Evidence:** `Services/Invoicing/InvoiceXmlBuilder.cs:122`
+- **Suggested fix:** Add a postal-code constant of 20, matching the validator, and use it here.
+- **History:**
+  - v9: found by the delta pass — correctness, convergence 1, verdict unverified-cleanup. Fix-generated by PPW-485, which introduced the truncation constants
+
+### PPW-576 — Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file
+
+- **What:** A row stamped for cloud storage while the local provider is configured is unroutable, but the log line for a missing blob carries no stamped tier, so it is indistinguishable from a genuinely deleted file. The ZIP-export path treats the same state as an explicit configuration error.
+- **Evidence:** `Controllers/InvoicesController.cs:122`
+- **Suggested fix:** Add the stamped tier to the blob-missing log line, as the tier-mismatch line already carries, or log an unroutable-tier event when the stamped tier is unreachable.
+- **History:**
+  - v9: found by the delta pass — correctness, convergence 1, hinted, verdict unverified-cleanup. Fix-generated by PPW-517, which introduced the per-row stamp that the log line PPW-523 added was never extended to carry
+
+### PPW-577 — Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files
+
+- **What:** The application no longer reads the provider variable, but four files still set it. An operator who edits it sees no effect, and its presence implies a provider switch that no longer exists.
+- **Evidence:** `Dockerfile:42`; `.env.example:13`; `docker-compose.yml:44`; `docker-compose.prod.yml:34`
+- **Suggested fix:** Delete the provider entry from all four files.
+- **History:**
+  - v9: found by the delta pass — db-parity, convergence 1, verdict unverified-cleanup. Not fix-generated: the entries date from the initial commit and were left behind by the PostgreSQL-only refactor. Overlaps PPW-573's second half — one change covers both
