@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -14,6 +15,10 @@ namespace PhotoPrint.API.Filters;
 /// </summary>
 public sealed class DetectLegacyShippingCostFilter : IAsyncResourceFilter
 {
+    // Buffering runs before authentication of any kind, so both numbers cap what an unauthenticated caller can make this filter hold; the buffer sits above the peek so the peek never trips it.
+    private const int PeekBytes = 64 * 1024;
+    private const int BufferLimitBytes = PeekBytes + 4096;
+
     private readonly ILogger<DetectLegacyShippingCostFilter> _logger;
 
     public DetectLegacyShippingCostFilter(ILogger<DetectLegacyShippingCostFilter> logger)
@@ -26,13 +31,17 @@ public sealed class DetectLegacyShippingCostFilter : IAsyncResourceFilter
         ResourceExecutionDelegate next)
     {
         var request = context.HttpContext.Request;
-        request.EnableBuffering();
+        request.EnableBuffering(bufferThreshold: PeekBytes, bufferLimit: BufferLimitBytes);
 
-        string body;
-        using (var reader = new StreamReader(request.Body, leaveOpen: true))
+        var buffer = new byte[PeekBytes];
+        var read = 0;
+        while (read < buffer.Length)
         {
-            body = await reader.ReadToEndAsync();
+            var chunk = await request.Body.ReadAsync(buffer.AsMemory(read));
+            if (chunk == 0) break;
+            read += chunk;
         }
+        var body = Encoding.UTF8.GetString(buffer, 0, read);
         request.Body.Position = 0;
 
         if (ContainsLegacyShippingCostKey(body))

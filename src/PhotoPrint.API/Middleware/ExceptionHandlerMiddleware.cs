@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Extensions;
 
@@ -71,6 +72,19 @@ public class ExceptionHandlerMiddleware : IMiddleware
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         var correlationId = context.GetCorrelationId() ?? Guid.NewGuid().ToString();
+
+        // Kestrel rejects an oversize or malformed request with this and names the status it wants; unmapped it would be a 500 plus a Sentry capture, so anyone could turn a rejected body into an error-budget burn.
+        if (exception is BadHttpRequestException badRequest)
+        {
+            _logger.LogWarning(
+                "request.rejected status={Status} reason={Reason} path={Path} correlation_id={CorrelationId}",
+                badRequest.StatusCode, badRequest.Message, context.Request.Path, correlationId);
+
+            await WriteProblemDetailsAsync(context, badRequest.StatusCode,
+                ReasonPhrases.GetReasonPhrase(badRequest.StatusCode),
+                badRequest.Message, correlationId, exception);
+            return;
+        }
 
         if (_exceptionMappings.TryGetValue(exception.GetType(), out var mapping))
         {

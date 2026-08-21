@@ -53,6 +53,7 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | `order_not_found` | Webhook referred to an order that doesn't exist |
 | `amount_mismatch` | Vendor-reported amount differs from `Order.TotalRon` |
 | `duplicate` | Idempotent receipt — the order has already been paid, whether it is still `Paid` or has moved on to `Printing`, `Shipped` or `Delivered` |
+| `body_too_large` | The request body passed the webhook's byte cap, so it was rejected with 413 before the signature was verified. Anonymous endpoint, so a spike is either a misconfigured vendor or someone probing for a memory-exhaustion vector |
 | `failed` | Vendor reported the payment failed, unparseable payload, or a receipt the order's state could not accept — a paid notification for an order that never can be `Paid` (`Cancelled`, `PaymentFailed`) is logged at `Error`, because the customer is charged and needs manual reconciliation. Also covers a paid notification whose invoice number could not be allocated before the retry budget ran out: the order stays `AwaitingPayment` and needs the same reconciliation. A fulfilled order is a `duplicate`, not this. |
 
 #### `result` (`awb_creation_total`)

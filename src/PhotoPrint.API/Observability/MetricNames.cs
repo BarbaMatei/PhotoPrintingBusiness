@@ -56,9 +56,10 @@ public static class MetricNames
         public const string AmountMismatch    = "amount_mismatch";
         public const string Duplicate         = "duplicate";
         public const string Failed            = "failed";
+        public const string BodyTooLarge      = "body_too_large";
 
         public static readonly string[] All =
-            [Ok, SignatureInvalid, OrderNotFound, AmountMismatch, Duplicate, Failed];
+            [Ok, SignatureInvalid, OrderNotFound, AmountMismatch, Duplicate, Failed, BodyTooLarge];
     }
 
     public static class AwbResultValues

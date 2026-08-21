@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -7,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
+using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
@@ -21,6 +23,13 @@ namespace PhotoPrint.API.Controllers;
 [Route("api/webhooks")]
 public class WebhooksController : ControllerBase
 {
+    // Stripe's own webhook payloads are a few KB; 1 MB is three orders of magnitude of headroom, and rejecting a genuine event costs a three-day Stripe retry cycle.
+    public const int StripeMaxBodyBytes = 1024 * 1024;
+    private const int StripeBodyBackstopBytes = 2 * StripeMaxBodyBytes;
+
+    // An EuPlatesc IPN is ~10 short form fields; the form is materialised by model binding, before any code here runs, so only a byte ceiling bounds it.
+    private const int EuPlatescIpnMaxBodyBytes = 64 * 1024;
+
     private readonly IOrderService _orderService;
     private readonly IStripeSignatureVerifier _stripeVerifier;
     private readonly IEuPlatescService _euPlatescService;
@@ -66,14 +75,22 @@ public class WebhooksController : ControllerBase
 
     [HttpPost("stripe")]
     [AllowAnonymous]
-    [DisableRequestSizeLimit]
+    [RequestSizeLimit(StripeBodyBackstopBytes)]
     public async Task<IActionResult> StripeWebhookAsync(CancellationToken cancellationToken)
     {
-        string json;
-        using (var reader = new System.IO.StreamReader(Request.Body))
+        var body = await ReadBodyUpToAsync(Request.Body, StripeMaxBodyBytes + 1, cancellationToken);
+        if (body.Length > StripeMaxBodyBytes)
         {
-            json = await reader.ReadToEndAsync(cancellationToken);
+            _logger.LogWarning(
+                "payments.webhook.body-too-large processor={Processor} limit_bytes={LimitBytes} content_length={ContentLength}",
+                MetricNames.ProcessorValues.Stripe, StripeMaxBodyBytes, Request.ContentLength);
+            RecordPaymentWebhook(MetricNames.ProcessorValues.Stripe,
+                MetricNames.WebhookResultValues.BodyTooLarge);
+            throw new RequestEntityTooLargeException(
+                $"Stripe webhook body exceeds {StripeMaxBodyBytes} bytes.");
         }
+
+        var json = Encoding.UTF8.GetString(body);
 
         var signature = Request.Headers["Stripe-Signature"].ToString();
 
@@ -140,6 +157,7 @@ public class WebhooksController : ControllerBase
 
     [HttpPost("euplatesc")]
     [AllowAnonymous]
+    [RequestSizeLimit(EuPlatescIpnMaxBodyBytes)]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> EuPlatescIpnAsync(
         [FromForm] IFormCollection form,
@@ -248,6 +266,20 @@ public class WebhooksController : ControllerBase
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private static async Task<byte[]> ReadBodyUpToAsync(Stream body, int maxBytes, CancellationToken ct)
+    {
+        using var buffer = new MemoryStream();
+        var chunk = new byte[8192];
+        while (buffer.Length < maxBytes)
+        {
+            var wanted = (int)Math.Min(chunk.Length, maxBytes - buffer.Length);
+            var read = await body.ReadAsync(chunk.AsMemory(0, wanted), ct);
+            if (read == 0) break;
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
+    }
 
     private async Task HandleStripePaymentSucceededAsync(string? paymentIntentId, CancellationToken ct)
     {

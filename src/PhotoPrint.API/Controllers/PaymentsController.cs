@@ -13,10 +13,15 @@ namespace PhotoPrint.API.Controllers;
 [ApiController]
 [Route("api/payments")]
 [Authorize(Policy = GuestSessionExtensions.DualAuthPolicy)]
+[RequestSizeLimit(MaxRequestBodyBytes)]
 [ServiceFilter(typeof(DetectLegacyShippingCostFilter))]
 [ServiceFilter(typeof(IdempotencyKeyFilter))]
 public class PaymentsController : ControllerBase
 {
+    // CreateOrderRequest is an enum pair plus one length-bounded address (~2 KB at its longest), and a guest token is free, so the body DetectLegacyShippingCostFilter buffers needs a ceiling.
+    public const int MaxRequestBodyBytes = 64 * 1024;
+
+
     private readonly IOrderService _orderService;
     private readonly IStripePaymentGateway _stripeGateway;
     private readonly IEuPlatescService _euPlatescService;

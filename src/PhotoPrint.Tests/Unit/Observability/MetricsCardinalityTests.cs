@@ -24,7 +24,7 @@ public class MetricsCardinalityTests
     public static TheoryData<string, int> DeclaredInstruments() => new()
     {
         { MetricNames.Instruments.OrdersCreatedTotal, 6 },
-        { MetricNames.Instruments.PaymentWebhookTotal, 12 },
+        { MetricNames.Instruments.PaymentWebhookTotal, 14 },
         { MetricNames.Instruments.AwbCreationTotal, 6 },
         { MetricNames.Instruments.InvoiceAnafStatusTotal, 4 },
         { MetricNames.Instruments.UploadSizeBytes, 1 },

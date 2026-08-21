@@ -102,6 +102,31 @@ public class DetectLegacyShippingCostFilterTests
         CountWarnings(log).Should().Be(0);
     }
 
+    // Buffering happens before the guest token is even looked at, so an unbounded peek is memory anyone can claim.
+    [Fact]
+    public async Task OversizeBody_IsNotBufferedWholeAndStillPassesThrough()
+    {
+        var (sut, _) = BuildSut();
+        var payload = Encoding.UTF8.GetBytes(
+            "{\"deliveryType\":\"Easybox\",\"pad\":\"" + new string('x', 1024 * 1024) + "\"}");
+        var counting = new CountingStream(payload);
+        var http = new DefaultHttpContext();
+        http.Request.Path = "/api/payments/stripe/intent";
+        http.Request.Method = "POST";
+        http.Request.ContentType = "application/json";
+        http.Request.Body = counting;
+        var ctx = new ResourceExecutingContext(
+            new ActionContext(http, new RouteData(), new ActionDescriptor()),
+            new List<IFilterMetadata>(), new List<IValueProviderFactory>());
+
+        var act = async () => await sut.OnResourceExecutionAsync(ctx, () =>
+            Task.FromResult<ResourceExecutedContext>(new ResourceExecutedContext(ctx, new List<IFilterMetadata>())));
+
+        await act.Should().NotThrowAsync();
+        counting.BytesRead.Should().BeLessThan(
+            256 * 1024, "the peek is capped, so a multi-megabyte body must not land in memory here");
+    }
+
     [Fact]
     public async Task Filter_RewindsBodyStream_ForDownstreamModelBinder()
     {
@@ -113,5 +138,26 @@ public class DetectLegacyShippingCostFilterTests
 
         ctx.HttpContext.Request.Body.Position.Should().Be(0,
             "the model binder reads the body next and needs it positioned at the start");
+    }
+
+    private sealed class CountingStream : MemoryStream
+    {
+        public CountingStream(byte[] buffer) : base(buffer, writable: false) { }
+
+        public int BytesRead { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = base.Read(buffer, offset, count);
+            BytesRead += read;
+            return read;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var read = base.Read(buffer.Span);
+            BytesRead += read;
+            return ValueTask.FromResult(read);
+        }
     }
 }

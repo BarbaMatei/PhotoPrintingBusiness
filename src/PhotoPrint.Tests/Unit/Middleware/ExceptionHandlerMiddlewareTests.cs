@@ -393,6 +393,30 @@ public class ExceptionHandlerMiddlewareTests
             Times.Once);
     }
 
+    [Theory]
+    [InlineData(413)]
+    [InlineData(400)]
+    public async Task InvokeAsync_KestrelRejectedRequest_AnswersItsOwnStatusAtWarning(int status)
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new BadHttpRequestException("Request body too large.", status);
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(status,
+            "a rejected request body is the caller's fault, not a 500 that burns the error budget");
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
     [Fact]
     public async Task InvokeAsync_KnownException_IncludesCorrelationIdFromContext()
     {
