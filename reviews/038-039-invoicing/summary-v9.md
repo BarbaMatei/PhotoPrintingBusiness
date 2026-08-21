@@ -59,14 +59,14 @@ this loop's own earlier fixes. The verdict is request-changes ([review-v9.md](re
   "the feature is clean".
 - **Each 🔴 rests on one lens plus a built trace**, not on lenses agreeing ([metrics.jsonl](metrics.jsonl), `conv: 1`),
   and eleven of the 24 got no adversarial check at all, by this pass type's own rules (`unverified-*`).
-- **Eight findings had their topic planted by a shared prompt hint**, including the only three-lens agreement,
+- **Seven findings had their topic planted by a shared prompt hint**, including the only three-lens agreement,
   [PPW-560](ledger.md) ([metrics.jsonl](metrics.jsonl), `hinted: true`).
 - **[PPW-560](ledger.md) and [PPW-565](ledger.md) are `plausible`, not `confirmed`** — both traces found today's
   failing state unreachable.
 - **Nine of the 21 new rows were created by an earlier fix in this same loop** ([metrics.jsonl](metrics.jsonl),
   `fix_generated`); new findings per pass run 37 at v1, 38 at v6, 21 here.
-- **The suite state is a scoped run**: 382 passed, 0 failed, 10 skipped over the changed surface
-  ([metrics.jsonl](metrics.jsonl)); and blinding is best-effort, with no tool checking that the lenses obeyed it.
+- **The suite state is a scoped run**: 382 passed and 0 failed ([metrics.jsonl](metrics.jsonl)), 10 of 392 skipped
+  ([review-v9.md](review-v9.md)); and blinding is best-effort, with no tool checking that the lenses obeyed it.
 
 ## Filed automatically
 
