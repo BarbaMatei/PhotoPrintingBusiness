@@ -123,6 +123,7 @@ public class AdminOrderService : IAdminOrderService
 
         double? processingSeconds = null;
         var savedWithInvoice = false;
+        PaidSaveOutcome? paidOutcome = null;
 
         if (newStatus == OrderStatus.Shipped)
         {
@@ -146,7 +147,7 @@ public class AdminOrderService : IAdminOrderService
             // Offline / manual reconciliation — PaidAt is what the AWB retry sweep
             // keys off, so it must be stamped like the webhook Paid path does.
             order.PaidAt = DateTimeOffset.UtcNow;
-            await SaveWithInvoiceAsync(order, ct);
+            paidOutcome = await SaveWithInvoiceAsync(order, ct);
             savedWithInvoice = true;
         }
 
@@ -161,8 +162,9 @@ public class AdminOrderService : IAdminOrderService
             _orderEmailService.FireOrderShippedEmail(order);
         else if (newStatus == OrderStatus.Delivered)
             _orderEmailService.FireOrderDeliveredEmail(order);
-        else if (newStatus == OrderStatus.Paid)
+        else if (newStatus == OrderStatus.Paid && paidOutcome != PaidSaveOutcome.AlreadyInvoiced)
         {
+            // The delivery that invoiced this order already sent both, and a second confirmation email cannot be unsent.
             _orderEmailService.FireOrderConfirmedEmail(order);
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
         }
@@ -410,25 +412,32 @@ public class AdminOrderService : IAdminOrderService
             items);
     }
 
+    // Only Created may run the caller's Paid side effects; the webhook's own enum is private and pinned by a test that reflects on it.
+    private enum PaidSaveOutcome { Created, AlreadyInvoiced }
+
     // Mirrors the webhook Paid path: a concurrent delivery or taken number must not 500 an admin status change.
-    private async Task SaveWithInvoiceAsync(Order order, CancellationToken ct)
+    private async Task<PaidSaveOutcome> SaveWithInvoiceAsync(Order order, CancellationToken ct)
     {
         const int maxNumberRetries = 3;
         for (var attempt = 0; ; attempt++)
         {
             var invoice = await _invoiceCreator.CreateForOrderAsync(order, ct);
+
+            // The creation service's existence query returns a winner's committed row as an unchanged entity, so this window throws nothing to catch.
+            if (invoice is not null && _db.Entry(invoice).State != EntityState.Added)
+                return await AbandonToWinnerAsync(order, ct);
+
             try
             {
                 await _db.SaveChangesAsync(ct);
-                return;
+                return PaidSaveOutcome.Created;
             }
             catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsOrderIdViolation(ex))
             {
                 if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
                 _logger.LogInformation(
                     "admin.order.invoice-already-created order_id={OrderId}", order.Id);
-                await _db.SaveChangesAsync(ct);
-                return;
+                return await AbandonToWinnerAsync(order, ct);
             }
             catch (DbUpdateException ex) when (attempt < maxNumberRetries && InvoiceUniqueViolation.IsNumberViolation(ex))
             {
@@ -438,5 +447,12 @@ public class AdminOrderService : IAdminOrderService
                     order.Id, attempt);
             }
         }
+    }
+
+    // A reload, not a second save: saving here would commit the admin's own PaidAt over the one the winner's invoice was issued against.
+    private async Task<PaidSaveOutcome> AbandonToWinnerAsync(Order order, CancellationToken ct)
+    {
+        await _db.Entry(order).ReloadAsync(ct);
+        return PaidSaveOutcome.AlreadyInvoiced;
     }
 }
