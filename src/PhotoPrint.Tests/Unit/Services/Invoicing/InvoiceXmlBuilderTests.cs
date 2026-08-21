@@ -314,4 +314,61 @@ public class InvoiceXmlBuilderTests
         // Should round-trip as UTF-8 text starting with the XML declaration.
         Encoding.UTF8.GetString(bytes).Should().StartWith("<?xml");
     }
+
+    // Refusing beats filing a document whose three mandatory buyer address elements are empty.
+    [Fact]
+    public void Locker_order_with_a_contact_only_snapshot_is_refused_rather_than_emitted_blank()
+    {
+        var (order, invoice) = Fixture();
+        order.DeliveryType = DeliveryType.Easybox;
+        order.ShippingAddress!.Street = "";
+        order.ShippingAddress!.Number = "";
+        order.ShippingAddress!.Block = null;
+        order.ShippingAddress!.City = "";
+        order.ShippingAddress!.PostalCode = "";
+
+        var act = () => new InvoiceXmlBuilder().Build(order, invoice, Seller());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*StreetName, CityName, PostalZone*");
+    }
+
+    [Fact]
+    public void Guest_locker_order_is_refused_for_the_same_reason()
+    {
+        var (order, invoice) = Fixture(isGuest: true);
+        order.ShippingAddress!.Street = "";
+        order.ShippingAddress!.City = "";
+        order.ShippingAddress!.PostalCode = "";
+
+        var act = () => new InvoiceXmlBuilder().Build(order, invoice, Seller());
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void All_null_address_fields_are_refused_and_do_not_crash()
+    {
+        // OrderService substitutes an empty snapshot when the request omits one, leaving every field null.
+        var (order, invoice) = Fixture();
+        order.ShippingAddress = new ShippingAddressSnapshot();
+
+        var act = () => new InvoiceXmlBuilder().Build(order, invoice, Seller());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*mandatory*");
+    }
+
+    [Fact]
+    public void A_complete_address_still_builds()
+    {
+        var (order, invoice) = Fixture();
+
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        var addr = doc.Root!.Element(Cac + "AccountingCustomerParty")!.Descendants(Cac + "PostalAddress").First();
+        addr.Element(Cbc + "StreetName")!.Value.Should().NotBeEmpty();
+        addr.Element(Cbc + "CityName")!.Value.Should().NotBeEmpty();
+        addr.Element(Cbc + "PostalZone")!.Value.Should().NotBeEmpty();
+    }
 }

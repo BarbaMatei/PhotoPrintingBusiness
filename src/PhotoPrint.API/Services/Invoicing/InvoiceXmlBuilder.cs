@@ -119,6 +119,19 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
             InvoiceAddressFormatter.FormatStreetName(addr.Street, addr.Number, addr.Block),
             InvoiceAddressFormatter.StreetNameMaxLength);
         var cityName = InvoiceAddressFormatter.Truncate(addr.City, InvoiceAddressFormatter.CityNameMaxLength);
+        var postalZone = InvoiceAddressFormatter.Truncate(addr.PostalCode, InvoiceAddressFormatter.CityNameMaxLength);
+
+        // A locker order records only a contact snapshot, so nothing here can supply the buyer address these mandatory elements need.
+        var missing = new[]
+        {
+            streetName.Length == 0 ? "StreetName" : null,
+            cityName.Length   == 0 ? "CityName"   : null,
+            postalZone.Length == 0 ? "PostalZone" : null,
+        }.Where(f => f is not null);
+        if (missing.Any())
+            throw new InvalidOperationException(
+                $"Order {order.OrderNumber} has no buyer address: {string.Join(", ", missing)} would be empty, " +
+                "and all three are mandatory. A locker order records only a contact snapshot.");
 
         var party = new XElement(Cac + "Party",
             new XElement(Cac + "PartyName",
@@ -126,7 +139,7 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
             new XElement(Cac + "PostalAddress",
                 new XElement(Cbc + "StreetName",  streetName),
                 new XElement(Cbc + "CityName",    cityName),
-                new XElement(Cbc + "PostalZone", addr.PostalCode),
+                new XElement(Cbc + "PostalZone", postalZone),
                 new XElement(Cac + "Country",
                     new XElement(Cbc + "IdentificationCode", "RO"))),
             new XElement(Cac + "PartyLegalEntity",
