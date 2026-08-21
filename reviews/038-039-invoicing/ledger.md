@@ -108,7 +108,7 @@ updated: 2026-08-21
 | PPW-566 | 🟠 | v9 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | verified | `f769e22` |
 | PPW-567 | 🟡 | v9 | Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid | `Services/AdminOrderService.cs:417` | verified | `f769e22` |
 | PPW-568 | 🟡 | v9 | Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not | `Services/AdminOrderService.cs:414` | verified | `f769e22` |
-| PPW-569 | 🟡 | v9 | CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded | `Services/Invoicing/PostgresInvoiceNumberingService.cs:46` | backlog | `c8d6bb4` |
+| PPW-569 | 🟡 | v9 | CREATE SEQUENCE IF NOT EXISTS is not race-safe and only the ft_2026 sequence is seeded | `Services/Invoicing/PostgresInvoiceNumberingService.cs:46` | fixed | `4d6bc6d` |
 | PPW-570 | 🟡 | v9 | PostgresTestDatabase contexts omit the split-query behaviour production configures | `Tests/Helpers/PostgresTestDatabase.cs:53` | backlog | `c8d6bb4` |
 | PPW-571 | 🟡 | v9 | PostgresTestDatabase.Dispose clears every Npgsql pool in the process while parallel test classes hold their own databases | `Tests/Helpers/PostgresTestDatabase.cs:99` | backlog | `c8d6bb4` |
 | PPW-572 | 🟡 | v9 | MemoryCacheOnceRegistry.MarkOnce is a non-atomic read-then-write despite promising first-caller-only | `Services/MemoryCacheOnceRegistry.cs:23` | backlog | `c8d6bb4` |
@@ -117,6 +117,7 @@ updated: 2026-08-21
 | PPW-575 | ⚪ | v9 | PostalZone is truncated with the borrowed CityNameMaxLength constant | `Services/Invoicing/InvoiceXmlBuilder.cs:122` | backlog | `c8d6bb4` |
 | PPW-576 | ⚪ | v9 | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `Controllers/InvoicesController.cs:122` | backlog | `c8d6bb4` |
 | PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
+| PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | fixed | `4d6bc6d` |
 
 ## Details
 
@@ -1058,6 +1059,8 @@ updated: 2026-08-21
 - **Suggested fix:** Catch the duplicate-object failure from the create and fall through to drawing the next value, and drop the comment claiming a concurrent create is safe.
 - **History:**
   - v9: found by the delta pass — db-parity, convergence 1, verdict unverified-low. Not fix-generated: the statement dates from the bolt's own numbering commit. Adjacent to PPW-505, which covers the year-boundary constraint rather than the create
+  - v10: pulled out of the backlog and fixed beside PPW-578, the same defect at the order-number site; status moved `backlog` → `fixed` so verification covers it (resolution-v10, commit `de1a4cb`)
+  - v10: the comment claiming a concurrent `IF NOT EXISTS` is safe was checked and is false. A test that makes this caller lose the create race reddens on `23505: duplicate key value violates unique constraint "pg_class_relname_nsp_index"`. The comment is gone and the create runs inside a guarded `DO` block
 
 ### PPW-570 — PostgresTestDatabase contexts omit the split-query behaviour production configures
 
@@ -1122,3 +1125,12 @@ updated: 2026-08-21
 - **Suggested fix:** Delete the provider entry from all four files.
 - **History:**
   - v9: found by the delta pass — db-parity, convergence 1, verdict unverified-cleanup. Not fix-generated: the entries date from the initial commit and were left behind by the PostgreSQL-only refactor. Overlaps PPW-573's second half — one change covers both
+
+### PPW-578 — Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index
+
+- **What:** The per-year order sequence is created lazily inside a `DO` block that tests `pg_sequences` and then creates. Two callers placing the first order of a year both see the sequence missing and both create it. The loser fails on PostgreSQL's own catalogue uniqueness and order creation answers 500. The window opens at every New Year and at the first deploy — on the money path.
+- **Evidence:** `Services/OrderNumberService.cs:37`; a full backend run (1446 passed, 1 failed of 1457) failed `Tests/Unit/Services/OrderNumberServicePostgresTests.cs:56` with `23505: duplicate key value violates unique constraint "pg_class_relname_nsp_index"`, and the class re-run alone passed
+- **Suggested fix:** Create the sequence inside a PL/pgSQL block that swallows only the duplicate errors, shared with the invoice numbering site, which carries the same defect as PPW-569.
+- **History:**
+  - v10: found by the driver outside any pass, while preparing the v11 certification, and fixed on the owner's delegated authority in round 10 together with PPW-569
+  - v10: fix round — both sites create through `PostgresSequences.EnsureAsync`, whose `DO` block swallows `42P07`, `42710` and `23505` and only when the name then holds a sequence; three tests make a caller lose the race deterministically, all red on the real `23505` first (resolution-v10, commits `de1a4cb` and `4d6bc6d`)

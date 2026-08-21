@@ -308,3 +308,17 @@
 {"t":"2026-08-21T17:34:16+03:00","ev":"pass-records-done","pass":10,"type":"verification"}
 {"t":"2026-08-21T18:48:03+03:00","ev":"run-start","note":"third unattended run: certification, single pass on the owner ruling"}
 {"t":"2026-08-21T18:48:03+03:00","ev":"pass-launch","pass":11,"type":"certification","subtype":"certification-single","commit":"de673a5"}
+{"t":"2026-08-21T18:56:00+03:00","ev":"round-start","round":10}
+{"t":"2026-08-21T19:00:33+03:00","ev":"triage-done","round":10,"clusters":1,"checks_needed":1,"pre_cleared":0,"gates":1}
+{"t":"2026-08-21T19:00:33+03:00","ev":"check-dispatched","cluster":"A — lazy sequence creation race","round":10}
+{"t":"2026-08-21T19:00:33+03:00","ev":"gate-parked","round":10,"kind":"fixer-decision","default":"reuse PPW-569 for the invoice site and mint one new id for the order site","reason":"the invoice half of this defect class already has a backlog ledger row; routing it is the owner list ruling"}
+{"t":"2026-08-21T19:09:30+03:00","ev":"test-run","round":10,"kind":"red","filter":"FullyQualifiedName~OrderNumberServicePostgresTests|FullyQualifiedName~PostgresInvoiceNumberingServiceIntegrationTests","passed":6,"failed":3,"duration_s":15}
+{"t":"2026-08-21T19:09:31+03:00","ev":"check-returned","cluster":"A — lazy sequence creation race","round":10,"verdict":"revised","tokens":55757}
+{"t":"2026-08-21T19:13:12+03:00","ev":"test-run","round":10,"kind":"green","filter":"FullyQualifiedName~OrderNumberServicePostgresTests|FullyQualifiedName~PostgresInvoiceNumberingServiceIntegrationTests|FullyQualifiedName~OrderNumberServiceTests|FullyQualifiedName~InvoiceCreationServiceTests","passed":20,"failed":0,"duration_s":23}
+{"t":"2026-08-21T19:14:10+03:00","ev":"micro-review-dispatched","round":10,"cluster":"A — lazy sequence creation race"}
+{"t":"2026-08-21T19:14:10+03:00","ev":"finding","round":10,"id":"PPW-578","status":"fixed","commit":"de1a4cb"}
+{"t":"2026-08-21T19:14:11+03:00","ev":"finding","round":10,"id":"PPW-569","status":"fixed","commit":"de1a4cb"}
+{"t":"2026-08-21T19:28:59+03:00","ev":"micro-review-returned","round":10,"cluster":"A — lazy sequence creation race","found":7}
+{"t":"2026-08-21T19:28:59+03:00","ev":"test-run","round":10,"kind":"final","filter":"FullyQualifiedName~PostgresSequences|FullyQualifiedName~OrderNumberServicePostgresTests|FullyQualifiedName~PostgresInvoiceNumberingServiceIntegrationTests","passed":14,"failed":0,"duration_s":49}
+{"t":"2026-08-21T19:29:51+03:00","ev":"round-end","round":10}
+{"t":"2026-08-21T19:38:47+03:00","ev":"doc-gate","round":10,"lint":"clean","judge":"approve","auditor":"1 error: round commits reachable from no pushed ref"}
