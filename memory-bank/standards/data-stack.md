@@ -120,10 +120,15 @@ throws. Construct from `DateTimeOffset.UtcNow` or an explicit `TimeSpan.Zero` of
 ## Writing a relational test
 
 ```csharp
-public class MyRelationalTests : IDisposable
+public class MyRelationalTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly PostgresTestDatabase _database = new();
-    public void Dispose() => _database.Dispose();
+    private readonly PostgresTestDatabase _database;
+
+    public MyRelationalTests(PostgresTestDatabase database)
+    {
+        _database = database;
+        database.TruncateAllTables();
+    }
 
     [Fact]
     public async Task Something()
@@ -134,10 +139,21 @@ public class MyRelationalTests : IDisposable
 }
 ```
 
+**Share the database; never build one per test.** A field initialiser
+(`private readonly PostgresTestDatabase _database = new();`) builds one per test *method*, because
+xUnit constructs the test class once per test — measured at ~3 s each on a dev box, of which
+`CREATE`/`DROP DATABASE` is about half and the migration chain the rest. `IClassFixture` makes it
+one database per class, and `TruncateAllTables()` in the constructor gives each test the clean
+slate it would otherwise have paid seconds for. Truncation also rewinds sequences, which
+`TRUNCATE … RESTART IDENTITY` leaves alone because no table column owns the numbering sequences.
+Take a private database only where a test wrecks the schema: `BreakOrdersTable()` drops a table,
+and the rest of the class would inherit the wreck.
+
 The fixture creates `pp_test_<guid>`, applies the migration chain, and drops the database on
 `Dispose`. Extras: `DropAllForeignKeys()` for tests that insert a row without its parents,
-`Execute(sql)` for schema surgery, and `BreakOrdersTable()` to simulate an unreachable
-database. It connects using `POSTGRES_TEST_CONNECTION` if set, otherwise
+`TruncateAllTables()` to reset a shared database between tests, `Execute(sql)` for schema
+surgery, and `BreakOrdersTable()` to simulate an unreachable database. It connects using
+`POSTGRES_TEST_CONNECTION` if set, otherwise
 `Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=postgres`; the role must
 be allowed to `CREATE DATABASE`. If no server is reachable the constructor throws with that
 instruction rather than skipping — a silently-skipped relational test proves nothing.
