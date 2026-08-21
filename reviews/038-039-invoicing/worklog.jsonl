@@ -329,3 +329,4 @@
 {"t":"2026-08-21T20:27:43+03:00","ev":"check-returned","pass":12,"verdicts":"6 revised, 0 cleared, 0 refuted","tokens":481449}
 {"t":"2026-08-21T20:41:00+03:00","ev":"pass-records-done","pass":12,"type":"certification","subtype":"certification-single","commit":"090873d","verdict":"request-changes","outcome":"not-certified"}
 {"t":"2026-08-21T20:44:05+03:00","ev":"run-end","passes":3,"parked":0,"note":"certification does not certify; 11 high-severity rows open, 7 owner decisions listed in summary-v12"}
+{"t":"2026-08-21T20:51:20+03:00","ev":"doc-gate","verdict":"approve","pass":12,"note":"judge independently confirmed PPW-579, PPW-584 and PPW-586 against the code and re-derived the severity and id math"}
