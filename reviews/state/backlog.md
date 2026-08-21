@@ -1,6 +1,6 @@
 ---
 type: review-backlog
-updated: 2026-08-11
+updated: 2026-08-21
 ---
 
 # Backlog — unfixed minors from closed targets
@@ -22,16 +22,18 @@ Target reads `inbox` came from the holding file of that name, retired 2026-08-11
 the owner routed them here, and their full evidence text is in that file's git
 history. Every row was re-keyed to `PPW-<n>` on 2026-08-11; the old names
 translate through [archive/id-map.md](../archive/id-map.md).
+On 2026-08-21 five rows left as fixed when PostgreSQL became the only database
+provider: PPW-20, PPW-36, PPW-74, PPW-262 and PPW-279, each with its terminal
+state and evidence written back to its home ledger row @`90b5683`. PPW-39 and
+PPW-40 stayed, with their blocker recorded as gone; PPW-394 stayed and was
+narrowed to the half that survives.
 
 | ID | Target | Sev | What | Area |
 |---|---|---|---|---|
 | PPW-12 | 035-payment-idempotency | 🟡 | The ddd-02 design sketch puts conflict resolution in the controller, the code puts it in the order service | `records` |
-| PPW-20 | 035-payment-idempotency | 🟡 | Model snapshot is Npgsql-typed — next Npgsql migration scaffolds a phantom diff | `data` |
 | PPW-32 | 035-payment-idempotency | ⚪ | The controller saves through the database context itself rather than through the order service | `payments` |
-| PPW-36 | 035-payment-idempotency | 🟠 | Entire Postgres production DB path is unexercised by tests — deferred to the migration/3-env phase | `data` |
 | PPW-39 | 035-payment-idempotency | 🟡 | Global single-column idempotency-key uniqueness = cross-tenant existence oracle + key-squatting; durable fix needs a per-tenant composite index (migration) | `payments` |
-| PPW-40 | 035-payment-idempotency | 🟡 | EuPlatesc recovery-replay regenerates a different redirect URL (no gateway idempotency key); row-lock fix needs the Postgres arm | `payments` |
-| PPW-74 | 042-thumbnail-cache | 🟡 | The migration's Postgres arm and the model snapshot are exercised by no test; the next scaffolded migration would show a phantom column change | `data` |
+| PPW-40 | 035-payment-idempotency | 🟡 | EuPlatesc recovery-replay regenerates a different redirect URL (no gateway idempotency key); row-lock fix now unblocked (PPW-36 fixed) | `payments` |
 | PPW-79 | 042-thumbnail-cache | 🟡 | The storage contract assumes a rewindable stream with a readable length; deferred to bolt 043, which closed without taking it | `uploads` |
 | PPW-82 | 042-thumbnail-cache | 🟡 | Nothing reclaims a thumbnail written between the cleanup job's read and its commit; deferred to bolt 043, which closed without taking it | `uploads` |
 | PPW-85 | 042-thumbnail-cache | 🟠 | The cache-fill write races the cleanup job and strands a thumbnail on the dead row; the liveness re-read narrows the window but does not close it | `uploads` |
@@ -95,8 +97,6 @@ translate through [archive/id-map.md](../archive/id-map.md).
 | PPW-236 | 043-cloud-storage-provider | 🟡 | Retention sweep query omits the `DeletedAt` filter → reprocesses soft-deleted rows, re-emits false audit (`ArchiveRetentionJob.cs:96`) | `uploads` |
 | PPW-237 | 043-cloud-storage-provider | 🟡 | Promoter tests assert cloud-write keys but never the bytes written (`OrderPhotoPromoterTests.cs`) | `tests` |
 | PPW-239 | 043-cloud-storage-provider | 🟡 | PPW-185 close-*during*-refresh resolve-time re-read has no spec (only close-before-error is tested) (`order-detail-page.spec.ts`) | `tests` |
-| PPW-262 | 015-sameday-shipping | 🟡 | Dual-DB parity: migrations + `timestamptz` CAS never run on Postgres (offset-write may throw) *(hinted)* | `data` |
-| PPW-279 | 015-sameday-shipping | ⚪ | New migration designer snapshots embed stale `StripeClientSecret` 255 vs 512 *(hinted)* | `data` |
 | PPW-329 | 015-sameday-shipping | 🟡 | `ISamedayAuthenticator` singleton captures the transient typed `ISamedayClient` → handler never rotated (pre-existing, carried into the new extension) | `shipping` |
 | PPW-330 | 015-sameday-shipping | ⚪ | `ISamedayClient` doc still claims NotImplementedException "until bolt 037" — stale twin of the claim stripped from `SamedayClient.cs` | `shipping` |
 | PPW-331 | 015-sameday-shipping | ⚪ | `AwbNumber` (varchar(100)) is the unclamped sibling of PPW-299's clamp on the same post-bill persist | `shipping` |
@@ -127,7 +127,7 @@ translate through [archive/id-map.md](../archive/id-map.md).
 | PPW-390 | 044-045-observability | 🟡 | The documented `Sentry__Debug=true` verbosity knob is inert under Serilog's Information floor | `records` |
 | PPW-391 | 044-045-observability | 🟡 | No volume ceiling on the new Sentry capture site | `observability` |
 | PPW-393 | 044-045-observability | 🟡 | §13.10 still says a No-Data panel means a name mismatch, contradicting the accepted panel-8 decision | `records` |
-| PPW-394 | 044-045-observability | 🟡 | AWB shutdown carve-out matches only `OperationCanceledException`; tests run on PostgreSQL, prod is Postgres | `shipping` |
+| PPW-394 | 044-045-observability | 🟡 | AWB shutdown carve-out matches only `OperationCanceledException`, so an Npgsql cancellation (`PostgresException` 57014 / `NpgsqlException`) is recorded as `error` | `shipping` |
 | PPW-395 | 044-045-observability | 🟡 | `CapturingSentryTransport.Payloads` is an unsynchronized `List` across threads | `tests` |
 | PPW-396 | 044-045-observability | 🟡 | `wrong_listener` and `not_allowed` denials share one 512-entry log budget | `edge` |
 | PPW-397 | 044-045-observability | 🟡 | A throw escaping a webhook endpoint records no metric at all — sibling class resolved the opposite way | `payments` |

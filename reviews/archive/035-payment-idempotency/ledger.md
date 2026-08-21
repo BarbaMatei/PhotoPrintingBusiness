@@ -30,7 +30,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
 | PPW-17 | 🟡 | v2 | An expired key stays reserved for its first owner, so a second caller is refused a key the contract calls free | `Services/OrderService.cs:184` | verified | `01b5264` |
 | PPW-18 | 🟠 | v3 | The order-number service has no SQLite branch, so every order creation in the development environment fails | `Services/OrderNumberService.cs:15` | verified | `650f615` |
 | PPW-19 | 🟡 | v3 | The filter refactor dropped the searchable follow-up marker PPW-4 asked for | `Filters/IdempotencyKeyFilter.cs:11` | verified | `650f615` |
-| PPW-20 | 🟡 | v5 | The model snapshot is SQLite-flavoured, so the next Postgres scaffold emits a phantom migration | `Migrations/PhotoPrintDbContextModelSnapshot.cs` | backlog | `065a516` |
+| PPW-20 | 🟡 | v5 | The model snapshot is SQLite-flavoured, so the next Postgres scaffold emits a phantom migration | `Migrations/PhotoPrintDbContextModelSnapshot.cs` | fixed | `90b5683` |
 | PPW-21 | 🟠 | v5 | The Stripe secret column is sized at exactly the vendor ceiling, so a longer secret fails on Postgres after the charge | `Data/PhotoPrintDbContext.cs:296` | verified | `3faaae6` |
 | PPW-22 | 🟠 | v5 | The 409 body names the divergent fields only outside Development, and no test reads the body | `Middleware/ExceptionHandlerMiddleware.cs:103` | verified | `3faaae6` |
 | PPW-23 | 🟡 | v5 | The recovery catch infers that any database write failure was the key collision | `Services/OrderService.cs:161` | verified | `3faaae6` |
@@ -46,7 +46,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
 | PPW-33 | ⚪ | v5 | The payment request builders and the SQLite fixture setup are duplicated across test files | `Tests/…` | verified | `fbb4c7c` |
 | PPW-34 | ⚪ | v5 | The order-number query raises a compiler warning and its Postgres branch has no test | `Services/OrderNumberService.cs:33` | verified | `3faaae6` |
 | PPW-35 | ⚪ | v6 | The ddd-02 controller sketch still forwards the caller's key to Stripe, contradicting the section above it | `memory-bank/…/ddd-02:265` | fixed | `3faaae6` |
-| PPW-36 | 🟠 | v8 | No test touches the Postgres path: not the constraint match, not the filtered index, not the migration | `Services/OrderService.cs:197` | backlog | `065a516` |
+| PPW-36 | 🟠 | v8 | No test touches the Postgres path: not the constraint match, not the filtered index, not the migration | `Services/OrderService.cs:197` | fixed | `90b5683` |
 | PPW-37 | 🟠 | v8 | The cross-tenant key collision has no distinct log event, so key probing is invisible | `Services/OrderService.cs:178` | verified | `01b5264` |
 | PPW-38 | 🟡 | v8 | On SQLite the key violation is recognised by a phrase in the error message, not a structured code | `Services/OrderService.cs:194` | verified | `01b5264` |
 | PPW-39 | 🟡 | v8 | One global key index tells an attacker whether a guessed key is in use, and lets them reserve it first | `Data/PhotoPrintDbContext.cs:308` | backlog | `065a516` |
@@ -281,6 +281,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v8: re-found, severity recorded as 🟡 rather than v5's 🟠
   - round 8: deferred again @`01b5264` · v9: deferral sound @`01b5264` · v10: unchanged @`065a516`
   - 2026-08-11: row carried to the backlog under its old name DB-2
+  - 2026-08-21: fixed @`90b5683` — snapshot regenerated under Npgsql; `has-pending-model-changes` reports no drift
 
 ### PPW-21 — The Stripe secret column is sized at exactly the vendor ceiling, so a longer secret fails on Postgres after the charge
 
@@ -447,6 +448,10 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - round 8: deferred @`01b5264` — belongs with the migration and deployment work, like PPW-20
   - v9: deferral sound @`01b5264` · v10: unchanged @`065a516`
   - 2026-08-11: row carried to the backlog under its old name DB-1
+  - 2026-08-21: fixed @`90b5683` — all three legs exist: `PostgresTestDatabase` applies the real chain,
+    `OrderServiceIdempotencyConcurrencyTests` drives the concurrent same-key creates, and
+    `IdempotencyCollision_SurfacesUniqueViolationSqlState_AndConstraintName` asserts the live
+    `ConstraintName` equals `IdempotencyKeyIndexName`. CI runs them on `postgres:16-alpine`
 
 ### PPW-37 — The cross-tenant key collision has no distinct log event, so key probing is invisible
 
@@ -483,6 +488,9 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v9: deferral sound @`01b5264` — the accepted-residual note at the index is present and accurate
   - v10: unchanged @`065a516`
   - 2026-08-11: row carried to the backlog under its old name SEC-1
+  - 2026-08-21: unblocked, still open @`90b5683` — the durable fix is a composite-index migration, and the
+    migration chain is now Npgsql-native and proven against a real PostgreSQL server, so the schema change
+    is no longer gated on untrusted migrations. The defect itself is unchanged
 
 ### PPW-40 — The EuPlatesc recovery replay builds a fresh redirect URL instead of returning the stored one
 
@@ -501,6 +509,8 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - v9: deferral sound @`01b5264` — no double charge today; only the verbatim-replay promise breaks
   - v10: unchanged @`065a516`
   - 2026-08-11: row carried to the backlog under its old name BUG-2
+  - 2026-08-21: unblocked, still open @`90b5683` — PPW-36 is fixed, so the Postgres path this row's
+    row-lock fix was waiting on now exists. The defect itself is unchanged
 
 ### PPW-41 — The key is never trimmed, so a padded copy of the same key creates a second order and a second charge
 

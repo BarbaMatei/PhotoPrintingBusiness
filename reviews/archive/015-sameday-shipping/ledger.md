@@ -33,7 +33,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 | PPW-259 | 🟡 | v1 | `MaxConcurrentSamedayCalls` overloaded as concurrency gate AND req/s rate limit | `Services/Sameday/SamedayResilienceHandler.cs:25` | verified | `1816f5f` |
 | PPW-260 | 🟡 | v1 | Raw vendor error body in exception + logged at Error (conditional PII) | `Services/Sameday/SamedayClient.cs:140` | verified | `5fc330b` |
 | PPW-261 | 🟡 | v1 | `AwbLabelUrl` migration hardcodes `text` → unbounded on Postgres, diverges from model | `Migrations/20260602141429_AddSamedayOrderFields.cs:23` | verified | `5fc330b` |
-| PPW-262 | 🟡 | v1 | Dual-DB parity: migrations + `timestamptz` CAS never run on Postgres | `Tests/…/OrderSamedayFieldsTests.cs:21` | deferred | `1816f5f` |
+| PPW-262 | 🟡 | v1 | Dual-DB parity: migrations + `timestamptz` CAS never run on Postgres | `Tests/…/OrderSamedayFieldsTests.cs:21` | fixed | `90b5683` |
 | PPW-263 | 🟡 | v1 | Tracking `observedAt` fabricated to `UtcNow` when vendor omits timestamps → wrong `DeliveredAt` | `Services/Sameday/SamedayClient.cs:224` | verified | `1816f5f` |
 | PPW-264 | 🟡 | v1 | `expire_at_utc` bound without UTC guarantee (non-UTC host shifts token expiry) | `Services/Sameday/SamedayClient.cs:90` | verified | `1816f5f` |
 | PPW-265 | 🟡 | v1 | Monotonic guard can drop a legitimate `Delivered` snapshot (untested) | `BackgroundJobs/ShipmentTrackingJob.cs:132` | verified | `5fc330b` |
@@ -50,7 +50,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 | PPW-276 | ⚪ | v1 | `LogRedactor` defined but never referenced → no HTTP transport tracing | `Services/Sameday/LogRedactor.cs:13` | verified | `1816f5f` |
 | PPW-277 | ⚪ | v1 | `TrackingStopRegistry` is a near-copy of `AwbGiveUpRegistry` | `Services/Sameday/TrackingStopRegistry.cs:9` | verified | `1816f5f` |
 | PPW-278 | ⚪ | v1 | Hand-constructs `StaticShippingService` instead of injecting | `Services/SamedayShippingService.cs:35` | verified | `5734021` |
-| PPW-279 | ⚪ | v1 | New migration designer snapshots embed stale `StripeClientSecret` 255 vs 512 | `Migrations/20260602190046_…Designer.cs:365` | deferred | `1816f5f` |
+| PPW-279 | ⚪ | v1 | New migration designer snapshots embed stale `StripeClientSecret` 255 vs 512 | `Migrations/20260602190046_…Designer.cs:365` | fixed | `90b5683` |
 | PPW-280 | ⚪ | v1 | Per-print gram weight bare literal `50` colliding with `MinimumGrams` | `Services/Sameday/ParcelWeight.cs:35` | verified | `5fc330b` |
 | PPW-281 | — | v1 | "5xx retry unsafe for POST bodies" — `JsonContent` re-serializes each attempt | `Services/Sameday/SamedayResilienceHandler.cs:33` | false-positive | `1765918` |
 | PPW-282 | 🔴 | v3 | Easybox `Continue` never re-enables after typing contact (`canContinue` cannot see `form.valid`) | `UI/…/delivery-step.ts:326` | verified | `5fc330b` |
@@ -339,6 +339,11 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v5: re-raised, deferral re-affirmed
   - v6: re-affirmed @`1816f5f` — now also covers the round-5 label-length migration
   - 2026-07-29: target closed — row carried to the backlog; named in the pre-enable checklist
+  - 2026-08-21: fixed @`90b5683` — the parity gap is gone rather than measured: PostgreSQL is the only
+    provider, so migrations run against it at every boot, and the guarded `ExecuteUpdateAsync` CAS is now
+    exercised on a real PostgreSQL database by `ShipmentTrackingJobTests`, `AwbCreatorTests` and
+    `InvoiceLifecycleTests`. Npgsql rejects a non-zero-offset `DateTimeOffset`, which the code avoids by
+    constructing from `UtcNow`; that constraint is recorded in `data-stack.md`
 
 ### PPW-263 — Tracking `observedAt` fabricated to `UtcNow` when vendor omits timestamps → wrong `DeliveredAt`
 
@@ -563,6 +568,9 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 5: deferred again — the drift predates this feature and Stripe secrets are about 66 characters, so the gap is harmless
   - v6: re-affirmed @`1816f5f` — cited files unchanged since `5fc330b`
   - 2026-07-29: target closed — row carried to the backlog
+  - 2026-08-21: fixed @`90b5683` — the first branch of the suggested fix was taken: the chain was
+    re-scaffolded into one baseline, so the cited designer files no longer exist and the single snapshot
+    records `character varying(512)` with `HasMaxLength(512)`, matching the model
 
 ### PPW-280 — Per-print gram weight bare literal `50` colliding with `MinimumGrams`
 
