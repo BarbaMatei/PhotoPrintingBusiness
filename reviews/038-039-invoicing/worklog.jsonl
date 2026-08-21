@@ -241,3 +241,6 @@
 {"t":"2026-08-21T12:11:06+03:00","ev":"doc-gate","round":8,"verdict":"approve","note":"lint clean for v8 and the state files; Sonnet judge approved with 3 optional nits, one of which (unattended round -> unattended run) was applied"}
 {"t":"2026-08-21T12:13:13+03:00","ev":"pass-launch","pass":8,"type":"verification"}
 {"t":"2026-08-21T12:21:23+03:00","ev":"pass-records-done","pass":8,"type":"verification"}
+{"t":"2026-08-21T12:26:51+03:00","ev":"doc-gate","verdict":"approve","pass":8}
+{"t":"2026-08-21T12:29:41+03:00","ev":"gate-parked","kind":"certification-go-ahead","default":"not launched","reason":"the policy answers certification (pair), ~4.0-4.6M tokens; parked because the auditor cannot go green without the owner authorising a push of this branch to its public remote, so a certification recorded now would carry evidence the system itself flags as single-machine"}
+{"t":"2026-08-21T12:29:41+03:00","ev":"run-end","passes":4,"parked":5}
