@@ -18,8 +18,9 @@
 //        node reviews/lib/render-records.mjs <target> --verification <pass> --outcome "<text>"
 //          [--new-findings <h,m,l,c>] [--commit <sha>] [--no-index] [--dry-run] [--in-progress]
 // Exit 0 = rendered (or dry-run) · 1 = cannot render: missing records, a duplicate metrics line,
-// a bad worklog, unpaired stamps, a missing or over-50-word --outcome, no Passes table to insert
-// into, or an unresolved resolution / unstamped pass-records-done without --in-progress.
+// a bad worklog, unpaired stamps, an --outcome that is missing, over 50 words or carries a "|" or a
+// line break, no Passes table to insert into, or an unresolved resolution / unstamped
+// pass-records-done without --in-progress.
 import { readFileSync, writeFileSync, appendFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -56,6 +57,7 @@ const ts = e => Date.parse(e.t)
 // The same count doc-gate applies to the cell: a link is one space, not one word.
 const words = s => s.replace(/\[[^\]]*\]\([^)]*\)/g, ' ').split(/\s+/).filter(w => /[a-z0-9]/i.test(w)).length
 const asCode = v => String(v).split(',').map(s => s.trim().replace(/[`"]/g, '')).filter(Boolean).map(s => `\`${s}\``).join(', ')
+const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 const passNum = v => Number(String(v ?? '').replace(/^v/i, ''))
 const VERIFY = PASS !== null
@@ -64,7 +66,12 @@ if (VERIFY && ROUND !== null) fail('--verification and --round are different mod
 const pass = VERIFY ? passNum(PASS) : null
 
 const OUTCOME_CAP = 50
-if (OUTCOME !== null) {
+if (OUTCOME === undefined) fail(`--outcome takes the text of the index row's Outcome cell; ${USAGE}`)
+if (OUTCOME != null) {
+  if (/^--/.test(OUTCOME)) fail(`--outcome reads "${OUTCOME}", which is another flag — quote the outcome text; ${USAGE}`)
+  // The index row is pipe-delimited and one line: a stray "|" or newline would be written as a broken row.
+  const stray = /[|\r\n]/.exec(OUTCOME)
+  if (stray) fail(`--outcome contains ${stray[0] === '|' ? 'a "|"' : 'a line break'} — an index row is one pipe-delimited line; reword it`)
   const w = words(OUTCOME)
   if (!w) fail('--outcome is empty — the index row needs one or two sentences saying what the pass proved')
   if (w > OUTCOME_CAP) fail(`--outcome is ${w} words — the index cap is ${OUTCOME_CAP}; shorten it (doc-contracts.md)`)
@@ -129,7 +136,7 @@ const targetKey = /^\d+/.exec(target)?.[0] ?? target
 const crOf = lines => lines.some(l => l.endsWith('\r')) ? '\r' : ''
 
 function planIndex(row) {
-  if (NO_INDEX || OUTCOME === null) return null
+  if (NO_INDEX || OUTCOME == null) return null
   if (!existsSync(indexPath)) fail(`no reviews/state/index.md under ${ROOT} — pass --no-index for a target outside the index`)
   const lines = readFileSync(indexPath, 'utf8').split('\n')
   const heading = lines.findIndex(l => /^## Passes\s*$/.test(l))
@@ -331,7 +338,7 @@ function renderFixRound() {
   }
 
   const clusters = Number.isFinite(triage?.clusters) ? triage.clusters : 0
-  const indexPlan = planIndex(`| ${line.date} | ${targetKey} | v${round} fix round (${clusters} clusters, ${checksRun} approach-checks, ${microD} micro-reviews) | — (${resStatus}) | 0/0/0/0 | ${OUTCOME} | [resolution](../${target}/resolution-v${round}.md) · [ledger](../${target}/ledger.md) |`)
+  const indexPlan = planIndex(`| ${line.date} | ${targetKey} | v${round} fix round (${count(clusters, 'cluster')}, ${count(checksRun, 'approach-check')}, ${count(microD, 'micro-review')}) | — (${resStatus}) | 0/0/0/0 | ${OUTCOME} | [resolution](../${target}/resolution-v${round}.md) · [ledger](../${target}/ledger.md) |`)
 
   const flips = [...findings].map(([id, f]) => {
     const rowCommit = f.commit && /[0-9a-f]{7,40}/.test(f.commit) ? asCode(f.commit) : null
@@ -344,7 +351,7 @@ function renderFixRound() {
   const ledgerPlan = planLedger(flips)
 
   if (!DRY) {
-    if (OUTCOME === null && !NO_INDEX) fail(`--outcome "<text>" is required to append records (it is the index row's Outcome cell, max ${OUTCOME_CAP} words) — or pass --no-index for a target outside the index`)
+    if (OUTCOME == null && !NO_INDEX) fail(`--outcome "<text>" is required to append records (it is the index row's Outcome cell, max ${OUTCOME_CAP} words) — or pass --no-index for a target outside the index`)
     if (resStatus !== 'resolved' && !ALLOW_UNRESOLVED) fail(`resolution-v${round}.md reads status: ${resStatus} — finish the round or pass --in-progress (--dry-run renders at any status)`)
     if (alreadyHas(o => o.type === 'fix-round' && o.round === round)) fail(`metrics.jsonl already has a fix-round line for round ${round} — append a correction line instead (schema: Corrections)`)
   }
@@ -408,7 +415,7 @@ function renderVerification() {
   const ledgerPlan = planLedger(flips)
 
   if (!DRY) {
-    if (OUTCOME === null && !NO_INDEX) fail(`--outcome "<text>" is required to append records (it is the index row's Outcome cell, max ${OUTCOME_CAP} words) — or pass --no-index for a target outside the index`)
+    if (OUTCOME == null && !NO_INDEX) fail(`--outcome "<text>" is required to append records (it is the index row's Outcome cell, max ${OUTCOME_CAP} words) — or pass --no-index for a target outside the index`)
     if (openPass && !ALLOW_UNRESOLVED) fail(`worklog has no pass-records-done for pass v${pass} — finish the pass (node reviews/lib/wl.mjs ${target} pass-records-done --pass v${pass}) or pass --in-progress (--dry-run renders at any point)`)
     if (alreadyHas(o => o.type === 'verification' && o.pass === pass)) fail(`metrics.jsonl already has a verification line for pass ${pass} — append a correction line instead (schema: Corrections)`)
   }

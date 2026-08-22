@@ -545,9 +545,22 @@ Fixture copy: one conforming row.
     check('renderer refuses an --outcome over the 50-word index cap', r.code === 1 && r.out.includes('51 words') && r.out.includes('50'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the over-cap refusal wrote nothing either', untouched(), 'one of metrics.jsonl / index.md / ledger.md changed')
   }
+  // A "|" or a newline in the outcome would be written straight into the pipe-delimited row, and the
+  // broken row only surfaces at the next doc gate — by then it needs hand repair.
+  for (const [label, text] of [['a "|"', 'Both rows closed | and the queue drained'], ['a newline', 'Both rows closed\nand the queue drained']]) {
+    const r = run('render-records.mjs', ['--root', T, target, '--outcome', text])
+    check(`renderer refuses an --outcome carrying ${label}`, r.code === 1 && r.out.includes('one pipe-delimited line'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
+    check(`the ${label} refusal wrote nothing`, untouched(), 'one of metrics.jsonl / index.md / ledger.md changed')
+  }
+  {
+    const r = run('render-records.mjs', ['--root', T, target, '--outcome'])
+    check('--outcome with no value prints the usage line, not a stack trace', r.code === 1 && r.out.includes('usage: render-records.mjs') && !r.out.includes('TypeError'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
+    const flag = run('render-records.mjs', ['--root', T, target, '--outcome', '--dry-run'])
+    check('an --outcome that swallowed the next flag is refused', flag.code === 1 && flag.out.includes('another flag'), `exit ${flag.code}: ${flag.out.trim().slice(0, 200)}`)
+  }
   {
     const r = run('render-records.mjs', ['--root', T, target, '--outcome', OUTCOME, '--dry-run'])
-    check('dry-run prints the index row it would insert', r.code === 0 && r.out.includes('| 2026-08-21 | 938 | v1 fix round (2 clusters, 1 approach-checks, 1 micro-reviews) |'), `exit ${r.code}: ${r.out.split('\n').find(l => l.startsWith('| 2026')) ?? r.out.trim().slice(0, 200)}`)
+    check('dry-run prints the index row it would insert', r.code === 0 && r.out.includes('| 2026-08-21 | 938 | v1 fix round (2 clusters, 1 approach-check, 1 micro-review) |'), `exit ${r.code}: ${r.out.split('\n').find(l => l.startsWith('| 2026')) ?? r.out.trim().slice(0, 200)}`)
     check('dry-run prints the ledger flips it would make', r.out.includes('PPW-9381 → fixed at `def5678`') && r.out.includes('PPW-9382 → deferred'), r.out.split('\n').filter(l => l.includes('→')).join(' | '))
     check('dry-run wrote nothing', untouched(), 'one of metrics.jsonl / index.md / ledger.md changed')
   }
@@ -556,7 +569,7 @@ Fixture copy: one conforming row.
     const r = run('render-records.mjs', ['--root', T, target, '--outcome', OUTCOME])
     check('renderer appends the fix round\'s records', r.code === 0 && metricsLines().length === 1, `exit ${r.code}: ${r.out.trim().slice(0, 300)}`)
     check('the renderer warns about a findings row with no ledger row', r.out.includes('PPW-9389 has no ledger row'), r.out.split('\n').find(l => l.includes('9389')) ?? r.out.trim().slice(0, 200))
-    const expectedRow = `| 2026-08-21 | 938 | v1 fix round (2 clusters, 1 approach-checks, 1 micro-reviews) | — (resolved) | 0/0/0/0 | ${OUTCOME} | [resolution](../938-index-rows/resolution-v1.md) · [ledger](../938-index-rows/ledger.md) |`
+    const expectedRow = `| 2026-08-21 | 938 | v1 fix round (2 clusters, 1 approach-check, 1 micro-review) | — (resolved) | 0/0/0/0 | ${OUTCOME} | [resolution](../938-index-rows/resolution-v1.md) · [ledger](../938-index-rows/ledger.md) |`
     const expectedIndex = indexBefore.replace(`${INDEX_SEP}\n`, `${INDEX_SEP}\n${expectedRow}\n`)
     check('the index row lands as the newest Passes row and every other byte is unchanged', read(indexPath) === expectedIndex,
       read(indexPath).split('\n').filter(l => l.startsWith('| 2026')).join('\n'))
@@ -611,6 +624,10 @@ Fixture copy: one conforming row.
     check('the verification line carries no outcome or subtype key and takes its counts from --new-findings',
       !('outcome' in appended) && !('subtype' in appended) && appended.new_findings?.medium === 1 && appended.tests?.passed === 20,
       JSON.stringify({ new_findings: appended.new_findings, tests: appended.tests }))
+    // records-auditor hard-requires `commit` on every pass line, and a verification is anchored at
+    // the commit whose fixes it checks — so with no --commit it reads the newest resolution's.
+    check('with no --commit the line falls back to the newest resolution\'s fixed_commit and says so',
+      appended.commit === 'def5678' && r.out.includes("resolution-v1.md's fixed_commit def5678"), `commit ${appended.commit}: ${r.out.split('\n').find(l => l.includes('fixed_commit')) ?? ''}`)
     const expectedRow = `| 2026-08-21 | 938 | v2 verification (anchored) | approve-with-followups | 0/1/0/0 | ${V_OUTCOME} | [ledger](../938-index-rows/ledger.md) |`
     check('the verification index row lands newest-first with the anchored pass cell, CRLF and all', read(indexPath) === afterRound.index.replace(`${INDEX_SEP}\r\n`, `${INDEX_SEP}\r\n${expectedRow}\r\n`),
       read(indexPath).split('\n').filter(l => l.startsWith('| 2026')).join('\n'))
@@ -638,6 +655,32 @@ Fixture copy: one conforming row.
 
     const gate = run('doc-gate.mjs', ['--root', T, 'state'])
     check('both generated index rows pass the state doc gate', gate.code === 0, gate.out.trim().slice(0, 400))
+  }
+
+  {
+    wl([...verifyEvents, { t: at('11:20'), ev: 'pass-records-done', pass: 'v2' },
+      { t: at('12:00'), ev: 'pass-launch', pass: 'v3', type: 'verification' },
+      { t: at('12:05'), ev: 'verify-result', id: 'PPW-9381', verdict: 'held', commit: 'bbb2222' },
+      { t: at('12:10'), ev: 'pass-records-done', pass: 'v3' }])
+    const r = run('render-records.mjs', ['--root', T, target, '--verification', 'v3', '--outcome', V_OUTCOME, '--commit', 'ccc3333', '--no-index'])
+    const appended = metricsLines().length ? JSON.parse(metricsLines()[metricsLines().length - 1]) : {}
+    check('an explicit --commit wins over the resolution fallback', r.code === 0 && appended.commit === 'ccc3333' && !r.out.includes('fixed_commit def5678'),
+      `exit ${r.code}: commit ${appended.commit}`)
+  }
+  {
+    const bare = '939-no-anchor'
+    mkdirSync(join(T, 'reviews', bare), { recursive: true })
+    writeFileSync(join(T, 'reviews', bare, 'worklog.jsonl'), [
+      { t: at('13:00'), ev: 'pass-launch', pass: 'v1', type: 'verification' },
+      { t: at('13:05'), ev: 'verify-result', id: 'PPW-9391', verdict: 'held' },
+      { t: at('13:10'), ev: 'pass-records-done', pass: 'v1' },
+    ].map(e => JSON.stringify(e)).join('\n') + '\n')
+    const r = run('render-records.mjs', ['--root', T, bare, '--verification', 'v1', '--outcome', 'The one fix held on its own revert.', '--no-index'])
+    const written = existsSync(join(T, 'reviews', bare, 'metrics.jsonl')) ? JSON.parse(readFileSync(join(T, 'reviews', bare, 'metrics.jsonl'), 'utf8').trim()) : {}
+    check('commit is null, and said to be, when there is no --commit and no resolution to read it from',
+      r.code === 0 && written.commit === null && r.out.includes('commit will be null'), `exit ${r.code}: ${JSON.stringify(written).slice(0, 200)}`)
+    check('a held row with no commit on its event leaves Affirmed alone', r.out.includes('PPW-9391 → verified') && !r.out.includes('PPW-9391 → verified at'),
+      r.out.split('\n').find(l => l.includes('→')) ?? r.out.trim().slice(0, 200))
   }
 
   rmSync(T, { recursive: true, force: true })
