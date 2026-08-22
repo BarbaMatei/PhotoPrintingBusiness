@@ -755,14 +755,30 @@ Fixture copy: one conforming row.
   g('add', '.'); g('commit', '-qm', 'resolution')
   const redGreen = `node -e "process.exit(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')?1:0)"`
 
+  const wlPath = join(T, 'reviews', '950-verify-target', 'worklog.jsonl')
+  const wlLines = () => existsSync(wlPath) ? readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l)) : []
+
   const dry = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--dry-run'])
   check('verify-fixes dry-run derives the plan', dry.code === 0 && dry.out.includes('calc.txt') && dry.out.includes('PhotoPrint.Tests.Unit.CalcTests'), dry.out.trim())
+  check('verify-fixes --dry-run appends no worklog event', wlLines().length === 0, JSON.stringify(wlLines()))
 
   const live = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
   check('verify-fixes proves red-then-green and reports held', live.code === 0 && live.out.includes('"verdict":"held"') && live.out.includes('SUMMARY: 1/1 held'), live.out.trim())
-  check('verify-fixes leaves the tree clean', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
   check("verify-fixes warns when HEAD has moved past the resolution's fixed_commit",
     live.out.includes(`warning: HEAD is not the resolution's fixed_commit ${sha}`), live.out.trim())
+  {
+    const verifyResults = wlLines().filter(e => e.ev === 'verify-result')
+    check('verify-fixes appends exactly one verify-result event for the held row', verifyResults.length === 1, JSON.stringify(verifyResults))
+    check('the verify-result event names PPW-9501 held', verifyResults[0]?.id === 'PPW-9501' && verifyResults[0]?.verdict === 'held', JSON.stringify(verifyResults))
+  }
+  // A live run's worklog write is a deliberate change, not revert-and-restore leftovers — commit
+  // it (as a real caller would) before checking the tree is otherwise clean.
+  g('add', '.'); g('commit', '-qm', 'worklog')
+  check('verify-fixes leaves the tree clean', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
+
+  const liveNoEvents = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen, '--no-events'])
+  check('verify-fixes --no-events reports held without appending', liveNoEvents.code === 0 && liveNoEvents.out.includes('"verdict":"held"'), liveNoEvents.out.trim())
+  check('verify-fixes --no-events appends no additional worklog event', wlLines().filter(e => e.ev === 'verify-result').length === 1, JSON.stringify(wlLines()))
 
   {
     const decoyT = mkdtempSync(join(tmpdir(), 'decoy-'))
@@ -773,7 +789,7 @@ Fixture copy: one conforming row.
     dg('add', '.'); dg('commit', '-qm', 'decoy base')
     const decoyHead = dg('rev-parse', 'HEAD').stdout.trim()
     const leakedEnv = { ...process.env, GIT_DIR: join(decoyT, '.git'), GIT_WORK_TREE: decoyT, GIT_COMMON_DIR: join(decoyT, '.git') }
-    const leaked = spawnSync(process.execPath, [join(REVIEWS, 'lib', 'verify-fixes.mjs'), '--root', T, '950-verify-target', '--test-cmd-api', redGreen], { encoding: 'utf8', cwd: REPO, env: leakedEnv })
+    const leaked = spawnSync(process.execPath, [join(REVIEWS, 'lib', 'verify-fixes.mjs'), '--root', T, '950-verify-target', '--test-cmd-api', redGreen, '--no-events'], { encoding: 'utf8', cwd: REPO, env: leakedEnv })
     const leakedOut = `${leaked.stdout ?? ''}${leaked.stderr ?? ''}`
     check('verify-fixes ignores a leaked GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR and still verifies the real target',
       leaked.status === 0 && leakedOut.includes('"verdict":"held"'), leakedOut.trim())
@@ -785,7 +801,7 @@ Fixture copy: one conforming row.
     rmSync(decoyT, { recursive: true, force: true })
   }
 
-  const neverRed = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', 'node -e "process.exit(0)"'])
+  const neverRed = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', 'node -e "process.exit(0)"', '--no-events'])
   check('verify-fixes reopens a fix whose test never goes red', neverRed.code === 1 && neverRed.out.includes('"verdict":"test-never-red"'), neverRed.out.trim())
 
   writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'dirty\n')
@@ -801,11 +817,41 @@ Fixture copy: one conforming row.
   writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${sha2}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9501 | fixed | \`${sha}\`, \`${sha2}\` | fixture fix with a follow-up |\n| PPW-9502 | fixed | — | fixture row whose cell names no commit |\n`)
   g('add', '.'); g('commit', '-qm', 'resolution with two commits')
-  const multi = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
+  const multi = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen, '--no-events'])
   check('verify-fixes covers a row whose Commit cell lists two commits', multi.out.includes('"id":"PPW-9501"') && multi.out.includes('"verdict":"held"'), multi.out.trim())
   check('verify-fixes never skips a fixed row it cannot parse', multi.out.includes('"id":"PPW-9502"') && multi.out.includes('"verdict":"unparsable-commit"'), multi.out.trim())
   check('verify-fixes counts both rows in its summary', multi.out.includes('SUMMARY: 1/2 held') && multi.code === 1, `exit ${multi.code}: ${multi.out.trim()}`)
   check('verify-fixes leaves the tree clean after a multi-commit revert', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
+
+  // Two rows that both complete a full revert -> red -> restore -> green cycle in the same run:
+  // row 2's `git reset --hard` must not wipe row 1's already-appended (uncommitted) worklog event.
+  mkdirSync(join(T, 'src', 'app2'), { recursive: true })
+  writeFileSync(join(T, 'src', 'app2', 'a.txt'), 'buggyA\n')
+  writeFileSync(join(T, 'src', 'app2', 'b.txt'), 'buggyB\n')
+  g('add', '.'); g('commit', '-qm', 'two-row base')
+  writeFileSync(join(T, 'src', 'app2', 'a.txt'), 'fixedA\n')
+  writeFileSync(join(T, 'src', 'PhotoPrint.Tests', 'Unit', 'ATests.cs'), 'test a\n')
+  g('add', '.'); g('commit', '-qm', 'fix a')
+  const shaA = g('rev-parse', '--short', 'HEAD').stdout.trim()
+  writeFileSync(join(T, 'src', 'app2', 'b.txt'), 'fixedB\n')
+  writeFileSync(join(T, 'src', 'PhotoPrint.Tests', 'Unit', 'BTests.cs'), 'test b\n')
+  g('add', '.'); g('commit', '-qm', 'fix b')
+  const shaB = g('rev-parse', '--short', 'HEAD').stdout.trim()
+  writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
+    `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${shaB}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9510 | fixed | \`${shaA}\` | two-row fixture: row A |\n| PPW-9511 | fixed | \`${shaB}\` | two-row fixture: row B |\n`)
+  g('add', '.'); g('commit', '-qm', 'two-row resolution')
+  const twoRowTpl = `node -e "const fs=require('fs'); const f=process.argv[1].indexOf('ATests')>=0?'src/app2/a.txt':'src/app2/b.txt'; process.exit(fs.readFileSync(f,'utf8').indexOf('buggy')>=0?1:0)" {filter}`
+  const twoRow = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', twoRowTpl])
+  check('verify-fixes holds both rows of the two-row run', twoRow.code === 0 && twoRow.out.includes('SUMMARY: 2/2 held'), twoRow.out.trim())
+  {
+    const twoRowResults = wlLines().filter(e => e.ev === 'verify-result' && (e.id === 'PPW-9510' || e.id === 'PPW-9511'))
+    check("row 2's reset --hard did not wipe row 1's already-appended worklog event",
+      twoRowResults.length === 2 && twoRowResults.every(e => e.verdict === 'held'), JSON.stringify(wlLines()))
+  }
+  check('verify-fixes leaves the tree clean after the two-row run (worklog aside)',
+    g('status', '--porcelain', '--', '.', ':(exclude)reviews/950-verify-target/worklog.jsonl').stdout.trim() === '',
+    g('status', '--porcelain').stdout)
+  g('add', '.'); g('commit', '-qm', 'worklog after two-row run')
 
   // A frontend spec with no installed dependencies must not be run: the runner would fail to
   // start in both legs, which reads as a red that reddened for the wrong reason.
@@ -817,7 +863,7 @@ Fixture copy: one conforming row.
   writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${uiSha}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9503 | fixed | \`${uiSha}\` | fixture fix carrying a frontend spec |\n`)
   g('add', '.'); g('commit', '-qm', 'ui resolution')
-  const ui = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
+  const ui = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen, '--no-events'])
   check('verify-fixes refuses a frontend row with no installed dependencies', ui.out.includes('"verdict":"env-missing"') && ui.out.includes('node_modules'), ui.out.trim())
   check('verify-fixes ran no test for the refused frontend row', ui.out.includes('"red_exits":[]'), ui.out.trim())
   rmSync(T, { recursive: true, force: true })

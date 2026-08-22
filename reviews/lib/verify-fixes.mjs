@@ -7,7 +7,7 @@
 // Test commands are injectable so the fixture suite can drive a throwaway repo.
 //
 // Usage: node reviews/lib/verify-fixes.mjs [--root <repoRoot>] <target>
-//          [--only PPW-1,PPW-2] [--dry-run]
+//          [--only PPW-1,PPW-2] [--dry-run] [--no-events]
 //          [--test-cmd-api "<tpl with {filter}>"] [--test-cmd-ui "<tpl with {name}>"]
 // Output: one JSON line per row {id, verdict, commit, filters, red_exits, green_exits},
 // then "SUMMARY: <held>/<total> held". Verdicts: held · test-never-red · no-test ·
@@ -15,14 +15,17 @@
 // rename-in-fix · env-missing · dry-run. A row's Commit cell may list several commits; all of
 // them are reverted together, back to the parent of the first. A row whose tests include a
 // frontend spec needs src/PhotoPrint.UI/node_modules in this checkout, or it is not run at all.
+// Every row's verdict also lands as a verify-result event in the target's worklog (crash-safe:
+// a killed run leaves whatever rows already finished), unless --dry-run or --no-events.
 // Exit: 0 all held · 1 any other verdict · 2 dirty tree or usage error.
-import { readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { appendEvent } from './wl.mjs'
 
 const argv = process.argv.slice(2)
-let root = null, only = null, dryRun = false
+let root = null, only = null, dryRun = false, noEvents = false
 let tplApi = 'dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"'
 let tplUi = 'npm --prefix src/PhotoPrint.UI test -- --watch=false --include=**/{name}*.spec.ts'
 const rest = []
@@ -30,13 +33,14 @@ for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--root') root = argv[++i]
   else if (argv[i] === '--only') only = new Set(argv[++i].split(','))
   else if (argv[i] === '--dry-run') dryRun = true
+  else if (argv[i] === '--no-events') noEvents = true
   else if (argv[i] === '--test-cmd-api') tplApi = argv[++i]
   else if (argv[i] === '--test-cmd-ui') tplUi = argv[++i]
   else rest.push(argv[i])
 }
 const target = rest[0]
 const REPO = root ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-if (!target) { console.error('usage: node reviews/lib/verify-fixes.mjs [--root <repoRoot>] <target> [--only ids] [--dry-run] [--test-cmd-api tpl] [--test-cmd-ui tpl]'); process.exit(2) }
+if (!target) { console.error('usage: node reviews/lib/verify-fixes.mjs [--root <repoRoot>] <target> [--only ids] [--dry-run] [--no-events] [--test-cmd-api tpl] [--test-cmd-ui tpl]'); process.exit(2) }
 const dir = [join(REPO, 'reviews', target), join(REPO, 'reviews', 'archive', target)].find(existsSync)
 if (!dir) { console.error(`no reviews folder for "${target}"`); process.exit(2) }
 
@@ -80,9 +84,16 @@ if (git('status', '--porcelain').stdout.trim() !== '') {
 }
 
 const isTest = p => /^src\/PhotoPrint\.Tests\//.test(p) || /\.spec\.ts$/.test(p)
+const worklogPath = join(REPO, 'reviews', target, 'worklog.jsonl')
+const worklogPathspec = `:(exclude)reviews/${target}/worklog.jsonl`
 const restoreOrDie = id => {
+  // worklog.jsonl is a tracked file in a real target; an earlier row's already-appended (and
+  // still uncommitted) event would otherwise be wiped by this row's own reset --hard.
+  const wlSnapshot = existsSync(worklogPath) ? readFileSync(worklogPath) : null
   const r = git('reset', '--hard', 'HEAD')
-  if (r.status !== 0 || git('status', '--porcelain').stdout.trim() !== '') {
+  if (wlSnapshot !== null) writeFileSync(worklogPath, wlSnapshot)
+  else if (existsSync(worklogPath)) rmSync(worklogPath)
+  if (r.status !== 0 || git('status', '--porcelain', '--', '.', worklogPathspec).stdout.trim() !== '') {
     console.error(`FATAL: restore failed after reverting ${id} — check the tree by hand`)
     process.exit(2)
   }
@@ -91,48 +102,58 @@ const results = []
 for (const row of rows) {
   const res = { id: row.id, verdict: null, commit: row.commit, filters: [], red_exits: [], green_exits: [] }
   results.push(res)
-  if (!row.commits.length) { res.verdict = 'unparsable-commit'; continue }
-  if (row.commits.some(c => git('cat-file', '-e', c).status !== 0 ||
-      git('merge-base', '--is-ancestor', c, 'HEAD').status !== 0)) { res.verdict = 'unreachable-commit'; continue }
-  const entries = row.commits.flatMap(c => git('show', '--name-status', '--format=', c).stdout
-    .split('\n').filter(l => l.trim()).map(l => l.split('\t')))
-  if (entries.some(e => e[0].startsWith('R'))) { res.verdict = 'rename-in-fix'; continue }
-  const base = `${row.commits[0]}^`
-  const uniq = new Map()
-  for (const e of entries) uniq.set(e[1], e[0])
-  const tests = [...uniq.keys()].filter(isTest)
-  const source = [...uniq.entries()].filter(([f]) => !isTest(f)).map(([f, st]) => [st, f])
-  if (!tests.length) { res.verdict = 'no-test'; continue }
-  if (!source.length) { res.verdict = 'test-only'; continue }
-  // A frontend suite cannot run without installed dependencies, and a runner that fails to start
-  // exits non-zero in BOTH legs — reading as a red that reddened for the wrong reason. Refuse.
-  if (tests.some(p => p.endsWith('.spec.ts')) && !existsSync(join(REPO, 'src', 'PhotoPrint.UI', 'node_modules'))) {
-    res.verdict = 'env-missing'
-    res.note = 'src/PhotoPrint.UI/node_modules is absent in this checkout, so the frontend suites cannot run'
-    continue
-  }
-  const cmds = tests.map(p => p.endsWith('.cs')
-    ? tplApi.replace('{filter}', 'PhotoPrint.Tests.' + p.replace(/^src\/PhotoPrint\.Tests\//, '').replace(/\.cs$/, '').split('/').join('.'))
-    : tplUi.replace('{name}', basename(p).replace(/\.spec\.ts$/, '')))
-  res.filters = cmds
-  if (dryRun) { res.verdict = 'dry-run'; res.plan = { source: source.map(e => e[1]), tests }; continue }
+  try {
+    if (!row.commits.length) { res.verdict = 'unparsable-commit'; continue }
+    if (row.commits.some(c => git('cat-file', '-e', c).status !== 0 ||
+        git('merge-base', '--is-ancestor', c, 'HEAD').status !== 0)) { res.verdict = 'unreachable-commit'; continue }
+    const entries = row.commits.flatMap(c => git('show', '--name-status', '--format=', c).stdout
+      .split('\n').filter(l => l.trim()).map(l => l.split('\t')))
+    if (entries.some(e => e[0].startsWith('R'))) { res.verdict = 'rename-in-fix'; continue }
+    const base = `${row.commits[0]}^`
+    const uniq = new Map()
+    for (const e of entries) uniq.set(e[1], e[0])
+    const tests = [...uniq.keys()].filter(isTest)
+    const source = [...uniq.entries()].filter(([f]) => !isTest(f)).map(([f, st]) => [st, f])
+    if (!tests.length) { res.verdict = 'no-test'; continue }
+    if (!source.length) { res.verdict = 'test-only'; continue }
+    // A frontend suite cannot run without installed dependencies, and a runner that fails to start
+    // exits non-zero in BOTH legs — reading as a red that reddened for the wrong reason. Refuse.
+    if (tests.some(p => p.endsWith('.spec.ts')) && !existsSync(join(REPO, 'src', 'PhotoPrint.UI', 'node_modules'))) {
+      res.verdict = 'env-missing'
+      res.note = 'src/PhotoPrint.UI/node_modules is absent in this checkout, so the frontend suites cannot run'
+      continue
+    }
+    const cmds = tests.map(p => p.endsWith('.cs')
+      ? tplApi.replace('{filter}', 'PhotoPrint.Tests.' + p.replace(/^src\/PhotoPrint\.Tests\//, '').replace(/\.cs$/, '').split('/').join('.'))
+      : tplUi.replace('{name}', basename(p).replace(/\.spec\.ts$/, '')))
+    res.filters = cmds
+    if (dryRun) { res.verdict = 'dry-run'; res.plan = { source: source.map(e => e[1]), tests }; continue }
 
-  let reverted = true
-  for (const [, f] of source) {
-    const existedBefore = git('cat-file', '-e', `${base}:${f}`).status === 0
-    if (!existedBefore) { try { rmSync(join(REPO, f)) } catch { reverted = false } }
-    else if (git('checkout', base, '--', f).status !== 0) reverted = false
-  }
-  if (!reverted) {
+    let reverted = true
+    for (const [, f] of source) {
+      const existedBefore = git('cat-file', '-e', `${base}:${f}`).status === 0
+      if (!existedBefore) { try { rmSync(join(REPO, f)) } catch { reverted = false } }
+      else if (git('checkout', base, '--', f).status !== 0) reverted = false
+    }
+    if (!reverted) {
+      restoreOrDie(row.id)
+      res.verdict = 'revert-failed'
+      continue
+    }
+    for (const c of cmds) res.red_exits.push(runCmd(c).status ?? -1)
     restoreOrDie(row.id)
-    res.verdict = 'revert-failed'
-    continue
+    if (!res.red_exits.some(x => x !== 0)) { res.verdict = 'test-never-red'; continue }
+    for (const c of cmds) res.green_exits.push(runCmd(c).status ?? -1)
+    res.verdict = res.green_exits.every(x => x === 0) ? 'held' : 'green-failed'
+  } finally {
+    if (!dryRun && !noEvents) {
+      try {
+        appendEvent(REPO, target, { ev: 'verify-result', id: res.id, verdict: res.verdict, commit: res.commit })
+      } catch (e) {
+        console.error(`note: ${res.id} verify-result not recorded: ${e.message}`)
+      }
+    }
   }
-  for (const c of cmds) res.red_exits.push(runCmd(c).status ?? -1)
-  restoreOrDie(row.id)
-  if (!res.red_exits.some(x => x !== 0)) { res.verdict = 'test-never-red'; continue }
-  for (const c of cmds) res.green_exits.push(runCmd(c).status ?? -1)
-  res.verdict = res.green_exits.every(x => x === 0) ? 'held' : 'green-failed'
 }
 
 for (const r of results) console.log(JSON.stringify(r))
