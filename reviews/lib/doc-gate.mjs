@@ -41,8 +41,7 @@ function report(label) {
   process.exit(0)
 }
 
-// Lints reviews/state/backlog.md and reviews/state/index.md. Shared by standalone `state`
-// mode and by target mode, which runs it too so the index row lands linted, not after the gate.
+// Lints reviews/state/*.md; target mode below runs this too so the index row lands linted.
 const stateRows = raw => raw.replace(/\r\n/g, '\n').split('\n')
   .map((line, i) => ({ line, n: i + 1, cells: line.split('|').map(c => c.trim()) }))
   .filter(r => /^\|/.test(r.line) && r.cells[1] !== 'ID' && r.cells[1] !== 'Target' && r.cells[1] !== 'Date' && !/^:?-{2,}:?$/.test(r.cells[1]))
@@ -234,7 +233,8 @@ if (existsSync(join(dir, resolutionFile))) {
       bad(resolutionFile, `title is "${got[0] ?? '(none)'}" — template requires "# Resolution v${pass} — ${name}"`)
     for (const h of ['## Findings', '## Scope', '## Decisions']) if (!got.includes(h)) bad(resolutionFile, `missing heading "${h}"`)
     if (bodyLines(p.body) > 200) bad(resolutionFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 200`)
-    const decisions = p.body.split(/^### /m).slice(1)
+    const decisionsSection = p.body.split(/^## /m).find(s => s.startsWith('Decisions')) ?? ''
+    const decisions = decisionsSection.split(/^### /m).slice(1)
     for (const d of decisions) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1
       if (n > 15) bad(resolutionFile, `decision "${d.split('\n')[0]}" is ${n} lines — cap is 15`)

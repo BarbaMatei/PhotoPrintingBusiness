@@ -61,6 +61,62 @@ const firstLine = out => out.split('\n')[0]
   for (const e of expected) check(`doc-gate reports: ${e}`, r.out.includes(e), 'not in the gate output')
 }
 
+// ---------- doc-gate: Check A's Decisions-heading match is scoped to "## Decisions" only ----------
+// A stray "### ... (PPW-n)" heading anywhere else in the body (e.g. under Findings) must not
+// satisfy the rule, and must not count against the per-decision 15-line cap either.
+{
+  const T = mkdtempSync(join(tmpdir(), 'doc-gate-decisions-scope-'))
+  const target = '940-decisions-scope'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  const filler = Array.from({ length: 17 }, (_, i) => `- filler line ${i + 1}`).join('\n')
+  const resolution = (pass, decisionsBody) => `---
+type: resolution
+target: ${target}
+version: ${pass}
+answers: review-v${pass}.md
+status: resolved
+fixed_commit: aaaaaaa
+---
+
+# Resolution v${pass} — ${target}
+
+## Findings
+
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| PPW-9500 | deferred | — | Queued behind other work. |
+
+### A stray heading that must not count (PPW-9500)
+
+${filler}
+
+## Scope
+
+| Cluster | Findings | Files | Approach-check |
+|---|---|---|---|
+| A | PPW-9500 | \`Services/Fixture.cs\` | not needed (fixture) |
+
+## Decisions
+
+${decisionsBody}
+`
+  writeFileSync(join(dir, 'resolution-v1.md'), resolution(1, '### Some unrelated call (PPW-9999)\n\nNothing about PPW-9500 here.'))
+  const bad = run('doc-gate.mjs', ['--root', T, target, '1'])
+  check('doc-gate fires when the only matching heading sits outside Decisions',
+    bad.code === 1 && bad.out.includes('PPW-9500 status deferred has no Decisions block — every non-fixed status needs its rationale (doc-contracts.md)'),
+    `exit ${bad.code}: ${bad.out.trim()}`)
+  check('the stray 17-line heading outside Decisions is not counted against the 15-line cap',
+    !bad.out.includes('cap is 15'), bad.out.trim())
+
+  writeFileSync(join(dir, 'resolution-v2.md'), resolution(2, '### Queued until the rewrite lands (PPW-9500)\n\nNot a defect this round can close.'))
+  const good = run('doc-gate.mjs', ['--root', T, target, '2'])
+  check('doc-gate is clean once the real Decisions section names the id, decoy heading notwithstanding',
+    good.code === 0, `exit ${good.code}: ${good.out.trim()}`)
+
+  rmSync(T, { recursive: true, force: true })
+}
+
 // ---------- doc-gate target mode: state files lint in the same run, keyed to the target ----------
 {
   const r = run('doc-gate.mjs', ['--root', BAD_STATE_ROOT, '901-good-target', '1'])

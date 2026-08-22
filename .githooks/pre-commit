@@ -14,7 +14,7 @@ hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
 # Doc-gate backstop: staged review artifacts of contracts-era targets must pass the
 # structure lint. Targets without detail blocks in the ledger are exempt.
 if [ -z "$DOCGATE_OK" ]; then
-  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u)
+  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u | grep -v '^reviews/lib/')
   for d in $dirs; do
     [ -f "$d/ledger.md" ] || continue
     grep -q "^### PPW-" "$d/ledger.md" || continue
