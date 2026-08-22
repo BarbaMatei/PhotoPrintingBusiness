@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readLedger, openIds } from './ledger.mjs'
 
 const argv = process.argv.slice(2)
 let root = null, arg = null
@@ -63,14 +64,7 @@ const fm = (file, key) => {
   const m = new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm').exec(block[1])
   return m ? m[1] : null
 }
-// Findings-table rows only: one severity cell, one status word, both from doc-contracts.md.
-const LEDGER_STATUSES = ['open', 'in-progress', 'fixed', 'verified', 'wont-fix', 'deferred', 'disputed', 'false-positive', 'backlog']
-const OPEN_STATUSES = ['open', 'in-progress']
-const LEDGER_ROW = /^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|\n]*\|[^|\n]*\|[^|\n]*\|\s*([a-z-]+)\s*\|/gm
-const ledgerRows = file => [...readFileSync(file, 'utf8').matchAll(LEDGER_ROW)]
-  .filter(m => LEDGER_STATUSES.includes(m[3]))
-  .map(m => ({ id: m[1], sev: m[2], status: m[3] }))
-const openIds = (rows, sev) => rows.filter(r => r.sev === sev && OPEN_STATUSES.includes(r.status)).map(r => r.id)
+const count = (n, word, plural = `${word}s`) => `${n} ${n === 1 ? word : plural}`
 
 const out = []
 const say = s => out.push(s)
@@ -130,48 +124,60 @@ const serious = L.new_findings ? (L.new_findings.high || 0) + (L.new_findings.me
 say(`STATE: latest review v${N} · last ${L.type === 'fix-round' ? `fix round r${L.round}` : `pass v${L.pass} ${L.type}`}${L.subtype ? ` (${L.subtype})` : ''} → ${L.verdict ?? '—'}${L.outcome ? ` · outcome ${L.outcome}` : ''} · new serious ${serious} · reopened ${L.reopened || 0}`)
 say(`STATE: latest resolution v${RN || '—'}${rStatus ? ` (${rStatus}${rCommit ? ` @${rCommit}` : ''})` : ''}`)
 
-// Ledger-derived open counts. A target with no ledger.md predates this record and routes on the
-// metrics tally alone, exactly as before.
-const ledgerFindings = existsSync(ledger) ? ledgerRows(ledger) : null
-const openHigh = ledgerFindings ? openIds(ledgerFindings, '🔴') : []
-const openMedium = ledgerFindings ? openIds(ledgerFindings, '🟠') : []
-if (ledgerFindings) say(`STATE: ledger open 🔴 ${openHigh.length} · open 🟠 ${openMedium.length} (queue threshold ${QUEUE_THRESHOLD})`)
+const led = readLedger(ledger)
+const openHigh = led ? openIds(led.rows, '🔴') : []
+const openMedium = led ? openIds(led.rows, '🟠') : []
+if (led) {
+  say(`STATE: ledger open 🔴 ${openHigh.length} · open 🟠 ${openMedium.length} (queue threshold ${QUEUE_THRESHOLD})`)
+  const unread = led.idRows - led.rows.length
+  if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
+}
 
 // A resolved resolution not yet re-reviewed owns every row its round touched: the reviewed unit's
 // records render after the verification, so those rows still read open|in-progress here. Routing
 // on them would re-run the round instead of verifying it, so the ledger rows stand down and the
 // resolved-resolution row below answers.
 const pendingVerification = L.type !== 'verification' && RN >= N && rStatus === 'resolved'
+// 🟠 still open when a certification passes is the documented norm — they roll into the backlog at
+// close — so they must not pre-empt the owner's close decision. A 🔴 arms the loop even here.
+const atLoopClose = L.outcome === 'certified' && L.pass === N && (!RN || RN < N)
 let queued = []
-if (ledgerFindings && !pendingVerification) {
-  // A fix-caused 🟠 re-arms the loop where a plain 🟠 would queue — but only while it is still
-  // open: once the ledger settles it (fixed, deferred, wont-fix) the lineage entry stays on the
-  // line forever and would otherwise re-arm every run.
-  const lastVerification = lines.filter(l => l.type === 'verification').pop()
-  const regression = (lastVerification?.findings ?? [])
+if (led && !pendingVerification) {
+  // A fix-caused 🟠 re-arms the loop where a plain 🟠 would queue — for as long as it stays open.
+  // The lineage sits on the verification line that found it, which newer passes never rewrite, so
+  // every verification line is read; the ledger status is what says whether it is still live.
+  const regression = lines.filter(l => l.type === 'verification')
+    .flatMap(l => l.findings ?? [])
     .find(f => f && f.fix_generated != null && f.sev === 'medium' && openMedium.includes(f.d))
   const armed = []
   if (openHigh.length) armed.push(`${openHigh.length} open 🔴 in the ledger (${openHigh.join(', ')})`)
-  if ((L.reopened || 0) > 0) armed.push(`${L.reopened} reopened fix(es) on the latest line`)
+  if ((L.reopened || 0) > 0) armed.push(`${count(L.reopened, 'reopened fix', 'reopened fixes')} on the latest line`)
   if (regression) armed.push(`a fix-caused 🟠 regression (${regression.d}, from the fix for ${regression.fix_generated})`)
   if (armed.length) {
     say(`ROUTER: the loop is armed — ${armed.join(' · ')}.`)
     finish(0, 'fix round', null)
   }
-  if (openMedium.length >= QUEUE_THRESHOLD) {
-    say(`ROUTER: batch of ${openMedium.length} open mediums at or over the queue threshold of ${QUEUE_THRESHOLD} (${openMedium.join(', ')}).`)
+  if (openMedium.length >= QUEUE_THRESHOLD && !atLoopClose) {
+    say(`ROUTER: batch of ${count(openMedium.length, 'open medium')} at or over the queue threshold of ${QUEUE_THRESHOLD} (${openMedium.join(', ')}).`)
     finish(0, 'fix round', null)
   }
-  if (openMedium.length) {
+  if (openMedium.length && !atLoopClose) {
     say(`QUEUED: ${openMedium.join(', ')} (${openMedium.length} below the threshold of ${QUEUE_THRESHOLD})`)
     queued = openMedium
   }
 }
+// What the later rows must treat as still-open serious work. The metrics tally counts every
+// medium its pass filed for the life of the line, queued ones included, so a ledger'd target
+// counts the ledger: 🔴 always, 🟠 only once the queue is a batch.
+const openSerious = led
+  ? openHigh.length + (openMedium.length >= QUEUE_THRESHOLD ? openMedium.length : 0)
+  : serious
+const cleanBasis = led ? 'nothing open in the ledger' : '0 new serious'
 
 // Certified with NO post-cert fix round pending → close decision belongs to the owner.
 // A resolved post-cert fix round must fall through to the verification branch below (row 3):
 // 015's post-cert round is the precedent — its verification reopened 4 fixes.
-if (L.outcome === 'certified' && L.pass === N && (!RN || RN < N)) {
+if (atLoopClose) {
   say('ROUTER: certification passed on the latest pass; no post-cert fix round is pending.')
   finish(2, null, `close the loop (record \`closed:\` in the ledger frontmatter + index row, README note ²) — owner decision`, 'loop-close')
 }
@@ -181,8 +187,8 @@ if (L.outcome === 'certified' && L.pass === N && (!RN || RN < N)) {
 // discovery version and RN === N would otherwise re-route to verification forever.
 if (L.type === 'verification') {
   if ((L.reopened || 0) > 0) { say('ROUTER: reopened fixes re-arm the loop (last row).'); finish(0, 'fix round', null) }
-  if (serious > 0) { say('ROUTER: verification surfaced new serious findings (last row).'); finish(0, 'fix round', null) }
-  say('ROUTER: verification clean (0 reopened, 0 new serious).')
+  if (openSerious > 0) { say('ROUTER: verification surfaced new serious findings (last row).'); finish(0, 'fix round', null) }
+  say(`ROUTER: verification clean (0 reopened, ${cleanBasis}).`)
   say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
   finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'delta-worthiness')
 }
@@ -198,16 +204,16 @@ if (RN >= N && rStatus && rStatus !== 'resolved') {
   finish(0, 'fix round', null)
 }
 
-if (L.verdict === 'request-changes' || serious > 0) {
+if (L.verdict === 'request-changes' || openSerious > 0) {
   say(`ROUTER: open serious findings with no resolution answering review-v${N} (row 2).`)
   finish(0, 'fix round', null)
 }
-if ((L.type === 'discovery' || L.type === 'delta-discovery') && serious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes') {
+if ((L.type === 'discovery' || L.type === 'delta-discovery') && openSerious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes') {
   if (queued.length) {
-    say(`ROUTER: sweep before certification — ${queued.length} open mediums must drain (${queued.join(', ')}) before the loop quiets.`)
+    say(`ROUTER: sweep before certification — ${count(queued.length, 'open medium')} must drain (${queued.join(', ')}) before the loop quiets.`)
     finish(0, 'fix round', null)
   }
-  say('ROUTER: discovery-type pass clean (0 serious, 0 reopened) — loop quiet (row 6).')
+  say(`ROUTER: discovery-type pass clean (${cleanBasis}, 0 reopened) — loop quiet (row 6).`)
   finish(2, null, `certification — ALWAYS needs the owner's explicit go-ahead outside an unattended run: first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'certification-go-ahead')
 }
 say('ROUTER: no row matched mechanically — decide from the README router with the facts above.')

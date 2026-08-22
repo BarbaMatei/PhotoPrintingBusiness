@@ -4,13 +4,18 @@
 // rule below proceeds on the owner's standing approval (2026-08-20) — certification and loop
 // close included. Fail closed: a gate kind this file does not know answers "stop".
 //
+// No gate that leads to a certification may pass while the ledger still has open work: the
+// router only meets the pre-certification sweep on its loop-quiet row, so both certification-
+// bound gates read the ledger here too.
+//
 // Usage: node reviews/lib/autonomy-policy.mjs [--root <repoRoot>] <target> decide <gate-kind>
-// Output: ACTION: auto|stop, then NEXT (auto only: delta discovery · certification (pair) ·
-// certification (single) · close the loop) and REASON.
+// Output: ACTION: auto|stop, then NEXT (auto only: fix round · delta discovery · certification
+// (pair) · certification (single) · close the loop) and REASON.
 // Exit: 0 answered · 1 usage error or unknown target.
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readLedger, openIds } from './ledger.mjs'
 
 const argv = process.argv.slice(2)
 let root = null
@@ -34,6 +39,27 @@ function hasCertification(targetDir) {
     .some(l => { try { const e = JSON.parse(l); return e.outcome === 'certified' || /^certification/.test(e.subtype ?? '') } catch { return false } })
 }
 
+// Open ledger work outranks any answer that would launch a certification. Silent on a target
+// with no ledger, and never consulted at the loop-close gate: 🟠 open at close roll into the
+// backlog by design.
+function openWork() {
+  const led = readLedger(join(dir, 'ledger.md'))
+  if (!led) return null
+  const high = openIds(led.rows, '🔴')
+  if (high.length) return `the loop is armed — ${high.length} open 🔴 (${high.join(', ')})`
+  const medium = openIds(led.rows, '🟠')
+  if (medium.length) return `sweep before certification — ${medium.length} open medium${medium.length === 1 ? '' : 's'} must drain (${medium.join(', ')})`
+  return null
+}
+function sweepFirst() {
+  const reason = openWork()
+  if (!reason) return
+  say('ACTION', 'auto')
+  say('NEXT', 'fix round')
+  say('REASON', reason)
+  process.exit(0)
+}
+
 if (gateKind === 'loop-close') {
   say('ACTION', 'auto')
   say('NEXT', 'close the loop')
@@ -41,6 +67,7 @@ if (gateKind === 'loop-close') {
   process.exit(0)
 }
 if (gateKind === 'delta-worthiness') {
+  sweepFirst()
   // Judge the round that just ran, which is the newest resolution. A round answering a
   // verification pass raises no review file, so it has no blocker list and is patch-grade
   // unless its own review file says otherwise.
@@ -74,6 +101,7 @@ if (gateKind === 'delta-worthiness') {
   process.exit(0)
 }
 if (gateKind === 'certification-go-ahead') {
+  sweepFirst()
   const hasCert = hasCertification(dir)
   say('ACTION', 'auto')
   say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')

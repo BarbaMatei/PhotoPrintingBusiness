@@ -229,7 +229,7 @@ const REVIEWED_UNIT = 'NEXT: verification (reviewed unit — render records once
 {
   const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '917-sweep-before-cert'])
   check('router sweeps the queue before certification instead of gating', r.code === 0 && r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
-  check('the sweep reason states how many mediums must drain', r.out.includes('sweep before certification — 1 open mediums must drain'), r.out.trim())
+  check('the sweep reason states how many mediums must drain', r.out.includes('sweep before certification — 1 open medium must drain'), r.out.trim())
   check('the sweep counts only open mediums — not a deferred 🟠, not an open 🟡',
     r.out.includes('QUEUED: PPW-9172 (1 below the threshold of 3)'), r.out.trim())
   check('the certification gate does not print while the queue is unswept',
@@ -272,6 +272,90 @@ const REVIEWED_UNIT = 'NEXT: verification (reviewed unit — render records once
   const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '901-good-target'])
   check('the verification answer names the reviewed unit and keeps its cost line',
     r.out.includes(REVIEWED_UNIT) && r.out.includes('COST: ~60–250k agent tokens'), r.out.trim())
+}
+
+// ---------- route-next-pass: queued mediums are absent from the later rows too ----------
+// The metrics tally counts a medium as "serious" for the whole life of its line, so a queued
+// medium would print QUEUED and then be routed to a fix round two rows later by the same number —
+// the router contradicting itself. For a ledger'd target the later rows count the ledger instead.
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '948-verification-files-mediums'])
+  check('a verification that files two mediums queues them instead of re-arming',
+    r.out.includes('QUEUED: PPW-9482, PPW-9483 (2 below the threshold of 3)'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the queued mediums do not read as new serious findings on the verification row',
+    r.code === 3 && r.out.includes('GATE_KIND: delta-worthiness') && !r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('a new medium with fix_generated null is not a fix-caused regression', !r.out.includes('fix-caused'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '949-discovery-files-mediums'])
+  check('a discovery that files two mediums with nothing answering it queues them',
+    r.out.includes('QUEUED: PPW-9491, PPW-9492 (2 below the threshold of 3)'), `exit ${r.code}: ${r.out.trim()}`)
+  check('and then routes the sweep, not the open-serious row',
+    r.code === 0 && r.out.includes('sweep before certification — 2 open mediums must drain') && !r.out.includes('open serious findings'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '944-regression-persists'])
+  check('a still-open fix-caused 🟠 keeps arming the loop after a newer clean verification',
+    r.code === 0 && r.out.includes('fix-caused 🟠 regression') && r.out.includes('PPW-9442'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the regression is read across every verification line, not just the newest',
+    r.out.includes('from the fix for PPW-9441'), r.out.trim())
+}
+
+// ---------- route-next-pass: the loop-close gate and the ledger rows ----------
+// 🟠 still open at certification is the documented norm — they roll into the backlog at close, so
+// they must not pre-empt the owner's close decision. A 🔴 that lands after the certification pass
+// still has to arm the loop.
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '945-certified-two-mediums'])
+  check('two open mediums do not queue over the loop-close gate',
+    r.code === 2 && r.out.includes('GATE_KIND: loop-close') && !r.out.includes('QUEUED:'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '946-certified-medium-batch'])
+  check('a batch of three open mediums does not pre-empt the loop-close gate either',
+    r.code === 2 && r.out.includes('GATE_KIND: loop-close') && !r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '947-certified-open-blocker'])
+  check('an open 🔴 arms the loop even at the loop-close gate',
+    r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('PPW-9471'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the post-certification blocker is not answered with a close gate', !r.out.includes('GATE_KIND: loop-close'), r.out.trim())
+}
+
+// ---------- route-next-pass: a ledger row the router could not read ----------
+// Silently skipping a row can only make the loop quieter, which is the wrong direction to fail in,
+// so the count of id-shaped rows is compared against the rows that actually parsed.
+{
+  const T = mkdtempSync(join(tmpdir(), 'router-unparsed-row-'))
+  const target = '951-unparsed-ledger-row'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'review-v1.md'), '---\ntype: review\ntarget: 951-unparsed-ledger-row\nversion: 1\ncommit: ddddde1\n---\n\n# Review v1\n')
+  writeFileSync(join(dir, 'metrics.jsonl'), JSON.stringify({
+    target, pass: 1, type: 'discovery', date: '2026-08-22', commit: 'ddddde1', verdict: 'approve-with-followups',
+    new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0,
+  }) + '\n')
+  writeFileSync(join(dir, 'ledger.md'), `---
+type: review-ledger
+target: ${target}
+updated: 2026-08-22
+---
+
+# Ledger — ${target}
+
+## Findings
+
+| ID | Sev | First seen | Title | File | Status | Affirmed |
+|---|---|---|---|---|---|---|
+| PPW-9511 | 🔴 | v1 | A real row the router reads | \`Services/Fixture.cs:5\` | verified | \`ddddde2\` |
+| PPW-9512 | — | v1 | A refuted row whose severity cell is a dash | \`Services/Fixture.cs:9\` | false-positive | \`ddddde2\` |
+`)
+  const r = run('route-next-pass.mjs', ['--root', T, target])
+  const note = r.out.split('\n').find(l => l.startsWith('NOTE:')) ?? ''
+  check('router notes a ledger row it could not parse, with the count', note.includes('1 of 2'), r.out.trim())
+  check('the note says which way the gap fails', /quiet/.test(note), note || r.out.trim())
+  check('an unparsed row does not stop the router routing', r.code === 2 && r.out.includes('GATE_KIND: certification-go-ahead'), `exit ${r.code}: ${r.out.trim()}`)
+  rmSync(T, { recursive: true, force: true })
 }
 
 // ---------- records auditor: smoke run against the real repo ----------
@@ -966,6 +1050,32 @@ Fixture copy: one conforming row.
 {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '909-certified-target', 'decide', 'mystery-gate'])
   check('policy fails closed on an unknown gate kind', r.out.includes('ACTION: stop'), r.out.trim())
+}
+
+// ---------- autonomy-policy: the queue drains before the policy can launch a certification ----------
+// The router only meets the sweep on the loop-quiet row; the delta-worthiness gate reaches
+// certification by the other road, so the policy has to read the ledger for itself.
+for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '915-queued-mediums', 'decide', gate])
+  check(`policy sweeps the medium queue instead of certifying at the ${gate} gate`,
+    r.code === 0 && r.out.includes('ACTION: auto') && r.out.includes('NEXT: fix round') && !r.out.includes('NEXT: certification'), r.out.trim())
+  check(`the ${gate} sweep reason names the count and the ids`,
+    r.out.includes('sweep before certification — 2 open mediums must drain') && r.out.includes('PPW-9152'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '918-open-blocker', 'decide', 'certification-go-ahead'])
+  check('policy answers an open 🔴 with a fix round, not a certification',
+    r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('the loop is armed — 1 open 🔴') && r.out.includes('PPW-9181'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '943-regression-deferred', 'decide', 'certification-go-ahead'])
+  check('a ledger with nothing open still certifies as before',
+    r.code === 0 && r.out.includes('NEXT: certification (pair)'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '945-certified-two-mediums', 'decide', 'loop-close'])
+  check('the loop-close gate still closes with mediums open — they roll into the backlog',
+    r.code === 0 && r.out.includes('NEXT: close the loop'), r.out.trim())
 }
 
 // ---------- verify-fixes: revert-and-rerun against a throwaway repo ----------
