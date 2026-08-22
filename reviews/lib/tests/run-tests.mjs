@@ -260,10 +260,14 @@ commit: abc1234
 // ---------- verify-fixes: revert-and-rerun against a throwaway repo ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'verify-fixes-'))
-  // A git hook's own GIT_DIR/GIT_WORK_TREE would otherwise leak in here and redirect these
-  // calls at the hook's repo instead of T.
+  // A git hook's own GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR (etc.) would otherwise leak in here
+  // and redirect these calls at the hook's repo instead of T; ask git for the authoritative
+  // list (git help githooks: "unset $(git rev-parse --local-env-vars)") rather than guessing.
+  const FALLBACK_GIT_ENV_VARS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES', 'GIT_PREFIX']
+  const localEnvVars = spawnSync('git', ['rev-parse', '--local-env-vars'], { encoding: 'utf8' })
+  const gitEnvVars = localEnvVars.status === 0 ? localEnvVars.stdout.split(/\r?\n/).filter(Boolean) : FALLBACK_GIT_ENV_VARS
   const gitEnv = { ...process.env }
-  for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES', 'GIT_PREFIX']) delete gitEnv[k]
+  for (const k of gitEnvVars) delete gitEnv[k]
   const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8', env: gitEnv })
   g('init', '-q', '-b', 'main')
   g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
@@ -289,6 +293,27 @@ commit: abc1234
   check('verify-fixes leaves the tree clean', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
   check("verify-fixes warns when HEAD has moved past the resolution's fixed_commit",
     live.out.includes(`warning: HEAD is not the resolution's fixed_commit ${sha}`), live.out.trim())
+
+  {
+    const decoyT = mkdtempSync(join(tmpdir(), 'decoy-'))
+    const dg = (...a) => spawnSync('git', ['-C', decoyT, ...a], { encoding: 'utf8', env: gitEnv })
+    dg('init', '-q', '-b', 'main')
+    dg('config', 'user.email', 'decoy@test'); dg('config', 'user.name', 'decoy')
+    writeFileSync(join(decoyT, 'marker.txt'), 'untouched\n')
+    dg('add', '.'); dg('commit', '-qm', 'decoy base')
+    const decoyHead = dg('rev-parse', 'HEAD').stdout.trim()
+    const leakedEnv = { ...process.env, GIT_DIR: join(decoyT, '.git'), GIT_WORK_TREE: decoyT, GIT_COMMON_DIR: join(decoyT, '.git') }
+    const leaked = spawnSync(process.execPath, [join(REVIEWS, 'lib', 'verify-fixes.mjs'), '--root', T, '950-verify-target', '--test-cmd-api', redGreen], { encoding: 'utf8', cwd: REPO, env: leakedEnv })
+    const leakedOut = `${leaked.stdout ?? ''}${leaked.stderr ?? ''}`
+    check('verify-fixes ignores a leaked GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR and still verifies the real target',
+      leaked.status === 0 && leakedOut.includes('"verdict":"held"'), leakedOut.trim())
+    check('verify-fixes leaves the real fixture tree clean despite the leaked env', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
+    check('verify-fixes never touches the decoy repo the leaked env pointed at',
+      dg('rev-parse', 'HEAD').stdout.trim() === decoyHead && dg('status', '--porcelain').stdout.trim() === '',
+      `decoy HEAD now ${dg('rev-parse', 'HEAD').stdout.trim()} (was ${decoyHead}); status: ${dg('status', '--porcelain').stdout.trim()}`)
+    check('the decoy marker file is untouched', readFileSync(join(decoyT, 'marker.txt'), 'utf8') === 'untouched\n', readFileSync(join(decoyT, 'marker.txt'), 'utf8'))
+    rmSync(decoyT, { recursive: true, force: true })
+  }
 
   const neverRed = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', 'node -e "process.exit(0)"'])
   check('verify-fixes reopens a fix whose test never goes red', neverRed.code === 1 && neverRed.out.includes('"verdict":"test-never-red"'), neverRed.out.trim())

@@ -40,10 +40,14 @@ if (!target) { console.error('usage: node reviews/lib/verify-fixes.mjs [--root <
 const dir = [join(REPO, 'reviews', target), join(REPO, 'reviews', 'archive', target)].find(existsSync)
 if (!dir) { console.error(`no reviews folder for "${target}"`); process.exit(2) }
 
-// A git hook's own GIT_DIR/GIT_WORK_TREE would otherwise leak in here and redirect these
-// calls at the hook's repo instead of REPO.
+// A git hook's own GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR (etc.) would otherwise leak in here
+// and redirect these calls at the hook's repo instead of REPO; ask git for the authoritative
+// list (git help githooks: "unset $(git rev-parse --local-env-vars)") rather than guessing.
+const FALLBACK_GIT_ENV_VARS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES', 'GIT_PREFIX']
+const localEnvVars = spawnSync('git', ['rev-parse', '--local-env-vars'], { encoding: 'utf8' })
+const gitEnvVars = localEnvVars.status === 0 ? localEnvVars.stdout.split(/\r?\n/).filter(Boolean) : FALLBACK_GIT_ENV_VARS
 const gitEnv = { ...process.env }
-for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES', 'GIT_PREFIX']) delete gitEnv[k]
+for (const k of gitEnvVars) delete gitEnv[k]
 const git = (...a) => spawnSync('git', a, { cwd: REPO, encoding: 'utf8', env: gitEnv })
 const runCmd = c => spawnSync(c, { cwd: REPO, encoding: 'utf8', shell: true, timeout: 600000 })
 
