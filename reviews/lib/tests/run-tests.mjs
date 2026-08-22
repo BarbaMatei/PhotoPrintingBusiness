@@ -207,6 +207,73 @@ ${decisionsBody}
   check('router names the resolution it routed on', r.out.includes('resolution-v2 resolved'), r.out.trim())
 }
 
+// ---------- route-next-pass: the ledger-derived rows — threshold, queue, sweep, reviewed unit ----------
+// A fix round and its verification are one reviewed unit, so the ledger — not the metrics tally —
+// is what says which findings are still open. Small mediums queue under QUEUE_THRESHOLD instead of
+// each spawning a round; the queue must drain before certification.
+const REVIEWED_UNIT = 'NEXT: verification (reviewed unit — render records once, after it)'
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '915-queued-mediums'])
+  check('router queues two open mediums instead of routing a round', r.out.includes('QUEUED: PPW-9152, PPW-9153 (2 below the threshold of 3)'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the queued mediums do not stop the delta-worthiness gate from printing',
+    r.code === 3 && r.out.includes('GATE_KIND: delta-worthiness'), `exit ${r.code}: ${r.out.trim()}`)
+  check('a verified 🔴 in the ledger does not arm the loop', !r.out.includes('NEXT: fix round'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '916-medium-batch'])
+  check('router routes a batch of three open mediums to a fix round', r.code === 0 && r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the batch reason names the count', r.out.includes('batch of 3 open mediums'), r.out.trim())
+  check('an in-progress medium counts toward the batch (2 open + 1 in-progress = 3)', !r.out.includes('QUEUED:'), r.out.trim())
+  check('the batch row wins over the clean verification it sits on', !r.out.includes('GATE:'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '917-sweep-before-cert'])
+  check('router sweeps the queue before certification instead of gating', r.code === 0 && r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the sweep reason states how many mediums must drain', r.out.includes('sweep before certification — 1 open mediums must drain'), r.out.trim())
+  check('the sweep counts only open mediums — not a deferred 🟠, not an open 🟡',
+    r.out.includes('QUEUED: PPW-9172 (1 below the threshold of 3)'), r.out.trim())
+  check('the certification gate does not print while the queue is unswept',
+    !r.out.includes('GATE_KIND: certification-go-ahead'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '918-open-blocker'])
+  check('router routes an open 🔴 in the ledger straight to a fix round', r.code === 0 && r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the armed reason names the open blocker', r.out.includes('PPW-9181'), r.out.trim())
+  check('the open blocker outranks the clean verification the metrics show',
+    !r.out.includes('GATE_KIND: delta-worthiness'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '919-reopened-latest'])
+  check('router routes a reopened fix to a fix round', r.code === 0 && r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the armed reason names the reopened count', r.out.includes('2 reopened'), r.out.trim())
+  check('a reopened fix outranks the medium queue — no QUEUED line prints', !r.out.includes('QUEUED:'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '941-fix-caused-medium'])
+  check('router routes a fix-caused 🟠 regression to a fix round', r.code === 0 && r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the armed reason names the regression and the fix that caused it',
+    r.out.includes('fix-caused 🟠 regression') && r.out.includes('PPW-9412') && r.out.includes('PPW-9411'), r.out.trim())
+  check('the regression outranks the medium queue — no QUEUED line prints', !r.out.includes('QUEUED:'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '943-regression-deferred'])
+  check('a lineage entry whose ledger row is settled no longer arms the loop',
+    r.code === 2 && !r.out.includes('NEXT: fix round') && r.out.includes('GATE_KIND: certification-go-ahead'), `exit ${r.code}: ${r.out.trim()}`)
+  check('a deferred 🟠 is not queued either, so nothing has to be swept', !r.out.includes('QUEUED:') && !r.out.includes('sweep before'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '942-resolved-unverified'])
+  check('a resolved resolution still routes to verification, open ledger rows and all',
+    r.code === 0 && r.out.includes(REVIEWED_UNIT), `exit ${r.code}: ${r.out.trim()}`)
+  check('the reviewed unit is not re-armed by the rows its own verification will close',
+    !r.out.includes('NEXT: fix round'), r.out.trim())
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '901-good-target'])
+  check('the verification answer names the reviewed unit and keeps its cost line',
+    r.out.includes(REVIEWED_UNIT) && r.out.includes('COST: ~60–250k agent tokens'), r.out.trim())
+}
+
 // ---------- records auditor: smoke run against the real repo ----------
 {
   const r = run('records-auditor.mjs', ['044-045-observability'])
