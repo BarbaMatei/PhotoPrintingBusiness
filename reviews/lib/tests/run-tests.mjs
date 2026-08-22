@@ -35,7 +35,7 @@ const firstLine = out => out.split('\n')[0]
 {
   const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '901-good-target', '1'])
   check('doc-gate exits 0 on the conforming target', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
-  check('doc-gate reports the conforming target clean', r.out.includes('clean for 901-good-target v1'), firstLine(r.out))
+  check('doc-gate reports the conforming target clean, state checks included', r.out.includes('clean for 901-good-target v1 + state'), firstLine(r.out))
 }
 
 // ---------- doc-gate: every planted violation on the broken target ----------
@@ -56,8 +56,35 @@ const firstLine = out => out.split('\n')[0]
     'detail block PPW-9103 is 21 lines — cap is 20',
     'PPW-9102 Status cell is "fixed at v1, see the history"',
     'review blocker PPW-9101 has no entry in the findings map',
+    'PPW-9104 status deferred has no Decisions block — every non-fixed status needs its rationale (doc-contracts.md)',
   ]
   for (const e of expected) check(`doc-gate reports: ${e}`, r.out.includes(e), 'not in the gate output')
+}
+
+// ---------- doc-gate target mode: state files lint in the same run, keyed to the target ----------
+{
+  const r = run('doc-gate.mjs', ['--root', BAD_STATE_ROOT, '901-good-target', '1'])
+  check('doc-gate exits 1 when the state files it also lints in target mode are broken', r.code === 1, `exit ${r.code}`)
+  check('doc-gate labels the combined run "<target> v<pass> + state"', r.out.includes('violation(s) for 901-good-target v1 + state'), firstLine(r.out))
+  const expected = [
+    'PPW-9999 is not in 901-good-target\'s ledger',
+    'sha `abcdef1` does not resolve',
+    'key "BUG-2" — PPW-<n> only',
+  ]
+  for (const e of expected) check(`doc-gate target mode reports the state violation: ${e}`, r.out.includes(e), 'not in the gate output')
+}
+
+// ---------- doc-gate target mode: silently skips the state half when reviews/state is absent ----------
+{
+  const T = mkdtempSync(join(tmpdir(), 'doc-gate-no-state-'))
+  mkdirSync(join(T, 'reviews', '999-no-state-dir'), { recursive: true })
+  writeFileSync(join(T, 'reviews', '999-no-state-dir', 'ledger.md'),
+    '---\ntype: review-ledger\ntarget: 999-no-state-dir\nupdated: 2026-08-22\n---\n\n# Ledger — 999-no-state-dir\n\n## Findings\n\n| ID | Sev | First seen | Title | File | Status | Affirmed |\n|---|---|---|---|---|---|---|\n')
+  const r = run('doc-gate.mjs', ['--root', T, '999-no-state-dir', '1'])
+  check('doc-gate exits 0 with no reviews/state dir present', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+  check('doc-gate skips the state half silently, no "+ state" suffix and no state/ labels',
+    r.out.includes('clean for 999-no-state-dir v1') && !r.out.includes('+ state') && !r.out.includes('state/'), r.out.trim())
+  rmSync(T, { recursive: true, force: true })
 }
 
 // ---------- doc-gate state mode ----------

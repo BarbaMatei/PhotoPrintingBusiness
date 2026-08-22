@@ -9,10 +9,11 @@ owner: Matei Barba
 
 Every review artifact follows a fixed template, a size cap, and the language rules
 below. The round-end gate (lint + Sonnet judge) enforces this file. It judges and
-explains; it never edits. `doc-gate.mjs <target> <pass>` lints a round's files,
-`doc-gate.mjs state` the two cross-target files, and `lib/tests/run-tests.mjs` lints
-the gate itself against fixtures. Scope: every per-target artifact, plus the cross-target
-`index.md` and `backlog.md`. `reviews/system/` and `track-record.md` have no contract
+explains; it never edits. `doc-gate.mjs <target> <pass>` lints a round's files plus the
+cross-target files keyed to that target, `doc-gate.mjs state` the cross-target files
+alone, and `lib/tests/run-tests.mjs` lints the gate itself against fixtures. Scope: every
+per-target artifact, plus the cross-target `index.md` and `backlog.md`. `reviews/system/`
+and `track-record.md` have no contract
 here — but the system target keeps its own lightweight records: `SF<n>` ids (outside
 the `PPW-<n>` sequence), a ledger-style status registry, a worklog, and a metrics
 line per meta-pass, grouped per pass under `reviews/system/review-v<n>/`. Archived targets are being
@@ -160,7 +161,9 @@ The `## Findings` body table (ID · Status · Commit ·
 Note, note ≤ 240 chars) is the machine-read state, keyed by `PPW-<n>`; the body
 also carries the scope table. Rationale that deserves prose goes under
 `Decisions`, one titled block per decision — including the owner's ruling on any
-defect proposed at this round's gate from outside the finding set. `verified` is
+defect proposed at this round's gate from outside the finding set. Every row whose
+status is not `fixed` needs a `### ` heading under `Decisions` naming its `PPW-<n>`;
+the gate enforces this. `verified` is
 not a legal value in the Status column.
 
 ### summary-v<n>.md — template `templates/summary.md`

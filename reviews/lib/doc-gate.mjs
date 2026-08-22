@@ -6,7 +6,8 @@
 // Judges only — never edits. Old-shape targets are out of scope (grandfathered).
 //
 // Usage: node reviews/lib/doc-gate.mjs [--root <repoRoot>] <target> <pass>
-//        node reviews/lib/doc-gate.mjs [--root <repoRoot>] state   (the cross-target files)
+//          (also lints reviews/state/backlog.md and index.md, keyed to this target)
+//        node reviews/lib/doc-gate.mjs [--root <repoRoot>] state   (the cross-target files alone)
 // Exit: 0 clean · 1 violations (listed) · 2 usage/IO error.
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -40,12 +41,20 @@ function report(label) {
   process.exit(0)
 }
 
-// Root-file mode: reviews/state/backlog.md and reviews/state/index.md.
-if (rest[0] === 'state') {
-  const at = p => (root ? join(root, 'reviews', relative(REVIEWS_HOME, p)) : p)
-  const rows = raw => raw.replace(/\r\n/g, '\n').split('\n')
-    .map((line, i) => ({ line, n: i + 1, cells: line.split('|').map(c => c.trim()) }))
-    .filter(r => /^\|/.test(r.line) && r.cells[1] !== 'ID' && r.cells[1] !== 'Target' && r.cells[1] !== 'Date' && !/^:?-{2,}:?$/.test(r.cells[1]))
+// Lints reviews/state/backlog.md and reviews/state/index.md. Shared by standalone `state`
+// mode and by target mode, which runs it too so the index row lands linted, not after the gate.
+const stateRows = raw => raw.replace(/\r\n/g, '\n').split('\n')
+  .map((line, i) => ({ line, n: i + 1, cells: line.split('|').map(c => c.trim()) }))
+  .filter(r => /^\|/.test(r.line) && r.cells[1] !== 'ID' && r.cells[1] !== 'Target' && r.cells[1] !== 'Date' && !/^:?-{2,}:?$/.test(r.cells[1]))
+const stateAt = p => (root ? join(root, 'reviews', relative(REVIEWS_HOME, p)) : p)
+const stateSection = (raw, h) => {
+  const m = new RegExp(`^## ${h}$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm').exec(raw)
+  return m ? m[1] : null
+}
+
+function lintStateFiles() {
+  const rows = stateRows
+  const at = stateAt
   const words = s => s.replace(/\[[^\]]*\]\([^)]*\)/g, ' ').split(/\s+/).filter(w => /[a-z0-9]/i.test(w)).length
 
   const backlogFile = at(BACKLOG)
@@ -83,10 +92,7 @@ if (rest[0] === 'state') {
         if (num) { keys.add(num[0]); keys.add(num[0].split('-')[0]) }
       }
     }
-    const section = h => {
-      const m = new RegExp(`^## ${h}$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm').exec(raw)
-      return m ? m[1] : null
-    }
+    const section = h => stateSection(raw, h)
     const glance = section('Targets at a glance')
     if (glance === null) bad(f, 'missing heading "## Targets at a glance"')
     else for (const r of rows(glance)) {
@@ -110,6 +116,10 @@ if (rest[0] === 'state') {
       }
     }
   }
+}
+
+if (rest[0] === 'state') {
+  lintStateFiles()
   report('the state files')
 }
 
@@ -209,10 +219,12 @@ if (existsSync(join(dir, resolutionFile))) {
     if (/^findings:/m.test(p.fm)) bad(resolutionFile, 'frontmatter carries a findings map — per-finding state lives in the "## Findings" body table (doc-contracts.md)')
     const RSTAT = /^(fixed|wont-fix|deferred|disputed|false-positive|backlog)$/
     const findingsSection = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+    const resolutionRows = []
     for (const r of findingsSection.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*(ID|D#|-)/.test(l))) {
       const cells = r.split('|').map(c => c.trim())
       if (!/^PPW-\d+$/.test(cells[1] ?? '')) { bad(resolutionFile, `findings row key "${cells[1]}" — PPW-<n> only (doc-contracts.md)`); continue }
       resolutionKeys.push(cells[1])
+      resolutionRows.push({ id: cells[1], status: cells[2] ?? '' })
       if (!RSTAT.test(cells[2] ?? '')) bad(resolutionFile, `${cells[1]} status "${cells[2]}" — one status word, never "verified" (that belongs to a re-review)`)
       if ((cells[4] ?? '').length > 240) bad(resolutionFile, `${cells[1]} note is ${cells[4].length} chars — cap is 240; the story goes in Decisions`)
     }
@@ -226,6 +238,12 @@ if (existsSync(join(dir, resolutionFile))) {
     for (const d of decisions) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1
       if (n > 15) bad(resolutionFile, `decision "${d.split('\n')[0]}" is ${n} lines — cap is 15`)
+    }
+    const decisionHeadings = decisions.map(d => d.split('\n')[0])
+    for (const { id, status } of resolutionRows) {
+      if (status === 'fixed') continue
+      if (!decisionHeadings.some(h => h.includes(id)))
+        bad(resolutionFile, `${id} status ${status} has no Decisions block — every non-fixed status needs its rationale (doc-contracts.md)`)
     }
   }
 }
@@ -272,4 +290,55 @@ if (reviewFm && resolutionKeys.length) {
     bad(resolutionFile, `review blocker ${b} has no entry in the findings map`)
 }
 
-report(`${target} v${pass}`)
+// ---------- state files: PPW ids and shas this target's rows cite must check out ----------
+function checkTargetStateSanity() {
+  const indexFile = stateAt(INDEX)
+  if (!existsSync(indexFile)) return
+  const raw = readFileSync(indexFile, 'utf8').replace(/\r\n/g, '\n')
+  const f = 'state/index.md'
+
+  const hasLedger = existsSync(join(dir, 'ledger.md'))
+  const ledgerIds = new Set()
+  if (hasLedger) for (const m of read('ledger.md').matchAll(/PPW-\d+/g)) ledgerIds.add(m[0])
+
+  const numPrefix = (/^\d+(-\d+)?/.exec(name) ?? [name])[0]
+  const passesKeys = new Set([name, numPrefix, numPrefix.split('-')[0]])
+  const glanceRe = new RegExp(`^${numPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\d)`)
+
+  let gitAvailable = true
+  try { execFileSync('git', ['rev-parse', '--git-dir'], { cwd: join(REVIEWS, '..'), stdio: ['ignore', 'ignore', 'ignore'] }) }
+  catch { gitAvailable = false }
+  const shaCache = new Map()
+  const shaResolves = sha => {
+    if (!shaCache.has(sha)) {
+      try { execFileSync('git', ['cat-file', '-e', sha], { cwd: join(REVIEWS, '..'), stdio: ['ignore', 'ignore', 'ignore'] }); shaCache.set(sha, true) }
+      catch { shaCache.set(sha, false) }
+    }
+    return shaCache.get(sha)
+  }
+  const scan = (where, text) => {
+    if (hasLedger) for (const m of text.matchAll(/PPW-\d+/g)) if (!ledgerIds.has(m[0])) bad(f, `${where}: ${m[0]} is not in ${name}'s ledger`)
+    if (!gitAvailable) return
+    for (const m of text.matchAll(/\b[0-9a-f]{7,40}\b/g)) {
+      const tok = m[0]
+      if (!/\d/.test(tok) || /^\d+$/.test(tok)) continue
+      if (!shaResolves(tok)) bad(f, `${where}: sha \`${tok}\` does not resolve (git cat-file -e)`)
+    }
+  }
+
+  const glance = stateSection(raw, 'Targets at a glance')
+  if (glance) for (const r of stateRows(glance)) if (glanceRe.test((r.cells[1] ?? '').trim()))
+    scan(`glance row "${r.cells[1]}"`, r.cells[2] ?? '')
+  const passes = stateSection(raw, 'Passes')
+  if (passes) for (const r of stateRows(passes)) if (passesKeys.has((r.cells[2] ?? '').trim()))
+    scan(`pass row "${r.cells[1]} ${r.cells[2]} ${r.cells[3]}"`, r.line)
+}
+
+let stateLabel = ''
+if (existsSync(join(REVIEWS, 'state'))) {
+  lintStateFiles()
+  checkTargetStateSanity()
+  stateLabel = ' + state'
+}
+
+report(`${target} v${pass}${stateLabel}`)
