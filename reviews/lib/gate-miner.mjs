@@ -1,0 +1,110 @@
+#!/usr/bin/env node
+// Lint miner (reporter half): scans worklogs for doc-gate judge disapprovals and prints
+// each one with a stub checklist line, so a human/agent can decide which become
+// deterministic doc-gate.mjs checks. Never edits anything, never classifies "lintable" itself.
+//
+// Usage: node reviews/lib/gate-miner.mjs [--root <repoRoot>] [--since YYYY-MM-DD] [target ...]
+//   No target ⇒ every target, live and archived. --since default = 30 days before the
+//   newest worklog event seen in the scanned scope (never wall-clock, so a run is reproducible).
+// Exit: 0 always, even with zero matches · 1 on an IO error while reading worklogs.
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const TARGETLESS = new Set(['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'])
+// The field that trips the match isn't necessarily the one worth printing — priority differs.
+const MATCH_FIELDS = ['verdict', 'judge', 'reason', 'note']
+const TEXT_FIELDS = ['reason', 'judge', 'note', 'verdict']
+const STUB = '[ ] lintable? -> add a check to doc-gate.mjs + a fixture to run-tests.mjs'
+
+function listTargets(reviewsDir, filters) {
+  const out = []
+  for (const base of [reviewsDir, join(reviewsDir, 'archive')]) {
+    if (!existsSync(base)) continue
+    for (const e of readdirSync(base, { withFileTypes: true })) {
+      if (!e.isDirectory() || TARGETLESS.has(e.name)) continue
+      out.push({ name: e.name, dir: join(base, e.name) })
+    }
+  }
+  return filters.length ? out.filter(t => filters.some(f => t.name.includes(f))) : out
+}
+
+function readWorklog(dir) {
+  const p = join(dir, 'worklog.jsonl')
+  if (!existsSync(p)) return []
+  return readFileSync(p, 'utf8').split(/\r?\n/).filter(l => l.trim())
+    .map(l => { try { return JSON.parse(l) } catch { return null } })
+    .filter(Boolean)
+}
+
+const isDisapproval = e => MATCH_FIELDS.some(k => typeof e[k] === 'string' && /disapprove/i.test(e[k]))
+const textOf = e => TEXT_FIELDS.map(k => e[k]).find(v => typeof v === 'string') ?? ''
+// Compares the literal YYYY-MM-DD in the timestamp, not a UTC-normalized calendar day.
+const dateOf = e => typeof e.t === 'string' ? e.t.slice(0, 10) : null
+
+function main() {
+  const argv = process.argv.slice(2)
+  let root = null, sinceArg = null
+  const filters = []
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--root') root = argv[++i]
+    else if (argv[i] === '--since') sinceArg = argv[++i]
+    else filters.push(argv[i])
+  }
+  if (!root) root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+  const reviewsDir = join(root, 'reviews')
+
+  const targets = listTargets(reviewsDir, filters)
+  const events = []
+  for (const t of targets) for (const event of readWorklog(t.dir)) events.push({ target: t.name, event })
+
+  let newest = null
+  for (const { event } of events) {
+    const d = dateOf(event)
+    if (d && (!newest || d > newest)) newest = d
+  }
+
+  let since = sinceArg
+  if (!since && newest) {
+    const cutoff = new Date(`${newest}T00:00:00Z`)
+    cutoff.setUTCDate(cutoff.getUTCDate() - 30)
+    since = cutoff.toISOString().slice(0, 10)
+  }
+
+  const disapprovals = events
+    .filter(({ event }) => event.ev === 'doc-gate' && isDisapproval(event))
+    .filter(({ event }) => { const d = dateOf(event); return d && (!since || d >= since) })
+    .sort((a, b) => a.event.t.localeCompare(b.event.t))
+
+  console.log(`GATE MINER: ${targets.length} target(s) scanned, since ${since ?? '(no worklog events found)'}\n`)
+  for (const { target, event } of disapprovals) {
+    const which = event.round !== undefined ? `round ${event.round}` : event.pass !== undefined ? `pass ${event.pass}` : '—'
+    console.log(`${dateOf(event)} · ${target} · ${which}`)
+    console.log(`  ${textOf(event)}\n`)
+  }
+
+  console.log('SUMMARY')
+  console.log(`  total disapprovals: ${disapprovals.length}`)
+  console.log('  by target:')
+  const byTarget = new Map()
+  for (const { target } of disapprovals) byTarget.set(target, (byTarget.get(target) ?? 0) + 1)
+  for (const [t, c] of byTarget) console.log(`    ${t}: ${c}`)
+
+  console.log('  distinct reasons:')
+  const seen = new Set()
+  for (const { event } of disapprovals) {
+    const text = textOf(event)
+    if (seen.has(text)) continue
+    seen.add(text)
+    console.log(`    - ${text}`)
+    console.log(`      ${STUB}`)
+  }
+}
+
+try {
+  main()
+  process.exit(0)
+} catch (e) {
+  console.error(`ERROR ${e.message}`)
+  process.exit(1)
+}
