@@ -4,24 +4,32 @@
 // resolution's Findings table) plus a printed index-row suggestion the fixer pastes by hand.
 // It writes only metrics.jsonl; every prose file stays a human's.
 //
-// Usage: node reviews/lib/render-records.mjs <target> [--round <n>] [--dry-run] [--root <repoRoot>]
-// Exit 0 = rendered (or dry-run) · 1 = cannot render (missing records, duplicate line, bad worklog).
+// Runtime covers only the round's paired round-start/round-end spans — a round stopped and
+// resumed has several, and the records/gate time between them belongs to no round. Events a
+// `void` event names are dropped before anything is measured. An unpairable round stamp aborts
+// instead of over-counting, and an append waits for the resolution to read `status: resolved`.
+//
+// Usage: node reviews/lib/render-records.mjs <target> [--round <n>] [--dry-run]
+//          [--in-progress] [--root <repoRoot>]
+// Exit 0 = rendered (or dry-run) · 1 = cannot render (missing records, duplicate line, bad
+// worklog, unpaired round stamps, or an unresolved resolution without --in-progress).
 import { readFileSync, appendFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const argv = process.argv.slice(2)
-let ROOT = null, ROUND = null, DRY = false
+let ROOT = null, ROUND = null, DRY = false, ALLOW_UNRESOLVED = false
 const rest = []
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--root') ROOT = argv[++i]
   else if (argv[i] === '--round') ROUND = Number(argv[++i])
   else if (argv[i] === '--dry-run') DRY = true
+  else if (argv[i] === '--in-progress') ALLOW_UNRESOLVED = true
   else rest.push(argv[i])
 }
 if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const target = rest[0]
-if (!target) fail('usage: render-records.mjs <target> [--round <n>] [--dry-run]')
+if (!target) fail('usage: render-records.mjs <target> [--round <n>] [--dry-run] [--in-progress]')
 const dir = join(ROOT, 'reviews', target)
 if (!existsSync(dir)) fail(`no reviews/${target}/`)
 
@@ -64,46 +72,75 @@ const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', ba
 const tallies = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
 for (const { status } of findings.values()) tallies[TALLY[status] ?? 'open']++
 
-// ---------- worklog slice for this round ----------
+// ---------- worklog: void filtering, then this round's paired spans ----------
 const wlPath = join(dir, 'worklog.jsonl')
 if (!existsSync(wlPath)) fail(`no worklog.jsonl — the v2 fixer contract writes it as it works; nothing to compute runtime from`)
-const events = readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map((l, i) => {
+const logged = readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map((l, i) => {
   try { return JSON.parse(l) } catch (e) { fail(`worklog line ${i + 1}: unparseable JSON (${e.message})`) }
 })
-const startIdx = events.findIndex(e => e.ev === 'round-start' && e.round === round)
-if (startIdx === -1) fail(`worklog has no round-start for round ${round}`)
-let endIdx = -1
-for (let i = events.length - 1; i >= 0; i--) if (events[i].ev === 'round-end' && events[i].round === round) { endIdx = i; break }
-const slice = events.slice(startIdx, endIdx === -1 ? undefined : endIdx + 1)
-if (endIdx === -1) note('no round-end yet — treating the last event as the current end (in-progress render)')
-const ts = e => Date.parse(e.t)
-for (const e of slice) if (!Number.isFinite(ts(e))) fail(`worklog event with unparseable timestamp: ${JSON.stringify(e)}`)
+// A void's "of" matches on a key subset, so one carrying "round" must not hit a same-timestamp stamp for another round.
+const sameVal = (a, b) => a === b || (!!a && !!b && typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b))
+const voids = logged.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
+const events = logged.filter(e => e.ev !== 'void' && !voids.some(v => Object.keys(v.of).every(k => sameVal(e[k], v.of[k]))))
 
-// ---------- runtime: blocked (gates) / active (gaps <= 30 min) / idle ----------
+const voidHint = (ev, t) => `void the wrong stamp: node reviews/lib/wl.mjs ${target} void --json '{"of":{"ev":"${ev}","t":"${t}","round":${round}}}'`
+const spans = []
+let openStart = null
+for (let i = 0; i < events.length; i++) {
+  const e = events[i]
+  if (e.ev === 'round-start' && e.round === round) {
+    if (openStart) fail(`worklog: round-start ${round} at ${e.t} while the round-start at ${openStart.e.t} is still open — one of the two is a mislabel; ${voidHint('round-start', openStart.e.t)}`)
+    openStart = { e, i }
+  } else if (e.ev === 'round-end' && e.round === round) {
+    if (!openStart) {
+      const prior = spans.length ? `the previous span already closed at ${events[spans[spans.length - 1].to].t}` : `no round-start ${round} precedes it`
+      fail(`worklog: round-end ${round} at ${e.t} closes nothing — ${prior}; ${voidHint('round-end', e.t)}`)
+    }
+    spans.push({ from: openStart.i, to: i })
+    openStart = null
+  }
+}
+if (openStart) {
+  spans.push({ from: openStart.i, to: events.length - 1 })
+  note('no round-end yet — treating the last event as the current end (in-progress render)')
+}
+if (!spans.length) fail(`worklog has no round-start for round ${round}`)
+const ts = e => Date.parse(e.t)
+const spanEvents = spans.map(s => events.slice(s.from, s.to + 1))
+const inSpans = spanEvents.flat()
+for (const e of inSpans) if (!Number.isFinite(ts(e))) fail(`worklog event with unparseable timestamp: ${JSON.stringify(e)}`)
+
+// ---------- runtime: blocked (gates) / active (gaps <= 30 min) / idle, per span ----------
 const CAP_S = 30 * 60 // schema v3: gaps above this with no open gate = nobody at the wheel
 const blocked = []
-let open = null
-for (const e of slice) {
-  if (e.ev === 'gate-open' && !open) open = e
-  else if (e.ev === 'gate-closed' && open) { blocked.push({ reason: open.reason ?? e.reason ?? 'unstated', s: Math.round((ts(e) - ts(open)) / 1000) }); open = null }
+let activeRaw = 0, spanS = 0
+for (const seq of spanEvents) {
+  const last = seq[seq.length - 1]
+  let open = null
+  for (const e of seq) {
+    if (e.ev === 'gate-open' && !open) open = e
+    else if (e.ev === 'gate-closed' && open) { blocked.push({ reason: open.reason ?? e.reason ?? 'unstated', s: Math.round((ts(e) - ts(open)) / 1000) }); open = null }
+  }
+  if (open) { blocked.push({ reason: `${open.reason ?? 'unstated'} (never closed)`, s: Math.round((ts(last) - ts(open)) / 1000) }); note('a gate-open has no gate-closed — counted to the end of its round span') }
+  let inGate = false
+  for (let i = 0; i < seq.length - 1; i++) {
+    if (seq[i].ev === 'gate-open') inGate = true
+    if (seq[i].ev === 'gate-closed') inGate = false
+    if (inGate) continue
+    const gap = (ts(seq[i + 1]) - ts(seq[i])) / 1000
+    if (gap >= 0 && gap <= CAP_S) activeRaw += gap
+  }
+  spanS += Math.round((ts(last) - ts(seq[0])) / 1000)
 }
-if (open) { blocked.push({ reason: `${open.reason ?? 'unstated'} (never closed)`, s: Math.round((ts(slice[slice.length - 1]) - ts(open)) / 1000) }); note('a gate-open has no gate-closed — counted to the end of the slice') }
 const blockedS = blocked.reduce((a, b) => a + b.s, 0)
-let activeS = 0
-let inGate = false
-for (let i = 0; i < slice.length - 1; i++) {
-  if (slice[i].ev === 'gate-open') inGate = true
-  if (slice[i].ev === 'gate-closed') inGate = false
-  if (inGate) continue
-  const gap = (ts(slice[i + 1]) - ts(slice[i])) / 1000
-  if (gap >= 0 && gap <= CAP_S) activeS += gap
-}
-activeS = Math.round(activeS)
-const started = slice[0].t, ended = slice[slice.length - 1].t
-const idleS = Math.max(0, Math.round((ts(slice[slice.length - 1]) - ts(slice[0])) / 1000) - activeS - blockedS)
+const activeS = Math.round(activeRaw)
+const lastSpan = spanEvents[spanEvents.length - 1]
+const firstEvent = spanEvents[0][0], lastEvent = lastSpan[lastSpan.length - 1]
+const started = firstEvent.t, ended = lastEvent.t
+const idleS = Math.max(0, spanS - activeS - blockedS)
 
 // ---------- counters from events ----------
-const by = ev => slice.filter(e => e.ev === ev)
+const by = ev => inSpans.filter(e => e.ev === ev)
 const testRuns = by('test-run')
 const finals = testRuns.filter(e => e.kind === 'final')
 const checksReturned = by('check-returned')
@@ -118,7 +155,7 @@ const baseCommit = existsSync(revPath) ? (/^commit:\s*([0-9a-f]{7,40})\b/m.exec(
 if (!baseCommit) note(`review-v${round}.md commit not found — base_commit will be null`)
 
 const line = {
-  target, round, type: 'fix-round', date: new Date(ts(slice[slice.length - 1])).toISOString().slice(0, 10),
+  target, round, type: 'fix-round', date: new Date(ts(lastEvent)).toISOString().slice(0, 10),
   base_commit: baseCommit, fixed_commit: fixedCommit,
   findings: tallies,
   tests: { invocations: testRuns.length, red_runs: testRuns.filter(e => e.kind === 'red').length, green_runs: testRuns.filter(e => e.kind === 'green').length, final: finals.length ? { passed: finals[finals.length - 1].passed ?? null, failed: finals[finals.length - 1].failed ?? null } : null },
@@ -138,6 +175,7 @@ const already = existsSync(metricsPath) && readFileSync(metricsPath, 'utf8').spl
 console.log(JSON.stringify(line, null, 2))
 console.log(`\nindex.md status suggestion for "${target}": fix round v${round} ${resStatus} — ${tallies.fixed} fixed / ${tallies.open} open, active ${(activeS / 60).toFixed(0)} min, blocked ${(blockedS / 60).toFixed(0)} min`)
 if (DRY) { note('dry-run: nothing written'); process.exit(0) }
+if (resStatus !== 'resolved' && !ALLOW_UNRESOLVED) fail(`resolution-v${round}.md reads status: ${resStatus} — finish the round or pass --in-progress (--dry-run renders at any status)`)
 if (already) fail(`metrics.jsonl already has a fix-round line for round ${round} — append a correction line instead (schema: Corrections)`)
 const prev = existsSync(metricsPath) ? readFileSync(metricsPath, 'utf8') : ''
 appendFileSync(metricsPath, (prev && !prev.endsWith('\n') ? '\n' : '') + JSON.stringify(line) + '\n')
