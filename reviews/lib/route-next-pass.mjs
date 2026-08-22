@@ -16,7 +16,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readLedger, openIds } from './ledger.mjs'
+import { readLedger, openIds, standsDown } from './ledger.mjs'
 
 const argv = process.argv.slice(2)
 let root = null, arg = null
@@ -133,11 +133,7 @@ if (led) {
   if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
 }
 
-// A resolved resolution not yet re-reviewed owns every row its round touched: the reviewed unit's
-// records render after the verification, so those rows still read open|in-progress here. Routing
-// on them would re-run the round instead of verifying it, so the ledger rows stand down and the
-// resolved-resolution row below answers.
-const pendingVerification = L.type !== 'verification' && RN >= N && rStatus === 'resolved'
+const pendingVerification = standsDown(t.dir, L.type)
 // 🟠 still open when a certification passes is the documented norm — they roll into the backlog at
 // close — so they must not pre-empt the owner's close decision. A 🔴 arms the loop even here.
 const atLoopClose = L.outcome === 'certified' && L.pass === N && (!RN || RN < N)

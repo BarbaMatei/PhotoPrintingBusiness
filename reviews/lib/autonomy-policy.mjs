@@ -15,7 +15,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readLedger, openIds } from './ledger.mjs'
+import { readLedger, openIds, standsDown } from './ledger.mjs'
 
 const argv = process.argv.slice(2)
 let root = null
@@ -39,12 +39,22 @@ function hasCertification(targetDir) {
     .some(l => { try { const e = JSON.parse(l); return e.outcome === 'certified' || /^certification/.test(e.subtype ?? '') } catch { return false } })
 }
 
-// Open ledger work outranks any answer that would launch a certification. Silent on a target
-// with no ledger, and never consulted at the loop-close gate: 🟠 open at close roll into the
-// backlog by design.
+function latestPassType() {
+  const metricsPath = join(dir, 'metrics.jsonl')
+  if (!existsSync(metricsPath)) return null
+  const lines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
+    .map(l => { try { return JSON.parse(l) } catch { return null } })
+    .filter(l => l && !l.correction_for)
+  return lines.length ? lines[lines.length - 1].type ?? null : null
+}
+
+// Open ledger work outranks any answer that would launch a certification — and only those
+// answers, so a delta-worthy round is judged first and keeps its delta discovery. Silent on a
+// target with no ledger, on a round awaiting its verification, and at the loop-close gate:
+// 🟠 open at close roll into the backlog by design.
 function openWork() {
   const led = readLedger(join(dir, 'ledger.md'))
-  if (!led) return null
+  if (!led || standsDown(dir, latestPassType())) return null
   const high = openIds(led.rows, '🔴')
   if (high.length) return `the loop is armed — ${high.length} open 🔴 (${high.join(', ')})`
   const medium = openIds(led.rows, '🟠')
@@ -67,7 +77,6 @@ if (gateKind === 'loop-close') {
   process.exit(0)
 }
 if (gateKind === 'delta-worthiness') {
-  sweepFirst()
   // Judge the round that just ran, which is the newest resolution. A round answering a
   // verification pass raises no review file, so it has no blocker list and is patch-grade
   // unless its own review file says otherwise.
@@ -94,6 +103,7 @@ if (gateKind === 'delta-worthiness') {
     say('REASON', `the fix round fixed high-severity ${hit.join(', ')} — delta-worthy by the mechanical half of the rule`)
     process.exit(0)
   }
+  sweepFirst()
   const hasCert = hasCertification(dir)
   say('ACTION', 'auto')
   say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')
