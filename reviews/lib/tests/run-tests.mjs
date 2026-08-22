@@ -755,8 +755,11 @@ Fixture copy: one conforming row.
   g('add', '.'); g('commit', '-qm', 'resolution')
   const redGreen = `node -e "process.exit(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')?1:0)"`
 
-  const wlPath = join(T, 'reviews', '950-verify-target', 'worklog.jsonl')
+  const wlRel = 'reviews/950-verify-target/worklog.jsonl'
+  const wlPath = join(T, wlRel)
   const wlLines = () => existsSync(wlPath) ? readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(Boolean).map(l => JSON.parse(l)) : []
+  const statusLines = () => g('status', '--porcelain').stdout.trim().split(/\r?\n/).filter(Boolean)
+  const commitWorklog = msg => { g('add', wlRel); g('commit', '-qm', msg) }
 
   const dry = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--dry-run'])
   check('verify-fixes dry-run derives the plan', dry.code === 0 && dry.out.includes('calc.txt') && dry.out.includes('PhotoPrint.Tests.Unit.CalcTests'), dry.out.trim())
@@ -771,10 +774,9 @@ Fixture copy: one conforming row.
     check('verify-fixes appends exactly one verify-result event for the held row', verifyResults.length === 1, JSON.stringify(verifyResults))
     check('the verify-result event names PPW-9501 held', verifyResults[0]?.id === 'PPW-9501' && verifyResults[0]?.verdict === 'held', JSON.stringify(verifyResults))
   }
-  // A live run's worklog write is a deliberate change, not revert-and-restore leftovers — commit
-  // it (as a real caller would) before checking the tree is otherwise clean.
-  g('add', '.'); g('commit', '-qm', 'worklog')
-  check('verify-fixes leaves the tree clean', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
+  check('verify-fixes leaves the tree clean except the worklog it just wrote',
+    statusLines().length === 1 && statusLines()[0].endsWith(wlRel), g('status', '--porcelain').stdout)
+  commitWorklog('worklog')
 
   const liveNoEvents = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen, '--no-events'])
   check('verify-fixes --no-events reports held without appending', liveNoEvents.code === 0 && liveNoEvents.out.includes('"verdict":"held"'), liveNoEvents.out.trim())
@@ -823,8 +825,7 @@ Fixture copy: one conforming row.
   check('verify-fixes counts both rows in its summary', multi.out.includes('SUMMARY: 1/2 held') && multi.code === 1, `exit ${multi.code}: ${multi.out.trim()}`)
   check('verify-fixes leaves the tree clean after a multi-commit revert', g('status', '--porcelain').stdout.trim() === '', g('status', '--porcelain').stdout)
 
-  // Two rows that both complete a full revert -> red -> restore -> green cycle in the same run:
-  // row 2's `git reset --hard` must not wipe row 1's already-appended (uncommitted) worklog event.
+  // Two rows each completing a full revert -> red -> restore -> green cycle in one run.
   mkdirSync(join(T, 'src', 'app2'), { recursive: true })
   writeFileSync(join(T, 'src', 'app2', 'a.txt'), 'buggyA\n')
   writeFileSync(join(T, 'src', 'app2', 'b.txt'), 'buggyB\n')
@@ -845,13 +846,38 @@ Fixture copy: one conforming row.
   check('verify-fixes holds both rows of the two-row run', twoRow.code === 0 && twoRow.out.includes('SUMMARY: 2/2 held'), twoRow.out.trim())
   {
     const twoRowResults = wlLines().filter(e => e.ev === 'verify-result' && (e.id === 'PPW-9510' || e.id === 'PPW-9511'))
-    check("row 2's reset --hard did not wipe row 1's already-appended worklog event",
+    check('both rows of the multi-row run land their own held verify-result event',
       twoRowResults.length === 2 && twoRowResults.every(e => e.verdict === 'held'), JSON.stringify(wlLines()))
   }
-  check('verify-fixes leaves the tree clean after the two-row run (worklog aside)',
-    g('status', '--porcelain', '--', '.', ':(exclude)reviews/950-verify-target/worklog.jsonl').stdout.trim() === '',
-    g('status', '--porcelain').stdout)
-  g('add', '.'); g('commit', '-qm', 'worklog after two-row run')
+  check('verify-fixes leaves the tree clean except the worklog after the two-row run',
+    statusLines().length === 1 && statusLines()[0].endsWith(wlRel), g('status', '--porcelain').stdout)
+  commitWorklog('worklog after two-row run')
+
+  // A fix commit can itself touch worklog.jsonl (a fixer commits a worklog event alongside their
+  // code change); the revert/restore cycle must not corrupt that already-committed history.
+  writeFileSync(join(T, 'src', 'app2', 'c.txt'), 'buggyC\n')
+  g('add', '.'); g('commit', '-qm', 'c base')
+  writeFileSync(join(T, 'src', 'app2', 'c.txt'), 'fixedC\n')
+  writeFileSync(join(T, 'src', 'PhotoPrint.Tests', 'Unit', 'CTests.cs'), 'test c\n')
+  writeFileSync(wlPath, readFileSync(wlPath, 'utf8') + JSON.stringify({ t: '2020-01-01T00:00:00+00:00', ev: 'note', text: 'fixer note committed with the fix' }) + '\n')
+  g('add', '.'); g('commit', '-qm', 'fix c (also touches worklog.jsonl)')
+  const shaC = g('rev-parse', '--short', 'HEAD').stdout.trim()
+  const worklogAtHead = wlLines()
+  writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
+    `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${shaC}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9520 | fixed | \`${shaC}\` | fixture: fix commit also touches worklog.jsonl |\n`)
+  g('add', '.'); g('commit', '-qm', 'worklog-in-fix resolution')
+  const worklogInFixTpl = `node -e "process.exit(require('fs').readFileSync('src/app2/c.txt','utf8').includes('buggy')?1:0)"`
+  const wlFix = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', worklogInFixTpl])
+  check('verify-fixes holds a row whose fix commit also touches worklog.jsonl', wlFix.code === 0 && wlFix.out.includes('"verdict":"held"'), wlFix.out.trim())
+  const worklogAfterFix = wlLines()
+  check("the fix commit's committed worklog history survives the revert/restore intact",
+    worklogAfterFix.length === worklogAtHead.length + 1 &&
+    worklogAtHead.every((e, i) => JSON.stringify(e) === JSON.stringify(worklogAfterFix[i])),
+    JSON.stringify({ before: worklogAtHead, after: worklogAfterFix }))
+  const lastLine = worklogAfterFix[worklogAfterFix.length - 1]
+  check('the run appended its own verify-result on top of, not instead of, that history',
+    lastLine?.id === 'PPW-9520' && lastLine?.verdict === 'held', JSON.stringify(worklogAfterFix))
+  commitWorklog('worklog after worklog-in-fix run')
 
   // A frontend spec with no installed dependencies must not be run: the runner would fail to
   // start in both legs, which reads as a red that reddened for the wrong reason.
@@ -993,6 +1019,17 @@ Fixture copy: one conforming row.
   } catch (e) {
     check('appendEvent is importable and usable in-process', false, String(e))
   }
+  rmSync(T, { recursive: true, force: true })
+}
+{
+  const T = mkdtempSync(join(tmpdir(), 'wl-archive-'))
+  const target = '933-wl-archived'
+  mkdirSync(join(T, 'reviews', 'archive', target), { recursive: true })
+  writeFileSync(join(T, 'reviews', 'archive', target, 'resolution-v1.md'), '---\nstatus: resolved\n---\n')
+  const r = run('wl.mjs', ['--root', T, target, 'note', '--text', 'archived target event'])
+  check('wl appends for an archived target and exits 0', r.code === 0, r.out.trim())
+  check('the event lands in the archive folder', existsSync(join(T, 'reviews', 'archive', target, 'worklog.jsonl')), 'reviews/archive/' + target + '/worklog.jsonl is missing')
+  check('no stray reviews/<target>/ folder is created for an archived target', !existsSync(join(T, 'reviews', target)), 'reviews/' + target + ' should not exist')
   rmSync(T, { recursive: true, force: true })
 }
 

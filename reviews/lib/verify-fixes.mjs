@@ -15,10 +15,11 @@
 // rename-in-fix · env-missing · dry-run. A row's Commit cell may list several commits; all of
 // them are reverted together, back to the parent of the first. A row whose tests include a
 // frontend spec needs src/PhotoPrint.UI/node_modules in this checkout, or it is not run at all.
-// Every row's verdict also lands as a verify-result event in the target's worklog (crash-safe:
-// a killed run leaves whatever rows already finished), unless --dry-run or --no-events.
+// Every row's verdict also lands as a verify-result event in the target's worklog, buffered in
+// memory and flushed once after the last row (a killed run leaves no partial trail; re-run
+// instead — the run is idempotent), unless --dry-run or --no-events.
 // Exit: 0 all held · 1 any other verdict · 2 dirty tree or usage error.
-import { readFileSync, readdirSync, existsSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -79,26 +80,20 @@ if (fixedCommit) {
 }
 
 if (git('status', '--porcelain').stdout.trim() !== '') {
-  console.error('the tree is dirty — verification reverts files and restores with reset --hard; commit or stash first')
+  console.error(`the tree is dirty — verification reverts files and restores with reset --hard; a likely cause is a previous run's worklog events — commit reviews/${target}/worklog.jsonl first`)
   process.exit(2)
 }
 
 const isTest = p => /^src\/PhotoPrint\.Tests\//.test(p) || /\.spec\.ts$/.test(p)
-const worklogPath = join(REPO, 'reviews', target, 'worklog.jsonl')
-const worklogPathspec = `:(exclude)reviews/${target}/worklog.jsonl`
 const restoreOrDie = id => {
-  // worklog.jsonl is a tracked file in a real target; an earlier row's already-appended (and
-  // still uncommitted) event would otherwise be wiped by this row's own reset --hard.
-  const wlSnapshot = existsSync(worklogPath) ? readFileSync(worklogPath) : null
   const r = git('reset', '--hard', 'HEAD')
-  if (wlSnapshot !== null) writeFileSync(worklogPath, wlSnapshot)
-  else if (existsSync(worklogPath)) rmSync(worklogPath)
-  if (r.status !== 0 || git('status', '--porcelain', '--', '.', worklogPathspec).stdout.trim() !== '') {
+  if (r.status !== 0 || git('status', '--porcelain').stdout.trim() !== '') {
     console.error(`FATAL: restore failed after reverting ${id} — check the tree by hand`)
     process.exit(2)
   }
 }
 const results = []
+const pending = []
 for (const row of rows) {
   const res = { id: row.id, verdict: null, commit: row.commit, filters: [], red_exits: [], green_exits: [] }
   results.push(res)
@@ -116,8 +111,7 @@ for (const row of rows) {
     const source = [...uniq.entries()].filter(([f]) => !isTest(f)).map(([f, st]) => [st, f])
     if (!tests.length) { res.verdict = 'no-test'; continue }
     if (!source.length) { res.verdict = 'test-only'; continue }
-    // A frontend suite cannot run without installed dependencies, and a runner that fails to start
-    // exits non-zero in BOTH legs — reading as a red that reddened for the wrong reason. Refuse.
+    // A runner that fails to start exits non-zero in both legs, reading as a red for the wrong reason.
     if (tests.some(p => p.endsWith('.spec.ts')) && !existsSync(join(REPO, 'src', 'PhotoPrint.UI', 'node_modules'))) {
       res.verdict = 'env-missing'
       res.note = 'src/PhotoPrint.UI/node_modules is absent in this checkout, so the frontend suites cannot run'
@@ -146,13 +140,14 @@ for (const row of rows) {
     for (const c of cmds) res.green_exits.push(runCmd(c).status ?? -1)
     res.verdict = res.green_exits.every(x => x === 0) ? 'held' : 'green-failed'
   } finally {
-    if (!dryRun && !noEvents) {
-      try {
-        appendEvent(REPO, target, { ev: 'verify-result', id: res.id, verdict: res.verdict, commit: res.commit })
-      } catch (e) {
-        console.error(`note: ${res.id} verify-result not recorded: ${e.message}`)
-      }
-    }
+    if (res.verdict !== null) pending.push({ ev: 'verify-result', id: res.id, verdict: res.verdict, commit: res.commit })
+  }
+}
+
+if (!dryRun && !noEvents) {
+  for (const e of pending) {
+    try { appendEvent(REPO, target, e) }
+    catch (err) { console.error(`note: ${e.id} verify-result not recorded: ${err.message}`) }
   }
 }
 
