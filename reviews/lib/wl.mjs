@@ -49,7 +49,7 @@ function readEvents(wlPath) {
 
 function openRound(events) {
   let open = null
-  for (const e of events) {
+  for (const e of live(events)) {
     if (e.ev === 'round-start') open = e.round
     else if (e.ev === 'round-end' && e.round === open) open = null
   }
@@ -62,6 +62,13 @@ function deepEqual(a, b) {
   if (typeof a !== 'object') return false
   const ak = Object.keys(a), bk = Object.keys(b)
   return ak.length === bk.length && ak.every(k => deepEqual(a[k], b[k]))
+}
+
+// Every reader of the log has to agree on what a void erased, or the stamper and the renderer
+// disagree about which round is open after a repair.
+function live(events) {
+  const voids = events.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
+  return events.filter(e => e.ev !== 'void' && !voids.some(v => Object.keys(v.of).every(k => deepEqual(e[k], v.of[k]))))
 }
 
 function closestTimestamps(events, tIso) {
@@ -121,8 +128,8 @@ export function appendEvent(root, target, event) {
       throw new Error(`round-start ${event.round}: no resolution-v${event.round}.md in reviews/${target}/`)
     }
     const open = openRound(existing)
-    if (open !== null && open !== event.round) {
-      throw new Error(`round-start ${event.round}: round ${open} is still open — one round open at a time`)
+    if (open !== null) {
+      throw new Error(`round-start ${event.round}: round ${open} is still open — stamp its round-end first (a re-start after round-end is how a multi-part round is recorded)`)
     }
   }
   if (ev === 'round-end') {

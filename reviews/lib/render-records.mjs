@@ -81,20 +81,31 @@ const logged = readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
 // A void's "of" matches on a key subset, so one carrying "round" must not hit a same-timestamp stamp for another round.
 const sameVal = (a, b) => a === b || (!!a && !!b && typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b))
 const voids = logged.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
-const events = logged.filter(e => e.ev !== 'void' && !voids.some(v => Object.keys(v.of).every(k => sameVal(e[k], v.of[k]))))
+const matchesVoid = (e, v) => Object.keys(v.of).every(k => sameVal(e[k], v.of[k]))
+const events = logged.filter(e => e.ev !== 'void' && !voids.some(v => matchesVoid(e, v)))
+for (const v of voids) {
+  const hits = logged.filter(e => e.ev !== 'void' && matchesVoid(e, v)).length
+  if (hits > 1) note(`the void at ${v.t} matches ${hits} events — every one of them is dropped; narrow its "of" if only one was meant`)
+}
 
 const voidHint = (ev, t) => `void the wrong stamp: node reviews/lib/wl.mjs ${target} void --json '{"of":{"ev":"${ev}","t":"${t}","round":${round}}}'`
 const spans = []
 let openStart = null
 for (let i = 0; i < events.length; i++) {
   const e = events[i]
-  if (e.ev === 'round-start' && e.round === round) {
+  if (e.ev !== 'round-start' && e.ev !== 'round-end') continue
+  if (e.round !== round) {
+    // An unclosed start followed by another round's stamp is a missing round-end, not a live round.
+    if (openStart) fail(`worklog: round-start ${round} at ${openStart.e.t} has no round-end — ${e.ev} ${e.round} at ${e.t} follows it, so this round's end went unstamped; stamp it (node reviews/lib/wl.mjs ${target} round-end --round ${round}) or, if the start itself was the mislabel, ${voidHint('round-start', openStart.e.t)}`)
+    continue
+  }
+  if (e.ev === 'round-start') {
     if (openStart) fail(`worklog: round-start ${round} at ${e.t} while the round-start at ${openStart.e.t} is still open — one of the two is a mislabel; ${voidHint('round-start', openStart.e.t)}`)
     openStart = { e, i }
-  } else if (e.ev === 'round-end' && e.round === round) {
+  } else {
     if (!openStart) {
       const prior = spans.length ? `the previous span already closed at ${events[spans[spans.length - 1].to].t}` : `no round-start ${round} precedes it`
-      fail(`worklog: round-end ${round} at ${e.t} closes nothing — ${prior}; ${voidHint('round-end', e.t)}`)
+      fail(`worklog: round-end ${round} at ${e.t} closes nothing — ${prior}. If it is a stray stamp, ${voidHint('round-end', e.t)}. If the round really was resumed, the missing stamp is its round-start: re-stamp that instead, because voiding this end merges the two parts and restores the over-count`)
     }
     spans.push({ from: openStart.i, to: i })
     openStart = null

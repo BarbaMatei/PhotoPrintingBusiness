@@ -244,7 +244,7 @@ closed:
 |---|---|---|---|
 | PPW-92${n}1 | fixed | \`abc1234\` | done |
 `
-  for (const n of [6, 7, 8]) writeFileSync(join(dir, `resolution-v${n}.md`), resolution(n, 'resolved', 'abc1234'))
+  for (const n of [1, 4, 6, 7, 8]) writeFileSync(join(dir, `resolution-v${n}.md`), resolution(n, 'resolved', 'abc1234'))
   const at = hhmm => `2026-08-21T${hhmm}:00+03:00`
   const line = (out, key) => out.split('\n').find(l => l.includes(`"${key}"`)) ?? out.trim().slice(0, 200)
 
@@ -274,7 +274,19 @@ closed:
       `exit ${r.code}: ${line(r.out, 'active_s')} ${line(r.out, 'started')}`)
   }
 
-  wl(mislabel)
+  wl(mislabel.filter(e => !(e.ev === 'round-start' && e.round === 7)))
+  {
+    const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
+    check('renderer aborts on the unvoided mislabel instead of spanning both parts', r.code === 1, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
+    check('the abort names the unclosed start, the foreign stamp that follows it, and both repairs',
+      r.out.includes(at('10:15')) && r.out.includes(at('10:44')) && r.out.includes('round-end --round 8') && r.out.includes('void'), r.out.trim())
+  }
+
+  wl([
+    { t: at('10:15'), ev: 'round-start', round: 8 },
+    { t: at('11:36'), ev: 'round-start', round: 8 },
+    { t: at('12:00'), ev: 'round-end', round: 8 },
+  ])
   {
     const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
     check('renderer aborts on a second round-start while the round is open', r.code === 1, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
@@ -290,6 +302,35 @@ closed:
   {
     const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
     check('renderer aborts on a round-end that closes nothing', r.code === 1 && r.out.includes(at('10:30')) && r.out.includes(at('10:20')), `exit ${r.code}: ${r.out.trim()}`)
+    check('that abort also offers the resumed-without-a-start repair, not just the void',
+      r.out.includes('resumed') && r.out.includes('round-start'), r.out.trim())
+  }
+
+  // A round left open while another round runs is a missing round-end, not work in progress: the
+  // single-slice reader charged the second round's events to the first.
+  wl([
+    { t: at('09:00'), ev: 'round-start', round: 1 },
+    { t: at('09:10'), ev: 'test-run', kind: 'red' },
+    { t: at('11:00'), ev: 'round-start', round: 2 },
+    { t: at('11:10'), ev: 'test-run', kind: 'green' },
+    { t: at('11:30'), ev: 'round-end', round: 2 },
+  ])
+  {
+    const r = run('render-records.mjs', ['--root', T, target, '--round', '1', '--dry-run'])
+    check('renderer aborts when a later round runs inside an unclosed round', r.code === 1 && !r.out.includes('"invocations"'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
+    check('that abort names the unclosed start and the first foreign round stamp',
+      r.out.includes(at('09:00')) && r.out.includes(at('11:00')), r.out.trim())
+  }
+
+  wl([
+    { t: at('09:00'), ev: 'round-start', round: 1 },
+    { t: at('09:10'), ev: 'test-run', kind: 'red' },
+  ])
+  {
+    const r = run('render-records.mjs', ['--root', T, target, '--round', '1', '--dry-run'])
+    check('a round still open at the end of the log renders in progress', r.code === 0 && r.out.includes('no round-end yet'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
+    check('the in-progress render ends at the last event',
+      r.out.includes(`"started": "${at('09:00')}"`) && r.out.includes(`"ended": "${at('09:10')}"`), `${line(r.out, 'started')} ${line(r.out, 'ended')}`)
   }
 
   wl([
@@ -314,6 +355,20 @@ closed:
       r.out.includes('"invocations": 3') && r.out.includes('"green_runs": 1'), `${line(r.out, 'invocations')} ${line(r.out, 'green_runs')}`)
   }
 
+  // Two stamps can share a timestamp, so a broad "of" erases more than the one event meant.
+  wl([
+    { t: at('09:00'), ev: 'round-start', round: 4 },
+    { t: at('09:10'), ev: 'test-run', kind: 'red' },
+    { t: at('09:10'), ev: 'test-run', kind: 'red' },
+    { t: at('09:20'), ev: 'round-end', round: 4 },
+    { t: at('09:30'), ev: 'void', of: { ev: 'test-run', t: at('09:10') } },
+  ])
+  {
+    const r = run('render-records.mjs', ['--root', T, target, '--round', '4', '--dry-run'])
+    check('renderer warns when one void matches more than one event', r.code === 0 && r.out.includes('matches 2 events'), `exit ${r.code}: ${r.out.split('\n').find(l => l.includes('void')) ?? r.out.trim().slice(0, 200)}`)
+    check('every event the void matched is dropped', r.out.includes('"invocations": 0'), line(r.out, 'invocations'))
+  }
+
   writeFileSync(join(dir, 'resolution-v5.md'), resolution(5, 'in-progress', null))
   wl([
     { t: at('08:00'), ev: 'round-start', round: 5 },
@@ -334,6 +389,21 @@ closed:
     const written = existsSync(metricsPath) ? readFileSync(metricsPath, 'utf8').trim().split('\n') : []
     check('--in-progress appends the line anyway', r.code === 0 && written.length === 1, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the appended line is this round\'s fix-round line', written.length === 1 && JSON.parse(written[0]).type === 'fix-round' && JSON.parse(written[0]).round === 5, written.join(' | '))
+  }
+
+  wl([...mislabel, voidEvent])
+  {
+    const before = readFileSync(metricsPath, 'utf8').trim().split('\n').length
+    const r = run('render-records.mjs', ['--root', T, target, '--round', '8'])
+    const written = readFileSync(metricsPath, 'utf8').trim().split('\n')
+    check('renderer appends the line at hand-back for a resolved round with no flag',
+      r.code === 0 && written.length === before + 1, `exit ${r.code}: ${written.length} line(s), was ${before}: ${r.out.trim().slice(0, 200)}`)
+    const appended = written.length ? JSON.parse(written[written.length - 1]) : {}
+    check('the hand-back line carries this round\'s number and span-derived runtime',
+      appended.type === 'fix-round' && appended.round === 8 && appended.runtime?.active_s === 1440, JSON.stringify(appended.runtime ?? appended))
+    const again = run('render-records.mjs', ['--root', T, target, '--round', '8'])
+    check('a second hand-back render refuses rather than duplicating the line',
+      again.code === 1 && readFileSync(metricsPath, 'utf8').trim().split('\n').length === written.length, `exit ${again.code}: ${again.out.trim().slice(0, 200)}`)
   }
 
   rmSync(T, { recursive: true, force: true })
@@ -555,6 +625,33 @@ closed:
     check('wl worklog grew by exactly one line for the accepted void', lines().length === 6, String(lines().length))
   } else {
     check('wl accepts a void matching an existing event', false, 'no earlier event was captured to void')
+  }
+
+  rmSync(T, { recursive: true, force: true })
+}
+{
+  const T = mkdtempSync(join(tmpdir(), 'wl-void-'))
+  const target = '932-wl-void'
+  mkdirSync(join(T, 'reviews', target), { recursive: true })
+  for (const n of [1, 2]) writeFileSync(join(T, 'reviews', target, `resolution-v${n}.md`), '---\nstatus: resolved\n---\n')
+  const wlPath = join(T, 'reviews', target, 'worklog.jsonl')
+  const lines = () => existsSync(wlPath) ? readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()) : []
+
+  let r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '1'])
+  check('wl opens round 1', r.code === 0, r.out.trim())
+  const opened = lines().length ? JSON.parse(lines()[0]) : null
+
+  r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '1'])
+  check('wl refuses a repeat round-start for the round already open', r.code === 1 && r.out.includes('ERROR') && r.out.includes('still open'), r.out.trim())
+  check('wl appended nothing for the repeat round-start', lines().length === 1, String(lines().length))
+
+  if (opened) {
+    r = run('wl.mjs', ['--root', T, target, 'void', '--json', JSON.stringify({ of: { ev: 'round-start', t: opened.t, round: 1 } })])
+    check('wl voids the round-start it just stamped', r.code === 0, r.out.trim())
+    r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '2'])
+    check('a voided round-start no longer holds the round open for the stamper', r.code === 0, r.out.trim())
+  } else {
+    check('a voided round-start no longer holds the round open for the stamper', false, 'no round-start was captured to void')
   }
 
   rmSync(T, { recursive: true, force: true })
