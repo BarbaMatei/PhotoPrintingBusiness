@@ -21,4 +21,5 @@ updated: 2026-08-22
 - **Suggested fix:** Render the id in the footer.
 - **History:**
   - v1: found
-  - v1: fix round — fixed at   - v1: verification — held
+  - v1: fix round — fixed at `6666661`
+  - v1: verification — held

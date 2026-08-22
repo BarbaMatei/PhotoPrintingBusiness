@@ -14,7 +14,7 @@ closed: 2026-08-22
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-9525 | fixed |  | The footer carries the id; a regression test asserts it on the error path. |
+| PPW-9525 | fixed | `6666661` | The footer carries the id; a regression test asserts it on the error path. |
 
 ## Scope
 
