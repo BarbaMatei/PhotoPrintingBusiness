@@ -260,7 +260,11 @@ commit: abc1234
 // ---------- verify-fixes: revert-and-rerun against a throwaway repo ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'verify-fixes-'))
-  const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8' })
+  // A git hook's own GIT_DIR/GIT_WORK_TREE would otherwise leak in here and redirect these
+  // calls at the hook's repo instead of T.
+  const gitEnv = { ...process.env }
+  for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES', 'GIT_PREFIX']) delete gitEnv[k]
+  const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8', env: gitEnv })
   g('init', '-q', '-b', 'main')
   g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
   mkdirSync(join(T, 'src', 'app'), { recursive: true })
