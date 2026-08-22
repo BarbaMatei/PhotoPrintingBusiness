@@ -286,6 +286,35 @@ closed: 2026-08-21
     check('once the fix-round line lands the warning is gone and the auditor stays exit 0', r.code === 0 && !r.out.includes('unit records pending'), `exit ${r.code}: ${r.out.trim()}`)
   }
 
+  // A resolution closed before V3_CUTOFF never gets a fix-round line — that's a permanent fact
+  // of the schema's history, not a pending unit, so it must never trigger the warning.
+  const legacyTarget = '923-legacy-pre-cutoff'
+  const legacyDir = join(T, 'reviews', legacyTarget)
+  mkdirSync(legacyDir, { recursive: true })
+  writeFileSync(join(legacyDir, 'metrics.jsonl'), '')
+  writeFileSync(join(legacyDir, 'resolution-v1.md'), `---
+type: resolution
+target: ${legacyTarget}
+version: 1
+answers: review-v1.md
+status: resolved
+fixed_commit: abc1234
+closed: 2026-07-15
+---
+
+# Resolution v1 — ${legacyTarget}
+
+## Findings
+
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| PPW-9231 | fixed | \`abc1234\` | done |
+`)
+  {
+    const r = run('records-auditor.mjs', ['--root', T, legacyTarget])
+    check('a resolution closed before V3_CUTOFF stays silent even with no fix-round line', r.code === 0 && !r.out.includes('unit records pending'), `exit ${r.code}: ${r.out.trim()}`)
+  }
+
   rmSync(T, { recursive: true, force: true })
 }
 

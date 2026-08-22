@@ -335,9 +335,7 @@ function auditTarget(t) {
     if (ls.length > 1 && !ls.every(l => l.subtype && l.subtype.startsWith('certification-pair'))) warn(`${tag}: ${ls.length} metrics lines share pass ${p} without pair subtypes`)
   }
 
-  // A resolution can read status: resolved before its round's fix-round line is rendered — the
-  // line renders once, at hand-back, so the gap is a legal in-flight window, not a defect. A
-  // resolution closed before fix-round lines existed (V3_CUTOFF) never gets one and isn't "pending".
+  // resolved-no-line is legal in-flight unless closed predates V3_CUTOFF (fix-round lines did not exist before it).
   for (const f of readdirSync(t.dir)) {
     const m = /^resolution-v(\d+)\.md$/.exec(f)
     if (!m || fixRounds.has(Number(m[1]))) continue

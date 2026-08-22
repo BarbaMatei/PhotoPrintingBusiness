@@ -5,6 +5,7 @@ version: 1
 answers: review-v1.md
 status: resolved
 fixed_commit: ccccccc
+closed: 2026-07-15
 ---
 
 # Resolution v1 — 901-good-target
