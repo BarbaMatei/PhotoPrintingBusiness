@@ -1286,6 +1286,65 @@ Fixture copy: one conforming row.
   rmSync(T, { recursive: true, force: true })
 }
 
+// ---------- gate-miner: mixed Z/offset timestamps — bucketing and print order by instant ----------
+// The real 038-039 worklog mixes `Z` and `+03:00` stamps. A raw ISO-string compare mis-orders
+// and mis-buckets across that mix: "...T23:30:00Z" sorts before "...T01:00:00+03:00" the next
+// calendar day even though the +03:00 stamp is the earlier instant (it's 3h behind its own
+// written day). Per the header's bucketing/ordering contract, both are judged by parsed instant.
+{
+  const T = mkdtempSync(join(tmpdir(), 'gate-miner-tz-'))
+  const target = '966-gate-miner-mixed-tz'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  const REASON_Z = 'Z stamp reading the earlier day by string alone'
+  const REASON_OFFSET = 'offset stamp reading the next local day but the earlier instant'
+  writeFileSync(join(dir, 'worklog.jsonl'), [
+    { t: '2026-08-21T23:30:00Z', ev: 'doc-gate', verdict: 'disapprove', round: 1, reason: REASON_Z },
+    { t: '2026-08-22T01:00:00+03:00', ev: 'doc-gate', verdict: 'disapprove', round: 2, reason: REASON_OFFSET },
+  ].map(e => JSON.stringify(e)).join('\n') + '\n')
+
+  {
+    const r = run('gate-miner.mjs', ['--root', T])
+    check('both mixed-offset disapprovals are counted', r.code === 0 && r.out.includes('total disapprovals: 2'), r.out.trim())
+    check('both bucket to the same true UTC day (2026-08-21), not two different days',
+      (r.out.match(/2026-08-21 ·/g) || []).length === 2 && !r.out.includes('2026-08-22 ·'), r.out.trim())
+    check('the earlier instant (the +03:00 stamp) prints before the later one (the Z stamp)',
+      r.out.indexOf(REASON_OFFSET) > -1 && r.out.indexOf(REASON_OFFSET) < r.out.indexOf(REASON_Z), r.out.trim())
+  }
+  {
+    const r = run('gate-miner.mjs', ['--root', T, '--since', '2026-08-22'])
+    check('--since buckets by the true UTC day: both real instants are 2026-08-21, so both are excluded (the +03:00 stamp\'s raw string alone would have wrongly survived)',
+      r.code === 0 && r.out.includes('total disapprovals: 0'), r.out.trim())
+    check('neither reason text leaks through the boundary', !r.out.includes(REASON_OFFSET) && !r.out.includes(REASON_Z), r.out.trim())
+  }
+  {
+    const r = run('gate-miner.mjs', ['--root', T, '--since', '2026-08-21'])
+    check('--since on the true UTC day itself keeps both', r.code === 0 && r.out.includes('total disapprovals: 2'), r.out.trim())
+  }
+  rmSync(T, { recursive: true, force: true })
+}
+
+// ---------- gate-miner: an approved round's note mentioning "disapprove" still matches ----------
+// Real shape, 038-039-invoicing worklog line 8: an overall-approved pass whose note narrates
+// per-round disapprovals inline. The pinned match rule (verdict/judge/reason/note, case
+// insensitive) doesn't care about the top-level verdict — this locks that in.
+{
+  const T = mkdtempSync(join(tmpdir(), 'gate-miner-approve-note-'))
+  const target = '967-gate-miner-approve-note'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  const NOTE = 'lint clean throughout; Sonnet judge disapproved rounds 1-4 (heading/title mismatches, unauthorized metrics-schema vocabulary in prose) — approved round 5'
+  writeFileSync(join(dir, 'worklog.jsonl'), JSON.stringify(
+    { t: '2026-08-13T08:45:00Z', ev: 'doc-gate', pass: 'v1', verdict: 'approve', rounds: 5, note: NOTE }
+  ) + '\n')
+
+  const r = run('gate-miner.mjs', ['--root', T])
+  check('an approve-verdict event whose note mentions "disapprove" still matches', r.code === 0 && r.out.includes(NOTE), r.out.trim())
+  check('the summary counts it despite the overall verdict being approve', r.out.includes('total disapprovals: 1'), r.out.trim())
+  check('round/pass falls back to the pass field when there is no round', r.out.includes('pass v1'), r.out.trim())
+  rmSync(T, { recursive: true, force: true })
+}
+
 if (failures.length) {
   console.log(`FAIL: ${failures.length} of ${count} assertion(s) failed:\n`)
   for (const f of failures) console.log(`  - ${f}`)

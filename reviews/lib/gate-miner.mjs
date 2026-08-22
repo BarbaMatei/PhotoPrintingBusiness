@@ -6,6 +6,10 @@
 // Usage: node reviews/lib/gate-miner.mjs [--root <repoRoot>] [--since YYYY-MM-DD] [target ...]
 //   No target ⇒ every target, live and archived. --since default = 30 days before the
 //   newest worklog event seen in the scanned scope (never wall-clock, so a run is reproducible).
+// Bucketing/ordering contract: every date comparison (--since, "newest seen", print order) uses
+// the event's parsed instant normalized to its UTC calendar day, never the raw ISO-string
+// prefix — real worklogs mix `Z` and offset (`+03:00`) stamps, and a naive string compare
+// mis-buckets and mis-orders across that mix.
 // Exit: 0 always, even with zero matches · 1 on an IO error while reading worklogs.
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -39,8 +43,9 @@ function readWorklog(dir) {
 
 const isDisapproval = e => MATCH_FIELDS.some(k => typeof e[k] === 'string' && /disapprove/i.test(e[k]))
 const textOf = e => TEXT_FIELDS.map(k => e[k]).find(v => typeof v === 'string') ?? ''
-// Compares the literal YYYY-MM-DD in the timestamp, not a UTC-normalized calendar day.
-const dateOf = e => typeof e.t === 'string' ? e.t.slice(0, 10) : null
+// See the bucketing/ordering contract in the header — both derive from the parsed instant.
+const epochOf = e => typeof e.t === 'string' ? Date.parse(e.t) : NaN
+const dateOf = e => { const ms = epochOf(e); return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null }
 
 function main() {
   const argv = process.argv.slice(2)
@@ -74,7 +79,7 @@ function main() {
   const disapprovals = events
     .filter(({ event }) => event.ev === 'doc-gate' && isDisapproval(event))
     .filter(({ event }) => { const d = dateOf(event); return d && (!since || d >= since) })
-    .sort((a, b) => a.event.t.localeCompare(b.event.t))
+    .sort((a, b) => epochOf(a.event) - epochOf(b.event))
 
   console.log(`GATE MINER: ${targets.length} target(s) scanned, since ${since ?? '(no worklog events found)'}\n`)
   for (const { target, event } of disapprovals) {
