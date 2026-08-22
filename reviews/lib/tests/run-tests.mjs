@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { REVIEWS, REPO } from '../paths.mjs'
 
@@ -325,6 +325,106 @@ commit: abc1234
   const ui = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
   check('verify-fixes refuses a frontend row with no installed dependencies', ui.out.includes('"verdict":"env-missing"') && ui.out.includes('node_modules'), ui.out.trim())
   check('verify-fixes ran no test for the refused frontend row', ui.out.includes('"red_exits":[]'), ui.out.trim())
+  rmSync(T, { recursive: true, force: true })
+}
+
+// ---------- wl: the validated worklog stamper ----------
+{
+  const T = mkdtempSync(join(tmpdir(), 'wl-'))
+  const target = '930-wl-target'
+  mkdirSync(join(T, 'reviews', target), { recursive: true })
+  writeFileSync(join(T, 'reviews', target, 'resolution-v1.md'), '---\nstatus: resolved\n---\n')
+  const wlPath = join(T, 'reviews', target, 'worklog.jsonl')
+  const lines = () => existsSync(wlPath) ? readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()) : []
+
+  let r = run('wl.mjs', ['--root', T, target, 'pass-launch', '--pass', 'v1', '--type', 'full discovery'])
+  check('wl appends a valid event and exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+  check('wl prints exactly the appended line', lines().length === 1 && r.out.trim() === lines()[0], r.out.trim())
+  let firstEvent = lines().length ? JSON.parse(lines()[0]) : null
+  check('wl stamps a timestamp with the local UTC offset', !!firstEvent && /[+-]\d{2}:\d{2}$/.test(firstEvent.t), JSON.stringify(firstEvent))
+
+  r = run('wl.mjs', ['--root', T, target, 'not-a-real-event'])
+  check('wl refuses an unknown ev', r.code === 1 && r.out.includes('ERROR') && r.out.includes('unknown ev'), r.out.trim())
+  check('wl appended nothing for the unknown ev', lines().length === 1, String(lines().length))
+
+  const shapeCases = [
+    ['round-start', [], 'round'],
+    ['triage-done', ['--round', '1'], 'clusters'],
+    ['gate-open', [], 'reason'],
+    ['gate-parked', ['--kind', 'fixer-decision', '--default', 'deferred'], 'reason'],
+    ['test-run', [], 'kind'],
+    ['finding', ['--id', 'PPW-1'], 'status'],
+    ['micro-review-dispatched', [], 'cluster'],
+    ['pass-launch', ['--pass', 'v1'], 'type'],
+    ['pass-records-done', [], 'pass'],
+    ['verify-result', ['--id', 'PPW-1'], 'verdict'],
+    ['void', [], 'of'],
+  ]
+  for (const [ev, args, field] of shapeCases) {
+    const before = lines().length
+    const rr = run('wl.mjs', ['--root', T, target, ev, ...args])
+    check(`wl refuses ${ev} missing "${field}"`, rr.code === 1 && rr.out.includes('ERROR'), rr.out.trim())
+    check(`wl appends nothing for ${ev} missing "${field}"`, lines().length === before, String(lines().length))
+  }
+
+  r = run('wl.mjs', ['--root', T, target, 'test-run', '--kind', 'bogus'])
+  check('wl refuses a test-run kind outside the enum', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'finding', '--id', 'BUG-1', '--status', 'fixed'])
+  check('wl refuses a finding id not shaped like PPW-<n>', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'run-start', '--t', '2020-01-01T00:00:00+00:00'])
+  check('wl refuses a passed --t (the stamper owns time)', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+  check('wl appends nothing when --t is passed', lines().length === 1, String(lines().length))
+
+  r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '7'])
+  check('wl refuses round-start when resolution-v7.md is missing', r.code === 1 && r.out.includes('ERROR') && r.out.includes('resolution-v7'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '1'])
+  check('wl accepts round-start 1 (resolution-v1.md exists)', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '2'])
+  check('wl refuses round-start 2 while round 1 is still open', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-end', '--round', '2'])
+  check('wl refuses round-end 2 with no open round-start for 2', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-end', '--round', '1'])
+  check('wl accepts round-end 1, closing the open round', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-start', '--round', '1'])
+  check('wl accepts a same-number restart after round-end (multi-part round)', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-end', '--round', '1'])
+  check('wl closes the restarted round', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'void', '--json', '{"of":{"ev":"round-start","t":"1999-01-01T00:00:00+00:00"}}'])
+  check('wl refuses a void with no matching event', r.code === 1 && r.out.includes('ERROR') && r.out.includes('closest timestamps'), r.out.trim())
+
+  if (firstEvent) {
+    r = run('wl.mjs', ['--root', T, target, 'void', '--json', JSON.stringify({ of: { ev: firstEvent.ev, t: firstEvent.t } })])
+    check('wl accepts a void matching an existing event', r.code === 0, r.out.trim())
+    check('wl worklog grew by exactly one line for the accepted void', lines().length === 6, String(lines().length))
+  } else {
+    check('wl accepts a void matching an existing event', false, 'no earlier event was captured to void')
+  }
+
+  rmSync(T, { recursive: true, force: true })
+}
+{
+  const T = mkdtempSync(join(tmpdir(), 'wl-inprocess-'))
+  const target = '931-wl-inprocess'
+  mkdirSync(join(T, 'reviews', target), { recursive: true })
+  try {
+    const { appendEvent } = await import('../wl.mjs')
+    const stamped = appendEvent(T, target, { ev: 'note', text: 'in-process call' })
+    check('appendEvent returns the stamped event with an offset timestamp',
+      stamped.ev === 'note' && /[+-]\d{2}:\d{2}$/.test(stamped.t), JSON.stringify(stamped))
+    const written = readFileSync(join(T, 'reviews', target, 'worklog.jsonl'), 'utf8').trim()
+    check('appendEvent wrote exactly the stamped line to disk', written === JSON.stringify(stamped), written)
+  } catch (e) {
+    check('appendEvent is importable and usable in-process', false, String(e))
+  }
   rmSync(T, { recursive: true, force: true })
 }
 
