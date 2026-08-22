@@ -2,10 +2,11 @@
 // Records auditor — mechanical checks over reviews/ structured records, per metrics-schema.md v3.
 // Checks: metrics.jsonl parses + validates (strict for lines dated >= 2026-07-30, v3 fix-round
 // lines strict from 2026-08-03, lenient with grandfathered drift before); new_findings tallies
-// vs findings[]; fix-round findings tallies vs the resolution frontmatter; review-v<n>.md <->
-// metrics pairing; worklog.jsonl event shape; every cited commit resolves AND is reachable from
-// a pushed ref (tag or remote branch); correction lines reference real passes; index.md mentions
-// each pass; citation-leak count.
+// vs findings[]; fix-round findings tallies vs the resolution frontmatter (a resolved resolution
+// with no fix-round line yet warns instead of erroring — the line renders only once, at or after
+// hand-back); review-v<n>.md <-> metrics pairing; worklog.jsonl event shape; every cited commit
+// resolves AND is reachable from a pushed ref (tag or remote branch); correction lines reference
+// real passes; index.md mentions each pass; citation-leak count.
 // Prose bodies (ledgers, resolutions) are NOT checked — numbers there stay a human's job.
 //
 // Usage: node reviews/lib/records-auditor.mjs [--root <repoRoot>] [target ...]
@@ -76,6 +77,15 @@ function listTargets(all = false) {
 
 function num(v) { return typeof v === 'number' && Number.isFinite(v) }
 function numOrNull(v) { return v === null || num(v) }
+
+function resolutionMeta(text) {
+  const end = text.indexOf('\n---', 3)
+  const fm = text.startsWith('---') && end !== -1 ? text.slice(3, end) : ''
+  return {
+    status: /^status:[ \t]*(\S+)/m.exec(fm)?.[1] ?? 'open',
+    closed: /^closed:[ \t]*(\d{4}-\d{2}-\d{2})/m.exec(fm)?.[1] ?? null,
+  }
+}
 
 // Counts statuses from a resolution's "## Findings" body table (frontmatter map on old rounds).
 function resolutionTallies(text) {
@@ -323,6 +333,17 @@ function auditTarget(t) {
     if (!reviewVersions.includes(p) && !ls.every(l => l.type === 'verification'))
       strictTier(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
     if (ls.length > 1 && !ls.every(l => l.subtype && l.subtype.startsWith('certification-pair'))) warn(`${tag}: ${ls.length} metrics lines share pass ${p} without pair subtypes`)
+  }
+
+  // A resolution can read status: resolved before its round's fix-round line is rendered — the
+  // line renders once, at hand-back, so the gap is a legal in-flight window, not a defect. A
+  // resolution closed before fix-round lines existed (V3_CUTOFF) never gets one and isn't "pending".
+  for (const f of readdirSync(t.dir)) {
+    const m = /^resolution-v(\d+)\.md$/.exec(f)
+    if (!m || fixRounds.has(Number(m[1]))) continue
+    const { status, closed } = resolutionMeta(readFileSync(join(t.dir, f), 'utf8'))
+    if (status === 'resolved' && !(closed && closed < V3_CUTOFF))
+      warn(`${tag}: resolution-v${m[1]} resolved, no fix-round line yet — unit records pending`)
   }
 
   // worklog: every event line must parse and carry t + ev; fix-round lines want event backing

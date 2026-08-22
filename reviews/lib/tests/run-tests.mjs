@@ -227,6 +227,68 @@ ${decisionsBody}
   check('renderer buckets a backlog row as deferred', r.out.includes('"deferred": 1') && r.out.includes('"open": 0'), r.out.split('\n').filter(l => /"(deferred|open)"/.test(l)).join(' ').trim() || r.out.trim().slice(0, 160))
 }
 
+// ---------- records auditor: the reviewed-unit window ----------
+// A resolution can flip to status: resolved before render-records.mjs appends that round's
+// fix-round line (the line now renders once, after the paired verification confirms the round).
+// That gap must warn, not error, and stop warning once the line lands. The worklog also carries
+// two new legal event kinds, void and verify-result, which must not read as malformed shapes.
+{
+  const T = mkdtempSync(join(tmpdir(), 'records-auditor-window-'))
+  const target = '922-resolved-window'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'metrics.jsonl'), '')
+  writeFileSync(join(dir, 'resolution-v1.md'), `---
+type: resolution
+target: ${target}
+version: 1
+answers: review-v1.md
+status: resolved
+fixed_commit: abc1234
+closed: 2026-08-21
+---
+
+# Resolution v1 — ${target}
+
+## Findings
+
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| PPW-9221 | fixed | \`abc1234\` | done |
+`)
+  writeFileSync(join(dir, 'worklog.jsonl'), [
+    { t: '2026-08-21T10:00:00+03:00', ev: 'round-start', round: 1 },
+    { t: '2026-08-21T10:30:00+03:00', ev: 'round-end', round: 1 },
+    { t: '2026-08-21T10:35:00+03:00', ev: 'void', of: { ev: 'round-start', t: '2026-08-21T10:00:00+03:00', round: 1 } },
+    { t: '2026-08-21T11:00:00+03:00', ev: 'pass-launch', pass: 'v2', type: 'verification' },
+    { t: '2026-08-21T11:05:00+03:00', ev: 'verify-result', id: 'PPW-9221', verdict: 'held', commit: 'abc1234' },
+    { t: '2026-08-21T11:10:00+03:00', ev: 'pass-records-done', pass: 'v2' },
+  ].map(e => JSON.stringify(e)).join('\n') + '\n')
+  const WARNING = `${target}: resolution-v1 resolved, no fix-round line yet — unit records pending`
+
+  {
+    const r = run('records-auditor.mjs', ['--root', T, target])
+    check('auditor tolerates a resolved resolution with no fix-round line yet', r.code === 0 && r.out.includes(WARNING), `exit ${r.code}: ${r.out.trim()}`)
+    check('void and verify-result worklog events read as valid shapes', !r.out.includes('worklog line'), r.out.split('\n').find(l => l.includes('worklog line')) ?? '')
+  }
+
+  const fixRoundLine = {
+    target, round: 1, type: 'fix-round', date: '2026-08-21', base_commit: null, fixed_commit: null,
+    findings: { fixed: 1, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 },
+    tests: null, approach_checks: { pre_cleared_consumed: 0, run: 0, tokens: null },
+    micro_reviews: { count: 0, follow_up_fixes: 0 }, cost: { agents: 0, tokens: null },
+    runtime: { started: '2026-08-21T10:00:00+03:00', ended: '2026-08-21T10:30:00+03:00', active_s: 1800, blocked_s: 0, idle_s: 0, blocked: [] },
+    notes: '',
+  }
+  writeFileSync(join(dir, 'metrics.jsonl'), JSON.stringify(fixRoundLine) + '\n')
+  {
+    const r = run('records-auditor.mjs', ['--root', T, target])
+    check('once the fix-round line lands the warning is gone and the auditor stays exit 0', r.code === 0 && !r.out.includes('unit records pending'), `exit ${r.code}: ${r.out.trim()}`)
+  }
+
+  rmSync(T, { recursive: true, force: true })
+}
+
 // ---------- render-records: frontmatter and worklog edge shapes ----------
 // An in-progress round leaves fixed_commit empty, and a fixer may write pre_cleared as the list
 // of ids rather than their count. Both once produced a wrong metrics line.
