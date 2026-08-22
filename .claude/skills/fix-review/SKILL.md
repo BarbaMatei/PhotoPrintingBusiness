@@ -196,6 +196,15 @@ background-launched so you work while it executes; scope filters per CLAUDE.md
 (`--filter FullyQualifiedName~<Namespace>` / `--include='**/<name>*.spec.ts'`); one final
 scoped run over all touched namespaces before hand-back (`test-run kind:final`).
 
+Two rules against runs whose result is thrown away:
+
+- **`--no-build` when no source changed since the previous run** — a rebuild of an unchanged
+  tree costs ~15 s per invocation and proves nothing. Docs-only and records-only steps between
+  two runs do not invalidate the build.
+- **Never launch the final run while a micro-review is in flight.** Its follow-up fixes land
+  after, so the run is dead on arrival and pays full cost. Wait for `micro-review-returned`,
+  fold the follow-ups in, then run once.
+
 ## Fix-diff micro-review — per cluster, pipelined
 
 Your own re-read of the diff does not count: it is the same mind that wrote the fixes.

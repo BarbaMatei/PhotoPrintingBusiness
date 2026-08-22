@@ -9,14 +9,17 @@ namespace PhotoPrint.Tests.Unit.Services;
 /// OrderNumberService against a real PostgreSQL database, exercising the per-year
 /// <c>CREATE SEQUENCE</c> + <c>nextval</c> path rather than the InMemory count fallback.
 /// </summary>
-public class OrderNumberServicePostgresTests : IDisposable
+public class OrderNumberServicePostgresTests : IClassFixture<PostgresTestDatabase>, IDisposable
 {
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
     private readonly PhotoPrintDbContext _db;
     private readonly OrderNumberService _service;
 
-    public OrderNumberServicePostgresTests()
+    public OrderNumberServicePostgresTests(PostgresTestDatabase database)
     {
+        _database = database;
+        database.ResetForTest();
+
         _db = _database.NewContext();
         _service = new OrderNumberService(_db);
     }
@@ -24,7 +27,6 @@ public class OrderNumberServicePostgresTests : IDisposable
     public void Dispose()
     {
         _db.Dispose();
-        _database.Dispose();
     }
 
     [Fact]

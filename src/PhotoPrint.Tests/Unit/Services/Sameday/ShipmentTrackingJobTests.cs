@@ -12,6 +12,7 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
@@ -25,13 +26,14 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 /// The InMemory provider does not support EF's <c>ExecuteUpdateAsync</c>, so the
 /// suite runs against a real PostgreSQL database.
 /// </summary>
-public class ShipmentTrackingJobTests : IDisposable
+public class ShipmentTrackingJobTests : IClassFixture<PostgresTestDatabase>, IDisposable
 {
     private readonly PostgresScopeFactory _scopes;
 
-    public ShipmentTrackingJobTests()
+    public ShipmentTrackingJobTests(PostgresTestDatabase database)
     {
-        _scopes = new PostgresScopeFactory();
+        database.ResetForTest();
+        _scopes = new PostgresScopeFactory(database);
     }
 
     public void Dispose() => _scopes.Dispose();
@@ -428,12 +430,13 @@ public class ShipmentTrackingJobTests : IDisposable
 /// </summary>
 internal sealed class PostgresScopeFactory : IDisposable
 {
-    private readonly PhotoPrint.Tests.Helpers.PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
     private readonly ServiceProvider _provider;
     private readonly Dictionary<Type, object> _overrides = new();
 
-    public PostgresScopeFactory()
+    public PostgresScopeFactory(PostgresTestDatabase database)
     {
+        _database = database;
         var services = new ServiceCollection();
         services.AddDbContext<PhotoPrintDbContext>(
             options => options.UseNpgsql(_database.ConnectionString));
@@ -451,7 +454,6 @@ internal sealed class PostgresScopeFactory : IDisposable
     public void Dispose()
     {
         _provider.Dispose();
-        _database.Dispose();
     }
 
     private sealed class ScopeFactoryAdapter : IServiceScopeFactory

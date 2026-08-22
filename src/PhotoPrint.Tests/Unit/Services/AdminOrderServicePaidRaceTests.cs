@@ -20,19 +20,22 @@ using Xunit;
 namespace PhotoPrint.Tests.Unit.Services;
 
 // Real Postgres and a real creation service: EF InMemory raises no unique violation, and the classifier only matches the PostgreSQL error.
-public class AdminOrderServicePaidRaceTests : IDisposable
+public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase>
 {
     private static readonly DateTimeOffset WebhookPaidAt = new(2026, 8, 1, 9, 30, 0, TimeSpan.Zero);
 
-    private readonly PostgresTestDatabase _database = new();
+    private readonly PostgresTestDatabase _database;
     private readonly Mock<IOrderEmailService> _email = new();
     private readonly Mock<IAwbCreationNotifier> _awb = new();
     private readonly Mock<IHubContext<AdminOrderHub>> _hub = new();
     private readonly Mock<IHubClients> _hubClients = new();
     private readonly Mock<IClientProxy> _clientProxy = new();
 
-    public AdminOrderServicePaidRaceTests()
+    public AdminOrderServicePaidRaceTests(PostgresTestDatabase database)
     {
+        _database = database;
+        database.ResetForTest();
+
         _hub.Setup(h => h.Clients).Returns(_hubClients.Object);
         _hubClients.Setup(c => c.All).Returns(_clientProxy.Object);
         _clientProxy
@@ -42,7 +45,6 @@ public class AdminOrderServicePaidRaceTests : IDisposable
             .Returns(Task.CompletedTask);
     }
 
-    public void Dispose() => _database.Dispose();
 
     private AdminOrderService BuildService(
         PhotoPrintDbContext db, IInvoiceCreationService creator,
