@@ -14,16 +14,16 @@ closed: 2026-08-22
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-9521 | fixed |  | The footer carries the id; a regression test asserts it on the error path. |
+| PPW-9525 | fixed |  | The footer carries the id; a regression test asserts it on the error path. |
 
 ## Scope
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A | PPW-9521 |  | not needed (fixture) |
+| A | PPW-9525 |  | not needed (fixture) |
 
 ## Decisions
 
-### Render the id, do not log it twice (PPW-9521)
+### Render the id, do not log it twice (PPW-9525)
 
 The id is already on the request log; the page needs it so a user can quote it.

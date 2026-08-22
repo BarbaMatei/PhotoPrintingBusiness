@@ -10,11 +10,11 @@ updated: 2026-08-22
 
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
-| PPW-9521 | 🟡 | v1 | The upload error page drops the correlation id |  | verified |  |
+| PPW-9525 | 🟡 | v1 | The upload error page drops the correlation id |  | verified |  |
 
 ## Details
 
-### PPW-9521 — The upload error page drops the correlation id
+### PPW-9525 — The upload error page drops the correlation id
 
 - **What:** The page renders without the id, so a user's report cannot be traced to a request.
 - **Evidence:** .

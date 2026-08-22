@@ -21,7 +21,7 @@ tests: { dotnet: "12/12", frontend: "4/4" }
 
 | ID | Sev | Title | File | Fix now? |
 |---|---|---|---|---|
-| PPW-9521 | 🟡 | The upload error page drops the correlation id |  | yes |
+| PPW-9525 | 🟡 | The upload error page drops the correlation id |  | yes |
 
 ## Refuted
 

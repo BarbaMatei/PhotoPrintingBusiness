@@ -1074,6 +1074,11 @@ Fixture copy: one conforming row.
     r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('sweep before certification — 2 open mediums must drain') && r.out.includes('PPW-9521'), r.out.trim())
 }
 {
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '952-patch-grade-clean-ledger', 'decide', 'delta-worthiness'])
+  check('a patch-grade round with a clean ledger still certifies at the delta-worthiness gate',
+    r.code === 0 && r.out.includes('NEXT: certification'), r.out.trim())
+}
+{
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '942-resolved-unverified', 'decide', 'certification-go-ahead'])
   check('the ledger guard stands down while a resolved round awaits its verification',
     !r.out.includes('the loop is armed') && !r.out.includes('sweep before certification'), r.out.trim())
