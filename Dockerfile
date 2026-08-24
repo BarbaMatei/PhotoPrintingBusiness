@@ -28,7 +28,7 @@ RUN npm run build -- --configuration=production
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 # curl for HEALTHCHECK; non-root runtime user. icu-libs + icu-data-full because this base
 # image ships no ICU and the invoice PDF renders in ro-RO; icu-libs alone pulls the
-# English-only data set, which prints 1,234.56 on a fiscal invoice without erroring.
+# English-only data set, which carries no Romanian locale data.
 RUN apk add --no-cache curl icu-libs icu-data-full \
  && addgroup -g 1001 app \
  && adduser -D -u 1001 -G app app
