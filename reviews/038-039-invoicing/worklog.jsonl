@@ -330,3 +330,15 @@
 {"t":"2026-08-21T20:41:00+03:00","ev":"pass-records-done","pass":12,"type":"certification","subtype":"certification-single","commit":"090873d","verdict":"request-changes","outcome":"not-certified"}
 {"t":"2026-08-21T20:44:05+03:00","ev":"run-end","passes":3,"parked":0,"note":"certification does not certify; 11 high-severity rows open, 7 owner decisions listed in summary-v12"}
 {"t":"2026-08-21T20:51:20+03:00","ev":"doc-gate","verdict":"approve","pass":12,"note":"judge independently confirmed PPW-579, PPW-584 and PPW-586 against the code and re-derived the severity and id math"}
+{"t":"2026-08-24T11:09:13+03:00","ev":"round-start","round":12,"note":"unattended fix round on review-v12, scope PPW-579 only per owner ruling"}
+{"t":"2026-08-24T11:16:04+03:00","ev":"test-run","round":12,"kind":"red","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdfCultureTests","passed":1,"failed":2,"duration_s":0.14,"note":"csproj and Dockerfile contract tests red before the fix; the ro-RO formatting test passes on an ICU host"}
+{"t":"2026-08-24T11:19:35+03:00","ev":"test-run","round":12,"kind":"green","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdf","passed":10,"failed":0,"duration_s":0.96}
+{"t":"2026-08-24T11:21:19+03:00","ev":"finding","round":12,"id":"PPW-579","status":"fixed","commit":"8e71c63"}
+{"t":"2026-08-24T11:21:19+03:00","ev":"micro-review-dispatched","round":12,"cluster":"A — production image globalization","commit":"8e71c63"}
+{"t":"2026-08-24T11:26:50+03:00","ev":"micro-review-returned","round":12,"cluster":"A — production image globalization","found":1,"note":"the culture-formatting test passed in both the fixed and broken states; tests retargeted at the shipped runtimeconfig and at the renderer own culture field"}
+{"t":"2026-08-24T11:28:49+03:00","ev":"test-run","round":12,"kind":"red","filter":"InvoicePdfCultureTests (fix reverted to 8e71c63~1)","passed":1,"failed":2,"duration_s":0.15,"note":"runtimeconfig and Dockerfile tests red on the revert; the culture canary passes on an ICU host"}
+{"t":"2026-08-24T11:28:49+03:00","ev":"test-run","round":12,"kind":"final","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdf","passed":10,"failed":0,"duration_s":0.83}
+{"t":"2026-08-24T11:28:50+03:00","ev":"test-run","round":12,"kind":"red","filter":"InvoicePdfCultureTests with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1","passed":2,"failed":1,"duration_s":0.07,"note":"the culture canary fails loudly in an invariant host with TypeInitializationException -> CultureNotFoundException"}
+{"t":"2026-08-24T11:28:50+03:00","ev":"finding","round":12,"id":"PPW-579","status":"fixed","commit":"ed3ce30","note":"micro-review follow-up folded in"}
+{"t":"2026-08-24T11:29:45+03:00","ev":"round-end","round":12,"note":"PPW-579 fixed; 9 other blockers recorded without code — 2 wont-fix on the owner ruling, 7 deferred"}
+{"t":"2026-08-24T11:31:47+03:00","ev":"doc-gate","round":12,"verdict":"clean","note":"doc-gate.mjs 038-039-invoicing 12 clean and doc-gate.mjs state clean; records-auditor reports one error — no pushed ref reaches ed3ce30, because pushing was withheld"}

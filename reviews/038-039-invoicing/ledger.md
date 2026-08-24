@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 038-039-invoicing
-updated: 2026-08-21
+updated: 2026-08-24
 ---
 
 # Ledger — 038-039-invoicing
@@ -118,7 +118,7 @@ updated: 2026-08-21
 | PPW-576 | ⚪ | v9 | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `Controllers/InvoicesController.cs:122` | backlog | `c8d6bb4` |
 | PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
 | PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | verified | `88f5ee6` |
-| PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | open | `090873d` |
+| PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | fixed | `ed3ce30` |
 | PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | wont-fix | `090873d` |
 | PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | wont-fix | `090873d` |
 | PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | open | `090873d` |
@@ -1236,6 +1236,7 @@ updated: 2026-08-21
 - **Suggested fix:** Install icu-libs and set DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false in the Dockerfile (or use an -extra base), and add a test that asserts the renderer works under invariant globalization. **Files:** `Services/Invoicing/InvoicePdfDocument.cs:19`, `Services/Invoicing/InvoicePdfRenderer.cs:23`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:281`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:315`, `Dockerfile:28`, `PhotoPrint.API.csproj:3`. **Path:** Reproduced: with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1, InvoicePdfRendererTests fails with TypeInitializationException -> CultureNotFoundException "Only the invariant culture is supported... ro-ro is an invalid culture identifier" at line 19. Dockerfile's aspnet:8.0-alpine adds no icu-libs; csproj sets no InvariantGlobalization; no compose override. In prod: InvoiceUploadJob:281 Render throws, generic catch :315 records LastError, releases claim, returns — XML built, PDF and ANAF upload never happen, retried every tick forever. **Test shape:** InvoicePdfRendererTests.Renders_under_invariant_globalization: arrange a child dotnet run (or test host) with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1; act Render(order, invoice, seller); assert bytes start "%PDF" — today throws TypeInitializationException/CultureNotFoundException. **Trigger-list-shaped:** no (a base-image and configuration change plus a renderer test) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — correctness, convergence 1, verdict confirmed
+  - v12: fix round — the runtime stage installs `icu-libs` and `icu-data-full`, the stage's `ENV` turns the base image's invariant flag off, and the API's runtimeconfig pins `System.Globalization.Invariant` false, which a probe showed outranks the environment variable; the culture stays `ro-RO` on the owner's ruling. Two tests hold the shipped runtimeconfig and the runtime stage and were red on the revert; a third reads the renderer's culture by reflection and reddens in any invariant host (resolution-v12, commits `8e71c63` and `ed3ce30`)
 
 ### PPW-580 — One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing
 
