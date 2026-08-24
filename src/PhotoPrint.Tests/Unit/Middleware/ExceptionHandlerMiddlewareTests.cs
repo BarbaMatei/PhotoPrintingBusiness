@@ -247,7 +247,7 @@ public class ExceptionHandlerMiddlewareTests
         var sut = CreateSut();
         var context = CreateContext();
         RequestDelegate next = _ =>
-            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+            throw new IdempotencyConflictException(new[] { "deliveryType", "totalRon" });
 
         // Act
         await sut.InvokeAsync(context, next);
@@ -257,7 +257,7 @@ public class ExceptionHandlerMiddlewareTests
         var body = await ReadResponseBodyAsync(context);
         var fields = body.RootElement.GetProperty("divergentFields")
             .EnumerateArray().Select(e => e.GetString()).ToArray();
-        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+        fields.Should().BeEquivalentTo("deliveryType", "totalRon");
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class ExceptionHandlerMiddlewareTests
         var sut = CreateSut();
         var context = CreateContext();
         RequestDelegate next = _ =>
-            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+            throw new IdempotencyConflictException(new[] { "deliveryType", "totalRon" });
 
         // Act
         await sut.InvokeAsync(context, next);
@@ -281,7 +281,7 @@ public class ExceptionHandlerMiddlewareTests
         body.RootElement.TryGetProperty("divergentFields", out var divergent)
             .Should().BeTrue("the 409 contract field must be present in Development too (OBS-1)");
         var fields = divergent.EnumerateArray().Select(e => e.GetString()).ToArray();
-        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+        fields.Should().BeEquivalentTo("deliveryType", "totalRon");
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public class ExceptionHandlerMiddlewareTests
         var sut = CreateSut();
         var context = CreateContext();
         RequestDelegate next = _ =>
-            throw new IdempotencyConflictException(new[] { "paymentProcessor" });
+            throw new IdempotencyConflictException(new[] { "deliveryType" });
 
         await sut.InvokeAsync(context, next);
 

@@ -54,7 +54,6 @@ public class BackfillCommandTests
             Id = Guid.NewGuid(),
             OrderNumber = "FT-" + Random.Shared.Next(100_000, 999_999),
             Status = status,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Easybox,
             ShippingAddress = new ShippingAddressSnapshot
             {

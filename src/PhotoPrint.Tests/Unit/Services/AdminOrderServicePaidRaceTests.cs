@@ -52,7 +52,6 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         => new(
             db,
             _email.Object,
-            Mock.Of<IEuPlatescService>(),
             Mock.Of<Stripe.IStripeClient>(),
             Mock.Of<IStorageRouter>(),
             Mock.Of<IOriginalPurger>(),
@@ -71,13 +70,13 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
             TimeProvider.System,
             NullLogger<InvoiceCreationService>.Instance);
 
-    private async Task<Guid> SeedAwaitingPaymentAsync(string? euTransactionId = null)
+    private async Task<Guid> SeedAwaitingPaymentAsync(string? paymentIntentId = null)
     {
         var id = Guid.NewGuid();
         using var seed = _database.NewContext();
         var order = TestOrders.Make(id);
         order.Status = OrderStatus.AwaitingPayment;
-        order.EuPlatescTransactionId = euTransactionId;
+        order.PaymentIntentId = paymentIntentId;
         seed.Orders.Add(order);
         await seed.SaveChangesAsync();
         return id;
@@ -210,7 +209,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
     public async Task ManualPaid_WhenInvoiceNumberRetriesExhaust_LeavesTheOrderUnpaidAndAnswersConflict()
     {
         await SeedInvoicedOrderAsync(number: 700);
-        var orderId = await SeedAwaitingPaymentAsync(euTransactionId: "EP-ADMIN-RECONCILE");
+        var orderId = await SeedAwaitingPaymentAsync(paymentIntentId: "pi_admin_reconcile");
 
         using var db = _database.NewContext();
         var numbering = new FixedNumbering(700);
@@ -234,7 +233,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
                  r.Message.StartsWith("admin.order.invoice-number-collision-exhausted", StringComparison.Ordinal) &&
                  r.Message.Contains(order.OrderNumber) &&
                  r.Message.Contains("100") &&
-                 r.Message.Contains("EP-ADMIN-RECONCILE"),
+                 r.Message.Contains("pi_admin_reconcile"),
             "the order number, the total and the payment handles are what a manual reconciliation needs");
         AssertNoPaidSideEffects();
         _clientProxy.Verify(
@@ -311,7 +310,6 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         var services = new ServiceCollection();
         services.AddDbContext<PhotoPrintDbContext>(o => o.UseNpgsql(_database.ConnectionString));
         services.AddSingleton(_email.Object);
-        services.AddSingleton(Mock.Of<IEuPlatescService>());
         services.AddSingleton(Mock.Of<Stripe.IStripeClient>());
         services.AddSingleton(Mock.Of<IStorageRouter>());
         services.AddSingleton(Mock.Of<IOriginalPurger>());

@@ -39,7 +39,6 @@ public class WebhooksControllerBodyLimitTests
         _sut = new WebhooksController(
             new Mock<IOrderService>().Object,
             _stripeVerifier.Object,
-            new Mock<IEuPlatescService>().Object,
             db,
             new Mock<IOrderEmailService>().Object,
             new Mock<IOrderPhotoPromoter>().Object,
@@ -47,7 +46,6 @@ public class WebhooksControllerBodyLimitTests
             new Mock<IInvoiceCreationService>().Object,
             new Mock<IHubContext<AdminOrderHub>>().Object,
             Options.Create(new StripeSettings { WebhookSecret = "whsec_test" }),
-            Options.Create(new EuPlatescSettings { SecretKey = "00112233445566778899aabbccddeeff", MerchantId = "M1" }),
             _logs.LoggerFor<WebhooksController>());
     }
 
@@ -172,7 +170,6 @@ public class WebhooksControllerBodyLimitTests
 
     [Theory]
     [InlineData(nameof(WebhooksController.StripeWebhookAsync))]
-    [InlineData(nameof(WebhooksController.EuPlatescIpnAsync))]
     public void Every_anonymous_webhook_action_caps_its_request_body(string action)
     {
         var method = typeof(WebhooksController).GetMethod(action)!;

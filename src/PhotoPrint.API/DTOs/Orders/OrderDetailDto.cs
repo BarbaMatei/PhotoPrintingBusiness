@@ -13,7 +13,6 @@ public record OrderDetailDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
     string DeliveryType,
-    string PaymentProcessor,
     Guid? LockerId,
     string? LockerName,
     string? LockerAddress,

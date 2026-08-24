@@ -12,7 +12,6 @@ public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderR
 
     public CreateOrderRequestValidator()
     {
-        RuleFor(x => x.PaymentProcessor).IsInEnum();
         RuleFor(x => x.DeliveryType).IsInEnum();
 
         When(x => x.DeliveryType == DeliveryType.Easybox, () =>

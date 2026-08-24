@@ -200,12 +200,6 @@ builder.Services
     .Validate(s => !paymentsRequired || !string.IsNullOrWhiteSpace(s.SecretKey),
         "Stripe:SecretKey is required in Production.")
     .ValidateOnStart();
-builder.Services
-    .AddOptions<PhotoPrint.API.Configuration.EuPlatescSettings>()
-    .Bind(builder.Configuration.GetSection(PhotoPrint.API.Configuration.EuPlatescSettings.SectionName))
-    .Validate(s => !paymentsRequired || (!string.IsNullOrWhiteSpace(s.MerchantId) && !string.IsNullOrWhiteSpace(s.SecretKey)),
-        "EuPlatesc:MerchantId and EuPlatesc:SecretKey are required in Production.")
-    .ValidateOnStart();
 builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 {
     var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.StripeSettings>>().Value;
@@ -213,7 +207,6 @@ builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 });
 builder.Services.AddScoped<PhotoPrint.API.Services.IStripePaymentGateway, PhotoPrint.API.Services.StripePaymentGateway>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IStripeSignatureVerifier, PhotoPrint.API.Services.StripeSignatureVerifier>();
-builder.Services.AddScoped<PhotoPrint.API.Services.IEuPlatescService, PhotoPrint.API.Services.EuPlatescService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderService, PhotoPrint.API.Services.OrderService>();
 
 // ── Invoicing ─────────────────────────────────────────────────────────────────

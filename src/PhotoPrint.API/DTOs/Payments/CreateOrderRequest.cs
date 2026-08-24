@@ -6,7 +6,6 @@ namespace PhotoPrint.API.DTOs.Payments;
 /// Carries delivery/shipping details when creating an order from the current cart.
 /// </summary>
 public record CreateOrderRequest(
-    PaymentProcessor PaymentProcessor,
     DeliveryType DeliveryType,
     Guid? EasyboxLockerId,
     ShippingAddressSnapshot? ShippingAddress

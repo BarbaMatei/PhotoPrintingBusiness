@@ -21,7 +21,6 @@ public class PaymentIdempotencyRelationalTests : IClassFixture<PostgresPaymentFa
     // Courier delivery avoids the Order → EasyboxLocker FK (PostgreSQL enforces it), so the
     // only constraint the second tenant's INSERT can violate is the unique idempotency index.
     private static readonly CreateOrderRequest CourierStripeRequest = new(
-        PaymentProcessor: PaymentProcessor.Stripe,
         DeliveryType: DeliveryType.Courier,
         EasyboxLockerId: null,
         ShippingAddress: new ShippingAddressSnapshot

@@ -176,7 +176,7 @@ public sealed class InvoicePdfDocument : IDocument
                 r.RelativeItem().AlignRight().Text("Total de plată:").Bold();
                 r.ConstantItem(80).AlignRight().Text($"{_invoice.TotalRon.ToString("N2", Ro)} RON").Bold();
             });
-            col.Item().PaddingTop(5).Text($"Plată: {_order.PaymentProcessor}").FontSize(9);
+            col.Item().PaddingTop(5).Text("Plată: Stripe").FontSize(9);
             if (!string.IsNullOrWhiteSpace(_order.AwbNumber))
                 col.Item().Text($"AWB: {_order.AwbNumber}").FontSize(9);
         });

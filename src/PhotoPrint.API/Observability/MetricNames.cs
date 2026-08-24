@@ -34,9 +34,8 @@ public static class MetricNames
     public static class ProcessorValues
     {
         public const string Stripe    = "stripe";
-        public const string EuPlatesc = "euplatesc";
 
-        public static readonly string[] All = [Stripe, EuPlatesc];
+        public static readonly string[] All = [Stripe];
     }
 
     public static class OrderStatusValues

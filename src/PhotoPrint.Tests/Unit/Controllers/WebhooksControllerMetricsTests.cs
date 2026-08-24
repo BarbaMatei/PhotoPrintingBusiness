@@ -22,11 +22,8 @@ namespace PhotoPrint.Tests.Unit.Controllers;
 // denominator, so the payment SLO reads 100% while customers are losing money.
 public class WebhooksControllerMetricsTests
 {
-    private const string SecretKeyHex = "00112233445566778899aabbccddeeff";
-
     private readonly Mock<IOrderService> _orderService = new();
     private readonly Mock<IStripeSignatureVerifier> _stripeVerifier = new();
-    private readonly Mock<IEuPlatescService> _euPlatesc = new();
     private readonly Mock<IOrderEmailService> _emailSvc = new();
     private readonly Mock<IOrderPhotoPromoter> _promoter = new();
     private readonly Mock<IAwbCreationNotifier> _awbNotifier = new();
@@ -62,7 +59,6 @@ public class WebhooksControllerMetricsTests
         _sut = new WebhooksController(
             _orderService.Object,
             _stripeVerifier.Object,
-            _euPlatesc.Object,
             _db,
             _emailSvc.Object,
             _promoter.Object,
@@ -70,7 +66,6 @@ public class WebhooksControllerMetricsTests
             _invoiceCreator.Object,
             _hub.Object,
             Options.Create(new StripeSettings { WebhookSecret = "whsec_test" }),
-            Options.Create(new EuPlatescSettings { SecretKey = SecretKeyHex, MerchantId = "M1" }),
             _logs.LoggerFor<WebhooksController>());
     }
 
@@ -83,7 +78,6 @@ public class WebhooksControllerMetricsTests
             Id = Guid.NewGuid(),
             OrderNumber = $"FT-{Random.Shared.Next(100_000, 999_999)}",
             Status = status,
-            PaymentProcessor = PaymentProcessor.EuPlatesc,
             DeliveryType = DeliveryType.Courier,
             TotalRon = total,
             ShippingAddress = new ShippingAddressSnapshot
@@ -98,35 +92,6 @@ public class WebhooksControllerMetricsTests
         _orderService.Setup(s => s.GetByIdAsync(order.Id, It.IsAny<CancellationToken>()))
                      .ReturnsAsync(order);
         return order;
-    }
-
-    private static FormCollection SignedIpn(Guid orderId, string action, decimal amount)
-    {
-        var fields = new Dictionary<string, string>
-        {
-            ["amount"] = amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
-            ["curr"] = "RON",
-            ["invoice_id"] = orderId.ToString(),
-            ["ep_id"] = "EP-1",
-            ["merch_id"] = "M1",
-            ["action"] = action,
-            ["message"] = "",
-            ["approval"] = "",
-            ["timestamp"] = "20260803120000",
-            ["nonce"] = "abc",
-        };
-
-        var ordered = new[]
-        {
-            "amount", "curr", "invoice_id", "ep_id",
-            "merch_id", "action", "message", "approval",
-            "timestamp", "nonce",
-        };
-        fields["fp"] = EuPlatescService.ComputeHmac(
-            SecretKeyHex, ordered.Select(k => fields[k]).ToArray());
-
-        return new FormCollection(
-            fields.ToDictionary(kvp => kvp.Key, kvp => new Microsoft.Extensions.Primitives.StringValues(kvp.Value)));
     }
 
     private void StripeEventIs(string type) =>
@@ -152,48 +117,22 @@ public class WebhooksControllerMetricsTests
     private PhotoPrintDbContext FreshDb() =>
         new(new DbContextOptionsBuilder<PhotoPrintDbContext>().UseInMemoryDatabase(_dbName).Options);
 
-    // ── EuPlatesc fall-through: the charged-but-unpaid case ───────────────────
+    // ── Stripe succeeded: the happy path records ok ───────────────────────────
 
     [Fact]
-    public async Task EuPlatesc_paid_notification_for_a_cancelled_order_records_failed_and_logs_error()
-    {
-        var order = SeedOrder(OrderStatus.Cancelled);
-        using var metrics = Capture();
-
-        await _sut.EuPlatescIpnAsync(SignedIpn(order.Id, action: "0", order.TotalRon), default);
-
-        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
-                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
-                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Failed))
-            .Should().HaveCount(1, "a customer charged for an order that cannot become Paid must enter the SLO denominator");
-        metrics.ContractViolations().Should().BeEmpty();
-
-        _logs.Records.Should().Contain(r =>
-            r.Level == Microsoft.Extensions.Logging.LogLevel.Error &&
-            r.Message.Contains("customer charged"));
-    }
-
-    [Fact]
-    public async Task EuPlatesc_failure_notification_for_a_paid_order_records_exactly_one_increment()
-    {
-        var order = SeedOrder(OrderStatus.Paid);
-        using var metrics = Capture();
-
-        await _sut.EuPlatescIpnAsync(SignedIpn(order.Id, action: "1", order.TotalRon), default);
-
-        metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);
-        metrics.ContractViolations().Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task EuPlatesc_paid_notification_for_an_awaiting_order_still_records_ok()
+    public async Task Stripe_succeeded_for_an_awaiting_order_records_ok()
     {
         var order = SeedOrder(OrderStatus.AwaitingPayment);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_ok", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_ok");
         using var metrics = Capture();
 
-        await _sut.EuPlatescIpnAsync(SignedIpn(order.Id, action: "0", order.TotalRon), default);
+        await _sut.StripeWebhookAsync(default);
 
         metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Ok))
             .Should().HaveCount(1);
         metrics.ContractViolations().Should().BeEmpty();
@@ -301,29 +240,6 @@ public class WebhooksControllerMetricsTests
 
         metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
                 (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
-                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Duplicate))
-            .Should().HaveCount(1, "the order was paid and has simply moved on, so a redelivery is a duplicate");
-        metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);
-        metrics.ContractViolations().Should().BeEmpty();
-
-        _logs.Records.Should().NotContain(r =>
-            r.Level == Microsoft.Extensions.Logging.LogLevel.Error,
-            "a healthy fulfilled order must not raise a reconciliation alert");
-    }
-
-    [Theory]
-    [InlineData(OrderStatus.Printing)]
-    [InlineData(OrderStatus.Shipped)]
-    [InlineData(OrderStatus.Delivered)]
-    public async Task EuPlatesc_paid_notification_for_an_order_past_paid_records_duplicate(OrderStatus status)
-    {
-        var order = SeedOrder(status);
-        using var metrics = Capture();
-
-        await _sut.EuPlatescIpnAsync(SignedIpn(order.Id, action: "0", order.TotalRon), default);
-
-        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
-                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
                 (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Duplicate))
             .Should().HaveCount(1, "the order was paid and has simply moved on, so a redelivery is a duplicate");
         metrics.For(MetricNames.Instruments.PaymentWebhookTotal).Should().HaveCount(1);

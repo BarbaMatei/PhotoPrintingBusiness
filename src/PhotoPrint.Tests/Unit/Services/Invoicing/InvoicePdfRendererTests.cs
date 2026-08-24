@@ -43,7 +43,6 @@ public class InvoicePdfRendererTests
             OrderNumber = "FT-12345",
             Status = OrderStatus.Paid,
             PaidAt = new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero),
-            PaymentProcessor = PaymentProcessor.Stripe,
             UserId = Guid.NewGuid(),
             User = new User { Id = Guid.NewGuid(), Email = "x@y.ro", FirstName = "Alex", LastName = "Pop" },
             ShippingAddress = new ShippingAddressSnapshot

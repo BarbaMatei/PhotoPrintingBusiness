@@ -75,7 +75,6 @@ public class WebhooksControllerInvoiceRaceTests : IClassFixture<PostgresTestData
         => new(
             orderService ?? Mock.Of<IOrderService>(),
             stripeVerifier ?? Mock.Of<IStripeSignatureVerifier>(),
-            Mock.Of<IEuPlatescService>(),
             db,
             Mock.Of<IOrderEmailService>(),
             Mock.Of<IOrderPhotoPromoter>(),
@@ -83,7 +82,6 @@ public class WebhooksControllerInvoiceRaceTests : IClassFixture<PostgresTestData
             invoiceCreator,
             Mock.Of<IHubContext<AdminOrderHub>>(),
             Options.Create(new StripeSettings()),
-            Options.Create(new EuPlatescSettings()),
             logCapture is null
                 ? NullLogger<WebhooksController>.Instance
                 : logCapture.LoggerFor<WebhooksController>());
@@ -250,7 +248,7 @@ public class WebhooksControllerInvoiceRaceTests : IClassFixture<PostgresTestData
 
         using var db = CreateDb();
         var order = await db.Orders.FirstAsync(o => o.Id == orderId);
-        order.EuPlatescTransactionId = "EP-RECONCILE-1";
+        order.PaymentIntentId = "pi_reconcile_1";
         var logs = new LogCapture();
         var hub = new Mock<Sentry.IHub>();
         hub.SetupGet(h => h.IsEnabled).Returns(true);
@@ -269,7 +267,7 @@ public class WebhooksControllerInvoiceRaceTests : IClassFixture<PostgresTestData
                  r.Message.StartsWith("invoice.creation.number-collision-exhausted", StringComparison.Ordinal) &&
                  r.Message.Contains(order.Id.ToString()) &&
                  r.Message.Contains(order.OrderNumber) &&
-                 r.Message.Contains("EP-RECONCILE-1"));
+                 r.Message.Contains("pi_reconcile_1"));
         using var verify = CreateDb();
         (await verify.Invoices.Where(i => i.OrderId == orderId).CountAsync()).Should().Be(0);
     }
