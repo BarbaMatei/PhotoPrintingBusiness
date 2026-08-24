@@ -343,3 +343,5 @@
 {"t":"2026-08-24T11:29:45+03:00","ev":"round-end","round":12,"note":"PPW-579 fixed; 9 other blockers recorded without code — 2 wont-fix on the owner ruling, 7 deferred"}
 {"t":"2026-08-24T11:31:47+03:00","ev":"doc-gate","round":12,"verdict":"clean","note":"doc-gate.mjs 038-039-invoicing 12 clean and doc-gate.mjs state clean; records-auditor reports one error — no pushed ref reaches ed3ce30, because pushing was withheld"}
 {"t":"2026-08-24T12:22:31+03:00","ev":"note","text":"owner triage of 2026-08-24 applied: 13 rows regraded down and backlogged, PPW-600 and PPW-604 regraded up to high, PPW-562 recorded fixed by the peer merge 4dd6763; each ruling is a history line on its ledger row"}
+{"t":"2026-08-24T14:53:04+03:00","ev":"pass-launch","pass":13,"type":"verification"}
+{"t":"2026-08-24T14:53:04+03:00","ev":"pass-records-done","pass":13,"type":"verification"}

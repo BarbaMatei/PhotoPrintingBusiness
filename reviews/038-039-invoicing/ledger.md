@@ -52,7 +52,7 @@ updated: 2026-08-24
 | PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | verified | `07b0c1b` |
 | PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | open | `08e7746` |
 | PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | open | `08e7746` |
-| PPW-511 | 🟡 | v5 | EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | open | `07b0c1b` |
+| PPW-511 | 🟡 | v5 | EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | fixed | `06fd2b1` |
 | PPW-512 | 🔴 | v6 | Easybox orders emit e-Factura with empty mandatory buyer address elements | `Services/Invoicing/InvoiceXmlBuilder.cs:121` | verified | `2979ea0` |
 | PPW-513 | 🔴 | v6 | uq_invoices_series_year_number index expression is not IMMUTABLE, so Postgres aborts Migrate() at prod boot | `Migrations/20260603101910_AddVatAndInvoices.cs:112` | verified | `2979ea0` |
 | PPW-514 | 🔴 | v6 | Exhausted-retry rollback reload discards the processor transaction id and the Error log omits it | `Controllers/WebhooksController.cs:427` | verified | `2979ea0` |
@@ -118,11 +118,11 @@ updated: 2026-08-24
 | PPW-576 | ⚪ | v9 | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `Controllers/InvoicesController.cs:122` | backlog | `c8d6bb4` |
 | PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
 | PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | verified | `88f5ee6` |
-| PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | fixed | `ed3ce30` |
+| PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | verified | `06fd2b1` |
 | PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | wont-fix | `090873d` |
 | PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | wont-fix | `090873d` |
 | PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | open | `090873d` |
-| PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | open | `090873d` |
+| PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | fixed | `06fd2b1` |
 | PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | open | `090873d` |
 | PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | open | `090873d` |
 | PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | open | `090873d` |
@@ -148,7 +148,7 @@ updated: 2026-08-24
 | PPW-606 | ⚪ | v12 | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `Services/Invoicing/InvoiceCreationService.cs:98` | backlog | `090873d` |
 | PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | open | `090873d` |
 | PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | open | `090873d` |
-| PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | open | `090873d` |
+| PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | fixed | `06fd2b1` |
 | PPW-610 | 🟡 | v12 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:133` | backlog | `090873d` |
 | PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | open | `090873d` |
 | PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | open | `090873d` |
@@ -597,6 +597,7 @@ updated: 2026-08-24
 - **Suggested fix:** Record the removal as one work item, and until it lands add one line to `definition-of-done.md` class 2 naming EuPlatesc coverage as an accepted divergence with its expiry. `system-architecture.md` still presents EuPlatesc as a current payment backend, so it needs the same line — CLAUDE.md requires a standard to be updated in the change that alters what it describes. Docs and tracking only; no code change, and the removal ruling itself is not in question.
 - **History:**
   - v5: found by the verification pass checking whether the owner ruling that dropped PPW-508 EuPlatesc leg is recorded anywhere as work. It is not, and the standard that mandates the coverage still reads as if it were being met
+  - v13: fixed @`06fd2b1` — the removal this row existed to track happened in PR #13, so the untracked-removal gap it named is closed
 
 ### PPW-512 — Easybox orders emit e-Factura with empty mandatory buyer address elements
 
@@ -760,6 +761,7 @@ updated: 2026-08-24
   - v6: re-affirmed @`2979ea0` — the owner ruling stands, and the untracked-removal gap stays tracked via open PPW-511
   - v9: re-raised by the delta pass — completeness-critic, convergence 1, skeptics skipped as a decided re-raise. Prior decision, verbatim from the v6 line above: "fix round — wont-fix on the owner ruling that EuPlatesc is being removed; PPW-511 tracks that the removal is untracked". Re-affirmed at `c8d6bb4`: the ruling stands, PPW-511 is still open, and the new fact this pass adds is that both webhook legs now share one failure-metric wrapper whose EuPlatesc half answers a different response contract — still waived with the integration
   - v12: re-raised by the certification pass — tests-coverage, convergence 1, verdict re-raise. Prior decision: PPW-526 wont-fix: owner ruled EuPlatesc is being removed; PPW-511 tracks that the removal is written down nowhere. Matched on same untested EuPlatesc paid leg
+  - v13: the waiver this row rests on is now moot — PR #13 deleted the EuPlatesc webhook leg whose coverage was waived, so there is no untested code left behind the ruling. Status stays wont-fix, the owner ruling that closed it
 
 ### PPW-527 — Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook
 
@@ -1240,6 +1242,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — correctness, convergence 1, verdict confirmed
   - v12: fix round — the runtime stage installs `icu-libs` and `icu-data-full`, the stage's `ENV` turns the base image's invariant flag off, and the API's runtimeconfig pins `System.Globalization.Invariant` false, which a probe showed outranks the environment variable; the culture stays `ro-RO` on the owner's ruling. Two tests hold the shipped runtimeconfig and the runtime stage and were red on the revert; a third reads the renderer's culture by reflection and reddens in any invariant host (resolution-v12, commits `8e71c63` and `ed3ce30`)
+  - v13: verified @`06fd2b1` — revert-and-rerun (isolated worktree, commits `8e71c63` and `ed3ce30`) reddened `InvoicePdfCultureTests` and the restore greened it. The image package names remain unproven: no Docker on this machine, so a wrong name fails the deploy image build rather than shipping broken
 
 ### PPW-580 — One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing
 
@@ -1278,6 +1281,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (keep the panel in the DOM, but `[hidden]` alone is a no-op because the panel class sets `display: flex`, and a remount without a destroy leaks an orphaned Stripe iframe per toggle. Mount through a view-child element reference with an idempotent guard. The same commit must wrap the confirm call in try/catch/finally: the stuck spinner is reachable without switching tabs, and an unhandled rejection breaks the new spec's stability wait. The drafted spec cannot run — there is no seam for a fake Stripe, so the module needs mocking; today the card element is mounted zero times in specs, and two existing specs pass for the wrong reason)
+  - v13: fixed @`06fd2b1` — retired by deletion, not repaired: PR #13 removed the second payment processor, so the checkout has no tab switcher and no destroyed-element path. Nothing verifies it, because the surface it described no longer exists
 
 ### PPW-584 — SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount
 
@@ -1500,6 +1504,7 @@ updated: 2026-08-24
 - **Suggested fix:** Branch on HttpErrorResponse status, surface the API ProblemDetails detail/divergentFields, add a retry button, and show a message on the EuPlatesc error path. **Files:** `src/app/features/checkout/pages/payment-step.ts:188`, `src/app/features/checkout/pages/payment-step.ts:54`, `src/app/features/checkout/pages/payment-step.ts:235`, `src/app/core/interceptors/error.interceptor.ts:35`, `src/app/core/services/payment.service.ts:18`. **Path:** Delivery complete, Stripe loads, POST /payments/stripe/intent returns 409 (idempotency divergence). error handler (188) sets "Verificați că aveți articole în coș."; stripeReady stays false, so "Plătește acum" is permanently disabled (54) with no retry. Switching to EuPlatesc and clicking gives the same 409: handler (235-237) only clears the spinner, and errorInterceptor toasts only 403/5xx/status-0, so nothing is shown. 500/network do get a generic toast. **Test shape:** payment-step.spec.ts: "surfaces the server reason on intent 409 and on EuPlatesc failure". Arrange delivery-complete state, flush POST 409 with divergentFields. Assert error text is not the cart string and pay is retryable; on EuPlatesc click + 409, assert a visible error. **Trigger-list-shaped:** yes (a payment-step error state machine) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: fixed @`06fd2b1` — retired by deletion: with one processor there is no shared error string to mislabel, and the EuPlatesc branch it named is gone
 
 ### PPW-610 — The invoice-number-exhausted 409 message is replaced by a generic admin failure toast
 
@@ -1549,6 +1554,7 @@ updated: 2026-08-24
 - **Suggested fix:** Wrap the await in try/catch that clears stripeLoading and shows an error, and add an else branch messaging any status other than 'succeeded'. **Files:** `src/app/features/checkout/pages/payment-step.ts:213`, `src/app/features/checkout/pages/payment-step.ts:217`, `src/app/features/checkout/pages/payment-step.ts:219`, `src/app/features/checkout/pages/payment-step.ts:46`, `src/app/features/checkout/pages/payment-step.ts:200`, `Services/StripePaymentGateway.cs:21`. **Path:** Line 213 awaits confirmCardPayment with no try/catch: any rejection skips line 217, so stripeLoading stays true and the button is disabled forever with no message. Reachable trigger: switch to EuPlatesc and back — *ngIf (line 46) destroys #stripe-card-element while stripeReady stays true, so pay runs against a detached element and Stripe rejects. Resolved 'processing' also falls through silently. 'requires_capture' is unreachable (no CaptureMethod set, StripePaymentGateway.cs:21). **Test shape:** payment-step.spec.ts: inject fake stripeInstance/cardElement; confirmCardPayment rejects (and a second case resolves status 'processing'); await payWithStripe(); expect stripeLoading() false and stripeError() non-null. Both fail today. **Trigger-list-shaped:** yes (adds the missing catch and status branches to the pay state machine) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: partly retired by PR #13 — the tab-switch path that detached the mounted Stripe element is gone with the second processor. The finding stays open on its other path: a Stripe result that is neither succeeded nor an error still leaves the customer with no feedback
 
 ### PPW-616 — Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in
 
