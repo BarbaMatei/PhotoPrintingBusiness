@@ -4,6 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Not the default it looks like: this emits the runtimeconfig switch, which outranks
+         the Alpine base image's DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true. Without it the
+         ro-RO invoice culture is unavailable and every invoice PDF render throws. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

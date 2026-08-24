@@ -67,7 +67,7 @@ are on you**.
 
 | File | Role |
 |------|------|
-| `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. |
+| `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. The runtime stage installs `icu-libs` + `icu-data-full` and sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, because the invoice PDF is rendered in `ro-RO` (§15.1) and the Alpine base ships no ICU at all. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
 | `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
 | `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
@@ -213,6 +213,7 @@ backwards-compatible migrations.
 | Migration error on first PG connect | Role lacks DDL rights, or a partially-created schema | Confirm the role owns the database, then re-run against a scratch Postgres per §7. |
 | Uploaded images vanish on redeploy | `Storage` not on a volume | Confirm the `apidata:/app/Storage` volume in `docker-compose.prod.yml`. |
 | Site shows API 404 instead of the app | UI not built into `wwwroot` (image built without the UI stage) | Rebuild with the standard `Dockerfile`; the `ui-build` stage populates `wwwroot`. |
+| Every invoice sits at `Pending` with no PDF, and `GET /api/orders/{id}/invoice` 404s forever. `Invoice.LastError` reads "The type initializer for … `InvoicePdfDocument` threw an exception"; the `anaf.upload-job.build-failed` log line carries a `CultureNotFoundException` | The image is running in globalization-invariant mode, so the `ro-RO` invoice culture does not exist | Rebuild with the standard `Dockerfile` (it installs `icu-libs` + `icu-data-full`), and make sure nothing in the server `.env` or a compose `environment:` block sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT`. The API's own `runtimeconfig` pins it off, which outranks the variable. The stuck rows are still `Pending`, so they file themselves on the next worker tick — no admin retry needed. |
 
 ---
 
@@ -1286,7 +1287,7 @@ For every paid order the API:
 2. **Allocates an invoice number** inside the payment webhook's existing transaction (bolt 039), via `IInvoiceNumberingService.NextNumberAsync("FT", year)`, which uses `nextval()` on a per-`(series, year)` `SEQUENCE`. The number is `FT-YYYY-NNNNN`. See [ADR-020](../memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md) for the gap-on-rollback trade-off and the quarterly audit (§15.8).
 3. **Inserts the `Invoice` row** in the same transaction as the Order → Paid transition. The Invoice is the frozen legal artefact; the Order can be modified later (admin notes, status corrections) but the Invoice's monetary snapshot is immutable.
 4. **Builds a UBL 2.1 + CIUS-RO compliant XML payload** ([`InvoiceXmlBuilder`](../src/PhotoPrint.API/Services/Invoicing/InvoiceXmlBuilder.cs)) asynchronously via `InvoiceUploadJob`. Stored on `Invoice.XmlPayload`.
-5. **Renders a customer-facing PDF** ([`InvoicePdfRenderer`](../src/PhotoPrint.API/Services/Invoicing/InvoicePdfRenderer.cs)) via QuestPDF; stores it via `IStorageService` at `invoices/yyyy/MM/{InvoiceNumber}.pdf`. See [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md) for why QuestPDF over PuppeteerSharp.
+5. **Renders a customer-facing PDF** ([`InvoicePdfRenderer`](../src/PhotoPrint.API/Services/Invoicing/InvoicePdfRenderer.cs)) via QuestPDF; stores it via `IStorageService` at `invoices/yyyy/MM/{InvoiceNumber}.pdf`. See [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md) for why QuestPDF over PuppeteerSharp. Dates and amounts print in `ro-RO` (`03 august 2026`, `1.234,56`), so the host must carry real ICU data — the image installs it and pins globalization-invariant mode off (§2); a host without it renders no PDF at all (§10).
 6. **Uploads the XML to ANAF SPV** via OAuth 2 client-credentials + PKCS#12 client cert, polls for status, and lands the invoice in `Accepted` / `Rejected` / `Failed`. `InvoiceUploadJob : BackgroundService` runs every 30 minutes by default.
 7. **Exposes admin tooling** at `/api/admin/invoices` — list, retry, raw-XML download.
 

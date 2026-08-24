@@ -26,8 +26,10 @@ RUN npm run build -- --configuration=production
 
 # ── Stage 3: runtime ───────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
-# curl for HEALTHCHECK; non-root runtime user.
-RUN apk add --no-cache curl \
+# curl for HEALTHCHECK; non-root runtime user. icu-libs + icu-data-full because this base
+# image ships no ICU and the invoice PDF renders in ro-RO; icu-libs alone pulls the
+# English-only data set, which prints 1,234.56 on a fiscal invoice without erroring.
+RUN apk add --no-cache curl icu-libs icu-data-full \
  && addgroup -g 1001 app \
  && adduser -D -u 1001 -G app app
 WORKDIR /app
@@ -39,7 +41,8 @@ USER app
 EXPOSE 8080
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080 \
-    DatabaseProvider=Postgres
+    DatabaseProvider=Postgres \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://localhost:8080/health || exit 1
 ENTRYPOINT ["dotnet", "PhotoPrint.API.dll"]
