@@ -1,4 +1,4 @@
----
+---|||||| fixed | `06fd2b1` 
 type: review-ledger
 target: 035-payment-idempotency
 updated: 2026-08-11
@@ -511,6 +511,7 @@ closed: 2026-08-11 — retroactive owner sign-off (resolution loop complete at v
   - 2026-08-11: row carried to the backlog under its old name BUG-2
   - 2026-08-21: unblocked, still open @`90b5683` — PPW-36 is fixed, so the Postgres path this row's
     row-lock fix was waiting on now exists. The defect itself is unchanged
+  - post-close: fixed @`06fd2b1` — the replay path was deleted with the EuPlatesc processor (PR #13, recorded at 038-039 v13), so the defect has no code left; noted here because a backlog row leaves the queue only after its home row records the state
 
 ### PPW-41 — The key is never trimmed, so a padded copy of the same key creates a second order and a second charge
 

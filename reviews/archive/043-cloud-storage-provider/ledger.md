@@ -1094,6 +1094,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 - **History:**
   - v9: found — coverage sibling of PPW-208
   - 2026-07-27: owner ruled wont-fix — the EuPlatesc gateway is slated for removal, so its coverage is not worth building
+  - post-close: the waiver is moot @`06fd2b1` — the EuPlatesc notification path whose test was waived was deleted with the processor (PR #13). Status stays wont-fix, the ruling that closed it
 
 ### PPW-234 — The backfill command was outside the review file list, and backfill against the live worker is untested
 
