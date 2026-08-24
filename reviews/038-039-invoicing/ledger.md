@@ -119,13 +119,13 @@ updated: 2026-08-21
 | PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
 | PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | verified | `88f5ee6` |
 | PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | open | `090873d` |
-| PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | open | `090873d` |
-| PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | open | `090873d` |
+| PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | wont-fix | `090873d` |
+| PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | wont-fix | `090873d` |
 | PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | open | `090873d` |
 | PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | open | `090873d` |
 | PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | open | `090873d` |
-| PPW-585 | 🔴 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | open | `090873d` |
-| PPW-586 | 🔴 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | open | `090873d` |
+| PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | open | `090873d` |
+| PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | open | `090873d` |
 | PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | open | `090873d` |
 | PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | open | `090873d` |
 | PPW-589 | 🟠 | v12 | nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | open | `090873d` |
@@ -1245,6 +1245,7 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (the separate caps are right but aimed at the wrong trigger — 50 healthy in-progress rows starve Pending with no failure at all, because the poll writes nothing on an in-progress answer, and ordering by CreatedAt is the root cause. Order the Submitted query by UpdatedAt ascending and stamp UpdatedAt on every poll outcome, instead of using LastError as a scheduler. Record genuine poll failures through `IInvoiceLifecycle.RecordErrorAsync`, never a raw `ExecuteUpdateAsync`, or four existing tests break on the cooldown they do not advance. Per-tick ANAF fan-out becomes the sum of both caps, so the MaxBatchSize doc comment changes with it. claim-lost and row-missing stay exempt. The suite is real PostgreSQL per test and `Build` takes no batch-size parameter, so seed two Submitted rows and one Pending, not fifty)
+  - v12: owner ruled wont-fix on 2026-08-22 — reaching it needs the tax authority to keep erroring on stareMesaj until 50 rows are stuck, and he accepts that risk rather than pay for the fix now; the consequence if it happens is that newly paid invoices stop being filed
 
 ### PPW-581 — Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick
 
@@ -1254,6 +1255,7 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (the re-map does reach the alert on every leg — nothing swallows it — but classify by status, not by the error body the provider deliberately never reads: 400, 401 and 403 are auth; 408, 429, 5xx and transport stay unreachable, or a rate-limit answer pages as a dead credential. `AnafAuthException` has one constructor, hardcoding "ANAF returned 401 twice", so LastError and Sentry would lie about a rejected secret or a certificate failure until it takes a reason and an inner exception. The token client sits outside the Polly pipeline, SPV 403 is still unclassified, and the batch loop still needs its own unreachable arm. The drafted unit test is unwritable — the provider builds its own HttpClient and loads a real certificate — and the job-level test passes with the fix reverted)
+  - v12: owner ruled wont-fix on 2026-08-22 — reaching it needs revoked or expired ANAF credentials, and he accepts that risk; the consequence if it happens is that a credential outage pages nobody and shows only generic row failures
 
 ### PPW-582 — Confirmation page races the payment webhook and redirects the paying customer home
 
@@ -1289,6 +1291,7 @@ updated: 2026-08-21
 - **Suggested fix:** Render the address on recapitulare for both methods (labelled billing for Easybox) and retarget the spec; refresh its Easybox fixtures that still use shippingAddress: null. **Files:** `src/app/features/checkout/pages/review-step.spec.ts:126`, `src/app/features/checkout/pages/review-step.ts:43`, `src/app/features/checkout/pages/delivery-step.ts:357`, `src/app/features/checkout/pages/delivery-step.ts:483`, `src/app/core/services/checkout-state.service.ts:39`, `src/app/features/checkout/pages/payment-step.ts:251`. **Path:** Pick Easybox, locker l1, fill address (Timiș/Timișoara). canContinue (delivery-step.ts:357) requires the address; continue() calls setEasyboxAddress, which keeps it. payment-step.ts:251 posts shippingAddress for Easybox too, so it lands on the invoice. But review-step.ts:43 gates the line on method==='Courier', so recapitulare shows only "Easybox — Box A". The spec's own premise is false: setMethod (line 26) clears shippingAddress, so no "leftover courier address" exists — line 146/147 pin real hiding. **Test shape:** ReviewStep spec "renders the fiscal address for an Easybox order": arrange Easybox state with shippingAddress (Timișoara); act createFixture; assert .delivery-summary textContent contains 'Str. Fantoma' and 'Timișoara' — reddens today. **Trigger-list-shaped:** no (renders a value already in state and retargets a spec) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, completeness-critic, convergence 2, verdict confirmed
+  - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the driver checked the code with him and the consequence is that a locker customer cannot proof-read the address printed on the invoice, not money or data loss
 
 ### PPW-586 — Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified
 
@@ -1298,6 +1301,7 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — tests-coverage, completeness-critic, convergence 2, verdict confirmed
   - v12: Approach pre-check: revised (the 403 is real and deterministic, but the fix belongs in the shared claims extension, whose claim scan makes every both-headers caller lose its user id — cart scope, and worse, order attribution, where a signed-in user carrying a stale guest token creates a guest order today. Make the read identity-scoped rather than deleting the guard, or guest-only requests start writing a session id into the user column. The existing factory chain boots the real pipeline, but the 200 leg needs a seed helper for a stored PDF, and the admin retry route can only be tested for 401 and 403 on the in-memory provider because its update runs as raw SQL. Any test-authentication override deletes the defect)
+  - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the 403 needs a caller sending a valid JWT and a live guest token together, which the shipped SPA never does, so it is unreachable through the site itself
 
 ### PPW-587 — A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked
 
