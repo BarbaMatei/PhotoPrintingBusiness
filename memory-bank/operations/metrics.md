@@ -36,7 +36,6 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | Value | When |
 |---|---|
 | `stripe` | Stripe-routed payment |
-| `euplatesc` | EuPlatesc-routed payment |
 
 #### `status` (order lifecycle, `orders_created_total`)
 | Value | When |
@@ -51,9 +50,8 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | `ok` | Webhook verified, order transitioned to `Paid`, side effects fired |
 | `signature_invalid` | HMAC / Stripe-Signature verification failed |
 | `order_not_found` | Webhook referred to an order that doesn't exist |
-| `amount_mismatch` | Vendor-reported amount differs from `Order.TotalRon` |
 | `duplicate` | Idempotent receipt — the order has already been paid, whether it is still `Paid` or has moved on to `Printing`, `Shipped` or `Delivered` |
-| `body_too_large` | Stripe only: the body passed the cap the action enforces, so it was rejected with 413 before the signature was verified. Anonymous endpoint, so a spike is either a misconfigured vendor or someone probing for a memory-exhaustion vector. The EuPlatesc IPN is capped by `[RequestSizeLimit]` instead — model binding materialises its form before any code runs — so an oversize IPN appears as a `request.rejected` log line and never under this label |
+| `body_too_large` | The body passed the cap the action enforces, so it was rejected with 413 before the signature was verified. Anonymous endpoint, so a spike is either a misconfigured vendor or someone probing for a memory-exhaustion vector |
 | `failed` | Vendor reported the payment failed, unparseable payload, or a receipt the order's state could not accept — a paid notification for an order that never can be `Paid` (`Cancelled`, `PaymentFailed`) is logged at `Error`, because the customer is charged and needs manual reconciliation. Also covers a paid notification whose invoice number could not be allocated before the retry budget ran out: the order stays `AwaitingPayment` and needs the same reconciliation. A fulfilled order is a `duplicate`, not this. The admin's manual mark-as-paid can reach the identical outcome, but it is a request rather than a webhook and enters no meter at all — it answers 409 and is observable only through `admin.order.invoice-number-collision-exhausted` and its Sentry capture. |
 
 #### `result` (`awb_creation_total`)

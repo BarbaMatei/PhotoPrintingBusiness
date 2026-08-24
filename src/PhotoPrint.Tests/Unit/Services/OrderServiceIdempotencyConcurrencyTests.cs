@@ -122,7 +122,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTes
     // Courier delivery avoids the Order → EasyboxLocker FK, so the
     // ONLY constraint a colliding INSERT can violate is the unique idempotency index.
     private static CreateOrderRequest MakeRequest()
-        => new(PaymentProcessor.Stripe, DeliveryType.Courier, null, null);
+        => new(DeliveryType.Courier, null, null);
 
     [Fact]
     public async Task CreateFromCart_CrossTenantKeyCollisionOnInsert_Returns409_NotServerError()
@@ -173,7 +173,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTes
         var svc = NewService(db);
 
         var easyboxWithBogusLocker = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(), ShippingAddress: null);
 
         await Assert.ThrowsAsync<DbUpdateException>(

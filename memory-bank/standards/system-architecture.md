@@ -88,12 +88,12 @@ this blocks multi-VM scale-out by design until the Redis work (bolt 046, deliber
 
 ## Payments
 
-- **Stripe** (Elements client-side; server creates PaymentIntents with gateway-side idempotency
-  keyed by order Id) and **EuPlatesc** (signed redirect + HMAC-MD5-verified IPN callback, storno
-  refunds). Webhooks are anonymous endpoints with signature verification.
+- **Stripe** is the only payment processor (Elements client-side; server creates PaymentIntents
+  with gateway-side idempotency keyed by order Id). The webhook is an anonymous endpoint with
+  signature verification.
 - **Idempotency (bolt 035)**: `Idempotency-Key` header (≤80 chars) → `Orders.IdempotencyKey`,
   globally-unique index, 24 h replay window; replays return the cached client
-  secret/redirect URL; divergent replays → 409 with `divergentFields` (ADR-004/005). There is
+  secret; divergent replays → 409 with `divergentFields` (ADR-004/005). There is
   no separate idempotency table and **no optimistic-concurrency tokens anywhere** — uniqueness
   violations + retry are the concurrency mechanism.
 - Payment success: order → `Paid` (state machine), SignalR `NewOrderReceived`, confirmation

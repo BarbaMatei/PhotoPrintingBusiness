@@ -4,7 +4,7 @@ namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
 /// Creates the <see cref="Invoice"/> row at the Paid transition. Called
-/// from the Stripe / EuPlatesc webhook handlers inside their existing
+/// from the Stripe webhook handler and the admin Paid transition inside their existing
 /// transactional scope — adding the Invoice INSERT to the same
 /// <c>SaveChangesAsync</c> preserves the gap-free numbering posture
 /// (ADR-020): if the Paid transition rolls back, both the Order mutation

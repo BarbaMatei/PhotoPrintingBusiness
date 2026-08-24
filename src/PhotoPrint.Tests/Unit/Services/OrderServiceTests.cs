@@ -71,10 +71,8 @@ public class OrderServiceTests : IDisposable
         return (userId, graph.Product.Id, graph.Upload.Id);
     }
 
-    private static CreateOrderRequest MakeRequest(
-        PaymentProcessor processor = PaymentProcessor.Stripe)
+    private static CreateOrderRequest MakeRequest()
         => new CreateOrderRequest(
-            PaymentProcessor: processor,
             DeliveryType: DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(),
             ShippingAddress: null);
@@ -262,20 +260,20 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateFromCart_SameKey_DivergentProcessor_ThrowsConflictNamingField()
+    public async Task CreateFromCart_SameKey_DivergentDeliveryType_ThrowsConflictNamingField()
     {
         var (userId, _, _) = await SeedCartAsync();
         const string key = "idem-key-002";
 
-        // Same base request; vary ONLY the processor so the divergence is unambiguous.
-        var request = MakeRequest(PaymentProcessor.Stripe);
+        // Same base request; vary ONLY the delivery type so the divergence is unambiguous.
+        var request = MakeRequest();
         await _service.CreateFromCartAsync(userId, null, request, key);
 
-        var divergent = request with { PaymentProcessor = PaymentProcessor.EuPlatesc };
+        var divergent = request with { DeliveryType = DeliveryType.Courier };
         var ex = await Assert.ThrowsAsync<IdempotencyConflictException>(
             () => _service.CreateFromCartAsync(userId, null, divergent, key));
 
-        Assert.Contains("paymentProcessor", ex.DivergentFields);
+        Assert.Contains("deliveryType", ex.DivergentFields);
         Assert.DoesNotContain("easyboxLockerId", ex.DivergentFields);
         // Still only one order — the conflicting second request created nothing.
         Assert.Equal(1, await _db.Orders.CountAsync());
@@ -372,7 +370,6 @@ public class OrderServiceTests : IDisposable
             IdempotencyKey = key,
             StripeClientSecret = "pi_secret_owner",
             CreatedAt = DateTimeOffset.UtcNow,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Easybox,
             TotalRon = 26.00m,
             ShippingAddress = new ShippingAddressSnapshot
@@ -696,17 +693,16 @@ public class OrderServiceTests : IDisposable
     // ── orders_created_total emission ─────────────────────────────────────────
 
     [Fact]
-    public async Task CreateFromCartAsync_RecordsOrdersCreatedWithTheRequestedProcessor()
+    public async Task CreateFromCartAsync_RecordsOrdersCreatedWithTheStripeProcessorLabel()
     {
         var (userId, _, _) = await SeedCartAsync();
         using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
 
-        await _service.CreateFromCartAsync(
-            userId, null, MakeRequest(PaymentProcessor.EuPlatesc));
+        await _service.CreateFromCartAsync(userId, null, MakeRequest());
 
         var recorded = metrics.For(
             MetricNames.Instruments.OrdersCreatedTotal,
-            (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
+            (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
             (MetricNames.Labels.Status, MetricNames.OrderStatusValues.Created));
         Assert.Single(recorded);
         Assert.Equal(1, recorded[0].Value);

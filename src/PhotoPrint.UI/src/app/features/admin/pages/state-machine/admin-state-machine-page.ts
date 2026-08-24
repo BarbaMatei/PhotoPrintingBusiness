@@ -35,7 +35,7 @@ export class AdminStateMachinePage {
       id: 'Paid',
       label: 'Plătit',
       colorClass: 'state--paid',
-      description: 'Plata a fost confirmată de Stripe / EuPlatesc. Comanda intră în coada de producție.',
+      description: 'Plata a fost confirmată de Stripe. Comanda intră în coada de producție.',
     },
     {
       id: 'Printing',
@@ -67,7 +67,7 @@ export class AdminStateMachinePage {
       id: 'Cancelled',
       label: 'Anulat',
       colorClass: 'state--cancelled',
-      description: 'Comanda a fost anulată de admin. Rambursarea este inițiată automat prin Stripe / EuPlatesc.',
+      description: 'Comanda a fost anulată de admin. Rambursarea este inițiată automat prin Stripe.',
       isTerminal: true,
     },
   ];

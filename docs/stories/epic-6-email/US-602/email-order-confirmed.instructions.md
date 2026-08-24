@@ -12,11 +12,11 @@ EPIC-6 | Notificări Email
 
 ## Dependencies
 - US-605 (IEmailService)
-- US-305/US-306 (Payment webhook triggers this)
+- US-305 (Payment webhook triggers this)
 
 ## Acceptance Criteria
 
-1. **Triggered by**: payment webhook success (Stripe or EuPlatesc)
+1. **Triggered by**: payment webhook success (Stripe)
 2. **Subject**: `Comanda #FT-XXXX a fost primită!`
 3. **Body**: customer first name (or `Drag client` for guest), order number, items table (format, finish, qty, unit price, line total), delivery address/locker name, shipping cost, TOTAL paid, estimated delivery `2-4 zile lucrătoare`
 4. **Guest email includes**: `Urmărește comanda` link `/comanda/{id}?email={email}`
@@ -59,6 +59,5 @@ Livrare estimată: 2-4 zile lucrătoare
 
 ## Testing
 - Unit test: email queued after Stripe payment success
-- Unit test: email queued after EuPlatesc IPN success
 - Unit test: guest tracking link includes email param
 - Unit test: template renders order items table

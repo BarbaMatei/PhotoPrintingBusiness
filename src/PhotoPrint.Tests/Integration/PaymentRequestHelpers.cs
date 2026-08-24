@@ -18,10 +18,6 @@ internal static class PaymentRequestHelpers
         this HttpClient client, CreateOrderRequest body, string idempotencyKey)
         => PostWithKeyAsync(client, "/api/payments/stripe/intent", body, idempotencyKey);
 
-    public static Task<HttpResponseMessage> PostEuPlatescInitiateAsync(
-        this HttpClient client, CreateOrderRequest body, string idempotencyKey)
-        => PostWithKeyAsync(client, "/api/payments/euplatesc/initiate", body, idempotencyKey);
-
     private static Task<HttpResponseMessage> PostWithKeyAsync(
         HttpClient client, string url, CreateOrderRequest body, string idempotencyKey)
     {

@@ -23,8 +23,8 @@ public class MetricsCardinalityTests
     // Changing a number here is the acknowledgement that a label set grew.
     public static TheoryData<string, int> DeclaredInstruments() => new()
     {
-        { MetricNames.Instruments.OrdersCreatedTotal, 6 },
-        { MetricNames.Instruments.PaymentWebhookTotal, 14 },
+        { MetricNames.Instruments.OrdersCreatedTotal, 3 },
+        { MetricNames.Instruments.PaymentWebhookTotal, 6 },
         { MetricNames.Instruments.AwbCreationTotal, 6 },
         { MetricNames.Instruments.InvoiceAnafStatusTotal, 4 },
         { MetricNames.Instruments.UploadSizeBytes, 1 },

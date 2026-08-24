@@ -11,7 +11,7 @@ FRONTEND — Angular
 EPIC-3 | Checkout & Plată
 
 ## Dependencies
-- US-305/US-306 (Payment must be processed)
+- US-305 (Payment must be processed)
 - US-403 (Orders API for fetching order data)
 
 ## Acceptance Criteria
@@ -32,7 +32,6 @@ EPIC-3 | Checkout & Plată
 - Route: `/comanda/:orderId/confirmare`
 - On init: call `GET /api/orders/{orderId}` to fetch order details
 - Guard: if order status is not `Paid` or higher, redirect to home
-- Handle `?processor=euplatesc` query param: same page, different entry point
 - Status stepper: reusable component showing 4 stages with current step highlighted
 - Guest detection: check if current auth is guest token
   - Show register CTA with pre-filled email from guest session

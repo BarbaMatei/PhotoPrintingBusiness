@@ -152,7 +152,6 @@ public class OrderService : IOrderService
             GuestSessionId = guestSessionId,
             GuestEmail = guestEmail,
             Status = OrderStatus.AwaitingPayment,
-            PaymentProcessor = request.PaymentProcessor,
             ShippingAddress = request.ShippingAddress ?? new ShippingAddressSnapshot(),
             DeliveryType = request.DeliveryType,
             EasyboxLockerId = request.EasyboxLockerId,
@@ -191,16 +190,10 @@ public class OrderService : IOrderService
                 // Observability: orders_created_total{processor,status}.
                 // Status is "created" — the order is in AwaitingPayment; the Paid
                 // transition is observed via payment_webhook_total at the webhook handlers.
-                var processorLabel = order.PaymentProcessor switch
-                {
-                    PaymentProcessor.Stripe    => MetricNames.ProcessorValues.Stripe,
-                    PaymentProcessor.EuPlatesc => MetricNames.ProcessorValues.EuPlatesc,
-                    _                          => "unknown",
-                };
                 FotoMetrics.OrdersCreated.Add(1,
                     new TagList
                     {
-                        { MetricNames.Labels.Processor, processorLabel },
+                        { MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe },
                         { MetricNames.Labels.Status,    MetricNames.OrderStatusValues.Created },
                     });
 
@@ -350,7 +343,6 @@ public class OrderService : IOrderService
         IReadOnlyList<OrderItem> candidateItems)
     {
         var fields = new List<string>();
-        if (existing.PaymentProcessor != request.PaymentProcessor) fields.Add("paymentProcessor");
         if (existing.DeliveryType != request.DeliveryType) fields.Add("deliveryType");
         if (existing.EasyboxLockerId != request.EasyboxLockerId) fields.Add("easyboxLockerId");
         if (existing.TotalRon != candidateTotal) fields.Add("totalRon");
@@ -467,7 +459,6 @@ public class OrderService : IOrderService
             order.CreatedAt,
             order.PaidAt,
             order.DeliveryType.ToString(),
-            order.PaymentProcessor.ToString(),
             order.EasyboxLockerId,
             order.EasyboxLocker?.Name,
             order.EasyboxLocker?.Address,

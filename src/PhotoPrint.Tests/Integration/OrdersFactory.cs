@@ -100,7 +100,6 @@ public class OrdersFactory : PaymentFactory
             OrderNumber = $"FT-TEST-{Guid.NewGuid():N}".Substring(0, 14),
             UserId = userId,
             Status = status,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = deliveryType,
             EasyboxLockerId = locker?.Id,
             ShippingAddress = shippingAddress,

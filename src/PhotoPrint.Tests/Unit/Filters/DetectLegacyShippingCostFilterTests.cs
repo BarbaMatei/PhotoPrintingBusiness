@@ -42,7 +42,7 @@ public class DetectLegacyShippingCostFilterTests
     public async Task BodyContainingShippingCostRon_LogsWarning()
     {
         var (sut, log) = BuildSut();
-        var ctx = BuildContext("""{"paymentProcessor":"Stripe","shippingCostRon":-100}""");
+        var ctx = BuildContext("""{"deliveryType":"Courier","shippingCostRon":-100}""");
 
         await sut.OnResourceExecutionAsync(ctx, () =>
             Task.FromResult<ResourceExecutedContext>(new ResourceExecutedContext(ctx, new List<IFilterMetadata>())));
@@ -66,7 +66,7 @@ public class DetectLegacyShippingCostFilterTests
     public async Task BodyWithoutShippingCostRon_DoesNotLog()
     {
         var (sut, log) = BuildSut();
-        var ctx = BuildContext("""{"paymentProcessor":"Stripe","deliveryType":"Easybox"}""");
+        var ctx = BuildContext("""{"deliveryType":"Easybox"}""");
 
         await sut.OnResourceExecutionAsync(ctx, () =>
             Task.FromResult<ResourceExecutedContext>(new ResourceExecutedContext(ctx, new List<IFilterMetadata>())));

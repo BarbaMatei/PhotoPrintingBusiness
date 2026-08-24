@@ -91,7 +91,6 @@ Orders
   - ShippingAddress (jsonb)
   - EasyboxLockerId (varchar 50, nullable)
   - SubTotal, ShippingCost, Total (decimal 18,2)
-  - PaymentProvider (varchar 20 — "Stripe"/"EuPlatesc")
   - PaymentIntentId (varchar 200, nullable)
   - PaidAt (DateTimeOffset, nullable)
   - Notes (text, nullable)

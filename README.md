@@ -99,7 +99,6 @@ Production secrets are validated at boot — a missing one fails startup with th
 | `ConnectionStrings:Default` | Database connection string | always |
 | `JwtSettings:PrivateKeyPem` | RSA private key for signing JWTs | always (boot-fails if empty) |
 | `Stripe:SecretKey`, `Stripe:WebhookSecret` | Stripe payment + webhook verification | Production |
-| `EuPlatesc:MerchantId`, `EuPlatesc:SecretKey` | EuPlatesc payment gateway | Production |
 | `Cors:AllowedOrigins` | Comma-separated allowed SPA origins | always |
 | `Email:Provider` (+ `Email:Smtp:*` / `Email:SendGrid:ApiKey`) | SMTP (dev) or SendGrid (prod) | always |
 | `GoogleAuth:ClientId` | Google OAuth | if Google sign-in enabled |
