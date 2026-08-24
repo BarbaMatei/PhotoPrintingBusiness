@@ -52,13 +52,12 @@ public static class MetricNames
         public const string Ok                = "ok";
         public const string SignatureInvalid  = "signature_invalid";
         public const string OrderNotFound     = "order_not_found";
-        public const string AmountMismatch    = "amount_mismatch";
         public const string Duplicate         = "duplicate";
         public const string Failed            = "failed";
         public const string BodyTooLarge      = "body_too_large";
 
         public static readonly string[] All =
-            [Ok, SignatureInvalid, OrderNotFound, AmountMismatch, Duplicate, Failed, BodyTooLarge];
+            [Ok, SignatureInvalid, OrderNotFound, Duplicate, Failed, BodyTooLarge];
     }
 
     public static class AwbResultValues
