@@ -83,7 +83,7 @@ are on you**.
 - A **domain** with DNS you control (e.g. `fototipar.ro`).
 - A **container registry** — GHCR is used automatically (`ghcr.io/<owner>/fototipar/api`). Make the package visible to the deploy host or use a PAT.
 - A **managed PostgreSQL 16** instance (connection string), or accept the in-compose Postgres + your own backups.
-- **Secrets ready**: JWT keypair, Stripe keys, EuPlatesc credentials, SendGrid API key, Google OAuth client ID. See `.env.example` and the [README env matrix](../README.md#environment--secret-matrix).
+- **Secrets ready**: JWT keypair, Stripe keys, SendGrid API key, Google OAuth client ID. See `.env.example` and the [README env matrix](../README.md#environment--secret-matrix).
 - For Proposal A: an SSH-reachable Linux VM with Docker Engine + Compose v2.
 
 ---
@@ -184,7 +184,7 @@ docker compose -f docker-compose.prod.yml run --rm api dotnet PhotoPrint.API.dll
 - [ ] API reachable (e.g. `GET /api/products` returns catalog JSON).
 - [ ] A test login / registration succeeds (JWT signing key wired).
 - [ ] Logs clean: `docker compose -f docker-compose.prod.yml logs --tail=100 api` — no `OptionsValidationException` (means a required secret is missing) and no migration errors.
-- [ ] A Stripe test-mode payment completes end-to-end (and the EuPlatesc redirect builds).
+- [ ] A Stripe test-mode payment completes end-to-end.
 
 ---
 
@@ -208,7 +208,7 @@ backwards-compatible migrations.
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Caddy can't get a cert | DNS not pointing at the VM yet, or port 80/443 blocked | Fix DNS/firewall; use the staging `acme_ca` line in `Caddyfile` while testing. |
-| API exits on boot with `OptionsValidationException` | A required secret (Stripe/EuPlatesc/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
+| API exits on boot with `OptionsValidationException` | A required secret (Stripe/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
 | `docker compose pull` 403/denied | GHCR package private and host not logged in | `docker login ghcr.io` with a PAT that has `read:packages`. |
 | Migration error on first PG connect | Role lacks DDL rights, or a partially-created schema | Confirm the role owns the database, then re-run against a scratch Postgres per §7. |
 | Uploaded images vanish on redeploy | `Storage` not on a volume | Confirm the `apidata:/app/Storage` volume in `docker-compose.prod.yml`. |
