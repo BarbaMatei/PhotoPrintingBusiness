@@ -21,7 +21,6 @@ function makeOrder(status: string): OrderDto {
     subtotalRon: 25.5,
     shippingCostRon: 20,
     deliveryType: 'Easybox',
-    paymentProcessor: 'Stripe',
     createdAt: '2026-01-01T00:00:00Z',
     paidAt: '2026-01-01T00:01:00Z',
   };

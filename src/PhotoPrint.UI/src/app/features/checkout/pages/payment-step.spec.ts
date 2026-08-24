@@ -42,7 +42,6 @@ describe('PaymentStep', () => {
 
     const mockPayment = {
       createStripeIntent: vi.fn().mockReturnValue(intentSubject.asObservable()),
-      initiateEuPlatesc: vi.fn(),
     };
     const mockState = {
       snapshot: DELIVERY_STATE,
@@ -66,27 +65,21 @@ describe('PaymentStep', () => {
     });
   });
 
-  it('renders both payment tab buttons', () => {
+  it('renders the card payment panel directly, with no tab switcher', () => {
     const fixture = createFixture();
     fixture.detectChanges();
-    const tabs = fixture.debugElement.queryAll(By.css('.tab-btn'));
-    expect(tabs.length).toBe(2);
+
+    expect(fixture.debugElement.query(By.css('.payment-panel'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('#stripe-card-element'))).not.toBeNull();
+    expect(fixture.debugElement.queryAll(By.css('.tab-btn')).length).toBe(0);
   });
 
-  it('Stripe tab is active by default', () => {
+  it('disables the pay button until Stripe is ready', () => {
     const fixture = createFixture();
     fixture.detectChanges();
-    const stripeTab = fixture.debugElement.queryAll(By.css('.tab-btn'))[0];
-    expect(stripeTab.nativeElement.classList).toContain('active');
-  });
 
-  it('switching to EuPlatesc tab shows EuPlatesc panel', () => {
-    const fixture = createFixture();
-    fixture.componentInstance.switchTab('euplatesc');
-    fixture.detectChanges();
-
-    const panel = fixture.debugElement.query(By.css('.euplatesc-info'));
-    expect(panel).not.toBeNull();
+    const payButton = fixture.debugElement.query(By.css('.payment-panel .btn--primary'));
+    expect(payButton.nativeElement.disabled).toBe(true);
   });
 
   it('createStripeIntent is called on init', () => {

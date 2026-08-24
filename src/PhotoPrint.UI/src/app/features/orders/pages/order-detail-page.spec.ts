@@ -17,7 +17,6 @@ const MOCK_DETAIL: OrderDetailDto = {
   paidAt: '2026-05-01T12:05:00Z',
   deliveryType: 'Easybox',
   itemCount: 1,
-  paymentProcessor: 'Stripe',
   lockerId: 'locker-1',
   lockerName: 'Easybox Mega Mall',
   lockerAddress: 'Str. Exemplu 1, București',

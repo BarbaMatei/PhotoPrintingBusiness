@@ -34,7 +34,6 @@ export interface OrderDetailDto extends OrderSummaryDto {
   subtotalRon: number;
   shippingCostRon: number;
   paidAt: string | null;
-  paymentProcessor: string;
   lockerId: string | null;
   lockerName: string | null;
   lockerAddress: string | null;
