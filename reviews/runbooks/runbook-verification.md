@@ -20,7 +20,10 @@ feature clean?".
    test cannot go red is not verified — reopen it.
    `node reviews/lib/verify-fixes.mjs <target>` runs this step mechanically and prints one
    verdict line per fix; `test-never-red`, `revert-failed` and `green-failed` rows come back
-   to you for a reopen or a hand check.
+   to you for a reopen or a hand check. The red leg counts only when the runner output
+   names a failing test (recorded in `red_evidence`); a revert that breaks compilation —
+   or reddens with nothing attributable — is `revert-broke-build`: re-prove that row by
+   its smallest lever by hand, never by trusting the non-zero exit.
 3. **Judgment items** (doc fixes; `wont-fix` / `deferred` / `disputed` rationales): first run
    `git diff <last-affirmed-commit>..HEAD -- <cited files>` yourself. Unchanged → record
    "unchanged since `<commit>`, stands" with **no agent**. Changed → one anchored Explore

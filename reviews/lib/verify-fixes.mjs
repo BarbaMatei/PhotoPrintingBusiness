@@ -9,10 +9,13 @@
 // Usage: node reviews/lib/verify-fixes.mjs [--root <repoRoot>] <target>
 //          [--only PPW-1,PPW-2] [--dry-run]
 //          [--test-cmd-api "<tpl with {filter}>"] [--test-cmd-ui "<tpl with {name}>"]
-// Output: one JSON line per row {id, verdict, commit, filters, red_exits, green_exits},
-// then "SUMMARY: <held>/<total> held". Verdicts: held · test-never-red · no-test ·
-// test-only · unreachable-commit · unparsable-commit · revert-failed · green-failed ·
-// rename-in-fix · env-missing · dry-run. A row's Commit cell may list several commits; all of
+// Output: one JSON line per row {id, verdict, commit, filters, red_exits, red_reasons,
+// red_evidence, green_exits}, then "SUMMARY: <held>/<total> held". Verdicts: held ·
+// test-never-red · revert-broke-build · no-test · test-only · unreachable-commit ·
+// unparsable-commit · revert-failed · green-failed · rename-in-fix · env-missing · dry-run.
+// The red leg counts only when the runner output names a failing TEST: a non-zero exit
+// whose output shows a compile/build error — or nothing attributable at all — is
+// revert-broke-build, never red. A row's Commit cell may list several commits; all of
 // them are reverted together, back to the parent of the first. A row whose tests include a
 // frontend spec needs src/PhotoPrint.UI/node_modules in this checkout, or it is not run at all.
 // Exit: 0 all held · 1 any other verdict · 2 dirty tree or usage error.
@@ -72,6 +75,19 @@ if (git('status', '--porcelain').stdout.trim() !== '') {
 }
 
 const isTest = p => /^src\/PhotoPrint\.Tests\//.test(p) || /\.spec\.ts$/.test(p)
+const TEST_FAIL_RE = /^\s*(?:Failed|FAIL)[ !]|[✗×]|\b[1-9]\d* failed\b/m
+const BUILD_FAIL_RE = /error (?:CS|TS|NU|MSB)\d+|Build FAILED|SyntaxError:|Cannot find module/i
+function classifyRed(run) {
+  const out = `${run.stdout ?? ''}${run.stderr ?? ''}`
+  if ((run.status ?? -1) === 0) return { reason: 'green' }
+  if (BUILD_FAIL_RE.test(out)) return { reason: 'build-broke', evidence: BUILD_FAIL_RE.exec(out)[0] }
+  const m = TEST_FAIL_RE.exec(out)
+  if (m) {
+    const line = out.slice(out.lastIndexOf('\n', m.index) + 1).split('\n')[0].trim().slice(0, 200)
+    return { reason: 'test-failed', evidence: line }
+  }
+  return { reason: 'unattributed' }
+}
 const restoreOrDie = id => {
   const r = git('reset', '--hard', 'HEAD')
   if (r.status !== 0 || git('status', '--porcelain').stdout.trim() !== '') {
@@ -120,9 +136,14 @@ for (const row of rows) {
     res.verdict = 'revert-failed'
     continue
   }
-  for (const c of cmds) res.red_exits.push(runCmd(c).status ?? -1)
+  const redRuns = cmds.map(c => runCmd(c))
+  res.red_exits = redRuns.map(r => r.status ?? -1)
   restoreOrDie(row.id)
   if (!res.red_exits.some(x => x !== 0)) { res.verdict = 'test-never-red'; continue }
+  const legs = redRuns.map(classifyRed)
+  res.red_reasons = legs.map(l => l.reason)
+  res.red_evidence = legs.map(l => l.evidence ?? null)
+  if (!legs.some(l => l.reason === 'test-failed')) { res.verdict = 'revert-broke-build'; continue }
   for (const c of cmds) res.green_exits.push(runCmd(c).status ?? -1)
   res.verdict = res.green_exits.every(x => x === 0) ? 'held' : 'green-failed'
 }

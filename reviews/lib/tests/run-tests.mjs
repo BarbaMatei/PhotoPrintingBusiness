@@ -275,7 +275,7 @@ commit: abc1234
   writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${sha}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9501 | fixed | \`${sha}\` | fixture fix |\n`)
   g('add', '.'); g('commit', '-qm', 'resolution')
-  const redGreen = `node -e "process.exit(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')?1:0)"`
+  const redGreen = `node -e "if(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')){console.log('Failed CalcTests.Fixture');process.exit(1)}"`
 
   const dry = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--dry-run'])
   check('verify-fixes dry-run derives the plan', dry.code === 0 && dry.out.includes('calc.txt') && dry.out.includes('PhotoPrint.Tests.Unit.CalcTests'), dry.out.trim())
@@ -286,8 +286,18 @@ commit: abc1234
   check("verify-fixes warns when HEAD has moved past the resolution's fixed_commit",
     live.out.includes(`warning: HEAD is not the resolution's fixed_commit ${sha}`), live.out.trim())
 
+  check('verify-fixes records which failing test made the red leg red', live.out.includes('"red_reasons":["test-failed"]') && live.out.includes('Failed CalcTests.Fixture'), live.out.trim())
+
   const neverRed = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', 'node -e "process.exit(0)"'])
   check('verify-fixes reopens a fix whose test never goes red', neverRed.code === 1 && neverRed.out.includes('"verdict":"test-never-red"'), neverRed.out.trim())
+
+  const buildFail = `node -e "if(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')){console.log('error CS1002: ; expected');console.log('Build FAILED.');process.exit(1)}"`
+  const broke = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', buildFail])
+  check('verify-fixes reads a compile-error red leg as revert-broke-build, never red', broke.code === 1 && broke.out.includes('"verdict":"revert-broke-build"'), broke.out.trim())
+
+  const silentRed = `node -e "process.exit(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')?1:0)"`
+  const silent = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', silentRed])
+  check('verify-fixes refuses a non-zero red leg that names no failing test', silent.code === 1 && silent.out.includes('"verdict":"revert-broke-build"'), silent.out.trim())
 
   writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'dirty\n')
   const dirty = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', redGreen])
