@@ -8,7 +8,7 @@ import {
   OnInit,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { catchError, EMPTY } from 'rxjs';
 import { OrderService } from '../../../core/services/order.service';
 import { OrderStatusPipe } from '../../../core/pipes/order-status.pipe';
@@ -27,7 +27,7 @@ interface StepDef {
   selector: 'app-order-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, RouterLink, OrderStatusPipe, SpinnerComponent, PhotoLightboxComponent],
+  imports: [DecimalPipe, PercentPipe, RouterLink, OrderStatusPipe, SpinnerComponent, PhotoLightboxComponent],
   template: `
     <div class="order-detail-page">
       @if (loading()) {
@@ -94,6 +94,10 @@ interface StepDef {
             <div class="summary-row">
               <span>Transport</span>
               <span>{{ order()!.shippingCostRon | number:'1.2-2' }} RON</span>
+            </div>
+            <div class="summary-row">
+              <span>din care TVA ({{ order()!.vatRate | percent:'1.0-2' }})</span>
+              <span>{{ order()!.vatRon | number:'1.2-2' }} RON</span>
             </div>
             <div class="summary-row summary-row--total">
               <span>Total</span>

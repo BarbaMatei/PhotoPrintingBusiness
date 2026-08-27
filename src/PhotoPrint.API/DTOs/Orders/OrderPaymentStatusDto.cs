@@ -6,6 +6,8 @@ public record OrderPaymentStatusDto(
     string OrderNumber,
     string Status,
     decimal TotalRon,
+    decimal VatRon,
+    decimal VatRate,
     string DeliveryType,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt);

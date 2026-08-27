@@ -7,7 +7,7 @@ import {
   input,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { isAtLeast as isAtLeastFn } from '../../../core/models/order-status.constants';
 import { PaymentService } from '../../../core/services/payment.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -28,7 +28,7 @@ const MAX_SETTLE_POLLS = 10;
   selector: 'app-confirmation',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, RouterLink, SpinnerComponent],
+  imports: [DecimalPipe, PercentPipe, RouterLink, SpinnerComponent],
   template: `
     <div class="confirmation-page">
       @if (loading()) {
@@ -47,6 +47,10 @@ const MAX_SETTLE_POLLS = 10;
           <div class="summary-row">
             <span>Total plătit:</span>
             <strong>{{ order()!.totalRon | number:'1.2-2' }} RON</strong>
+          </div>
+          <div class="summary-row">
+            <span>din care TVA ({{ order()!.vatRate | percent:'1.0-2' }}):</span>
+            <span>{{ order()!.vatRon | number:'1.2-2' }} RON</span>
           </div>
           <div class="summary-row">
             <span>Livrare:</span>

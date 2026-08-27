@@ -25,6 +25,8 @@ export interface OrderPaymentStatusDto {
   orderNumber: string;
   status: OrderStatus;
   totalRon: number;
+  vatRon: number;
+  vatRate: number;
   deliveryType: DeliveryType;
   createdAt: string;
   paidAt: string | null;

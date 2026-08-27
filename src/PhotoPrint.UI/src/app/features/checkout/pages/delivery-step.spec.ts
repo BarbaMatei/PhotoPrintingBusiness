@@ -56,6 +56,42 @@ describe('DeliveryStep', () => {
     http.expectOne(`${BASE}/lockers?city=`).flush(prime);
   }
 
+  it('stores the price the server sent, not a built-in default', () => {
+    const fixture = createFixture();
+    http.expectOne(`${BASE}/cost?type=Easybox`).flush({ costRon: 15 });
+    http.expectOne(`${BASE}/cost?type=Courier`).flush({ costRon: 18 });
+    fixture.detectChanges();
+
+    selectEasybox(fixture);
+
+    const state = TestBed.inject(CheckoutStateService);
+    expect(state.snapshot.shippingCostRon).toBe(15);
+  });
+
+  it('ignores a delivery choice made before the prices arrive', () => {
+    const fixture = createFixture();
+
+    fixture.componentInstance.selectMethod('Courier');
+    fixture.detectChanges();
+
+    const state = TestBed.inject(CheckoutStateService);
+    expect(state.snapshot.method).toBeNull();
+    flushCosts();
+  });
+
+  it('offers a retry when the delivery prices cannot be loaded', () => {
+    const fixture = createFixture();
+    http.expectOne(`${BASE}/cost?type=Easybox`).flush(null, { status: 500, statusText: 'Server Error' });
+    http.expectOne(`${BASE}/cost?type=Courier`).flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    const retry = fixture.debugElement.query(By.css('.btn-retry-costs'));
+    expect(retry).toBeTruthy();
+
+    retry.nativeElement.click();
+    flushCosts();
+  });
+
   it('renders two delivery option cards', () => {
     const fixture = createFixture();
     flushCosts();

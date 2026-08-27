@@ -59,6 +59,13 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
     <div class="delivery-step">
       <h2 class="step-title">Metoda de livrare</h2>
 
+      @if (shippingCostsFailed()) {
+        <div class="cost-error" role="alert">
+          <span>Nu am putut încărca costurile de livrare.</span>
+          <button type="button" class="btn-retry-costs" (click)="loadShippingCosts()">Reîncearcă</button>
+        </div>
+      }
+
       <!-- Delivery method cards -->
       <div class="delivery-cards">
         <label class="delivery-card" [class.selected]="deliveryMethod() === 'Easybox'">
@@ -66,11 +73,18 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
             type="radio"
             name="delivery"
             value="Easybox"
+            [disabled]="!shippingCostsReady()"
             (change)="selectMethod('Easybox')"
           />
           <div class="card-body">
             <div class="card-title">📦 Easybox Sameday</div>
-            <div class="card-price">{{ easyboxCostRon() | number:'1.2-2' }} RON</div>
+            <div class="card-price">
+              @if (easyboxCostRon() !== null) {
+                {{ easyboxCostRon() | number:'1.2-2' }} RON
+              } @else {
+                <span class="card-price--pending">se încarcă…</span>
+              }
+            </div>
             <div class="card-desc">Ridicare dintr-un easybox în 24h</div>
           </div>
         </label>
@@ -80,11 +94,18 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
             type="radio"
             name="delivery"
             value="Courier"
+            [disabled]="!shippingCostsReady()"
             (change)="selectMethod('Courier')"
           />
           <div class="card-body">
             <div class="card-title">🚚 Livrare la ușă</div>
-            <div class="card-price">{{ courierCostRon() | number:'1.2-2' }} RON</div>
+            <div class="card-price">
+              @if (courierCostRon() !== null) {
+                {{ courierCostRon() | number:'1.2-2' }} RON
+              } @else {
+                <span class="card-price--pending">se încarcă…</span>
+              }
+            </div>
             <div class="card-desc">Curier la domiciliu în 2–4 zile</div>
           </div>
         </label>
@@ -337,8 +358,11 @@ export class DeliveryStep implements OnInit {
   readonly deliveryMethod = signal<DeliveryType | null>(
     this.checkoutState.snapshot.method,
   );
-  readonly easyboxCostRon = signal(20);
-  readonly courierCostRon = signal(25);
+  // Null until the server answers: a default that differs from the configured price is charged
+  // and invoiced at the server value, so the customer would agree to a total nobody bills.
+  readonly easyboxCostRon = signal<number | null>(null);
+  readonly courierCostRon = signal<number | null>(null);
+  readonly shippingCostsFailed = signal(false);
   readonly lockers = signal<LockerDto[]>([]);
   readonly selectedLockerId = signal<string | null>(this.checkoutState.snapshot.lockerId);
   readonly showLockerError = signal(false);
@@ -374,9 +398,7 @@ export class DeliveryStep implements OnInit {
   });
 
   ngOnInit(): void {
-    // Load shipping costs
-    this.shippingService.getShippingCost('Easybox').subscribe(r => this.easyboxCostRon.set(r.costRon));
-    this.shippingService.getShippingCost('Courier').subscribe(r => this.courierCostRon.set(r.costRon));
+    this.loadShippingCosts();
 
     const saved = this.checkoutState.snapshot.shippingAddress;
     if (saved) this.addressForm.patchValue(saved);
@@ -449,7 +471,30 @@ export class DeliveryStep implements OnInit {
       });
   }
 
+  loadShippingCosts(): void {
+    this.shippingCostsFailed.set(false);
+    this.shippingService.getShippingCost('Easybox').subscribe({
+      next: r => this.applyCost('Easybox', r.costRon),
+      error: () => this.shippingCostsFailed.set(true),
+    });
+    this.shippingService.getShippingCost('Courier').subscribe({
+      next: r => this.applyCost('Courier', r.costRon),
+      error: () => this.shippingCostsFailed.set(true),
+    });
+  }
+
+  private applyCost(method: DeliveryType, costRon: number): void {
+    if (method === 'Easybox') this.easyboxCostRon.set(costRon);
+    else this.courierCostRon.set(costRon);
+    if (this.deliveryMethod() === method) this.checkoutState.setShippingCost(costRon);
+  }
+
+  readonly shippingCostsReady = computed(
+    () => this.easyboxCostRon() !== null && this.courierCostRon() !== null,
+  );
+
   selectMethod(method: DeliveryType): void {
+    if (!this.shippingCostsReady()) return;
     if (this.deliveryMethod() === method) return; // a no-op re-click must not wipe a restored locker
     this.deliveryMethod.set(method);
     // Mirror the state setMethod clears: without this the stale selectedLockerId leaves canContinue
@@ -457,7 +502,7 @@ export class DeliveryStep implements OnInit {
     this.selectedLockerId.set(null);
     this.showLockerError.set(false);
     this.lockerSearchError.set(false);
-    const cost = method === 'Easybox' ? this.easyboxCostRon() : this.courierCostRon();
+    const cost = method === 'Easybox' ? this.easyboxCostRon()! : this.courierCostRon()!;
     this.checkoutState.setMethod(method, cost);
     if (method === 'Easybox') this.primeLockers$.next();
   }

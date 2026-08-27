@@ -22,6 +22,8 @@ function makeOrder(status: string): OrderPaymentStatusDto {
     orderNumber: 'FT-20260001',
     status: status as OrderPaymentStatusDto['status'],
     totalRon: 45.5,
+    vatRon: 7.27,
+    vatRate: 0.19,
     deliveryType: 'Easybox',
     createdAt: '2026-01-01T00:00:00Z',
     paidAt: status === 'AwaitingPayment' ? null : '2026-01-01T00:01:00Z',
