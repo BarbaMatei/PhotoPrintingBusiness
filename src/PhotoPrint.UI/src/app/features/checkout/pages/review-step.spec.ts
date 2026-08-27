@@ -123,10 +123,9 @@ describe('ReviewStep', () => {
     expect(grandEl[0].nativeElement.textContent).toContain('40');
   });
 
-  it('does not render a street-address line for an Easybox order', () => {
-    // The address line is gated on Courier. Seed Easybox WITH a leftover courier address (the real
-    // state after switching method) so the gate is what is under test — asserting on a null address
-    // would prove nothing, since Angular renders a missing value as blank either way.
+  it('renders the fiscal address for an Easybox order, because that address is invoiced', () => {
+    // A locker order now collects a fiscal address, and this is the last screen before paying:
+    // a mistyped county would otherwise reach the legal invoice unseen.
     stateSubject.next({
       method: 'Easybox',
       lockerId: 'l1',
@@ -142,8 +141,9 @@ describe('ReviewStep', () => {
     fixture.detectChanges();
 
     const summary = fixture.debugElement.query(By.css('.delivery-summary')).nativeElement as HTMLElement;
-    expect(summary.textContent).toContain('Box A');           // locker shown
-    expect(summary.textContent).not.toContain('Str. Fantoma'); // street line suppressed
-    expect(summary.textContent).not.toContain('Timișoara');
+    expect(summary.textContent).toContain('Box A');
+    expect(summary.textContent).toContain('Str. Fantoma');
+    expect(summary.textContent).toContain('Timișoara');
+    expect(summary.textContent).toContain('facturare');
   });
 });
