@@ -103,7 +103,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
         TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false,
         AnafOutageRegistry? outages = null, int pollIntervalMinutes = 30,
-        bool realXmlBuilder = false)
+        bool realXmlBuilder = false, int maxBatchSize = 50)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -161,6 +161,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
                 {
                     ClaimTtlMinutes = claimTtlMinutes,
                     PollIntervalMinutes = pollIntervalMinutes,
+                    MaxBatchSize = maxBatchSize,
                     BackoffHours = backoffHours ?? new AnafSettings().BackoffHours,
                 }),
                 outages ?? new AnafOutageRegistry(new MemoryCache(new MemoryCacheOptions())),
@@ -181,7 +182,8 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(
         PostgresTestDatabase database, InvoiceAnafStatus status = InvoiceAnafStatus.Pending,
         DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>", string? anafUploadId = null,
-        DateTimeOffset? createdAt = null, DateTimeOffset? updatedAt = null)
+        DateTimeOffset? createdAt = null, DateTimeOffset? updatedAt = null,
+        string? pdfStoragePath = null)
     {
         var orderId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -198,6 +200,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         invoice.AnafUploadId = anafUploadId;
         if (createdAt is not null) invoice.CreatedAt = createdAt.Value;
         if (updatedAt is not null) invoice.UpdatedAt = updatedAt.Value;
+        invoice.PdfStoragePath = pdfStoragePath;
         seed.Invoices.Add(invoice);
         seed.SaveChanges();
         return (orderId, invoiceId);
@@ -654,6 +657,55 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         row.AnafStatus.Should().Be(InvoiceAnafStatus.Failed,
             "Rejected must reach Failed on its own, or the admin retry endpoint is the only way out");
         row.ClaimedAt.Should().BeNull("the admin retry endpoint cannot take a claimed row");
+    }
+
+    // A queue of rejections must not push Pending uploads out of the batch they share.
+    [Fact]
+    public async Task ProcessBatchAsync_ManyNotYetDueRejections_StillUploadsAPendingInvoice()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true, maxBatchSize: 5);
+
+        for (var i = 0; i < 5; i++)
+            SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Rejected,
+                anafUploadId: "upload-" + i,
+                createdAt: now.AddHours(-4), updatedAt: now.AddHours(-2));
+
+        var (_, pendingId) = SeedOrderAndInvoice(database, createdAt: now.AddHours(-1));
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("fresh-upload", now));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var pending = await verify.Invoices.FirstAsync(i => i.Id == pendingId);
+        pending.AnafStatus.Should().Be(InvoiceAnafStatus.Submitted,
+            "five not-yet-due rejections must not fill a batch of five and starve the upload");
+    }
+
+    // The customer can already download this PDF; an automatic resubmit must not revoke it.
+    [Fact]
+    public async Task ProcessBatchAsync_AutomaticRejectionResubmit_KeepsTheRenderedPdf()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-2), updatedAt: now.AddHours(-2),
+            pdfStoragePath: "invoices/2026/FT-2026-00001.pdf");
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Pending);
+        row.PdfStoragePath.Should().Be("invoices/2026/FT-2026-00001.pdf",
+            "clearing it 404s the customer download until a later tick re-renders");
     }
 
     private static Task InvokeRunTickAsync(InvoiceUploadJob job, CancellationToken ct)

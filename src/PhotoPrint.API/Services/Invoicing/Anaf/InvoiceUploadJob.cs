@@ -23,6 +23,7 @@ public sealed class InvoiceUploadJob : BackgroundService
     private readonly TimeProvider _clock;
     private readonly ILogger<InvoiceUploadJob> _logger;
     private readonly int _pollIntervalMinutes;
+    private readonly int _maxBatchSize;
     private readonly int _maxUnknownUploadOutcomes;
     private readonly TimeSpan _authOutageAlertWindow;
 
@@ -40,6 +41,7 @@ public sealed class InvoiceUploadJob : BackgroundService
         _logger = logger;
         _pollIntervalMinutes = Math.Max(1, _settings.PollIntervalMinutes);
         _maxUnknownUploadOutcomes = Math.Max(1, _settings.MaxUnknownUploadOutcomes);
+        _maxBatchSize = Math.Clamp(_settings.MaxBatchSize, 1, 500);
         _authOutageAlertWindow = AuthOutageAlertWindowFor(_pollIntervalMinutes);
     }
 
@@ -101,14 +103,23 @@ public sealed class InvoiceUploadJob : BackgroundService
             var rejectedNotBefore = now - TimeSpan.FromHours(Math.Max(1, MinBackoffHours));
 
             var batch = await db.Invoices
-                .Where(i => ((i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
-                             && (i.LastError == null || i.UpdatedAt == null || i.UpdatedAt < retryNotBefore))
-                            || (i.AnafStatus == rejectedStatus
-                                && (i.UpdatedAt == null || i.UpdatedAt < rejectedNotBefore)))
+                .Where(i => (i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
+                            && (i.LastError == null || i.UpdatedAt == null || i.UpdatedAt < retryNotBefore))
                 .OrderBy(i => i.CreatedAt)
-                .Take(_settings.MaxBatchSize)
+                .Take(_maxBatchSize)
                 .Select(i => new BatchRow(i.Id, i.OrderId, i.AnafStatus, i.CreatedAt, i.UpdatedAt))
                 .ToListAsync(ct);
+
+            // Oldest transition first: a row that just moved is the least likely to be due.
+            var rejected = await db.Invoices
+                .Where(i => i.AnafStatus == rejectedStatus
+                            && (i.UpdatedAt == null || i.UpdatedAt < rejectedNotBefore))
+                .OrderBy(i => i.UpdatedAt)
+                .Take(RejectedSliceCap)
+                .Select(i => new BatchRow(i.Id, i.OrderId, i.AnafStatus, i.CreatedAt, i.UpdatedAt))
+                .ToListAsync(ct);
+
+            batch.AddRange(rejected);
 
             if (batch.Count == 0) return;
 
@@ -206,6 +217,9 @@ public sealed class InvoiceUploadJob : BackgroundService
     private int MinBackoffHours =>
         _settings.BackoffHours.Length == 0 ? 1 : _settings.BackoffHours.Min();
 
+    // Its own budget, so a backlog of rejections cannot push Pending uploads out of the batch.
+    private int RejectedSliceCap => Math.Max(1, _maxBatchSize / 10);
+
     private async Task ProcessOneAsync(
         IServiceProvider sp, BatchRow row, CancellationToken ct)
     {
@@ -250,7 +264,7 @@ public sealed class InvoiceUploadJob : BackgroundService
             return;
         }
 
-        var requeued = await lifecycle.RetryAsync(row.Id, InvoiceAnafStatus.Rejected, ct);
+        var requeued = await lifecycle.RequeueRejectedAsync(row.Id, ct);
         if (requeued)
         {
             IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);

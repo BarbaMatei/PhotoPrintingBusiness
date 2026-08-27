@@ -174,6 +174,24 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
         return LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Failed, parked);
     }
 
+    public async Task<bool> RequeueRejectedAsync(
+        Guid invoiceId, CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var affected = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Rejected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.AnafStatus,   InvoiceAnafStatus.Pending)
+                .SetProperty(i => i.AnafUploadId, (string?)null)
+                .SetProperty(i => i.LastError,    (string?)null)
+                .SetProperty(i => i.XmlPayload,   (string?)null)
+                .SetProperty(i => i.UnknownUploadOutcomes, 0)
+                .SetProperty(i => i.ClaimedAt,    (DateTimeOffset?)null)
+                .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),
+                ct);
+        return LogAndReturn(invoiceId, InvoiceAnafStatus.Rejected, InvoiceAnafStatus.Pending, affected);
+    }
+
     public async Task<bool> RetryAsync(
         Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default)
     {

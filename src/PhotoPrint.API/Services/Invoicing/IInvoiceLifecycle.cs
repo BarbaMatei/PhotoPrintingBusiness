@@ -55,6 +55,10 @@ public interface IInvoiceLifecycle
     /// Failed, claim released so the admin retry endpoint can pick it up.</summary>
     Task<bool> GiveUpOnRejectedAsync(Guid invoiceId, string reason, CancellationToken ct = default);
 
+    /// <summary>The worker's own resubmission of a rejected invoice: same reset as a retry, except
+    /// the rendered PDF stays, because the customer can already download it.</summary>
+    Task<bool> RequeueRejectedAsync(Guid invoiceId, CancellationToken ct = default);
+
     Task<bool> RetryAsync(Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default);
 }
 
