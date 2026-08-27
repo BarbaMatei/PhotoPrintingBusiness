@@ -12,9 +12,17 @@ import { isAtLeast as isAtLeastFn } from '../../../core/models/order-status.cons
 import { PaymentService } from '../../../core/services/payment.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
+import { CheckoutAttemptService } from '../../../core/services/checkout-attempt.service';
 import { CartService } from '../../../core/services/cart.service';
-import { OrderDto } from '../../../core/models/payment.model';
+import { OrderPaymentStatusDto } from '../../../core/models/payment.model';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+
+const SETTLED_STATUSES = ['Paid', 'Printing', 'Shipped', 'Delivered'];
+
+// Three seconds between reads, ten reads: half a minute covers a normal webhook, and the page
+// then keeps the order number on screen instead of pretending the payment failed.
+const SETTLE_POLL_MS = 3000;
+const MAX_SETTLE_POLLS = 10;
 
 @Component({
   selector: 'app-confirmation',
@@ -88,7 +96,20 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
         </div>
       }
 
-      @if (!loading() && !order()) {
+      @if (!loading() && settling()) {
+        <div class="settling">
+          <app-spinner label="Se confirmă plata..." [showLabel]="true" />
+          <p>
+            Plata a fost trimisă pentru comanda <strong>#{{ settling()!.orderNumber }}</strong>.
+            Confirmarea de la procesatorul de plăți poate întârzia câteva momente.
+          </p>
+          <p class="settling-hint">
+            Puteți închide pagina — comanda este înregistrată și veți primi un e-mail.
+          </p>
+        </div>
+      }
+
+      @if (!loading() && !order() && !settling()) {
         <div class="state-error">
           <p>Comanda nu a fost găsită sau nu a fost finalizată.</p>
           <a routerLink="/" class="btn btn--primary">Înapoi acasă</a>
@@ -195,28 +216,57 @@ export class ConfirmationPage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly checkoutState = inject(CheckoutStateService);
   private readonly cartService = inject(CartService);
+  private readonly attempts = inject(CheckoutAttemptService);
 
   readonly loading = signal(true);
-  readonly order = signal<OrderDto | null>(null);
+  readonly order = signal<OrderPaymentStatusDto | null>(null);
+  readonly settling = signal<OrderPaymentStatusDto | null>(null);
+
+  private polls = 0;
 
   readonly isAuthenticated = () => this.authService.isAuthenticated();
 
   ngOnInit(): void {
-    this.paymentService.getOrder(this.orderId()).subscribe({
+    this.read();
+  }
+
+  // The card confirmation returns before the payment webhook has marked the order paid, so a
+  // customer who just paid arrives here on an order still awaiting payment. Sending them home
+  // for that loses the confirmation and their emptied basket, so wait instead — but only for an
+  // order this browser submitted, and only until the budget runs out.
+  private read(): void {
+    this.paymentService.getPaymentStatus(this.orderId()).subscribe({
       next: order => {
         this.loading.set(false);
-        if (order.status !== 'Paid' && order.status !== 'Printing' && order.status !== 'Shipped' && order.status !== 'Delivered') {
-          // Order not in a success state — redirect home
-          this.router.navigate(['/']);
+
+        if (SETTLED_STATUSES.includes(order.status)) {
+          this.settling.set(null);
+          this.order.set(order);
+          this.attempts.clear();
+          this.checkoutState.reset();
+          this.cartService.clearCart().subscribe();
           return;
         }
-        this.order.set(order);
-        // Reset checkout state now that we've confirmed success
-        this.checkoutState.reset();
-        this.cartService.clearCart().subscribe();
+
+        const stillPaying = order.status === 'AwaitingPayment';
+        if (!stillPaying || !this.attempts.isWaitingFor(this.orderId())) {
+          // Either the payment came back failed, or this browser never submitted this order:
+          // nothing to wait for, so show the not-finalised state rather than polling.
+          this.settling.set(null);
+          return;
+        }
+
+        this.settling.set(order);
+        if (this.polls < MAX_SETTLE_POLLS) {
+          this.polls++;
+          setTimeout(() => this.read(), SETTLE_POLL_MS);
+        }
       },
+      // One failed read stops the wait: retrying a rejected read would hammer the endpoint and,
+      // for a guest, repeat whatever cleared their token in the first place.
       error: () => {
         this.loading.set(false);
+        this.settling.set(null);
       },
     });
   }

@@ -10,6 +10,7 @@ import { NgIf } from '@angular/common';
 import { PaymentService } from '../../../core/services/payment.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
 import { CartService } from '../../../core/services/cart.service';
+import { CheckoutAttemptService } from '../../../core/services/checkout-attempt.service';
 import { CreateOrderRequest } from '../../../core/models/payment.model';
 import { environment } from '../../../../environments/environment';
 
@@ -24,6 +25,14 @@ import { environment } from '../../../../environments/environment';
 
       <div class="payment-panel">
         <div *ngIf="stripeError()" class="payment-error">{{ stripeError() }}</div>
+        <button
+          *ngIf="canRetry()"
+          type="button"
+          class="btn btn--ghost retry-payment"
+          (click)="retryPayment()"
+        >
+          Încearcă din nou
+        </button>
         <div *ngIf="!stripeReady() && !stripeError()" class="loading-placeholder">
           Se inițializează formularul de plată...
         </div>
@@ -81,10 +90,12 @@ export class PaymentStep implements OnInit {
   private readonly paymentService = inject(PaymentService);
   private readonly checkoutState = inject(CheckoutStateService);
   private readonly cartService = inject(CartService);
+  private readonly attempts = inject(CheckoutAttemptService);
 
   readonly stripeReady = signal(false);
   readonly stripeLoading = signal(false);
   readonly stripeError = signal<string | null>(null);
+  readonly canRetry = signal(false);
 
   // Stripe internals (no strong typing to avoid hard dep at compile time)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,21 +123,58 @@ export class PaymentStep implements OnInit {
         return;
       }
 
-      // Create order + PaymentIntent
-      const req = this.buildOrderRequest();
-      this.paymentService.createStripeIntent(req).subscribe({
-        next: resp => {
-          this.orderId = resp.orderId;
-          this.clientSecret = resp.clientSecret;
-          this.mountCardElement();
-        },
-        error: () => {
-          this.stripeError.set('Nu s-a putut crea sesiunea de plată. Verificați că aveți articole în coș.');
-        },
-      });
+      this.createIntent(false);
     } catch {
       this.stripeError.set('Plata nu este disponibilă momentan. Încercați din nou mai târziu.');
     }
+  }
+
+  // One key per basket, reused across mounts, so a second tab or a Back-then-forward cannot
+  // turn one basket into two orders. The server answers 409 two ways and they mean opposites:
+  // a divergent payload means the stored key belongs to another basket, a named order means
+  // the customer already paid and must be sent there instead of charged again.
+  private createIntent(afterDivergence: boolean): void {
+    const key = this.attempts.idempotencyKey();
+    this.paymentService.createStripeIntent(this.buildOrderRequest(), key).subscribe({
+      next: resp => {
+        this.orderId = resp.orderId;
+        this.clientSecret = resp.clientSecret;
+        this.attempts.markOrderCreated(resp.orderId);
+        this.mountCardElement();
+      },
+      error: err => this.handleIntentError(err, afterDivergence),
+    });
+  }
+
+  private handleIntentError(err: unknown, afterDivergence: boolean): void {
+    const response = err as { status?: number; error?: { orderId?: string; divergentFields?: string[] } };
+    const settledOrderId = response?.error?.orderId;
+    const diverged = !!response?.error?.divergentFields?.length;
+
+    if (response?.status === 409 && settledOrderId) {
+      this.attempts.clear();
+      this.router.navigate(['/comanda', settledOrderId, 'confirmare']);
+      return;
+    }
+
+    if (response?.status === 409 && diverged && !afterDivergence) {
+      this.attempts.clear();
+      this.createIntent(true);
+      return;
+    }
+
+    this.stripeError.set(
+      response?.status === 409
+        ? 'Coșul s-a schimbat între timp. Reîncărcați pagina și încercați din nou.'
+        : 'Nu s-a putut crea sesiunea de plată. Verificați că aveți articole în coș.',
+    );
+    this.canRetry.set(true);
+  }
+
+  retryPayment(): void {
+    this.canRetry.set(false);
+    this.stripeError.set(null);
+    this.createIntent(false);
   }
 
   private mountCardElement(): void {
@@ -142,19 +190,39 @@ export class PaymentStep implements OnInit {
     this.stripeLoading.set(true);
     this.stripeError.set(null);
 
-    const result = await this.stripeInstance.confirmCardPayment(this.clientSecret, {
-      payment_method: { card: this.cardElement },
-    });
+    // A rejected confirm call (the network dropped, Stripe.js threw) must not leave the button
+    // spinning with nothing said.
+    let result: { error?: { message?: string }; paymentIntent?: { status?: string } };
+    try {
+      result = await this.stripeInstance.confirmCardPayment(this.clientSecret, {
+        payment_method: { card: this.cardElement },
+      });
+    } catch {
+      this.stripeLoading.set(false);
+      this.stripeError.set('Plata nu a putut fi trimisă. Verificați conexiunea și încercați din nou.');
+      return;
+    }
 
     this.stripeLoading.set(false);
 
     if (result.error) {
       this.stripeError.set(result.error.message ?? 'Plata a eșuat. Verificați datele cardului.');
-    } else if (result.paymentIntent?.status === 'succeeded') {
+      return;
+    }
+
+    // A payment still in flight is submitted, not failed: the confirmation page waits for the
+    // webhook. Any other status means nothing was charged, so say so rather than stranding.
+    const status = result.paymentIntent?.status;
+    if (status === 'succeeded' || status === 'processing' || status === 'requires_capture') {
       this.checkoutState.reset();
       this.cartService.clearCart().subscribe();
       this.router.navigate(['/comanda', this.orderId, 'confirmare']);
+      return;
     }
+
+    this.stripeError.set(
+      'Plata nu a fost finalizată. Verificați datele cardului și încercați din nou.',
+    );
   }
 
   back(): void {
@@ -167,7 +235,6 @@ export class PaymentStep implements OnInit {
       deliveryType: s.method ?? 'Courier',
       easyboxLockerId: s.lockerId,
       shippingAddress: s.shippingAddress,
-      shippingCostRon: s.shippingCostRon,
     };
   }
 }
