@@ -12,8 +12,8 @@ using PhotoPrint.API.Data;
 namespace PhotoPrint.API.Migrations
 {
     [DbContext(typeof(PhotoPrintDbContext))]
-    [Migration("20260820133204_InitialPostgres")]
-    partial class InitialPostgres
+    [Migration("20260827161417_DropEuPlatescColumns")]
+    partial class DropEuPlatescColumns
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -335,8 +335,16 @@ namespace PhotoPrint.API.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<int>("StorageLocation")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<decimal>("TotalRon")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("UnknownUploadOutcomes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -393,14 +401,6 @@ namespace PhotoPrint.API.Migrations
                     b.Property<Guid?>("EasyboxLockerId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("EuPlatescRedirectUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("EuPlatescTransactionId")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<string>("GuestEmail")
                         .HasColumnType("text");
 
@@ -431,10 +431,6 @@ namespace PhotoPrint.API.Migrations
                     b.Property<string>("PaymentIntentId")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<string>("PaymentProcessor")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("ShippedAt")
                         .HasColumnType("timestamp with time zone");

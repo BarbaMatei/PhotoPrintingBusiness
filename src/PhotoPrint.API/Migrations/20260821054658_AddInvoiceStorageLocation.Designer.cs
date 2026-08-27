@@ -398,6 +398,14 @@ namespace PhotoPrint.API.Migrations
                     b.Property<Guid?>("EasyboxLockerId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("EuPlatescRedirectUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("EuPlatescTransactionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("GuestEmail")
                         .HasColumnType("text");
 
@@ -428,6 +436,10 @@ namespace PhotoPrint.API.Migrations
                     b.Property<string>("PaymentIntentId")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PaymentProcessor")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("ShippedAt")
                         .HasColumnType("timestamp with time zone");
