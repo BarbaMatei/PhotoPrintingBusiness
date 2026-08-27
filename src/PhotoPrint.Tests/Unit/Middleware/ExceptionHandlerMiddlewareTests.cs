@@ -457,4 +457,42 @@ public class ExceptionHandlerMiddlewareTests
         var body = await ReadResponseBodyAsync(context);
         body.RootElement.GetProperty("correlationId").GetString().Should().Be(expectedId);
     }
+    [Fact]
+    public async Task InvokeAsync_IdempotencyKeyConsumed_Returns409CarryingTheOrderId()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        var orderId = Guid.NewGuid();
+        RequestDelegate next = _ => throw new IdempotencyKeyConsumedException(orderId);
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(409);
+        var body = await ReadResponseBodyAsync(context);
+        body.RootElement.GetProperty("orderId").GetString().Should().Be(orderId.ToString());
+        body.RootElement.TryGetProperty("divergentFields", out _).Should().BeFalse(
+            "a consumed key is not a divergent request — the client must be able to tell them apart");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyKeyConsumed_LogsTheReservedEvent()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new IdempotencyKeyConsumedException(Guid.NewGuid());
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("payments.idempotency.key-consumed")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
 }

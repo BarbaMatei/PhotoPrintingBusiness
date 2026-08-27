@@ -14,10 +14,11 @@ public class OrdersFactory : PaymentFactory
     /// Seeds a completed <see cref="Order"/> directly for the given user.
     /// </summary>
     public async Task<Order> SeedOrderAsync(
-        Guid userId,
+        Guid? userId,
         OrderStatus status = OrderStatus.Paid,
         DeliveryType deliveryType = DeliveryType.Easybox,
-        int quantity = 2)
+        int quantity = 2,
+        Guid? guestSessionId = null)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
@@ -99,6 +100,7 @@ public class OrdersFactory : PaymentFactory
         {
             OrderNumber = $"FT-TEST-{Guid.NewGuid():N}".Substring(0, 14),
             UserId = userId,
+            GuestSessionId = guestSessionId,
             Status = status,
             DeliveryType = deliveryType,
             EasyboxLockerId = locker?.Id,

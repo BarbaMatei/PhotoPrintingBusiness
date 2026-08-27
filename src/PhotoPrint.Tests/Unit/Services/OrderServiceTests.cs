@@ -422,6 +422,46 @@ public class OrderServiceTests : IDisposable
         Assert.Null(freed!.IdempotencyKey);                 // old row's key was nulled
     }
 
+    [Fact]
+    public async Task CreateFromCart_SameKey_AfterOrderPaid_DoesNotReplayThePaidOrder()
+    {
+        var (userId, _, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
+        const string key = "idem-key-settled";
+
+        var request = MakeRequest();
+        var first = await _service.CreateFromCartAsync(userId, null, request, key);
+        first.Order.Status = OrderStatus.Paid;
+        first.Order.StripeClientSecret = "pi_secret_paid";
+        first.Order.PaidAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<IdempotencyKeyConsumedException>(
+            () => _service.CreateFromCartAsync(userId, null, request, key));
+
+        Assert.Equal(first.Order.Id, ex.OrderId);
+        Assert.Equal(1, await _db.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateFromCart_SameKey_AfterPaymentFailed_FreesTheKeyAndCreatesANewOrder()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "idem-key-failed-attempt";
+
+        var request = MakeRequest();
+        var first = await _service.CreateFromCartAsync(userId, null, request, key);
+        first.Order.Status = OrderStatus.PaymentFailed;
+        await _db.SaveChangesAsync();
+
+        var second = await _service.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.False(second.WasIdempotentReplay);
+        Assert.NotEqual(first.Order.Id, second.Order.Id);
+        Assert.Equal(key, second.Order.IdempotencyKey);
+        var freed = await _db.Orders.FindAsync(first.Order.Id);
+        Assert.Null(freed!.IdempotencyKey);
+    }
+
     // ── Queries ───────────────────────────────────────────────────────────────
 
     [Fact]

@@ -110,9 +110,12 @@ public class OrderService : IOrderService
             var holder = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
             if (holder is not null)
             {
-                // Fresh match for this caller → replay or (on divergence) 409.
-                if (IsFresh(holder))
+                // A settled order must not hand back its client secret; a failed one frees the key.
+                if (IsFresh(holder) && holder.Status == OrderStatus.AwaitingPayment)
                     return ReplayOrConflict(holder, request, total, orderItems);
+
+                if (IsFresh(holder) && holder.Status != OrderStatus.PaymentFailed)
+                    throw new IdempotencyKeyConsumedException(holder.Id);
 
                 // Stale (>24h) row this caller owns still holds the key. Null it on the
                 // in-memory entity WITHOUT an intermediate save, so
@@ -207,10 +210,15 @@ public class OrderService : IOrderService
                 var candidateItems = order.Items.ToList();
                 DetachFailedInsert(order);
 
-                // Same caller won the race → replay it (or 409 if the request diverged).
                 var winner = await FindKeyHolderAsync(idempotencyKey!, userId, guestSessionId, ct);
                 if (winner is not null && IsFresh(winner))
-                    return ReplayOrConflict(winner, request, total, candidateItems);
+                {
+                    if (winner.Status == OrderStatus.AwaitingPayment)
+                        return ReplayOrConflict(winner, request, total, candidateItems);
+
+                    if (winner.Status != OrderStatus.PaymentFailed)
+                        throw new IdempotencyKeyConsumedException(winner.Id);
+                }
 
                 // The constraint error already proves the key is taken, but this caller owns
                 // no (fresh) row for it → it is held by a *different* caller (global unique
