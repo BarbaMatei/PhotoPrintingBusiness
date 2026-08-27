@@ -15,7 +15,6 @@ namespace PhotoPrint.API.Migrations
     [Migration("20260820133204_InitialPostgres")]
     partial class InitialPostgres
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
@@ -335,8 +334,16 @@ namespace PhotoPrint.API.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<int>("StorageLocation")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<decimal>("TotalRon")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("UnknownUploadOutcomes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

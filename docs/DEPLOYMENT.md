@@ -161,23 +161,24 @@ PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). Ever
 environment — local dev included — uses that same path, so a normal deploy needs no
 manual migration step.
 
-The chain is three migrations, all scaffolded under the Npgsql design-time provider: the squashed
-baseline `20260820133204_InitialPostgres`, then `20260821054658_AddInvoiceStorageLocation` and
-`20260821110018_AddInvoiceUnknownUploadOutcomes`, each a single `AddColumn`. The baseline carries
-`uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial unique index on
-`Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox locker seed rows, the
-`uq_invoices_series_year_number` expression index, and the `invoice_seq_ft_2026` sequence. It has
-been applied against a real PostgreSQL 16 instance from an empty database.
+**There is exactly one migration:** `20260820133204_InitialPostgres`, scaffolded under the Npgsql
+design-time provider. It carries `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial
+unique index on `Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox locker
+seed rows, the `uq_invoices_series_year_number` expression index, and the `invoice_seq_ft_2026`
+sequence. It has been applied against a real PostgreSQL 16 instance from an empty database.
 
-**Until the first deploy, the baseline is edited in place rather than added to.** Nothing is
-deployed, so there is no database whose history must be respected, and the branch that reaches
-`main` is meant to carry one migration rather than a trail of corrections. The cost is that
-`Database.Migrate()` compares ids, not contents: an id already in `__EFMigrationsHistory` is
-skipped whatever it now says, so an edited baseline never reaches a database that already ran it.
-A developer whose database predates the edit must bring it in line by hand — dropping a removed
-column with `ALTER TABLE ... DROP COLUMN` keeps the data, and recreating the database is always
-safe while nothing is live. A `NOT NULL` column the model no longer maps fails every `INSERT`
-with `23502` until that is done.
+**Until the first deploy there is only ever one migration, edited in place.** Nothing is deployed,
+so no database history has to be respected, and the branch that reaches `main` carries a single
+migration rather than a trail of corrections. A schema change means editing
+`20260820133204_InitialPostgres` and its `.Designer.cs`, never scaffolding a second file.
+
+The cost is that `Database.Migrate()` compares ids, not contents: an id already in
+`__EFMigrationsHistory` is skipped whatever it now says, so an edited baseline never reaches a
+database that already ran it. A developer whose database predates the edit brings it in line by
+hand — `ALTER TABLE ... ADD COLUMN` / `DROP COLUMN` keeps the data, and recreating the database is
+always safe while nothing is live. A `NOT NULL` column the model no longer maps fails every
+`INSERT` with `23502`; a column the model expects and the database lacks fails every read of that
+table. Neither shows up as a pending migration, so neither is caught at boot.
 
 **This stops at the first deploy.** From the moment a real environment has run the chain, an
 applied migration is frozen and a column is removed by adding a migration, never by rewriting an
@@ -187,7 +188,7 @@ old one.
 the baseline over existing tables and aborts with `42P07`. No such database exists — the deleted
 pre-squash chain was never applied anywhere, and dev ran on SQLite through `EnsureCreated`, which
 records no migration history at all. Should one appear, do not delete data: replace its
-`__EFMigrationsHistory` rows with the three ids above so EF sees the chain as already applied,
+`__EFMigrationsHistory` rows with the single id above so EF sees the migration as already applied,
 then restart the API.
 
 Seeding the product catalog (first deploy only):

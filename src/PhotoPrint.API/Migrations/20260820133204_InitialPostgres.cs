@@ -379,7 +379,9 @@ namespace PhotoPrint.API.Migrations
                     LastError = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    ClaimedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    ClaimedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    StorageLocation = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    UnknownUploadOutcomes = table.Column<int>(type: "integer", nullable: false, defaultValue: 0)
                 },
                 constraints: table =>
                 {

@@ -26,15 +26,16 @@ or user-secrets — never in a tracked settings file (ADR-006).
 
 ## The migration chain
 
-Three migrations, all scaffolded under the Npgsql design-time provider: the squashed baseline
-**`20260820133204_InitialPostgres`**, then `20260821054658_AddInvoiceStorageLocation` and
-`20260821110018_AddInvoiceUnknownUploadOutcomes`, each a single `AddColumn`.
+**One migration, always:** **`20260820133204_InitialPostgres`**, scaffolded under the Npgsql
+design-time provider.
 
-Pre-deploy, the baseline is **edited in place** — the branch that reaches `main` carries one
-migration, not a trail of corrections. `Migrate()` matches ids, not contents, so an edited
-baseline never reaches a database that already ran it: bring a stale developer database in line by
-hand (`ALTER TABLE ... DROP COLUMN` keeps the data) or recreate it. Once anything is deployed this
-reverses — an applied migration is frozen and a column goes in a new migration.
+Pre-deploy, it is **edited in place** — a schema change edits the baseline and its `.Designer.cs`,
+never adds a second file, so the branch that reaches `main` carries one migration rather than a
+trail of corrections. `Migrate()` matches ids, not contents, so an edited baseline never reaches a
+database that already ran it: bring a stale developer database in line by hand
+(`ALTER TABLE ... ADD COLUMN` / `DROP COLUMN` keeps the data) or recreate it. Neither a missing
+column nor a stale one registers as a pending migration, so boot will not warn. Once anything is
+deployed this reverses — an applied migration is frozen and a change goes in a new migration.
 
 The baseline's snapshot contains only Postgres store types — `uuid`, `timestamp with time zone`,
 `jsonb`, `numeric`, `character varying(n)`, `double precision`, `boolean` — and **zero**
