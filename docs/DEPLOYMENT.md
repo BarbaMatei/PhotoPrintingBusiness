@@ -161,12 +161,21 @@ PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). Ever
 environment — local dev included — uses that same path, so a normal deploy needs no
 manual migration step.
 
-There is a single migration, `20260820133204_InitialPostgres`, scaffolded under the Npgsql
-design-time provider: `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial
-unique index on `Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox
-locker seed rows, the `uq_invoices_series_year_number` expression index, and the
-`invoice_seq_ft_2026` sequence. It has been applied against a real PostgreSQL 16 instance
-from an empty database.
+The chain is three migrations, all scaffolded under the Npgsql design-time provider: the
+squashed baseline `20260820133204_InitialPostgres`, then `20260821054658_AddInvoiceStorageLocation`
+and `20260821110018_AddInvoiceUnknownUploadOutcomes`, each a single `AddColumn`. The baseline
+carries `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial unique index on
+`Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox locker seed rows, the
+`uq_invoices_series_year_number` expression index, and the `invoice_seq_ft_2026` sequence. It has
+been applied against a real PostgreSQL 16 instance from an empty database.
+
+**If a database ever carries a migration id this repo no longer contains**, boot will try to
+apply the baseline over existing tables and abort with `42P07` (relation already exists). No such
+database exists — the deleted pre-squash chain was never applied anywhere, and dev ran on SQLite
+through `EnsureCreated`, which records no migration history at all. Should one appear, do not
+delete data: replace its `__EFMigrationsHistory` rows with the three ids above
+(`DELETE FROM "__EFMigrationsHistory"; INSERT INTO "__EFMigrationsHistory" ...`) so EF sees the
+chain as already applied, then restart the API.
 
 Seeding the product catalog (first deploy only):
 ```sh
