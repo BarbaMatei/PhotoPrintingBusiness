@@ -462,6 +462,48 @@ public class OrderServiceTests : IDisposable
         Assert.Null(freed!.IdempotencyKey);
     }
 
+    // Handing the key on leaves the failed order's intent chargeable, so one basket would hold
+    // two confirmable intents — the double charge the idempotency key exists to prevent.
+    [Fact]
+    public async Task CreateFromCart_SameKey_AfterPaymentFailed_AbandonsTheOldPaymentIntent()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "idem-key-failed-intent";
+        var gateway = new RecordingGateway();
+        var sut = new OrderService(
+            _db, _orderNumberServiceMock.Object, _shippingMock.Object, _storageRouterMock.Object,
+            Options.Create(new StorageSettings()), Options.Create(new VatSettings()), gateway);
+
+        var request = MakeRequest();
+        var first = await sut.CreateFromCartAsync(userId, null, request, key);
+        first.Order.Status = OrderStatus.PaymentFailed;
+        first.Order.PaymentIntentId = "pi_declined";
+        first.Order.StripeClientSecret = "secret_declined";
+        await _db.SaveChangesAsync();
+
+        await sut.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.Contains("pi_declined", gateway.Cancelled);
+        var abandoned = await _db.Orders.FindAsync(first.Order.Id);
+        Assert.Null(abandoned!.StripeClientSecret);
+    }
+
+    private sealed class RecordingGateway : IStripePaymentGateway
+    {
+        public List<string> Cancelled { get; } = [];
+
+        public Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
+            long amountBani, string currency, string orderIdMetadata,
+            string? idempotencyKey = null, CancellationToken ct = default) =>
+            Task.FromResult(("secret", "pi_new"));
+
+        public Task<bool> CancelPaymentIntentAsync(string paymentIntentId, CancellationToken ct = default)
+        {
+            Cancelled.Add(paymentIntentId);
+            return Task.FromResult(true);
+        }
+    }
+
     // ── Queries ───────────────────────────────────────────────────────────────
 
     [Fact]

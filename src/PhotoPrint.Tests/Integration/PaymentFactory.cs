@@ -26,6 +26,9 @@ public class FakeStripePaymentGateway : IStripePaymentGateway
     /// <summary>The most recent idempotency key forwarded to the gateway.</summary>
     public string? LastIdempotencyKey { get; private set; }
 
+    /// <summary>Every PaymentIntent this fake was asked to make unconfirmable.</summary>
+    public List<string> CancelledIntents { get; } = [];
+
     public Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
         long amountBani, string currency, string orderIdMetadata,
         string? idempotencyKey = null, CancellationToken ct = default)
@@ -33,6 +36,12 @@ public class FakeStripePaymentGateway : IStripePaymentGateway
         CreateCallCount++;
         LastIdempotencyKey = idempotencyKey;
         return Task.FromResult(("pi_test_secret_fake", "pi_test_fake_id"));
+    }
+
+    public Task<bool> CancelPaymentIntentAsync(string paymentIntentId, CancellationToken ct = default)
+    {
+        CancelledIntents.Add(paymentIntentId);
+        return Task.FromResult(true);
     }
 }
 

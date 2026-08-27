@@ -19,6 +19,8 @@ public static class OrderStatusMachine
     [
         (OrderStatus.AwaitingPayment, OrderStatus.Paid),
         (OrderStatus.AwaitingPayment, OrderStatus.PaymentFailed),
+        // A declined card leaves the intent chargeable, so a later success must still land.
+        (OrderStatus.PaymentFailed,   OrderStatus.Paid),
         (OrderStatus.Paid,            OrderStatus.Printing),
         (OrderStatus.Paid,            OrderStatus.Cancelled),
         (OrderStatus.Printing,        OrderStatus.Shipped),

@@ -11,6 +11,20 @@ public class StripePaymentGateway : IStripePaymentGateway
         _service = new PaymentIntentService(stripeClient);
     }
 
+    public async Task<bool> CancelPaymentIntentAsync(
+        string paymentIntentId, CancellationToken ct = default)
+    {
+        try
+        {
+            await _service.CancelAsync(paymentIntentId, cancellationToken: ct);
+            return true;
+        }
+        catch (StripeException)
+        {
+            return false;
+        }
+    }
+
     public async Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
         long amountBani,
         string currency,

@@ -138,6 +138,30 @@ public class WebhooksControllerMetricsTests
         metrics.ContractViolations().Should().BeEmpty();
     }
 
+    // A declined card leaves the same intent chargeable, so a later success must complete the
+    // order instead of logging "manual reconciliation required" over a real charge.
+    [Fact]
+    public async Task Stripe_succeeded_after_a_declined_card_marks_the_order_paid()
+    {
+        var order = SeedOrder(OrderStatus.PaymentFailed);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_retry", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_retry");
+        using var metrics = Capture();
+
+        await _sut.StripeWebhookAsync(default);
+
+        using var verify = FreshDb();
+        var fresh = await verify.Orders.FirstAsync(o => o.Id == order.Id);
+        fresh.Status.Should().Be(OrderStatus.Paid);
+        fresh.PaidAt.Should().NotBeNull();
+        metrics.For(MetricNames.Instruments.PaymentWebhookTotal,
+                (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
+                (MetricNames.Labels.Result, MetricNames.WebhookResultValues.Ok))
+            .Should().HaveCount(1);
+    }
+
     // ── Stripe succeeded: fall-through past the AwaitingPayment guard ─────────
 
     [Fact]

@@ -187,7 +187,9 @@ public class WebhooksController : ControllerBase
             return;
         }
 
-        if (order.Status == OrderStatus.AwaitingPayment)
+        // PaymentFailed included: the same intent stays chargeable after a decline, so a second
+        // attempt that succeeds must complete the order rather than strand the charge.
+        if (order.Status is OrderStatus.AwaitingPayment or OrderStatus.PaymentFailed)
         {
             var statusBeforeTransition = order.Status;
             OrderStatusMachine.Transition(order, OrderStatus.Paid);

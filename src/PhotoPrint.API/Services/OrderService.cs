@@ -14,6 +14,8 @@ namespace PhotoPrint.API.Services;
 public class OrderService : IOrderService
 {
     private readonly PhotoPrintDbContext _db;
+    private readonly IStripePaymentGateway? _paymentGateway;
+    private readonly ILogger<OrderService>? _logger;
     private readonly IOrderNumberService _orderNumberService;
     private readonly IShippingService _shipping;
     private readonly IStorageRouter _storageRouter;
@@ -26,7 +28,9 @@ public class OrderService : IOrderService
         IShippingService shipping,
         IStorageRouter storageRouter,
         IOptions<StorageSettings> storageSettings,
-        IOptions<VatSettings> vatSettings)
+        IOptions<VatSettings> vatSettings,
+        IStripePaymentGateway? paymentGateway = null,
+        ILogger<OrderService>? logger = null)
     {
         _db = db;
         _orderNumberService = orderNumberService;
@@ -34,11 +38,33 @@ public class OrderService : IOrderService
         _storageRouter = storageRouter;
         _storageSettings = storageSettings.Value;
         _vatSettings = vatSettings.Value;
+        _paymentGateway = paymentGateway;
+        _logger = logger;
     }
 
     // ── Idempotency ────────────────────────────────────────────────
 
     private static readonly TimeSpan IdempotencyWindow = TimeSpan.FromHours(24);
+
+    private async Task AbandonPaymentIntentAsync(Order holder, CancellationToken ct)
+    {
+        holder.StripeClientSecret = null;
+        if (_paymentGateway is null || string.IsNullOrEmpty(holder.PaymentIntentId)) return;
+
+        try
+        {
+            var cancelled = await _paymentGateway.CancelPaymentIntentAsync(holder.PaymentIntentId, ct);
+            _logger?.LogInformation(
+                "payments.idempotency.intent-abandoned order_id={OrderId} payment_intent_id={PaymentIntentId} cancelled={Cancelled}",
+                holder.Id, holder.PaymentIntentId, cancelled);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The new order still gets created: a live old intent is a risk, a blocked checkout is certain.
+            _logger?.LogWarning(ex,
+                "payments.idempotency.intent-abandon-failed order_id={OrderId}", holder.Id);
+        }
+    }
 
     // The non-Postgres OrderNumber generator is a racy COUNT, so a
     // concurrent insert can pick a duplicate number. That is transient — regenerate and retry
@@ -116,6 +142,11 @@ public class OrderService : IOrderService
 
                 if (IsFresh(holder) && holder.Status != OrderStatus.PaymentFailed)
                     throw new IdempotencyKeyConsumedException(holder.Id);
+
+                // A failed order keeps a confirmable intent, so handing its key to a new order
+                // would leave one basket with two chargeable intents.
+                if (IsFresh(holder) && holder.Status == OrderStatus.PaymentFailed)
+                    await AbandonPaymentIntentAsync(holder, ct);
 
                 // Stale (>24h) row this caller owns still holds the key. Null it on the
                 // in-memory entity WITHOUT an intermediate save, so
