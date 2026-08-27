@@ -121,9 +121,9 @@ updated: 2026-08-24
 | PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | verified | `06fd2b1` |
 | PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | wont-fix | `090873d` |
 | PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | wont-fix | `090873d` |
-| PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | fixed | `901f8a2` |
+| PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | verified | `901f8a2` |
 | PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | fixed | `06fd2b1` |
-| PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | fixed | `901f8a2` |
+| PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | verified | `901f8a2` |
 | PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | verified | `c03f99a` |
 | PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | verified | `8950624` |
 | PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | verified | `32d4eee` |
@@ -150,11 +150,11 @@ updated: 2026-08-24
 | PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | verified | `add7611` |
 | PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | fixed | `06fd2b1` |
 | PPW-610 | 🟡 | v12 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:133` | backlog | `090873d` |
-| PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | fixed | `2acda1f` |
+| PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | verified | `2acda1f` |
 | PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | verified | `5cd48a5` |
 | PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | verified | `6812453` |
 | PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | verified | `6812453` |
-| PPW-615 | 🟠 | v12 | A non-succeeded, non-error Stripe result leaves the user stranded with no feedback | `src/app/features/checkout/pages/payment-step.ts:221` | fixed | `901f8a2` |
+| PPW-615 | 🟠 | v12 | A non-succeeded, non-error Stripe result leaves the user stranded with no feedback | `src/app/features/checkout/pages/payment-step.ts:221` | verified | `901f8a2` |
 | PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | verified | `5cd48a5` |
 | PPW-617 | 🟡 | v12 | The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test | `Services/AdminOrderService.cs:437` | backlog | `090873d` |
 | PPW-618 | 🟡 | v12 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `Controllers/InvoicesController.cs:99` | backlog | `090873d` |
@@ -1308,6 +1308,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (polling fixes only the signed-in half: the order read is JWT-only, so a guest customer gets 401 and ten polls delete the guest token ten times. Close the server hole first — dual auth on a status read that checks the guest session, or a processor reconcile inside the read. Retry only a 200 that still says AwaitingPayment; abort at once on 401, 403, 404, 429 and PaymentFailed; on budget expiry show the order number, never the homepage. Gate the wait on an explicit payment-submitted marker set before the checkout reset, or a stale or foreign URL waits too. Zoneless: an rxjs timer writing signals under `takeUntilDestroyed`, and fake timers in the spec, because `fakeAsync` does not exist in this app)
   - v12 fix round: fixed @`901f8a2` — a new guest-readable payment-status endpoint, which the confirmation page reads up to ten times over half a minute while the webhook lands, instead of reading the signed-in-only order and sending a paying customer home. Its pre-check was right that the SPA alone could not fix it
+  - v16: verified — clearing `settling` instead of setting it reddened 4 `confirmation-page` specs, restored green. The polling this added was then reworked by PPW-670, PPW-672 and PPW-679, each verified in the same pass
 
 ### PPW-583 — Switching payment tabs destroys the Stripe card element but leaves the pay button enabled
 
@@ -1328,6 +1329,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (the server dedupe already exists and is tested; the storage choice is the defect — the checkout state service persists to sessionStorage, so two tabs still mint two orders. Put the key in its own localStorage entry, one per attempt and processor, cleared on success, on login, on logout, on a guest-token clear and on any 409; nesting it inside the guest session defeats the guest-token clear rule. Requiring the header without a SQLite arm in the violation classifier turns every dev-mode collision into a 500, and replay has no status check, so a stale key replays a paid order's secret. Checkout handles no 409 anywhere, so the key alone converts a silent double order into a 24-hour dead end)
   - v12 fix round: fixed @`901f8a2` — the checkout mints one key per basket in localStorage, reuses it across mounts, and clears it when the order settles; the server answers a settled key with a 409 naming that order and the page sends the customer to it. The pre-check ruled out sessionStorage, which a second tab does not share
+  - v16: verified — sending no idempotency key reddened 3 `payment-step` specs, restored green. The one-key-per-basket half is covered by PPW-661, verified in the same pass
 
 ### PPW-585 — Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour
 
@@ -1592,6 +1594,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12 fix round: fixed @`2acda1f` — the deprecated shippingCostRon left the request and its model, so a checkout no longer logs a tampering warning that would mask a real one
+  - v16: verified by the compiler rather than a red test — putting `shippingCostRon` back on the request no longer type-checks, because the field is gone from `CreateOrderRequest`. A type error is a stronger guarantee here than a spec, but it is not a red leg, so it is recorded as what it is
 
 ### PPW-612 — Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step
 
@@ -1632,6 +1635,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v13: partly retired by PR #13 — the tab-switch path that detached the mounted Stripe element is gone with the second processor. The finding stays open on its other path: a Stripe result that is neither succeeded nor an error still leaves the customer with no feedback
   - v12 fix round: fixed @`901f8a2` — a result that is neither success nor error now tells the customer, a rejected confirm call clears the spinner, and an intent that never got created offers a retry. The tab-switch half of this finding had already died with the second processor
+  - v16: verified — removing the neither-success-nor-error message reddened its `payment-step` spec, restored green
 
 ### PPW-616 — Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in
 
