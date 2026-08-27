@@ -50,8 +50,8 @@ updated: 2026-08-24
 | PPW-506 | 🟠 | v2 | Config comment and rollout runbook still promise the customer invoice email that does not exist | `docs/DEPLOYMENT.md:1409` | verified | `08e7746` |
 | PPW-507 | 🟡 | v2 | New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation | `Configuration/AnafSettings.cs:44` | verified | `08e7746` |
 | PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | verified | `07b0c1b` |
-| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | fixed | `ec29613` |
-| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | fixed | `ec29613` |
+| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | verified | `ec29613` |
+| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | verified | `ec29613` |
 | PPW-511 | 🟡 | v5 | EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | fixed | `06fd2b1` |
 | PPW-512 | 🔴 | v6 | Easybox orders emit e-Factura with empty mandatory buyer address elements | `Services/Invoicing/InvoiceXmlBuilder.cs:121` | verified | `2979ea0` |
 | PPW-513 | 🔴 | v6 | uq_invoices_series_year_number index expression is not IMMUTABLE, so Postgres aborts Migrate() at prod boot | `Migrations/20260603101910_AddVatAndInvoices.cs:112` | verified | `2979ea0` |
@@ -65,7 +65,7 @@ updated: 2026-08-24
 | PPW-521 | 🟠 | v6 | InvoiceAddressFormatter.Truncate throws NRE on a null City/Street that the validators accept | `Services/Invoicing/InvoiceAddressFormatter.cs:12` | verified | `2979ea0` |
 | PPW-522 | 🟠 | v6 | Unbuildable invoice stays Pending forever and starves the upload batch | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:206` | verified | `2979ea0` |
 | PPW-523 | 🟠 | v6 | Missing invoice PDF blob surfaces as an unlogged generic 500 with no distinct event | `Controllers/InvoicesController.cs:69` | verified | `2979ea0` |
-| PPW-524 | 🟠 | v6 | The whole invoicing feature has no SPA consumer and no lens covered the frontend | `Controllers/InvoicesController.cs:1` | deferred | `2979ea0` |
+| PPW-524 | 🟠 | v6 | The whole invoicing feature has no SPA consumer and no lens covered the frontend | `Controllers/InvoicesController.cs:1` | verified | `5324a1c` |
 | PPW-525 | 🟠 | v6 | Guest invoice access is defeated by the unchanged guest-session lifetime and the never-implemented order transfer | `Controllers/InvoicesController.cs:52` | deferred | `2979ea0` |
 | PPW-526 | 🟠 | v6 | EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:205` | wont-fix | `2979ea0` |
 | PPW-527 | 🟠 | v6 | Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook | `Controllers/WebhooksController.cs:390` | verified | `2979ea0` |
@@ -99,7 +99,7 @@ updated: 2026-08-24
 | PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | verified | `f769e22` |
 | PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | verified | `f769e22` |
 | PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | verified | `f769e22` |
-| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | fixed | `56eb9be` |
+| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | verified | `56eb9be` |
 | PPW-561 | 🟡 | v9 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `Tests/Helpers/PostgresTestDatabase.cs:33` | backlog | `c8d6bb4` |
 | PPW-562 | 🟠 | v9 | PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run | `Tests/Helpers/PostgresTestDatabase.cs:25` | fixed | `4dd6763` |
 | PPW-563 | 🟡 | v9 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | backlog | `c8d6bb4` |
@@ -124,38 +124,38 @@ updated: 2026-08-24
 | PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | fixed | `901f8a2` |
 | PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | fixed | `06fd2b1` |
 | PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | fixed | `901f8a2` |
-| PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | fixed | `c03f99a` |
-| PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | fixed | `8950624` |
-| PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | fixed | `32d4eee` |
-| PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | fixed | `32d4eee` |
+| PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | verified | `c03f99a` |
+| PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | verified | `8950624` |
+| PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | verified | `32d4eee` |
+| PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | verified | `32d4eee` |
 | PPW-589 | 🟡 | v12 | nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | backlog | `090873d` |
 | PPW-590 | 🟡 | v12 | PollSubmittedAsync takes no claim, so every replica polls every Submitted row on every tick | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | backlog | `090873d` |
-| PPW-591 | 🟠 | v12 | No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | fixed | `72202c0` |
-| PPW-592 | 🟠 | v12 | ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop | `Services/Invoicing/Anaf/AnafSpvClient.cs:91` | fixed | `add7611` |
+| PPW-591 | 🟠 | v12 | No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | verified | `72202c0` |
+| PPW-592 | 🟠 | v12 | ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop | `Services/Invoicing/Anaf/AnafSpvClient.cs:91` | verified | `add7611` |
 | PPW-593 | 🟡 | v12 | Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered | `Tests/Unit/Controllers/AdminInvoicesControllerTests.cs:75` | backlog | `090873d` |
 | PPW-594 | 🟡 | v12 | The new Invoice.StorageLocation stamp is never asserted after a PDF save | `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:304` | backlog | `090873d` |
 | PPW-595 | 🟡 | v12 | QuestPDF licence is set by the test class itself, so the production licence wiring is unverified | `Tests/Unit/Services/Invoicing/InvoicePdfRendererTests.cs:23` | backlog | `090873d` |
-| PPW-596 | 🟠 | v12 | No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered | `Controllers/InvoicesController.cs:58` | fixed | `e3f4bb8` |
-| PPW-597 | 🟠 | v12 | Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped | `Services/Invoicing/InvoicePdfReadyNotifier.cs:31` | fixed | `5324a1c`, `beb7732` |
-| PPW-598 | 🟠 | v12 | Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback | `Services/Invoicing/InvoiceLifecycle.cs:165` | fixed | `add7611` |
-| PPW-599 | 🟠 | v12 | Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout | `docs/DEPLOYMENT.md:1531` | fixed | `add7611` |
-| PPW-600 | 🔴 | v12 | FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99` | fixed | `6977d5b` |
+| PPW-596 | 🟠 | v12 | No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered | `Controllers/InvoicesController.cs:58` | verified | `e3f4bb8` |
+| PPW-597 | 🟠 | v12 | Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped | `Services/Invoicing/InvoicePdfReadyNotifier.cs:31` | verified | `5324a1c`, `beb7732` |
+| PPW-598 | 🟠 | v12 | Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback | `Services/Invoicing/InvoiceLifecycle.cs:165` | verified | `add7611` |
+| PPW-599 | 🟠 | v12 | Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout | `docs/DEPLOYMENT.md:1531` | verified | `add7611` |
+| PPW-600 | 🔴 | v12 | FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99` | verified | `6977d5b` |
 | PPW-601 | 🟡 | v12 | system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule | `memory-bank/standards/system-architecture.md:83` | backlog | `090873d` |
-| PPW-602 | 🟠 | v12 | Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away | `Controllers/InvoicesController.cs:68` | fixed | `add7611` |
+| PPW-602 | 🟠 | v12 | Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away | `Controllers/InvoicesController.cs:68` | verified | `add7611` |
 | PPW-603 | 🟡 | v12 | The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:414` | backlog | `090873d` |
-| PPW-604 | 🔴 | v12 | No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344` | fixed | `32d4eee` |
-| PPW-605 | 🟠 | v12 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | fixed | `add7611` |
+| PPW-604 | 🔴 | v12 | No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344` | verified | `32d4eee` |
+| PPW-605 | 🟠 | v12 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | verified | `add7611` |
 | PPW-606 | ⚪ | v12 | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `Services/Invoicing/InvoiceCreationService.cs:98` | backlog | `090873d` |
-| PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | fixed | `166230a` |
-| PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | fixed | `add7611` |
+| PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | verified | `166230a` |
+| PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | verified | `add7611` |
 | PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | fixed | `06fd2b1` |
 | PPW-610 | 🟡 | v12 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:133` | backlog | `090873d` |
 | PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | fixed | `2acda1f` |
-| PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | fixed | `5cd48a5` |
-| PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | fixed | `6812453` |
-| PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | fixed | `6812453` |
+| PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | verified | `5cd48a5` |
+| PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | verified | `6812453` |
+| PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | verified | `6812453` |
 | PPW-615 | 🟠 | v12 | A non-succeeded, non-error Stripe result leaves the user stranded with no feedback | `src/app/features/checkout/pages/payment-step.ts:221` | fixed | `901f8a2` |
-| PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | fixed | `5cd48a5` |
+| PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | verified | `5cd48a5` |
 | PPW-617 | 🟡 | v12 | The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test | `Services/AdminOrderService.cs:437` | backlog | `090873d` |
 | PPW-618 | 🟡 | v12 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `Controllers/InvoicesController.cs:99` | backlog | `090873d` |
 | PPW-619 | 🟡 | v12 | OrderNumberService's manually opened DbConnection is never closed, pinning it for the rest of the scope | `Services/OrderNumberService.cs:34` | backlog | `090873d` |
@@ -188,7 +188,7 @@ updated: 2026-08-24
 | PPW-646 | 🟡 | v12 | Polling loads the whole invoice row, including XmlPayload, to read two fields | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | backlog | `090873d` |
 | PPW-647 | ⚪ | v12 | AddInvoiceUnknownUploadOutcomes leaves a permanent DEFAULT 0 that the model does not declare | `Migrations/20260821110018_AddInvoiceUnknownUploadOutcomes.cs:18` | backlog | `090873d` |
 | PPW-648 | ⚪ | v12 | The VAT rounding-mode test mostly asserts decimal.Round's own behaviour and never pins the net-side mode | `Tests/Unit/Services/VatCalculatorTests.cs:57` | backlog | `090873d` |
-| PPW-649 | ⚪ | v12 | metrics.md still marks invoice_anaf_status_total as future and never incremented | `memory-bank/operations/metrics.md:69` | fixed | `6977d5b` |
+| PPW-649 | ⚪ | v12 | metrics.md still marks invoice_anaf_status_total as future and never incremented | `memory-bank/operations/metrics.md:69` | verified | `6977d5b` |
 | PPW-650 | ⚪ | v12 | Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done | `Services/VatCalculator.cs:14` | backlog | `090873d` |
 | PPW-651 | ⚪ | v12 | Both admin retry-refusal branches log nothing despite the class's audit-logged claim | `Controllers/AdminInvoicesController.cs:123` | backlog | `090873d` |
 | PPW-652 | ⚪ | v12 | Paid webhook spends two extra round-trips re-loading order relations it could have Included | `Controllers/WebhooksController.cs:402` | backlog | `090873d` |
@@ -582,6 +582,7 @@ updated: 2026-08-24
 - **History:**
   - v3: found by the verification pass's class check on PPW-481 and PPW-506 — the false sentence is original bolt-039 text, not fix-caused, but two fix rounds edited this file and left it. The fix round's claim to have corrected every operator-facing site does not hold
   - v13: fixed @`ec29613` — the pipeline sentence is gone from the settings docstring, which now points at `AnafSettings` for what the ANAF flag governs, and the registration comment says the builders are wired but only the worker calls them
+  - v13: verified by reading — the docstring and the registration comment were re-read against `AnafSettings` and the worker's call sites
 
 ### PPW-510 — ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority
 
@@ -591,6 +592,7 @@ updated: 2026-08-24
 - **History:**
   - v3: found by the verification pass reviewing the fix round's decision to keep ADR-022 and ddd-02 as point-in-time records. The decision is agreed; the routing into it is the defect
   - v13: fixed @`ec29613` — the ADR keeps its frozen-record convention and gains one note at the head naming both statements that no longer hold and sending the reader to the decision index
+  - v13: verified by reading — the ADR's note names both false statements and the decision index carries the current summary
 
 ### PPW-511 — EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence
 
@@ -739,6 +741,7 @@ updated: 2026-08-24
   - v6: fix round — deferred on the owner ruling that the missing SPA consumer is out of scope
   - v6: re-affirmed @`2979ea0` — the owner ruling parking this out of scope is on record (worklog.jsonl round 5 gate-closed, 2026-08-20)
   - v12: re-raised by the certification pass — frontend-ux, convergence 1, verdict re-raise. Prior decision: PPW-524 deferred: owner ruled it out of scope at v6; the frontend-ux lens runs for the first time in this pass. Matched on same missing SPA consumer for the invoice endpoint
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: renaming the download button's class reddened one `confirmation-page` spec, restored green
 
 ### PPW-525 — Guest invoice access is defeated by the unchanged guest-session lifetime and the never-implemented order transfer
 
@@ -1066,6 +1069,7 @@ updated: 2026-08-24
 - **History:**
   - v9: found by the delta pass — correctness, db-parity and completeness-critic, convergence 3, hinted, verdict plausible. The trace found the mechanism real but the state unreachable today: no deployed PostgreSQL exists, dev ran SQLite through EnsureCreated so the deleted ids were never recorded, and every test database is created fresh — only a hand-seeded history row reproduces the abort. The runbook section naming the deleted migrations is stale either way
   - v13: fixed @`56eb9be` — the unreachable half is recorded, not scripted: no database has ever run the deleted chain (dev used SQLite through EnsureCreated, which writes no history rows), so §7 now states the real three-migration chain and gives the `__EFMigrationsHistory` reseed to run if such a database ever appears
+  - v13: verified by reading — a documented recovery procedure, checked against the three migration ids the assembly actually carries
 
 ### PPW-561 — PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry
 
@@ -1306,6 +1310,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — frontend-ux, completeness-critic, convergence 2, verdict confirmed
   - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the driver checked the code with him and the consequence is that a locker customer cannot proof-read the address printed on the invoice, not money or data loss
   - v13: fixed @`c03f99a` — the recap renders the invoiced address for locker orders too, and the spec that pinned the old behaviour was retargeted
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-586 — Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified
 
@@ -1317,6 +1322,7 @@ updated: 2026-08-24
   - v12: Approach pre-check: revised (the 403 is real and deterministic, but the fix belongs in the shared claims extension, whose claim scan makes every both-headers caller lose its user id — cart scope, and worse, order attribution, where a signed-in user carrying a stale guest token creates a guest order today. Make the read identity-scoped rather than deleting the guard, or guest-only requests start writing a session id into the user column. The existing factory chain boots the real pipeline, but the 200 leg needs a seed helper for a stored PDF, and the admin retry route can only be tested for 401 and 403 on the in-memory provider because its update runs as raw SQL. Any test-authentication override deletes the defect)
   - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the 403 needs a caller sending a valid JWT and a live guest token together, which the shipped SPA never does, so it is unreachable through the site itself
   - v13: fixed @`8950624` — six tests through the real pipeline: 401 anonymous, 403 for another customer, 403 for another guest session, 404 for the guest owner and for the order owner (with the Retry-After), and the admin role override. Reverting the admin branch reddens the last one
+  - v13: verified by reading — the commit changes only test files, so nothing can be reverted to redden it. Its own admin case was proved by reverting the production branch it covers (see PPW-596)
 
 ### PPW-587 — A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked
 
@@ -1326,6 +1332,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — correctness, convergence 1, verdict confirmed
   - v13: fixed @`32d4eee` — a non-success HTTP status that is not 408/429/5xx now raises `AnafContentRejectedException`, and the job parks the row as Failed instead of retrying a document ANAF has refused
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: disabling only the `AnafContentRejectedException` catch reddened the parking test, restored green
 
 ### PPW-588 — Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs
 
@@ -1335,6 +1342,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed. Fix-generated by PPW-559
   - v13: fixed @`32d4eee` — an upload-leg outage spends the blind-repost budget through `RecordUnknownUploadOutcomeAsync` and **keeps the claim**: a row whose ANAF answer nobody has cannot be re-posted by a second replica
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: releasing the claim on the unreachable branch reddened the keeps-the-claim test, restored green
 
 ### PPW-589 — nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number
 
@@ -1362,6 +1370,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — db-parity, convergence 1, verdict confirmed
   - v13: fixed @`72202c0` — a taken-number collision now runs `setval` past `MAX("Number")` for the series and the UTC year of `IssuedAt`, mirroring the unique index; three Postgres tests cover lagging, ahead-of-table and a foreign year
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: returning early from `ReconcileWithStoredInvoicesAsync` reddened the lagging-sequence Postgres test, restored green
 
 ### PPW-592 — ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop
 
@@ -1371,6 +1380,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — db-parity, input-validation, convergence 2, verdict confirmed
   - v13: fixed @`add7611` — the client rejects an `index_incarcare` wider than `Invoice.AnafUploadIdMaxLength`, and a failed status write after a successful upload counts as an unknown outcome instead of rethrowing into a re-file loop
+  - v13: verified — revert-and-rerun held; the only file this row shares with a later commit is `docs/DEPLOYMENT.md`, which is neither compiled nor a test input
 
 ### PPW-593 — Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered
 
@@ -1407,6 +1417,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v13: fixed @`e3f4bb8` — an Admin may read a customer invoice and the read is logged as `invoice.pdf.admin-read`
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: dropping `!isAdmin` from the ownership guard reddened `GetInvoice_AdminOnACustomersOrder_IsNotForbidden`, restored green
 
 ### PPW-597 — Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped
 
@@ -1416,6 +1427,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v13: fixed @`5324a1c`, `beb7732` — the contradiction is resolved on the doc side plus a real route: ddd-02 now says the email is unshipped, and the confirmation page has a download button reading `GET /api/orders/{id}/invoice`. Story 003 (invoice by email) stays open as scope, not as a false claim
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: renaming the download button's class reddened one `confirmation-page` spec. The doc half (ddd-02) is verified by reading, not by a test
 
 ### PPW-598 — Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback
 
@@ -1425,6 +1437,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v13: fixed @`add7611` — `RetryAsync` clears `PdfStoragePath`, so a fixed renderer actually re-renders; the test that pinned the kept path was retargeted
+  - v13: verified — revert-and-rerun held, and the retargeted lifecycle test asserts the cleared path directly
 
 ### PPW-599 — Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout
 
@@ -1434,6 +1447,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v13: fixed @`add7611` — the documented batch SQL now also clears `XmlPayload`, `PdfStoragePath`, `UnknownUploadOutcomes` and `ClaimedAt`, with a comment saying why each one matters
+  - v13: verified by reading — a documented SQL statement has nothing to redden; it was checked field by field against `RetryAsync`
 
 ### PPW-600 — FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts
 
@@ -1444,6 +1458,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v12: owner regraded 🟠 to 🔴 on 2026-08-24 — with PPW-604 it means an ANAF outage can let the filing deadline lapse while the only dashboard panel shows nothing wrong
   - v13: fixed @`6977d5b` — Rejected rows re-enter the batch on cumulative `BackoffHours` milestones from `CreatedAt` (ADR-024, no persisted counter) and reach Failed through `GiveUpOnRejectedAsync` when the schedule is spent. Reverting the dispatch reddens two of the three new tests
+  - v13: verified — removing the Rejected dispatch case reddened two of the three new tests (the third is the negative control), restored green
 
 ### PPW-601 — system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule
 
@@ -1462,6 +1477,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v13: fixed @`add7611` — the 404 carries a `Retry-After` of `Anaf:PollIntervalMinutes`, so the hint matches the only producer of the PDF
+  - v13: verified — revert-and-rerun held, and the new controller test pins the header to 1800 seconds
 
 ### PPW-603 — The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable
 
@@ -1481,6 +1497,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
   - v12: owner regraded 🟠 to 🔴 on 2026-08-24 — with PPW-600 it means an ANAF outage is invisible: no metric marks a stuck or retrying invoice
   - v13: fixed @`32d4eee` — a `retrying` value joins `invoice_anaf_status_total` on the unreachable, upload-error and auth branches; the cardinality budget was raised deliberately from 4 to 5 and metrics.md no longer calls the instrument future
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: removing only the `retrying` emission reddened the metric test. Renaming the constant does **not** redden it: the assertion reads the same constant, so the label value itself is pinned only by the cardinality budget and metrics.md
 
 ### PPW-605 — Manual admin mark-Paid issues a fiscal invoice with no log naming the admin
 
@@ -1490,6 +1507,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
   - v13: fixed @`add7611` — `admin.order.mark-paid` carries admin_user_id, order_id, order_number and the committed invoice_number; the id is passed from the controller rather than through a new HttpContext dependency
+  - v13: verified — revert-and-rerun held, and the new test asserts admin_user_id and the committed invoice number in one log line
 
 ### PPW-606 — Only the pre-commit attempted invoice number is logged; the committed number is never logged
 
@@ -1508,6 +1526,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — input-validation, completeness-critic, convergence 2, verdict confirmed
   - v13: fixed @`166230a` — every field routed through the address formatter drops XML-invalid characters, and the UBL line description is wrapped in it
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-608 — Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry
 
@@ -1517,6 +1536,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict plausible. Mechanically true: status 'AwaitingPayment' misses NEXT_STATUSES, nextStatuses is [], and html:114's @if hides the card. But it is not a failure — the admin state-machine page's own rule (line 90) tells admins exactly this: manual Paid marking for offline reconciliation "exists only via the API — the panel has no button for it." Behaviour matches the documented contract, so this is a feature gap, not a defect. Guard hunt: No guard. NEXT_STATUSES (admin-order-detail-page.ts:19-23) has no AwaitingPayment key, so nextStatuses is [] and the "Schimbă status" card is hidden by @if in admin-order-detail-page.html:114. That page is the only UI caller of AdminService.updateOrderStatus. The closest thing is documentation, not a check: admin-state-machine-page.ts:90 states manual marking as Paid "există doar prin API — panoul nu are buton pentru ea", confirming the gap.
   - v13: fixed @`add7611` — `NEXT_STATUSES` gains `AwaitingPayment: [Paid, PaymentFailed, Cancelled]`, so an offline transfer can be reconciled from the UI the API already supported
+  - v13: verified — revert-and-rerun held, and the new spec asserts `Paid` is offered for an order awaiting payment
 
 ### PPW-609 — One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent
 
@@ -1553,6 +1573,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — input-validation, frontend-ux, convergence 2, verdict confirmed
   - v13: fixed @`5cd48a5` — the checkout address form mirrors the server caps, including a group-level combined street length, so an over-long field fails where it is typed
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: widening every new cap to 100000 reddened the combined-street-line spec, restored green
 
 ### PPW-613 — VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate
 
@@ -1562,6 +1583,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v13: fixed @`6812453` — order detail and the confirmation page render a TVA line from the server `vatRon`/`vatRate`; the payment-status DTO carries the two fields, and the review step is deliberately left out (no order exists yet, so the rate would have to be hardcoded in the SPA)
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-614 — Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total
 
@@ -1571,6 +1593,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v13: fixed @`6812453` — the cost signals start null, both cards stay disabled until the server answers, a failure offers a retry, and a price arriving after a restored method updates the stored cost without wiping the locker or address
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-615 — A non-succeeded, non-error Stripe result leaves the user stranded with no feedback
 
@@ -1590,6 +1613,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — completeness-critic, convergence 1, verdict confirmed
   - v13: fixed @`5cd48a5` — the saved-address city cap is aligned to `InvoiceAddressFormatter.CityNameMaxLength`, so a prefill cannot carry an over-long value into checkout
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: putting the city cap back to 100 reddened `SavedAddressValidator`, restored green
 
 ### PPW-617 — The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test
 
@@ -1857,6 +1881,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict unverified-cleanup
   - v13: fixed @`6977d5b` — metrics.md drops the "future" marker, documents the new `retrying` value and corrects the series counts
+  - v13: verified by reading — a metrics.md row has nothing to redden; it shares its commit with PPW-600, whose tests carry the code half
 
 ### PPW-650 — Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done
 

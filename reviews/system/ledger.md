@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: system
-updated: 2026-08-12
+updated: 2026-08-27
 ---
 
 # Ledger — the review system (meta-target)
@@ -52,3 +52,6 @@ History goes on the row's History cell, newest first, `;`-separated.
 | SF34 | ⚪ | v2 | Index pass rows ragged; gate silent on cell count | verified | v3: verified (revert-and-rerun on the bad-state 6-cell row; contract states 5-or-7); v2: fixed `1528576` (5-or-7 rule + gate check) |
 | SF35 | ⚪ | v2 | Stale prose inside the machinery (comments, runbook dates) | verified | v3: verified (30-min comment, Sonnet judge header, 2026-08-12 runbook dates, weak-spots bullets read); v2: fixed `152de93` + `ff3e64f` |
 | SF36 | ⚪ | v3 | fix-links.mjs has no automated test — SF26's rewrite logic is verifiable only by hand | open | v3: named at verification of SF26 (fix-generated surface without a fixture) |
+| SF37 | 🟠 | v4 | verify-fixes guards a dirty tree at startup but its `reset --hard` destroys any edit made while it runs | open | v4: hit during the 038-039 v13 verification — an index.md edit written mid-run vanished at the next restore point. The pre-flight check reads the tree once; nothing re-checks or warns, and the run holds the tree for the better part of an hour |
+| SF38 | 🟡 | v4 | verify-fixes buffers every verdict until exit, so a long run is indistinguishable from a hung one | open | v4: `for (const r of results) console.log(...)` runs after the loop, so a 21-row run wrote nothing for 40+ minutes. A per-row emit would cost nothing and make the run observable |
+| SF39 | 🟡 | v4 | A red leg that fails to build counts as red, so a fix touching a file later changed elsewhere verifies for the wrong reason | open | v4: reverting one file of a commit whose neighbours moved on can break compilation; the runner reads any non-zero exit as the test reddening. The tool already warns when HEAD is past `fixed_commit`, but the warning does not distinguish a build failure from a failing assertion |
