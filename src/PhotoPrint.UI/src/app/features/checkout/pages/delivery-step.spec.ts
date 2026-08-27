@@ -360,4 +360,38 @@ describe('DeliveryStep', () => {
     // http.verify() in afterEach fails if an /account/addresses request was made.
     expect(fixture.componentInstance.addressForm.value.city).toBeFalsy();
   });
+  it('refuses a city longer than the server accepts, on the screen that collects it', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+    const comp = fixture.componentInstance;
+    comp.selectLocker(locker('l1'));
+
+    comp.addressForm.setValue({ ...FISCAL_ADDRESS, city: 'C'.repeat(51) });
+    fixture.detectChanges();
+
+    expect(comp.addressForm.get('city')!.valid).toBe(false);
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('refuses a street, number and block that exceed the invoice line together', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+    const comp = fixture.componentInstance;
+    comp.selectLocker(locker('l1'));
+
+    comp.addressForm.setValue({
+      ...FISCAL_ADDRESS,
+      street: 'S'.repeat(120),
+      number: '4'.repeat(20),
+      block: 'B'.repeat(20),
+    });
+    fixture.detectChanges();
+
+    expect(comp.addressForm.valid).toBe(false);
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
 });

@@ -37,6 +37,19 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
   return digits >= 9 && digits <= 15 ? null : { phone: true };
 }
 
+// The invoice line takes street, number and block as one field, so the server caps their total.
+const CITY_MAX = 50;
+const RECIPIENT_MAX = 200;
+const STREET_LINE_MAX = 150;
+
+function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
+  const parts = ['street', 'number', 'block']
+    .map(name => (group.get(name)?.value ?? '').toString().trim())
+    .filter(part => part.length > 0);
+  const combined = parts.join(' ');
+  return combined.length > STREET_LINE_MAX ? { streetLineTooLong: true } : null;
+}
+
 @Component({
   selector: 'app-delivery-step',
   standalone: true,
@@ -333,16 +346,18 @@ export class DeliveryStep implements OnInit {
 
   readonly citySearch = this.fb.control('');
 
+  // Mirrors the server caps: a value the API rejects should be caught on the screen that asks
+  // for it, not two screens later as a 400 on a field the customer can no longer see.
   readonly addressForm = this.fb.group({
-    street: ['', Validators.required],
-    number: ['', Validators.required],
-    block: [''],
-    city: ['', Validators.required],
-    county: ['', Validators.required],
-    postalCode: ['', Validators.required],
-    recipientName: ['', Validators.required],
+    street: ['', [Validators.required, Validators.maxLength(255)]],
+    number: ['', [Validators.required, Validators.maxLength(50)]],
+    block: ['', Validators.maxLength(100)],
+    city: ['', [Validators.required, Validators.maxLength(CITY_MAX)]],
+    county: ['', [Validators.required, Validators.maxLength(100)]],
+    postalCode: ['', [Validators.required, Validators.maxLength(20)]],
+    recipientName: ['', [Validators.required, Validators.maxLength(RECIPIENT_MAX)]],
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
-  });
+  }, { validators: combinedStreetLength });
 
   // Form validity is not a signal, so mirror it into one — otherwise the computed
   // below memoizes a stale value and the button never re-enables after typing.
