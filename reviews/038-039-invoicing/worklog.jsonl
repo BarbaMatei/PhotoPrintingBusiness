@@ -345,3 +345,12 @@
 {"t":"2026-08-24T12:22:31+03:00","ev":"note","text":"owner triage of 2026-08-24 applied: 13 rows regraded down and backlogged, PPW-600 and PPW-604 regraded up to high, PPW-562 recorded fixed by the peer merge 4dd6763; each ruling is a history line on its ledger row"}
 {"t":"2026-08-24T14:53:04+03:00","ev":"pass-launch","pass":13,"type":"verification"}
 {"t":"2026-08-24T14:53:04+03:00","ev":"pass-records-done","pass":13,"type":"verification"}
+{"t":"2026-08-24T15:06:25+03:00","ev":"round-start","round":13,"note":"final fix round on review-v12, cluster 1 of 3 (payment flow: PPW-584, PPW-582, PPW-615, PPW-611); unattended; rows append to resolution-v12.md which stays in-progress for the two later clusters"}
+{"t":"2026-08-24T15:12:32+03:00","ev":"check-dispatched","cluster":"payment-flow","note":"adversarial approach-check on the 409 handling, the stale-key paid replay, the polling state machine and the new payment-status endpoint (PPW-584, PPW-582, PPW-615)"}
+{"t":"2026-08-24T15:15:02+03:00","ev":"triage-done","round":13,"clusters":1,"checks_needed":1,"pre_cleared":2,"gates":0,"note":"cluster 1 of 3 = payment flow; PPW-611 is a deprecated-field drop (no check), PPW-584/PPW-582 ride their v12 pre-check revisions, PPW-615 shares the new check"}
+{"t":"2026-08-24T15:27:28+03:00","ev":"test-run","kind":"red","filter":"dotnet test src/PhotoPrint.Tests --filter \"FullyQualifiedName~OrderPaymentStatus|FullyQualifiedName~OrderServiceTests|FullyQualifiedName~ExceptionHandlerMiddlewareTests\"","passed":90,"failed":12,"duration_s":2,"note":"8 of 9 payment-status endpoint tests fail (route absent: 401 and 403 legs answer NotFound), plus the two consumed-key OrderService tests and the two consumed-key middleware tests"}
+{"t":"2026-08-27T17:06:13+03:00","ev":"test-run","kind":"green","filter":"full backend suite + full frontend suite","passed":1451,"failed":0}
+{"t":"2026-08-27T17:06:13+03:00","ev":"finding","id":"PPW-584","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-582","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-615","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-611","status":"fixed","commit":"2acda1f"}

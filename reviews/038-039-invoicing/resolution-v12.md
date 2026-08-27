@@ -14,15 +14,17 @@ fixed_commit: ed3ce30
 | ID | Status | Commit | Note |
 |---|---|---|---|
 | PPW-579 | fixed | `8e71c63`, `ed3ce30` | runtime stage installs `icu-libs` + `icu-data-full`, its `ENV` turns the base image's invariant flag off, and the API runtimeconfig pins it off, which outranks the variable. Culture stays `ro-RO`. New surface: the image's ICU packages |
-| PPW-584 | deferred | — | not addressed this round; the owner scoped the round to PPW-579. Ledger row stays open at 🔴 — the double-charge path is the loudest thing still standing |
+| PPW-584 | fixed | `d572a1a`, `2acda1f`, `901f8a2` | one key per basket in localStorage, reused across mounts and cleared when the order settles; a settled key now 409s naming its order and the page sends the customer there instead of charging again |
 | PPW-580 | wont-fix | — | owner ruled 2026-08-22; reaching it needs the tax authority to keep erroring on `stareMesaj` until 50 rows are stuck, and he accepts that risk |
 | PPW-581 | wont-fix | — | owner ruled 2026-08-22; reaching it needs revoked or expired ANAF credentials, and he accepts that risk |
-| PPW-582 | deferred | — | not addressed this round; the owner scoped the round to PPW-579. Ledger row stays open at 🔴 |
+| PPW-582 | fixed | `d572a1a`, `901f8a2` | new guest-readable `GET /api/orders/{id}/payment-status`; the confirmation page waits on it for up to ten reads instead of sending a paying customer home |
 | PPW-583 | deferred | — | not addressed this round; the owner scoped the round to PPW-579. Ledger row stays open at 🔴 |
 | PPW-586 | deferred | — | owner regraded 🔴 to 🟠 on 2026-08-22; not addressed this round, ledger row stays open at medium |
 | PPW-585 | deferred | — | owner regraded 🔴 to 🟠 on 2026-08-22; not addressed this round, ledger row stays open at medium |
 | PPW-489 | wont-fix | — | the earlier owner ruling stands; v12 raised it again and this round did not revisit it |
 | PPW-524 | deferred | — | the earlier deferral stands; v12 raised it again and this round did not revisit it |
+| PPW-615 | fixed | `901f8a2` | a card result that is neither success nor error now says so, a rejected confirm call clears the spinner, and an intent that cannot be created offers a retry |
+| PPW-611 | fixed | `2acda1f` | the deprecated `shippingCostRon` is gone from the request and its model, so a checkout no longer logs a tampering warning |
 
 ## Scope
 
@@ -30,6 +32,7 @@ fixed_commit: ed3ce30
 |---|---|---|---|
 | A — production image globalization | PPW-579 | `Dockerfile`, `src/PhotoPrint.API/PhotoPrint.API.csproj`, `src/PhotoPrint.Tests/Unit/Services/Invoicing/InvoicePdfCultureTests.cs`, `docs/DEPLOYMENT.md` | not needed (the v12 pre-check classified it not trigger-list-shaped: a base-image and configuration change plus a renderer test) |
 | B — untouched this round | PPW-580, PPW-581, PPW-582, PPW-583, PPW-584, PPW-585, PPW-586, PPW-489, PPW-524 | — | not needed (no code changed) |
+| C — checkout payment flow (final round, cluster 1 of 3) | PPW-584, PPW-582, PPW-615, PPW-611 | `src/app/core/services/checkout-attempt.service.ts`, `core/services/payment.service.ts`, `core/services/auth.service.ts`, `core/models/payment.model.ts`, `features/checkout/pages/payment-step.ts`, `features/orders/pages/confirmation-page.ts`, `Controllers/OrderPaymentStatusController.cs`, `DTOs/Orders/OrderPaymentStatusDto.cs`, their specs/tests, `memory-bank/standards/{system-architecture,api-conventions}.md` | v12 pre-checks consumed for PPW-584 (revised) and PPW-582 (revised); one new adversarial check for the PPW-615 pay-state machine and the 409 handling |
 
 ## Decisions
 
