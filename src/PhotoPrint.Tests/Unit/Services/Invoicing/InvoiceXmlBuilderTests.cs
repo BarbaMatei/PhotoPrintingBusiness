@@ -397,4 +397,29 @@ public class InvoiceXmlBuilderTests
         addr.Element(Cbc + "CityName")!.Value.Should().NotBeEmpty();
         addr.Element(Cbc + "PostalZone")!.Value.Should().NotBeEmpty();
     }
+    [Fact]
+    public void Product_name_pasted_from_a_word_processor_still_parses()
+    {
+        var (order, invoice) = Fixture();
+        // U+000B is Word's manual line break: XmlWriter emits it as a character reference no parser accepts.
+        order.Items.First().ProductSnapshot.ProductName = "TablouCanvas";
+
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        // Parsing at all is half the proof: before the guard, XmlWriter emitted a reference no parser accepts.
+        var names = doc.Descendants().Where(e => e.Name.LocalName == "Name").Select(e => e.Value).ToList();
+        names.Should().Contain(n => n.Contains("Tablou") && n.Contains("Canvas"));
+        doc.ToString().Should().NotContain("");
+    }
+
+    [Fact]
+    public void Seller_and_buyer_names_drop_xml_invalid_characters()
+    {
+        var (order, invoice) = Fixture();
+        order.ShippingAddress!.RecipientName = "Ion Popescu";
+
+        var doc = BuildAndParse(order, invoice, Seller());
+
+        doc.ToString().Should().NotContain("");
+    }
 }

@@ -1,5 +1,7 @@
 using PhotoPrint.API.Models;
 
+using System.Text;
+
 namespace PhotoPrint.API.Services.Invoicing;
 
 public static class InvoiceAddressFormatter
@@ -36,11 +38,32 @@ public static class InvoiceAddressFormatter
     public static string Truncate(string? value, int maxLength)
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
+
+        value = StripXmlInvalid(value);
         if (value.Length <= maxLength) return value;
 
         // Never cut between a surrogate pair — a lone half is not valid XML and wedges the invoice in Pending.
         var end = maxLength;
         if (char.IsHighSurrogate(value[end - 1])) end--;
         return value[..end];
+    }
+
+    // XmlWriter emits a character XML 1.0 forbids as a reference no parser accepts, so a name
+    // pasted from a word processor would wedge the invoice in Pending for ever.
+    public static string StripXmlInvalid(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+
+        var kept = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            var code = (int)ch;
+            var legal = code is 0x09 or 0x0A or 0x0D ||
+                        (code >= 0x20 && code <= 0xD7FF) ||
+                        (code >= 0xE000 && code <= 0xFFFD) ||
+                        char.IsSurrogate(ch);
+            if (legal) kept.Append(ch);
+        }
+        return kept.ToString();
     }
 }
