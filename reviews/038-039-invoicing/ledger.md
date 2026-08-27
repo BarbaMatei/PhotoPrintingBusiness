@@ -50,8 +50,8 @@ updated: 2026-08-24
 | PPW-506 | 🟠 | v2 | Config comment and rollout runbook still promise the customer invoice email that does not exist | `docs/DEPLOYMENT.md:1409` | verified | `08e7746` |
 | PPW-507 | 🟡 | v2 | New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation | `Configuration/AnafSettings.cs:44` | verified | `08e7746` |
 | PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | verified | `07b0c1b` |
-| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | open | `08e7746` |
-| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | open | `08e7746` |
+| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | fixed | `ec29613` |
+| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | fixed | `ec29613` |
 | PPW-511 | 🟡 | v5 | EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | fixed | `06fd2b1` |
 | PPW-512 | 🔴 | v6 | Easybox orders emit e-Factura with empty mandatory buyer address elements | `Services/Invoicing/InvoiceXmlBuilder.cs:121` | verified | `2979ea0` |
 | PPW-513 | 🔴 | v6 | uq_invoices_series_year_number index expression is not IMMUTABLE, so Postgres aborts Migrate() at prod boot | `Migrations/20260603101910_AddVatAndInvoices.cs:112` | verified | `2979ea0` |
@@ -581,6 +581,7 @@ updated: 2026-08-24
 - **Suggested fix:** Cut the pipeline sentence from the settings docstring and keep the sentence PPW-472 added, which is true. Reword the `Program.cs` comment to say the builders are registered but only the worker calls them. Doc-only.
 - **History:**
   - v3: found by the verification pass's class check on PPW-481 and PPW-506 — the false sentence is original bolt-039 text, not fix-caused, but two fix rounds edited this file and left it. The fix round's claim to have corrected every operator-facing site does not hold
+  - v13: fixed @`ec29613` — the pipeline sentence is gone from the settings docstring, which now points at `AnafSettings` for what the ANAF flag governs, and the registration comment says the builders are wired but only the worker calls them
 
 ### PPW-510 — ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority
 
@@ -589,6 +590,7 @@ updated: 2026-08-24
 - **Suggested fix:** Either add one superseded line at the head of the ADR pointing at the decision index, or drop the "use this ADR to recall what side effect is gated" clause and the two citations that present it as current. Doc-only.
 - **History:**
   - v3: found by the verification pass reviewing the fix round's decision to keep ADR-022 and ddd-02 as point-in-time records. The decision is agreed; the routing into it is the defect
+  - v13: fixed @`ec29613` — the ADR keeps its frozen-record convention and gains one note at the head naming both statements that no longer hold and sending the reader to the decision index
 
 ### PPW-511 — EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence
 
