@@ -197,34 +197,34 @@ updated: 2026-08-24
 | PPW-655 | ⚪ | v12 | Runtime Math.Max clamps duplicate ANAF ranges the settings validator already enforces, with a divergent floor | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:41` | backlog | `090873d` |
 | PPW-656 | ⚪ | v12 | Third copy of the mandatory-address field list in checkout-state.service.ts | `src/app/core/services/checkout-state.service.ts:51` | backlog | `090873d` |
 | PPW-657 | ⚪ | v12 | Lens manifest omits three changed files and names one that did not change | `Migrations/20260821110018_AddInvoiceUnknownUploadOutcomes.cs:1` | backlog | `090873d` |
-| PPW-659 | 🔴 | v15 | Not-yet-due Rejected invoices fill the upload batch and starve Pending uploads | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:103` | open | `5fca3cf` |
-| PPW-660 | 🔴 | v15 | A succeeded webhook on an order already moved to PaymentFailed leaves the customer charged and the order unfulfillable | `Controllers/WebhooksController.cs:242` | open | `5fca3cf` |
-| PPW-661 | 🔴 | v15 | Checkout idempotency key is never retired after a paid order, so the next checkout is redirected to the old order and the new basket deleted | `src/app/core/services/checkout-attempt.service.ts:49` | open | `5fca3cf` |
-| PPW-662 | 🔴 | v15 | Retry after a declined card reuses the same client secret whose order the failure webhook already moved to PaymentFailed | `src/app/features/checkout/pages/payment-step.ts:208` | open | `5fca3cf` |
-| PPW-663 | 🔴 | v15 | EuPlatesc columns removed by editing the already-applied baseline migration, so existing databases keep Orders.PaymentProcessor NOT NULL | `Migrations/20260820133204_InitialPostgres.cs:216` | open | `5fca3cf` |
-| PPW-664 | 🟠 | v15 | Automatic rejection-resubmit nulls PdfStoragePath, revoking the customer's invoice | `Services/Invoicing/InvoiceLifecycle.cs:200` | open | `5fca3cf` |
-| PPW-665 | 🟠 | v15 | Any non-2xx 4xx from ANAF maps to content-rejected and permanently parks the invoice as Failed | `Services/Invoicing/Anaf/AnafSpvClient.cs:74` | open | `5fca3cf` |
-| PPW-666 | 🟠 | v15 | OrderService frees the idempotency key on a fresh PaymentFailed order while its PaymentIntent is still chargeable | `Services/OrderService.cs:129` | open | `5fca3cf` |
-| PPW-667 | 🟠 | v15 | ANAF 429/503 counts as an unknown upload outcome and parks the invoice after 3 ticks | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:441` | open | `5fca3cf` |
-| PPW-668 | 🟠 | v15 | Two concurrent same-key payment requests both call Stripe and one turns a 409 into a 500 | `Controllers/PaymentsController.cs:81` | open | `5fca3cf` |
-| PPW-669 | 🟠 | v15 | Post-commit webhook side effects are lost for good when one throws, because the retry hits the already-paid guard | `Controllers/WebhooksController.cs:201` | open | `5fca3cf` |
-| PPW-670 | 🟠 | v15 | One transient poll failure replaces the payment-submitted screen with "order not found" | `src/app/features/orders/pages/confirmation-page.ts:287` | open | `5fca3cf` |
-| PPW-671 | 🟠 | v15 | combinedStreetLength group error is never rendered, so Continue is disabled with no explanation | `src/app/features/checkout/pages/delivery-step.ts:384` | open | `5fca3cf` |
-| PPW-672 | 🟠 | v15 | Settle-poll setTimeout is never cancelled on destroy, so a late poll clears a newer basket | `src/app/features/orders/pages/confirmation-page.ts:282` | open | `5fca3cf` |
-| PPW-673 | 🟠 | v15 | Invoice download uses a detached anchor and revokes the object URL in the same tick as click() | `src/app/features/orders/pages/confirmation-page.ts:322` | open | `5fca3cf` |
-| PPW-674 | 🟠 | v15 | Admin cross-customer invoice read can be logged with an empty admin id | `Controllers/InvoicesController.cs:72` | open | `5fca3cf` |
-| PPW-675 | 🟠 | v15 | Pooled test database is reused without checking the migration chain actually applied | `Tests/Helpers/PostgresTestDatabase.cs:227` | open | `5fca3cf` |
-| PPW-676 | 🟡 | v15 | Content-rejected branch ignores a lost park CAS: claim stays held, no LastError, metric still counted | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:435` | open | `5fca3cf` |
-| PPW-677 | 🟡 | v15 | Webhook AlreadyInvoiced return leaves the uncommitted Paid transition on the scoped context | `Controllers/WebhooksController.cs:328` | open | `5fca3cf` |
-| PPW-678 | 🟡 | v15 | Invoice number allocated outside the transaction that inserts the row, against the numbering service's contract | `Services/Invoicing/InvoiceCreationService.cs:93` | open | `5fca3cf` |
-| PPW-679 | 🟡 | v15 | After the 10-poll budget the payment-confirming spinner spins forever with no terminal message | `src/app/features/orders/pages/confirmation-page.ts:280` | open | `5fca3cf` |
-| PPW-680 | 🟡 | v15 | canContinue ignores shippingCostsReady, so a restored session proceeds on a stale shipping cost | `src/app/features/checkout/pages/delivery-step.ts:393` | open | `5fca3cf` |
-| PPW-681 | 🟡 | v15 | Non-owner invoice PDF served with a one-year immutable browser cache | `Controllers/InvoicesController.cs:149` | open | `5fca3cf` |
-| PPW-682 | 🟡 | v15 | ResetForTest deletes the migration's 42 EasyboxLocker seed rows and never restores them | `Tests/Helpers/PostgresTestDatabase.cs:106` | open | `5fca3cf` |
-| PPW-683 | 🟡 | v15 | DropAllForeignKeys does not mark the pooled database dirty, so a constraint-free schema can be handed on | `Tests/Helpers/PostgresTestDatabase.cs:166` | open | `5fca3cf` |
-| PPW-684 | 🟡 | v15 | Test-database sweep is scoped to its own salt, so pools from other worktrees are never reclaimed | `Tests/Helpers/PostgresTestDatabase.cs:292` | open | `5fca3cf` |
-| PPW-685 | 🟡 | v15 | ResetSequences drops every public sequence the migration script did not literally CREATE, including identity-owned ones | `Tests/Helpers/PostgresTestDatabase.cs:128` | open | `5fca3cf` |
-| PPW-686 | ⚪ | v15 | MaxBatchSize is used unclamped unlike the upload job's other settings | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:109` | open | `5fca3cf` |
+| PPW-659 | 🔴 | v15 | Not-yet-due Rejected invoices fill the upload batch and starve Pending uploads | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:103` | fixed | `9527eba` |
+| PPW-660 | 🔴 | v15 | A succeeded webhook on an order already moved to PaymentFailed leaves the customer charged and the order unfulfillable | `Controllers/WebhooksController.cs:242` | fixed | `c60260c` |
+| PPW-661 | 🔴 | v15 | Checkout idempotency key is never retired after a paid order, so the next checkout is redirected to the old order and the new basket deleted | `src/app/core/services/checkout-attempt.service.ts:49` | fixed | `2302bec` |
+| PPW-662 | 🔴 | v15 | Retry after a declined card reuses the same client secret whose order the failure webhook already moved to PaymentFailed | `src/app/features/checkout/pages/payment-step.ts:208` | fixed | `2302bec` |
+| PPW-663 | 🔴 | v15 | EuPlatesc columns removed by editing the already-applied baseline migration, so existing databases keep Orders.PaymentProcessor NOT NULL | `Migrations/20260820133204_InitialPostgres.cs:216` | fixed | `de1b70d` |
+| PPW-664 | 🟠 | v15 | Automatic rejection-resubmit nulls PdfStoragePath, revoking the customer's invoice | `Services/Invoicing/InvoiceLifecycle.cs:200` | fixed | `9527eba` |
+| PPW-665 | 🟠 | v15 | Any non-2xx 4xx from ANAF maps to content-rejected and permanently parks the invoice as Failed | `Services/Invoicing/Anaf/AnafSpvClient.cs:74` | fixed | `5d84a5e` |
+| PPW-666 | 🟠 | v15 | OrderService frees the idempotency key on a fresh PaymentFailed order while its PaymentIntent is still chargeable | `Services/OrderService.cs:129` | fixed | `c60260c` |
+| PPW-667 | 🟠 | v15 | ANAF 429/503 counts as an unknown upload outcome and parks the invoice after 3 ticks | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:441` | fixed | `5d84a5e` |
+| PPW-668 | 🟠 | v15 | Two concurrent same-key payment requests both call Stripe and one turns a 409 into a 500 | `Controllers/PaymentsController.cs:81` | fixed | `18f0b1c` |
+| PPW-669 | 🟠 | v15 | Post-commit webhook side effects are lost for good when one throws, because the retry hits the already-paid guard | `Controllers/WebhooksController.cs:201` | fixed | `18f0b1c` |
+| PPW-670 | 🟠 | v15 | One transient poll failure replaces the payment-submitted screen with "order not found" | `src/app/features/orders/pages/confirmation-page.ts:287` | fixed | `2302bec` |
+| PPW-671 | 🟠 | v15 | combinedStreetLength group error is never rendered, so Continue is disabled with no explanation | `src/app/features/checkout/pages/delivery-step.ts:384` | fixed | `2302bec` |
+| PPW-672 | 🟠 | v15 | Settle-poll setTimeout is never cancelled on destroy, so a late poll clears a newer basket | `src/app/features/orders/pages/confirmation-page.ts:282` | fixed | `2302bec` |
+| PPW-673 | 🟠 | v15 | Invoice download uses a detached anchor and revokes the object URL in the same tick as click() | `src/app/features/orders/pages/confirmation-page.ts:322` | fixed | `2302bec` |
+| PPW-674 | 🟠 | v15 | Admin cross-customer invoice read can be logged with an empty admin id | `Controllers/InvoicesController.cs:72` | fixed | `5d84a5e` |
+| PPW-675 | 🟠 | v15 | Pooled test database is reused without checking the migration chain actually applied | `Tests/Helpers/PostgresTestDatabase.cs:227` | fixed | `18f0b1c` |
+| PPW-676 | 🟡 | v15 | Content-rejected branch ignores a lost park CAS: claim stays held, no LastError, metric still counted | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:435` | fixed | `5d84a5e` |
+| PPW-677 | 🟡 | v15 | Webhook AlreadyInvoiced return leaves the uncommitted Paid transition on the scoped context | `Controllers/WebhooksController.cs:328` | backlog | `5fca3cf` |
+| PPW-678 | 🟡 | v15 | Invoice number allocated outside the transaction that inserts the row, against the numbering service's contract | `Services/Invoicing/InvoiceCreationService.cs:93` | backlog | `5fca3cf` |
+| PPW-679 | 🟡 | v15 | After the 10-poll budget the payment-confirming spinner spins forever with no terminal message | `src/app/features/orders/pages/confirmation-page.ts:280` | fixed | `2302bec` |
+| PPW-680 | 🟡 | v15 | canContinue ignores shippingCostsReady, so a restored session proceeds on a stale shipping cost | `src/app/features/checkout/pages/delivery-step.ts:393` | fixed | `2302bec` |
+| PPW-681 | 🟡 | v15 | Non-owner invoice PDF served with a one-year immutable browser cache | `Controllers/InvoicesController.cs:149` | backlog | `5fca3cf` |
+| PPW-682 | 🟡 | v15 | ResetForTest deletes the migration's 42 EasyboxLocker seed rows and never restores them | `Tests/Helpers/PostgresTestDatabase.cs:106` | backlog | `5fca3cf` |
+| PPW-683 | 🟡 | v15 | DropAllForeignKeys does not mark the pooled database dirty, so a constraint-free schema can be handed on | `Tests/Helpers/PostgresTestDatabase.cs:166` | backlog | `5fca3cf` |
+| PPW-684 | 🟡 | v15 | Test-database sweep is scoped to its own salt, so pools from other worktrees are never reclaimed | `Tests/Helpers/PostgresTestDatabase.cs:292` | backlog | `5fca3cf` |
+| PPW-685 | 🟡 | v15 | ResetSequences drops every public sequence the migration script did not literally CREATE, including identity-owned ones | `Tests/Helpers/PostgresTestDatabase.cs:128` | backlog | `5fca3cf` |
+| PPW-686 | ⚪ | v15 | MaxBatchSize is used unclamped unlike the upload job's other settings | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:109` | fixed | `9527eba` |
 
 ## Details
 
@@ -1982,6 +1982,7 @@ updated: 2026-08-24
 - **Suggested fix:** Compute due-ness in SQL (CreatedAt + cumulative backoff <= now) instead of MinBackoffHours, or fetch Rejected rows in a separate slice with its own cap so they cannot consume the Pending budget. **Trace:** Real. Defaults BackoffHours [1,4,16,64], MaxBatchSize 50, interval 30min. Invoice created T0, rejected at T0+21.5h (MarkRejectedAsync stamps UpdatedAt); NextResubmitAt returns T0+85h, but the coarse filter admits it from T0+22.5h. Not-due path only LogDebug-returns, leaving UpdatedAt untouched, so the row re-enters every tick. 50 such older rows, OrderBy(CreatedAt), fill Take(50); a Pending invoice created later never enters the batch for ~62h. **Test shape:** NotDueRejectedRowsDoNotStarvePending: seed 50 Rejected invoices CreatedAt=T0, UpdatedAt=T0+21.5h, plus one Pending created T0+22h; clock T0+25h; run one tick; assert IAnafSpvClient.UploadAsync called for the Pending invoice.
 - **History:**
   - v15: found by the delta pass — correctness, convergence 1, verdict confirmed
+  - v15: fixed @`9527eba` — rejections are a separate slice capped at `MaxBatchSize / 10` and ordered by oldest transition, so they cannot crowd out Pending uploads. Re-merging the two queries reddens the new test
 
 ### PPW-660 — A succeeded webhook on an order already moved to PaymentFailed leaves the customer charged and the order unfulfillable
 
@@ -1990,6 +1991,7 @@ updated: 2026-08-24
 - **Suggested fix:** Allow PaymentFailed -> Paid in OrderStatusMachine and treat succeeded-on-PaymentFailed as a normal Paid transition (invoice + side effects), rather than a log-only dead end. **Trace:** Real. Decline: payment_step keeps the same clientSecret and mounted card, button re-enabled (payment-step.ts:208), while payment_failed sets PaymentFailed (Webhooks:242). Second confirm with a good card succeeds; Stripe reuses the PI. succeeded handler: HasBeenPaid false, Status != AwaitingPayment, so it only logs (Webhooks:190-217). No PaymentFailed->Paid edge exists (OrderStatusMachine:18-27), so nothing recovers. Cart cleared, confirmation shows the not-found text (confirmation-page.ts:271). **Test shape:** WebhooksControllerTests.StripeSucceeded_AfterPaymentFailed_MarksOrderPaid: arrange order Status=PaymentFailed with PaymentIntentId pi_1; act POST /api/webhooks/stripe payment_intent.succeeded for pi_1; assert Status==Paid, PaidAt set, invoice created. Reddens today (stays PaymentFailed).
 - **History:**
   - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`c60260c` — `PaymentFailed → Paid` is legal and the succeeded webhook treats it like `AwaitingPayment`, so a second card that works completes the order instead of logging over a real charge
 
 ### PPW-661 — Checkout idempotency key is never retired after a paid order, so the next checkout is redirected to the old order and the new basket deleted
 
@@ -1998,6 +2000,7 @@ updated: 2026-08-24
 - **Suggested fix:** Retire the key as soon as confirmCardPayment succeeds (keep only orderId for the settle wait), so the next checkout mints a fresh key. **Trace:** Real. Guest pays: payWithStripe navigates to confirmation without clearing; only a settled read clears, so closing the settling page leaves the key stored (24h TTL, same guest fingerprint). New basket, /checkout/plata reuses it. OrderService.cs:118 throws IdempotencyKeyConsumedException for a fresh non-AwaitingPayment/non-Failed holder before any divergence check, so 409 carries the old paid order id; handleIntentError navigates there; confirmation clears cart. New basket gone, nothing ordered. **Test shape:** payment-step.spec: "reused key after a paid order starts a fresh attempt". Arrange stored attempt (orderId set, <24h) + createStripeIntent stubbed 409 {orderId:'old'}. Act createIntent. Assert no navigate to /comanda/old, retry sent with a new key.
 - **History:**
   - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — the key is retired as soon as the card is confirmed, keeping only the order id for the settle wait. Dropping the `retired` check reddens the new spec
 
 ### PPW-662 — Retry after a declined card reuses the same client secret whose order the failure webhook already moved to PaymentFailed
 
@@ -2006,6 +2009,7 @@ updated: 2026-08-24
 - **Suggested fix:** After result.error, discard clientSecret/cardElement and force a fresh createIntent (new attempt key) before allowing another confirm. **Trace:** Decline: confirmCardPayment returns error; payment-step.ts:206-211 only sets a message — stripeLoading false, stripeReady true, clientSecret unchanged, so the pay button stays live. Stripe's payment_failed webhook flips the order AwaitingPayment→PaymentFailed (WebhooksController.cs:242). Declined intents stay requires_payment_method, so a second click on the same secret with a fresh card succeeds and charges. The succeeded handler sees PaymentFailed (not AwaitingPayment, not paid) and only logs "manual reconciliation required" (:206-212); PaymentFailed→Paid isn't in OrderStatusMachine. Confirmation page shows "nu a fost găsită". **Test shape:** payment-step.spec.ts "second attempt after a decline does not reuse the dead client secret": stub confirmCardPayment to return {error}, click pay twice; assert createStripeIntent ran again and the second confirm got the new secret.
 - **History:**
   - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — a decline discards the client secret and unmounts the card, so a retry must mint a fresh key and intent. Removing the discard call reddens the new spec
 
 ### PPW-663 — EuPlatesc columns removed by editing the already-applied baseline migration, so existing databases keep Orders.PaymentProcessor NOT NULL
 
@@ -2014,6 +2018,7 @@ updated: 2026-08-24
 - **Suggested fix:** Restore the baseline's Up() and add a forward migration that drops PaymentProcessor, EuPlatescTransactionId and EuPlatescRedirectUrl; add a test that migrates from the old baseline, not just a fresh DB. **Trace:** Constructed and confirmed against the live dev DB. `psql` shows `Orders."PaymentProcessor"` = text NOT NULL, no default, and `__EFMigrationsHistory` holds only `20260820133204_InitialPostgres` — so `Migrate()` (Program.cs:329) skips the edited baseline; the two pending migrations touch only Invoices. Grep finds zero `PaymentProcessor` in src/, so the EF INSERT at OrderService.cs:171 (and DevDataSeed.cs:166) omits it → Postgres 23502. Checkout dead on every migrated DB. **Test shape:** Relational test: apply chain on PostgresTestDatabase, `ALTER TABLE "Orders" ADD "PaymentProcessor" text NOT NULL` (legacy state), run `Migrate()`, then insert an Order — reddens with 23502 until a DropColumn migration exists.
 - **History:**
   - v15: found by the delta pass — db-parity, convergence 1, verdict confirmed
+  - v15: fixed @`de1b70d` — the applied baseline is restored and a forward `DropEuPlatescColumns` migration drops the three columns. Confirmed on the dev database before the change: history held only the baseline, `Orders."PaymentProcessor"` was `text NOT NULL` with no default, and the model no longer mapped it. The new chain test starts from that legacy state and reddens when the drop is emptied
 
 ### PPW-664 — Automatic rejection-resubmit nulls PdfStoragePath, revoking the customer's invoice
 
@@ -2022,6 +2027,7 @@ updated: 2026-08-24
 - **Suggested fix:** Keep PdfStoragePath on the worker's automatic resubmit (clear it only on the admin retry endpoint), or re-render the PDF before flipping the row back to Pending. **Trace:** Real. UploadPendingAsync renders and stores the PDF (step 2) before submitting (step 3), so a Rejected row always has PdfStoragePath and is downloadable — InvoicesController checks ownership and path only, never status. At the due backoff slot ResubmitRejectedAsync calls RetryAsync(Rejected), which nulls PdfStoragePath and LastError. The row re-enters the next Pending batch, so the customer sees 404 / "Factura se pregătește" for up to one poll interval (30 min default), repeating each slot, plus a duplicate PDF-ready notification. **Test shape:** InvoiceUploadJobTests.RejectedResubmit_KeepsRenderedPdf: arrange Rejected invoice, PdfStoragePath="x", UpdatedAt past first backoff slot; act one job tick; assert status Pending and PdfStoragePath still "x".
 - **History:**
   - v15: found by the delta pass — correctness, convergence 1, verdict confirmed
+  - v15: fixed @`9527eba` — the worker resubmits through a new `RequeueRejectedAsync` that keeps `PdfStoragePath`; only the admin retry drops it. Swapping back to `RetryAsync` reddens the new test
 
 ### PPW-665 — Any non-2xx 4xx from ANAF maps to content-rejected and permanently parks the invoice as Failed
 
@@ -2030,6 +2036,7 @@ updated: 2026-08-24
 - **Suggested fix:** Restrict AnafContentRejectedException to 400/422 (ideally only with an ANAF error body); treat 403/404/405 as AnafUnreachableException, and short-circuit the batch after the first content rejection. **Trace:** Set Anaf:BaseUrl to a wrong path (404) or issue a scope-less token (403). AnafResilienceHandler.IsRetryable rejects both (only 5xx/408/429); AnafAuthHandler only refreshes on 401. AnafSpvClient.cs:74 falls through to AnafContentRejectedException. InvoiceUploadJob catches it, calls ParkUnbuildableAsync → Pending becomes Failed with the claim cleared. Only `authFailed` short-circuits the batch, so the loop repeats this for every Pending row up to MaxBatchSize=50, each needing the admin retry endpoint. **Test shape:** UploadJob_ParksEveryPendingRow_WhenAnafReturns404: arrange three Pending invoices + stub handler answering 404 to upload; act one tick; assert all three are Failed (expected: stay Pending, batch short-circuits after the first misconfiguration).
 - **History:**
   - v15: found by the delta pass — correctness, convergence 1, verdict confirmed
+  - v15: fixed @`5d84a5e` — only 400 and 422 are content rejections; 403, 404 and 405 read as unreachable, so one wrong setting no longer parks every Pending invoice
 
 ### PPW-666 — OrderService frees the idempotency key on a fresh PaymentFailed order while its PaymentIntent is still chargeable
 
@@ -2038,6 +2045,7 @@ updated: 2026-08-24
 - **Suggested fix:** When freeing the key from a fresh PaymentFailed holder, also cancel/void that order's PaymentIntent and clear its StripeClientSecret so only one intent per basket stays confirmable. **Trace:** Real. WebhooksController:242 only flips status; no cancel exists on IStripePaymentGateway, so O1's PaymentIntent stays requires_payment_method and payment-step.ts:197 keeps clientSecret, re-confirming after a decline. OrderService:117 lets a fresh PaymentFailed holder fall to :129, freeing the key; O2 gets a new intent keyed by O2.Id (PaymentsController:82). Both cards charge. Correction: O1's later success hits the else at WebhooksController:208 — one invoice, not two. **Test shape:** OrderServiceIdempotencyTests.FreshPaymentFailedHolder_DoesNotFreeKey: arrange an order holding the key, Status=PaymentFailed, CreatedAt=now; act CreateFromCartAsync with the same key and caller; assert no second order is inserted (replay or 409). Today it creates O2.
 - **History:**
   - v15: found by the delta pass — correctness + race, convergence 2, verdict confirmed
+  - v15: fixed @`c60260c` — handing the key on from a fresh failed holder cancels that order's PaymentIntent and clears its client secret, so one basket cannot hold two confirmable intents
 
 ### PPW-667 — ANAF 429/503 counts as an unknown upload outcome and parks the invoice after 3 ticks
 
@@ -2046,6 +2054,7 @@ updated: 2026-08-24
 - **Suggested fix:** Only count genuinely ambiguous outcomes (timeout, connection drop, unparseable 200) against the blind-repost budget; treat 429 and 503 as plain retryable outages via RecordPendingErrorAsync. **Trace:** Real. ANAF answers 429 (or 503) to every upload; Polly's 3 retries exhaust, client throws AnafUnreachableException(429). Job's catch calls RecordUnknownUploadOutcomeAsync, incrementing persisted UnknownUploadOutcomes. The cooldown makes the row eligible every other 30-min tick, so at t0, t0+60, t0+120 the third increment hits MaxUnknownUploadOutcomes=3 and ParkPendingAsFailedAsync sets Failed with the "reconcile in ANAF SPV" text. Nothing auto-resumes Failed; only the admin retry endpoint does. Timing ~2 h, not 90 min. **Test shape:** InvoiceUploadJobTests: "Rate_limited_upload_does_not_spend_blind_repost_budget" — stub IAnafSpvClient throwing AnafUnreachableException(httpStatus:429) on three due ticks; assert invoice stays Pending with UnknownUploadOutcomes 0, not Failed.
 - **History:**
   - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`5d84a5e` — 429 and 503 are refusals before ANAF reads anything, so they record a plain pending error instead of spending the blind-repost budget
 
 ### PPW-668 — Two concurrent same-key payment requests both call Stripe and one turns a 409 into a 500
 
@@ -2054,6 +2063,7 @@ updated: 2026-08-24
 - **Suggested fix:** Catch StripeException with type idempotency_error on the recovery path and re-read the order's persisted StripeClientSecret (or retry briefly) instead of letting it surface as a 500. **Trace:** Tab A saves the order (AwaitingPayment, secret null), then calls Stripe. Tab B, inside that window, has FindKeyHolderAsync return A's fresh AwaitingPayment row → ReplayOrConflict → WasIdempotentReplay with null secret → controller line 81 calls Stripe with the same order-id key while A is in flight → 409 idempotency_error. StripeException is absent from _exceptionMappings, so the else branch returns 500. Caveat: stripe-dotnet auto-retries 409s, masking short races; no double charge occurs. **Test shape:** Integration: CreateStripeIntent_WhenGatewayRejectsConcurrentIdempotentCall_DoesNotReturn500. Arrange existing AwaitingPayment order with null StripeClientSecret plus fake gateway throwing StripeException (409 idempotency_error); act POST same Idempotency-Key; assert 502/409, not 500.
 - **History:**
   - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`18f0b1c` — a gateway `idempotency_error` re-reads the persisted secret or answers 409, never the 500 that told the customer their basket was broken
 
 ### PPW-669 — Post-commit webhook side effects are lost for good when one throws, because the retry hits the already-paid guard
 
@@ -2062,6 +2072,7 @@ updated: 2026-08-24
 - **Suggested fix:** Wrap each post-commit side effect in its own try/catch that logs and continues, or drive them from a restartable outbox keyed on the order so a retry can replay only what is missing. **Trace:** Real. Paid+invoice commits at line 195. Then line 200/288 hits a transient failure (hub SendAsync, or Entry(order).Collection(Items).LoadAsync). Nothing catches it; the exception is unmapped, so ExceptionHandlerMiddleware returns 500. Stripe retries; line 183 HasBeenPaid(Paid) is true, records Duplicate, returns. FireOrderConfirmedEmail never ran, so no Pending email row exists for EmailRetryJob to pick up. Promotion and AWB do have sweeps (PromotionRecoveryScanner, AwbRetryJob); the email has none. **Test shape:** WebhooksController test: first payment_intent.succeeded delivery with hub or Items-load throwing once -> 500; replay same event; assert IOrderEmailService.FireOrderConfirmedEmail never invoked and metric records Duplicate.
 - **History:**
   - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`18f0b1c` — each post-paid side effect runs in its own try/catch with a Sentry capture. The outbox half is deliberately not done: a confirmation email lost to a transient fault stays lost, now visibly. Recorded in resolution-v15 Decisions
 
 ### PPW-670 — One transient poll failure replaces the payment-submitted screen with "order not found"
 
@@ -2070,6 +2081,7 @@ updated: 2026-08-24
 - **Suggested fix:** Keep the last settling snapshot on a poll error (only the very first read may fall through to the not-found state) and show a retry link. **Trace:** Real. Read 1 returns AwaitingPayment and attempts.isWaitingFor is true, so settling is set and the "Plata a fost trimisă… #FT-20260001" panel renders. Poll 3 (t=6s) rejects; the error handler at line 287-290 unconditionally does settling.set(null) with order() still null and no retry, so the only remaining template branch is .state-error — "Comanda nu a fost găsită sau nu a fost finalizată" plus the home link — while the payment is still in flight. **Test shape:** confirmation-page.spec.ts: "keeps the settling panel when a later poll fails". Arrange AwaitingPayment + submitted, advance 0, assert .settling; switch getPaymentStatus to throwError(500), advance 3000; assert .settling still shown with FT-20260001 and .state-error null.
 - **History:**
   - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — only the first read may fall through to not-found; a later failure keeps the settling panel and says the check failed
 
 ### PPW-671 — combinedStreetLength group error is never rendered, so Continue is disabled with no explanation
 
@@ -2078,6 +2090,7 @@ updated: 2026-08-24
 - **Suggested fix:** Render addressForm.errors.streetLineTooLong as a form-level message, and give maxlength breaches their own message instead of "Câmp obligatoriu". **Trace:** Pick Courier (costs loaded). Fill every field validly, street = 160 chars (control's maxLength is 255, so street is valid; number/block empty-or-short). combinedStreetLength joins parts → 160 > 150 → group error {streetLineTooLong}. statusChanges emits INVALID → addressValid() false → canContinue() false → "Continuă →" is [disabled], so continue()/markAllAsTouched never run. No control is invalid, so no @if field-error renders. grep confirms streetLineTooLong appears in no template. **Test shape:** delivery-step.spec: "shows a message when street+number+block exceed 150" — arrange Courier + valid address with 160-char street; act detectChanges; assert Continue disabled AND some .field-error text present (fails today).
 - **History:**
   - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — the combined-street-line error renders as a form-level message, and an over-long field says so rather than claiming it is empty
 
 ### PPW-672 — Settle-poll setTimeout is never cancelled on destroy, so a late poll clears a newer basket
 
@@ -2086,6 +2099,7 @@ updated: 2026-08-24
 - **Suggested fix:** Clear the pending timeout in a DestroyRef.onDestroy callback (or use timer+takeUntilDestroyed), and gate the cart clear on attempts.isWaitingFor(orderId). **Trace:** Real. Poll pending at line 282; component has no OnDestroy/DestroyRef and never clears the timer. Guest on AwaitingPayment page (attempts.isWaitingFor true) navigates to /tipareste and adds photos. Within the remaining 30 s budget a timer fires, read() re-subscribes, webhook has landed so status is Paid, and the settled branch (262-267) runs unconditionally: checkoutState.reset() plus cartService.clearCart() — a DELETE that empties the server cart and localStorage of the new basket. **Test shape:** confirmation-page.spec: "does not clear a new cart after destroy" — arrange AwaitingPayment + isWaitingFor true, fixture.destroy(), tick(3000), flush Paid response; assert httpMock.expectNone(DELETE /cart) and clearCart spy not called.
 - **History:**
   - v15: found by the delta pass — correctness + frontend-ux, convergence 2, verdict confirmed
+  - v15: fixed @`2302bec` — the poll timer is cleared on destroy and the cart is only cleared for an order this browser was waiting on
 
 ### PPW-673 — Invoice download uses a detached anchor and revokes the object URL in the same tick as click()
 
@@ -2094,6 +2108,7 @@ updated: 2026-08-24
 - **Suggested fix:** Follow the existing pattern: document.body.appendChild(link), click, removeChild, and revoke the URL in a setTimeout/next tick. **Trace:** Confirmed code: line 319 builds an anchor never inserted, 322 clicks it, 323 revokes in the same tick. Guest clicks "Descarcă factura"; blob arrives; the anchor's download fetch is queued as a task, so the URL is already revoked when it runs — download aborts. invoiceLoading clears, invoiceMessage stays null, so nothing is shown. The detached-anchor half is browser-version dependent; the same-tick revoke and the silent failure are not. **Test shape:** confirmation-page.spec: "attaches the invoice link and revokes after the click" — stub URL.createObjectURL/revokeObjectURL, spy body.appendChild and anchor.click; call downloadInvoice with a blob; assert anchor was connected at click and revoke ran after, not same tick.
 - **History:**
   - v15: found by the delta pass — correctness + frontend-ux, convergence 2, verdict confirmed
+  - v15: fixed @`2302bec` — the anchor is attached before the click and the object URL revoked on the next tick, matching the pattern `admin.service.downloadZip` already used
 
 ### PPW-674 — Admin cross-customer invoice read can be logged with an empty admin id
 
@@ -2102,6 +2117,7 @@ updated: 2026-08-24
 - **Suggested fix:** Take the admin id from the Bearer ClaimsIdentity (FindFirst on that identity) rather than GetUserIdOrNull, and/or refuse the admin override when a guest identity is also attached. **Trace:** Admin sends Bearer admin JWT + X-Guest-Token of any valid session, GET /api/orders/{victim}/invoice. The DualAuth policy authenticates both schemes; PolicyEvaluator merges identities into one principal. ClaimsPrincipalExtensions.cs:12 sees the guest_session_id claim and returns null, so userId=null; guestSessionId doesn't match the order, so owns=false. IsInRole scans all identities, finds the JWT's ClaimTypes.Role=Admin, so the PDF is served and line 72 logs admin_id= empty. **Test shape:** InvoicesControllerTests "AdminReadWithGuestTokenLogsAdminId": arrange principal holding both a JWT identity (NameIdentifier=adminId, Role=Admin) and a GuestToken identity (guest_session_id=other), act GetInvoiceAsync on a foreign order, assert captured log contains adminId.
 - **History:**
   - v15: found by the delta pass — security, convergence 1, verdict confirmed
+  - v15: fixed @`5d84a5e` — the audit line reads the admin id from the Bearer identity through a new `GetBearerUserIdOrNull`, so a request also carrying a guest token cannot log an empty one
 
 ### PPW-675 — Pooled test database is reused without checking the migration chain actually applied
 
@@ -2110,6 +2126,7 @@ updated: 2026-08-24
 - **Suggested fix:** Drop the database in LeaseSlot's catch, and on the reuse path assert GetPendingMigrations() is empty (or call Migrate()) before returning the lease. **Trace:** Real. Run 1: slot created (line 233), then Ctrl+C kills the process mid-Migrate (or during AwbCreatorTests, which drops "Orders" at line 236 and relies on Dispose to drop the DB). The database survives with no/partial schema. Run 2: same salt+fingerprint, so the sweep's `NOT LIKE current%` (line 289) skips it; DatabaseExists (227) takes the truncate path, whose pg_tables aggregate tolerates missing tables; the slot is handed out schema-less and every test throws relation "Orders" does not exist. **Test shape:** LeaseSlot_RepairsAnExistingSlotMissingItsSchema: arrange — pre-create the pool-named database (salt/fingerprint prefix) empty; act — construct PostgresTestDatabase; assert — NewContext().Orders.CountAsync() returns 0 instead of throwing "relation does not exist".
 - **History:**
   - v15: found by the delta pass — db-parity, convergence 1, verdict confirmed
+  - v15: fixed @`18f0b1c` — a leased slot with pending migrations is migrated before use, and a slot whose first migration fails is dropped rather than left to poison later runs
 
 ### PPW-676 — Content-rejected branch ignores a lost park CAS: claim stays held, no LastError, metric still counted
 
@@ -2118,6 +2135,7 @@ updated: 2026-08-24
 - **Suggested fix:** Mirror the InvoiceNotBuildableException branch: on parked==false, call RecordPendingErrorAsync and ReleaseClaimAsync, and only count the Failed metric when the park actually succeeded. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — correctness, convergence 1, verdict unverified-low
+  - v15: fixed @`5d84a5e` — a lost park CAS records the error, releases the claim and logs, instead of counting a park that did not happen
 
 ### PPW-677 — Webhook AlreadyInvoiced return leaves the uncommitted Paid transition on the scoped context
 
@@ -2126,6 +2144,7 @@ updated: 2026-08-24
 - **Suggested fix:** Reload the order entity (as AbandonToWinnerAsync does) before returning AlreadyInvoiced from both the pre-insert check and the unique-index catch. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — correctness, convergence 1, verdict unverified-low
+  - v15: backlogged — unverified-low tier with no trace built; it cannot strand a payment or an invoice
 
 ### PPW-678 — Invoice number allocated outside the transaction that inserts the row, against the numbering service's contract
 
@@ -2134,6 +2153,7 @@ updated: 2026-08-24
 - **Suggested fix:** Either open one transaction spanning NextNumberAsync and SaveChanges, or update the numbering service's doc comment to state the real (transaction-free) contract. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — race, convergence 1, verdict unverified-low
+  - v15: backlogged — a contract nit against the numbering service's own doc comment; ADR-020 already accepts the gap-on-rollback this describes
 
 ### PPW-679 — After the 10-poll budget the payment-confirming spinner spins forever with no terminal message
 
@@ -2142,6 +2162,7 @@ updated: 2026-08-24
 - **Suggested fix:** When polls hit MAX_SETTLE_POLLS, swap the spinner for a settled-message plus a "Verifică din nou" button that calls read(). **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — frontend-ux, convergence 1, verdict unverified-low
+  - v15: fixed @`2302bec` — a spent poll budget ends with a message instead of a spinner that never stops
 
 ### PPW-680 — canContinue ignores shippingCostsReady, so a restored session proceeds on a stale shipping cost
 
@@ -2150,6 +2171,7 @@ updated: 2026-08-24
 - **Suggested fix:** Include shippingCostsReady() in canContinue() (or re-gate on a confirmed cost for the selected method) so the cost-error banner blocks progress. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — frontend-ux, convergence 1, verdict unverified-low
+  - v15: fixed @`2302bec` — `canContinue` requires both shipping prices, so a restored session cannot proceed on a stored one
 
 ### PPW-681 — Non-owner invoice PDF served with a one-year immutable browser cache
 
@@ -2158,6 +2180,7 @@ updated: 2026-08-24
 - **Suggested fix:** Now that non-owners can fetch this endpoint, send private, no-store (or a short max-age) for the invoice PDF, matching OrderPaymentStatusController. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — security, convergence 1, verdict unverified-low
+  - v15: backlogged — restates the caching half of PPW-621, which the owner already sent to the backlog
 
 ### PPW-682 — ResetForTest deletes the migration's 42 EasyboxLocker seed rows and never restores them
 
@@ -2166,6 +2189,7 @@ updated: 2026-08-24
 - **Suggested fix:** Exclude the migration's seeded reference tables from the wipe, or re-insert the seed rows after each reset — the same treatment sequences already get. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
 
 ### PPW-683 — DropAllForeignKeys does not mark the pooled database dirty, so a constraint-free schema can be handed on
 
@@ -2174,6 +2198,7 @@ updated: 2026-08-24
 - **Suggested fix:** Route DropAllForeignKeys() through Execute() so it sets _schemaTouched, or make it private to the ForeignKeyFreeTestDatabase construction path. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
 
 ### PPW-684 — Test-database sweep is scoped to its own salt, so pools from other worktrees are never reclaimed
 
@@ -2182,6 +2207,7 @@ updated: 2026-08-24
 - **Suggested fix:** Sweep on the pp_test_ prefix across salts when the advisory lock is free, or stamp a last-used timestamp per pool and drop pools unused for N days. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
 
 ### PPW-685 — ResetSequences drops every public sequence the migration script did not literally CREATE, including identity-owned ones
 
@@ -2190,6 +2216,7 @@ updated: 2026-08-24
 - **Suggested fix:** Skip sequences that pg_sequences reports as owned by a column (pg_depend/pg_get_serial_sequence) instead of relying only on the scraped whitelist. **Trace:** (unchallenged lens verdict, not a refutation)
 - **History:**
   - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
 
 ### PPW-686 — MaxBatchSize is used unclamped unlike the upload job's other settings
 
@@ -2198,3 +2225,4 @@ updated: 2026-08-24
 - **Suggested fix:** Clamp in the constructor, e.g. _maxBatchSize = Math.Clamp(_settings.MaxBatchSize, 1, 500), and use that field in the query. **Trace:** (cleanup — not verified)
 - **History:**
   - v15: found by the delta pass — correctness, convergence 1, verdict unverified-cleanup
+  - v15: fixed @`9527eba` — `MaxBatchSize` is clamped to 1–500 in the constructor, like `PollIntervalMinutes` and `MaxUnknownUploadOutcomes`
