@@ -33,6 +33,7 @@ function makeOrder(status: string): OrderPaymentStatusDto {
 describe('ConfirmationPage', () => {
   let getPaymentStatus: ReturnType<typeof vi.fn>;
   let downloadInvoice: ReturnType<typeof vi.fn>;
+  let cartSpy: { clearCart: ReturnType<typeof vi.fn> };
 
   function setup(overrides: {
     orderStatus?: string;
@@ -67,6 +68,7 @@ describe('ConfirmationPage', () => {
     };
     const mockState = { reset: vi.fn() };
     const mockCart = { clearCart: vi.fn().mockReturnValue(new Subject()) };
+    cartSpy = mockCart;
 
     TestBed.configureTestingModule({
       imports: [ConfirmationPage],
@@ -197,6 +199,63 @@ describe('ConfirmationPage', () => {
 
     expect(getPaymentStatus.mock.calls.length).toBe(1);
     expect(fixture.debugElement.query(By.css('.state-error'))).not.toBeNull();
+  });
+
+  // The payment is in flight; a dropped Wi-Fi read says nothing about it, so the panel must stay.
+  it('keeps the settling panel when a later poll fails', async () => {
+    vi.useFakeTimers();
+    const fixture = setup({ orderStatus: 'AwaitingPayment', submitted: true });
+    fixture.detectChanges();
+    await vi.advanceTimersByTimeAsync(0);
+    fixture.detectChanges();
+    expect(fixture.debugElement.query(By.css('.settling'))).not.toBeNull();
+
+    getPaymentStatus.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    await vi.advanceTimersByTimeAsync(3000);
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css('.settling'))).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('.state-error'))).toBeNull();
+    expect(fixture.debugElement.query(By.css('.settling-warning'))).not.toBeNull();
+  });
+
+  // A timer outliving the page clears a basket the customer built after leaving it.
+  it('does not clear a cart built after the page was destroyed', async () => {
+    vi.useFakeTimers();
+    const fixture = setup({ orderStatus: 'AwaitingPayment', submitted: true });
+    fixture.detectChanges();
+    await vi.advanceTimersByTimeAsync(0);
+
+    getPaymentStatus.mockReturnValue(of(makeOrder('Paid')));
+    fixture.destroy();
+    await vi.advanceTimersByTimeAsync(10000);
+
+    expect(cartSpy.clearCart).not.toHaveBeenCalled();
+  });
+
+  // A detached anchor saves nothing in Firefox, and revoking in the same tick can beat the save.
+  it('attaches the invoice link before clicking and revokes the url afterwards', async () => {
+    vi.useFakeTimers();
+    const fixture = setup({ orderStatus: 'Paid' });
+    fixture.detectChanges();
+
+    const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake');
+    const revoked = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    let connectedAtClick: boolean | null = null;
+    const realClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { connectedAtClick = this.isConnected; };
+
+    try {
+      fixture.componentInstance.downloadInvoice();
+      expect(connectedAtClick).toBe(true);
+      expect(revoked).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(revoked).toHaveBeenCalledWith('blob:fake');
+    } finally {
+      HTMLAnchorElement.prototype.click = realClick;
+      created.mockRestore();
+      revoked.mockRestore();
+    }
   });
 
   it('shows the order number instead of the homepage when the settle budget runs out', async () => {

@@ -186,6 +186,23 @@ describe('PaymentStep', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  // The failure webhook moves this order to PaymentFailed while its intent stays chargeable, so
+  // confirming the same secret again takes money the order can no longer be settled against.
+  it('does not let a second attempt reuse the client secret a decline killed', async () => {
+    const fixture = await mountReadyStep();
+    const firstKey = lastKey();
+    stripe.confirmCardPayment.mockResolvedValue({ error: { message: 'Card refuzat' } });
+
+    await fixture.componentInstance.payWithStripe();
+
+    expect(fixture.componentInstance.stripeReady()).toBe(false);
+    expect(fixture.componentInstance.canRetry()).toBe(true);
+
+    fixture.componentInstance.retryPayment();
+    await vi.waitFor(() => expect(mockPayment.createStripeIntent).toHaveBeenCalledTimes(2));
+    expect(lastKey()).not.toBe(firstKey);
+  });
+
   it('treats a still-processing payment as submitted and sends the customer to the confirmation page', async () => {
     const fixture = await mountReadyStep();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

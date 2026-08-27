@@ -171,6 +171,15 @@ export class PaymentStep implements OnInit {
     this.canRetry.set(true);
   }
 
+  private discardDeadIntent(): void {
+    this.clientSecret = null;
+    this.stripeReady.set(false);
+    this.cardElement?.unmount?.();
+    this.cardElement = null;
+    this.attempts.retireKey();
+    this.canRetry.set(true);
+  }
+
   retryPayment(): void {
     this.canRetry.set(false);
     this.stripeError.set(null);
@@ -207,6 +216,9 @@ export class PaymentStep implements OnInit {
 
     if (result.error) {
       this.stripeError.set(result.error.message ?? 'Plata a eșuat. Verificați datele cardului.');
+      // The webhook moves this order to PaymentFailed, and its intent stays chargeable: confirming
+      // the same secret again takes money the order can no longer be settled against.
+      this.discardDeadIntent();
       return;
     }
 
@@ -214,6 +226,7 @@ export class PaymentStep implements OnInit {
     // webhook. Any other status means nothing was charged, so say so rather than stranding.
     const status = result.paymentIntent?.status;
     if (status === 'succeeded' || status === 'processing' || status === 'requires_capture') {
+      this.attempts.retireKey();
       this.checkoutState.reset();
       this.cartService.clearCart().subscribe();
       this.router.navigate(['/comanda', this.orderId, 'confirmare']);

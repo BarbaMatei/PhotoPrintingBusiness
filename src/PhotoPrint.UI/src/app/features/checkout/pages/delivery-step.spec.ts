@@ -92,6 +92,30 @@ describe('DeliveryStep', () => {
     flushCosts();
   });
 
+  // Continue greying out with nothing on screen is indistinguishable from a broken page.
+  it('says why Continue is disabled when street, number and block are too long together', () => {
+    const fixture = createFixture();
+    flushCosts();
+    fixture.componentInstance.selectMethod('Courier');
+    fixture.detectChanges();
+
+    fixture.componentInstance.addressForm.setValue({
+      street: 'S'.repeat(120),
+      number: '4'.repeat(20),
+      block: 'B'.repeat(20),
+      city: 'Cluj-Napoca',
+      county: 'Cluj',
+      postalCode: '400100',
+      recipientName: 'Ana Pop',
+      phone: '0712345678',
+    });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.canContinue()).toBe(false);
+    const errors = fixture.debugElement.queryAll(By.css('.field-error'));
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
   it('renders two delivery option cards', () => {
     const fixture = createFixture();
     flushCosts();

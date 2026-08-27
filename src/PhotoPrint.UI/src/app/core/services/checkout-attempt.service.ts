@@ -11,6 +11,7 @@ interface StoredAttempt {
   owner: string;
   createdAt: number;
   orderId?: string;
+  retired?: boolean;
 }
 
 function mintKey(): string {
@@ -49,7 +50,7 @@ export class CheckoutAttemptService {
   idempotencyKey(): string {
     const owner = this.owner();
     const stored = this.read();
-    if (stored && stored.owner === owner && this.isLive(stored)) return stored.key;
+    if (stored && stored.owner === owner && this.isLive(stored) && !stored.retired) return stored.key;
 
     const attempt: StoredAttempt = { key: mintKey(), owner, createdAt: Date.now() };
     this.write(attempt);
@@ -63,6 +64,14 @@ export class CheckoutAttemptService {
         ? { ...stored, orderId }
         : { key: mintKey(), owner: this.owner(), createdAt: Date.now(), orderId };
     this.write(attempt);
+  }
+
+  // Called once the card is confirmed: the order id stays so the confirmation page can still
+  // wait on it, but the key is spent and the next basket must mint its own.
+  retireKey(): void {
+    const stored = this.read();
+    if (!stored) return;
+    this.write({ ...stored, retired: true });
   }
 
   isWaitingFor(orderId: string): boolean {

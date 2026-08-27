@@ -1,5 +1,6 @@
 import {
   Component,
+  DestroyRef,
   inject,
   OnInit,
   ChangeDetectionStrategy,
@@ -124,6 +125,17 @@ const MAX_SETTLE_POLLS = 10;
           <p class="settling-hint">
             Puteți închide pagina — comanda este înregistrată și veți primi un e-mail.
           </p>
+          @if (pollFailed()) {
+            <p class="settling-warning">
+              Nu am putut verifica starea acum. Comanda este trimisă; reîncărcați pagina în câteva momente.
+            </p>
+          }
+          @if (settleGaveUp()) {
+            <p class="settling-warning">
+              Confirmarea întârzie mai mult decât de obicei. Comanda este înregistrată — reîncărcați
+              pagina sau verificați e-mailul.
+            </p>
+          }
         </div>
       }
 
@@ -235,18 +247,26 @@ export class ConfirmationPage implements OnInit {
   private readonly checkoutState = inject(CheckoutStateService);
   private readonly cartService = inject(CartService);
   private readonly attempts = inject(CheckoutAttemptService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(true);
   readonly order = signal<OrderPaymentStatusDto | null>(null);
   readonly settling = signal<OrderPaymentStatusDto | null>(null);
   readonly invoiceMessage = signal<string | null>(null);
   readonly invoiceLoading = signal(false);
+  readonly pollFailed = signal(false);
+  readonly settleGaveUp = signal(false);
 
   private polls = 0;
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly isAuthenticated = () => this.authService.isAuthenticated();
 
   ngOnInit(): void {
+    this.destroyRef.onDestroy(() => {
+      if (this.settleTimer !== null) clearTimeout(this.settleTimer);
+      this.settleTimer = null;
+    });
     this.read();
   }
 
@@ -260,11 +280,14 @@ export class ConfirmationPage implements OnInit {
         this.loading.set(false);
 
         if (SETTLED_STATUSES.includes(order.status)) {
+          const wasWaiting = this.attempts.isWaitingFor(this.orderId());
           this.settling.set(null);
           this.order.set(order);
-          this.attempts.clear();
-          this.checkoutState.reset();
-          this.cartService.clearCart().subscribe();
+          if (wasWaiting) {
+            this.attempts.clear();
+            this.checkoutState.reset();
+            this.cartService.clearCart().subscribe();
+          }
           return;
         }
 
@@ -277,15 +300,23 @@ export class ConfirmationPage implements OnInit {
         }
 
         this.settling.set(order);
+        this.pollFailed.set(false);
         if (this.polls < MAX_SETTLE_POLLS) {
           this.polls++;
-          setTimeout(() => this.read(), SETTLE_POLL_MS);
+          // PPW-672: a timer that outlives the page would clear a basket built after it.
+          this.settleTimer = setTimeout(() => this.read(), SETTLE_POLL_MS);
+          return;
         }
+        this.settleGaveUp.set(true);
       },
-      // One failed read stops the wait: retrying a rejected read would hammer the endpoint and,
-      // for a guest, repeat whatever cleared their token in the first place.
+      // A later read failing says nothing about the payment, which is still in flight; only the
+      // very first read may fall through to the not-found state.
       error: () => {
         this.loading.set(false);
+        if (this.settling()) {
+          this.pollFailed.set(true);
+          return;
+        }
         this.settling.set(null);
       },
     });
@@ -319,8 +350,11 @@ export class ConfirmationPage implements OnInit {
     const link = document.createElement('a');
     link.href = url;
     link.download = name;
+    // A detached anchor saves nothing in Firefox, and revoking in the same tick can beat the save.
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   isAtLeast(status: string): boolean {

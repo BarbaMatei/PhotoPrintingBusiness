@@ -79,6 +79,17 @@ describe('CheckoutAttemptService', () => {
     expect(service.isWaitingFor('order-1')).toBe(false);
   });
 
+  // A key that paid for an order must never be offered to the next basket: the server answers it
+  // with the old order and the page would send the customer there, clearing the new cart.
+  it('retires the key once the card is confirmed but still waits on the order', () => {
+    const paid = service.idempotencyKey();
+    service.markOrderCreated('order-1');
+    service.retireKey();
+
+    expect(service.isWaitingFor('order-1')).toBe(true);
+    expect(service.idempotencyKey()).not.toBe(paid);
+  });
+
   it('drops the attempt on clear, so the next checkout gets a new key', () => {
     const first = service.idempotencyKey();
     service.clear();

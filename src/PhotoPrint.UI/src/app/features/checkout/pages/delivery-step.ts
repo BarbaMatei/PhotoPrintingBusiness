@@ -174,7 +174,9 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
             <div class="form-group">
               <label for="street">Strada</label>
               <input id="street" type="text" formControlName="street" />
-              @if (touched('street') && addressForm.get('street')?.invalid) {
+              @if (touched('street') && addressForm.get('street')?.errors?.['maxlength']) {
+                <span class="field-error">Prea lung pentru factură</span>
+              } @else if (touched('street') && addressForm.get('street')?.invalid) {
                 <span class="field-error">Câmp obligatoriu</span>
               }
             </div>
@@ -235,6 +237,12 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
             }
           </div>
         </form>
+      }
+
+      @if (addressForm.errors?.['streetLineTooLong']) {
+        <div class="field-error form-error" role="alert">
+          Strada, numărul și blocul depășesc împreună 150 de caractere, limita liniei de adresă de pe factură.
+        </div>
       }
 
       <div class="step-actions">
@@ -328,6 +336,7 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
       font-size: 0.95rem;
     }
     .field-error { color: #dc3545; font-size: 0.8rem; }
+    .form-error { margin: 0.5rem 0; }
 
     .step-actions {
       display: flex;
@@ -393,6 +402,9 @@ export class DeliveryStep implements OnInit {
   readonly canContinue = computed(() => {
     const method = this.deliveryMethod();
     if (!method) return false;
+    // A restored method carries a stored price; continuing before the server confirms it invoices
+    // a total the customer never agreed to.
+    if (!this.shippingCostsReady()) return false;
     if (method === 'Easybox') return !!this.selectedLockerId() && this.addressValid();
     return this.addressValid();
   });
