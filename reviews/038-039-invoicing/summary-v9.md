@@ -47,8 +47,8 @@ this loop's own earlier fixes. The verdict is request-changes ([review-v9.md](re
    generated migration would inherit any. *Fix now, minutes: one assertion in the migration test.* [PPW-565](ledger.md)
 
 8. **A test gap you already waived came back.** Both payment callbacks now share one failure-counting wrapper, only
-   the Stripe half is tested, and the EuPlatesc half answers a different response format. *Re-affirm the waiver on the
-   ground that EuPlatesc is being removed, or overturn it — [PPW-511](ledger.md) still tracks that the removal is
+   the Stripe half is tested, and the legacy processor half answers a different response format. *Re-affirm the waiver on the
+   ground that the legacy processor is being removed, or overturn it — [PPW-511](ledger.md) still tracks that the removal is
    written down nowhere.* [PPW-526](ledger.md) · `Controllers/WebhooksController.cs:204`
 
 ## Reasons to doubt

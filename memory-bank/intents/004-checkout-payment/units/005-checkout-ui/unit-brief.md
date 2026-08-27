@@ -22,9 +22,9 @@ The checkout steps share a single `CheckoutStateService` that carries state (del
 
 - Leaflet.js integration in Angular standalone components (needs `ngx-leaflet` or custom wrapper)
 - Stripe Elements must be initialized with `clientSecret` just-in-time (before user submits)
-- EuPlatesc redirect must handle browser back-button case gracefully (order in `AwaitingPayment` state)
+- the legacy processor redirect must handle browser back-button case gracefully (order in `AwaitingPayment` state)
 - Checkout state must survive browser refresh (sessionStorage backup)
-- Confirmation page must handle `?processor=euplatesc` query param from EuPlatesc return URL
+- Confirmation page must handle `?processor=legacy-processor` query param from the legacy processor return URL
 
 ## Stories
 

@@ -9,7 +9,7 @@ ASP.NET Core 8 Web API  (C#)
 PostgreSQL · EF Core · JWT · SignalR
 Scop &amp; Decizii Cheie
 Platformă e-commerce de tipărire foto 100% online, în limba română. Clienții uploadează fotografii, aleg format (10×15 / 13×18 / 15×21 cm) și finisaj (Lucios / Mat), plătesc online și primesc comenzile prin Sameday Easybox sau livrare la ușă.
-Auth: Email+Parolă + Google OAuth + Guest Checkout  ·  Plăți: Stripe + EuPlatesc  ·  Livrare: Easybox (auto API) + curier (manual fallback)  ·  Email: Confirmare / Expediat / Livrat / Bun venit  ·  DB: PostgreSQL
+Auth: Email+Parolă + Google OAuth + Guest Checkout  ·  Plăți: Stripe + the legacy processor  ·  Livrare: Easybox (auto API) + curier (manual fallback)  ·  Email: Confirmare / Expediat / Livrat / Bun venit  ·  DB: PostgreSQL
 1. Technology Stack
 FE Framework
 Angular 17+ — standalone components, Signals, lazy-loaded routes
@@ -40,7 +40,7 @@ SixLabors.ImageSharp — dimension extraction, future resizing
 Email
 IEmailService: MailKit (dev SMTP) / SendGrid (prod) — Razor templates
 Payments
-Stripe (webhook-driven) + EuPlatesc (IPN-driven)
+Stripe (webhook-driven) + the legacy processor (IPN-driven)
 Shipping
 IShippingService: Sameday API (Phase 2) / static seed + manual (Phase 1)
 Real-time
@@ -248,7 +248,7 @@ AC
 • Validates: uploadId belongs to session/user; productId is active; quantity 1–100
 • Cart scoped by userId OR guestSessionId
 EPIC-3  |  Checkout &amp; Plată
-Selecție livrare Easybox (hartă) sau acasă. Recenzie comandă. Plată duală Stripe + EuPlatesc. Confirmare comandă.
+Selecție livrare Easybox (hartă) sau acasă. Recenzie comandă. Plată duală Stripe + the legacy processor. Confirmare comandă.
 [FRONTEND — Angular]  US-301 — Checkout — Delivery Method
 As a
 customer
@@ -288,13 +288,13 @@ AC
 As a
 customer
 I want to
-choose between card payment (Stripe) or Romanian card payment (EuPlatesc) and complete the payment
+choose between card payment (Stripe) or Romanian card payment (the legacy processor) and complete the payment
 AC
-• Payment step shows two tabs/options: &apos;Card internațional (Stripe)&apos; and &apos;Card românesc (EuPlatesc)&apos;
+• Payment step shows two tabs/options: &apos;Card internațional (Stripe)&apos; and &apos;Card românesc (the legacy processor)&apos;
 • Stripe tab: embedded Stripe Elements (card number, expiry, CVC, name) — no redirect
-• EuPlatesc tab: &apos;Plătește cu EuPlatesc&apos; button → redirects to EuPlatesc hosted payment page
+• the legacy processor tab: &apos;Plătește cu the legacy processor&apos; button → redirects to the legacy processor hosted payment page
 • Stripe success: redirect to /comanda/{orderId}/confirmare
-• EuPlatesc success: EuPlatesc redirects back to /comanda/{orderId}/confirmare?processor=euplatesc
+• the legacy processor success: the legacy processor redirects back to /comanda/{orderId}/confirmare?processor=legacy-processor
 • Failure: inline error in Romanian; retry available without losing cart
 [BACKEND — ASP.NET Core]  US-305 — Payment — Stripe Backend
 As a
@@ -308,17 +308,17 @@ AC
 • payment_intent.succeeded → Order status=Paid; fires OrderConfirmedEmail; associates uploads to order
 • payment_intent.payment_failed → Order status=PaymentFailed
 • Idempotent: duplicate events ignored by PaymentIntentId uniqueness check
-[BACKEND — ASP.NET Core]  US-306 — Payment — EuPlatesc Backend
+[BACKEND — ASP.NET Core]  US-306 — Payment — the legacy processor Backend
 As a
 system
 I want to
-initiate EuPlatesc payment sessions and confirm orders via EuPlatesc IPN callback
+initiate the legacy processor payment sessions and confirm orders via the legacy processor IPN callback
 AC
-• POST /api/payments/euplatesc/initiate — builds EuPlatesc payment request (amount, orderId, returnUrl, cancelUrl, ipnUrl); returns {redirectUrl}
-• EuPlatesc IPN endpoint: POST /api/webhooks/euplatesc — validates HMAC signature using EuPlatesc merchant key
+• POST /api/payments/legacy-processor/initiate — builds the legacy processor payment request (amount, orderId, returnUrl, cancelUrl, ipnUrl); returns {redirectUrl}
+• the legacy processor IPN endpoint: POST /api/webhooks/legacy-processor — validates HMAC signature using the legacy processor merchant key
 • On success IPN: Order status=Paid; fires OrderConfirmedEmail
 • On failure IPN: Order status=PaymentFailed
-• Stores EuPlatescTransactionId on order for reconciliation
+• Stores LegacyProcessorTransactionId on order for reconciliation
 • IPN endpoint is public (no JWT); protected by HMAC validation only
 [FRONTEND — Angular]  US-307 — Order Confirmation Page
 As a
@@ -415,7 +415,7 @@ AC
 • GET /api/admin/orders/{id} — full detail + internalNotes
 • PATCH /api/admin/orders/{id}/status {status, awbNumber?} — validates transitions: Paid→Printing→Shipped→Delivered; any→Cancelled
 • GET /api/admin/orders/{id}/download-zip — streams ZIP (System.IO.Compression) of all order photo files
-• POST /api/admin/orders/{id}/cancel — initiates Stripe refund OR EuPlatesc refund based on PaymentProcessor field; sets status=Cancelled
+• POST /api/admin/orders/{id}/cancel — initiates Stripe refund OR the legacy processor refund based on PaymentProcessor field; sets status=Cancelled
 • PATCH /api/admin/orders/{id}/notes {notes} — saves internal note
 • SignalR AdminOrderHub: broadcasts NewOrderReceived and OrderStatusChanged to admin clients on order events
 [BACKEND — ASP.NET Core]  US-505 — Admin — Stats API
@@ -459,7 +459,7 @@ system
 I want to
 confirm to the customer (registered or guest) that payment was received and order is being processed
 AC
-• Triggered by: payment webhook success (Stripe or EuPlatesc)
+• Triggered by: payment webhook success (Stripe or the legacy processor)
 • Subject: &apos;Comanda #FT-XXXX a fost primită!&apos;
 • Body: customer first name (or &apos;Drag client&apos; for guest), order number, items table (format, finish, qty, unit price, line total), delivery address/locker name, shipping cost, TOTAL paid, estimated delivery &apos;2-4 zile lucrătoare&apos;
 • Guest email includes: &apos;Urmărește comanda&apos; link /comanda/{id}?email={email}
@@ -603,7 +603,7 @@ Id(UUID), UserId?→Users, GuestSessionId?→GuestSessions, FilePath, WidthPx, H
 CartItems
 Id, UserId?|GuestSessionId?, UploadId→Uploads, ProductId→Products, Quantity, AddedAt
 Orders
-Id(UUID), OrderNumber(FT-YYYYNNNN unique), UserId?→Users, GuestSessionId?→GuestSessions, Status(enum), PaymentProcessor(Stripe|EuPlatesc), PaymentIntentId?, EuPlatescTransactionId?, PaymentTotal, ShippingCost, ShippingType(Easybox|Courier), AwbNumber?, TrackingUrl?, InternalNotes?, CreatedAt, UpdatedAt
+Id(UUID), OrderNumber(FT-YYYYNNNN unique), UserId?→Users, GuestSessionId?→GuestSessions, Status(enum), PaymentProcessor(Stripe|the legacy processor), PaymentIntentId?, LegacyProcessorTransactionId?, PaymentTotal, ShippingCost, ShippingType(Easybox|Courier), AwbNumber?, TrackingUrl?, InternalNotes?, CreatedAt, UpdatedAt
 OrderItems
 Id, OrderId→Orders, UploadId→Uploads, ProductId→Products, Quantity, UnitPriceRon, ProductSnapshot(JSONB)
 Addresses
@@ -737,17 +737,17 @@ POST
 Auth|Guest
 Create Stripe PaymentIntent
 POST
-/api/payments/euplatesc/initiate
+/api/payments/legacy-processor/initiate
 Auth|Guest
-Initiate EuPlatesc payment
+Initiate the legacy processor payment
 POST
 /api/webhooks/stripe
 Public+HMAC
 Stripe event receiver
 POST
-/api/webhooks/euplatesc
+/api/webhooks/legacy-processor
 Public+HMAC
-EuPlatesc IPN receiver
+the legacy processor IPN receiver
 GET
 /api/orders
 Auth|Guest
@@ -867,10 +867,10 @@ Status curent
 Declanșat de
 AwaitingPayment
 Paid
-Webhook Stripe / EuPlatesc IPN (plată reușită)
+Webhook Stripe / the legacy processor IPN (plată reușită)
 AwaitingPayment
 PaymentFailed
-Webhook Stripe / EuPlatesc IPN (plată eșuată)
+Webhook Stripe / the legacy processor IPN (plată eșuată)
 Paid
 Printing
 Admin: &apos;Marchează ca În imprimare&apos;
@@ -882,7 +882,7 @@ Delivered
 Admin: &apos;Marchează ca Livrată&apos;
 Paid → orice
 Cancelled
-Admin: &apos;Anulează&apos; + rambursare Stripe/EuPlatesc inițiată
+Admin: &apos;Anulează&apos; + rambursare Stripe/legacy-processor inițiată
 Printing → orice
 Cancelled
 Admin: &apos;Anulează&apos; + rambursare inițiată

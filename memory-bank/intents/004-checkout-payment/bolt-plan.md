@@ -300,7 +300,7 @@ enables:
 **Order entity domain**:
 - `Order` entity:
   - `Id (UUID)`, `OrderNumber (string, unique)`, `UserId?`, `GuestSessionId?`
-  - `Status (OrderStatus enum)`, `PaymentProcessor (PaymentProcessor enum)`, `PaymentIntentId? (string)`, `EuPlatescTransactionId? (string)`
+  - `Status (OrderStatus enum)`, `PaymentProcessor (PaymentProcessor enum)`, `PaymentIntentId? (string)`, `the legacy processorTransactionId? (string)`
   - `ShippingAddress (JSONB)` — `ShippingAddressDto` serialized: `{ street, number, block?, city, county, postalCode, recipientName, phone }`
   - `DeliveryType (DeliveryType enum: Easybox | Courier)`, `EasyboxLockerId? → EasyboxLockers`
   - `ShippingCostRon (decimal)`, `SubtotalRon (decimal)`, `TotalRon (decimal)`
@@ -310,7 +310,7 @@ enables:
   - `Id (UUID)`, `OrderId → Orders`, `UploadId → Uploads`, `ProductId → Products`
   - `Quantity (int)`, `UnitPriceRon (decimal)` (snapshot at order time), `LineTotalRon (decimal)`
   - `ProductSnapshot (JSONB)` — `{ productName, size, finish }` at order time
-- Enums: `OrderStatus { AwaitingPayment, Paid, Printing, Shipped, Delivered, PaymentFailed, Cancelled }`, `PaymentProcessor { Stripe, EuPlatesc }`, `DeliveryType { Easybox, Courier }`
+- Enums: `OrderStatus { AwaitingPayment, Paid, Printing, Shipped, Delivered, PaymentFailed, Cancelled }`, `PaymentProcessor { Stripe, the legacy processor }`, `DeliveryType { Easybox, Courier }`
 - EF Core migration: `Orders` table + `OrderItems` table; unique index on `OrderNumber`; composite index on `(Status, CreatedAt)`
 
 **Order number generation**:
@@ -358,8 +358,8 @@ stories:
   - 001-order-service
   - 002-stripe-payment-intent
   - 003-stripe-webhook-handler
-  - 004-euplatesc-initiate
-  - 005-euplatesc-ipn-handler
+  - 004-legacy-processor-initiate
+  - 005-legacy-processor-ipn-handler
 epic_stories:
   - US-305
   - US-306
@@ -395,30 +395,30 @@ enables:
   - Stripe signature invalid: return `400 Bad Request`
 - Config: `Stripe:SecretKey`, `Stripe:WebhookSecret`, `Stripe:PublishableKey` (returned to frontend via config endpoint or environment)
 
-**EuPlatesc integration** (custom service — no official NuGet):
-- `IEuPlatescService` → `EuPlatescService`
-- `POST /api/payments/euplatesc/initiate` (Bearer JWT or X-Guest-Token)
-  - Calls `OrderService.CreateFromCartAsync` (sets `PaymentProcessor = EuPlatesc`)
-  - Builds EuPlatesc payment parameters (exact field names per EuPlatesc v3 spec):
+**the legacy processor integration** (custom service — no official NuGet):
+- `ILegacyProcessorService` → `the legacy processorService`
+- `POST /api/payments/legacy-processor/initiate` (Bearer JWT or X-Guest-Token)
+  - Calls `OrderService.CreateFromCartAsync` (sets `PaymentProcessor = the legacy processor`)
+  - Builds the legacy processor payment parameters (exact field names per the legacy processor v3 spec):
     - `amount` (decimal, 2dp), `curr = "RON"`, `invoice_id = orderId.ToString()`, `order_desc = "FotoTipar comanda {orderNumber}"`, `merch_id`, `timestamp (yyyyMMddHHmmss UTC)`, `nonce (random 32-hex)`
-  - HMAC-MD5 generation: concatenate fields in exact EuPlatesc spec order → HMAC-MD5 with merchant secret key (hex digest)
-  - Returns `{ redirectUrl: "https://secure.euplatesc.ro/tdsprocess/tranzactd.php?{params}", orderId }`
-  - `return_url = {frontendUrl}/comanda/{orderId}/confirmare?processor=euplatesc`
+  - HMAC-MD5 generation: concatenate fields in exact the legacy processor spec order → HMAC-MD5 with merchant secret key (hex digest)
+  - Returns `{ redirectUrl: "https://secure.legacy-processor.ro/tdsprocess/tranzactd.php?{params}", orderId }`
+  - `return_url = {frontendUrl}/comanda/{orderId}/confirmare?processor=legacy-processor`
   - `cancel_url = {frontendUrl}/checkout?cancelled=true`
-  - `ipn_url = {backendUrl}/api/webhooks/euplatesc`
-- `POST /api/webhooks/euplatesc` (NO auth — EuPlatesc IPN; public endpoint)
+  - `ipn_url = {backendUrl}/api/webhooks/legacy-processor`
+- `POST /api/webhooks/legacy-processor` (NO auth — the legacy processor IPN; public endpoint)
   - Content-Type: `application/x-www-form-urlencoded`
-  - Read all form fields; validate HMAC signature using `EuPlatescService.ValidateIpnSignature(fields, key)`
+  - Read all form fields; validate HMAC signature using `the legacy processorService.ValidateIpnSignature(fields, key)`
   - Amount validation: `fields["amount"] == order.TotalRon.ToString("F2")` → reject if mismatch (log + 200 with error response per spec)
-  - `fields["action"] == "0"` → success: find Order by `invoice_id` → Transition to Paid → store `EuPlatescTransactionId` → fire email
+  - `fields["action"] == "0"` → success: find Order by `invoice_id` → Transition to Paid → store `the legacy processorTransactionId` → fire email
   - Any other action value → PaymentFailed
-  - Response: `<epayment>{date}|{hmac}</epayment>` plain text as per EuPlatesc IPN spec
-  - Invalid signature: return `<epayment>error</epayment>` (per spec; do NOT return 4xx or EuPlatesc will retry indefinitely)
-- Config: `EuPlatesc:MerchantId`, `EuPlatesc:SecretKey`, `EuPlatesc:GatewayUrl`
+  - Response: `<epayment>{date}|{hmac}</epayment>` plain text as per the legacy processor IPN spec
+  - Invalid signature: return `<epayment>error</epayment>` (per spec; do NOT return 4xx or the legacy processor will retry indefinitely)
+- Config: `the legacy processor:MerchantId`, `the legacy processor:SecretKey`, `the legacy processor:GatewayUrl`
 
 **Configuration** (environment variables only — never in appsettings.json for secrets):
 - `STRIPE__SECRETKEY`, `STRIPE__WEBHOOKSECRET`, `STRIPE__PUBLISHABLEKEY`
-- `EUPLATESC__MERCHANTID`, `EUPLATESC__SECRETKEY`
+- `legacy-processor__MERCHANTID`, `legacy-processor__SECRETKEY`
 
 **Tests**:
 - Unit: `OrderService.CreateFromCart` — builds OrderItems with correct unit price from tier; sets OrderNumber
@@ -426,12 +426,12 @@ enables:
 - Unit: Stripe webhook — valid signature + `payment_intent.succeeded` → Order status = Paid
 - Unit: Stripe webhook — tampered signature → 400
 - Unit: Stripe webhook — duplicate event for already-paid order → 200, no email fired
-- Unit: EuPlatesc HMAC generation — verified against known test vector from EuPlatesc docs
-- Unit: EuPlatesc IPN — valid signature + `action=0` → Order Paid
-- Unit: EuPlatesc IPN — amount mismatch → no status change, warning logged
-- Unit: EuPlatesc IPN — invalid signature → `<epayment>error</epayment>` response
+- Unit: the legacy processor HMAC generation — verified against known test vector from the legacy processor docs
+- Unit: the legacy processor IPN — valid signature + `action=0` → Order Paid
+- Unit: the legacy processor IPN — amount mismatch → no status change, warning logged
+- Unit: the legacy processor IPN — invalid signature → `<epayment>error</epayment>` response
 - Integration: Stripe intent creation with mocked `StripeClient`
-- Integration: Full EuPlatesc initiate + IPN flow
+- Integration: Full the legacy processor initiate + IPN flow
 
 ---
 
@@ -501,23 +501,23 @@ enables: []  # terminal bolt for this intent
 
 **Payment step** (`/checkout/plata`):
 - `PaymentStepComponent` — on init: calls `POST /api/payments/stripe/intent` to get `clientSecret` (eagerly to reduce latency when user reaches step)
-- Two option tabs: `Card internațional (Stripe)` | `Card românesc (EuPlatesc)`
+- Two option tabs: `Card internațional (Stripe)` | `Card românesc (the legacy processor)`
 - **Stripe tab** (`StripeFormComponent`):
   - Loads `@stripe/stripe-js` with `loadStripe(environment.stripePublishableKey)`
   - Creates `Elements` instance with `clientSecret`; mounts `CardElement` in div
   - On submit: `stripe.confirmCardPayment(clientSecret, { payment_method: { card } })`
   - Success: navigate to `/comanda/{orderId}/confirmare`
   - Error: display inline Romanian error message; Stripe Elements remain mounted for retry
-- **EuPlatesc tab**:
-  - `Plătește cu EuPlatesc` button
-  - On click: calls `POST /api/payments/euplatesc/initiate` → `window.location.href = redirectUrl`
+- **the legacy processor tab**:
+  - `Plătește cu the legacy processor` button
+  - On click: calls `POST /api/payments/legacy-processor/initiate` → `window.location.href = redirectUrl`
   - Loading spinner during API call
 - Back button → `/checkout/recapitulare` (Stripe intent already created; order remains in `AwaitingPayment`)
 
 **Order confirmation** (`/comanda/:orderId/confirmare`):
 - `ConfirmationComponent` — route: `/comanda/:orderId/confirmare`
 - On init: `GET /api/orders/{orderId}` — if `status != Paid`, redirect to `/`
-- Handles `?processor=euplatesc` query param (same page, different entry path — no behavioral difference)
+- Handles `?processor=legacy-processor` query param (same page, different entry path — no behavioral difference)
 - Displays: success animation (CSS checkmark), order number, photo count, format, total paid, delivery method + address/locker
 - `OrderStatusStepperComponent` (shared, reusable): shows 4 stages with current step highlighted — `Comandă primită ✓`, `În pregătire`, `Expediată`, `Livrată`
 - Estimated delivery date range
@@ -529,7 +529,7 @@ enables: []  # terminal bolt for this intent
   - `getShippingCost(type) → Observable<ShippingCostDto>`
 - `PaymentService` — `src/app/core/services/payment.service.ts`
   - `createStripeIntent() → Observable<StripeIntentResponse>`
-  - `initiateEuPlatesc() → Observable<EuPlatescInitiateResponse>`
+  - `initiateLegacyProcessor() → Observable<the legacy processorInitiateResponse>`
 
 **NPM packages to install**:
 - `leaflet` + `@types/leaflet`
@@ -546,7 +546,7 @@ enables: []  # terminal bolt for this intent
 - Unit: `ConfirmationComponent` — redirects to `/` if order not Paid
 - Unit: `ConfirmationComponent` — shows guest CTA for guest session, `Comenzi` link for auth user
 - E2E: Full checkout flow — upload → format → cart → delivery (Easybox) → review → Stripe payment → confirmation
-- E2E: EuPlatesc redirect flow (mock redirect)
+- E2E: the legacy processor redirect flow (mock redirect)
 
 ---
 

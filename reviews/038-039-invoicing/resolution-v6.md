@@ -35,7 +35,7 @@ closed: 2026-08-21
 | PPW-520 | deferred | — | Depends on a rule the repo does not document, and the check that would settle it was never built. See Decisions |
 | PPW-524 | deferred | — | Owner ruled the missing SPA consumer out of scope for this round |
 | PPW-525 | deferred | — | Needs the order-transfer capability that was never built; not a defect this round can close. See Decisions |
-| PPW-526 | wont-fix | — | Owner ruled EuPlatesc is being removed, so its coverage was waived rather than written; PPW-511 tracks that the removal is untracked |
+| PPW-526 | wont-fix | — | Owner ruled the legacy processor is being removed, so its coverage was waived rather than written; PPW-511 tracks that the removal is untracked |
 | PPW-528 | deferred | — | Wants a metric value whose only use is a dashboard panel this round should not add. See Decisions |
 | PPW-530 | false-positive | — | The migration it names was deleted by the Postgres-only squash; one baseline builds the index on an empty database, so there is nothing to de-duplicate |
 

@@ -28,7 +28,7 @@ Wire Sentry error tracking into the API so every unhandled exception lands in Se
 - `memory-bank/operations/slos.md` documenting:
   - Availability ≥ 99.5% (rolling 30 d).
   - p95 checkout latency ≤ 1.5s on `POST /api/payments/stripe/intent`.
-  - Payment-webhook success ≥ 99.9% (Stripe + EuPlatesc combined).
+  - Payment-webhook success ≥ 99.9% (Stripe + the legacy processor combined).
   - AWB auto-creation ≥ 98% (intent 015).
   - ANAF submission success ≥ 99% (intent 016, planned).
 - `ops/dashboards/fototipar-overview.json` — Grafana dashboard JSON, 6 panels: RPS, latency p50/p95/p99, error rate, orders/day, payment-webhook success, AWB success, ANAF status.

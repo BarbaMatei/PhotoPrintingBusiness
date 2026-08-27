@@ -10,16 +10,16 @@ decisions-needed: 3
 
 # Owner summary — 038-039-invoicing v15
 
-Five blinded lenses read everything that changed since the last full pass — the EuPlatesc
+Five blinded lenses read everything that changed since the last full pass — the legacy processor
 removal, the payment-flow cluster and the round that closed every remaining ledger row — and
 found **28 defects: 5 serious, 12 medium, 10 minor, 1 cleanup**. The verdict is
 **request-changes**. The uncomfortable part is where they came from: **15 of the 28 were
-introduced by the last two fix rounds**, and one more by the EuPlatesc removal. The round
+introduced by the last two fix rounds**, and one more by the legacy processor removal. The round
 closed 26 rows and broke roughly a dozen things doing it.
 
 ## Needs your decision
 
-- **The dev database is already broken and I can fix it (PPW-663).** The EuPlatesc removal
+- **The dev database is already broken and I can fix it (PPW-663).** The legacy processor removal
   deleted three columns by editing the migration that had *already run*, so PostgreSQL never
   hears about it. On your machine `Orders.PaymentProcessor` is still `NOT NULL` with no default
   while the code no longer sets it — the next checkout there dies. The fix is to put the old

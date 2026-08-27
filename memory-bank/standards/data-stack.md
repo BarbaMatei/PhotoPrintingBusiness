@@ -26,13 +26,15 @@ or user-secrets — never in a tracked settings file (ADR-006).
 
 ## The migration chain
 
-Four migrations, all scaffolded under the Npgsql design-time provider: the squashed baseline
+Three migrations, all scaffolded under the Npgsql design-time provider: the squashed baseline
 **`20260820133204_InitialPostgres`**, then `20260821054658_AddInvoiceStorageLocation` and
-`20260821110018_AddInvoiceUnknownUploadOutcomes` (each a single `AddColumn`), then
-`20260827161417_DropEuPlatescColumns`.
+`20260821110018_AddInvoiceUnknownUploadOutcomes`, each a single `AddColumn`.
 
-A migration that has run anywhere is frozen: `Migrate()` matches ids, not contents, so editing one
-changes only databases that have not seen it. Drop a column with a new migration.
+Pre-deploy, the baseline is **edited in place** — the branch that reaches `main` carries one
+migration, not a trail of corrections. `Migrate()` matches ids, not contents, so an edited
+baseline never reaches a database that already ran it: bring a stale developer database in line by
+hand (`ALTER TABLE ... DROP COLUMN` keeps the data) or recreate it. Once anything is deployed this
+reverses — an applied migration is frozen and a column goes in a new migration.
 
 The baseline's snapshot contains only Postgres store types — `uuid`, `timestamp with time zone`,
 `jsonb`, `numeric`, `character varying(n)`, `double precision`, `boolean` — and **zero**

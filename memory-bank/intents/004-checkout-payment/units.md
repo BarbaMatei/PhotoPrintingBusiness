@@ -34,7 +34,7 @@ updated: 2026-05-21T10:00:00Z
 - **FR-12** Order entity + order number generation → `003-shipping-and-order-core`
 - **FR-13** Order status state machine → `003-shipping-and-order-core`
 - **FR-14** Stripe payment integration (backend) → `004-payment-backends`
-- **FR-15** EuPlatesc payment integration (backend) → `004-payment-backends`
+- **FR-15** the legacy processor payment integration (backend) → `004-payment-backends`
 - **FR-16** Delivery step Angular UI → `005-checkout-ui`
 - **FR-17** Order review step Angular UI → `005-checkout-ui`
 - **FR-18** Payment step + order confirmation Angular UI → `005-checkout-ui`
@@ -122,26 +122,26 @@ Shipping API and Order entity are both needed before any payment bolt can be bui
 
 ## Unit 004: payment-backends
 
-**Purpose**: The complete backend payment integration: Stripe (PaymentIntent, webhook) and EuPlatesc (redirect initiate, IPN callback). Both processors share the `OrderService` which creates Orders from carts and fires post-payment side effects (email trigger, upload association).
+**Purpose**: The complete backend payment integration: Stripe (PaymentIntent, webhook) and the legacy processor (redirect initiate, IPN callback). Both processors share the `OrderService` which creates Orders from carts and fires post-payment side effects (email trigger, upload association).
 
 **Why one bolt?**
-Stripe and EuPlatesc share the Order entity, `IOrderService`, and the webhook/IPN pattern. Shared context means they are faster to build together than independently, and the ADR decision to keep them in parallel (same Order model) is easier to enforce in one bolt.
+Stripe and the legacy processor share the Order entity, `IOrderService`, and the webhook/IPN pattern. Shared context means they are faster to build together than independently, and the ADR decision to keep them in parallel (same Order model) is easier to enforce in one bolt.
 
 **Key technical challenges**:
 - Stripe: raw body must be read before JSON deserialization for webhook signature verification (ASP.NET Core body parsing must be disabled on webhook endpoint)
-- EuPlatesc: HMAC-MD5 field order is exact and documented — any field ordering mistake breaks all payments
+- the legacy processor: HMAC-MD5 field order is exact and documented — any field ordering mistake breaks all payments
 - IPN amount validation: must cross-check IPN amount against stored order amount in RON
 - Idempotency: both webhook handlers must check existing order status before applying transition
 
 **Bolt Plan**:
-- `016-payment-backends` — IOrderService + Stripe + EuPlatesc backends (FR-14, FR-15)
+- `016-payment-backends` — IOrderService + Stripe + the legacy processor backends (FR-14, FR-15)
 
 **Stories** (5):
 1. `001-order-service.md` — IOrderService: create order from cart snapshot, compute order number
 2. `002-stripe-payment-intent.md` — POST /api/payments/stripe/intent
 3. `003-stripe-webhook-handler.md` — POST /api/webhooks/stripe + sig + idempotency
-4. `004-euplatesc-initiate.md` — POST /api/payments/euplatesc/initiate + HMAC-MD5
-5. `005-euplatesc-ipn-handler.md` — POST /api/webhooks/euplatesc + IPN validation
+4. `004-legacy-processor-initiate.md` — POST /api/payments/legacy-processor/initiate + HMAC-MD5
+5. `005-legacy-processor-ipn-handler.md` — POST /api/webhooks/legacy-processor + IPN validation
 
 **Depends on**: Bolt 015 (shipping-and-order-core — Order entity + status machine)
 
@@ -157,9 +157,9 @@ The checkout steps share a single `CheckoutStateService` that carries state (del
 **Key technical challenges**:
 - Leaflet.js integration in Angular standalone components (needs `ngx-leaflet` or custom wrapper)
 - Stripe Elements must be initialized with `clientSecret` just-in-time (before user submits)
-- EuPlatesc redirect must handle browser back-button case gracefully (order in `AwaitingPayment` state)
+- the legacy processor redirect must handle browser back-button case gracefully (order in `AwaitingPayment` state)
 - Checkout state must survive browser refresh (sessionStorage backup)
-- Confirmation page must handle `?processor=euplatesc` query param from EuPlatesc return URL
+- Confirmation page must handle `?processor=legacy-processor` query param from the legacy processor return URL
 
 **Bolt Plan**:
 - `017-checkout-ui` — Full Angular checkout flow (FR-16, FR-17, FR-18)
@@ -169,5 +169,5 @@ The checkout steps share a single `CheckoutStateService` that carries state (del
 2. `002-delivery-step.md` — Delivery method selection + address form + saved addresses
 3. `003-locker-map-component.md` — Leaflet map + city search + locker pin selection
 4. `004-order-review-step.md` — Read-only summary + terms checkbox + totals
-5. `005-payment-step.md` — Dual payment tabs: Stripe Elements + EuPlatesc redirect
+5. `005-payment-step.md` — Dual payment tabs: Stripe Elements + the legacy processor redirect
 6. `006-order-confirmation-page.md` — /comanda/{orderId}/confirmare + stepper + guest CTA

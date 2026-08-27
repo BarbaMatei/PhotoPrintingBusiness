@@ -114,7 +114,7 @@ now-implemented methods).
   `DeliveredAt` automatically via the CAS UPDATE.
 - `Controllers/WebhooksController.cs` — injected
   `IAwbCreationNotifier`; calls `NotifyPaidAsync(order.Id, ct)` in
-  both Paid-transition branches (EuPlatesc + Stripe).
+  both Paid-transition branches (the legacy processor + Stripe).
 - `Program.cs` — registers `NullAwbCreationNotifier` always.
   Under `if (samedayEnabled)`, adds a second nested `if (jobsEnabled)`
   block that overrides with the real notifier and registers

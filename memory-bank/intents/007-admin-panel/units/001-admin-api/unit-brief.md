@@ -23,7 +23,7 @@ Expose all admin-only backend endpoints: order management (list, detail, status 
 - `IAdminStatsService` + `AdminStatsService` — analytics queries (cached 5 min)
 - `AdminOrderHub` (SignalR) — `NewOrderReceived`, `OrderStatusChanged` broadcasts
 - Stripe refund integration via `StripeClient.RefundCreateAsync`
-- EuPlatesc refund integration via `IEuPlatescService.RefundAsync`
+- the legacy processor refund integration via `ILegacyProcessorService.RefundAsync`
 - ZIP download via `System.IO.Compression.ZipArchive` streaming
 - DTOs: `AdminOrderSummaryDto`, `AdminOrderDetailDto`, `UpdateOrderStatusRequest`, `AdminStatsDto`, `RevenueDataPointDto`, `ProductStatsDto`
 
@@ -43,7 +43,7 @@ Expose all admin-only backend endpoints: order management (list, detail, status 
 | Get order detail | `GET /api/admin/orders/{id}` | Includes internalNotes |
 | Update status | `PATCH /api/admin/orders/{id}/status` | Validates transitions; fires SignalR + email |
 | Download ZIP | `GET /api/admin/orders/{id}/download-zip` | Streams ZipArchive |
-| Cancel order | `POST /api/admin/orders/{id}/cancel` | Refund via Stripe or EuPlatesc |
+| Cancel order | `POST /api/admin/orders/{id}/cancel` | Refund via Stripe or the legacy processor |
 | Save notes | `PATCH /api/admin/orders/{id}/notes` | Internal notes only |
 | Stats summary | `GET /api/admin/stats/summary` | Today + month KPIs |
 | Revenue chart | `GET /api/admin/stats/revenue?days=30` | Daily totals |

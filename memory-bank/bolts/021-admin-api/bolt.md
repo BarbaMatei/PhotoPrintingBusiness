@@ -44,7 +44,7 @@ By the end of this bolt the admin frontend can manage every order through its li
 
 ## Bolt Type
 
-`ddd-construction-bolt` — complex backend with domain transitions, external API calls (Stripe/EuPlatesc refunds), SignalR, and streaming ZIP responses.
+`ddd-construction-bolt` — complex backend with domain transitions, external API calls (Stripe/legacy-processor refunds), SignalR, and streaming ZIP responses.
 
 ## Stage Plan
 
@@ -67,5 +67,5 @@ By the end of this bolt the admin frontend can manage every order through its li
 - `Order.InternalNotes` — add nullable string column (EF migration if not present)
 - `Order.AwbNumber` / `Order.TrackingUrl` — set on status → Shipped
 - Stripe refund: `StripeClient.RefundService.CreateAsync(new RefundCreateOptions { PaymentIntent = order.PaymentIntentId })`
-- EuPlatesc refund: `IEuPlatescService.RefundAsync(order.EuPlatescTransactionId, order.TotalRon)`
+- the legacy processor refund: `ILegacyProcessorService.RefundAsync(order.LegacyProcessorTransactionId, order.TotalRon)`
 - SignalR hub: requires `services.AddSignalR()` and `app.MapHub<AdminOrderHub>("/hubs/admin-orders")`

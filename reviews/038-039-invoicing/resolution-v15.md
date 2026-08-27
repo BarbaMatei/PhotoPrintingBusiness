@@ -14,7 +14,7 @@ closed: 2026-08-27
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-663 | fixed | `de1b70d` | the applied baseline is restored byte for byte and a forward `DropEuPlatescColumns` migration drops the three columns; the new chain test starts from the legacy state, not a fresh database |
+| PPW-663 | fixed | `de1b70d`, `pending` | the columns come out of the baseline itself on the owner's ruling that this pre-deploy branch ships one migration; the forward drop migration is withdrawn. See Decisions |
 | PPW-659 | fixed | `9527eba` | rejections are fetched as their own slice with a cap of `MaxBatchSize / 10`, ordered by oldest transition, so they cannot consume the budget Pending uploads share |
 | PPW-664 | fixed | `9527eba` | the worker's automatic resubmit goes through a new `RequeueRejectedAsync` that keeps `PdfStoragePath`; only the admin retry still drops it |
 | PPW-686 | fixed | `9527eba` | `MaxBatchSize` is clamped to 1–500 in the constructor, like the job's other settings |
@@ -47,7 +47,7 @@ closed: 2026-08-27
 
 | Cluster | Findings | Files | Approach-check |
 |---|---|---|---|
-| A — the migration that had already run | PPW-663 | `Migrations/20260820133204_InitialPostgres.cs` and its Designer, `Migrations/20260827161417_DropEuPlatescColumns.cs`, `Migrations/PhotoPrintDbContextModelSnapshot.cs`, `Tests/Integration/MigrationChainTests.cs`, `docs/DEPLOYMENT.md`, `memory-bank/standards/data-stack.md` | not needed (a restore plus a scaffolded `DropColumn`); the claim was confirmed against the live dev database before any code changed |
+| A — the migration that had already run | PPW-663 | `Migrations/20260820133204_InitialPostgres.cs` and the three Designer snapshots, `Migrations/PhotoPrintDbContextModelSnapshot.cs`, `Tests/Integration/MigrationChainTests.cs`, `docs/DEPLOYMENT.md`, `memory-bank/standards/data-stack.md` | not needed; the claim was confirmed against the live dev database before any code changed, and the final shape was the owner's ruling rather than a pre-check |
 | B — the two ANAF fixes colliding | PPW-659, PPW-664, PPW-686 | `Services/Invoicing/Anaf/InvoiceUploadJob.cs`, `Services/Invoicing/{InvoiceLifecycle,IInvoiceLifecycle}.cs`, `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs` | not needed (a query split and a second lifecycle transition), and both were proven by targeted revert |
 | C — the declined-card story | PPW-660, PPW-666, PPW-661, PPW-662 | `Services/OrderStatusMachine.cs`, `Controllers/WebhooksController.cs`, `Services/OrderService.cs`, `Services/{IStripePaymentGateway,StripePaymentGateway}.cs`, `core/services/checkout-attempt.service.ts`, `features/checkout/pages/payment-step.ts`, their tests | not needed; the review's own note that fixing either half alone leaves a hole was the design input |
 | D — the rest of the SPA regressions | PPW-670, PPW-671, PPW-672, PPW-673, PPW-679, PPW-680 | `features/orders/pages/confirmation-page.ts`, `features/checkout/pages/delivery-step.ts`, their specs | not needed (state, template and lifecycle fixes) |
@@ -81,11 +81,27 @@ without a ruling from him, because none of them can strand a payment or an invoi
 test-database helper, one repeats a decided row, and two are contract tidiness. If he wants them
 graded differently, the rows are there to regrade.
 
+### The baseline is edited in place until the first deploy (PPW-663, owner ruling)
+
+The first fix took the textbook route: leave the applied migration truthful, drop the columns in a
+new one. The owner overruled it — nothing is deployed, the branch that reaches `main` is meant to
+carry one migration, and he wants no trace of the removed processor anywhere in the repository. So
+the columns came out of the baseline itself and the forward migration was deleted, along with the
+test that started from the legacy state.
+
+What that costs, stated plainly: `Migrate()` compares ids and not contents, so any database that
+already ran the old baseline keeps the three columns and, because one was `NOT NULL` with no
+default while the model no longer maps it, fails every `INSERT` into `Orders` with `23502`. Exactly
+one such database existed — the developer's — and it was brought in line with
+`ALTER TABLE "Orders" DROP COLUMN`, keeping all 6 of its orders. `docs/DEPLOYMENT.md` §7 and
+`memory-bank/standards/data-stack.md` now record the policy and the date it reverses: the first
+deploy, after which an applied migration is frozen.
+
 ### PPW-663 changes what the PPW-560 note claimed
 
 PPW-560 was closed a few commits earlier with a note reasoning about a migration id this repo no
 longer contains. This round found the worse case: an id it *still* contains, whose body was
 rewritten. `Migrate()` compares ids and skips it, so the edit reaches new databases only —
 confirmed on the dev database, where `Orders.PaymentProcessor` was still `NOT NULL` while the code
-had stopped setting it. Both DEPLOYMENT.md §7 and data-stack.md now say never to edit an applied
-migration, and give the drop-with-a-new-migration rule instead.
+had stopped setting it. Both documents now carry the rule that applies before the first deploy — the baseline is
+edited in place — and the one that replaces it after, when an applied migration becomes frozen.

@@ -63,7 +63,7 @@ public async Task<IActionResult> CreateStripeIntent(
 - 001-idempotency-key-migration
 
 ### Enables
-- 003-euplatesc-initiate-idempotency (shares lookup helper)
+- 003-legacy-processor-initiate-idempotency (shares lookup helper)
 
 ## Edge Cases
 

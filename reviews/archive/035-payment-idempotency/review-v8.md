@@ -25,7 +25,7 @@ tests: { dotnet: "474/474", frontend: "not recorded" }
 | PPW-37 | 🟠 | The cross-tenant key collision has no distinct log event, so key probing is invisible | `Services/OrderService.cs:178` | yes |
 | PPW-38 | 🟡 | On SQLite the key violation is recognised by a phrase in the error message, not a structured code | `Services/OrderService.cs:194` | yes |
 | PPW-39 | 🟡 | One global key index tells an attacker whether a guessed key is in use, and lets them reserve it first | `Data/PhotoPrintDbContext.cs:308` | no |
-| PPW-40 | 🟡 | The EuPlatesc recovery replay builds a fresh redirect URL instead of returning the stored one | `Controllers/PaymentsController.cs:131` | no |
+| PPW-40 | 🟡 | The legacy processor recovery replay builds a fresh redirect URL instead of returning the stored one | `Controllers/PaymentsController.cs:131` | no |
 | PPW-41 | 🟡 | The key is never trimmed, so a padded copy of the same key creates a second order and a second charge | `Filters/IdempotencyKeyFilter.cs:23` | no |
 | PPW-42 | 🟡 | Freeing the stale key and inserting the new order are two separate saves with nothing to roll them back together | `Services/OrderService.cs:99` | no |
 | PPW-43 | 🟡 | On SQLite two racing requests can collide on the order-number index first, which the recovery does not handle | `Services/OrderService.cs:162` | no |
@@ -58,7 +58,7 @@ tests: { dotnet: "474/474", frontend: "not recorded" }
 - PPW-42 and PPW-43 both sit inside the create path's recovery. Read them together before touching it, and
   keep them apart from PPW-38, which is about how a violation is recognised rather than what is retried.
 - PPW-40 is the only place where the two payment processors behave differently under retry. Stripe is
-  deduplicated by the gateway, EuPlatesc is not.
+  deduplicated by the gateway, the legacy processor is not.
 - Six of the eighteen are test or duplication work: PPW-45, PPW-46, PPW-47, PPW-48, PPW-49 and PPW-50.
 - Every lens was barred from reading earlier passes, so two of these are problems earlier passes had
   already named and decided: PPW-17 and PPW-20. Their prior rulings are on the ledger and must be read before

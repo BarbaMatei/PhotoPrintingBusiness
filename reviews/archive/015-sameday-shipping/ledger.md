@@ -59,7 +59,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
 | PPW-285 | 🟠 | v3 | `isDeliveryComplete()` Easybox gate ignores mandatory contact → stepper skip to payment → 400 | `UI/…/checkout-state.service.ts:51` | verified | `5fc330b` |
 | PPW-286 | 🟠 | v3 | Same OCE-as-shutdown bug drops an AWB dispatch job silently | `BackgroundJobs/AwbDispatcher.cs:69` | verified | `5fc330b` |
 | PPW-287 | 🟠 | v3 | `LastTrackingSyncAt=UtcNow` fallback + monotonic guard can strand a Shipped order | `BackgroundJobs/ShipmentTrackingJob.cs:139` | verified | `5fc330b` |
-| PPW-288 | 🟠 | v3 | EuPlatesc webhook→AWB enqueue untested (Stripe-only from PPW-245) | `Tests/…/PaymentControllerIntegrationTests.cs` | verified | `5fc330b` |
+| PPW-288 | 🟠 | v3 | the legacy processor webhook→AWB enqueue untested (Stripe-only from PPW-245) | `Tests/…/PaymentControllerIntegrationTests.cs` | verified | `5fc330b` |
 | PPW-289 | 🟠 | v3 | `AwbDispatcher` outcome routing + re-enqueue untested | `BackgroundJobs/AwbDispatcher.cs:83` | verified | `1816f5f` |
 | PPW-290 | 🟠 | v3 | `Status != Cancelled` persist guard has no test | `Services/Sameday/AwbCreator.cs:107` | verified | `5fc330b` |
 | PPW-291 | 🟠 | v3 | A `429` surviving retries → permanent GiveUp instead of transient | `Services/Sameday/SamedayClient.cs:139` | verified | `5fc330b` |
@@ -165,7 +165,7 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - v1: found
   - round 1: fixed @`e8d4b53` — recording notifier plus a Stripe webhook test
   - v2: verified @`727a018`
-  - v3: the EuPlatesc half was still uncovered and was raised as PPW-288
+  - v3: the legacy processor half was still uncovered and was raised as PPW-288
 
 ### PPW-246 — ADR-016 CAS race-lost test seeds Cancelled → never reaches the CAS
 
@@ -649,13 +649,13 @@ closed: 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pr
   - round 3: fixed @`18e7815` — the sync stamp is the poll clock and the monotonic guard is gone
   - v4: verified @`5fc330b`
 
-### PPW-288 — EuPlatesc webhook→AWB enqueue untested (Stripe-only from PPW-245)
+### PPW-288 — the legacy processor webhook→AWB enqueue untested (Stripe-only from PPW-245)
 
-- **What:** Only the Stripe webhook's enqueue had a test, so deleting the EuPlatesc one stayed green
+- **What:** Only the Stripe webhook's enqueue had a test, so deleting the legacy processor one stayed green
   while every order paid that way would get no label.
 - **History:**
   - v3: found — both passes; residual of PPW-245
-  - round 3: fixed @`19cd0b8` — the EuPlatesc enqueue is asserted
+  - round 3: fixed @`19cd0b8` — the legacy processor enqueue is asserted
   - v4: verified @`5fc330b`
 
 ### PPW-289 — `AwbDispatcher` outcome routing + re-enqueue untested

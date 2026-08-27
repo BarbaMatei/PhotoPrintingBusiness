@@ -32,7 +32,7 @@ Implement the 4 transactional emails triggered by the FotoTipar order lifecycle:
 - **Related Stories**: US-601
 
 ### FR-2: Order Confirmed Email
-- **Description**: Triggered by the payment webhook success handler (Stripe or EuPlatesc) in the existing `OrderService.CreateFromCartAsync` flow.
+- **Description**: Triggered by the payment webhook success handler (Stripe or the legacy processor) in the existing `OrderService.CreateFromCartAsync` flow.
 - **Acceptance Criteria**: Subject `'Comanda #FT-XXXX a fost primită!'`; items table (format, finish, qty, unit price, line total); delivery address or locker name; total paid; estimated delivery `'2-4 zile lucrătoare'`; guest link `/comanda/{id}?email={email}`; registered user link to order history.
 - **Priority**: Must
 - **Related Stories**: US-602

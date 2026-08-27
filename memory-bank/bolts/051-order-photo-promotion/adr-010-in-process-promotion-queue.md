@@ -11,7 +11,7 @@ superseded_by: null
 
 Bolt 051 introduces **promotion-on-paid**: when an order reaches `OrderStatus.Paid`, its photos must be uploaded from the local deployment server's disk to the cloud archive (original + ~2000 px large preview + thumbnail). Two facts shape the queueing problem:
 
-1. The **webhook hot path** (`WebhooksController.HandleStripePaymentSucceededAsync`, `EuPlatescIpnAsync`) must return in milliseconds — payment providers consider slow webhooks failed and retry. So promotion runs asynchronously off the hot path.
+1. The **webhook hot path** (`WebhooksController.HandleStripePaymentSucceededAsync`, `LegacyProcessorIpnAsync`) must return in milliseconds — payment providers consider slow webhooks failed and retry. So promotion runs asynchronously off the hot path.
 2. We are deployed on a **single VM** (bolt 040 recommendation; multi-replica is a future concern, and pre-payment uploads are bound to one VM by ADR-008 anyway).
 
 We needed a mechanism to carry "this order needs promotion" from the webhook to a background worker. Two shapes were viable:

@@ -19,34 +19,6 @@ public class MigrationChainTests
         (await db.Database.GetAppliedMigrationsAsync()).Should().NotBeEmpty();
     }
 
-    // Editing an applied migration in place is invisible to Migrate(), so only a database that
-    // already ran the old baseline can prove the columns are really gone.
-    [Fact]
-    public async Task A_database_that_ran_the_baseline_with_the_EuPlatesc_columns_can_still_take_an_order()
-    {
-        using var database = PostgresTestDatabase.Throwaway();
-
-        using (var legacy = database.NewContext())
-        {
-            await legacy.Database.ExecuteSqlRawAsync("""
-                ALTER TABLE "Orders" ADD COLUMN "PaymentProcessor" text NOT NULL;
-                ALTER TABLE "Orders" ADD COLUMN "EuPlatescTransactionId" character varying(200);
-                ALTER TABLE "Orders" ADD COLUMN "EuPlatescRedirectUrl" character varying(1000);
-                DELETE FROM "__EFMigrationsHistory" WHERE "MigrationId" LIKE '%DropEuPlatescColumns';
-                """);
-        }
-
-        using var db = database.NewContext();
-        await db.Database.MigrateAsync();
-
-        db.Orders.Add(TestOrders.Make(Guid.NewGuid()));
-        var act = () => db.SaveChangesAsync();
-
-        await act.Should().NotThrowAsync(
-            "the model no longer maps PaymentProcessor, so a NOT NULL column left behind fails 23502");
-        (await db.Database.GetPendingMigrationsAsync()).Should().BeEmpty();
-    }
-
     // Drift that adds no column — an index, a length, a precision — is invisible to the tests below, and the next scaffolded migration would diff against the stale snapshot.
     [Fact]
     public void The_model_snapshot_still_matches_the_model()

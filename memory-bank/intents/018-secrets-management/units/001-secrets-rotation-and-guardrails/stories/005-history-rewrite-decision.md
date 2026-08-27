@@ -52,4 +52,4 @@ decision: accept-and-rotate (ADR-006)
 
 ## Out of Scope
 
-- Auditing Stripe / EuPlatesc / SendGrid keys for past leaks (separate ops audit).
+- Auditing Stripe / the legacy processor / SendGrid keys for past leaks (separate ops audit).

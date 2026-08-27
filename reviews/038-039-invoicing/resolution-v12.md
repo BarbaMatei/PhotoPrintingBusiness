@@ -103,7 +103,7 @@ cannot slip past it. The third reads the renderer's culture field by reflection.
 `CreateSpecificCulture`, hard-coded culture names, `TimeZoneInfo`, `IdnMapping` and
 `CompareInfo`. `Services/Invoicing/InvoicePdfDocument.cs:19` is the only site that needs a real
 culture. Every other formatting call passes `CultureInfo.InvariantCulture` on purpose —
-`Controllers/WebhooksController.cs:200`, `Services/EuPlatescService.cs:26` and `:120`, and six
+`Controllers/WebhooksController.cs:200`, `Services/LegacyProcessorService.cs:26` and `:120`, and six
 sites in `Services/Invoicing/InvoiceXmlBuilder.cs` — which is correct there: the UBL XML and the
 processor signatures are machine-read and must not carry Romanian separators.
 

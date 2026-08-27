@@ -33,7 +33,7 @@ created: 2026-05-22T07:25:00Z
 - **DeliveryType** (enum/string): `Easybox | Courier`
   - Constraints: determines which address fields are populated on the Order
 
-- **PaymentProcessor** (enum/string): `Stripe | EuPlatesc`
+- **PaymentProcessor** (enum/string): `Stripe | LegacyProcessor`
 
 - **ShippingAddress** (derived — not a separate entity, flattened columns on Order):
   - Meaningful only when `DeliveryType = Courier`

@@ -7,7 +7,7 @@ status: complete
 stories:
   - 001-idempotency-key-migration
   - 002-stripe-intent-idempotency
-  - 003-euplatesc-initiate-idempotency
+  - 003-legacy-processor-initiate-idempotency
 created: 2026-05-25T10:05:00Z
 started: 2026-05-25T13:10:00Z
 completed: 2026-05-25T14:15:00Z
@@ -49,13 +49,13 @@ Make payment-intent creation idempotent end-to-end: at the DB (filtered unique i
 
 ## Objective
 
-By the end of this bolt, a double-clicked "Pay" produces exactly one order, exactly one Stripe charge, and exactly one EuPlatesc redirect URL — verified by integration tests.
+By the end of this bolt, a double-clicked "Pay" produces exactly one order, exactly one Stripe charge, and exactly one the legacy processor redirect URL — verified by integration tests.
 
 ## Stories Included
 
 - **001-idempotency-key-migration** — schema change + filtered unique index (Must).
 - **002-stripe-intent-idempotency** — controller + service flow + Stripe SDK options (Must).
-- **003-euplatesc-initiate-idempotency** — reuse the persisted redirect URL/order (Must).
+- **003-legacy-processor-initiate-idempotency** — reuse the persisted redirect URL/order (Must).
 
 ## Bolt Type
 

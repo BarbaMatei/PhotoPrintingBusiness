@@ -71,7 +71,7 @@ For our scale and call path, `SEQUENCE` is the right primitive:
 
 1. **The rollback case is extraordinarily rare in our path.** The
    Paid-transition transaction contains a single `SaveChanges` and no
-   external I/O. The Stripe and EuPlatesc webhook handlers commit
+   external I/O. The Stripe and the legacy processor webhook handlers commit
    before any post-payment side effect (email send, AWB enqueue,
    photo-promote enqueue) fires. The only routes to a rollback
    are operational incidents (DB connection drop mid-commit, host

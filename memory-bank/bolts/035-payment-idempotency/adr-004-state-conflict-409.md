@@ -70,6 +70,6 @@ State conflicts return **`HTTP 409 Conflict`** as RFC 7807 ProblemDetails, disti
 
 ## Related
 
-- **Stories**: 002-stripe-intent-idempotency, 003-euplatesc-initiate-idempotency
+- **Stories**: 002-stripe-intent-idempotency, 003-legacy-processor-initiate-idempotency
 - **Standards**: `api-conventions.md` (should gain a "409 vs 422" subsection in a follow-up)
 - **Previous ADRs**: ADR-002 (validation → 422) — this ADR is the state-conflict counterpart, not a replacement

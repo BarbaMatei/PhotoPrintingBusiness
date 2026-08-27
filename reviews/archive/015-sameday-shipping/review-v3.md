@@ -27,7 +27,7 @@ tests: { dotnet: "893/893 (+10 skipped MinIO)", frontend: "451/451" }
 | PPW-285 | 🟠 | `isDeliveryComplete()` Easybox gate ignores mandatory contact → stepper skip to payment → 400 | `UI/…/checkout-state.service.ts:51` | yes |
 | PPW-286 | 🟠 | Same OCE-as-shutdown bug drops an AWB dispatch job silently | `BackgroundJobs/AwbDispatcher.cs:69` | yes |
 | PPW-287 | 🟠 | `LastTrackingSyncAt=UtcNow` fallback + monotonic guard can strand a Shipped order | `BackgroundJobs/ShipmentTrackingJob.cs:139` | yes |
-| PPW-288 | 🟠 | EuPlatesc webhook→AWB enqueue untested (Stripe-only from PPW-245) | `Tests/…/PaymentControllerIntegrationTests.cs` | yes |
+| PPW-288 | 🟠 | the legacy processor webhook→AWB enqueue untested (Stripe-only from PPW-245) | `Tests/…/PaymentControllerIntegrationTests.cs` | yes |
 | PPW-289 | 🟠 | `AwbDispatcher` outcome routing + re-enqueue untested | `BackgroundJobs/AwbDispatcher.cs:83` | yes |
 | PPW-290 | 🟠 | `Status != Cancelled` persist guard has no test | `Services/Sameday/AwbCreator.cs:107` | yes |
 | PPW-291 | 🟠 | A `429` surviving retries → permanent GiveUp instead of transient | `Services/Sameday/SamedayClient.cs:139` | yes |

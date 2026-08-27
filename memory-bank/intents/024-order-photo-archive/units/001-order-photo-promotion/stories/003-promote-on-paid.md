@@ -19,7 +19,7 @@ implemented: true
 
 ## Acceptance Criteria
 
-- [ ] On order → **Paid** (Stripe webhook / EuPlatesc IPN), promotion is **enqueued** — the webhook returns immediately (no blocking upload on the hot path).
+- [ ] On order → **Paid** (Stripe webhook / the legacy processor IPN), promotion is **enqueued** — the webhook returns immediately (no blocking upload on the hot path).
 - [ ] A background `OrderPhotoPromoter` processes the queue: for each upload in the order it uploads the **original** (`uploads/`), generates + uploads the **large preview** (`previews/`), ensures the **thumbnail** (`thumbs/`), sets `StorageLocation = Cloud` and the three keys.
 - [ ] **Local files are deleted only after** all cloud writes for that upload are confirmed.
 - [ ] **Idempotent**: an upload already at `StorageLocation = Cloud` is skipped; re-processing an order is a no-op.
