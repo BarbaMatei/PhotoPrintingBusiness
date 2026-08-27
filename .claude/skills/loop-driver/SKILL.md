@@ -78,6 +78,8 @@ run journal (not guesswork) explains an empty result.
 | Router says | Do |
 |---|---|
 | full discovery · delta discovery · certification | Follow `reviews/runbooks/runbook-discovery.md` exactly — scoping, lens manifest, launch args, synthesis. The delta lens cap (5) and token budget (600k) are script-enforced; don't fight them. |
+| lens-coverage discovery (<lens>) | A discovery pass per the same runbook, full scope, lenses = the one owed lens + completeness-critic. It exists to clear lens-coverage debt before certification (README note ³). |
+| design pass (owner gate) | Only on the owner's go-ahead: a fix round per the `/fix-review` skill whose first artifact is a component-level protocol block, reimplementation against it, then discovery. Its metrics `notes` must carry `design-pass:<area>` — that is how the router counts the one-per-component cap. |
 | verification | Follow `reviews/runbooks/runbook-verification.md`. You must not be the fixer — sole exception: the test-only rule written in its step 1. Self-verification is the exact bias the loop exists to prevent. |
 | fix round | Invoke the **/fix-review** skill and stop there — it is the sole owner of the fixer contract. Do not fix findings inline. |
 | loop CLOSED | Report the closure line and stop. The target is under watch: a new serious finding in its files re-arms the loop and may be a `post-cert-escape` (reviews/state/track-record.md). |

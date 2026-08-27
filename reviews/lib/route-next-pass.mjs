@@ -11,6 +11,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MANIFEST_LENSES } from './vocab.mjs'
 
 const argv = process.argv.slice(2)
 let root = null, arg = null
@@ -26,6 +27,7 @@ const COST = {
   'full discovery': '~2.5–3M tokens / ~48 agents (11-lens manifest; lean 5-lens ≈ 1.6M)',
   'delta discovery': '~0.6–1.2M tokens (5-lens cap, 600k output budget script-enforced)',
   'verification': '~60–250k agent tokens + main-agent revert-and-rerun work',
+  'lens-coverage discovery': '~0.3–0.5M tokens (one owed lens, full scope, plus dedup/skeptics)',
   'fix round': 'unmetered; scales with finding count (/fix-review)',
   'certification (pair)': '~4.0–4.6M tokens (two blinded full passes)',
   'certification (single)': '~2.9M tokens (re-certification after a small verified fix round)',
@@ -105,6 +107,53 @@ for (const c of allLines.filter(l => l.correction_for && (
   say(`NOTE: a correction line is on file for ${which} ("${c.correction_for.field}") — read it before acting on this state.`)
 }
 
+// Convergence-rule state (2026-08-28): lens-coverage union, seed-rate lineage, round sizes.
+const lensUnion = new Set()
+for (const l of lines) if (Array.isArray(l.lenses)) for (const k of l.lenses) lensUnion.add(k)
+const owedLenses = MANIFEST_LENSES.filter(k => !lensUnion.has(k))
+const isBlind = l => l.type === 'discovery' || l.type === 'delta-discovery'
+const substantive = l => l.type === 'fix-round' && (l.findings?.fixed ?? 0) > 0 && (l.tests?.invocations ?? 0) > 0
+let lastFixIdx = -1
+for (let i = lines.length - 1; i >= 0; i--) if (substantive(lines[i])) { lastFixIdx = i; break }
+const seedMeasured = lastFixIdx === -1 || lines.some((l, i) => i > lastFixIdx && isBlind(l))
+const seeds = new Map()
+for (const l of lines) if (isBlind(l) && Array.isArray(l.findings)) for (const f of l.findings) {
+  if (f.new !== true || (f.sev !== 'high' && f.sev !== 'medium') || !Number.isFinite(f.seed_round)) continue
+  if (!seeds.has(f.seed_round)) seeds.set(f.seed_round, new Map())
+  const m = seeds.get(f.seed_round)
+  const a = typeof f.area === 'string' ? f.area : '(unstated)'
+  m.set(a, (m.get(a) || 0) + 1)
+}
+function routeFixRound(reason) {
+  say(reason)
+  const subs = lines.filter(substantive)
+  if (subs.length >= 2) {
+    const [r1, r2] = subs.slice(-2)
+    if (r2.findings.fixed >= r1.findings.fixed)
+      say(`NOTE: fix rounds are not shrinking (r${r1.round}: ${r1.findings.fixed} fixed → r${r2.round}: ${r2.findings.fixed}) — the convergence rule expects each round strictly smaller than the one before.`)
+    const rate = r => {
+      const m = seeds.get(r.round)
+      let n = 0
+      if (m) for (const c of m.values()) n += c
+      return { s: n / r.findings.fixed, areas: new Set(m ? m.keys() : []) }
+    }
+    const a1 = rate(r1), a2 = rate(r2)
+    if (a1.s >= 0.3 && a2.s >= 0.3) {
+      const common = [...a2.areas].filter(a => a !== '(unstated)' && a1.areas.has(a))
+      if (common.length) {
+        const area = common[0]
+        const capped = lines.some(l => l.type === 'fix-round' && typeof l.notes === 'string' && l.notes.includes(`design-pass:${area}`))
+        if (!capped) {
+          say(`ROUTER: rounds r${r1.round} and r${r2.round} both seeded serious findings in "${area}" at s ≥ 0.3 (s=${a1.s.toFixed(2)}, ${a2.s.toFixed(2)}) — patching declared non-convergent for that component; further fix rounds there are refused (convergence rule, 2026-08-28).`)
+          finish(2, null, `design pass for "${area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${area}; at most one per component per loop — owner decision`, 'design-pass')
+        }
+        say(`NOTE: rounds r${r1.round}/r${r2.round} still seed "${area}" at s ≥ 0.3, but its one design pass per loop already ran — the fix round proceeds; raise it with the owner if it seeds again.`)
+      }
+    }
+  }
+  finish(0, 'fix round', null)
+}
+
 const resolutions = readdirSync(t.dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
 const RN = resolutions.length ? Math.max(...resolutions) : 0
 const rStatus = RN ? fm(join(t.dir, `resolution-v${RN}.md`), 'status') : null
@@ -126,11 +175,13 @@ if (L.outcome === 'certified' && L.pass === N && (!RN || RN < N)) {
 // resolved-resolution branch — verifications write no review file, so N stays at the
 // discovery version and RN === N would otherwise re-route to verification forever.
 if (L.type === 'verification') {
-  if ((L.reopened || 0) > 0) { say('ROUTER: reopened fixes re-arm the loop (last row).'); finish(0, 'fix round', null) }
-  if (serious > 0) { say('ROUTER: verification surfaced new serious findings (last row).'); finish(0, 'fix round', null) }
+  if ((L.reopened || 0) > 0) routeFixRound('ROUTER: reopened fixes re-arm the loop (last row).')
+  if (serious > 0) routeFixRound('ROUTER: verification surfaced new serious findings (last row).')
   say('ROUTER: verification clean (0 reopened, 0 new serious).')
   say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
-  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'delta-worthiness')
+  if (owedLenses.length) say(`NOTE: lens-coverage debt — never run on this target: ${owedLenses.join(', ')}; certification is refused until each has run (a lean lens-coverage discovery clears one, ${COST['lens-coverage discovery']}).`)
+  if (!seedMeasured) say(`NOTE: round r${lines[lastFixIdx].round}'s seed rate is unmeasured — no blind pass has run since it, so "quiet" is unmeasured and certification is refused until a delta discovery measures it (convergence rule, 2026-08-28).`)
+  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ² — but certification stays refused while a NOTE above names owed lenses or an unmeasured seed rate`, 'delta-worthiness')
 }
 // A fix round exists for the latest review and is resolved → verification. RN can exceed N:
 // a fix round answering a verification pass raises no review file, so its resolution takes the
@@ -140,16 +191,18 @@ if (RN >= N && rStatus === 'resolved') {
   finish(0, 'verification', null)
 }
 if (RN >= N && rStatus && rStatus !== 'resolved') {
-  say(`ROUTER: resolution-v${RN} is ${rStatus} (row 2).`)
-  finish(0, 'fix round', null)
+  routeFixRound(`ROUTER: resolution-v${RN} is ${rStatus} (row 2).`)
 }
 
 if (L.verdict === 'request-changes' || serious > 0) {
-  say(`ROUTER: open serious findings with no resolution answering review-v${N} (row 2).`)
-  finish(0, 'fix round', null)
+  routeFixRound(`ROUTER: open serious findings with no resolution answering review-v${N} (row 2).`)
 }
 if ((L.type === 'discovery' || L.type === 'delta-discovery') && serious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes') {
-  say('ROUTER: discovery-type pass clean (0 serious, 0 reopened) — loop quiet (row 6).')
+  if (owedLenses.length) {
+    say(`ROUTER: loop quiet, but these manifest lenses have never run on this target: ${owedLenses.join(', ')} — certification refused on lens-coverage debt (audit R5); the owed lens runs first as a lean pass.`)
+    finish(0, `lens-coverage discovery (${owedLenses[0]})`, null)
+  }
+  say('ROUTER: discovery-type pass clean (0 serious, 0 reopened), every manifest lens has run, and this pass measures the final round\'s seed rate at 0 — loop quiet (row 6).')
   finish(2, null, `certification — ALWAYS needs the owner's explicit go-ahead outside an unattended run: first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'certification-go-ahead')
 }
 say('ROUTER: no row matched mechanically — decide from the README router with the facts above.')

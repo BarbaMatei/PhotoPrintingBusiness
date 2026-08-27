@@ -257,6 +257,44 @@ commit: abc1234
   check('policy fails closed on an unknown gate kind', r.out.includes('ACTION: stop'), r.out.trim())
 }
 
+// ---------- convergence rule + lens-coverage debt (audit R5, 2026-08-28) ----------
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '915-lens-debt'])
+  check('router refuses row 6 on lens-coverage debt and routes the owed lens', r.code === 0 && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '916-unmeasured-seed'])
+  check('router flags an unmeasured seed rate at the delta-worthiness gate', r.code === 3 && r.out.includes('seed rate is unmeasured'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '917-non-convergent'])
+  check('router declares a component non-convergent at s >= 0.3 on two consecutive rounds', r.code === 2 && r.out.includes('GATE_KIND: design-pass') && r.out.includes('"payments"'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '918-design-capped'])
+  check('router routes a fix round once the component used its one design pass', r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('design pass per loop already ran'), `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '915-lens-debt', 'decide', 'certification-go-ahead'])
+  check('policy refuses auto-certification on lens debt and routes the owed lens', r.out.includes('ACTION: auto') && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '916-unmeasured-seed', 'decide', 'delta-worthiness'])
+  check('policy routes an unmeasured final round to a measuring delta discovery', r.out.includes('ACTION: auto') && r.out.includes('NEXT: delta discovery') && r.out.includes('unmeasured'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '917-non-convergent', 'decide', 'design-pass'])
+  check('policy stops on a design-pass gate', r.out.includes('ACTION: stop'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-stop', 'decide', 'loop-close'])
+  check('policy stops when a gate override was logged after the run started', r.out.includes('ACTION: stop') && r.out.includes('COMMENTS_OK'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-clean', 'decide', 'loop-close'])
+  check('policy ignores overrides logged before the run started', r.out.includes('ACTION: auto'), r.out.trim())
+}
+
 // ---------- verify-fixes: revert-and-rerun against a throwaway repo ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'verify-fixes-'))
