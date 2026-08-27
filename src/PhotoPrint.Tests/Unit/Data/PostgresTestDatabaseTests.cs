@@ -15,6 +15,25 @@ public class PostgresTestDatabaseTests : IClassFixture<PostgresTestDatabase>
         database.ResetForTest();
     }
 
+    // A slot whose CREATE DATABASE committed but whose Migrate() died is handed on truncated,
+    // and every test in it then fails on "relation Orders does not exist".
+    [Fact]
+    public async Task EnsureSchemaApplied_RepairsADatabaseThatLostItsSchema()
+    {
+        using var wrecked = PostgresTestDatabase.Throwaway();
+        await using (var db = wrecked.NewContext())
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "DROP SCHEMA public CASCADE; CREATE SCHEMA public;");
+        }
+
+        PostgresTestDatabase.EnsureSchemaApplied(wrecked.ConnectionString, dropForeignKeys: false);
+
+        await using var verify = wrecked.NewContext();
+        (await verify.Orders.CountAsync()).Should().Be(0,
+            "the repair has to re-apply the chain, not hand on a schema-less database");
+    }
+
     [Fact]
     public async Task ResetForTest_ClearsAParentAndTheRowThatReferencesIt()
     {

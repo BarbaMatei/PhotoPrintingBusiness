@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Stripe;
 using PhotoPrint.API.Authentication;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Payments;
+using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Filters;
 using PhotoPrint.API.Services;
@@ -76,10 +79,32 @@ public class PaymentsController : ControllerBase
         }
 
         var amountBani = (long)(order.TotalRon * 100);
-        // Key Stripe by the order id (stable per order), not the client
-        // Idempotency-Key, so a recycled client key can't collide at Stripe.
-        var (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
-            amountBani, "ron", order.Id.ToString(), order.Id.ToString(), cancellationToken);
+        string clientSecret;
+        string paymentIntentId;
+        try
+        {
+            // Key Stripe by the order id (stable per order), not the client
+            // Idempotency-Key, so a recycled client key can't collide at Stripe.
+            (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
+                amountBani, "ron", order.Id.ToString(), order.Id.ToString(), cancellationToken);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Type == "idempotency_error")
+        {
+            // The other tab is mid-flight with the same gateway key. Its secret lands in a moment;
+            // a 500 here would tell the customer the basket is broken.
+            _logger.LogInformation(
+                "payments.idempotency.gateway-race order_id={OrderId}", order.Id);
+            var persisted = await _db.Orders
+                .Where(o => o.Id == order.Id)
+                .Select(o => o.StripeClientSecret)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (persisted is not null)
+                return Ok(new StripeIntentResponse(persisted, order.Id));
+
+            throw new ConflictException(
+                "Sesiunea de plată se pregătește deja în altă filă. Reîncărcați pagina în câteva secunde.");
+        }
+
         order.PaymentIntentId = paymentIntentId;
         order.StripeClientSecret = clientSecret;
         await _db.SaveChangesAsync(cancellationToken);

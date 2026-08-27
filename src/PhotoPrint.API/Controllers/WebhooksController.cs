@@ -199,14 +199,11 @@ public class WebhooksController : ControllerBase
             var created = outcome == PaidSaveOutcome.Created;
             if (created)
             {
-                await BroadcastNewOrderAsync(order, ct);
-                await FireOrderConfirmedEmailAsync(order, ct);
-                // Enqueue cloud promotion off the hot path. Returns immediately;
-                // the worker picks up and uploads asynchronously.
-                await _photoPromoter.EnqueueAsync(order.Id, ct);
-                // Enqueue Sameday AWB creation off the hot path.
-                // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
-                await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+                await RunSideEffectAsync("broadcast", order.Id, () => BroadcastNewOrderAsync(order, ct), ct);
+                await RunSideEffectAsync("confirmation-email", order.Id, () => FireOrderConfirmedEmailAsync(order, ct), ct);
+                // Cloud promotion and AWB creation are enqueued off the hot path; the workers upload.
+                await RunSideEffectAsync("photo-promotion", order.Id, async () => await _photoPromoter.EnqueueAsync(order.Id, ct), ct);
+                await RunSideEffectAsync("awb-notify", order.Id, () => _awbNotifier.NotifyPaidAsync(order.Id, ct), ct);
             }
         }
         else
@@ -263,6 +260,24 @@ public class WebhooksController : ControllerBase
                 { MetricNames.Labels.Processor, processor },
                 { MetricNames.Labels.Result,    result },
             });
+    }
+
+    // Each runs on its own: the order is committed Paid before any of them, so a 500 here would
+    // only earn a Stripe retry that the already-paid guard turns into a no-op, losing the rest.
+    private async Task RunSideEffectAsync(
+        string name, Guid orderId, Func<Task> effect, CancellationToken ct)
+    {
+        try
+        {
+            await effect();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogError(ex,
+                "payments.paid.side-effect-failed order_id={OrderId} effect={Effect} — the order is Paid; this step did not run",
+                orderId, name);
+            HttpContext?.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(ex);
+        }
     }
 
     private async Task BroadcastNewOrderAsync(Order order, CancellationToken ct)

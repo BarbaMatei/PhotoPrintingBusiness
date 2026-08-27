@@ -138,6 +138,29 @@ public class WebhooksControllerMetricsTests
         metrics.ContractViolations().Should().BeEmpty();
     }
 
+    // The order is committed Paid before these run, so a throwing step must not cost the others:
+    // Stripe would retry into the already-paid guard and none of them would run again.
+    [Fact]
+    public async Task Stripe_succeeded_with_one_failing_side_effect_still_runs_the_rest()
+    {
+        var order = SeedOrder(OrderStatus.AwaitingPayment);
+        _orderService.Setup(s => s.GetByPaymentIntentIdAsync("pi_side", It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(order);
+        _emailSvc.Setup(e => e.FireOrderConfirmedEmail(It.IsAny<Order>()))
+                 .Throws(new InvalidOperationException("smtp down"));
+        StripeEventIs("payment_intent.succeeded");
+        GivenStripeBody("pi_side");
+
+        var act = () => _sut.StripeWebhookAsync(default);
+
+        await act.Should().NotThrowAsync("a 500 here earns a retry that the already-paid guard makes a no-op");
+        _awbNotifier.Verify(n => n.NotifyPaidAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _promoter.Verify(p => p.EnqueueAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
+        _logs.Records.Should().Contain(r =>
+            r.Message.StartsWith("payments.paid.side-effect-failed", StringComparison.Ordinal) &&
+            r.Message.Contains("confirmation-email"));
+    }
+
     // A declined card leaves the same intent chargeable, so a later success must complete the
     // order instead of logging "manual reconciliation required" over a real charge.
     [Fact]
