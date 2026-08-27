@@ -25,4 +25,9 @@ public interface IInvoiceCreationService
 
     /// <summary>Same idempotent-create contract, for a caller that already holds the tracked <see cref="Order"/>.</summary>
     Task<Invoice?> CreateForOrderAsync(Order order, CancellationToken ct = default);
+
+    /// <summary>Realigns the number allocator with the invoices already stored for the series and
+    /// year <paramref name="order"/> would be invoiced under. Call after a taken-number collision;
+    /// safe to call when nothing is wrong.</summary>
+    Task ReconcileNumberingAsync(Order order, CancellationToken ct = default);
 }

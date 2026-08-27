@@ -55,6 +55,63 @@ public sealed class PostgresInvoiceNumberingServiceIntegrationTests : IClassFixt
     }
 
     [Fact]
+    public async Task ReconcileWithStoredInvoicesAsync_SequenceLagsTheStoredInvoices_AllocatesPastTheHighestStoredNumber()
+    {
+        var year = RandomYear();
+        await SeedInvoicesAsync(year, series: "FT", numbers: [1, 2, 3, 4, 5]);
+        using var sut = MakeSut();
+
+        var beforeReconcile = await sut.NextNumberAsync("FT", year);
+        await sut.ReconcileWithStoredInvoicesAsync("FT", year);
+        var afterReconcile = await sut.NextNumberAsync("FT", year);
+
+        beforeReconcile.Number.Should().Be(1, "a restore without the sequence leaves it at the start");
+        afterReconcile.Number.Should().Be(6, "every number up to 5 is already taken");
+    }
+
+    [Fact]
+    public async Task ReconcileWithStoredInvoicesAsync_SequenceIsAheadOfTheStoredInvoices_DoesNotHandOutATakenNumber()
+    {
+        var year = RandomYear();
+        await SeedInvoicesAsync(year, series: "FT", numbers: [1]);
+        using var sut = MakeSut();
+        for (var i = 0; i < 4; i++) await sut.NextNumberAsync("FT", year);
+
+        await sut.ReconcileWithStoredInvoicesAsync("FT", year);
+        var next = await sut.NextNumberAsync("FT", year);
+
+        next.Number.Should().Be(5, "reconciling must never wind a healthy sequence backwards");
+    }
+
+    [Fact]
+    public async Task ReconcileWithStoredInvoicesAsync_AnotherYearHoldsHighNumbers_LeavesThisYearAtTheStart()
+    {
+        var year = RandomYear();
+        await SeedInvoicesAsync(year - 1, series: "FT", numbers: [500]);
+        using var sut = MakeSut();
+
+        await sut.ReconcileWithStoredInvoicesAsync("FT", year);
+        var next = await sut.NextNumberAsync("FT", year);
+
+        next.Number.Should().Be(1, "the unique index partitions by the UTC year of IssuedAt");
+    }
+
+    private async Task SeedInvoicesAsync(int year, string series, int[] numbers)
+    {
+        using var db = _database.NewContext();
+        foreach (var number in numbers)
+        {
+            var orderId = Guid.NewGuid();
+            db.Orders.Add(TestOrders.Make(orderId));
+            var invoice = TestOrders.MakeInvoice(orderId, series, number,
+                invoiceNumber: $"{series}-{year}-{number:D5}");
+            invoice.IssuedAt = new DateTimeOffset(year, 6, 3, 12, 0, 0, TimeSpan.Zero);
+            db.Invoices.Add(invoice);
+        }
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
     public async Task NextNumberAsync_LosesTheSequenceCreateRace_StillReturnsANumber()
     {
         var year = RandomYear();
@@ -158,6 +215,9 @@ public sealed class PostgresInvoiceNumberingServiceHandle : IInvoiceNumberingSer
 
     public Task<InvoiceNumber> NextNumberAsync(string series, int year, CancellationToken ct = default) =>
         _inner.NextNumberAsync(series, year, ct);
+
+    public Task ReconcileWithStoredInvoicesAsync(string series, int year, CancellationToken ct = default) =>
+        _inner.ReconcileWithStoredInvoicesAsync(series, year, ct);
 
     public void Dispose() => _db.Dispose();
 }

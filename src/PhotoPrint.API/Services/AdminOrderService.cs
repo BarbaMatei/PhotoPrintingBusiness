@@ -440,6 +440,7 @@ public class AdminOrderService : IAdminOrderService
                 _logger.LogWarning(
                     "admin.order.invoice-number-collision-retry order_id={OrderId} attempt={Attempt}",
                     order.Id, attempt);
+                await _invoiceCreator.ReconcileNumberingAsync(order, ct);
             }
             catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsNumberViolation(ex))
             {

@@ -348,6 +348,9 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         public Task<Invoice?> CreateForOrderAsync(Order order, CancellationToken ct = default)
             => RunAsync(() => _inner.CreateForOrderAsync(order, ct));
 
+        public Task ReconcileNumberingAsync(Order order, CancellationToken ct = default)
+            => _inner.ReconcileNumberingAsync(order, ct);
+
         private async Task<Invoice?> RunAsync(Func<Task<Invoice?>> inner)
         {
             if (!_fired && _beforeTheExistenceQuery)
