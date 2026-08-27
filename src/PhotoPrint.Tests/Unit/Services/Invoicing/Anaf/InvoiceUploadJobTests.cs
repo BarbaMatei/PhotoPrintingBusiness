@@ -449,6 +449,29 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         metrics.ContractViolations().Should().BeEmpty();
     }
 
+    // A 429 is refused before ANAF reads anything, so it must not spend the budget that exists
+    // for uploads whose outcome nobody knows.
+    [Theory]
+    [InlineData(429)]
+    [InlineData(503)]
+    public async Task UploadPendingAsync_UploadRefusedAtTheDoor_DoesNotSpendTheBlindRepostBudget(int httpStatus)
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: httpStatus));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.UnknownUploadOutcomes.Should().Be(0, "nothing was filed, so no blind re-post has happened");
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Pending);
+        row.LastError.Should().NotBeNullOrEmpty();
+    }
+
     // ANAF holds the document and we lost its id, so re-posting files a duplicate under a new number.
     [Fact]
     public async Task UploadPendingAsync_StatusWriteFailsAfterASuccessfulUpload_CountsItAsAnUnknownOutcome()

@@ -86,6 +86,51 @@ public class InvoicesControllerTests
         controller.Response.Headers["Retry-After"].ToString().Should().Be("1800",
             "the 30-minute poll is the only producer of the PDF, so a 30-second hint just burns requests");
     }
+    // With a guest token attached too, the merged principal reports no user id, so the audit line
+    // for one person reading another's fiscal document named nobody.
+    [Fact]
+    public async Task GetInvoice_AdminAlsoCarryingAGuestToken_LogsTheAdminId()
+    {
+        var adminId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, customerId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00077",
+            AnafStatus = InvoiceAnafStatus.Pending,
+        });
+        await _db.SaveChangesAsync();
+
+        var logs = new LogCapture();
+        var principal = new ClaimsPrincipal(
+        [
+            new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, adminId.ToString()),
+                 new Claim(ClaimTypes.Role, "Admin")],
+                authenticationType: "Bearer"),
+            new ClaimsIdentity(
+                [new Claim(GuestAuthenticationHandler.GuestSessionIdClaimType, Guid.NewGuid().ToString())],
+                authenticationType: "Guest"),
+        ]);
+
+        var controller = new InvoicesController(
+            _db, new Mock<IStorageRouter>().Object, AnafOptions(), logs.LoggerFor<InvoicesController>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = principal },
+            },
+        };
+
+        await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("invoice.pdf.admin-read", StringComparison.Ordinal) &&
+                 r.Message.Contains(adminId.ToString()));
+    }
+
     private static int _pollIntervalMinutes = 30;
 
     private static IOptions<AnafSettings> AnafOptions() =>

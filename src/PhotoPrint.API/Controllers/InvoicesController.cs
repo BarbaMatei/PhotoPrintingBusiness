@@ -70,7 +70,7 @@ public sealed class InvoicesController : ControllerBase
         if (!owns && isAdmin)
             _logger.LogInformation(
                 "invoice.pdf.admin-read order_id={OrderId} admin_id={AdminId}",
-                orderId, userId);
+                orderId, User.GetBearerUserIdOrNull());
 
         var invoice = await _db.Invoices
             .AsNoTracking()

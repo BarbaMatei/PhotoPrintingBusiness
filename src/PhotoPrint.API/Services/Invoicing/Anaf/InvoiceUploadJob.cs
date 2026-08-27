@@ -446,10 +446,31 @@ public sealed class InvoiceUploadJob : BackgroundService
         catch (AnafContentRejectedException ex)
         {
             // ANAF refused the document itself, so no number of retries changes the answer.
-            await lifecycle.ParkUnbuildableAsync(invoiceId, ex.Message, ct);
-            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
-            _logger.LogError(ex,
-                "anaf.upload-job.content-rejected invoice_id={InvoiceId} status={HttpStatus} — parked as Failed for an admin",
+            var parked = await lifecycle.ParkUnbuildableAsync(invoiceId, ex.Message, ct);
+            if (parked)
+            {
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+                _logger.LogError(ex,
+                    "anaf.upload-job.content-rejected invoice_id={InvoiceId} status={HttpStatus} — parked as Failed for an admin",
+                    invoiceId, ex.HttpStatus);
+            }
+            else
+            {
+                // The CAS lost, so this row is no longer Pending: leave a trace and let the claim go
+                // rather than counting a park that never happened.
+                await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+                await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+                _logger.LogWarning(ex,
+                    "anaf.upload-job.content-rejected-park-lost invoice_id={InvoiceId} status={HttpStatus}",
+                    invoiceId, ex.HttpStatus);
+            }
+        }
+        catch (AnafUnreachableException ex) when (FiledNothing(ex.HttpStatus))
+        {
+            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
+            _logger.LogWarning(ex,
+                "anaf.upload-job.upload-refused invoice_id={InvoiceId} status={HttpStatus} — nothing was filed, so the blind-repost budget is untouched",
                 invoiceId, ex.HttpStatus);
         }
         catch (AnafUnreachableException ex)
@@ -571,6 +592,10 @@ public sealed class InvoiceUploadJob : BackgroundService
                 break;
         }
     }
+
+    // 429 and 503 are refused before ANAF reads anything, unlike a 502, a 504 or a dropped
+    // connection, where the document may already be filed.
+    private static bool FiledNothing(int? httpStatus) => httpStatus is 429 or 503;
 
     private bool IsBudgetExhausted(Invoice invoice)
     {

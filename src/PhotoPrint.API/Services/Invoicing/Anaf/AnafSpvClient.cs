@@ -71,8 +71,14 @@ public sealed class AnafSpvClient : IAnafSpvClient
         if (response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
 
-        if (!response.IsSuccessStatusCode)
+        // Only these two mean ANAF read the document and refused it. Every other 4xx is us
+        // calling wrong — a bad base URL, a token without the scope — and parking the invoice
+        // for that costs an admin retry per row once the configuration is fixed.
+        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
             throw new AnafContentRejectedException(endpoint, httpStatus: (int)response.StatusCode);
+
+        if (!response.IsSuccessStatusCode)
+            throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
 
         var body = await response.Content.ReadAsStringAsync(ct);
         var xml  = SafeParse(body, endpoint);
