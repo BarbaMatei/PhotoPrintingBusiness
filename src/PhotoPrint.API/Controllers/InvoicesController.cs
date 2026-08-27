@@ -55,7 +55,16 @@ public sealed class InvoicesController : ControllerBase
 
         var owns = (userId is not null && order.UserId == userId.Value) ||
                    (guestSessionId is not null && order.GuestSessionId == guestSessionId.Value);
-        if (!owns) return Forbid();
+
+        // Ops must fetch customer invoices during the dual-write inspection week; the read is
+        // logged because it is one person reading another person's fiscal document.
+        var isAdmin = User.IsInRole("Admin");
+        if (!owns && !isAdmin) return Forbid();
+
+        if (!owns && isAdmin)
+            _logger.LogInformation(
+                "invoice.pdf.admin-read order_id={OrderId} admin_id={AdminId}",
+                orderId, userId);
 
         var invoice = await _db.Invoices
             .AsNoTracking()
