@@ -90,17 +90,24 @@ public sealed class InvoiceUploadJob : BackgroundService
 
             var pendingStatus   = InvoiceAnafStatus.Pending;
             var submittedStatus = InvoiceAnafStatus.Submitted;
+            var rejectedStatus  = InvoiceAnafStatus.Rejected;
 
             // A row that just failed gets a cooldown, or the oldest broken invoice heads every batch
             // forever and starves the healthy ones out of a batch capped at MaxBatchSize.
-            var retryNotBefore = _clock.GetUtcNow() - TimeSpan.FromMinutes(Math.Max(2, _settings.PollIntervalMinutes));
+            var now = _clock.GetUtcNow();
+            var retryNotBefore = now - TimeSpan.FromMinutes(Math.Max(2, _settings.PollIntervalMinutes));
+
+            // Coarse filter only: the exact schedule needs CreatedAt too, so due-ness is settled in memory below.
+            var rejectedNotBefore = now - TimeSpan.FromHours(Math.Max(1, MinBackoffHours));
 
             var batch = await db.Invoices
-                .Where(i => (i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
-                            && (i.LastError == null || i.UpdatedAt == null || i.UpdatedAt < retryNotBefore))
+                .Where(i => ((i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
+                             && (i.LastError == null || i.UpdatedAt == null || i.UpdatedAt < retryNotBefore))
+                            || (i.AnafStatus == rejectedStatus
+                                && (i.UpdatedAt == null || i.UpdatedAt < rejectedNotBefore)))
                 .OrderBy(i => i.CreatedAt)
                 .Take(_settings.MaxBatchSize)
-                .Select(i => new { i.Id, i.OrderId, i.AnafStatus })
+                .Select(i => new BatchRow(i.Id, i.OrderId, i.AnafStatus, i.CreatedAt, i.UpdatedAt))
                 .ToListAsync(ct);
 
             if (batch.Count == 0) return;
@@ -125,7 +132,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                 using var perRowScope = _scopeFactory.CreateScope();
                 try
                 {
-                    await ProcessOneAsync(perRowScope.ServiceProvider, row.Id, row.OrderId, row.AnafStatus, ct);
+                    await ProcessOneAsync(perRowScope.ServiceProvider, row, ct);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (AnafAuthException ex)
@@ -192,19 +199,77 @@ public sealed class InvoiceUploadJob : BackgroundService
         }
     }
 
+    private sealed record BatchRow(
+        Guid Id, Guid OrderId, InvoiceAnafStatus AnafStatus,
+        DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+
+    private int MinBackoffHours =>
+        _settings.BackoffHours.Length == 0 ? 1 : _settings.BackoffHours.Min();
+
     private async Task ProcessOneAsync(
-        IServiceProvider sp, Guid invoiceId, Guid orderId,
-        InvoiceAnafStatus status, CancellationToken ct)
+        IServiceProvider sp, BatchRow row, CancellationToken ct)
     {
-        switch (status)
+        switch (row.AnafStatus)
         {
             case InvoiceAnafStatus.Pending:
-                await UploadPendingAsync(sp, invoiceId, orderId, ct);
+                await UploadPendingAsync(sp, row.Id, row.OrderId, ct);
                 break;
             case InvoiceAnafStatus.Submitted:
-                await PollSubmittedAsync(sp, invoiceId, ct);
+                await PollSubmittedAsync(sp, row.Id, ct);
+                break;
+            case InvoiceAnafStatus.Rejected:
+                await ResubmitRejectedAsync(sp, row, ct);
                 break;
         }
+    }
+
+    // Rejections are re-submitted on the configured schedule, then given up on: a rejected row nobody
+    // resubmits silently outlives the 5-business-day ANAF submission deadline.
+    private async Task ResubmitRejectedAsync(
+        IServiceProvider sp, BatchRow row, CancellationToken ct)
+    {
+        var lifecycle = sp.GetRequiredService<IInvoiceLifecycle>();
+        var lastChange = row.UpdatedAt ?? row.CreatedAt;
+        var now = _clock.GetUtcNow();
+
+        var dueAt = NextResubmitAt(row.CreatedAt, lastChange);
+        if (dueAt is null)
+        {
+            var gaveUp = await lifecycle.GiveUpOnRejectedAsync(
+                row.Id,
+                $"ANAF rejected this invoice on every attempt within {_settings.BackoffHours.Sum()}h; manual correction required.",
+                ct);
+            if (gaveUp) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+            return;
+        }
+
+        if (now < dueAt)
+        {
+            _logger.LogDebug(
+                "anaf.upload-job.rejected-not-due invoice_id={InvoiceId} due_at={DueAt}", row.Id, dueAt);
+            return;
+        }
+
+        var requeued = await lifecycle.RetryAsync(row.Id, InvoiceAnafStatus.Rejected, ct);
+        if (requeued)
+        {
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
+            _logger.LogInformation(
+                "anaf.upload-job.rejected-resubmitted invoice_id={InvoiceId} due_at={DueAt}", row.Id, dueAt);
+        }
+    }
+
+    // Attempt count is not persisted: the next slot is the first cumulative milestone after the last transition.
+    private DateTimeOffset? NextResubmitAt(DateTimeOffset createdAt, DateTimeOffset lastChange)
+    {
+        var cumulativeHours = 0d;
+        foreach (var step in _settings.BackoffHours)
+        {
+            cumulativeHours += step;
+            var slot = createdAt.AddHours(cumulativeHours);
+            if (slot > lastChange) return slot;
+        }
+        return null;
     }
 
     private async Task UploadPendingAsync(

@@ -181,7 +181,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(
         PostgresTestDatabase database, InvoiceAnafStatus status = InvoiceAnafStatus.Pending,
         DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>", string? anafUploadId = null,
-        DateTimeOffset? createdAt = null)
+        DateTimeOffset? createdAt = null, DateTimeOffset? updatedAt = null)
     {
         var orderId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -197,6 +197,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         invoice.ClaimedAt = claimedAt;
         invoice.AnafUploadId = anafUploadId;
         if (createdAt is not null) invoice.CreatedAt = createdAt.Value;
+        if (updatedAt is not null) invoice.UpdatedAt = updatedAt.Value;
         seed.Invoices.Add(invoice);
         seed.SaveChanges();
         return (orderId, invoiceId);
@@ -570,6 +571,65 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
 
         h.Lifecycle.Verify(l => l.MarkFailedAsync(invoiceId, "date incorecte", It.IsAny<CancellationToken>()), Times.Once);
         h.Lifecycle.Verify(l => l.MarkRejectedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_RejectedInvoicePastItsBackoffSlot_IsRequeuedForResubmission()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-2), updatedAt: now.AddHours(-2));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Pending,
+            "the 1h slot has passed, so the next tick must re-upload it");
+        row.AnafUploadId.Should().BeNull("a resubmission gets its own upload id");
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_RejectedInvoiceBeforeItsNextBackoffSlot_IsLeftAlone()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-4), updatedAt: now.AddHours(-2));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Rejected,
+            "the 5h slot is still an hour away — resubmitting sooner ignores the schedule");
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_RejectedInvoiceWithNoBackoffSlotLeft_IsGivenUpOnAsFailed()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-10), updatedAt: now.AddHours(-4));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Failed,
+            "Rejected must reach Failed on its own, or the admin retry endpoint is the only way out");
+        row.ClaimedAt.Should().BeNull("the admin retry endpoint cannot take a claimed row");
     }
 
     private static Task InvokeRunTickAsync(InvoiceUploadJob job, CancellationToken ct)

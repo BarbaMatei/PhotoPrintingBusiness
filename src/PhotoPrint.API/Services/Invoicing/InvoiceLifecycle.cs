@@ -108,6 +108,21 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
         return LogAndReturn(invoiceId, InvoiceAnafStatus.Submitted, InvoiceAnafStatus.Failed, affected);
     }
 
+    public async Task<bool> GiveUpOnRejectedAsync(
+        Guid invoiceId, string reason, CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var affected = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Rejected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.AnafStatus, InvoiceAnafStatus.Failed)
+                .SetProperty(i => i.LastError,  (string?)reason)
+                .SetProperty(i => i.ClaimedAt,  (DateTimeOffset?)null)
+                .SetProperty(i => i.UpdatedAt,  (DateTimeOffset?)now),
+                ct);
+        return LogAndReturn(invoiceId, InvoiceAnafStatus.Rejected, InvoiceAnafStatus.Failed, affected);
+    }
+
     public async Task<UnknownUploadOutcome> RecordUnknownUploadOutcomeAsync(
         Guid invoiceId, string errorMessage, string budgetSpentMessage, int maxOutcomes,
         CancellationToken ct = default)

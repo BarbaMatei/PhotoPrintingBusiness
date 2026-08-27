@@ -26,7 +26,7 @@ is [`DEPLOYMENT.md` §14](../../docs/DEPLOYMENT.md#14-tracing-and-metrics-intent
 | `upload_size_bytes` | histogram | `By` | none | [`UploadService.UploadAsync`](../../src/PhotoPrint.API/Services/UploadService.cs) after upload persist |
 | `order_processing_duration_seconds` | histogram | `s` | none | [`AdminOrderService.UpdateStatusAsync`](../../src/PhotoPrint.API/Services/AdminOrderService.cs) on Paid→Shipped transition (`ShippedAt - PaidAt`) |
 | `awb_creation_total` | counter | `1` | `result` (5) | [`AwbCreator.CreateForOrderAsync`](../../src/PhotoPrint.API/Services/Sameday/AwbCreator.cs) — one increment per invocation, label mapped from the discriminated outcome (or `error` when the call throws) |
-| `invoice_anaf_status_total` | counter | `1` | `status` (4) | Meter defined here; increment sites ship with bolt 039 (intent 016). |
+| `invoice_anaf_status_total` | counter | `1` | `status` (5) | Incremented by the ANAF upload/poll job. |
 
 ### Label value enumerations
 
@@ -64,13 +64,14 @@ All label values are constants in [`MetricNames`](../../src/PhotoPrint.API/Obser
 | `give_up` | Permanent failure (invalid request, vendor validation error) — no retry, ops attention needed |
 | `error` | The creation attempt threw before producing an outcome (database unreachable, unexpected fault). Host-shutdown cancellation is deliberately excluded so a deploy does not depress the SLO |
 
-#### `status` (`invoice_anaf_status_total`, future)
+#### `status` (`invoice_anaf_status_total`)
 | Value | When |
 |---|---|
 | `accepted` | ANAF SPV accepted the e-Factura submission |
 | `rejected` | ANAF SPV returned a rejection (must be corrected and resubmitted) |
 | `pending` | Awaiting ANAF processing |
 | `failed` | The submission gave up: ANAF rejected it past the backoff budget, a `Pending` upload spent its blind re-post budget (`Anaf:MaxUnknownUploadOutcomes`) after repeated unknown outcomes and was parked for manual SPV reconciliation, or the invoice could not be built at all from the order as recorded (no buyer address, no items) and was parked on the first attempt — that last case never reaches ANAF, so it counts here without a matching `pending` |
+| `retrying` | The row is neither settled nor making progress: ANAF was unreachable on the upload leg (the unknown outcome spent part of the blind re-post budget), the upload returned an error, SPV authentication failed, or a rejected invoice was resubmitted on its `Anaf:BackoffHours` schedule. A rising `retrying` with a flat `accepted` is the signal that an outage is eating the 5-business-day submission window |
 
 ## Auto-instrumented metrics
 
@@ -101,7 +102,7 @@ These cover availability + latency without any application code changes.
    call site fires or what tags it attaches.
 8. Add the instrument's exact expected series count to `MetricsCardinalityTests.DeclaredInstruments`.
 9. Update this document.
-10. If the metric drives a dashboard panel, edit [`ops/dashboards/fototipar-overview.json`](../../ops/dashboards/fototipar-overview.json) and update the SLO doc. `DashboardMetricNamesTests` holds every dashboard and SLO query against a real `/metrics` exposition, so **a queried name this repo does not declare** fails the build rather than rendering "No Data". It does **not** prove production emits it: the exposition is seeded by the test itself, one observation per declared instrument, so a panel on a declared-but-never-incremented metric (`invoice_anaf_status_total` today) stays green. The test also expects every queried metric to appear in that seeded exposition, so a panel on an instrument the test does not emit needs a seed added there.
+10. If the metric drives a dashboard panel, edit [`ops/dashboards/fototipar-overview.json`](../../ops/dashboards/fototipar-overview.json) and update the SLO doc. `DashboardMetricNamesTests` holds every dashboard and SLO query against a real `/metrics` exposition, so **a queried name this repo does not declare** fails the build rather than rendering "No Data". It does **not** prove production emits it: the exposition is seeded by the test itself, one observation per declared instrument, so a panel on a declared-but-never-incremented metric stays green. The test also expects every queried metric to appear in that seeded exposition, so a panel on an instrument the test does not emit needs a seed added there.
 
 Adding a label or a label value is the same flow: extend the nested value class, extend the
 instrument's `LabelContract` entry, and update its expected series count.
@@ -119,7 +120,7 @@ enumerate the label combinations and assert the budget.
 | `upload_size_bytes` | 1 (no labels) | 99 |
 | `order_processing_duration_seconds` | 1 (no labels) | 99 |
 | `awb_creation_total` | 5 | 95 |
-| `invoice_anaf_status_total` | 4 | 96 |
+| `invoice_anaf_status_total` | 5 | 95 |
 
 Plenty of headroom; the budget exists to prevent free-form label leaks,
 not to limit growth.
