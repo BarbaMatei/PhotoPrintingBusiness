@@ -4,7 +4,6 @@ export interface CreateOrderRequest {
   deliveryType: DeliveryType;
   easyboxLockerId: string | null;
   shippingAddress: ShippingAddressForm | null;
-  shippingCostRon: number;
 }
 
 export interface StripeIntentResponse {
@@ -21,13 +20,11 @@ export type OrderStatus =
   | 'PaymentFailed'
   | 'Cancelled';
 
-export interface OrderDto {
+export interface OrderPaymentStatusDto {
   id: string;
   orderNumber: string;
   status: OrderStatus;
   totalRon: number;
-  subtotalRon: number;
-  shippingCostRon: number;
   deliveryType: DeliveryType;
   createdAt: string;
   paidAt: string | null;

@@ -2,7 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CreateOrderRequest, StripeIntentResponse, OrderDto } from '../models/payment.model';
+import {
+  CreateOrderRequest,
+  StripeIntentResponse,
+  OrderPaymentStatusDto,
+} from '../models/payment.model';
 
 @Injectable({ providedIn: 'root' })
 export class PaymentService {
@@ -10,11 +14,16 @@ export class PaymentService {
   private readonly paymentsBase = `${environment.apiUrl}/payments`;
   private readonly ordersBase = `${environment.apiUrl}/orders`;
 
-  createStripeIntent(request: CreateOrderRequest): Observable<StripeIntentResponse> {
-    return this.http.post<StripeIntentResponse>(`${this.paymentsBase}/stripe/intent`, request);
+  createStripeIntent(
+    request: CreateOrderRequest,
+    idempotencyKey?: string,
+  ): Observable<StripeIntentResponse> {
+    return this.http.post<StripeIntentResponse>(`${this.paymentsBase}/stripe/intent`, request, {
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
+    });
   }
 
-  getOrder(orderId: string): Observable<OrderDto> {
-    return this.http.get<OrderDto>(`${this.ordersBase}/${orderId}`);
+  getPaymentStatus(orderId: string): Observable<OrderPaymentStatusDto> {
+    return this.http.get<OrderPaymentStatusDto>(`${this.ordersBase}/${orderId}/payment-status`);
   }
 }

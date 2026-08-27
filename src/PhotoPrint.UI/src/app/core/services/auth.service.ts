@@ -99,6 +99,11 @@ export class AuthService {
     return this.isAdmin$$.value;
   }
 
+  /** Synchronous read of the signed-in user id — use in guards and services. */
+  currentUserId(): string | null {
+    return this.currentUser$$.value?.id ?? null;
+  }
+
   /** Returns the JWT access token from sessionStorage. */
   getAccessToken(): string | null {
     return sessionStorage.getItem('access_token');
