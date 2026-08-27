@@ -12,6 +12,7 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Invoicing;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services.Invoicing.Anaf;
 using PhotoPrint.Tests.Helpers;
 using Xunit;
@@ -405,21 +406,42 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     }
 
     [Fact]
-    public async Task UploadPendingAsync_AnafUnreachable_RecordsErrorAndReleasesClaim()
+    public async Task UploadPendingAsync_AnafUnreachable_CountsTheUnknownOutcomeAndKeepsTheClaim()
     {
         var database = _database;
-        var h = Build(database, cloudEnabled: false);
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
         h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 400));
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 502));
 
         await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
-        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         using var verify = CreateDb(database);
-        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
-        claimedAt.Should().BeNull();
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.UnknownUploadOutcomes.Should().Be(1, "ANAF may already hold this number");
+        row.LastError.Should().NotBeNullOrEmpty();
+        row.ClaimedAt.Should().NotBeNull("a second replica must not re-post it before the claim expires");
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafUnreachable_CountsTheRowAsRetryingOnTheStatusMetric()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 502));
+
+        using var metrics = new MetricCapture(MetricNames.Instruments.InvoiceAnafStatusTotal);
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        metrics.For(MetricNames.Instruments.InvoiceAnafStatusTotal,
+                    (MetricNames.Labels.Status, MetricNames.AnafStatusValues.Retrying))
+               .Should().HaveCount(1, "an outage that emits nothing looks like an idle queue");
+        metrics.ContractViolations().Should().BeEmpty();
     }
 
     [Fact]
@@ -933,5 +955,38 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         public AdvanceableClock(DateTimeOffset now) { _now = now; }
         public override DateTimeOffset GetUtcNow() => _now;
         public void Advance(TimeSpan delta) => _now = _now.Add(delta);
+    }
+    [Fact]
+    public async Task UploadPendingAsync_AnafRejectsTheContentPermanently_ParksTheRowInsteadOfRetryingForEver()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafContentRejectedException("/upload", httpStatus: 400));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var db = database.NewContext();
+        var invoice = db.Invoices.Single(i => i.Id == invoiceId);
+        invoice.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafUnreachableOnUpload_CountsAgainstTheBlindRepostBudget()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("/upload", httpStatus: 502));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var db = database.NewContext();
+        var invoice = db.Invoices.Single(i => i.Id == invoiceId);
+        invoice.UnknownUploadOutcomes.Should().Be(1);
     }
 }

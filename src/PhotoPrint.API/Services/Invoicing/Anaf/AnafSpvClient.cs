@@ -67,8 +67,11 @@ public sealed class AnafSpvClient : IAnafSpvClient
         if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
             throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
 
-        if (!response.IsSuccessStatusCode)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
+
+        if (!response.IsSuccessStatusCode)
+            throw new AnafContentRejectedException(endpoint, httpStatus: (int)response.StatusCode);
 
         var body = await response.Content.ReadAsStringAsync(ct);
         var xml  = SafeParse(body, endpoint);

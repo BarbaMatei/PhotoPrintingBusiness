@@ -138,6 +138,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                         if (_outages.MarkOutageOnce("auth", _authOutageAlertWindow))
                         {
                             // Urgent (expiring cert / revoked credential) — no per-replica-safe counter backs "escalate after N tries", so treat as urgent on first sight.
+                            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
                             _logger.LogError(ex, "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
                             perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
                         }
@@ -348,18 +349,41 @@ public sealed class InvoiceUploadJob : BackgroundService
         {
             // 200-with-errors: store the message and stay Pending; next tick retries.
             await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
             _logger.LogWarning(ex,
                 "anaf.upload-job.upload-errors invoice_id={InvoiceId}", invoiceId);
             await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
         }
+        catch (AnafContentRejectedException ex)
+        {
+            // ANAF refused the document itself, so no number of retries changes the answer.
+            await lifecycle.ParkUnbuildableAsync(invoiceId, ex.Message, ct);
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+            _logger.LogError(ex,
+                "anaf.upload-job.content-rejected invoice_id={InvoiceId} status={HttpStatus} — parked as Failed for an admin",
+                invoiceId, ex.HttpStatus);
+        }
         catch (AnafUnreachableException ex)
         {
-            // Also covers a hard content rejection (HTTP 400) AnafSpvClient can't tell apart from a real outage.
-            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
-            _logger.LogWarning(ex,
-                "anaf.upload-job.unreachable invoice_id={InvoiceId} status={HttpStatus}",
-                invoiceId, ex.HttpStatus);
-            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+            // On the upload leg an outage is an unknown outcome: ANAF may hold this number already.
+            var outcome = await lifecycle.RecordUnknownUploadOutcomeAsync(
+                invoiceId, ex.Message, BudgetSpentMessage(ex), _maxUnknownUploadOutcomes, ct);
+
+            if (outcome.Parked)
+            {
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+                _logger.LogError(ex,
+                    "anaf.upload-job.blind-repost-budget-spent invoice_id={InvoiceId} outcomes={Outcomes} max={Max} — parked as Failed, reconcile the invoice number in ANAF SPV",
+                    invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
+            }
+            else
+            {
+                // The claim stays so a second replica cannot re-post a row whose answer is unknown.
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
+                _logger.LogWarning(ex,
+                    "anaf.upload-job.unreachable invoice_id={InvoiceId} status={HttpStatus} outcomes={Outcomes}",
+                    invoiceId, ex.HttpStatus, outcome.Outcomes);
+            }
         }
         catch (AnafUploadTimeoutException ex)
         {
@@ -394,7 +418,7 @@ public sealed class InvoiceUploadJob : BackgroundService
         $"Invoice cannot be built and will not be retried: {ex.Message} " +
         "Retrying repeats the same failure until the order's own data is corrected.";
 
-    private string BudgetSpentMessage(AnafUploadTimeoutException ex) =>
+    private string BudgetSpentMessage(Exception ex) =>
         $"{ex.Message} {_maxUnknownUploadOutcomes} attempts ended without an answer, so no further upload will be made: reconcile this invoice number in ANAF SPV, then retry the invoice.";
 
     private async Task ReleaseClaimAsync(PhotoPrintDbContext db, Guid invoiceId, DateTimeOffset claimedAt, CancellationToken ct)

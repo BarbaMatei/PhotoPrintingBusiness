@@ -79,7 +79,10 @@ public static class MetricNames
         public const string Pending  = "pending";
         public const string Failed   = "failed";
 
-        public static readonly string[] All = [Accepted, Rejected, Pending, Failed];
+        // Without its own value an ANAF outage looks like no activity at all on the panel.
+        public const string Retrying = "retrying";
+
+        public static readonly string[] All = [Accepted, Rejected, Pending, Failed, Retrying];
     }
 
     // The label contract every instrument is held to. A cardinality budget computed from the
