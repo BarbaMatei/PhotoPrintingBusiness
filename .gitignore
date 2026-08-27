@@ -97,3 +97,6 @@ Thumbs.db
 #  Editor / IDE
 # -------------------------------------------------------------
 .vscode/
+
+# Review-gate override log (local evidence for the unattended policy, never shared)
+reviews/state/overrides.jsonl

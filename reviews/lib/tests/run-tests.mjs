@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { REVIEWS, REPO } from '../paths.mjs'
 
@@ -370,6 +370,31 @@ commit: abc1234
   check('verify-fixes refuses a frontend row with no installed dependencies', ui.out.includes('"verdict":"env-missing"') && ui.out.includes('node_modules'), ui.out.trim())
   check('verify-fixes ran no test for the refused frontend row', ui.out.includes('"red_exits":[]'), ui.out.trim())
   rmSync(T, { recursive: true, force: true })
+}
+
+// ---------- pre-commit hook: gate overrides leave a trace in the override log ----------
+{
+  const sh = spawnSync('sh', ['-c', 'true'], { encoding: 'utf8' })
+  if (sh.error || sh.status !== 0) {
+    console.log('note: sh unavailable — the pre-commit override-log checks were skipped')
+  } else {
+    const T = mkdtempSync(join(tmpdir(), 'hook-override-'))
+    const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8' })
+    g('init', '-q', '-b', 'main')
+    g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
+    mkdirSync(join(T, 'src'), { recursive: true })
+    writeFileSync(join(T, 'src', 'Fixture.cs'), 'var x = 1; // narrating comment\n')
+    g('add', '.')
+    const hook = join(REVIEWS, '..', '.githooks', 'pre-commit')
+    const blocked = spawnSync('sh', [hook], { cwd: T, encoding: 'utf8', env: { ...process.env, COMMENTS_OK: '', DOCGATE_OK: '' } })
+    check('hook blocks a staged comment line without an override', blocked.status === 1 && !existsSync(join(T, 'reviews', 'state', 'overrides.jsonl')), `exit ${blocked.status}: ${(blocked.stderr ?? '').trim().slice(0, 200)}`)
+    const overridden = spawnSync('sh', [hook], { cwd: T, encoding: 'utf8', env: { ...process.env, COMMENTS_OK: '1', DOCGATE_OK: '' } })
+    const logPath = join(T, 'reviews', 'state', 'overrides.jsonl')
+    const logged = existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
+    check('hook passes with COMMENTS_OK=1 but logs the override', overridden.status === 0 && logged.includes('"var":"COMMENTS_OK"') && logged.includes('src/Fixture.cs'), `exit ${overridden.status}: log=${logged.trim() || '(missing)'}`)
+    check('the override-log line parses as JSON with a timestamp', (() => { try { const o = JSON.parse(logged.trim().split('\n')[0]); return Number.isFinite(Date.parse(o.t)) } catch { return false } })(), logged.trim())
+    rmSync(T, { recursive: true, force: true })
+  }
 }
 
 if (failures.length) {
