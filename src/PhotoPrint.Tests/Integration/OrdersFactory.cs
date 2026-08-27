@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Integration;
 
@@ -13,6 +14,30 @@ public class OrdersFactory : PaymentFactory
     /// <summary>
     /// Seeds a completed <see cref="Order"/> directly for the given user.
     /// </summary>
+    public async Task<(Guid userId, string bearerToken)> SeedAdminWithJwtAsync()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
+        var hasher = scope.ServiceProvider
+            .GetRequiredService<Microsoft.AspNetCore.Identity.IPasswordHasher<User>>();
+
+        var admin = new User
+        {
+            Email               = $"admin-{Guid.NewGuid():N}@example.com",
+            NormalizedEmail     = $"ADMIN-{Guid.NewGuid():N}@EXAMPLE.COM",
+            FirstName           = "Admin",
+            LastName            = "Tester",
+            IsEmailConfirmed    = true,
+            GdprConsentAccepted = true,
+            Role                = UserRole.Admin,
+        };
+        admin.PasswordHash = hasher.HashPassword(admin, "Test@1234!");
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
+
+        return (admin.Id, AdminJwt.ForAdmin(admin.Id));
+    }
+
     public async Task<Order> SeedOrderAsync(
         Guid? userId,
         OrderStatus status = OrderStatus.Paid,
@@ -116,5 +141,39 @@ public class OrdersFactory : PaymentFactory
         await db.SaveChangesAsync();
 
         return order;
+    }
+}
+
+// The shared generator in UploadFactory is file-scoped and always stamps the User role.
+file static class AdminJwt
+{
+    public static string ForAdmin(Guid userId)
+    {
+        var rsa = System.Security.Cryptography.RSA.Create();
+        rsa.ImportFromPem(TestKeys.RsaPrivateKeyPem);
+
+        var creds = new Microsoft.IdentityModel.Tokens.SigningCredentials(
+            new Microsoft.IdentityModel.Tokens.RsaSecurityKey(rsa),
+            Microsoft.IdentityModel.Tokens.SecurityAlgorithms.RsaSha256);
+
+        var claims = new[]
+        {
+            new System.Security.Claims.Claim(
+                System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new System.Security.Claims.Claim(
+                System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email, "admin@test.com"),
+            new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "Admin"),
+            new System.Security.Claims.Claim(
+                System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        };
+
+        var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
+            issuer: "fototipar",
+            audience: "fototipar-spa",
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: creds);
+
+        return new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
     }
 }
