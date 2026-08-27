@@ -109,8 +109,10 @@ const finals = testRuns.filter(e => e.kind === 'final')
 const checksReturned = by('check-returned')
 const checkTokens = checksReturned.reduce((a, e) => a + (Number.isFinite(e.tokens) ? e.tokens : NaN), 0)
 const triage = by('triage-done')[0]
-const microD = by('micro-review-dispatched').length
-const microFound = by('micro-review-returned').reduce((a, e) => a + (Number.isFinite(e.found) ? e.found : 0), 0)
+// Since 2026-08-28 the one round-scope composition review replaces per-cluster
+// micro-reviews; both event shapes count into the same metrics field.
+const microD = by('micro-review-dispatched').length + by('round-review-dispatched').length
+const microFound = [...by('micro-review-returned'), ...by('round-review-returned')].reduce((a, e) => a + (Number.isFinite(e.found) ? e.found : 0), 0)
 
 // ---------- base commit from the review frontmatter ----------
 const revPath = join(dir, `review-v${round}.md`)
@@ -124,7 +126,7 @@ const line = {
   tests: { invocations: testRuns.length, red_runs: testRuns.filter(e => e.kind === 'red').length, green_runs: testRuns.filter(e => e.kind === 'green').length, final: finals.length ? { passed: finals[finals.length - 1].passed ?? null, failed: finals[finals.length - 1].failed ?? null } : null },
   approach_checks: { pre_cleared_consumed: preClearedCount(triage?.pre_cleared), run: by('check-dispatched').length, tokens: Number.isFinite(checkTokens) && checksReturned.length ? checkTokens : null },
   micro_reviews: { count: microD, follow_up_fixes: microFound },
-  cost: { agents: by('check-dispatched').length + microD, tokens: null },
+  cost: { agents: by('check-dispatched').length + by('test-audit-dispatched').length + microD, tokens: null },
   runtime: { started, ended, active_s: activeS, blocked_s: blockedS, idle_s: idleS, blocked },
   notes: resStatus === 'resolved' ? '' : `resolution status: ${resStatus}`,
 }

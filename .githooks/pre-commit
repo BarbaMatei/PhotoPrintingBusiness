@@ -26,7 +26,7 @@ if [ -n "$DOCGATE_OK" ]; then
   [ -n "$staged" ] && log_override DOCGATE_OK "$staged"
 fi
 if [ -z "$DOCGATE_OK" ]; then
-  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u)
+  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' ':!reviews/lib/**' | sed 's|/[^/]*$||' | sort -u)
   for d in $dirs; do
     [ -f "$d/ledger.md" ] || continue
     grep -q "^### PPW-" "$d/ledger.md" || continue

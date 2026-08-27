@@ -138,6 +138,17 @@ const firstLine = out => out.split('\n')[0]
   check('auditor reports a cross-target duplicate id', r.out.includes('duplicate id PPW-9001'), 'no duplicate-id error in the output')
   check('auditor accepts a well-formed verification findings[] with lineage', !r.out.includes('908-verification-lineage metrics line 2 findings['), r.out.split('\n').find(l => l.includes('line 2 findings[')) ?? '')
   check('auditor rejects a malformed verification findings[] entry', r.out.includes('908-verification-lineage metrics line 3 findings[') && r.out.includes('d must be') && r.out.includes('sev_delta malformed'), 'no shape error for the malformed lineage entry')
+  check('auditor accepts seed_round and area lineage keys when well-formed', !r.out.includes('line 2 findings[0]: seed_round') && !r.out.includes('line 2 findings[0]: area'), r.out.split('\n').find(l => l.includes('line 2 findings[0]')) ?? '')
+  check('auditor rejects a non-numeric seed_round and an off-vocabulary area', r.out.includes('seed_round must be a round number or null') && r.out.includes('area "checkout" — one of the twelve backlog area words only'), 'no seed-lineage shape errors in the output')
+
+  // hand-back gates (audit R1–R4, applied only to rounds closed on/after 2026-08-28)
+  check('auditor refuses a resolved round with no round-review pair (R3)', r.out.includes('921-gates-bad resolution-v1.md: code was fixed but the round has no round-review-dispatched/returned pair'), 'no R3 refusal in the output')
+  check('auditor refuses red test runs with no test-meaning audit (R4)', r.out.includes('921-gates-bad resolution-v1.md: regression tests ran red but no test-audit-returned event'), 'no R4 refusal in the output')
+  check('auditor refuses a trigger-classified fix with no check evidence (R2)', r.out.includes('PPW-9211 is trigger-classified by its fix brief but no pre-check verdict was consumed and no check-dispatched event names it'), 'no R2 refusal in the output')
+  check('auditor refuses an overlap cluster with no protocol block event (R1)', r.out.includes('PPW-9212, PPW-9213 share a stateful surface') && r.out.includes('no protocol-written event covers them'), 'no R1 missing-protocol refusal in the output')
+  check('auditor refuses a protocol written after the cluster was fixed (R1 spec-theatre)', r.out.includes('PPW-9214, PPW-9215') && r.out.includes('timestamped after the cluster\'s first finding event'), 'no R1 ordering refusal in the output')
+  check('auditor accepts a round carrying all four kinds of hand-back evidence', !r.out.includes('922-gates-good resolution-v1.md:'), r.out.split('\n').find(l => l.includes('922-gates-good resolution-v1.md:')) ?? '')
+  check('auditor grandfathers resolved rounds from before the 2026-08-28 cut-off', !r.out.includes('901-good-target resolution-v1.md:') && !r.out.includes('901-good-target: resolved without'), r.out.split('\n').find(l => l.includes('901-good-target resolution')) ?? '')
 }
 {
   const r = run('render-records.mjs', ['--root', GOOD_ROOT, '901-good-target', '--dry-run'])
@@ -157,6 +168,10 @@ const firstLine = out => out.split('\n')[0]
     { t: '2026-08-21T10:00:00+03:00', ev: 'round-start', round: 1 },
     { t: '2026-08-21T10:05:00+03:00', ev: 'triage-done', round: 1, clusters: 1, pre_cleared: preCleared },
     { t: '2026-08-21T10:20:00+03:00', ev: 'test-run', kind: 'final', passed: 12, failed: 0 },
+    { t: '2026-08-21T10:21:00+03:00', ev: 'round-review-dispatched', round: 1 },
+    { t: '2026-08-21T10:22:00+03:00', ev: 'round-review-returned', round: 1, found: 2 },
+    { t: '2026-08-21T10:23:00+03:00', ev: 'test-audit-dispatched', round: 1 },
+    { t: '2026-08-21T10:24:00+03:00', ev: 'test-audit-returned', round: 1, verdict: 'clean' },
     { t: '2026-08-21T10:25:00+03:00', ev: 'round-end', round: 1 },
   ].map(e => JSON.stringify(e)).join('\n')
   const resolution = (status, fixedCommit) => `---
@@ -201,6 +216,8 @@ commit: abc1234
       r.out.split('\n').find(l => l.includes('pre_cleared_consumed')) ?? '')
     check('renderer still reads the review commit as the base', r.out.includes('"base_commit": "abc1234"'),
       r.out.split('\n').find(l => l.includes('base_commit')) ?? '')
+    check('renderer counts a round review into micro_reviews and its agents into cost', r.out.includes('"count": 1') && r.out.includes('"follow_up_fixes": 2') && r.out.includes('"agents": 2'),
+      r.out.split('\n').filter(l => /"(count|follow_up_fixes|agents)"/.test(l)).join(' ').trim())
   }
 
   write('920-open-round', 'worklog.jsonl', worklog(2))

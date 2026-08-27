@@ -15,6 +15,7 @@ import { execSync } from 'node:child_process'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
+import { AREAS, V4_CUTOFF } from './vocab.mjs'
 
 const argv = process.argv.slice(2)
 let ROOT = null
@@ -76,6 +77,12 @@ function listTargets(all = false) {
 
 function num(v) { return typeof v === 'number' && Number.isFinite(v) }
 function numOrNull(v) { return v === null || num(v) }
+// Seed lineage (convergence rule, 2026-08-28): which fix round a fix-caused finding is
+// attributed to, plus the component word for per-area convergence accounting.
+function checkSeedKeys(f, fat) {
+  if (f.seed_round !== undefined && f.seed_round !== null && !num(f.seed_round)) err(`${fat}: seed_round must be a round number or null (a missing value means "not yet measured", never zero)`)
+  if (f.area !== undefined && !AREAS.includes(f.area)) err(`${fat}: area "${f.area}" — one of the twelve backlog area words only`)
+}
 
 // Counts statuses from a resolution's "## Findings" body table (frontmatter map on old rounds).
 function resolutionTallies(text) {
@@ -115,6 +122,7 @@ function auditTarget(t) {
   const lines = readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim())
   const passes = new Map() // pass -> [line objects]
   const fixRounds = new Set() // round numbers with a fix-round line
+  const roundDates = new Map() // round -> the fix-round line's date (hand-back gate cut-off)
   const shas = new Map()   // sha -> where
   let holdsCertification = false
 
@@ -175,6 +183,7 @@ function auditTarget(t) {
       }
       if (num(o.round)) {
         fixRounds.add(o.round)
+        if (typeof o.date === 'string') roundDates.set(o.round, o.date)
         const resPath = join(t.dir, `resolution-v${o.round}.md`)
         if (!existsSync(resPath)) badFr(`${at}: fix-round line for round ${o.round} but no resolution-v${o.round}.md`)
         else if (o.findings && correctedRoundFields.get(o.round)?.has('findings')) {
@@ -271,7 +280,8 @@ function auditTarget(t) {
           if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
           if (f.fix_generated !== null && f.fix_generated !== undefined && !/^(PPW-\d+|D\d+)$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null (pre-2026-08-11: D<n>)`)
           if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
-          for (const k of Object.keys(f)) if (!['d', 'new', 'sev', 'fix_generated', 'sev_delta'].includes(k)) err(`${fat}: unknown key "${k}" on a verification entry`)
+          checkSeedKeys(f, fat)
+          for (const k of Object.keys(f)) if (!['d', 'new', 'sev', 'fix_generated', 'sev_delta', 'seed_round', 'area'].includes(k)) err(`${fat}: unknown key "${k}" on a verification entry`)
           if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
         })
         if (o.new_findings) for (const s of SEVS) if (num(o.new_findings[s]) && o.new_findings[s] !== tally[s])
@@ -295,6 +305,7 @@ function auditTarget(t) {
           if (!VERDICTS.has(f.verdict)) err(`${fat}: verdict "${f.verdict}" invalid`)
           if (f.fix_generated !== null && f.fix_generated !== undefined && !/^(PPW-\d+|D\d+)$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null (pre-2026-08-11: D<n>)`)
           if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
+          checkSeedKeys(f, fat)
           if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
         })
         if (o.new_findings) for (const s of SEVS) if (num(o.new_findings[s]) && o.new_findings[s] !== tally[s])
@@ -327,16 +338,20 @@ function auditTarget(t) {
 
   // worklog: every event line must parse and carry t + ev; fix-round lines want event backing
   const worklogPath = join(t.dir, 'worklog.jsonl')
+  const worklogEvents = []
   if (existsSync(worklogPath)) {
     readFileSync(worklogPath, 'utf8').split('\n').filter(l => l.trim()).forEach((raw, i) => {
       try {
         const e = JSON.parse(raw)
         if (typeof e.t !== 'string' || typeof e.ev !== 'string') err(`${tag} worklog line ${i + 1}: every event needs string "t" and "ev"`)
+        else worklogEvents.push(e)
       } catch (e) { err(`${tag} worklog line ${i + 1}: unparseable JSON (${e.message})`) }
     })
   } else if (fixRounds.size) {
     warn(`${tag}: ${fixRounds.size} fix-round metrics line(s) but no worklog.jsonl — runtime is not backed by events`)
   }
+
+  auditHandBackGates(t, tag, roundDates, worklogEvents, strictTier)
 
   // commit resolvability + reachability from a pushed ref
   for (const [sha, where] of shas) {
@@ -361,6 +376,91 @@ function auditTarget(t) {
   if (legacyDrift.size) {
     const parts = [...legacyDrift].map(([k, n]) => `${k} ×${n}`).join(' · ')
     info(`${tag}: grandfathered v1 drift — ${parts}`)
+  }
+}
+
+// Hand-back gates (accepted fix-round audit, 2026-08-28): a resolution may not stand
+// `resolved` without the round's recorded evidence — a consumed pre-check verdict or a
+// dispatched check for every trigger-classified fix (R2), a round-scope composition review
+// for every code round (R3), a test-meaning audit whenever new tests ran red (R4), and a
+// protocol block written before the fixes of any cluster whose fix briefs overlap on the
+// same files (R1). Applies only to rounds closed on/after V4_CUTOFF; history is grandfathered.
+function auditHandBackGates(t, tag, roundDates, events, strictTier) {
+  for (const f of readdirSync(t.dir)) {
+    const m = /^resolution-v(\d+)\.md$/.exec(f)
+    if (!m) continue
+    const round = Number(m[1])
+    const text = readFileSync(join(t.dir, f), 'utf8')
+    const fmEnd = text.indexOf('\n---', 3)
+    const fm = text.startsWith('---') && fmEnd !== -1 ? text.slice(3, fmEnd) : ''
+    if ((/^status:\s*(\S+)/m.exec(fm)?.[1]) !== 'resolved') continue
+    const closed = /^closed:\s*(\d{4}-\d{2}-\d{2})/m.exec(fm)?.[1] ?? null
+    const lineDate = roundDates.get(round) ?? null
+    if (!((closed && closed >= V4_CUTOFF) || (lineDate && lineDate >= V4_CUTOFF))) continue
+    const at = `${tag} resolution-v${round}.md`
+    if (!closed) strictTier(`${at}: resolved without a closed: date — required since 2026-08-28; the hand-back gates key on it`)
+
+    const startIdx = events.findIndex(e => e.ev === 'round-start' && e.round === round)
+    if (startIdx === -1) { strictTier(`${at}: no round-start worklog event for round ${round} — the hand-back gates have nothing to check against`); continue }
+    let endIdx = -1
+    for (let i = events.length - 1; i >= 0; i--) if (events[i].ev === 'round-end' && events[i].round === round) { endIdx = i; break }
+    const slice = events.slice(startIdx, endIdx === -1 ? undefined : endIdx + 1)
+    const by = ev => slice.filter(e => e.ev === ev)
+    const idsOf = e => Array.isArray(e.ids) ? e.ids : []
+
+    const fixedRows = [...text.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|([^|]*)\|/gm)]
+      .map(r => ({ id: r[1], code: /[0-9a-f]{7,40}/.test(r[2]) }))
+    if (fixedRows.some(r => r.code) && (!by('round-review-dispatched').length || !by('round-review-returned').length))
+      strictTier(`${at}: code was fixed but the round has no round-review-dispatched/returned pair — one composition review over the whole round's diff gates hand-back (audit R3)`)
+    if (slice.some(e => e.ev === 'test-run' && e.kind === 'red') && !by('test-audit-returned').length)
+      strictTier(`${at}: regression tests ran red but no test-audit-returned event exists — the test-meaning check gates hand-back (audit R4)`)
+
+    const ledgerPath = join(t.dir, 'ledger.md')
+    const ledgerText = existsSync(ledgerPath) ? readFileSync(ledgerPath, 'utf8') : ''
+    const blocks = new Map()
+    for (const b of ledgerText.matchAll(/^### (PPW-\d+)[^\n]*\n([\s\S]*?)(?=^### PPW-\d+|(?![\s\S]))/gm)) blocks.set(b[1], b[2])
+    const sevOf = new Map()
+    for (const r of ledgerText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|/gm)) sevOf.set(r[1], r[2])
+
+    const dispatched = by('check-dispatched')
+    for (const row of fixedRows) {
+      const block = blocks.get(row.id)
+      if (!block || !/Trigger-list-shaped:\*{0,2}\s*yes/i.test(block)) continue
+      const preChecked = /Approach pre-check:\s*(cleared|revised)/i.test(block)
+      const named = dispatched.some(e => idsOf(e).includes(row.id))
+      if (!preChecked && !named)
+        strictTier(`${at}: ${row.id} is trigger-classified by its fix brief but no pre-check verdict was consumed and no check-dispatched event names it — "not needed" is not a writable value (audit R2)`)
+    }
+
+    const briefFiles = id => {
+      const set = new Set()
+      for (const hit of (blocks.get(id) ?? '').matchAll(/[A-Za-z0-9_./\\-]+\.(?:cs|ts|tsx|mjs|js|html|scss|css)\b/g)) {
+        const p = hit[0].replace(/\\/g, '/')
+        if (/\.spec\.ts$/.test(p) || /PhotoPrint\.Tests/.test(p) || /Tests\.cs$/.test(p)) continue
+        set.add(p.split('/').pop().toLowerCase())
+      }
+      return set
+    }
+    const serious = fixedRows.filter(r => r.code && ['🔴', '🟠'].includes(sevOf.get(r.id)))
+    const groups = []
+    for (const r of serious) {
+      const mine = briefFiles(r.id)
+      if (!mine.size) continue
+      let g = groups.find(gr => [...gr.files].some(fb => mine.has(fb)))
+      if (!g) { g = { ids: [], files: new Set() }; groups.push(g) }
+      g.ids.push(r.id)
+      for (const fb of mine) g.files.add(fb)
+    }
+    const findingEvents = by('finding')
+    const protoEvents = by('protocol-written')
+    for (const g of groups.filter(x => x.ids.length >= 2)) {
+      const proto = protoEvents.find(e => idsOf(e).some(id => g.ids.includes(id)))
+      const firstFix = findingEvents.find(e => g.ids.includes(e.id))
+      if (!proto)
+        strictTier(`${at}: ${g.ids.join(', ')} share a stateful surface (fix briefs overlap on ${[...g.files][0]}) but no protocol-written event covers them — the protocol block is the cluster's first artifact (audit R1)`)
+      else if (firstFix && Date.parse(proto.t) > Date.parse(firstFix.t))
+        strictTier(`${at}: the protocol-written event for ${g.ids.join(', ')} is timestamped after the cluster's first finding event — a protocol paraphrasing the diff is spec-theatre (audit R1)`)
+    }
   }
 }
 
