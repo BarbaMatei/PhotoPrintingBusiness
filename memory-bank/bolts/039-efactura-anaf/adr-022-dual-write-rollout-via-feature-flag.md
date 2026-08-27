@@ -6,6 +6,11 @@ status: accepted
 
 # ADR-022: Dual-Write Rollout for Regulated Integrations via Feature Flag, Not Branch Deploy
 
+> **Frozen bolt record.** Two statements below no longer hold: the flag gates no customer
+> email (no send path exists), and the XML build, ANAF upload, PDF render and storage write
+> are gated by `Anaf:Enabled`, not unconditional. `memory-bank/standards/decision-index.md`
+> carries the current summary — read it before flipping anything in production.
+
 ## Context
 
 Bolt 039 ships the full e-Factura pipeline: XML build, PDF render,

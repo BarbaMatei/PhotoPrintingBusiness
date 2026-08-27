@@ -254,9 +254,9 @@ builder.Services.AddOptions<PhotoPrint.API.Configuration.InvoicingSettings>().Va
 // tier annually (see DEPLOYMENT.md).
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-// Application-layer + domain services for bolt 039 — always wired even when
-// Anaf:Enabled = false (so the Invoice row is still created at Paid and the
-// admin endpoints still work; only the ANAF upload pipeline is conditional).
+// Always wired even when Anaf:Enabled = false: the Invoice row is still created at Paid and the
+// admin endpoints still work. The builders are registered either way, but the worker is their
+// only caller, so with the flag off no XML and no PDF is ever built.
 builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceCreationService,
                             PhotoPrint.API.Services.Invoicing.InvoiceCreationService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceXmlBuilder,

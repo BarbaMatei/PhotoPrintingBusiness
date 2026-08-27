@@ -99,7 +99,7 @@ updated: 2026-08-24
 | PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | verified | `f769e22` |
 | PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | verified | `f769e22` |
 | PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | verified | `f769e22` |
-| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | open | `c8d6bb4` |
+| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | fixed | `56eb9be` |
 | PPW-561 | 🟡 | v9 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `Tests/Helpers/PostgresTestDatabase.cs:33` | backlog | `c8d6bb4` |
 | PPW-562 | 🟠 | v9 | PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run | `Tests/Helpers/PostgresTestDatabase.cs:25` | fixed | `4dd6763` |
 | PPW-563 | 🟡 | v9 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | backlog | `c8d6bb4` |
@@ -124,38 +124,38 @@ updated: 2026-08-24
 | PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | fixed | `901f8a2` |
 | PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | fixed | `06fd2b1` |
 | PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | fixed | `901f8a2` |
-| PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | open | `090873d` |
-| PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | open | `090873d` |
-| PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | open | `090873d` |
-| PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | open | `090873d` |
+| PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | fixed | `c03f99a` |
+| PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | fixed | `8950624` |
+| PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | fixed | `32d4eee` |
+| PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | fixed | `32d4eee` |
 | PPW-589 | 🟡 | v12 | nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | backlog | `090873d` |
 | PPW-590 | 🟡 | v12 | PollSubmittedAsync takes no claim, so every replica polls every Submitted row on every tick | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | backlog | `090873d` |
-| PPW-591 | 🟠 | v12 | No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | open | `090873d` |
-| PPW-592 | 🟠 | v12 | ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop | `Services/Invoicing/Anaf/AnafSpvClient.cs:91` | open | `090873d` |
+| PPW-591 | 🟠 | v12 | No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | fixed | `72202c0` |
+| PPW-592 | 🟠 | v12 | ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop | `Services/Invoicing/Anaf/AnafSpvClient.cs:91` | fixed | `add7611` |
 | PPW-593 | 🟡 | v12 | Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered | `Tests/Unit/Controllers/AdminInvoicesControllerTests.cs:75` | backlog | `090873d` |
 | PPW-594 | 🟡 | v12 | The new Invoice.StorageLocation stamp is never asserted after a PDF save | `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:304` | backlog | `090873d` |
 | PPW-595 | 🟡 | v12 | QuestPDF licence is set by the test class itself, so the production licence wiring is unverified | `Tests/Unit/Services/Invoicing/InvoicePdfRendererTests.cs:23` | backlog | `090873d` |
-| PPW-596 | 🟠 | v12 | No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered | `Controllers/InvoicesController.cs:58` | open | `090873d` |
-| PPW-597 | 🟠 | v12 | Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped | `Services/Invoicing/InvoicePdfReadyNotifier.cs:31` | open | `090873d` |
-| PPW-598 | 🟠 | v12 | Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback | `Services/Invoicing/InvoiceLifecycle.cs:165` | open | `090873d` |
-| PPW-599 | 🟠 | v12 | Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout | `docs/DEPLOYMENT.md:1531` | open | `090873d` |
-| PPW-600 | 🔴 | v12 | FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99` | open | `090873d` |
+| PPW-596 | 🟠 | v12 | No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered | `Controllers/InvoicesController.cs:58` | fixed | `e3f4bb8` |
+| PPW-597 | 🟠 | v12 | Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped | `Services/Invoicing/InvoicePdfReadyNotifier.cs:31` | fixed | `5324a1c`, `beb7732` |
+| PPW-598 | 🟠 | v12 | Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback | `Services/Invoicing/InvoiceLifecycle.cs:165` | fixed | `add7611` |
+| PPW-599 | 🟠 | v12 | Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout | `docs/DEPLOYMENT.md:1531` | fixed | `add7611` |
+| PPW-600 | 🔴 | v12 | FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99` | fixed | `6977d5b` |
 | PPW-601 | 🟡 | v12 | system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule | `memory-bank/standards/system-architecture.md:83` | backlog | `090873d` |
-| PPW-602 | 🟠 | v12 | Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away | `Controllers/InvoicesController.cs:68` | open | `090873d` |
+| PPW-602 | 🟠 | v12 | Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away | `Controllers/InvoicesController.cs:68` | fixed | `add7611` |
 | PPW-603 | 🟡 | v12 | The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:414` | backlog | `090873d` |
-| PPW-604 | 🔴 | v12 | No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344` | open | `090873d` |
-| PPW-605 | 🟠 | v12 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | open | `090873d` |
+| PPW-604 | 🔴 | v12 | No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344` | fixed | `32d4eee` |
+| PPW-605 | 🟠 | v12 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | fixed | `add7611` |
 | PPW-606 | ⚪ | v12 | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `Services/Invoicing/InvoiceCreationService.cs:98` | backlog | `090873d` |
-| PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | open | `090873d` |
-| PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | open | `090873d` |
+| PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | fixed | `166230a` |
+| PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | fixed | `add7611` |
 | PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | fixed | `06fd2b1` |
 | PPW-610 | 🟡 | v12 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:133` | backlog | `090873d` |
 | PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | fixed | `2acda1f` |
-| PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | open | `090873d` |
-| PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | open | `090873d` |
-| PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | open | `090873d` |
+| PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | fixed | `5cd48a5` |
+| PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | fixed | `6812453` |
+| PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | fixed | `6812453` |
 | PPW-615 | 🟠 | v12 | A non-succeeded, non-error Stripe result leaves the user stranded with no feedback | `src/app/features/checkout/pages/payment-step.ts:221` | fixed | `901f8a2` |
-| PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | open | `090873d` |
+| PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | fixed | `5cd48a5` |
 | PPW-617 | 🟡 | v12 | The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test | `Services/AdminOrderService.cs:437` | backlog | `090873d` |
 | PPW-618 | 🟡 | v12 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `Controllers/InvoicesController.cs:99` | backlog | `090873d` |
 | PPW-619 | 🟡 | v12 | OrderNumberService's manually opened DbConnection is never closed, pinning it for the rest of the scope | `Services/OrderNumberService.cs:34` | backlog | `090873d` |
@@ -188,7 +188,7 @@ updated: 2026-08-24
 | PPW-646 | 🟡 | v12 | Polling loads the whole invoice row, including XmlPayload, to read two fields | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | backlog | `090873d` |
 | PPW-647 | ⚪ | v12 | AddInvoiceUnknownUploadOutcomes leaves a permanent DEFAULT 0 that the model does not declare | `Migrations/20260821110018_AddInvoiceUnknownUploadOutcomes.cs:18` | backlog | `090873d` |
 | PPW-648 | ⚪ | v12 | The VAT rounding-mode test mostly asserts decimal.Round's own behaviour and never pins the net-side mode | `Tests/Unit/Services/VatCalculatorTests.cs:57` | backlog | `090873d` |
-| PPW-649 | ⚪ | v12 | metrics.md still marks invoice_anaf_status_total as future and never incremented | `memory-bank/operations/metrics.md:69` | backlog | `090873d` |
+| PPW-649 | ⚪ | v12 | metrics.md still marks invoice_anaf_status_total as future and never incremented | `memory-bank/operations/metrics.md:69` | fixed | `6977d5b` |
 | PPW-650 | ⚪ | v12 | Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done | `Services/VatCalculator.cs:14` | backlog | `090873d` |
 | PPW-651 | ⚪ | v12 | Both admin retry-refusal branches log nothing despite the class's audit-logged claim | `Controllers/AdminInvoicesController.cs:123` | backlog | `090873d` |
 | PPW-652 | ⚪ | v12 | Paid webhook spends two extra round-trips re-loading order relations it could have Included | `Controllers/WebhooksController.cs:402` | backlog | `090873d` |
@@ -1063,6 +1063,7 @@ updated: 2026-08-24
 - **Suggested fix:** Document and script a one-time migration-history reseed to the two surviving ids, or make the baseline's first steps tolerate existing objects. **Files:** `20260820133204_InitialPostgres.cs:12`, `Program.cs:332`, `Program.cs:93`, `Tests/Helpers/PostgresTestDatabase.cs:29`, `docs/DEPLOYMENT.md:157`, `memory-bank/standards/data-stack.md:29`. **Path:** a database carrying the deleted ids, boot-time Migrate, 42P07 on the first table, rolled-back migration, API down. **Test shape:** seed a migration-history row for a deleted id in a fresh test database, then Migrate and assert the failure is either handled or documented as impossible. **Trigger-list-shaped:** no (a one-time script plus documentation) — no approach pre-check run.
 - **History:**
   - v9: found by the delta pass — correctness, db-parity and completeness-critic, convergence 3, hinted, verdict plausible. The trace found the mechanism real but the state unreachable today: no deployed PostgreSQL exists, dev ran SQLite through EnsureCreated so the deleted ids were never recorded, and every test database is created fresh — only a hand-seeded history row reproduces the abort. The runbook section naming the deleted migrations is stale either way
+  - v13: fixed @`56eb9be` — the unreachable half is recorded, not scripted: no database has ever run the deleted chain (dev used SQLite through EnsureCreated, which writes no history rows), so §7 now states the real three-migration chain and gives the `__EFMigrationsHistory` reseed to run if such a database ever appears
 
 ### PPW-561 — PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry
 
@@ -1302,6 +1303,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — frontend-ux, completeness-critic, convergence 2, verdict confirmed
   - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the driver checked the code with him and the consequence is that a locker customer cannot proof-read the address printed on the invoice, not money or data loss
+  - v13: fixed @`c03f99a` — the recap renders the invoiced address for locker orders too, and the spec that pinned the old behaviour was retargeted
 
 ### PPW-586 — Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified
 
@@ -1312,6 +1314,7 @@ updated: 2026-08-24
   - v12: found by the certification pass — tests-coverage, completeness-critic, convergence 2, verdict confirmed
   - v12: Approach pre-check: revised (the 403 is real and deterministic, but the fix belongs in the shared claims extension, whose claim scan makes every both-headers caller lose its user id — cart scope, and worse, order attribution, where a signed-in user carrying a stale guest token creates a guest order today. Make the read identity-scoped rather than deleting the guard, or guest-only requests start writing a session id into the user column. The existing factory chain boots the real pipeline, but the 200 leg needs a seed helper for a stored PDF, and the admin retry route can only be tested for 401 and 403 on the in-memory provider because its update runs as raw SQL. Any test-authentication override deletes the defect)
   - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the 403 needs a caller sending a valid JWT and a live guest token together, which the shipped SPA never does, so it is unreachable through the site itself
+  - v13: fixed @`8950624` — six tests through the real pipeline: 401 anonymous, 403 for another customer, 403 for another guest session, 404 for the guest owner and for the order owner (with the Retry-After), and the admin role override. Reverting the admin branch reddens the last one
 
 ### PPW-587 — A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked
 
@@ -1320,6 +1323,7 @@ updated: 2026-08-24
 - **Suggested fix:** Split 4xx (except 408/429) into its own exception and park the row as Failed via ParkUnbuildableAsync, mirroring the not-buildable path. **Files:** `Services/Invoicing/Anaf/AnafSpvClient.cs:70`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355`, `Services/Invoicing/InvoiceLifecycle.cs:44`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:98`, `Services/Invoicing/InvoiceLifecycle.cs:111`, `Services/Invoicing/Anaf/AnafExceptions.cs:44`. **Path:** Pending invoice, XML/PDF already built. ANAF answers 400 (bad CIF, duplicate number): AnafSpvClient.cs:70-71 throws AnafUnreachableException(httpStatus:400). Job's catch at line 355 calls RecordPendingErrorAsync — InvoiceLifecycle.cs:44-55 writes only LastError+UpdatedAt, keeps Pending, no UnknownUploadOutcomes bump, no Failed metric — then releases the claim. Next tick past the cooldown re-selects the row (line 98). No watchdog parks Pending elsewhere, so it loops forever. **Test shape:** InvoiceUploadJobTests.Upload_rejected_with_http_400_is_parked_after_budget: arrange fake IAnafSpvClient always throwing AnafUnreachableException(endpoint, httpStatus:400); act — run MaxUnknownUploadOutcomes+1 ticks; assert invoice.AnafStatus == Failed. Today it stays Pending forever. **Trigger-list-shaped:** yes (splits the exception mapping and adds a parking rule) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — correctness, convergence 1, verdict confirmed
+  - v13: fixed @`32d4eee` — a non-success HTTP status that is not 408/429/5xx now raises `AnafContentRejectedException`, and the job parks the row as Failed instead of retrying a document ANAF has refused
 
 ### PPW-588 — Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs
 
@@ -1328,6 +1332,7 @@ updated: 2026-08-24
 - **Suggested fix:** Treat 5xx/unreachable on the upload endpoint as an unknown outcome too (count it against MaxUnknownUploadOutcomes), and exclude POST upload from the Polly retry set. **Files:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:364`, `Services/Invoicing/Anaf/AnafSpvClient.cs:68`, `Services/Invoicing/Anaf/AnafSpvClient.cs:181`, `Services/Invoicing/Anaf/AnafResilienceHandler.cs:36`, `Services/Invoicing/InvoiceLifecycle.cs:111`. **Path:** Upload POSTs (non-idempotent, no idempotency key). ANAF answers 502 after registering it: Polly retries 3x (AnafResilienceHandler:36), then AnafSpvClient:68 throws AnafUnreachableException. InvoiceUploadJob:355-363 only calls RecordPendingErrorAsync and releases the claim — UnknownUploadOutcomes untouched, status stays Pending. No other code parks Pending rows, so every tick re-POSTs forever. Sharper variant: a 200 body that fails XML parse (AnafSpvClient:181) — upload definitely accepted — takes the same unlimited path. **Test shape:** UploadJob_Reposts_Forever_On_Gateway_5xx: fake IAnafSpvClient.UploadAsync always throws AnafUnreachableException(httpStatus:502); run MaxUnknownUploadOutcomes+1 ticks; assert invoice parked Failed and UnknownUploadOutcomes>0 — today it stays Pending with 0 and uploads every tick. **Trigger-list-shaped:** yes (changes retry semantics and the blind-repost budget) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed. Fix-generated by PPW-559
+  - v13: fixed @`32d4eee` — an upload-leg outage spends the blind-repost budget through `RecordUnknownUploadOutcomeAsync` and **keeps the claim**: a row whose ANAF answer nobody has cannot be re-posted by a second replica
 
 ### PPW-589 — nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number
 
@@ -1354,6 +1359,7 @@ updated: 2026-08-24
 - **Suggested fix:** On numbering exhaustion (or at boot) run setval(seq, max(Number)) for the series/year from Invoices; add a Postgres test seeding rows ahead of the sequence. **Files:** `Services/Invoicing/PostgresInvoiceNumberingService.cs:38`, `Data/PostgresSequences.cs:25`, `Migrations/20260820133204_InitialPostgres.cs:746`, `Services/Invoicing/InvoiceCreationService.cs:77`, `Controllers/WebhooksController.cs:468`, `Services/AdminOrderService.cs:449`. **Path:** State: invoices hold FT/2026 numbers 1..500; sequence invoice_seq_ft_2026 sits at 1 (migration creates it START 1; EnsureAsync only CREATE IF NOT EXISTS; no setval or MAX(number) reconciliation exists anywhere). Paid webhook: nextval yields 1,2,3,4 across attempts 0-3, each SaveChanges hits uq_invoices_series_year_number, attempt 3 returns NumberExhausted — charged, order not Paid. Self-heals only after ~125 such burned orders, not "forever". **Test shape:** Postgres integration test NumberingLaggingSequenceWedgesPaidTransition: seed invoices FT/2026 numbers 1..5, setval sequence to 1, run the paid save path, assert NumberExhausted and order not Paid. **Trigger-list-shaped:** yes (adds a self-heal step to the numbering key scheme) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — db-parity, convergence 1, verdict confirmed
+  - v13: fixed @`72202c0` — a taken-number collision now runs `setval` past `MAX("Number")` for the series and the UTC year of `IssuedAt`, mirroring the unique index; three Postgres tests cover lagging, ahead-of-table and a foreign year
 
 ### PPW-592 — ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop
 
@@ -1362,6 +1368,7 @@ updated: 2026-08-24
 - **Suggested fix:** Reject or truncate index_incarcare above the column width in AnafSpvClient, and treat a MarkSubmittedAsync failure as an unknown-outcome (increment the blind-repost budget) rather than a plain rethrow. **Files:** `Services/Invoicing/Anaf/AnafSpvClient.cs:91`, `Services/Invoicing/InvoiceLifecycle.cs:37`, `Data/PhotoPrintDbContext.cs:399`, `Migrations/20260820133204_InitialPostgres.cs:380`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:341`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:100`. **Path:** Line 91 only null/whitespace-checks index_incarcare. MarkSubmittedAsync writes it to character varying(100) (InitialPostgres.cs:380) via ExecuteUpdate — EF skips validation, Postgres raises 22001. Job:341 rethrows; PostgresException matches none of the catches at 347/355/364, so batch catch:157 only logs. Row stays Pending, LastError null, so filter:100 keeps it batch-eligible; claim never released, so re-upload every ClaimTtl (min 2 min) forever. Prod-only — SQLite/InMemory ignore length. **Test shape:** InvoiceUploadJobTests: MarkSubmittedAsync mock throws DbUpdateException after a successful upload. Assert invoice stays Pending with LastError null, ClaimedAt still set, UnknownUploadOutcomes 0 — proving the next tick re-files. Plus AnafSpvClient rejects a 101-char index_incarcare. **Trigger-list-shaped:** yes (adds input rejection plus an unknown-outcome mapping) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — db-parity, input-validation, convergence 2, verdict confirmed
+  - v13: fixed @`add7611` — the client rejects an `index_incarcare` wider than `Invoice.AnafUploadIdMaxLength`, and a failed status write after a successful upload counts as an unknown outcome instead of rethrowing into a re-file loop
 
 ### PPW-593 — Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered
 
@@ -1397,6 +1404,7 @@ updated: 2026-08-24
 - **Suggested fix:** Allow Admin role to bypass the ownership check (or add GET /api/admin/invoices/{id}/pdf), with an audit log line; add a test for admin fetching another user's invoice. **Files:** `Controllers/InvoicesController.cs:56`, `Controllers/InvoicesController.cs:58`, `Controllers/AdminInvoicesController.cs:145`, `Extensions/GuestSessionExtensions.cs:22`, `memory-bank/intents/016-romanian-vat-efactura/requirements.md:68`, `docs/DEPLOYMENT.md:1470`. **Path:** Admin logs in (JWT with role Admin) and calls GET /api/orders/{customerOrderId}/invoice. DualAuth passes (RequireAuthenticatedUser only), then InvoicesController.cs:56-58 computes owns from UserId/GuestSessionId alone — no IsInRole("Admin") anywhere — so order.UserId != admin id yields Forbid() → 403. AdminInvoicesController offers only list, retry, and /xml; grep for "application/pdf" hits one route. So no admin path to any customer PDF, contradicting FR-5 requirements.md:68 and the DEPLOYMENT.md:1470 spot-check step. **Test shape:** GetInvoice_AdminOnAnotherUsersOrder_ReturnsPdf: arrange paid order owned by user A with rendered invoice PDF; act GET /api/orders/{A.orderId}/invoice with Admin-role JWT; assert 200 and application/pdf. Today returns 403. **Trigger-list-shaped:** no (an authorization branch and a route) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`e3f4bb8` — an Admin may read a customer invoice and the read is logged as `invoice.pdf.admin-read`
 
 ### PPW-597 — Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped
 
@@ -1405,6 +1413,7 @@ updated: 2026-08-24
 - **Suggested fix:** Either implement the attachment/follow-up send, or mark story 003/FR-5's email criterion explicitly descoped in ddd-02 and the story file, and give guests a retrieval path. **Files:** `Services/Invoicing/InvoicePdfReadyNotifier.cs:31`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:293`, `Services/IEmailSender.cs:5`, `EmailTemplates/OrderConfirmed.cshtml:1`, `Controllers/InvoicesController.cs:17`, `Controllers/OrdersController.cs:10`. **Path:** with one correction. Guest pays; InvoiceUploadJob:293 renders the PDF then calls NotifyAsync, which only logs — flag off logs "suppressed", flag on logs "no-email-integration". No IEmailService is even injected, IEmailSender.SendAsync has no attachment parameter, and OrderConfirmed.cshtml never mentions factura/invoice. But the invoice is not unreachable by API: InvoicesController:17 uses DualAuthPolicy and matches GuestSessionId. It is unreachable in practice — no UI code calls it and OrdersController:10 is JWT-only. **Test shape:** InvoicePdfReadyNotifierTests: flag enabled, NotifyAsync(invoice, order) → assert IEmailService received a send naming the invoice number for order.CustomerEmail. Red today (no IEmailService dependency, log-only body). **Trigger-list-shaped:** yes (adds an outbound email event, or removes a promised capability) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`5324a1c`, `beb7732` — the contradiction is resolved on the doc side plus a real route: ddd-02 now says the email is unshipped, and the confirmation page has a download button reading `GET /api/orders/{id}/invoice`. Story 003 (invoice by email) stays open as scope, not as a false claim
 
 ### PPW-598 — Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback
 
@@ -1413,6 +1422,7 @@ updated: 2026-08-24
 - **Suggested fix:** Clear PdfStoragePath (and StorageLocation) on retry so the worker re-renders, or correct DEPLOYMENT §15.7 to state that retry cannot re-render and give the real procedure. **Files:** `Services/Invoicing/InvoiceLifecycle.cs:165`, `Services/Invoicing/InvoiceLifecycle.cs:178`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:247`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:279`, `Controllers/AdminInvoicesController.cs:105`, `docs/DEPLOYMENT.md:1482`. **Path:** Invoice Rejected, PdfStoragePath="invoices/FT-1.pdf" holding bytes from the buggy renderer. Ops deploy the fix, POST retry: RetryAsync (line 178) nulls XmlPayload but leaves PdfStoragePath, status Pending. Worker tick reaches UploadPendingAsync; line 279 `if (string.IsNullOrEmpty(invoice.PdfStoragePath))` is false, so Render is never called and no new bytes are stored. Customers keep downloading the stale PDF via InvoicesController line 92. Worse: an Accepted invoice 409s at AdminInvoicesController line 105, so the documented path fails outright. **Test shape:** InvoiceUploadJobTests.Retry_ReRendersPdf: arrange Failed invoice with PdfStoragePath set and a counting IInvoicePdfRenderer; act RetryAsync then one worker tick; assert Render called once and stored bytes replaced. Reddens today (zero calls). **Trigger-list-shaped:** yes (changes what the retry resets, so it changes retry semantics) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — `RetryAsync` clears `PdfStoragePath`, so a fixed renderer actually re-renders; the test that pinned the kept path was retargeted
 
 ### PPW-599 — Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout
 
@@ -1421,6 +1431,7 @@ updated: 2026-08-24
 - **Suggested fix:** Add "XmlPayload" = NULL, "UnknownUploadOutcomes" = 0, "ClaimedAt" = NULL to the documented SQL, or replace it with a loop over the retry endpoint. **Files:** `docs/DEPLOYMENT.md:1531`, `Services/Invoicing/InvoiceLifecycle.cs:163`, `Services/Invoicing/InvoiceLifecycle.cs:119`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:247`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:267`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:364`. **Path:** `RetryAsync` (InvoiceLifecycle.cs:180-188) also nulls `XmlPayload` and zeroes `UnknownUploadOutcomes`; the §15.9 SQL sets neither. So: Failed row keeps its old-CUI XML → `UploadPendingAsync`'s `if (string.IsNullOrEmpty(invoice.XmlPayload))` (InvoiceUploadJob.cs:267) skips the rebuild, reposting the rejected XML after the Seller:Cui fix. And a row parked at outcomes=3 stays 3, so one `AnafUploadTimeoutException` increments to 4 ≥ max (InvoiceLifecycle.cs:119-138) and re-parks on the first timeout. **Test shape:** InvoiceUploadJobTests.DocumentedBatchRetryFieldsAlone_RepostsStaleXmlAndParksOnFirstTimeout: seed Failed row (stale XmlPayload, UnknownUploadOutcomes=3); set only AnafStatus/AnafUploadId/LastError as §15.9 does; run tick with timeout client; assert xmlBuilder never called and status==Failed. **Trigger-list-shaped:** no (a documented SQL statement) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — the documented batch SQL now also clears `XmlPayload`, `PdfStoragePath`, `UnknownUploadOutcomes` and `ClaimedAt`, with a comment saying why each one matters
 
 ### PPW-600 — FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts
 
@@ -1430,6 +1441,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
   - v12: owner regraded 🟠 to 🔴 on 2026-08-24 — with PPW-604 it means an ANAF outage can let the filing deadline lapse while the only dashboard panel shows nothing wrong
+  - v13: fixed @`6977d5b` — Rejected rows re-enter the batch on cumulative `BackoffHours` milestones from `CreatedAt` (ADR-024, no persisted counter) and reach Failed through `GiveUpOnRejectedAsync` when the schedule is spent. Reverting the dispatch reddens two of the three new tests
 
 ### PPW-601 — system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule
 
@@ -1447,6 +1459,7 @@ updated: 2026-08-24
 - **Suggested fix:** Send a Retry-After matching Anaf:PollIntervalMinutes, and either kick the worker on the Paid transition or restate the NFR in the bolt docs. **Files:** `Controllers/InvoicesController.cs:68`, `Controllers/WebhooksController.cs:449`, `Services/Invoicing/InvoiceCreationService.cs:90`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:279`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:54`, `appsettings.json:102`. **Path:** Webhook `SaveOrderPaidWithInvoiceAsync` (line 449) inserts the Invoice with `AnafStatus=Pending` and no `PdfStoragePath`. The only renderer is `InvoiceUploadJob.UploadPendingAsync` Step 2 (line 279-289), driven by a `PeriodicTimer` at `PollIntervalMinutes` = 30 (appsettings.json:102, AnafSettings default). So: pay, GET the invoice, hit line 66 -> `Retry-After: 30` (seconds) while the PDF is up to 30 minutes away; a failed row adds another cooldown interval. **Test shape:** InvoicesControllerTests.Invoice404_RetryAfter_MatchesProducerInterval: arrange paid order + Pending invoice, PollIntervalMinutes=30; act GET invoice; assert Retry-After seconds >= 1800. Reddens today (returns 30). **Trigger-list-shaped:** yes (either re-times the producer or wakes the background job) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — the 404 carries a `Retry-After` of `Anaf:PollIntervalMinutes`, so the hint matches the only producer of the PDF
 
 ### PPW-603 — The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable
 
@@ -1465,6 +1478,7 @@ updated: 2026-08-24
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
   - v12: owner regraded 🟠 to 🔴 on 2026-08-24 — with PPW-600 it means an ANAF outage is invisible: no metric marks a stuck or retrying invoice
+  - v13: fixed @`32d4eee` — a `retrying` value joins `invoice_anaf_status_total` on the unreachable, upload-error and auth branches; the cardinality budget was raised deliberately from 4 to 5 and metrics.md no longer calls the instrument future
 
 ### PPW-605 — Manual admin mark-Paid issues a fiscal invoice with no log naming the admin
 
@@ -1473,6 +1487,7 @@ updated: 2026-08-24
 - **Suggested fix:** Log admin.order.mark-paid with admin_user_id, order_id and the committed invoice_number, matching AdminInvoicesController's admin_user_id convention. **Files:** `Controllers/AdminOrdersController.cs:52`, `Services/AdminOrderService.cs:154`, `Services/AdminOrderService.cs:428`, `Services/Invoicing/InvoiceCreationService.cs:96`, `Extensions/SerilogExtensions.cs:9`, `Controllers/AdminInvoicesController.cs:74`. **Path:** Admin (user U) PATCHes /status Paid on an order with PaidAt null. UpdateStatusAsync:149-155 calls SaveWithInvoiceAsync, which commits Invoice FT-2026-000123. Emitted logs: InvoiceCreationService:96 (order_id, invoice_number) and the default Serilog request log (method/path/status/elapsed only — SerilogExtensions adds no user enricher). No admin_user_id anywhere, no metric. Contrast AdminInvoicesController:74, which logs admin_user_id even for a list. **Test shape:** AdminOrderStatusTests.MarkPaid_LogsIssuingAdmin: arrange admin-authenticated PATCH status=Paid on unpaid order with a capturing ILogger; act; assert a log event carries admin_user_id plus the new invoice_number. Reddens — no such event exists. **Trigger-list-shaped:** no (one audit log line) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — `admin.order.mark-paid` carries admin_user_id, order_id, order_number and the committed invoice_number; the id is passed from the controller rather than through a new HttpContext dependency
 
 ### PPW-606 — Only the pre-commit attempted invoice number is logged; the committed number is never logged
 
@@ -1490,6 +1505,7 @@ updated: 2026-08-24
 - **Suggested fix:** Strip/reject XML-invalid chars and truncate inside InvoiceXmlBuilder (covers product name, size, finish, AWB note, seller); also add TextValidation.HasNoXmlInvalidChars plus a length rule to the product/size/finish validators. **Files:** `Services/Invoicing/InvoiceXmlBuilder.cs:204`, `Services/Invoicing/InvoiceXmlBuilder.cs:67`, `Validators/Admin/CreateProductRequestValidator.cs:10`, `Validators/TextValidation.cs:10`, `Services/OrderService.cs:89`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:269`. **Path:** CreateProductRequestValidator.Name has only NotEmpty+MaximumLength (no TextValidation.HasNoXmlInvalidChars, unlike address/name validators). Admin saves name "PosterMare"; OrderService.cs:89 snapshots it; InvoiceUploadJob:269 builds the Item/Name from it. I ran the builder's exact writer setup: XmlTextWriter emits `Poster&#xB;Mare` without throwing, and XDocument.Parse of that output throws "hexadecimal value 0x0B, is an invalid character". The bad XML is persisted to XmlPayload and re-sent each tick. Caveat: retries are budget-capped, not literally forever; the description is also untruncated (>100 chars possible). **Test shape:** InvoiceXmlBuilderTests.ProductNameWithControlChar_StillProducesParseableXml: arrange an order whose ProductSnapshot.ProductName contains (char)0x0B; act Build(...); assert XDocument.Parse(UTF8 bytes) succeeds and Item/Name has no 0x0B. Reddens today with XmlException. **Trigger-list-shaped:** no (character filtering and truncation in the builder and validators) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — input-validation, completeness-critic, convergence 2, verdict confirmed
+  - v13: fixed @`166230a` — every field routed through the address formatter drops XML-invalid characters, and the UBL line description is wrapped in it
 
 ### PPW-608 — Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry
 
@@ -1498,6 +1514,7 @@ updated: 2026-08-24
 - **Suggested fix:** Add AwaitingPayment: ['Paid', 'Cancelled', 'PaymentFailed'] to NEXT_STATUSES and confirm the mark-Paid action in the template.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict plausible. Mechanically true: status 'AwaitingPayment' misses NEXT_STATUSES, nextStatuses is [], and html:114's @if hides the card. But it is not a failure — the admin state-machine page's own rule (line 90) tells admins exactly this: manual Paid marking for offline reconciliation "exists only via the API — the panel has no button for it." Behaviour matches the documented contract, so this is a feature gap, not a defect. Guard hunt: No guard. NEXT_STATUSES (admin-order-detail-page.ts:19-23) has no AwaitingPayment key, so nextStatuses is [] and the "Schimbă status" card is hidden by @if in admin-order-detail-page.html:114. That page is the only UI caller of AdminService.updateOrderStatus. The closest thing is documentation, not a check: admin-state-machine-page.ts:90 states manual marking as Paid "există doar prin API — panoul nu are buton pentru ea", confirming the gap.
+  - v13: fixed @`add7611` — `NEXT_STATUSES` gains `AwaitingPayment: [Paid, PaymentFailed, Cancelled]`, so an offline transfer can be reconciled from the UI the API already supported
 
 ### PPW-609 — One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent
 
@@ -1533,6 +1550,7 @@ updated: 2026-08-24
 - **Suggested fix:** Add Validators.maxLength mirroring the server caps plus a group-level combined street+number+block <=150 validator and maxlength attributes on the inputs. **Files:** `src/app/features/checkout/pages/delivery-step.ts:336`, `src/app/features/checkout/pages/delivery-step.ts:354`, `src/app/features/checkout/pages/review-step.ts:187`, `src/app/core/services/checkout-state.service.ts:52`, `src/app/features/checkout/pages/payment-step.ts:188`, `Validators/Payments/CreateOrderRequestValidator.cs:42`. **Path:** Type street = 140 chars, number "12", block "Bl A2 Sc 1 Ap 45" (combined 160 > 150). addressForm only has Validators.required (+phone rules), so it is VALID, canContinue() true, "Continuă" navigates; review-step validates only the terms checkbox; isDeliveryComplete() checks non-blank only. payment-step's initStripe POSTs, FluentValidation auto-validation returns 400, and the error callback shows "Nu s-a putut crea sesiunea de plată. Verificați că aveți articole în coș." City > 50 behaves identically. **Test shape:** delivery-step.spec.ts: "blocks continue when street+number+block exceed 150 chars" — patch addressForm with a 140-char street, number, long block; expect canContinue() false (and a length field-error). Currently true, so it reddens. **Trigger-list-shaped:** no (client validators mirroring server caps) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — input-validation, frontend-ux, convergence 2, verdict confirmed
+  - v13: fixed @`5cd48a5` — the checkout address form mirrors the server caps, including a group-level combined street length, so an over-long field fails where it is typed
 
 ### PPW-613 — VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate
 
@@ -1541,6 +1559,7 @@ updated: 2026-08-24
 - **Suggested fix:** Add netTotalRon/vatRon/vatRate to the FE model and render a 'TVA (19%)' line on the review, confirmation and order-detail totals. **Files:** `src/app/core/models/order.model.ts:33`, `src/app/features/orders/pages/order-detail-page.ts:91`, `src/app/features/orders/pages/confirmation-page.ts:41`, `src/app/features/checkout/pages/review-step.ts:57`, `DTOs/Orders/OrderDetailDto.cs:8`, `Controllers/InvoicesController.cs:38`. **Path:** GET /api/orders/{id} returns NetTotalRon/VatRon/VatRate (OrderDetailDto.cs:8-10). order.model.ts:33 omits all three; order-detail-page.ts:91-101 renders Subtotal/Transport/Total, confirmation-page.ts:41 only Total, review-step.ts:57 Subtotal/Transport/Total. UI-wide grep for vatRon|vatRate|netTotalRon = zero hits; "TVA" = one static pricing-page sentence. The customer invoice-PDF endpoint (InvoicesController:38) is called by no UI service either. No runtime error — pure disclosure gap; VAT never reaches the customer's screen. **Test shape:** order-detail-page.spec.ts "renders the TVA line": arrange stub order with vatRon 19.44, vatRate 0.19; render component; assert host text contains "TVA" and "19.44". Reddens today — template has no TVA row. **Trigger-list-shaped:** no (three model fields and a template line) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: fixed @`6812453` — order detail and the confirmation page render a TVA line from the server `vatRon`/`vatRate`; the payment-status DTO carries the two fields, and the review step is deliberately left out (no order exists yet, so the rate would have to be hardcoded in the SPA)
 
 ### PPW-614 — Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total
 
@@ -1549,6 +1568,7 @@ updated: 2026-08-24
 - **Suggested fix:** Block method selection until both costs resolve (or re-read the cost inside selectMethod), and surface an error when getShippingCost fails instead of silently keeping the defaults. **Files:** `src/app/features/checkout/pages/delivery-step.ts:327`, `src/app/features/checkout/pages/delivery-step.ts:363`, `src/app/features/checkout/pages/delivery-step.ts:445`, `src/app/core/services/checkout-state.service.ts:25`, `src/app/features/checkout/pages/review-step.ts:62`, `Services/OrderService.cs:100`. **Path:** Set Shipping:EasyboxCostRon=15. On /checkout/livrare ngOnInit fires GET /shipping/cost with no error callback; easyboxCostRon stays 20 while pending (or forever if it 500s). User clicks Easybox now: selectMethod stores 20 via setMethod, persisted to sessionStorage. Nothing re-syncs when 15 arrives. Recap renders Transport 20.00 and Total subtotal+20; OrderService.cs:100 re-derives 15 (client can't send it — DetectLegacyShippingCostFilter), so charge and invoice line read 15. **Test shape:** delivery-step.spec: "stores the server cost, not the 20 RON default" — arrange HttpTestingController without flushing (or flush an error), click the Easybox radio, then flush {costRon:15}; assert checkoutState.snapshot.shippingCostRon === 15. **Trigger-list-shaped:** yes (gates the delivery-step state machine on a pending call) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: fixed @`6812453` — the cost signals start null, both cards stay disabled until the server answers, a failure offers a retry, and a price arriving after a restored method updates the stored cost without wiping the locker or address
 
 ### PPW-615 — A non-succeeded, non-error Stripe result leaves the user stranded with no feedback
 
@@ -1567,6 +1587,7 @@ updated: 2026-08-24
 - **Suggested fix:** Align SavedAddressValidator and the Angular form to InvoiceAddressFormatter.CityNameMaxLength / PartyNameMaxLength, and add maxlength attributes plus client validators mirroring the server caps. **Files:** `Validators/Account/SavedAddressValidator.cs:26`, `Validators/Payments/CreateOrderRequestValidator.cs:45`, `Services/Invoicing/InvoiceAddressFormatter.cs:8`, `Data/PhotoPrintDbContext.cs:436`, `src/app/features/checkout/pages/delivery-step.ts:340`, `src/app/features/checkout/pages/delivery-step.ts:429`. **Path:** Save an address with a 60-char city: SavedAddressValidator caps City at 100 and the column is HasMaxLength(100), so it persists. At checkout, prefillFromSavedAddress patches city into addressForm, whose city control is `['', Validators.required]` only, and the input has no maxlength attribute — form valid, Continue enabled. POST create-order hits CreateOrderRequestValidator line 45, MaximumLength(50) → 400 on a field the user never typed, with no hint. **Test shape:** CreateOrderRequestValidator_rejects_city_that_SavedAddressValidator_accepts: arrange a 60-char city; assert SavedAddressValidator passes while CreateOrderRequest fails on ShippingAddress.City — reddens once both share CityNameMaxLength (plus UI spec: prefilled 60-char city leaves addressForm invalid). **Trigger-list-shaped:** no (aligns two validators and the form) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — completeness-critic, convergence 1, verdict confirmed
+  - v13: fixed @`5cd48a5` — the saved-address city cap is aligned to `InvoiceAddressFormatter.CityNameMaxLength`, so a prefill cannot carry an over-long value into checkout
 
 ### PPW-617 — The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test
 
@@ -1833,6 +1854,7 @@ updated: 2026-08-24
 - **Suggested fix:** Drop the "future" markers, note the increment sites in InvoiceUploadJob, and pick a different never-incremented example for the dashboard caveat.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict unverified-cleanup
+  - v13: fixed @`6977d5b` — metrics.md drops the "future" marker, documents the new `retrying` value and corrects the series counts
 
 ### PPW-650 — Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done
 
