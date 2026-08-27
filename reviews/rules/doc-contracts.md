@@ -179,6 +179,14 @@ also carries the scope table. Rationale that deserves prose goes under
 defect proposed at this round's gate from outside the finding set. `verified` is
 not a legal value in the Status column.
 
+Rounds closed on/after the 2026-08-28 cut-off: the scope table's columns are
+Cluster · Findings · Files · **Protocol** — the old free-text Approach-check
+column is retired (the check is a machine-read worklog event). The Protocol
+cell names the cluster's `### Protocol — <label>` block under `Decisions`, or
+`—`. A protocol block states at least one quantified invariant ("never",
+"at most one", "exactly once"); one describing only mechanisms is spec-theatre
+and the gate refuses it. The block counts as a decision (≤ 15 lines).
+
 ### summary-v<n>.md — template `templates/summary.md`
 
 Audience: the owner. Frontmatter: `type`, `target`, `pass`, `pass-type`,

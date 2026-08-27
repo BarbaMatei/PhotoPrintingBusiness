@@ -18,11 +18,20 @@ closed: <yyyy-mm-dd>
 
 ## Scope
 
-| Cluster | Findings | Files | Approach-check |
+| Cluster | Findings | Files | Protocol |
 |---|---|---|---|
-| A — <label> | PPW-<n>, PPW-<n> | `<paths>` | <needed: link, or "not needed (<reason>)"> |
+| A — <label> | PPW-<n>, PPW-<n> | `<paths>` | <label of the cluster's "### Protocol — <label>" block, or —> |
 
 ## Decisions
+
+### Protocol — <label>
+
+<The cluster's spec, written at triage BEFORE any of its fixes: the states, the
+invariant(s) — each with a quantifier ("never", "at most one", "exactly once") —
+and the ordered rules for who mints/retires/cancels what. The approach-check
+critiques this block, and the cluster's tests include one invariant test over
+the composed flows. Required when two or more serious findings share a stateful
+surface; the checks are gated on worklog events (doc-contracts.md).>
 
 ### <One-line decision title (PPW-<n>)>
 

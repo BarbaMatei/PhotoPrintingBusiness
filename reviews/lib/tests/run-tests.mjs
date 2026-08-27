@@ -60,6 +60,18 @@ const firstLine = out => out.split('\n')[0]
   for (const e of expected) check(`doc-gate reports: ${e}`, r.out.includes(e), 'not in the gate output')
 }
 
+// ---------- doc-gate: the V4 resolution shape (audit R1/R2, rounds closed >= 2026-08-28) ----------
+{
+  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '923-newshape', '1'])
+  check('doc-gate accepts a post-cutoff resolution with a Protocol column and a quantified protocol block', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '924-oldshape', '1'])
+  check('doc-gate refuses the retired Approach-check column after the cut-off', r.code === 1 && r.out.includes('Approach-check column — retired 2026-08-28'), r.out.trim())
+  check('doc-gate requires the Protocol column after the cut-off', r.out.includes('no Protocol column'), r.out.trim())
+  check('doc-gate refuses a protocol block with no quantified invariant', r.out.includes('protocol block "vague" states no quantified invariant'), r.out.trim())
+}
+
 // ---------- doc-gate state mode ----------
 {
   const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, 'state'])
