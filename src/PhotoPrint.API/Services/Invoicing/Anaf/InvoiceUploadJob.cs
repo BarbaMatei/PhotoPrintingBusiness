@@ -404,7 +404,17 @@ public sealed class InvoiceUploadJob : BackgroundService
                 _logger.LogError(ex,
                     "anaf.upload-job.submitted-but-not-recorded invoice_id={InvoiceId} anaf_upload_id={AnafUploadId}",
                     invoiceId, result.UploadId);
-                throw;
+
+                var lost = await lifecycle.RecordUnknownUploadOutcomeAsync(
+                    invoiceId,
+                    $"Uploaded to ANAF as {result.UploadId} but the status write failed: {ex.Message}",
+                    BudgetSpentMessage(ex),
+                    _maxUnknownUploadOutcomes,
+                    ct);
+                IncrementAnafStatusMetric(lost.Parked
+                    ? MetricNames.AnafStatusValues.Failed
+                    : MetricNames.AnafStatusValues.Retrying);
+                return;
             }
 
             if (ok) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Pending);

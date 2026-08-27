@@ -112,7 +112,7 @@ public class AdminOrderService : IAdminOrderService
 
     public async Task<AdminOrderDetailDto> UpdateStatusAsync(
         Guid orderId, string statusStr, string? awbNumber, string? trackingUrl,
-        CancellationToken ct = default)
+        Guid? adminUserId = null, CancellationToken ct = default)
     {
         if (!Enum.TryParse<OrderStatus>(statusStr, true, out var newStatus))
             throw new BadRequestException($"Unknown order status '{statusStr}'.");
@@ -150,6 +150,8 @@ public class AdminOrderService : IAdminOrderService
             order.PaidAt = DateTimeOffset.UtcNow;
             paidOutcome = await SaveWithInvoiceAsync(order, ct);
             savedWithInvoice = true;
+            if (paidOutcome == PaidSaveOutcome.Created)
+                await LogManualInvoiceIssueAsync(order, adminUserId, ct);
         }
 
         if (!savedWithInvoice)
@@ -410,6 +412,19 @@ public class AdminOrderService : IAdminOrderService
     }
 
     // Only Created may run the caller's Paid side effects; the webhook's own enum is private and pinned by a test that reflects on it.
+    // Outside the payment processors this is the only line that can answer who issued a fiscal number.
+    private async Task LogManualInvoiceIssueAsync(Order order, Guid? adminUserId, CancellationToken ct)
+    {
+        var invoiceNumber = await _db.Invoices
+            .Where(i => i.OrderId == order.Id)
+            .Select(i => i.InvoiceNumber)
+            .FirstOrDefaultAsync(ct);
+
+        _logger.LogInformation(
+            "admin.order.mark-paid admin_user_id={AdminUserId} order_id={OrderId} order_number={OrderNumber} invoice_number={InvoiceNumber} total_ron={TotalRon}",
+            adminUserId, order.Id, order.OrderNumber, invoiceNumber, order.TotalRon);
+    }
+
     private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
 
     // Mirrors the webhook Paid path: a concurrent delivery or taken number must not 500 an admin status change.

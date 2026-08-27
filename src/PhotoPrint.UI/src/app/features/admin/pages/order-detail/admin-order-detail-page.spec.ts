@@ -96,6 +96,15 @@ describe('AdminOrderDetailPage', () => {
     expect(component).toBeTruthy();
   });
 
+  // An offline bank transfer is reconciled by hand, and the API has always supported it.
+  it('offers Paid for an order that is still awaiting payment', () => {
+    fixture.detectChanges();
+    flushOrder({ ...MOCK_ORDER, status: 'AwaitingPayment', paidAt: null });
+    fixture.detectChanges();
+
+    expect(component.nextStatuses).toContain('Paid');
+  });
+
   it('loads order detail on init', () => {
     fixture.detectChanges();
     flushOrder();

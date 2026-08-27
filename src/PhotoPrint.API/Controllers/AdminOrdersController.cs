@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PhotoPrint.API.Extensions;
 using PhotoPrint.API.DTOs.Admin;
 using PhotoPrint.API.Services;
 
@@ -50,7 +51,8 @@ public class AdminOrdersController(IAdminOrderService adminOrderService) : Contr
         CancellationToken cancellationToken = default)
     {
         var detail = await adminOrderService.UpdateStatusAsync(
-            id, request.Status, request.AwbNumber, request.TrackingUrl, cancellationToken);
+            id, request.Status, request.AwbNumber, request.TrackingUrl,
+            User.GetUserIdOrNull(), cancellationToken);
         return Ok(detail);
     }
 

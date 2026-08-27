@@ -1,6 +1,9 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Models;
@@ -19,20 +22,23 @@ public sealed class InvoicesController : ControllerBase
 {
     private readonly PhotoPrintDbContext _db;
     private readonly IStorageRouter _storageRouter;
+    private readonly AnafSettings _anafSettings;
     private readonly ILogger<InvoicesController> _logger;
 
     public InvoicesController(
-        PhotoPrintDbContext db, IStorageRouter storageRouter, ILogger<InvoicesController> logger)
+        PhotoPrintDbContext db, IStorageRouter storageRouter,
+        IOptions<AnafSettings> anafSettings, ILogger<InvoicesController> logger)
     {
         _db = db;
         _storageRouter = storageRouter;
+        _anafSettings = anafSettings.Value;
         _logger = logger;
     }
 
     /// <summary>
     /// GET /api/orders/{orderId}/invoice → PDF stream.
-    /// 404 when the Invoice row or PDF is not yet present (carries
-    /// <c>Retry-After: 30</c> per story 003 acceptance criteria).
+    /// 404 when the Invoice row or PDF is not yet present, carrying a
+    /// <c>Retry-After</c> that matches the background poll interval — the only producer of the PDF.
     /// 403 when the caller is not the order owner.
     /// </summary>
     [HttpGet]
@@ -74,7 +80,9 @@ public sealed class InvoicesController : ControllerBase
 
         if (invoice is null || string.IsNullOrEmpty(invoice.PdfStoragePath))
         {
-            Response.Headers["Retry-After"] = "30";
+            // The background poll is the only producer of the PDF, so a shorter hint just burns requests.
+            var retryAfterSeconds = Math.Max(30, _anafSettings.PollIntervalMinutes * 60);
+            Response.Headers["Retry-After"] = retryAfterSeconds.ToString(CultureInfo.InvariantCulture);
             return NotFound();
         }
 

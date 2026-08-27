@@ -393,7 +393,7 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(i => i.InvoiceNumber).HasMaxLength(50);
             entity.Property(i => i.Series).HasMaxLength(10);
             entity.Property(i => i.AnafStatus).HasConversion<string>().HasMaxLength(30);
-            entity.Property(i => i.AnafUploadId).HasMaxLength(100);
+            entity.Property(i => i.AnafUploadId).HasMaxLength(Invoice.AnafUploadIdMaxLength);
             entity.Property(i => i.PdfStoragePath).HasMaxLength(500);
             // Int-stored like Upload.StorageLocation, the other exception to the enums-as-strings rule.
             entity.Property(i => i.StorageLocation)

@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Authentication;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Controllers;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
@@ -45,7 +47,7 @@ public class InvoicesControllerTests
         MakeControllerWithClaim(db, router, new Claim(ClaimTypes.NameIdentifier, userId.ToString()), logs);
 
     private static InvoicesController MakeAdminController(PhotoPrintDbContext db, IStorageRouter router, LogCapture? logs = null) =>
-        new(db, router, logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
+        new(db, router, AnafOptions(), logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
         {
             ControllerContext = new ControllerContext
             {
@@ -62,8 +64,35 @@ public class InvoicesControllerTests
     private static InvoicesController MakeGuestController(PhotoPrintDbContext db, IStorageRouter router, Guid guestSessionId) =>
         MakeControllerWithClaim(db, router, new Claim(GuestAuthenticationHandler.GuestSessionIdClaimType, guestSessionId.ToString()));
 
+    [Fact]
+    public async Task GetInvoice_PdfNotRenderedYet_SendsARetryAfterMatchingTheProducerInterval()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00099",
+            AnafStatus = InvoiceAnafStatus.Pending,
+        });
+        await _db.SaveChangesAsync();
+
+        var controller = MakeController(_db, new Mock<IStorageRouter>().Object, userId);
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+        controller.Response.Headers["Retry-After"].ToString().Should().Be("1800",
+            "the 30-minute poll is the only producer of the PDF, so a 30-second hint just burns requests");
+    }
+    private static int _pollIntervalMinutes = 30;
+
+    private static IOptions<AnafSettings> AnafOptions() =>
+        Options.Create(new AnafSettings { PollIntervalMinutes = _pollIntervalMinutes });
+
     private static InvoicesController MakeControllerWithClaim(PhotoPrintDbContext db, IStorageRouter router, Claim claim, LogCapture? logs = null) =>
-        new(db, router, logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
+        new(db, router, AnafOptions(), logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
         {
             ControllerContext = new ControllerContext
             {

@@ -173,7 +173,7 @@ public class InvoiceLifecycleTests : IClassFixture<PostgresTestDatabase>, IDispo
         fresh.AnafUploadId.Should().BeNull();
         fresh.LastError.Should().BeNull();
         fresh.XmlPayload.Should().BeNull();
-        fresh.PdfStoragePath.Should().Be("invoices/2026/FT-2026-00001.pdf");
+        fresh.PdfStoragePath.Should().BeNull();
     }
 
     [Fact]
@@ -257,6 +257,21 @@ public class InvoiceLifecycleTests : IClassFixture<PostgresTestDatabase>, IDispo
         var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
         fresh.UnknownUploadOutcomes.Should().Be(0);
         fresh.ClaimedAt.Should().BeNull("the operator's retry has to hand the row to the next tick, not to a stale claim");
+    }
+
+    // Ops fix a renderer bug and retry; a kept path means the broken PDF is served for ever.
+    [Fact]
+    public async Task Retry_clears_the_rendered_pdf_so_the_worker_renders_it_again()
+    {
+        var id = await SeedInvoiceAsync(InvoiceAnafStatus.Failed,
+            pdfStoragePath: "invoices/2026/FT-2026-00001.pdf");
+
+        var ok = await _sut.RetryAsync(id, InvoiceAnafStatus.Failed, CancellationToken.None);
+
+        ok.Should().BeTrue();
+        var fresh = await _db.Invoices.AsNoTracking().FirstAsync(i => i.Id == id);
+        fresh.PdfStoragePath.Should().BeNull(
+            "the worker only renders when the path is empty, so the runbook retry cannot re-render otherwise");
     }
 
     [Fact]

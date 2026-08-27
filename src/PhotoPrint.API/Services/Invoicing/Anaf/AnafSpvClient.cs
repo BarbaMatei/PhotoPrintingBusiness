@@ -2,6 +2,7 @@ using System.Net;
 using System.Xml.Linq;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Models;
 
 namespace PhotoPrint.API.Services.Invoicing.Anaf;
 
@@ -96,6 +97,12 @@ public sealed class AnafSpvClient : IAnafSpvClient
 
         if (string.IsNullOrWhiteSpace(indexAttr))
             throw new AnafUploadException("ANAF upload response missing 'index_incarcare'.");
+
+        // A proxy error page can parse as XML; an over-long id would fail the status write, not the upload.
+        if (indexAttr.Length > Invoice.AnafUploadIdMaxLength)
+            throw new AnafUploadException(
+                $"ANAF upload response 'index_incarcare' is {indexAttr.Length} characters, " +
+                $"over the {Invoice.AnafUploadIdMaxLength} this system stores.");
 
         _logger.LogInformation("anaf.spv.upload upload_id={UploadId}", indexAttr);
         return new AnafUploadResult(indexAttr, _clock.GetUtcNow());

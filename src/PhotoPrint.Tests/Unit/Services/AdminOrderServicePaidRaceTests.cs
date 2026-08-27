@@ -120,6 +120,26 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         _awb.Verify(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // Asked later who issued a fiscal number outside the processors, only this line can answer.
+    [Fact]
+    public async Task ManualPaid_LogsTheAdminWhoIssuedTheInvoice()
+    {
+        var orderId = await SeedAwaitingPaymentAsync();
+        var adminUserId = Guid.NewGuid();
+
+        using var db = _database.NewContext();
+        var logs = new LogCapture();
+        var sut = BuildService(db, RealCreator(db, new FixedNumbering(910)),
+                               logs.LoggerFor<AdminOrderService>());
+
+        await sut.UpdateStatusAsync(orderId, "Paid", null, null, adminUserId);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("admin.order.mark-paid", StringComparison.Ordinal) &&
+                 r.Message.Contains(adminUserId.ToString()) &&
+                 r.Message.Contains("FT-2026-00910"));
+    }
+
     [Fact]
     public async Task ManualPaid_LosingTheRaceBeforeTheInsert_KeepsTheWebhookPaidAtAndFiresNoSideEffects()
     {
@@ -197,7 +217,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         var logger = new CancellingLogger(logs, "admin.order.invoice-already-created", cts);
         var sut = BuildService(db, creator, logger);
 
-        var dto = await sut.UpdateStatusAsync(orderId, "Paid", null, null, cts.Token);
+        var dto = await sut.UpdateStatusAsync(orderId, "Paid", null, null, null, cts.Token);
 
         dto.Should().NotBeNull();
         logs.Records.Should().ContainSingle(
@@ -275,7 +295,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
             logs, "admin.order.invoice-number-collision-exhausted", cts);
         var sut = BuildService(db, RealCreator(db, new FixedNumbering(701)), logger);
 
-        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null, cts.Token);
+        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null, null, cts.Token);
 
         await act.Should().ThrowAsync<ConflictException>();
         logs.Records.Should().ContainSingle(

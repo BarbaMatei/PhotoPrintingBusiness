@@ -177,7 +177,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
     public async Task<bool> RetryAsync(
         Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default)
     {
-        // PdfStoragePath stays untouched — clearing it would re-trigger the customer "ready" notification once that integration ships, and it plays no role in the ANAF path.
+        // PdfStoragePath is cleared so the worker re-renders: ops fix a renderer bug and retry, and a kept path would serve the broken PDF for ever.
         var before = await _db.Invoices
             .Where(i => i.Id == invoiceId)
             .Select(i => new { i.XmlPayload, i.LastError })
@@ -197,6 +197,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
                 .SetProperty(i => i.AnafUploadId, (string?)null)
                 .SetProperty(i => i.LastError,    (string?)null)
                 .SetProperty(i => i.XmlPayload,   (string?)null)
+                .SetProperty(i => i.PdfStoragePath, (string?)null)
                 .SetProperty(i => i.UnknownUploadOutcomes, 0)
                 .SetProperty(i => i.ClaimedAt,    (DateTimeOffset?)null)
                 .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),

@@ -1529,10 +1529,17 @@ If the result is empty: no gaps, nothing to explain. If the result lists numbers
 **Batch retry** (no built-in endpoint — use the admin UI loop or a one-shot SQL):
 ```sql
 -- Flip all Failed invoices from a specific date back to Pending. The worker picks up next tick.
+-- Every column below matters: keeping XmlPayload reposts the same rejected XML, keeping
+-- PdfStoragePath serves the old PDF, and keeping UnknownUploadOutcomes re-parks the row on its
+-- first timeout. A stale ClaimedAt makes the worker skip the row until the claim TTL expires.
 UPDATE "Invoices"
    SET "AnafStatus" = 'Pending',
        "AnafUploadId" = NULL,
        "LastError" = NULL,
+       "XmlPayload" = NULL,
+       "PdfStoragePath" = NULL,
+       "UnknownUploadOutcomes" = 0,
+       "ClaimedAt" = NULL,
        "UpdatedAt" = NOW()
  WHERE "AnafStatus" = 'Failed'
    AND "CreatedAt" >= '2026-06-01';

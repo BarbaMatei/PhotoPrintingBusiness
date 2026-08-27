@@ -340,7 +340,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     }
 
     [Fact]
-    public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyAndRethrows()
+    public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyWithoutRethrowing()
     {
         var database = _database;
         var logs = new LogCapture();
@@ -354,7 +354,8 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
 
         var act = () => InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().NotThrowAsync(
+            "a rethrow leaves the row Pending and claimed, so the next tick files a duplicate");
         logs.Records.Should().ContainSingle(
             r => r.Level == LogLevel.Error &&
                  r.Message.StartsWith("anaf.upload-job.submitted-but-not-recorded", StringComparison.Ordinal) &&
@@ -443,6 +444,29 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
                     (MetricNames.Labels.Status, MetricNames.AnafStatusValues.Retrying))
                .Should().HaveCount(1, "an outage that emits nothing looks like an idle queue");
         metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    // ANAF holds the document and we lost its id, so re-posting files a duplicate under a new number.
+    [Fact]
+    public async Task UploadPendingAsync_StatusWriteFailsAfterASuccessfulUpload_CountsItAsAnUnknownOutcome()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: false);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("index-42", DateTimeOffset.UtcNow));
+        h.Lifecycle.Setup(l => l.MarkSubmittedAsync(invoiceId, "index-42", It.IsAny<CancellationToken>()))
+                   .ThrowsAsync(new InvalidOperationException("value too long for type character varying(100)"));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.Lifecycle.Verify(l => l.RecordUnknownUploadOutcomeAsync(
+            invoiceId,
+            It.Is<string>(m => m.Contains("index-42")),
+            It.IsAny<string>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
