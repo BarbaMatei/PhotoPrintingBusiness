@@ -80,4 +80,13 @@ describe('PaymentService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({});
   });
+  it('fetches the invoice as a file, so the guest token travels with the request', () => {
+    service.downloadInvoice('order-9').subscribe();
+
+    const req = http.expectOne(r => r.url.endsWith('/orders/order-9/invoice'));
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+    expect(req.request.headers.get('X-Guest-Token')).toBe('guest-token-1');
+    req.flush(new Blob(['%PDF-1.4']));
+  });
 });

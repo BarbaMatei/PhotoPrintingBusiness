@@ -81,6 +81,20 @@ const MAX_SETTLE_POLLS = 10;
           </div>
         </div>
 
+        <div class="invoice-actions">
+          <button
+            type="button"
+            class="btn btn--ghost download-invoice"
+            [disabled]="invoiceLoading()"
+            (click)="downloadInvoice()"
+          >
+            {{ invoiceLoading() ? 'Se descarcă...' : 'Descarcă factura' }}
+          </button>
+          @if (invoiceMessage()) {
+            <p class="invoice-message">{{ invoiceMessage() }}</p>
+          }
+        </div>
+
         <!-- CTA based on auth state -->
         @if (!isAuthenticated()) {
           <div class="guest-cta">
@@ -221,6 +235,8 @@ export class ConfirmationPage implements OnInit {
   readonly loading = signal(true);
   readonly order = signal<OrderPaymentStatusDto | null>(null);
   readonly settling = signal<OrderPaymentStatusDto | null>(null);
+  readonly invoiceMessage = signal<string | null>(null);
+  readonly invoiceLoading = signal(false);
 
   private polls = 0;
 
@@ -269,6 +285,38 @@ export class ConfirmationPage implements OnInit {
         this.settling.set(null);
       },
     });
+  }
+
+  // A guest has no order list, so this page is their only route to a legally required document.
+  downloadInvoice(): void {
+    this.invoiceLoading.set(true);
+    this.invoiceMessage.set(null);
+
+    this.paymentService.downloadInvoice(this.orderId()).subscribe({
+      next: blob => {
+        this.invoiceLoading.set(false);
+        this.saveBlob(blob);
+      },
+      error: (err: { status?: number }) => {
+        this.invoiceLoading.set(false);
+        this.invoiceMessage.set(
+          err?.status === 404
+            ? 'Factura se pregătește. Încercați din nou în câteva minute.'
+            : 'Factura nu a putut fi descărcată. Încercați din nou mai târziu.',
+        );
+      },
+    });
+  }
+
+  private saveBlob(blob: Blob): void {
+    const order = this.order();
+    const name = order ? `factura-${order.orderNumber}.pdf` : 'factura.pdf';
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   isAtLeast(status: string): boolean {

@@ -30,6 +30,7 @@ function makeOrder(status: string): OrderPaymentStatusDto {
 
 describe('ConfirmationPage', () => {
   let getPaymentStatus: ReturnType<typeof vi.fn>;
+  let downloadInvoice: ReturnType<typeof vi.fn>;
 
   function setup(overrides: {
     orderStatus?: string;
@@ -55,6 +56,7 @@ describe('ConfirmationPage', () => {
     getPaymentStatus = vi.fn().mockReturnValue(
       orderError ? throwError(() => new HttpErrorResponse({ status: 404 })) : of(makeOrder(orderStatus)),
     );
+    downloadInvoice = vi.fn().mockReturnValue(of(new Blob(['%PDF-1.4'])));
 
     const mockAuth = {
       isAuthenticated: vi.fn().mockReturnValue(isAuthenticated),
@@ -77,7 +79,7 @@ describe('ConfirmationPage', () => {
             paramMap: of(convertToParamMap({ orderId: 'order-1' })),
           },
         },
-        { provide: PaymentService, useValue: { getPaymentStatus } },
+        { provide: PaymentService, useValue: { getPaymentStatus, downloadInvoice } },
         { provide: AuthService, useValue: mockAuth },
         { provide: CheckoutStateService, useValue: mockState },
         { provide: CartService, useValue: mockCart },
@@ -244,5 +246,23 @@ describe('ConfirmationPage', () => {
 
     expect(getPaymentStatus.mock.calls.length).toBe(1);
     expect(fixture.debugElement.query(By.css('.state-error'))).not.toBeNull();
+  });
+  it('offers the invoice to a guest, the only route they have to it', () => {
+    const fixture = setup({ orderStatus: 'Paid', submitted: true });
+    fixture.detectChanges();
+
+    const button = fixture.debugElement.query(By.css('.download-invoice'));
+    expect(button).not.toBeNull();
+  });
+
+  it('says the invoice is still being prepared when it is not ready yet', () => {
+    const fixture = setup({ orderStatus: 'Paid', submitted: true });
+    fixture.detectChanges();
+
+    downloadInvoice.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+    fixture.componentInstance.downloadInvoice();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.invoiceMessage()).not.toBeNull();
   });
 });

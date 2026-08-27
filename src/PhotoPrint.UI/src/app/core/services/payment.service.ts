@@ -26,4 +26,10 @@ export class PaymentService {
   getPaymentStatus(orderId: string): Observable<OrderPaymentStatusDto> {
     return this.http.get<OrderPaymentStatusDto>(`${this.ordersBase}/${orderId}/payment-status`);
   }
+
+  // Fetched rather than linked: the endpoint authenticates a guest by header, which a plain
+  // anchor cannot send.
+  downloadInvoice(orderId: string): Observable<Blob> {
+    return this.http.get(`${this.ordersBase}/${orderId}/invoice`, { responseType: 'blob' });
+  }
 }
