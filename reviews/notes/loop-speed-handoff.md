@@ -66,6 +66,9 @@ rules landed outside the measured ranges. Targets stand: ≤15 min/fix, ≥90% f
 - **T17** future-ideas script backlog in `self-driving-loop-design.md`.
 - **T18** sandbox replay against the 2026-08-21 records + final whole-branch review.
 
+After phase 6: **Phase 7 — restructure the machinery into named subsystems**, owner-approved
+2026-08-28 and planned in [machinery-restructure-plan.md](machinery-restructure-plan.md).
+
 T14+T15 and T16+T17 can run as two parallel doc dispatches (disjoint files); T18's
 sandbox replay is already done for the renderer half (below) and needs only the
 speed-report run and the final whole-branch review. Estimated remaining effort:
