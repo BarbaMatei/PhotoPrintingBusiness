@@ -69,6 +69,21 @@ const REVIEWED_UNIT = 'NEXT: verification (reviewed unit — render records once
   check('the reviewed unit is not re-armed by the rows its own verification will close',
     !r.out.includes('NEXT: fix round'), r.out.trim())
 }
+// A round that answers a verification pass leaves the verification as the newest metrics line, so
+// routing on that line re-fixes findings the round already fixed: the stand-down reads the records,
+// not the line, and row 3 outranks both the ledger rows and the verification-results row.
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '953-round-answers-verification'])
+  check('a round answering a verification pass routes to its verification, not another fix round',
+    r.code === 0 && r.out.includes(REVIEWED_UNIT) && !r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check('the stale verification line does not arm the loop over the resolved round',
+    !r.out.includes('the loop is armed') && r.out.includes('resolution-v2 resolved, not yet re-reviewed (row 3)'), r.out.trim())
+}
+for (const gate of ['certification-go-ahead', 'delta-worthiness']) {
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '953-round-answers-verification', 'decide', gate])
+  check(`the policy neither arms nor sweeps at the ${gate} gate while the round awaits its verification`,
+    !r.out.includes('the loop is armed') && !r.out.includes('sweep before certification'), r.out.trim())
+}
 {
   const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '901-good-target'])
   check('the verification answer names the reviewed unit and keeps its cost line',

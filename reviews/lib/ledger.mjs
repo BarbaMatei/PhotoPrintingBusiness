@@ -11,7 +11,6 @@ const ROW = /^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|\n]*\|[^|\n]*\|[
 const ID_ROW = /^\|\s*PPW-\d+\s*\|/gm
 
 // null when the target has no ledger at all: callers fall back to their pre-ledger behaviour.
-// `idRows` is every row that opens with an id, parsed or not, so a caller can report the gap.
 export function readLedger(file) {
   if (!existsSync(file)) return null
   const text = readFileSync(file, 'utf8')
@@ -21,11 +20,11 @@ export function readLedger(file) {
 
 export const openIds = (rows, sev) => rows.filter(r => r.sev === sev && OPEN_STATUSES.includes(r.status)).map(r => r.id)
 
-// The one rule for when the ledger is NOT the authority on open work: a resolved resolution
-// answering the latest review whose verification has not run yet. Its round's records render
-// after that verification, so its rows still read open|in-progress — verify the round, do not
-// re-route it. Every caller asks here so the router and the policy cannot drift apart.
-export function standsDown(dir, latestPassType) {
+// The one rule for when the ledger is NOT the authority on open work: the newest resolution reads
+// `resolved` and its round has no fix-round line yet, so the round's records (and the ledger flips
+// they carry) are still pending its verification — the same window records-auditor.mjs calls
+// resolved-no-line. Every caller asks here so the auditor, the router and the policy agree.
+export function standsDown(dir) {
   const files = readdirSync(dir)
   const newest = re => {
     const ns = files.map(f => re.exec(f)).filter(Boolean).map(m => Number(m[1]))
@@ -35,5 +34,10 @@ export function standsDown(dir, latestPassType) {
   if (!RN || RN < newest(/^review-v(\d+)\.md$/)) return false
   const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, `resolution-v${RN}.md`), 'utf8'))
   const status = block ? /^status:\s*(.+?)\s*$/m.exec(block[1])?.[1] ?? null : null
-  return status === 'resolved' && latestPassType !== 'verification'
+  if (status !== 'resolved') return false
+  const metrics = join(dir, 'metrics.jsonl')
+  if (!existsSync(metrics)) return true
+  return !readFileSync(metrics, 'utf8').split(/\r?\n/).filter(l => l.trim())
+    .map(l => { try { return JSON.parse(l) } catch { return null } })
+    .some(l => l && !l.correction_for && l.type === 'fix-round' && l.round === RN)
 }

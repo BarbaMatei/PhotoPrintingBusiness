@@ -88,22 +88,13 @@ function certificationBlocker(targetDir) {
   }
 }
 
-function latestPassType() {
-  const metricsPath = join(dir, 'metrics.jsonl')
-  if (!existsSync(metricsPath)) return null
-  const lines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
-    .map(l => { try { return JSON.parse(l) } catch { return null } })
-    .filter(l => l && !l.correction_for)
-  return lines.length ? lines[lines.length - 1].type ?? null : null
-}
-
 // Open ledger work outranks any answer that would launch a certification — and only those
 // answers, so a delta-worthy round is judged first and keeps its delta discovery. Silent on a
 // target with no ledger, on a round awaiting its verification, and at the loop-close gate:
 // 🟠 open at close roll into the backlog by design.
 function openWork() {
   const led = readLedger(join(dir, 'ledger.md'))
-  if (!led || standsDown(dir, latestPassType())) return null
+  if (!led || standsDown(dir)) return null
   const high = openIds(led.rows, '🔴')
   if (high.length) return `the loop is armed — ${high.length} open 🔴 (${high.join(', ')})`
   const medium = openIds(led.rows, '🟠')

@@ -80,6 +80,7 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 |---|---|
 | No `review-v1.md` | **Full discovery** |
 | The ledger frontmatter carries `closed:` | **Terminal** — loop done; the target stays under watch |
+| The newest resolution reads `resolved` and `metrics.jsonl` carries no fix-round line for its round | **Verification** — runs at the round's tip; round + verification are one **reviewed unit** with one set of records and one doc gate. This row outranks every row below it: until the unit's records render, both the open ledger rows and the latest metrics line describe work the round has already answered |
 | An open 🔴 in the ledger · a reopened fix on the latest line · a still-open fix-caused 🟠 regression (its lineage on a verification line's `findings[]`) | **Fix round now** (quiet counter resets) |
 | ≥ 3 open non-regression 🟠 in the ledger | **Fix round** (the batch) |
 | 1–2 open non-regression 🟠 | **Queued** — proceed as if quiet; the sweep row fires before certification |
@@ -87,7 +88,7 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | Certification passed on the latest pass, no post-cert fix round pending | **Close the loop** (owner gate) — open 🟠 stand down here and roll into the backlog² |
 | Latest line is a verification with reopened fixes, or with serious findings still open | **Fix round** |
 | Latest line is a clean verification | **Judgment call**: delta-worthy¹ → **delta discovery**; patch-grade → loop **quiet** |
-| Resolution `resolved`, not yet re-reviewed | **Verification** — runs at the round's tip; round + verification are one **reviewed unit** with one set of records and one doc gate |
+| Resolution `resolved`, its round's records already rendered, not yet re-reviewed | **Verification** — the same reviewed unit, entered from a target whose records were rendered before the verification (legacy order) |
 | Resolution `open` or `in-progress` answering the latest review | **Fix round** |
 | Open serious findings with no resolution answering the latest review | **Fix round** |
 | Loop quiet, any 🟠 still open (queued or not) | **Sweep round**, then its verification, then certification |
@@ -101,7 +102,12 @@ verification runs immediately at the round's tip, in the same driver invocation,
 writes one set of records and passes one doc gate. The verifier is never the fixer. The threshold
 (3) and the sweep guarantee no 🟠 outlives the loop: queued findings still block certification.
 While a resolved round waits for its verification the ledger is not read for open work — its rows
-still read `open`, because the unit's records render only after the verification.
+still read `open`, because the unit's records render only after the verification. That wait is what
+the top verification row means, and it outranks the armed rows and the verification-results rows:
+a round that answers a **verification** pass raises no review file, so the newest metrics line
+stays that verification and would otherwise re-route the loop onto findings the round just fixed.
+The mechanical test for the wait is the newest resolution reading `resolved` with no fix-round line
+for its round — the same window `records-auditor.mjs` reports as "unit records pending".
 
 **Where the convergence rule bites.** The design-pass gate sits inside the router's fix-round
 helper. It can therefore intercept only the four fix-round rows that go through that helper: the

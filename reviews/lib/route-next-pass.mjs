@@ -182,15 +182,18 @@ if (led) {
   if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
 }
 
-const pendingVerification = standsDown(t.dir, L.type)
-// 🟠 still open when a certification passes is the documented norm — they roll into the backlog at
-// close — so they must not pre-empt the owner's close decision. A 🔴 arms the loop even here.
+// Row 3 outranks every ledger row and the verification-results row: while the newest resolution is
+// resolved with its round's records unrendered, the open rows are the ones that verification will
+// close, and the latest metrics line is the round's own review or verification, not its answer.
+if (standsDown(t.dir)) {
+  say(`ROUTER: resolution-v${RN} resolved, not yet re-reviewed (row 3).`)
+  finish(0, 'verification (reviewed unit — render records once, after it)', null)
+}
+// 🟠 open at a passing certification roll into the backlog, so they never pre-empt the owner's close.
 const atLoopClose = L.outcome === 'certified' && L.pass === N && (!RN || RN < N)
 let queued = []
-if (led && !pendingVerification) {
+if (led) {
   // A fix-caused 🟠 re-arms the loop where a plain 🟠 would queue — for as long as it stays open.
-  // The lineage sits on the verification line that found it, which newer passes never rewrite, so
-  // every verification line is read; the ledger status is what says whether it is still live.
   const regression = lines.filter(l => l.type === 'verification')
     .flatMap(l => l.findings ?? [])
     .find(f => f && f.fix_generated != null && f.sev === 'medium' && openMedium.includes(f.d))
@@ -211,9 +214,7 @@ if (led && !pendingVerification) {
     queued = openMedium
   }
 }
-// What the later rows must treat as still-open serious work. The metrics tally counts every
-// medium its pass filed for the life of the line, queued ones included, so a ledger'd target
-// counts the ledger: 🔴 always, 🟠 only once the queue is a batch.
+// Still-open serious work for the later rows: a ledger'd target counts 🔴 always, 🟠 only as a batch.
 const openSerious = led
   ? openHigh.length + (openMedium.length >= QUEUE_THRESHOLD ? openMedium.length : 0)
   : serious
