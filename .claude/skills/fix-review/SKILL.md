@@ -48,7 +48,13 @@ and nowhere else.
    `reviews/`). If ambiguous, list `reviews/*/` and ask which one.
 2. In `reviews/<target>/`, find the **highest** `review-v<n>.md` and its paired
    `resolution-v<n>.md`. If the resolution file is missing, create it from the review's
-   finding list (all `status: open`) before starting — copy `reviews/templates/resolution.md`.
+   finding list (all `status: open`) before starting —
+   `node reviews/lib/mint-id.mjs scaffold-resolution <target> --version <n>` seeds it from
+   `review-v<n>.md`'s findings table and `reviews/templates/resolution.md`. A round that answers
+   a **verification** pass has no review file of its own: its round number is the next free
+   resolution version (so it runs ahead of the newest review), its Findings rows are seeded from
+   the reopened and new ids that verification recorded on the ledger, and the file is hand-copied
+   from the template — `scaffold-resolution` needs a review file and refuses without one.
 3. Read the review's frontmatter `blockers:` list and its findings table (id, severity,
    location). The defect detail lives on each id's **ledger detail block** — What / Evidence /
    Suggested fix / History; serious findings' Suggested-fix lines carry the **Fix brief**

@@ -3,7 +3,9 @@
 // content is the next free PPW-<n>, doc-contracts.md rule 3). `scaffold-ledger` appends a
 // Findings row + a Details block to a target's ledger.md, reading templates/ledger.md at
 // runtime to build a fresh one when absent. `scaffold-resolution` seeds resolution-v<N>.md
-// from review-v<N>.md's findings table, reading templates/resolution.md at runtime. Reading
+// from review-v<N>.md's findings table, reading templates/resolution.md at runtime — so it serves
+// review-answering rounds only; a round answering a verification pass has no review file and its
+// resolution is hand-copied from the template. Reading
 // the templates (not hand-duplicated strings) means a template edit reaches every scaffold
 // without a script change.
 //
@@ -51,10 +53,7 @@ function mint(counterPath, opts) {
   if (!opts.dryRun) writeFileSync(counterPath, `${b + 1}\n`)
 }
 
-// Builds a fresh ledger.md from templates/ledger.md: keeps its frontmatter (minus `closed:`,
-// absent while the loop is open) and its Findings/Details headings + table header, drops the
-// template's illustrative example row and detail block. Always LF — there is no pre-existing
-// file whose bytes need preserving.
+// Builds a fresh ledger.md from templates/ledger.md, dropping the template's illustrative rows.
 function freshLedger(target, templatesDir) {
   const lines = readFileSync(join(templatesDir, 'ledger.md'), 'utf8').split(/\r?\n/)
   const fmClose = lines.findIndex((l, i) => i > 0 && l === '---')
@@ -91,9 +90,7 @@ function scaffoldLedger(reviewsDir, target, opts, templatesDir) {
   const raw = existing ? readFileSync(ledgerPath, 'utf8') : freshLedger(target, templatesDir)
   if (existing && new RegExp(`\\b${id}\\b`).test(raw)) fail(`${id} already exists in ${ledgerPath}`)
 
-  // A Windows checkout keeps real ledgers CRLF: splitting on plain '\n' leaves the '\r' on
-  // every existing line untouched, so only the lines we insert need one added to match their
-  // neighbours (render-records.mjs's crOf pattern) — every pre-existing byte stays as-is.
+  // Real ledgers are CRLF: split on '\n' so every pre-existing byte survives and only new lines need a '\r'.
   const lines = raw.split('\n')
   const cr = lines.some(l => l.endsWith('\r')) ? '\r' : ''
   const detailsAt = lines.findIndex(l => strip(l) === '## Details')
@@ -120,10 +117,7 @@ function scaffoldLedger(reviewsDir, target, opts, templatesDir) {
   console.log(`MINT-ID: ${existing ? 'appended' : 'created'} ${ledgerPath} (${id})`)
 }
 
-// Reads templates/resolution.md at runtime: fills the frontmatter scalars (drops `closed:`),
-// replaces the Findings table's one illustrative row with one row per id, and keeps Scope and
-// Decisions — including the template's "### Protocol — <label>" block — verbatim, since
-// neither is named as filled by the caller.
+// Reads templates/resolution.md at runtime, keeping Scope and Decisions (Protocol block included) verbatim.
 function resolutionSkeleton(target, N, ids, templatesDir) {
   const lines = readFileSync(join(templatesDir, 'resolution.md'), 'utf8').split(/\r?\n/)
   const fmClose = lines.findIndex((l, i) => i > 0 && l === '---')
