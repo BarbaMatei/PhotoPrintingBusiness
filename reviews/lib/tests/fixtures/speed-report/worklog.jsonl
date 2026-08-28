@@ -1,0 +1,483 @@
+{"t":"2026-08-13T07:08:25Z","ev":"pass-launch","pass":"v1","type":"full discovery"}
+{"t":"2026-08-13T07:35:00Z","ev":"check-dispatched","pass":"v1","count":9,"note":"trigger-list-shaped suggested fixes: PPW-471,475,476,477,480,486,488,489,490 — adversarial approach-checks per runbook-discovery synthesis step 2"}
+{"t":"2026-08-13T07:52:00Z","ev":"check-returned","pass":"v1","count":9,"verdicts":"9 revised, 0 cleared, 0 refuted"}
+{"t":"2026-08-13T07:53:00Z","ev":"supplemental-check","pass":"v1","scope":"VatCalculator.cs + OrderService.cs VAT wiring — closing the manifest-completeness gap PPW-497 named","result":"VAT rounding math itself clean; surfaced new defect PPW-478 (UBL line amounts gross not net)"}
+{"t":"2026-08-13T08:02:00Z","ev":"check-dispatched","pass":"v1","count":1,"note":"trigger-list-shaped suggested fix for PPW-478 (money-field semantics change)"}
+{"t":"2026-08-13T08:08:00Z","ev":"check-returned","pass":"v1","count":1,"verdicts":"1 revised, 0 cleared, 0 refuted"}
+{"t":"2026-08-13T08:15:00Z","ev":"pass-records-done","pass":"v1"}
+{"t":"2026-08-13T08:45:00Z","ev":"doc-gate","pass":"v1","verdict":"approve","rounds":5,"note":"lint clean throughout; Sonnet judge disapproved rounds 1-4 (heading/title mismatches, unauthorized metrics-schema vocabulary in prose, approach-check naming, index.md sentence/word caps, filename-as-link-text, dense multi-id sentences) — approved round 5"}
+{"t":"2026-08-13T12:08:42+03:00","ev":"round-start","round":1}
+{"t":"2026-08-13T12:11:26+03:00","ev":"gate-open","round":1,"reason":"3 scope decisions: PPW-472 email integration scope, PPW-489 ANAF retry mitigation, PPW-493 Postgres test feasibility (no Docker locally)"}
+{"t":"2026-08-13T12:14:42+03:00","ev":"gate-closed","round":1,"answers":{"PPW-472":"ship flag off, document honestly","PPW-489":"accept documented tolerance, no code change","PPW-493":"write test now, prove in CI"}}
+{"t":"2026-08-13T12:14:43+03:00","ev":"triage-done","round":1,"clusters":25,"checks_needed":0,"pre_cleared":10,"gates":3}
+{"t":"2026-08-13T12:27:41+03:00","ev":"finding","id":"PPW-469","status":"fixed","commit":"04eb38e"}
+{"t":"2026-08-13T12:27:41+03:00","ev":"test-run","kind":"final","filter":"InvoicesControllerTests","passed":2,"failed":0}
+{"t":"2026-08-13T12:27:41+03:00","ev":"finding","id":"PPW-470","status":"fixed","commit":"f8daa1e"}
+{"t":"2026-08-13T12:27:41+03:00","ev":"test-run","kind":"final","filter":"InvoiceUploadJobTests","passed":2,"failed":0}
+{"t":"2026-08-13T12:52:56+03:00","ev":"finding","id":"PPW-471","status":"fixed","commit":"e38537d"}
+{"t":"2026-08-13T12:52:56+03:00","ev":"finding","id":"PPW-490","status":"fixed","commit":"e38537d"}
+{"t":"2026-08-13T12:52:56+03:00","ev":"test-run","kind":"final","filter":"WebhooksControllerInvoiceRaceTests+WebhooksControllerMetricsTests+PaymentIdempotencyRelationalTests+PaymentControllerIntegrationTests+PostgresInvoiceNumberingServiceIntegrationTests","passed":134,"failed":0}
+{"t":"2026-08-13T12:56:12+03:00","ev":"finding","id":"PPW-472","status":"fixed","commit":"4aa73d5"}
+{"t":"2026-08-13T12:59:09+03:00","ev":"finding","id":"PPW-473","status":"fixed","commit":"e7a1169"}
+{"t":"2026-08-13T13:17:59+03:00","ev":"finding","id":"PPW-474","status":"fixed","commit":"7539dcd"}
+{"t":"2026-08-13T13:21:45+03:00","ev":"finding","id":"PPW-475","status":"fixed","commit":"a33e6d3"}
+{"t":"2026-08-13T13:30:50+03:00","ev":"finding","id":"PPW-476","status":"fixed","commit":"e693baf"}
+{"t":"2026-08-13T13:46:09+03:00","ev":"finding","id":"PPW-477","status":"fixed","commit":"d50f897"}
+{"t":"2026-08-13T13:51:28+03:00","ev":"finding","id":"PPW-478","status":"fixed","commit":"94cd056"}
+{"t":"2026-08-13T13:52:59+03:00","ev":"finding","id":"PPW-479","status":"fixed","commit":"faa7dcb"}
+{"t":"2026-08-13T13:55:15+03:00","ev":"finding","id":"PPW-480","status":"fixed","commit":"bd4d8ba"}
+{"t":"2026-08-13T13:56:46+03:00","ev":"finding","id":"PPW-481","status":"fixed","commit":"82ab013"}
+{"t":"2026-08-13T13:58:29+03:00","ev":"finding","id":"PPW-482","status":"fixed","commit":"881b101"}
+{"t":"2026-08-13T14:07:45+03:00","ev":"finding","id":"PPW-483","status":"fixed","commit":"d24a115"}
+{"t":"2026-08-13T14:12:09+03:00","ev":"finding","id":"PPW-484","status":"fixed","commit":"ed031dc"}
+{"t":"2026-08-13T14:21:26+03:00","ev":"finding","id":"PPW-485","status":"fixed","commit":"0ccb7d6"}
+{"t":"2026-08-13T14:30:13+03:00","ev":"finding","id":"PPW-486","status":"fixed","commit":"8928e09"}
+{"t":"2026-08-13T14:34:11+03:00","ev":"finding","id":"PPW-487","status":"fixed","commit":"5450505"}
+{"t":"2026-08-13T14:39:08+03:00","ev":"finding","id":"PPW-488","status":"fixed","commit":"e7a9f71"}
+{"t":"2026-08-13T14:39:56+03:00","ev":"finding","id":"PPW-489","status":"wont-fix","commit":null}
+{"t":"2026-08-13T14:43:00+03:00","ev":"finding","id":"PPW-491","status":"fixed","commit":"c748d40"}
+{"t":"2026-08-13T14:45:30+03:00","ev":"finding","id":"PPW-492","status":"fixed","commit":"bc8e5a4"}
+{"t":"2026-08-13T14:49:24+03:00","ev":"finding","id":"PPW-493","status":"fixed","commit":"7cde815"}
+{"t":"2026-08-13T14:50:45+03:00","ev":"round-end","round":1}
+{"t":"2026-08-13T15:08:16+03:00","ev":"doc-gate","verdict":"approve","round":1}
+{"t":"2026-08-13T15:09:40+03:00","ev":"test-run","kind":"final","filter":"Controllers|Services.Invoicing|AdminOrderServiceTests|Validators|PostgresInvoiceNumberingServiceIntegrationTests","passed":180,"failed":0,"skipped":3,"note":"true cross-namespace final run before hand-back; earlier test-run stamps in this round covered only individual clusters"}
+{"t":"2026-08-13T15:26:03+03:00","ev":"pass-launch","pass":2,"type":"verification","commit":"7cde815","code_tip":"11dfb8e","note":"independent verification of resolution-v1; fresh session, not the fixer. Stamp is the first hard-evidenced moment of the pass (baseline test run); the doc-reading prefix before it is unstamped"}
+{"t":"2026-08-13T15:26:24+03:00","ev":"test-run","kind":"baseline","filter":"Unit.Controllers|Unit.Services.Invoicing|AdminOrderServiceTests|Unit.Validators|PostgresInvoiceNumberingServiceIntegrationTests","passed":180,"failed":0,"skipped":3}
+{"t":"2026-08-13T15:27:00+03:00","ev":"test-run","kind":"revert-and-rerun","note":"21 scoped runs, one per fixed finding leg; every run reddened exactly the predicted test set with zero collateral","red_runs":21,"green_runs":1}
+{"t":"2026-08-13T15:41:00+03:00","ev":"check-dispatched","target":"PPW-489","note":"anchored judgment-item checker on AnafResilienceHandler.cs + AnafSpvClient.cs delta since e724528"}
+{"t":"2026-08-13T15:42:00+03:00","ev":"check-returned","target":"PPW-489","verdict":"stands","tokens":30516}
+{"t":"2026-08-13T15:44:00+03:00","ev":"finding","id":"PPW-483","status":"reopened","note":"regression test cannot go red — reintroducing the re-query left all 6 InvoiceCreationServiceTests green"}
+{"t":"2026-08-13T15:45:00+03:00","ev":"finding","id":"PPW-481","status":"reopened","note":"replacement docstring claims the XML/PDF build stays live with Anaf:Enabled=false; the sole caller is registered only when enabled"}
+{"t":"2026-08-13T15:46:00+03:00","ev":"finding","id":"PPW-493","status":"fixed","note":"not verified — SkippableFact cannot run locally (no Postgres server); gated on CI, which does provide one"}
+{"t":"2026-08-13T15:47:00+03:00","ev":"finding","id":"PPW-506","status":"open","sev":"medium","note":"new — config comment and rollout runbook still promise the customer invoice email PPW-472 documented as absent"}
+{"t":"2026-08-13T15:47:30+03:00","ev":"finding","id":"PPW-507","status":"open","sev":"low","note":"new — Anaf:ClaimTtlMinutes undocumented and unvalidated"}
+{"t":"2026-08-13T15:48:00+03:00","ev":"finding","id":"PPW-508","status":"open","sev":"low","note":"new — exhausted numbering retries now answer the processor 200 and count as duplicate"}
+{"t":"2026-08-13T15:51:21+03:00","ev":"pass-records-done","pass":2,"verdict":"approve-with-followups","verified":21,"reopened":2}
+{"t":"2026-08-13T15:57:42+03:00","ev":"round-start","round":2}
+{"t":"2026-08-13T15:59:18+03:00","ev":"triage-done","round":2,"clusters":2,"checks_needed":0,"pre_cleared":0,"gates":1}
+{"t":"2026-08-13T15:59:18+03:00","ev":"gate-open","round":2,"reason":"scope: router sends the 2 new 🟡 (PPW-507, PPW-508) to backlog, not this round; PPW-507 shares files with cluster A and PPW-508 is a fix-caused behaviour change — owner call whether to pull either in"}
+{"t":"2026-08-13T16:15:47+03:00","ev":"gate-closed","round":2,"reason":"no owner ruling received; fixer pulled PPW-507 and PPW-508 into scope on own judgment (shared files with cluster A; PPW-508 is a regression caused by this round-1 fix). Recorded in Decisions for owner overrule."}
+{"t":"2026-08-13T16:16:36+03:00","ev":"check-dispatched","round":2,"cluster":"D"}
+{"t":"2026-08-13T16:19:52+03:00","ev":"test-run","round":2,"kind":"green","filter":"InvoicePdfReadyNotifier|Unit.Services.Invoicing","passed":74,"failed":0}
+{"t":"2026-08-13T16:21:14+03:00","ev":"check-returned","round":2,"cluster":"D","verdict":"revised","tokens":88414}
+{"t":"2026-08-13T16:22:27+03:00","ev":"test-run","round":2,"kind":"red","filter":"InvoiceCreationServiceTests","passed":5,"failed":1}
+{"t":"2026-08-13T16:22:27+03:00","ev":"test-run","round":2,"kind":"green","filter":"InvoiceCreationServiceTests","passed":6,"failed":0}
+{"t":"2026-08-13T16:25:19+03:00","ev":"test-run","round":2,"kind":"red","filter":"AnafSettingsValidatorTests","passed":13,"failed":4}
+{"t":"2026-08-13T16:25:19+03:00","ev":"test-run","round":2,"kind":"green","filter":"AnafSettingsValidatorTests","passed":17,"failed":0}
+{"t":"2026-08-14T11:01:15+03:00","ev":"test-run","round":2,"kind":"red","filter":"WebhooksController","passed":22,"failed":1}
+{"t":"2026-08-14T11:01:15+03:00","ev":"test-run","round":2,"kind":"green","filter":"WebhooksController","passed":23,"failed":0}
+{"t":"2026-08-14T11:07:34+03:00","ev":"micro-review-dispatched","round":2,"cluster":"A-D"}
+{"t":"2026-08-14T11:08:57+03:00","ev":"micro-review-returned","round":2,"cluster":"A-D","found":9}
+{"t":"2026-08-14T11:12:22+03:00","ev":"test-run","round":2,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing|Unit.Configuration|Unit.Validators|AdminOrderServiceTests|PostgresInvoiceNumberingServiceIntegrationTests","passed":348,"failed":0,"skipped":3}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-481","status":"fixed","commit":"c726820"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-506","status":"fixed","commit":"c726820"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-483","status":"fixed","commit":"d15737a"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-507","status":"fixed","commit":"7458454"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"01fbdaf"}
+{"t":"2026-08-14T11:13:06+03:00","ev":"round-end","round":2}
+{"t":"2026-08-14T11:25:23+03:00","ev":"doc-gate","round":2,"verdict":"approve","note":"disapproved once on Decisions heading shape (multi-id heading, count and severity glyph in a title, one heading with no id); fixed and re-judged"}
+{"t":"2026-08-14T11:33:00+03:00","ev":"pass-launch","pass":3,"type":"verification","commit":"08e7746","note":"anchored per-fix check of resolution v2; worktree reset from a stale c09675d to 08e7746 before any reading"}
+{"t":"2026-08-14T11:36:12+03:00","ev":"test-run","pass":3,"kind":"baseline","filter":"InvoiceCreationServiceTests|AnafSettingsValidatorTests|WebhooksControllerInvoiceRaceTests","passed":30,"failed":0}
+{"t":"2026-08-14T11:38:40+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-483","note":"Order overload delegated back to the Guid overload","passed":29,"failed":1}
+{"t":"2026-08-14T11:40:31+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-507","note":"ClaimTtlMinutes bound deleted from AnafSettingsValidator","passed":26,"failed":4}
+{"t":"2026-08-14T11:42:09+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-508","note":"ResultLabelFor NumberExhausted mapped back to duplicate","passed":45,"failed":1}
+{"t":"2026-08-14T11:43:55+03:00","ev":"test-run","pass":3,"kind":"green","finding":"PPW-508","note":"both call sites reverted to created ? ok : duplicate, helper kept — defect reintroduced, nothing red","passed":23,"failed":0}
+{"t":"2026-08-14T11:45:20+03:00","ev":"test-run","pass":3,"kind":"green","finding":"PPW-508","note":"whole ReloadAsync rollback deleted — nothing red","passed":23,"failed":0}
+{"t":"2026-08-14T11:46:48+03:00","ev":"test-run","pass":3,"kind":"red","finding":"PPW-508","note":"Sentry capture removed","passed":22,"failed":1}
+{"t":"2026-08-14T11:48:05+03:00","ev":"test-run","pass":3,"kind":"final","note":"all sources restored","passed":46,"failed":0}
+{"t":"2026-08-14T11:49:30+03:00","ev":"test-run","pass":3,"kind":"final","filter":"InvoiceUploadJobTests|InvoicePdfReadyNotifierTests","note":"collateral check on the claim-TTL floor change","passed":16,"failed":0}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-481","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-483","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-506","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-507","status":"verified"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-508","status":"open","note":"reopened — two of three legs stay green when the defect is reintroduced"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-509","status":"open","note":"new — settings docstring still claims the pipeline runs unconditionally"}
+{"t":"2026-08-14T11:50:10+03:00","ev":"finding","id":"PPW-510","status":"open","note":"new — ADR-022 frozen while three live docs cite it as current"}
+{"t":"2026-08-14T11:56:00+03:00","ev":"pass-records-done","pass":3,"verdict":"approve-with-followups"}
+{"t":"2026-08-14T12:13:46+03:00","ev":"round-start","round":3}
+{"t":"2026-08-14T12:21:57+03:00","ev":"test-run","round":3,"kind":"red","filter":"WebhooksController (label reintroduced)","passed":23,"failed":1}
+{"t":"2026-08-14T12:21:57+03:00","ev":"test-run","round":3,"kind":"red","filter":"WebhooksController (rollback removed)","passed":23,"failed":1}
+{"t":"2026-08-14T12:21:57+03:00","ev":"test-run","round":3,"kind":"green","filter":"WebhooksController","passed":24,"failed":0}
+{"t":"2026-08-14T12:23:26+03:00","ev":"test-run","round":3,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing|Unit.Configuration","passed":278,"failed":0}
+{"t":"2026-08-14T12:23:26+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"0a250b9"}
+{"t":"2026-08-14T12:23:26+03:00","ev":"round-end","round":3}
+{"t":"2026-08-14T12:26:45+03:00","ev":"doc-gate","round":3,"verdict":"approve"}
+{"t":"2026-08-14T12:27:30+03:00","ev":"pass-launch","pass":4,"type":"verification","commit":"0a250b9","note":"anchored per-leg check of resolution v3; worktree reset from a stale c09675d to 8237945 before any reading. Test-run stamps up to 12:45 are reconstructed to the minute from run order, anchored on the 12:39:33 assertion timestamp the partial-unwind revert printed"}
+{"t":"2026-08-14T12:32:10+03:00","ev":"test-run","pass":4,"kind":"baseline","filter":"Unit.Controllers.WebhooksController","passed":24,"failed":0}
+{"t":"2026-08-14T12:34:20+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 1, Stripe call site put back to created ? ok : duplicate","passed":23,"failed":1}
+{"t":"2026-08-14T12:36:40+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 1, the legacy processor call site put back alone — defect reintroduced, nothing red, so the sibling site is unproven","passed":24,"failed":0}
+{"t":"2026-08-14T12:38:30+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 2, whole ReloadAsync block deleted — reddens on Status","passed":23,"failed":1}
+{"t":"2026-08-14T12:39:40+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 2, partial unwind of Status and PaidAt only — reddens on UpdatedAt, so that pin is live","passed":23,"failed":1}
+{"t":"2026-08-14T12:41:30+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 3 probe added, cancellation forced from the Sentry hub callback — passes with the fix in place","passed":9,"failed":0}
+{"t":"2026-08-14T12:42:40+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 3 probe against the pre-fix catch filter — OperationCanceledException escapes ReloadAsync, so a cheap test does exist","passed":8,"failed":1}
+{"t":"2026-08-14T12:44:20+03:00","ev":"test-run","pass":4,"kind":"red","note":"class check, RecordPaymentWebhook no-oped — 14 of 24 redden, only the assert-absence test survives","passed":10,"failed":14}
+{"t":"2026-08-14T12:45:40+03:00","ev":"test-run","pass":4,"kind":"final","filter":"Unit.Controllers.WebhooksController","note":"probe removed, all sources restored","passed":24,"failed":0}
+{"t":"2026-08-14T12:46:50+03:00","ev":"finding","id":"PPW-508","status":"open","note":"reopened — label and rollback legs hold, cancellation leg has no test and the reason given for that is false"}
+{"t":"2026-08-14T12:51:20+03:00","ev":"doc-gate","pass":4,"verdict":"approve"}
+{"t":"2026-08-14T12:52:00+03:00","ev":"pass-records-done","pass":4,"verdict":"approve-with-followups","verified":0,"reopened":1}
+{"t":"2026-08-14T13:35:40+03:00","ev":"round-start","round":4}
+{"t":"2026-08-20T14:51:06+03:00","ev":"test-run","round":4,"kind":"red","filter":"WebhooksController (OCE filter restored)","passed":24,"failed":1}
+{"t":"2026-08-20T14:51:06+03:00","ev":"test-run","round":4,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing","passed":114,"failed":0}
+{"t":"2026-08-20T14:51:44+03:00","ev":"finding","id":"PPW-508","status":"fixed","commit":"07b0c1b"}
+{"t":"2026-08-20T14:51:44+03:00","ev":"round-end","round":4}
+{"t":"2026-08-20T14:52:10+03:00","ev":"pass-launch","pass":5,"type":"verification","commit":"07b0c1b","code_tip":"ae122b9","note":"anchored per-leg check of resolution v4, the fourth attempt to prove PPW-508; fresh session, not the fixer. The worktree was created from a stale c09675d and was reset to ae122b9 before anything was read - the same trap the v2, v3 and v4 passes hit, now four passes running. `src/` is byte-identical between 07b0c1b and ae122b9, so the verified tree is the resolution fixed_commit. Test-run stamps are reconstructed to the minute from run order, anchored on the 14:58:55 assertion timestamp the partial-unwind revert printed"}
+{"t":"2026-08-20T14:56:30+03:00","ev":"test-run","pass":5,"kind":"baseline","filter":"Unit.Controllers.WebhooksController","passed":25,"failed":0}
+{"t":"2026-08-20T14:57:20+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 1, Stripe call site back to created ? ok : duplicate - reddens only StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid, on the Failed-count assertion","passed":24,"failed":1}
+{"t":"2026-08-20T14:58:25+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 2, whole ReloadAsync block deleted - reddens the endpoint test on Status and the new cancellation test on its missing rollback-reload-failed log","passed":23,"failed":2}
+{"t":"2026-08-20T14:58:55+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 2 finer revert, Status and PaidAt unwound but UpdatedAt left behind - reddens on UpdatedAt, so the pin bites","passed":23,"failed":2}
+{"t":"2026-08-20T14:59:30+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 3, old when (reloadEx is not OperationCanceledException) filter restored - reddens the cancellation test with System.OperationCanceledException raised at WebhooksController.cs:434 inside EntityEntry.ReloadAsync via GetDatabaseValuesAsync and NpgsqlCommand.ExecuteReaderAsync","passed":24,"failed":1}
+{"t":"2026-08-20T15:01:20+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-508","note":"cancellation test run 5 times alone at HEAD, 5 of 5 green - the cancel fires synchronously inside the capture callback, so there is no race window","passed":5,"failed":0}
+{"t":"2026-08-20T15:01:50+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-511","note":"the legacy processor call site put back alone - defect reintroduced, all 25 green, so that site is still proven by nothing; not reopened, per the owner ruling","passed":25,"failed":0}
+{"t":"2026-08-20T15:02:20+03:00","ev":"test-run","pass":5,"kind":"red","note":"class check, RecordPaymentWebhook no-oped - 14 of 25 redden; the only metric-asserting survivor is Stripe_unhandled_event_type_records_nothing, which asserts absence by design","passed":11,"failed":14}
+{"t":"2026-08-20T15:03:00+03:00","ev":"test-run","pass":5,"kind":"final","filter":"Unit.Controllers.WebhooksController","note":"all 8 source mutations reverted, tree clean","passed":25,"failed":0}
+{"t":"2026-08-20T15:06:30+03:00","ev":"finding","id":"PPW-508","status":"verified","commit":"07b0c1b","note":"all three legs redden on their own revert; the cancellation proof holds for the claimed reason, not incidentally"}
+{"t":"2026-08-20T15:07:10+03:00","ev":"finding","id":"PPW-511","status":"open","note":"new - the removal that two coverage waivers rest on is tracked nowhere, and definition-of-done class 2 still mandates the coverage"}
+{"t":"2026-08-20T15:09:30+03:00","ev":"doc-gate","pass":5,"verdict":"approve"}
+{"t":"2026-08-20T15:10:00+03:00","ev":"pass-records-done","pass":5,"verdict":"approve-with-followups","verified":1,"reopened":0}
+{"t":"2026-08-20T15:17:06+03:00","ev":"pass-launch","pass":6,"type":"delta-discovery"}
+{"t":"2026-08-20T15:43:42+03:00","ev":"pass-records-done","pass":6}
+{"t":"2026-08-20T15:57:19+03:00","ev":"round-start","round":5}
+{"t":"2026-08-20T15:57:19+03:00","ev":"gate-open","round":5,"reason":"owner ruled: skip Postgres-DB-coupled rows while a real Postgres instance is stood up and PostgreSQL is dropped. Confirm which rows that covers, and the PPW-524 no-SPA-consumer scope question."}
+{"t":"2026-08-20T15:59:59+03:00","ev":"gate-closed","round":5,"reason":"owner: fix PPW-513 SQL now and defer its proof; PPW-524 out of scope (park); leave PostgreSQL-coupled rows until PostgreSQL is dropped"}
+{"t":"2026-08-20T15:59:59+03:00","ev":"triage-done","round":5,"clusters":8,"checks_needed":3,"pre_cleared":0,"gates":1}
+{"t":"2026-08-20T16:01:49+03:00","ev":"check-dispatched","round":5,"cluster":"A-upload-job-resilience"}
+{"t":"2026-08-20T16:01:49+03:00","ev":"check-dispatched","round":5,"cluster":"B-webhook-metric-safety"}
+{"t":"2026-08-20T16:01:49+03:00","ev":"check-dispatched","round":5,"cluster":"D-storage-tier"}
+{"t":"2026-08-20T16:05:32+03:00","ev":"test-run","round":5,"kind":"red","filter":"InvoiceAddressFormatterTests","passed":6,"failed":2}
+{"t":"2026-08-20T16:05:32+03:00","ev":"test-run","round":5,"kind":"green","filter":"InvoiceAddressFormatterTests|InvoiceXmlBuilderTests|CreateOrderRequestValidatorTests","passed":47,"failed":0}
+{"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"A-upload-job-resilience","verdict":"revised"}
+{"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"B-webhook-metric-safety","verdict":"revised"}
+{"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"D-storage-tier","verdict":"revised"}
+{"t":"2026-08-20T16:09:37+03:00","ev":"check-returned","round":5,"cluster":"C-ubl-address-and-price","verdict":"revised"}
+{"t":"2026-08-20T16:09:37+03:00","ev":"round-end","round":5,"note":"paused mid-round: owner switched to feat/postgres-only-data-stack, whose Phase 1b deletes the whole migration chain and Phase 2 removes PostgreSQL, invalidating or reshaping several in-scope rows"}
+{"t":"2026-08-21T08:07:59+03:00","ev":"round-start","round":7,"note":"resumed after the SQLite drop; owner asked for the round to run to completion"}
+{"t":"2026-08-21T08:07:59+03:00","ev":"test-run","round":7,"kind":"red","filter":"RunTickAsync","passed":1,"failed":1}
+{"t":"2026-08-21T08:08:00+03:00","ev":"test-run","round":7,"kind":"green","filter":"InvoiceUploadJobTests","passed":16,"failed":0}
+{"t":"2026-08-21T08:12:01+03:00","ev":"test-run","round":7,"kind":"red","filter":"InvoiceNumberCollisionExhaustsRetries","passed":0,"failed":1}
+{"t":"2026-08-21T08:14:40+03:00","ev":"test-run","round":7,"kind":"red","filter":"InvoiceXmlBuilderTests","passed":14,"failed":3}
+{"t":"2026-08-21T08:21:48+03:00","ev":"test-run","round":7,"kind":"red","filter":"ProcessBatchAsync_AuthFails","passed":0,"failed":2}
+{"t":"2026-08-21T08:21:48+03:00","ev":"test-run","round":7,"kind":"green","filter":"InvoiceUploadJobTests|InvoiceLifecycleTests","passed":27,"failed":0}
+{"t":"2026-08-21T08:27:43+03:00","ev":"test-run","round":7,"kind":"red","filter":"CompositeSeriesYearNumberViolation","passed":0,"failed":1}
+{"t":"2026-08-21T08:27:43+03:00","ev":"test-run","round":7,"kind":"green","filter":"RaceTests|MigrationChainTests|InvoiceCreationServiceTests","passed":19,"failed":0}
+{"t":"2026-08-21T08:32:47+03:00","ev":"test-run","round":7,"kind":"red","filter":"GetInvoiceAsync_BlobIsMissing","passed":0,"failed":1}
+{"t":"2026-08-21T08:37:33+03:00","ev":"test-run","round":7,"kind":"red","filter":"RowThatJustFailed","passed":0,"failed":1}
+{"t":"2026-08-21T08:44:44+03:00","ev":"test-run","round":7,"kind":"red","filter":"UpdateStatusAsync_ManualPaid_Retries","passed":0,"failed":1}
+{"t":"2026-08-21T08:53:41+03:00","ev":"test-run","round":7,"kind":"red","filter":"unclassified_still_records","passed":1,"failed":1}
+{"t":"2026-08-21T08:55:59+03:00","ev":"test-run","round":7,"kind":"final","filter":"Unit.Controllers|Unit.Services.Invoicing|AdminOrderServiceTests|Unit.Configuration|Unit.Validators|MigrationChainTests","passed":366,"failed":0}
+{"t":"2026-08-21T08:57:02+03:00","ev":"finding","id":"PPW-512","status":"fixed","commit":"8b79a5a"}
+{"t":"2026-08-21T08:57:02+03:00","ev":"finding","id":"PPW-513","status":"fixed","commit":"8917f9f"}
+{"t":"2026-08-21T08:57:02+03:00","ev":"finding","id":"PPW-514","status":"fixed","commit":"6aabff9"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-515","status":"fixed","commit":"42e5988"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-517","status":"fixed","commit":"67df511"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-518","status":"fixed","commit":"084c579"}
+{"t":"2026-08-21T08:57:03+03:00","ev":"finding","id":"PPW-521","status":"fixed","commit":"8917f9f"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-522","status":"fixed","commit":"03f71c5"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-523","status":"fixed","commit":"7e4a215"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-527","status":"fixed","commit":"b108c25"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-529","status":"fixed","commit":"8aea0b7"}
+{"t":"2026-08-21T08:57:04+03:00","ev":"finding","id":"PPW-531","status":"fixed","commit":"8aea0b7"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-532","status":"fixed","commit":"5300b78"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-533","status":"fixed","commit":"5300b78"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-534","status":"fixed","commit":"8aea0b7"}
+{"t":"2026-08-21T08:57:05+03:00","ev":"finding","id":"PPW-535","status":"fixed","commit":"8917f9f"}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-516","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-520","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-524","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:06+03:00","ev":"finding","id":"PPW-525","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-528","status":"deferred","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-519","status":"disputed","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-526","status":"wont-fix","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"finding","id":"PPW-530","status":"false-positive","commit":null}
+{"t":"2026-08-21T08:57:07+03:00","ev":"round-end","round":7}
+{"t":"2026-08-21T08:07:59+03:00","ev":"round-start","round":6,"note":"correction: the resumed round was stamped round 7 above, but it answers resolution-v6. Same span, correct number; the round-7 events stay as written because the worklog is append-only."}
+{"t":"2026-08-21T08:57:07+03:00","ev":"round-end","round":6}
+{"t":"2026-08-21T09:18:35+03:00","ev":"run-start"}
+{"t":"2026-08-21T09:19:18+03:00","ev":"pass-launch","pass":6,"type":"verification"}
+{"t":"2026-08-21T09:45:55+03:00","ev":"pass-records-done","pass":6,"verdict":"approve-with-followups","verified":16,"reopened":0}
+{"t":"2026-08-21T10:07:49+03:00","ev":"doc-gate","verdict":"disapprove","round":1,"reason":"PPW-513 proof misattributed by verify-fixes on a bundled fix commit; two wording defects"}
+{"t":"2026-08-21T10:12:01+03:00","ev":"doc-gate","verdict":"approve","round":2}
+{"t":"2026-08-21T10:15:47+03:00","ev":"round-start","round":8,"note":"fix round answering the v6 verification pass; records land in resolution-v7.md. Round number 8 because round 7 was already stamped (in error) by the v6 fix round"}
+{"t":"2026-08-21T10:19:01+03:00","ev":"triage-done","round":8,"clusters":2,"checks_needed":2,"pre_cleared":0,"gates":0,"note":"two 🟠 from the v6 verification pass; PPW-552 (🟡) stays backlog, out of scope"}
+{"t":"2026-08-21T10:19:01+03:00","ev":"check-dispatched","cluster":"B","finding":"PPW-551","note":"cross-tick outage window — trigger list (cache + retry semantics)"}
+{"t":"2026-08-21T10:19:01+03:00","ev":"check-dispatched","cluster":"A","finding":"PPW-550","note":"catch/mapping reshape — dispatched for the exception-type question"}
+{"t":"2026-08-21T10:23:22+03:00","ev":"check-returned","cluster":"A","finding":"PPW-550","verdict":"revised","tokens":71792,"note":"sibling catch clauses cannot catch each other (CS0165 risk); mirror UploadsController two-tier guard; keep the catch strictly FileNotFoundException; carry the miss exception + tiers_tried into blob-missing; premise corrected — the escaping 500 IS logged by the middleware; AdminOrderService ZIP export carries the same class"}
+{"t":"2026-08-21T10:24:15+03:00","ev":"test-run","kind":"red","filter":"FullyQualifiedName~InvoicesControllerTests","passed":13,"failed":1,"duration_s":1,"note":"PPW-550 red: FileNotFoundException escapes GetInvoiceAsync at InvoicesController.cs:90 on a double-tier miss; the two fallback-succeeds tests are new coverage and already pass"}
+{"t":"2026-08-21T10:26:16+03:00","ev":"check-returned","cluster":"B","finding":"PPW-551","verdict":"revised","tokens":93780,"note":"flat 2h window on the job (a PollIntervalMinutes derivation is unbounded at 1440 and can outlive the 85h BackoffHours budget); add a counter or the fix trades noise for blindness; window expiry is untestable via TimeProvider on net8 MemoryCache — use MemoryCacheOptions.Clock at registry level; all 19 job facts break at runtime on a ctor change (Activator args); claim one Error per replica per window, not per outage (PPW-455 still open)"}
+{"t":"2026-08-21T10:27:55+03:00","ev":"test-run","kind":"green","filter":"FullyQualifiedName~InvoicesControllerTests","passed":14,"failed":0,"duration_s":1}
+{"t":"2026-08-21T10:27:55+03:00","ev":"finding","id":"PPW-550","status":"fixed","commit":"f602d4b"}
+{"t":"2026-08-21T10:27:55+03:00","ev":"micro-review-dispatched","cluster":"A"}
+{"t":"2026-08-21T10:29:54+03:00","ev":"test-run","kind":"red","filter":"FullyQualifiedName~InvoiceUploadJobTests.ProcessBatchAsync_AuthStillFailingOnTheNextTick","passed":0,"failed":1,"duration_s":3,"note":"PPW-551 red: auth-failed Error expected 1 across two ticks, found 2"}
+{"t":"2026-08-21T10:32:23+03:00","ev":"gate-parked","kind":"fixer-decision","default":"deferred","reason":"AdminOrderService.cs:244 (ZIP export) carries PPW-550's defect class — an unguarded GetStreamAsync after response headers are already sent. Outside the finding set; routing it to the backlog is the owner's ruling"}
+{"t":"2026-08-21T10:32:23+03:00","ev":"gate-parked","kind":"fixer-decision","default":"deferred","reason":"the approach-check argues InvoiceUploadJob.cs's explicit Sentry CaptureException is redundant because UseSentry already ships Error-level logs as events; deleting it changes behaviour a prior round's test pins, so it stays"}
+{"t":"2026-08-21T10:34:27+03:00","ev":"micro-review-returned","cluster":"A","found":1,"note":"double miss overwrote the stamped tier's cause, dropping the S3 bucket-vs-key distinction in exactly the tiers_tried=2 case; control flow correct in all 8 tier/flag combinations, no leak, no adjacent regression"}
+{"t":"2026-08-21T10:34:27+03:00","ev":"test-run","kind":"green","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Sameday","passed":189,"failed":0,"duration_s":37,"note":"MemoryCacheOnceRegistry moved to PhotoPrint.API.Services — behaviour-neutral"}
+{"t":"2026-08-21T10:36:44+03:00","ev":"test-run","kind":"final","filter":"FullyQualifiedName~InvoicesControllerTests|FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":51,"failed":0,"duration_s":32}
+{"t":"2026-08-21T10:36:44+03:00","ev":"finding","id":"PPW-551","status":"fixed","commit":"dab1121"}
+{"t":"2026-08-21T10:36:44+03:00","ev":"micro-review-dispatched","cluster":"B"}
+{"t":"2026-08-21T10:44:01+03:00","ev":"micro-review-returned","cluster":"B","found":2,"note":"two false claims in this round's own artifacts: the runbook said the heartbeat Warning fires every tick, but the row cooldown makes it ~every other tick, and the window's code comment cited a BackoffHours bound that only gates the rejection path. Both corrected in 0ec6497. Class sweep answered: this was the only Sentry capture in any background job"}
+{"t":"2026-08-21T10:44:01+03:00","ev":"round-end","round":7,"note":"same span as the round-start stamped round 8 above; numbered 7 here to match resolution-v7.md, because round 7 was already used by the v6 fix round. The renderer's slice for round 7 therefore starts at that earlier round-start and over-counts runtime — corrected in metrics.jsonl"}
+{"t":"2026-08-21T10:58:21+03:00","ev":"test-run","kind":"green","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":37,"failed":0,"duration_s":24,"note":"stamped late: this run happened at ~10:33, before the Sameday run; recorded here because the worklog is append-only"}
+{"t":"2026-08-21T11:09:33+03:00","ev":"doc-gate","verdict":"disapprove","round":1,"reason":"index Passes row 90 words against a 50-word cap; metrics tests field counted the v6 round's runs and the correction line wrongly claimed every other field was correct"}
+{"t":"2026-08-21T11:09:33+03:00","ev":"doc-gate","verdict":"approve","round":2,"reason":"row trimmed to 50 words, two accurate correction lines (runtime, tests), base_commit null upheld as the precedent for a round answering a verification pass"}
+{"t":"2026-08-21T11:15:04+03:00","ev":"pass-launch","pass":7,"type":"verification"}
+{"t":"2026-08-21T11:27:30+03:00","ev":"pass-records-done","pass":7,"type":"verification"}
+{"t":"2026-08-21T11:35:35+03:00","ev":"doc-gate","verdict":"approve","pass":7}
+{"t":"2026-08-21T11:36:56+03:00","ev":"round-start","round":8}
+{"t":"2026-08-21T11:39:04+03:00","ev":"triage-done","round":8,"clusters":1,"checks_needed":1,"pre_cleared":0,"gates":1}
+{"t":"2026-08-21T11:39:04+03:00","ev":"check-dispatched","round":8,"cluster":"A"}
+{"t":"2026-08-21T11:39:04+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"leave the validator range as-is","reason":"narrowing Anaf:PollIntervalMinutes would refuse config that boots today — a capability removal needing an owner ruling"}
+{"t":"2026-08-21T11:44:49+03:00","ev":"check-returned","round":8,"cluster":"A","verdict":"revised","tokens":91258}
+{"t":"2026-08-21T11:44:49+03:00","ev":"test-run","round":8,"kind":"green","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":37,"failed":0,"duration_s":55,"note":"baseline before the fix, harness parameter only"}
+{"t":"2026-08-21T11:47:48+03:00","ev":"test-run","round":8,"kind":"red","filter":"FullyQualifiedName~InvoiceUploadJobTests","passed":22,"failed":2,"duration_s":90}
+{"t":"2026-08-21T11:50:39+03:00","ev":"test-run","round":8,"kind":"green","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":40,"failed":0,"duration_s":77}
+{"t":"2026-08-21T11:52:09+03:00","ev":"finding","round":8,"id":"PPW-553","status":"fixed","commit":"e782189"}
+{"t":"2026-08-21T11:52:09+03:00","ev":"micro-review-dispatched","round":8,"cluster":"A"}
+{"t":"2026-08-21T11:55:15+03:00","ev":"test-run","round":8,"kind":"final","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":40,"failed":0,"duration_s":82}
+{"t":"2026-08-21T11:55:38+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"deferred","reason":"ShipmentTrackingJob.cs:22 is a flat 30-minute outage window while SamedaySettingsValidator.cs:47-48 bounds TrackingIntervalMinutes only at >= 1, so the same class is unbounded there. Outside the finding set; routing it to the backlog is the owner ruling"}
+{"t":"2026-08-21T11:57:08+03:00","ev":"micro-review-returned","round":8,"cluster":"A","found":1}
+{"t":"2026-08-21T12:00:15+03:00","ev":"test-run","round":8,"kind":"final","filter":"FullyQualifiedName~PhotoPrint.Tests.Unit.Services.Invoicing.Anaf","passed":40,"failed":0,"duration_s":121,"note":"re-run at the round tip after the micro-review follow-up"}
+{"t":"2026-08-21T12:00:15+03:00","ev":"round-end","round":8}
+{"t":"2026-08-21T12:02:38+03:00","ev":"gate-parked","round":8,"kind":"fixer-decision","default":"do not push","reason":"the records auditor hard-fails because fixed_commit 2daf61e is reachable from no pushed ref. Clearing it needs a push of feat/bolt-038-vat-calculation, which no owner authorised; a local tag would satisfy the check while defeating its purpose. Error left standing and recorded in the metrics notes"}
+{"t":"2026-08-21T12:11:06+03:00","ev":"doc-gate","round":8,"verdict":"approve","note":"lint clean for v8 and the state files; Sonnet judge approved with 3 optional nits, one of which (unattended round -> unattended run) was applied"}
+{"t":"2026-08-21T12:13:13+03:00","ev":"pass-launch","pass":8,"type":"verification"}
+{"t":"2026-08-21T12:21:23+03:00","ev":"pass-records-done","pass":8,"type":"verification"}
+{"t":"2026-08-21T12:26:51+03:00","ev":"doc-gate","verdict":"approve","pass":8}
+{"t":"2026-08-21T12:29:41+03:00","ev":"gate-parked","kind":"certification-go-ahead","default":"not launched","reason":"the policy answers certification (pair), ~4.0-4.6M tokens; parked because the auditor cannot go green without the owner authorising a push of this branch to its public remote, so a certification recorded now would carry evidence the system itself flags as single-machine"}
+{"t":"2026-08-21T12:29:41+03:00","ev":"run-end","passes":4,"parked":5}
+{"t":"2026-08-21T12:35:27+03:00","ev":"gate-closed","reason":"owner ruled the 4 parked items and authorised the push: PPW-555 and PPW-556 to the backlog, both configuration questions closed with no change"}
+{"t":"2026-08-21T12:47:26+03:00","ev":"run-start","note":"second unattended run: delta discovery on the owner's choice"}
+{"t":"2026-08-21T12:47:26+03:00","ev":"pass-launch","pass":9,"type":"delta-discovery","commit":"c8d6bb4"}
+{"t":"2026-08-21T13:35:19+03:00","ev":"pass-records-done","pass":9,"type":"delta-discovery","verdict":"request-changes","minted":"PPW-557..PPW-577"}
+{"t":"2026-08-21T13:42:31+03:00","ev":"round-start","round":9}
+{"t":"2026-08-21T13:48:05+03:00","ev":"triage-done","round":9,"clusters":3,"checks_needed":0,"pre_cleared":["PPW-558","PPW-559","PPW-566"],"gates":0,"note":"unattended: no owner gate; PPW-565 not trigger-list-shaped"}
+{"t":"2026-08-21T13:52:25+03:00","ev":"test-run","kind":"red","cluster":"A","filter":"PhotoPrint.Tests.Unit.Controllers.WebhooksControllerBodyLimitTests","passed":1,"failed":7,"duration_s":9,"note":"the no-content-length case throws OutOfMemoryException today"}
+{"t":"2026-08-21T13:56:38+03:00","ev":"test-run","kind":"green","cluster":"A","filter":"Unit.Controllers.WebhooksController|Unit.Filters|Unit.Middleware.ExceptionHandlerMiddlewareTests|Unit.Observability","passed":158,"failed":0,"duration_s":23}
+{"t":"2026-08-21T13:59:03+03:00","ev":"finding","id":"PPW-558","status":"fixed","commit":"9cc0273"}
+{"t":"2026-08-21T13:59:03+03:00","ev":"micro-review-dispatched","cluster":"A","commit":"9cc0273"}
+{"t":"2026-08-21T14:04:59+03:00","ev":"micro-review-returned","cluster":"A","found":"3 real gaps folded in (5xx bypass of the Sentry invariant, 64 KB per-request peek allocation, 3 stale doc claims); 2 parked (UploadsController buffers a 50 MB IFormFile; no cancellation test on the bounded read)"}
+{"t":"2026-08-21T14:05:00+03:00","ev":"test-run","kind":"green","cluster":"A","filter":"Unit.Controllers.WebhooksController|Unit.Filters|Unit.Middleware.ExceptionHandlerMiddlewareTests","passed":82,"failed":0,"duration_s":22,"note":"follow-up commit 7ad27df"}
+{"t":"2026-08-21T14:09:04+03:00","ev":"test-run","kind":"red","cluster":"B","filter":"Unit.Services.Invoicing|Unit.Configuration.AnafSettingsValidatorTests","passed":116,"failed":8,"duration_s":74,"note":"upload called 5 times where the budget allows 3; row stays Pending with no count; the PPW-566 classifier tests pass on arrival by design"}
+{"t":"2026-08-21T14:13:12+03:00","ev":"test-run","kind":"green","cluster":"B","filter":"Unit.Services.Invoicing|Unit.Configuration.AnafSettingsValidatorTests|Unit.Controllers.AdminInvoicesControllerTests","passed":127,"failed":0,"duration_s":67}
+{"t":"2026-08-21T14:13:12+03:00","ev":"finding","id":"PPW-559","status":"fixed","commit":"12dac3a"}
+{"t":"2026-08-21T14:13:12+03:00","ev":"finding","id":"PPW-566","status":"fixed","commit":"35bde0e"}
+{"t":"2026-08-21T14:13:12+03:00","ev":"micro-review-dispatched","cluster":"B","commit":"12dac3a..35bde0e"}
+{"t":"2026-08-21T14:15:06+03:00","ev":"test-run","kind":"red","cluster":"C","filter":"MigrationChainTests.The_model_snapshot_still_matches_the_model","passed":0,"failed":1,"duration_s":1,"note":"drift proven by adding a throwaway Invoice property: HasPendingModelChanges returned True; property removed before the green run"}
+{"t":"2026-08-21T14:15:42+03:00","ev":"test-run","kind":"green","cluster":"C","filter":"Integration.MigrationChainTests","passed":4,"failed":0,"duration_s":8}
+{"t":"2026-08-21T14:15:43+03:00","ev":"finding","id":"PPW-565","status":"fixed","commit":"8d7a5e6"}
+{"t":"2026-08-21T14:21:08+03:00","ev":"micro-review-returned","cluster":"B","found":"4 real gaps folded in (claim release let a co-replica re-post seconds later; lost-CAS paths of the new lifecycle method untested; misleading outcomes=0 log; missing env-var doc line) plus the orphaned AnafUploadTimeoutException doc paragraph; 2 parked (AwbCreator holds the same disproven TTL belief; no Sentry on the park)"}
+{"t":"2026-08-21T14:21:08+03:00","ev":"test-run","kind":"green","cluster":"B","filter":"Unit.Services.Invoicing|Unit.Configuration.AnafSettingsValidatorTests|Unit.Controllers.AdminInvoicesControllerTests|Integration.MigrationChainTests","passed":134,"failed":0,"duration_s":78,"note":"follow-up commit 25f2097"}
+{"t":"2026-08-21T14:22:21+03:00","ev":"micro-review-dispatched","cluster":"C","commit":"8d7a5e6, 25f2097","note":"same agent resumed, covers the last cluster and the B follow-up"}
+{"t":"2026-08-21T14:23:42+03:00","ev":"test-run","kind":"final","filter":"Unit.Controllers.WebhooksController|Unit.Controllers.AdminInvoicesControllerTests|Unit.Filters|Unit.Middleware.ExceptionHandlerMiddlewareTests|Unit.Observability|Unit.Services.Invoicing|Unit.Configuration.AnafSettingsValidatorTests|Integration.MigrationChainTests|Integration.PaymentControllerIntegrationTests","passed":315,"failed":0,"duration_s":87}
+{"t":"2026-08-21T14:26:52+03:00","ev":"micro-review-returned","cluster":"C","found":"3 real items folded in (RetryAsync left a stale ClaimedAt on the operator exit; the claim comment was true only at default settings; the counted-but-not-parked recovery was untested); the drift guard confirmed to run without a database and to catch index, length and precision changes"}
+{"t":"2026-08-21T14:26:52+03:00","ev":"test-run","kind":"green","cluster":"C","filter":"Unit.Services.Invoicing|Unit.Controllers.AdminInvoicesControllerTests|Integration.MigrationChainTests","passed":115,"failed":0,"duration_s":79,"note":"follow-up commit d3ae1e7"}
+{"t":"2026-08-21T14:29:31+03:00","ev":"test-run","kind":"final","filter":"Unit.Controllers.WebhooksController|Unit.Controllers.AdminInvoicesControllerTests|Unit.Filters|Unit.Middleware.ExceptionHandlerMiddlewareTests|Unit.Observability|Unit.Services.Invoicing|Unit.Configuration.AnafSettingsValidatorTests|Integration.MigrationChainTests|Integration.PaymentControllerIntegrationTests","passed":316,"failed":0,"duration_s":85}
+{"t":"2026-08-21T14:29:40+03:00","ev":"round-end","round":9,"note":"4 fixed, 1 deferred (PPW-557, owner decision); resolution in-progress"}
+{"t":"2026-08-21T14:40:54+03:00","ev":"doc-gate","round":9,"lint":"clean (target v9 and state)","judge":"disapprove-then-fixed: PPW-557 lacked a Decisions block, and the renderer wrote fixed_commit as the text closed:; both addressed, re-judge requested","auditor":"0 errors, 1 pre-existing warning"}
+{"t":"2026-08-21T14:49:14+03:00","ev":"doc-gate","round":9,"lint":"clean (038-039-invoicing v9 and state)","judge":"disapproved twice, both rounds fixed: PPW-557 needed its own Decisions block, the renderer wrote fixed_commit as the text closed:, and the tooling note had to leave the PPW-559 heading","auditor":"0 errors, 1 pre-existing warning (two pass-6 lines share a number)","lib_suite":"74 assertions pass, 7 new, 3 proven red against the old renderer"}
+{"t":"2026-08-21T14:57:17+03:00","ev":"triage-done","round":9,"clusters":1,"checks_needed":0,"pre_cleared":["PPW-564"],"gates":0,"note":"continuation: cluster D (AdminOrderService manual-Paid) = PPW-564, PPW-567, PPW-568; PPW-564's revised pre-check settles the whole cluster's approach including the exhausted branch, so no new check"}
+{"t":"2026-08-21T15:05:02+03:00","ev":"test-run","kind":"red","cluster":"D","filter":"Unit.Services.AdminOrderService","passed":36,"failed":4,"duration_s":13,"note":"both race windows commit the admin's own PaidAt (2026-08-21 12:04 where the winner wrote 2026-08-01 09:30); the exhausted branch escapes as DbUpdateException on ix_invoices_invoice_number instead of a conflict"}
+{"t":"2026-08-21T15:10:09+03:00","ev":"test-run","kind":"green","cluster":"D","filter":"Unit.Services.AdminOrderService|Unit.Controllers.WebhooksController","passed":80,"failed":0,"duration_s":26}
+{"t":"2026-08-21T15:14:51+03:00","ev":"finding","id":"PPW-564","status":"fixed","commit":"c9ffae4"}
+{"t":"2026-08-21T15:18:40+03:00","ev":"finding","id":"PPW-567","status":"fixed","commit":"ba8e628"}
+{"t":"2026-08-21T15:18:41+03:00","ev":"finding","id":"PPW-568","status":"fixed","commit":"573dfb8"}
+{"t":"2026-08-21T15:18:41+03:00","ev":"micro-review-dispatched","cluster":"D","commit":"c9ffae4..573dfb8"}
+{"t":"2026-08-21T15:20:36+03:00","ev":"test-run","kind":"final","filter":"Unit.Services.AdminOrderService|Unit.Controllers.WebhooksController|Unit.Services.Invoicing|Unit.Controllers.AdminOrdersController","passed":188,"failed":0,"duration_s":82}
+{"t":"2026-08-21T15:31:32+03:00","ev":"micro-review-returned","cluster":"D","found":"8 real gaps folded in (the side-effect gate failed open; the abandon reload was the one unprotected await and could 500 a benign lost race; the pre-insert window logged nothing; the entity-state test was too loose; an English 409 message in a Romanian product; the deployment row implied Sentry pages when Sentry:Enabled=false ships; the admin state-machine page denied the path, the 409 and the email suppression; metrics.md said nothing about the admin path) plus 5 parked (no metric for the admin path, the duplicated retry constant, the admin panel has no button for the transition, the UI swallows the 409 detail, the DI proof is not the real composition root)"}
+{"t":"2026-08-21T15:32:50+03:00","ev":"test-run","kind":"green","cluster":"D","filter":"Unit.Services.AdminOrderService|Unit.Controllers.WebhooksController","passed":81,"failed":0,"duration_s":30,"note":"follow-up commit 6527bcb"}
+{"t":"2026-08-21T15:35:04+03:00","ev":"test-run","kind":"final","filter":"Unit.Services.AdminOrderService|Unit.Controllers.WebhooksController|Unit.Services.Invoicing|Unit.Controllers.AdminOrdersController|Unit.Middleware.ExceptionHandlerMiddlewareTests","passed":211,"failed":0,"duration_s":96}
+{"t":"2026-08-21T15:35:04+03:00","ev":"round-end","round":9,"note":"part 2 of 2: cluster D closed PPW-564, PPW-567 and PPW-568; round total 7 fixed, 1 deferred (PPW-557, owner decision); resolution stays in-progress"}
+{"t":"2026-08-21T15:47:09+03:00","ev":"doc-gate","round":9,"lint":"clean (038-039-invoicing v9 and state)","judge":"disapprove-then-fixed: the index State cell cited 573dfb8 instead of the round's tip 6527bcb, and the round-9 approach_checks and cost fields were left uncorrected; both addressed","auditor":"0 errors, 2 warnings (one is this round's intended findings supersession, one pre-existing pass-6 pair)"}
+{"t":"2026-08-21T15:51:55+03:00","ev":"doc-gate","round":9,"lint":"clean (038-039-invoicing v9 and state)","auditor":"0 errors, 2 warnings","note":"ledger rows for the round's seven fixes flipped open -> fixed with the Affirmed commit from resolution-v9's Findings table, one appended 'v9: fix round' History line each; PPW-557 untouched"}
+{"t":"2026-08-21T15:52:27+03:00","ev":"gate-parked","kind":"fixer-decision","default":"PPW-557 left open, no code change","reason":"which fiscal address a parcel-locker order carries is an owner decision; asked twice, unanswered"}
+{"t":"2026-08-21T15:52:28+03:00","ev":"run-end","passes":2,"parked":8}
+{"t":"2026-08-21T16:15:29+03:00","ev":"triage-done","round":9,"clusters":1,"checks_needed":1,"pre_cleared":[],"gates":0,"note":"part 3 of 3: cluster E (locker fiscal address) = PPW-557 alone; its review pre-check was refuted, and the owner delegated the ruling to the driver (collect a real address before payment, park what cannot build), so a fresh approach-check is dispatched before any code"}
+{"t":"2026-08-21T16:16:16+03:00","ev":"check-dispatched","cluster":"E","note":"adversarial approach-check on the two-part ruling: collect the fiscal address at locker checkout (frontend form reuse + server-side NotEmpty) and park an unbuildable invoice as Failed through PPW-559 park primitive"}
+{"t":"2026-08-21T16:22:24+03:00","ev":"check-returned","cluster":"E","verdict":"revised","tokens":103741,"note":"no address-form component exists to reuse (both forms are inline FormGroups that collide on recipientName/phone); isDeliveryComplete only drives a CSS class, canContinue is the real gate; a stale Easybox session dead-ends on the payment step with a misleading 400 message; the XML needs only Street/City/PostalCode (County is PDF-only) and SavedAddress carries one AddressLine that cannot be split; four server fixtures assert the blank-address Easybox body (PaymentControllerIntegrationTests.ValidRequest with 34 references, OrdersFactory, OrderEmailServiceTests, the validator suite); parking is a dead end because nothing can correct an order address, so retry re-parks; the no-items guard is equally permanent; the typed exception must derive from InvalidOperationException or three tests break; the cooldown already backs the loop off to one attempt per poll interval, so the finding overstates every tick"}
+{"t":"2026-08-21T16:26:40+03:00","ev":"test-run","kind":"red","cluster":"E","filter":"checkout-state.service|delivery-step|payment-step","passed":35,"failed":6,"duration_s":8,"note":"a contact-only Easybox state unlocks payment (expected true to be false, twice: live and restored from sessionStorage); the Easybox branch renders no #street/#city/#postalCode; a full address in addressForm leaves Continue disabled; no /account/addresses fetch for a signed-in customer; the payment step never redirects an incomplete state"}
+{"t":"2026-08-21T16:30:11+03:00","ev":"test-run","kind":"red","cluster":"E","filter":"Unit.Validators.CreateOrderRequestValidatorTests|Unit.Services.Invoicing.Anaf.InvoiceUploadJobTests","passed":53,"failed":3,"duration_s":59,"note":"the validator raises no error for a blank Easybox Street/City/PostalCode; the row with no buyer address is still Pending after a tick and after the next one, instead of parked Failed"}
+{"t":"2026-08-21T16:37:24+03:00","ev":"test-run","kind":"green","cluster":"E","filter":"checkout-state.service|delivery-step|payment-step|review-step","passed":47,"failed":0,"duration_s":8}
+{"t":"2026-08-21T16:45:49+03:00","ev":"finding","id":"PPW-557","status":"fixed","commit":"c2275a3"}
+{"t":"2026-08-21T16:45:49+03:00","ev":"micro-review-dispatched","cluster":"E","commit":"c2275a3"}
+{"t":"2026-08-21T16:56:02+03:00","ev":"micro-review-returned","cluster":"E","found":"5 folded in (the lost-park branch left no LastError and no metric, only a released claim; the DEPLOYMENT log catalogue had no not-buildable entry; payment-step.spec kept an impossible Easybox state with a null address while mocking isDeliveryComplete true; OrdersFactory still seeded the pre-fix blank snapshot; the saved-address fetch fired even when a complete address was already restored) plus 5 parked (the collected address is hidden on four read paths, OrderService still defaults a blank snapshot, the redirect is silent, idempotency equality still excludes the address, architecture-analysis-2026-05-25.md states the old rule and is a frozen record)"}
+{"t":"2026-08-21T16:56:02+03:00","ev":"test-run","kind":"final","filter":"Unit.Validators|Unit.Services.Invoicing|Integration.PaymentControllerIntegrationTests|Integration.OrdersControllerIntegrationTests|Unit.Services.OrderEmailServiceTests","passed":196,"failed":0,"duration_s":74}
+{"t":"2026-08-21T16:56:02+03:00","ev":"test-run","kind":"final","filter":"checkout-state.service|delivery-step|payment-step|review-step|guest-auth.service|account.service","passed":69,"failed":0,"duration_s":8}
+{"t":"2026-08-21T16:58:06+03:00","ev":"round-end","round":9,"note":"part 3 of 3: cluster E closed PPW-557 on the owner ruling; round total 8 fixed, 0 deferred; resolution set resolved at 78900b6"}
+{"t":"2026-08-21T17:00:15+03:00","ev":"doc-gate","round":9,"lint":"clean (038-039-invoicing v9 and state)","auditor":"0 errors, 2 warnings (a superseded findings tally and the pre-existing pass-6 pair)","note":"resolution set resolved at 78900b6; seven correction lines appended for round 9 because the renderer refuses a second fix-round line; PPW-557 ledger row flipped to fixed with two appended History lines"}
+{"t":"2026-08-21T17:17:02+03:00","ev":"doc-gate","verdict":"approve","round":9,"note":"two independent judges agreed; the single defect (PPW-557 affirmed at its pre-micro-review commit) is corrected in 74e23f3"}
+{"t":"2026-08-21T17:17:02+03:00","ev":"pass-launch","pass":10,"type":"verification"}
+{"t":"2026-08-21T17:34:16+03:00","ev":"pass-records-done","pass":10,"type":"verification"}
+{"t":"2026-08-21T18:48:03+03:00","ev":"run-start","note":"third unattended run: certification, single pass on the owner ruling"}
+{"t":"2026-08-21T18:48:03+03:00","ev":"pass-launch","pass":11,"type":"certification","subtype":"certification-single","commit":"de673a5"}
+{"t":"2026-08-21T18:56:00+03:00","ev":"round-start","round":10}
+{"t":"2026-08-21T19:00:33+03:00","ev":"triage-done","round":10,"clusters":1,"checks_needed":1,"pre_cleared":0,"gates":1}
+{"t":"2026-08-21T19:00:33+03:00","ev":"check-dispatched","cluster":"A — lazy sequence creation race","round":10}
+{"t":"2026-08-21T19:00:33+03:00","ev":"gate-parked","round":10,"kind":"fixer-decision","default":"reuse PPW-569 for the invoice site and mint one new id for the order site","reason":"the invoice half of this defect class already has a backlog ledger row; routing it is the owner list ruling"}
+{"t":"2026-08-21T19:09:30+03:00","ev":"test-run","round":10,"kind":"red","filter":"FullyQualifiedName~OrderNumberServicePostgresTests|FullyQualifiedName~PostgresInvoiceNumberingServiceIntegrationTests","passed":6,"failed":3,"duration_s":15}
+{"t":"2026-08-21T19:09:31+03:00","ev":"check-returned","cluster":"A — lazy sequence creation race","round":10,"verdict":"revised","tokens":55757}
+{"t":"2026-08-21T19:13:12+03:00","ev":"test-run","round":10,"kind":"green","filter":"FullyQualifiedName~OrderNumberServicePostgresTests|FullyQualifiedName~PostgresInvoiceNumberingServiceIntegrationTests|FullyQualifiedName~OrderNumberServiceTests|FullyQualifiedName~InvoiceCreationServiceTests","passed":20,"failed":0,"duration_s":23}
+{"t":"2026-08-21T19:14:10+03:00","ev":"micro-review-dispatched","round":10,"cluster":"A — lazy sequence creation race"}
+{"t":"2026-08-21T19:14:10+03:00","ev":"finding","round":10,"id":"PPW-578","status":"fixed","commit":"de1a4cb"}
+{"t":"2026-08-21T19:14:11+03:00","ev":"finding","round":10,"id":"PPW-569","status":"fixed","commit":"de1a4cb"}
+{"t":"2026-08-21T19:28:59+03:00","ev":"micro-review-returned","round":10,"cluster":"A — lazy sequence creation race","found":7}
+{"t":"2026-08-21T19:28:59+03:00","ev":"test-run","round":10,"kind":"final","filter":"FullyQualifiedName~PostgresSequences|FullyQualifiedName~OrderNumberServicePostgresTests|FullyQualifiedName~PostgresInvoiceNumberingServiceIntegrationTests","passed":14,"failed":0,"duration_s":49}
+{"t":"2026-08-21T19:29:51+03:00","ev":"round-end","round":10}
+{"t":"2026-08-21T19:38:47+03:00","ev":"doc-gate","round":10,"lint":"clean","judge":"approve","auditor":"1 error: round commits reachable from no pushed ref"}
+{"t":"2026-08-21T19:43:34+03:00","ev":"note","text":"the pass-launch stamped as pass 11 certification is superseded: pass 11 is this verification of the v10 round, and the certification runs as pass 12"}
+{"t":"2026-08-21T19:43:35+03:00","ev":"pass-records-done","pass":11,"type":"verification"}
+{"t":"2026-08-21T19:49:58+03:00","ev":"pass-launch","pass":12,"type":"certification","subtype":"certification-single","commit":"090873d"}
+{"t":"2026-08-21T20:22:10+03:00","ev":"check-dispatched","pass":12,"scope":"approach pre-checks, 6 high-severity trigger-list-shaped rows","ids":["PPW-580","PPW-581","PPW-582","PPW-583","PPW-584","PPW-586"]}
+{"t":"2026-08-21T20:27:43+03:00","ev":"check-returned","pass":12,"verdicts":"6 revised, 0 cleared, 0 refuted","tokens":481449}
+{"t":"2026-08-21T20:41:00+03:00","ev":"pass-records-done","pass":12,"type":"certification","subtype":"certification-single","commit":"090873d","verdict":"request-changes","outcome":"not-certified"}
+{"t":"2026-08-21T20:44:05+03:00","ev":"run-end","passes":3,"parked":0,"note":"certification does not certify; 11 high-severity rows open, 7 owner decisions listed in summary-v12"}
+{"t":"2026-08-21T20:51:20+03:00","ev":"doc-gate","verdict":"approve","pass":12,"note":"judge independently confirmed PPW-579, PPW-584 and PPW-586 against the code and re-derived the severity and id math"}
+{"t":"2026-08-24T11:09:13+03:00","ev":"round-start","round":12,"note":"unattended fix round on review-v12, scope PPW-579 only per owner ruling"}
+{"t":"2026-08-24T11:16:04+03:00","ev":"test-run","round":12,"kind":"red","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdfCultureTests","passed":1,"failed":2,"duration_s":0.14,"note":"csproj and Dockerfile contract tests red before the fix; the ro-RO formatting test passes on an ICU host"}
+{"t":"2026-08-24T11:19:35+03:00","ev":"test-run","round":12,"kind":"green","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdf","passed":10,"failed":0,"duration_s":0.96}
+{"t":"2026-08-24T11:21:19+03:00","ev":"finding","round":12,"id":"PPW-579","status":"fixed","commit":"8e71c63"}
+{"t":"2026-08-24T11:21:19+03:00","ev":"micro-review-dispatched","round":12,"cluster":"A — production image globalization","commit":"8e71c63"}
+{"t":"2026-08-24T11:26:50+03:00","ev":"micro-review-returned","round":12,"cluster":"A — production image globalization","found":1,"note":"the culture-formatting test passed in both the fixed and broken states; tests retargeted at the shipped runtimeconfig and at the renderer own culture field"}
+{"t":"2026-08-24T11:28:49+03:00","ev":"test-run","round":12,"kind":"red","filter":"InvoicePdfCultureTests (fix reverted to 8e71c63~1)","passed":1,"failed":2,"duration_s":0.15,"note":"runtimeconfig and Dockerfile tests red on the revert; the culture canary passes on an ICU host"}
+{"t":"2026-08-24T11:28:49+03:00","ev":"test-run","round":12,"kind":"final","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdf","passed":10,"failed":0,"duration_s":0.83}
+{"t":"2026-08-24T11:28:50+03:00","ev":"test-run","round":12,"kind":"red","filter":"InvoicePdfCultureTests with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1","passed":2,"failed":1,"duration_s":0.07,"note":"the culture canary fails loudly in an invariant host with TypeInitializationException -> CultureNotFoundException"}
+{"t":"2026-08-24T11:28:50+03:00","ev":"finding","round":12,"id":"PPW-579","status":"fixed","commit":"ed3ce30","note":"micro-review follow-up folded in"}
+{"t":"2026-08-24T11:29:45+03:00","ev":"round-end","round":12,"note":"PPW-579 fixed; 9 other blockers recorded without code — 2 wont-fix on the owner ruling, 7 deferred"}
+{"t":"2026-08-24T11:31:47+03:00","ev":"doc-gate","round":12,"verdict":"clean","note":"doc-gate.mjs 038-039-invoicing 12 clean and doc-gate.mjs state clean; records-auditor reports one error — no pushed ref reaches ed3ce30, because pushing was withheld"}
+{"t":"2026-08-24T12:22:31+03:00","ev":"note","text":"owner triage of 2026-08-24 applied: 13 rows regraded down and backlogged, PPW-600 and PPW-604 regraded up to high, PPW-562 recorded fixed by the peer merge 4dd6763; each ruling is a history line on its ledger row"}
+{"t":"2026-08-24T14:53:04+03:00","ev":"pass-launch","pass":13,"type":"verification"}
+{"t":"2026-08-24T14:53:04+03:00","ev":"pass-records-done","pass":13,"type":"verification"}
+{"t":"2026-08-24T15:06:25+03:00","ev":"round-start","round":13,"note":"final fix round on review-v12, cluster 1 of 3 (payment flow: PPW-584, PPW-582, PPW-615, PPW-611); unattended; rows append to resolution-v12.md which stays in-progress for the two later clusters"}
+{"t":"2026-08-24T15:12:32+03:00","ev":"check-dispatched","cluster":"payment-flow","note":"adversarial approach-check on the 409 handling, the stale-key paid replay, the polling state machine and the new payment-status endpoint (PPW-584, PPW-582, PPW-615)"}
+{"t":"2026-08-24T15:15:02+03:00","ev":"triage-done","round":13,"clusters":1,"checks_needed":1,"pre_cleared":2,"gates":0,"note":"cluster 1 of 3 = payment flow; PPW-611 is a deprecated-field drop (no check), PPW-584/PPW-582 ride their v12 pre-check revisions, PPW-615 shares the new check"}
+{"t":"2026-08-24T15:27:28+03:00","ev":"test-run","kind":"red","filter":"dotnet test src/PhotoPrint.Tests --filter \"FullyQualifiedName~OrderPaymentStatus|FullyQualifiedName~OrderServiceTests|FullyQualifiedName~ExceptionHandlerMiddlewareTests\"","passed":90,"failed":12,"duration_s":2,"note":"8 of 9 payment-status endpoint tests fail (route absent: 401 and 403 legs answer NotFound), plus the two consumed-key OrderService tests and the two consumed-key middleware tests"}
+{"t":"2026-08-27T17:06:13+03:00","ev":"test-run","kind":"green","filter":"full backend suite + full frontend suite","passed":1451,"failed":0}
+{"t":"2026-08-27T17:06:13+03:00","ev":"finding","id":"PPW-584","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-582","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-615","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-611","status":"fixed","commit":"2acda1f"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-585","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-524","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-596","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-607","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-612","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-616","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-597","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-587","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-588","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-604","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-591","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-600","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-649","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-592","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-598","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-599","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-602","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-605","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-608","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-613","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-614","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-586","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-560","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-509","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-510","status":"verified"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-659","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-660","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-661","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-662","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-663","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-664","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-665","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-666","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-667","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-668","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-669","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-670","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-671","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-672","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-673","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-674","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-675","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-676","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-677","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-678","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-679","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-680","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-681","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-682","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-683","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-684","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-685","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-686","status":"open"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-663","status":"fixed","commit":"de1b70d"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-659","status":"fixed","commit":"9527eba"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-664","status":"fixed","commit":"9527eba"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-686","status":"fixed","commit":"9527eba"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-660","status":"fixed","commit":"c60260c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-666","status":"fixed","commit":"c60260c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-661","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-662","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-670","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-671","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-672","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-673","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-679","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-680","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-665","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-667","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-674","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-676","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-668","status":"fixed","commit":"18f0b1c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-669","status":"fixed","commit":"18f0b1c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-675","status":"fixed","commit":"18f0b1c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-677","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-678","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-681","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-682","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-683","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-684","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-685","status":"backlog"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-663","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-659","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-664","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-686","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-660","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-666","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-661","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-662","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-670","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-671","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-672","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-673","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-679","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-680","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-665","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-667","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-674","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-676","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-668","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-669","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-675","status":"verified"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-687","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-688","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-689","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-690","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-691","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-692","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-693","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-694","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-695","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-696","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-697","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-698","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-699","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-700","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-701","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-702","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-703","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-704","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-705","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-706","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-707","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-708","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-709","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-710","status":"backlog"}
+{"t":"2026-08-27T21:35:00+03:00","ev":"loop-closed","note":"owner ruling, not certified"}
