@@ -1,6 +1,6 @@
 ---
 type: design-note
-status: paused — owner order 2026-08-28 after Phase 4; resume from this file
+status: phases 1–6 complete 2026-08-28; Phase 7a delivered, waiting on the owner's approval of its inventory
 created: 2026-08-22
 updated: 2026-08-28
 owner: Matei Barba
@@ -57,22 +57,29 @@ sittings-per-fix 0.414. Records+gates uses a 30-minute anchor-carry cap; a doc-g
 rules landed outside the measured ranges. Targets stand: ≤15 min/fix, ≥90% first-pass,
 ≤0.15 sittings/fix, ~0 corrections.
 
-## Remaining (plan tasks 14–18)
+## Phases 5 and 6 (done 2026-08-28)
 
-- **T14** `metrics-schema.md` + `doc-contracts.md` — describe the new reality.
-- **T15** `README.md` router table + `runbook-verification.md`.
-- **T16** loop-driver + fix-review skills: reviewed-unit sequence, queue/sweep,
-  judge fix-inline mandate, persistent fixer.
-- **T17** future-ideas script backlog in `self-driving-loop-design.md`.
-- **T18** sandbox replay against the 2026-08-21 records + final whole-branch review.
+| Work | Commits |
+|---|---|
+| T14 metrics-schema + doc-contracts; T15 README router table + verification runbook — integration over the owner's audit text | `2cb03e4` `8aecb31` `f52ca5b` |
+| T16 loop-driver + fix-review skills (reviewed unit, queue/sweep, persistent fixer, judge replacement-text mandate, wl.mjs/run-scoped-tests paths); T17 script backlog | `a4abf8d` `ee828e6` `5b6f0ba` |
+| T18 final whole-branch review + one fix wave: **C1** — the stand-down predicate keyed on "latest line is not a verification" re-routed a resolved round that answered a verification pass to "fix round"; now keyed on the auditor's resolved-with-no-fix-round-line window (pre-V3 rounds grandfathered, `V3_CUTOFF` shared via vocab.mjs), row 3 first, in router and policy · push before the auditor step · void filtering in the auditor, gate-miner and the policy's run-start scan · one-line comments · verification-answering rounds documented · `v<n>` pass coercion · skills wired to summary-data/mint-id/scaffold-resolution · duplicate test blocks deleted | `a9bbc03` `67c3c03` `497b0da` `f5d0da6` `a83e927` `43268e7` `3e79375` `b115835` `3b41def` |
 
-After phase 6: **Phase 7 — restructure the machinery into named subsystems**, owner-approved
-2026-08-28 and planned in [machinery-restructure-plan.md](machinery-restructure-plan.md).
+**T18 replay, speed-report half:** on the repaired sandbox (`--day 2026-08-21`) all five
+rounds separate — r6 7.8 · r7 33.1 · r8 42.3 · r9 29.0 · r10 21.4 min per fixed finding,
+**median 29.0**; fix-round work 262.1 · pass 185.1 · records+gates 201.7 · idle 114.6;
+first-pass gate rate 0.667; 25 corrections. That is the acceptance baseline for the next
+target.
 
-T14+T15 and T16+T17 can run as two parallel doc dispatches (disjoint files); T18's
-sandbox replay is already done for the renderer half (below) and needs only the
-speed-report run and the final whole-branch review. Estimated remaining effort:
-~1.5–2 h wall.
+## Next: Phase 7 — restructure into named subsystems
+
+Owner-approved 2026-08-28 ([machinery-restructure-plan.md](machinery-restructure-plan.md)).
+**7a is delivered:** [machinery-architecture-review.md](machinery-architecture-review.md)
+— 71 pieces inventoried (keep 52 / merge-split 14 / delete 5), 24 duplicated logic blocks,
+16 rules with more than one home, 13 legacy paths, a target layout, an 11-step 7b migration
+order, and six owner questions. **7b starts only after the owner approves that inventory
+and answers its section 9.** Recommended before 7a's delete decisions are final: one real
+target run through the new loop, so speed-report and the gate data say what is dead.
 
 **T18 replay, renderer half (done 2026-08-28, sandbox copy under the session
 scratchpad, live records untouched):** with three `void` events (the mis-stamped
