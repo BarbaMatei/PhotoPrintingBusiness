@@ -115,8 +115,11 @@ evidence events of the 2026-08-28 audit (`protocol-written`,
 `check-dispatched`/`check-returned` with `ids`, `round-review-dispatched`/`-returned`,
 `test-audit-dispatched`/`-returned`) and two events the renderer reads:
 
-- `void` — `{"ev":"void","of":{...}}`. The renderer and every reader drop the events `of`
-  matches. This is how a mis-stamped event is repaired; the log stays append-only.
+- `void` — `{"ev":"void","of":{...}}`. This is how a mis-stamped event is repaired; the log
+  stays append-only. Three readers drop the events `of` matches: the stamper, the renderer and
+  the speed report. Two do not: the auditor (`records-auditor.mjs`, its hand-back gates
+  included) and the lint miner (`gate-miner.mjs`) read the log unfiltered. The restructure phase
+  consolidates them; until then a void repairs the rendered records, not what the auditor sees.
 - `verify-result` — `{"ev":"verify-result","id":"PPW-<n>","verdict":"held|...","commit":"..."}`,
   appended by `reviews/lib/verify-fixes.mjs` as each row finishes. `commit` is the commit the
   row's fix was proved at; the renderer writes it into the ledger row's Affirmed cell. The run
@@ -126,8 +129,9 @@ evidence events of the 2026-08-28 audit (`protocol-written`,
 **The fix-round line** — appended by `render-records.mjs` (a wrong line is corrected by a
 correction line, never edited). The renderer appends it **once per round, when the resolution
 is `resolved`** — an in-progress round has no line; the worklog carries everything until then.
-In the same run the renderer also appends the round's index row and applies the ledger status
-flips (doc-contracts.md names these as its two mechanical writes):
+`--in-progress` overrides that gate for a deliberate mid-round render, and `--dry-run` renders at
+any status without writing. In the same run the renderer also appends the round's index row and
+applies the ledger status flips (doc-contracts.md names these as its two mechanical writes):
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -147,8 +151,11 @@ flips (doc-contracts.md names these as its two mechanical writes):
 `round-start`→`round-end` spans; time between spans belongs to records and gates and is counted
 nowhere in the round line. A mis-stamped event is repaired by an appended `void` event, never
 edited. A round stopped and resumed re-stamps `round-start` for each part, so such a round has
-one span per part; an unpairable stamp aborts the render instead of over-counting. Inside the
-spans: `blocked_s` = Σ `gate-open`→`gate-closed` spans (each listed in `blocked[]` with its
+one span per part. A second `round-start` while one is open, a start whose end went unstamped, or
+an end that closes nothing aborts the render rather than over-count — each refusal prints the
+`void` command that would repair it. The one unpaired stamp that does not abort is a trailing
+`round-start` with no end yet: the renderer treats the last event as the current end and says so,
+which is how an in-progress round renders. Inside the spans: `blocked_s` = Σ `gate-open`→`gate-closed` spans (each listed in `blocked[]` with its
 reason — a question the owner saw an hour later is an hour of `blocked_s`). `active_s` = Σ gaps
 between consecutive non-gate events **≤ 30 minutes**; a longer unexplained gap means nobody was
 at the wheel. `idle_s` = Σ span durations − `active_s` − `blocked_s`. The cap deliberately errs
@@ -163,22 +170,27 @@ ledger status — `verified` at the `commit` its `verify-result` carries, or bac
 the verdict that reopened it. `--commit <sha>` names the reviewed commit; without it the
 renderer reads the newest resolution's `fixed_commit`.
 
-**The speed report** — `reviews/lib/speed-report.mjs <target>` reads the worklog and this file
-and writes nothing. It charges every gap between consecutive events to exactly one bucket,
-priority gate > round > pass: `owner wait` inside a gate span, `fix-round work` inside a round
-span, `pass work` inside a pass span. Outside those a gap is `records+gates` when it touches a
-`doc-gate` event, and also when it runs on from a `round-end`, a `pass-records-done` or a
-`doc-gate` and is no longer than the 30-minute cap this schema already uses; the rest is
-`idle/other`. Its metrics: **all-in min per fixed finding** = per round, its first `round-start`
-to the first approving `doc-gate` after its last `round-end`, plus the verification that follows
-before the next round starts, over that round's fixed findings (median across rounds);
-**doc-gate first-pass approval** = the share of gate sittings whose first event is not a
-disapproval, a *sitting* being a run of adjacent `doc-gate` events sharing a round or pass key;
-**record sittings per fixed finding** = sittings ÷ fixed findings; **correction lines** = the
-`correction_for` lines of this file, counted cumulatively up to `--day`.
+**The speed report** — `reviews/lib/speed-report.mjs <target>` reads the target's `worklog.jsonl`
+and its `metrics.jsonl`, and writes nothing. It charges every gap between consecutive events to
+exactly one bucket, priority gate > round > pass. `owner wait` is a gap inside a gate span,
+`fix-round work` inside a round span, `pass work` inside a pass span. Outside those a gap is
+`records+gates` when it touches a `doc-gate` event. It is also `records+gates` when it runs on
+from a `round-end`, a `pass-records-done` or a `doc-gate` and is no longer than the 30-minute cap
+this schema already uses. That carry-over is cancelled by the next `run-end`, `gate-parked` or
+`gate-open` event. Everything else is `idle/other`.
+
+Its metrics. **All-in min per fixed finding** = per round, its first `round-start` to the first
+approving `doc-gate` after its last `round-end`, plus the verification that follows before the
+next round starts, over that round's fixed findings (median across rounds). A round with no
+approving gate after it is unmeasured, not zero. **Doc-gate first-pass approval** = the share of
+sittings whose first event is not a disapproval. **Record sittings per fixed finding** = sittings
+÷ fixed findings. **Correction lines** = the `correction_for` lines of this file, counted
+cumulatively up to `--day`; a correction line carrying no `date` is left out rather than dated by
+guess.
 
 **The measured baseline (038-039, reference snapshot of 2026-08-21, 175 events):** span 702.0
-min — fix-round work 262.1, records+gates 191.3, idle 114.6; doc-gate first-pass 0.636;
+min — fix-round work 262.1, records+gates 191.3, pass work ≈ 134.0, idle 114.6; doc-gate
+first-pass 0.636;
 correction lines 25. All-in min per fixed finding: r6 7.8 · r8 41.2 · r9 29.0 · r10 21.4, median
 25.2. The frozen full-day fixture (5 later events) reads span 763.4, first-pass 0.667, sittings
 per fix 0.414. Targets: ≤ 15 min per fix, ≥ 90% first-pass, ≤ 0.15 sittings per fix, ~0

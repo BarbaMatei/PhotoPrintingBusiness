@@ -80,10 +80,10 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 |---|---|
 | No `review-v1.md` | **Full discovery** |
 | The ledger frontmatter carries `closed:` | **Terminal** — loop done; the target stays under watch |
-| An open 🔴 in the ledger · a reopened fix on the latest line · a still-open fix-caused 🟠 regression | **Fix round now** (quiet counter resets) |
-| ≥ 3 open non-regression 🟠 in the ledger, with no resolution answering them | **Fix round** (the batch) |
+| An open 🔴 in the ledger · a reopened fix on the latest line · a still-open fix-caused 🟠 regression (its lineage on a verification line's `findings[]`) | **Fix round now** (quiet counter resets) |
+| ≥ 3 open non-regression 🟠 in the ledger | **Fix round** (the batch) |
 | 1–2 open non-regression 🟠 | **Queued** — proceed as if quiet; the sweep row fires before certification |
-| Two consecutive fix rounds seeded the same component at s ≥ 0.3³ | **Design pass**³ — it intercepts any fix-round answer above; further fix rounds there are refused (owner gate) |
+| Two consecutive fix rounds seeded the same component at s ≥ 0.3³ | **Design pass**³ (owner gate) — further fix rounds there are refused; it intercepts four of the fix-round rows only, listed below |
 | Certification passed on the latest pass, no post-cert fix round pending | **Close the loop** (owner gate) — open 🟠 stand down here and roll into the backlog² |
 | Latest line is a verification with reopened fixes, or with serious findings still open | **Fix round** |
 | Latest line is a clean verification | **Judgment call**: delta-worthy¹ → **delta discovery**; patch-grade → loop **quiet** |
@@ -92,7 +92,7 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | Open serious findings with no resolution answering the latest review | **Fix round** |
 | Loop quiet, any 🟠 still open (queued or not) | **Sweep round**, then its verification, then certification |
 | Loop quiet, a manifest lens never ran on the target | **Lens-coverage discovery**³ — certification refused until every manifest lens has run |
-| Loop quiet, no blind pass since the last substantive fix round | **Delta discovery** — that round's seed rate³ is unmeasured, and unmeasured is not quiet |
+| Loop quiet, no blind pass since the last substantive fix round | **Delta discovery** — a note and a gate refusal, not a routed row (below); that round's seed rate³ is unmeasured, and unmeasured is not quiet |
 | Loop quiet, nothing open, lens coverage complete | **Certification**² (owner gate) |
 | Certification quiet | **Certified** — verdict `approved`; loop done |
 
@@ -103,10 +103,17 @@ writes one set of records and passes one doc gate. The verifier is never the fix
 While a resolved round waits for its verification the ledger is not read for open work — its rows
 still read `open`, because the unit's records render only after the verification.
 
-The two convergence refusals land in different places: the router refuses certification itself on
-lens-coverage debt, and reports an unmeasured seed rate as a note on the clean-verification row.
-Both refusals are then executed at the certification gate — by the owner, or by
-[lib/autonomy-policy.mjs](lib/autonomy-policy.mjs) in an unattended run, which answers the gate
+**Where the convergence rule bites.** The design-pass gate sits inside the router's fix-round
+helper. It can therefore intercept only the four fix-round rows that go through that helper: the
+two routed from a verification's results (reopened fixes, new serious findings), the row for a
+resolution that is `open` or `in-progress`, and the row for open serious findings with no
+resolution answering the latest review. The armed row, the ≥ 3 batch row and the loop-quiet sweep
+row answer `fix round` directly, and the gate never sees them.
+
+Lens-coverage debt is refused by the router itself, on its loop-quiet row. An unmeasured seed rate
+is not a routed row at all. The router prints it as a note on the clean-verification row, and the
+refusal is executed at the certification gate — by the owner, or by
+[lib/autonomy-policy.mjs](lib/autonomy-policy.mjs) in an unattended run, which answers that gate
 with the owed lens-coverage discovery or the delta discovery instead.
 
 ¹ **Delta-worthy** = the fix round fixed a 🔴, added/converted a mechanism, or changed a

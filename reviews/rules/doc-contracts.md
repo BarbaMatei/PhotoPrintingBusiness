@@ -17,8 +17,9 @@ prose (summaries, Decisions, glance cells); machine-rendered rows are the lint's
 `doc-gate.mjs <target> <pass>` lints a round's files plus the
 cross-target files keyed to that target, `doc-gate.mjs state` the cross-target files
 alone, and `lib/tests/run-tests.mjs` lints the gate itself against fixtures. The lint also
-checks every `PPW-<n>` and every commit sha written into a state-file cell for this target:
-an id absent from the target's ledger, or a sha `git cat-file -e` cannot resolve, is a
+checks the target's own cells in the index — its row in `Targets at a glance` and its rows in
+`Passes`, and nothing in the backlog. Every `PPW-<n>` there must exist in that target's ledger,
+and every commit sha there must resolve under `git cat-file -e`; either miss is a
 violation. Scope: every
 per-target artifact, plus the cross-target `index.md` and `backlog.md`. `reviews/system/`
 and `track-record.md` have no contract
@@ -138,11 +139,13 @@ Allowed system terms. Anything else must be everyday English.
   allowed; the list and the tiebreak rule sit under `backlog.md` below.
 - **worklog** — `worklog.jsonl`, the per-target append-only event trail.
 - **stamper** — `lib/wl.mjs`, the only sanctioned way to append a worklog event; it owns the timestamp and enforces the event vocabulary and each event's required fields.
-- **void** — an appended worklog event that repairs a mis-stamped one; readers drop what it matches.
+- **void** — an appended worklog event that repairs a mis-stamped one. The stamper, the renderer and the speed report drop the events it matches; the auditor and the lint miner still read them (the restructure phase consolidates the readers).
+- **sitting** — one visit to the doc gate: a run of adjacent `doc-gate` events sharing a round or pass key.
 - **`verify-result`** — the worklog event a verification appends per checked row: its id, its verdict, and the commit the row was proved at.
 - **renderer** — `lib/render-records.mjs`, which turns a unit's worklog into its metrics line, its index rows and its ledger flips.
 - **test wrapper** — `lib/run-scoped-tests.mjs`, which runs one scoped suite under a machine-global lock and stamps its `test-run` event.
 - **speed report** — `lib/speed-report.mjs`, the read-only acceptance measurement of where a loop's wall-clock time went (definitions in `metrics-schema.md`).
+- **lint miner** — `lib/gate-miner.mjs`, which lists the doc gate's judge disapprovals so a person can decide which become deterministic lint checks.
 - **index** — `reviews/state/index.md`, one row per pass, repo-wide.
 - **severity** — 🔴 High · 🟠 Medium · 🟡 Low · ⚪ Cleanup.
 - **verdict** — `request-changes` · `approve-with-followups` · `approved`.
@@ -167,7 +170,7 @@ Allowed system terms. Anything else must be everyday English.
 - **test audit** — the sidecar check that a round's new tests assert what the fix brief's test shape states (three rules in the `/fix-review` skill); required whenever the round ran a red test run.
 - **evidence audit** — the verification mode for a round whose resolution records a per-fix revert proof for every fixed row: an independent agent reads the recorded red/green evidence and re-runs a random 2–3 rows; any non-reproduction reverts the target to full re-runs.
 - **seed rate** — `s(r)`: serious (🟠+) fix-caused findings the next blind pass attributes to fix round r (`seed_round` in metrics `findings[]`), divided by round r's fix count. Missing lineage means *not yet measured*, never zero.
-- **lens-coverage pass** — a lean full-scope discovery run on one manifest lens that has never run on the target; certification is refused while any is owed.
+- **lens-coverage pass** — a lean full-scope discovery run on one manifest lens that has never run on the target; certification is refused while any is owed. (The router prints it as `lens-coverage discovery (<lens>)`.)
 - **design pass** — the owner-gated pass replacing fix rounds for a component whose patching measured non-convergent (two consecutive rounds seeding it at s ≥ 0.3): a protocol block at component level, reimplementation against it, then discovery. At most one per component per loop; recorded as a fix round whose metrics notes carry `design-pass:<area>`.
 - **override log** — `reviews/state/overrides.jsonl`, untracked: the pre-commit hook's record of every `COMMENTS_OK`/`DOCGATE_OK` use. An entry newer than an unattended run's start stops the run.
 - **reconciliation** — after the blinded pass, matching its finds to ledger rows and
@@ -256,9 +259,12 @@ never estimated.
 
 Every event goes in through the stamper, which owns the timestamp and rejects an
 event outside the vocabulary or missing a required field. Two events serve the
-records: `void`, which repairs a mis-stamped event by naming it in `of` so every
-reader drops it, and `verify-result`, which carries a checked row's id, verdict
-and proved-at commit for the verification to render from.
+records. `void` repairs a mis-stamped event by naming it in `of`; the stamper, the
+renderer and the speed report then drop what it matches, while the auditor and the
+lint miner read the log unfiltered (the restructure phase consolidates them, so
+never repair a record a void alone would leave the auditor reading). `verify-result`
+carries a checked row's id, verdict and proved-at commit for the verification to
+render from.
 
 Since the 2026-08-28 cut-off it is also the hand-back evidence the auditor
 refuses `status: resolved` without:

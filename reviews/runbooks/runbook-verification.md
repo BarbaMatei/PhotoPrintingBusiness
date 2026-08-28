@@ -17,24 +17,43 @@ feature clean?".
    **test-only** fix round (zero production-code changes) may be self-verified when every fix
    carries a revert-and-rerun proof whose failing-test set was predicted before the revert and
    matched exactly, recorded in the resolution. Any production-code change voids the exception.
-2. **Evidence audit — when the round recorded its own proofs (2026-08-28).** A round whose
-   resolution records a single-lever revert proof for **every** `fixed` row (the lever and
-   the red evidence, per the `/fix-review` contract) is not re-proven wholesale: an agent
-   who is not the fixer reads the recorded red/green evidence and **re-runs a random 2–3
-   rows** (`verify-fixes.mjs --only`, or the recorded lever by hand). Every sampled row
-   reproduces → the evidence stands, proceed to step 3. **Any sampled row that fails to
-   reproduce reverts this target to full re-runs, this round and every later one.** The
-   `verified` flip still belongs to this re-review, never to the fixer's own record.
+2. **Revert-and-rerun — every round, every `fixed` row.** Revert the fix (source only); its
+   regression test must go red with clean attribution and zero collateral; restore, green. A fix
+   whose test cannot go red is not verified — reopen it. Run it mechanically over the whole
+   round:
 
-   **Full revert-and-rerun — every other round:** revert the fix (source only), its regression
-   test must go red with clean attribution and zero collateral; restore, green. A fix whose
-   test cannot go red is not verified — reopen it.
-   `node reviews/lib/verify-fixes.mjs <target>` runs this step mechanically and prints one
-   verdict line per fix; `test-never-red`, `revert-failed` and `green-failed` rows come back
-   to you for a reopen or a hand check. The red leg counts only when the runner output
-   names a failing test (recorded in `red_evidence`); a revert that breaks compilation —
-   or reddens with nothing attributable — is `revert-broke-build`: re-prove that row by
-   its smallest lever by hand, never by trusting the non-zero exit.
+   ```
+   node reviews/lib/verify-fixes.mjs <target>
+   ```
+
+   It prints one verdict line per row and stamps one `verify-result` event per row, which step 5
+   renders the ledger flips from. `--only PPW-1,PPW-2` re-runs named rows; it is never the first
+   pass over a round. The red leg counts only when the runner output names a failing test
+   (recorded in `red_evidence`); a revert that breaks compilation — or reddens with nothing
+   attributable — is `revert-broke-build`, never red. The tree must be clean or the run refuses.
+
+   **Rows the script cannot verdict** — `revert-broke-build`, `env-missing`, `test-never-red`,
+   `revert-failed`, `green-failed` — come back to you. Re-prove such a row by its smallest lever
+   by hand, never by trusting a non-zero exit. A row you prove held by hand needs its own stamp,
+   or step 5 leaves it `fixed`:
+
+   ```
+   node reviews/lib/wl.mjs <target> verify-result --id PPW-<n> --verdict held --commit <sha>
+   ```
+
+   The renderer keeps the last `verify-result` per id in the pass span, so this supersedes the
+   script's verdict for that row. Reopen every row you cannot prove, and leave the script's
+   verdict standing for it.
+
+   **Evidence audit — when the round recorded its own proofs (2026-08-28).** A round whose
+   resolution records a single-lever revert proof for **every** `fixed` row (the lever and the
+   red evidence, per the `/fix-review` contract) also gets its claims checked: an agent who is
+   not the fixer reads the recorded red/green evidence and **re-runs a random 2–3 rows** by their
+   recorded lever. This audits the fixer's record; it does not replace the run above. Every
+   sampled row reproduces → the record stands. **Any sampled row that fails to reproduce is a
+   finding of its own: reopen it and record that this target's recorded proofs are unreliable,
+   this round and every later one.** The `verified` flip always belongs to this re-review, never
+   to the fixer's own record.
 3. **Judgment items** (doc fixes; `wont-fix` / `deferred` / `disputed` rationales): first run
    `git diff <last-affirmed-commit>..HEAD -- <cited files>` yourself. Unchanged → record
    "unchanged since `<commit>`, stands" with **no agent**. Changed → one anchored Explore
@@ -60,7 +79,9 @@ feature clean?".
    — it renders the [metrics.jsonl](../rules/metrics-schema.md) line, the
    [index.md](../state/index.md) row, and the ledger flips (`verified` at the proved-at commit
    for a held fix, back to `open` for a reopened one, one History line each) from the
-   `verify-result` events `verify-fixes.mjs` stamped in step 2. Add `--new-findings h,m,l,c`
+   `verify-result` events of step 2 — the script's, plus any you stamped by hand. A `fixed` row
+   with no `verify-result` in this pass's span is not flipped and stays `fixed`; the renderer
+   says so when it finds no events at all. Add `--new-findings h,m,l,c`
    when the pass named new defects. Commit the worklog the run left behind. Then run
    `node reviews/lib/records-auditor.mjs <target>` — it must exit clean — and the unit's single
    doc gate covers this pass's records together with the fix round's. A verification that
