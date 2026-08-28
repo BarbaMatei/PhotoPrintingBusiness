@@ -1,7 +1,8 @@
 ---
 type: design-note
-status: paused — owner order 2026-08-22 (subscription budget); resume from this file
+status: paused — owner order 2026-08-28 after Phase 4; resume from this file
 created: 2026-08-22
+updated: 2026-08-28
 owner: Matei Barba
 ---
 
@@ -12,10 +13,20 @@ Branch `chore/loop-speed-redesign` (worktree `.claude/worktrees/loop-speed`, bas
 implementation plan is committed beside this file as
 [loop-speed-plan.md](loop-speed-plan.md) — task numbers below refer to it. Execution
 ran subagent-driven: every task got an independent review and a scoped re-review;
-all listed work is review-clean. The lib test suite stands at **299 assertions, all
-passing**, now split per script (`node reviews/lib/tests/run-tests.mjs [--only <name>]`).
+all listed work is review-clean. The lib test suite stands at **565 assertions, all
+passing**, split per script (`node reviews/lib/tests/run-tests.mjs [--only <name>]`;
+the full run takes 2–3 minutes).
 
-## Done (tasks 1–8 of 18, plus the suite split)
+2026-08-28: the owner merged `feat/bolt-038-vat-calculation` (038 loop closed
+2026-08-27 without certification) and its "accepted fix-round audit" machinery (R1–R6:
+protocol blocks, round-scope review, test-meaning audit, override log, convergence rule,
+lens-coverage debt, design-pass gate, verify-fixes `revert-broke-build`) into this branch
+at `2831ffb`. None of the redesign's vocabulary was in that merge's doc text, so Tasks
+14–17 stay as written but become **integration edits over the merged text** — never
+overwrite the audit sections. `reviews/lib/vocab.mjs` (MANIFEST_LENSES, AREAS, V4_CUTOFF)
+is now the machine authority the scripts share.
+
+## Done (tasks 1–13 of 18, plus the suite split)
 
 | Work | Commits |
 |---|---|
@@ -28,16 +39,26 @@ passing**, now split per script (`node reviews/lib/tests/run-tests.mjs [--only <
 | T7 gate-miner (lint-miner reporter), instant-parsed date handling | `3a872e5` `ae60510` |
 | T8 router + policy: ledger-driven routing, queue threshold 3, sweep before certification, reviewed-unit wording, shared `ledger.mjs`/`standsDown` | `2780fd0` `a15b5bb` `52e9162` `256acaa` |
 | Test-suite split: per-script `tests/*.test.mjs` + `lib.mjs` + `integration.test.mjs`, `--only` scoping | `4301c62` |
+| T9b `wl.mjs` accepts the audit machinery's events (`protocol-written`, `check-dispatched/returned` with `ids`, `round-review-*`, `test-audit-*`) | `7f11a33` `4b61337` |
+| T9 `run-scoped-tests.mjs` — stamping test wrapper with a machine-global lock (ownership-guarded; Windows: dead-pid steal is the recovery, signal handlers are POSIX-only) | `61ec043` `ae98e5d` `41ba6e0` |
+| T10 `mint-id.mjs` — PPW minting + ledger/resolution scaffolds read from the templates at runtime, CRLF-safe | `38e0a31` `a97b0e3` |
+| T11 `speed-report.mjs` — the acceptance metrics; fixtures frozen on the real 038 records | `2a9590b` `4408979` |
+| T12 `summary-data.mjs` — computed half of the owner summary; certification pairs merged per pass | `3f88c8e` `9661aee` |
+| T13 consolidation — 565 assertions across 13 test files; every CLI prints usage on bad args | — |
 
-## Remaining (plan tasks 9–18)
+**Acceptance baseline as `speed-report.mjs` measures it** (definitions implemented, not
+the plan's prose): reference snapshot of 2026-08-21 (log cut at the v12 pass-launch,
+175 events) — span 702.0 min, fix-round work 262.1, records+gates 191.3, idle 114.6,
+doc-gate first-pass 0.636, correction lines 25 (cumulative to the day); per-round all-in
+min per fixed finding r6 7.8 · r8 41.2 · r9 29.0 · r10 21.4, median 25.2. The frozen
+full-day fixture (5 later evening events) reads span 763.4 / first-pass 0.667 /
+sittings-per-fix 0.414. Records+gates uses a 30-minute anchor-carry cap; a doc-gate
+"sitting" is a run of adjacent doc-gate events — both chosen because the plan's literal
+rules landed outside the measured ranges. Targets stand: ≤15 min/fix, ≥90% first-pass,
+≤0.15 sittings/fix, ~0 corrections.
 
-- **T9** `run-scoped-tests.mjs` — stamping, machine-global-locking test wrapper.
-- **T10** `mint-id.mjs` — PPW minting + ledger/resolution scaffolds.
-- **T11** `speed-report.mjs` — the acceptance metrics, fixture frozen on the real
-  2026-08-21 worklog (baseline: 35–50 min/fix tail, 58% gate first-pass, 0.38
-  sittings/fix, 25 corrections; targets: ≤15, ≥90%, ≤0.15, ~0).
-- **T12** `summary-data.mjs` — the computed half of the owner summary.
-- **T13** suite consolidation for phases 1–4.
+## Remaining (plan tasks 14–18)
+
 - **T14** `metrics-schema.md` + `doc-contracts.md` — describe the new reality.
 - **T15** `README.md` router table + `runbook-verification.md`.
 - **T16** loop-driver + fix-review skills: reviewed-unit sequence, queue/sweep,
@@ -45,9 +66,19 @@ passing**, now split per script (`node reviews/lib/tests/run-tests.mjs [--only <
 - **T17** future-ideas script backlog in `self-driving-loop-design.md`.
 - **T18** sandbox replay against the 2026-08-21 records + final whole-branch review.
 
-T9–T12 are now parallelizable (each brings its own `tests/<script>.test.mjs`; the
-shared-file serialization the split removed was the only blocker). Estimated
-remaining effort: ~2.5–3 h wall.
+T14+T15 and T16+T17 can run as two parallel doc dispatches (disjoint files); T18's
+sandbox replay is already done for the renderer half (below) and needs only the
+speed-report run and the final whole-branch review. Estimated remaining effort:
+~1.5–2 h wall.
+
+**T18 replay, renderer half (done 2026-08-28, sandbox copy under the session
+scratchpad, live records untouched):** with three `void` events (the mis-stamped
+round-start 7 @08:07:59, round-end 7 @08:57:07, round-start 8 @10:15:47) and three
+hand-inserted `round-start` stamps (round 7 @10:15:47, round 9 @14:57:17 and
+@16:15:29), `render-records.mjs --dry-run` computes round 7 = 1694 s (28.2 min; the old
+line said 9362 s), round 8 = 1399 s (23.3 min; old 6268 s), round 9 = 7653 s (127.6 min
+over three spans, idle 0, 21 test invocations; old 11735 s). The router reads the
+sandbox as `loop CLOSED` — correct.
 
 ## Rulings and constraints the remaining tasks must honor
 
@@ -71,6 +102,16 @@ remaining effort: ~2.5–3 h wall.
   keeps its delta discovery (pinned by tests).
 - Regression trigger: `findings[]` flat-mapped across all verification lines,
   filtered to still-open mediums (pinned by tests).
+- **T14 also states:** `wl.mjs` is the only sanctioned way to stamp worklog events, and
+  its vocabulary now includes the audit events; `speed-report.mjs`'s metric definitions
+  as implemented (above); `summary-data.mjs` merges certification-pair lines per pass.
+- **T16 also states:** the fixer stamps `check-dispatched` with `round`, `cluster` AND
+  `ids` (the merged skill's prose at line ~175 names only `ids`); test runs go through
+  `run-scoped-tests.mjs`; the policy may answer `lens-coverage discovery (<lens>)` and
+  `fix round` (sweep) — the driver executes both like router answers.
+- Merged-text integration: the audit machinery's sections (protocol blocks, round
+  review, test audit, convergence rule, override log) are the owner's and stay verbatim;
+  the redesign's text is added beside them.
 
 ## Deferred minors (for T18's final whole-branch review to triage)
 
@@ -86,7 +127,13 @@ ledger rows; route-next-pass row 3 re-implements part of `standsDown` by hand
 (reorder hazard). gate-miner: IO-error path untested; malformed lines silently
 skipped; header overclaims day-granularity for print order. Misc: two-line fixture
 comment at the worklog-in-fix-commit test; `.githooks/pre-commit` comment gate scans
-only `*.cs`/`*.ts`.
+only `*.cs`/`*.ts`. Phase 4: run-scoped-tests steal-path two-collision has no fixture
+(correct by inspection); mint-id gained multi-line rationale comments in function bodies
+(beyond the header-block allowance); speed-report duplicates render-records'
+event-loading and gate-miner's disapproval rule; summary-data last-match-wins for two
+same-type lines sharing a pass number outside a certification pair; gate-miner IO-error
+path untested, malformed lines silently skipped, header overclaims day-granularity for
+print order.
 
 ## Operational notes
 
@@ -101,3 +148,12 @@ only `*.cs`/`*.ts`.
 - The SDD execution ledger (rulings, fix-round history, task reports) lives in the
   worktree's git-ignored `.superpowers/sdd/loop-speed-plan/`; everything needed to
   resume is in this file and the committed plan.
+- Phase 4 ran as five parallel implementers in isolated worktrees
+  (`.claude/worktrees/agent-*`, branches `task/9-run-scoped-tests`, `task/9b-wl-audit-events`,
+  `task-10-mint-id`, `task/11-speed-report`, `task-12-summary-data`); every commit was
+  cherry-picked onto this branch, so those worktrees and branches are disposable —
+  `git worktree remove` + `git branch -D` from the main checkout.
+- The merged pre-commit hook logs every `COMMENTS_OK`/`DOCGATE_OK` use to
+  `reviews/state/overrides.jsonl`, and the unattended policy stops on any override newer
+  than the run's start — the stale-hook `DOCGATE_OK` workaround used here therefore ends
+  the moment the branch's hook governs (post-merge), and should not be needed then.
