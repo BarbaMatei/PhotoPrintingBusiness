@@ -143,3 +143,64 @@ import { tmpdir } from 'node:os'
   check('no stray reviews/<target>/ folder is created for an archived target', !existsSync(join(T, 'reviews', target)), 'reviews/' + target + ' should not exist')
   rmSync(T, { recursive: true, force: true })
 }
+{
+  const T = mkdtempSync(join(tmpdir(), 'wl-audit-'))
+  const target = '934-wl-audit-events'
+  mkdirSync(join(T, 'reviews', target), { recursive: true })
+  writeFileSync(join(T, 'reviews', target, 'resolution-v1.md'), '---\nstatus: resolved\n---\n')
+  const wlPath = join(T, 'reviews', target, 'worklog.jsonl')
+  const lines = () => existsSync(wlPath) ? readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()) : []
+
+  let r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--round', '1', '--cluster', 'c1', '--ids', 'PPW-1,PPW-2'])
+  check('wl accepts protocol-written with round/cluster/ids', r.code === 0, r.out.trim())
+  const written = lines().length ? JSON.parse(lines()[lines().length - 1]) : null
+  check('wl parses --ids as an array via comma-split', !!written && Array.isArray(written.ids) && written.ids.length === 2 && written.ids[0] === 'PPW-1' && written.ids[1] === 'PPW-2', JSON.stringify(written))
+
+  r = run('wl.mjs', ['--root', T, target, 'check-dispatched', '--round', '1', '--cluster', 'c1', '--json', '{"ids":["PPW-3"]}'])
+  check('wl accepts check-dispatched with round/cluster/ids', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'check-returned', '--round', '1', '--cluster', 'c1', '--verdict', 'cleared'])
+  check('wl accepts check-returned with round/cluster/verdict', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'check-returned', '--round', '1', '--cluster', 'c1', '--verdict', 'cleared', '--tokens', '1200'])
+  check('wl still accepts check-returned with the optional tokens field', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-review-dispatched', '--round', '1'])
+  check('wl accepts round-review-dispatched with round', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'round-review-returned', '--round', '1', '--found', '0'])
+  check('wl accepts round-review-returned with round/found', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'test-audit-dispatched', '--round', '1'])
+  check('wl accepts test-audit-dispatched with round', r.code === 0, r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'test-audit-returned', '--round', '1', '--verdict', 'pass'])
+  check('wl accepts test-audit-returned with round/verdict', r.code === 0, r.out.trim())
+
+  const auditShapeCases = [
+    ['protocol-written', ['--round', '1', '--cluster', 'c1'], 'ids'],
+    ['check-dispatched', ['--round', '1', '--cluster', 'c1'], 'ids'],
+    ['check-returned', ['--round', '1', '--cluster', 'c1'], 'verdict'],
+    ['round-review-dispatched', [], 'round'],
+    ['round-review-returned', ['--round', '1'], 'found'],
+    ['test-audit-dispatched', [], 'round'],
+    ['test-audit-returned', ['--round', '1'], 'verdict'],
+  ]
+  for (const [ev, args, field] of auditShapeCases) {
+    const before = lines().length
+    const rr = run('wl.mjs', ['--root', T, target, ev, ...args])
+    check(`wl refuses ${ev} missing "${field}"`, rr.code === 1 && rr.out.includes('ERROR'), rr.out.trim())
+    check(`wl appends nothing for ${ev} missing "${field}"`, lines().length === before, String(lines().length))
+  }
+
+  r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--round', '1', '--cluster', 'c1', '--ids', 'BUG-1'])
+  check('wl refuses ids not shaped like PPW-<n>', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--round', '1', '--cluster', 'c1', '--json', '{"ids":[]}'])
+  check('wl refuses an empty ids array', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'check-dispatched', '--round', '1', '--cluster', 'c1', '--json', '{"ids":"PPW-1"}'])
+  check('wl refuses ids that is a string instead of an array', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  rmSync(T, { recursive: true, force: true })
+}

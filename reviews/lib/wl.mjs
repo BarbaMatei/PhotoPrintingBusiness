@@ -8,9 +8,10 @@
 //
 // Usage: node reviews/lib/wl.mjs [--root <repoRoot>] <target> <ev> [--<key> <value>]...
 //          [--json '<obj>']
-// Numeric-looking flag values become numbers; --json merges a raw object for fields flags
-// can't express (e.g. nested "of"). Also exports appendEvent(root, target, event) for other
-// lib scripts to call in-process; the CLI is a thin wrapper over it.
+// Numeric-looking flag values become numbers; --ids comma-splits into an array (e.g.
+// PPW-1,PPW-2); --json merges a raw object for fields flags can't express (e.g. nested
+// "of"). Also exports appendEvent(root, target, event) for other lib scripts to call
+// in-process; the CLI is a thin wrapper over it.
 // Exit: 0 appended (prints the appended line) · 1 usage or validation error (prints
 // "ERROR <reason>", appends nothing).
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs'
@@ -19,9 +20,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const VOCAB = new Set([
   'round-start', 'round-end', 'triage-done', 'gate-open', 'gate-closed', 'gate-parked',
-  'check-dispatched', 'check-returned', 'test-run', 'finding', 'micro-review-dispatched',
-  'micro-review-returned', 'doc-gate', 'pass-launch', 'pass-records-done', 'run-start',
-  'run-end', 'note', 'void', 'verify-result',
+  'protocol-written', 'check-dispatched', 'check-returned', 'test-run', 'finding',
+  'micro-review-dispatched', 'micro-review-returned', 'round-review-dispatched',
+  'round-review-returned', 'test-audit-dispatched', 'test-audit-returned', 'doc-gate',
+  'pass-launch', 'pass-records-done', 'run-start', 'run-end', 'note', 'void', 'verify-result',
 ])
 
 const REQUIRED = {
@@ -31,10 +33,17 @@ const REQUIRED = {
   'gate-open': ['reason'],
   'gate-closed': ['reason'],
   'gate-parked': ['kind', 'default', 'reason'],
+  'protocol-written': ['round', 'cluster', 'ids'],
+  'check-dispatched': ['round', 'cluster', 'ids'],
+  'check-returned': ['round', 'cluster', 'verdict'],
   'test-run': ['kind'],
   'finding': ['id', 'status'],
   'micro-review-dispatched': ['cluster'],
   'micro-review-returned': ['cluster'],
+  'round-review-dispatched': ['round'],
+  'round-review-returned': ['round', 'found'],
+  'test-audit-dispatched': ['round'],
+  'test-audit-returned': ['round', 'verdict'],
   'pass-launch': ['pass', 'type'],
   'pass-records-done': ['pass'],
   'verify-result': ['id', 'verdict'],
@@ -43,6 +52,7 @@ const REQUIRED = {
 
 const TEST_KINDS = new Set(['red', 'green', 'final', 'baseline', 'revert-and-rerun'])
 const PPW = /^PPW-\d+$/
+const IDS_EVENTS = new Set(['protocol-written', 'check-dispatched'])
 
 function readEvents(wlPath) {
   if (!existsSync(wlPath)) return []
@@ -94,6 +104,9 @@ function validateShape(event) {
   }
   if ((ev === 'finding' || ev === 'verify-result') && !PPW.test(event.id)) {
     throw new Error(`"${ev}" requires "id" shaped like PPW-<n>`)
+  }
+  if (IDS_EVENTS.has(ev) && (!Array.isArray(event.ids) || event.ids.length === 0 || !event.ids.every(id => PPW.test(id)))) {
+    throw new Error(`"${ev}" requires "ids" to be a non-empty array of PPW-<n> strings`)
   }
   if (ev === 'void') {
     const of_ = event.of
@@ -174,6 +187,7 @@ if (isMain()) {
       const a = argv[i]
       if (a === '--root') root = argv[++i]
       else if (a === '--json') Object.assign(event, JSON.parse(argv[++i]))
+      else if (a === '--ids') event.ids = argv[++i].split(',')
       else if (a.startsWith('--')) event[a.slice(2)] = coerce(argv[++i])
       else rest.push(a)
     }
