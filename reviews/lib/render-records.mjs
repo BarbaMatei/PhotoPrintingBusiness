@@ -131,8 +131,7 @@ function sliceSpans(events, spans) {
 // ---------- index row: built here, inserted as the newest row of the Passes table ----------
 const indexPath = join(ROOT, 'reviews', relative(REVIEWS_HOME, INDEX))
 const targetKey = /^\d+/.exec(target)?.[0] ?? target
-// A Windows checkout keeps these files CRLF: split on \n leaves the \r on every line, so an
-// inserted line needs its own to match its neighbours and leave the rest byte-identical.
+// These files are CRLF: split on \n keeps every \r, so an inserted line needs its own to match.
 const crOf = lines => lines.some(l => l.endsWith('\r')) ? '\r' : ''
 
 function planIndex(row) {
@@ -317,8 +316,7 @@ function renderFixRound() {
   const checkTokens = checksReturned.reduce((a, e) => a + (Number.isFinite(e.tokens) ? e.tokens : NaN), 0)
   const triage = by('triage-done')[0]
   const checksRun = by('check-dispatched').length
-  // Since 2026-08-28 the one round-scope composition review replaces per-cluster
-  // micro-reviews; both event shapes count into the same metrics field (audit R3).
+  // The round-scope review replaced per-cluster micro-reviews; both shapes count into one field.
   const microD = by('micro-review-dispatched').length + by('round-review-dispatched').length
   const microFound = [...by('micro-review-returned'), ...by('round-review-returned')].reduce((a, e) => a + (Number.isFinite(e.found) ? e.found : 0), 0)
 

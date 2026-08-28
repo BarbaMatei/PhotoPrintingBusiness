@@ -20,10 +20,7 @@ export function readLedger(file) {
 
 export const openIds = (rows, sev) => rows.filter(r => r.sev === sev && OPEN_STATUSES.includes(r.status)).map(r => r.id)
 
-// The one rule for when the ledger is NOT the authority on open work: the newest resolution reads
-// `resolved` and its round has no fix-round line yet, so the round's records (and the ledger flips
-// they carry) are still pending its verification — the same window records-auditor.mjs calls
-// resolved-no-line. Every caller asks here so the auditor, the router and the policy agree.
+// The ledger is not the authority while a resolved round's records are unrendered (resolved-no-line).
 export function standsDown(dir) {
   const files = readdirSync(dir)
   const newest = re => {

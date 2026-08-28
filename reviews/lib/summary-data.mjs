@@ -34,10 +34,7 @@ if (!existsSync(metricsPath)) { console.error(USAGE); process.exit(2) }
 const allLines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
 const lines = allLines.filter(l => !l.correction_for)
 
-// A certification pair writes two lines sharing one `pass`, subtypes A/B (metrics-schema.md);
-// treat every discovery-type line at a pass number as one unit — union lenses, sum
-// new_findings/budget_skipped, concatenate findings[] — so a pair reads as one pass, not two
-// contradictory halves. A same-numbered non-discovery-type line (verification) never merges in.
+// A certification pair writes two lines at one `pass`, so discovery-type lines merge per pass.
 const isDiscoveryType = l => l.type === 'discovery' || l.type === 'delta-discovery'
 const discoveryGroups = new Map()
 for (const l of lines) {

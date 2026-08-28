@@ -74,10 +74,7 @@ function isAlive(pid) {
   try { process.kill(pid, 0); return true } catch { return false }
 }
 
-// Only the run that successfully creates the lock owns it, so only that run may delete it —
-// a run that exits 3 because another pid holds it must never touch that file. A steal is
-// attempted at most once: a second collision right after stealing means a sibling won the
-// race, and is treated as live rather than stolen again (no unlink-fight between siblings).
+// Only the creating run may delete the lock, and a dead holder's lock is stolen at most once.
 function acquireLock() {
   const payload = JSON.stringify({ pid: process.pid, started: new Date().toISOString() })
   let stolenOnce = false

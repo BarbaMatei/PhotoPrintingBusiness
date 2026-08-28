@@ -182,9 +182,7 @@ if (led) {
   if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
 }
 
-// Row 3 outranks every ledger row and the verification-results row: while the newest resolution is
-// resolved with its round's records unrendered, the open rows are the ones that verification will
-// close, and the latest metrics line is the round's own review or verification, not its answer.
+// Row 3 outranks the ledger rows and the verification row: both describe work this round answered.
 if (standsDown(t.dir)) {
   say(`ROUTER: resolution-v${RN} resolved, not yet re-reviewed (row 3).`)
   finish(0, 'verification (reviewed unit — render records once, after it)', null)

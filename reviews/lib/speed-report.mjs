@@ -124,9 +124,7 @@ function pairSpans(startEv, endEv, key, resume) {
 
 const passSpans = pairSpans('pass-launch', 'pass-records-done', 'pass', null)
 
-// A resumed fix round re-triages before it works again, so its latest triage-done is where it
-// restarts. A stray end reaching back across a closed run or a whole pass is not a resumption —
-// charging it would hand that time to the round, so it is reported and dropped instead.
+// A resumed round restarts at its latest triage-done; an end reaching back past a run or pass is dropped.
 const resumeRound = (e, i, spans) => {
   const after = spans.filter(s => s.key === e.round).reduce((a, s) => Math.max(a, s.to), -1)
   let from = null

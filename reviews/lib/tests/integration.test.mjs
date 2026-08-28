@@ -588,8 +588,7 @@ Fixture copy: one conforming row.
     statusLines().length === 1 && statusLines()[0].endsWith(wlRel), g('status', '--porcelain').stdout)
   commitWorklog('worklog after two-row run')
 
-  // A fix commit can itself touch worklog.jsonl (a fixer commits a worklog event alongside their
-  // code change); the revert/restore cycle must not corrupt that already-committed history.
+  // A fix commit can itself touch worklog.jsonl, and revert/restore must not corrupt that history.
   writeFileSync(join(T, 'src', 'app2', 'c.txt'), 'buggyC\n')
   g('add', '.'); g('commit', '-qm', 'c base')
   writeFileSync(join(T, 'src', 'app2', 'c.txt'), 'fixedC\n')
