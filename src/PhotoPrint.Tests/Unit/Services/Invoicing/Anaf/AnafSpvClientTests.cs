@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Models;
 using PhotoPrint.API.Services.Invoicing.Anaf;
 using PhotoPrint.Tests.Helpers;
 using PhotoPrint.Tests.Unit.Services.Sameday;     // reuse ScriptedHttpMessageHandler
@@ -45,6 +46,51 @@ public class AnafSpvClientTests
 
         result.UploadId.Should().Be("index-42");
         result.SubmittedAt.Should().Be(now);
+    }
+
+    // A wrong base URL or a token without the scope is our misconfiguration, not ANAF judging the
+    // document: parking every invoice for it costs an admin retry per row.
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.MethodNotAllowed)]
+    public async Task Upload_treats_a_misconfiguration_status_as_unreachable_not_content_rejected(
+        HttpStatusCode status)
+    {
+        var script = new ScriptedHttpMessageHandler(_ => new HttpResponseMessage(status));
+        var sut = Build(script, DateTimeOffset.UtcNow);
+
+        var act = () => sut.UploadAsync(Encoding.UTF8.GetBytes("<Invoice />"));
+
+        await act.Should().ThrowAsync<AnafUnreachableException>();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.UnprocessableEntity)]
+    public async Task Upload_treats_a_document_refusal_as_content_rejected(HttpStatusCode status)
+    {
+        var script = new ScriptedHttpMessageHandler(_ => new HttpResponseMessage(status));
+        var sut = Build(script, DateTimeOffset.UtcNow);
+
+        var act = () => sut.UploadAsync(Encoding.UTF8.GetBytes("<Invoice />"));
+
+        await act.Should().ThrowAsync<AnafContentRejectedException>();
+    }
+
+    // A proxy error page can parse as XML; storing an over-long id fails the status write, not the upload.
+    [Fact]
+    public async Task Upload_throws_when_index_incarcare_is_wider_than_the_column_that_stores_it()
+    {
+        var tooLong = new string('9', Invoice.AnafUploadIdMaxLength + 1);
+        var script = new ScriptedHttpMessageHandler(_ => ScriptedHttpMessageHandler.Json(
+            HttpStatusCode.OK,
+            $"<header index_incarcare=\"{tooLong}\" data_incarcare=\"2026-06-03 11:30:00\" />"));
+
+        var sut = Build(script, DateTimeOffset.UtcNow);
+
+        var act = () => sut.UploadAsync(Encoding.UTF8.GetBytes("<Invoice />"));
+        await act.Should().ThrowAsync<AnafUploadException>();
     }
 
     [Fact]
@@ -222,6 +268,7 @@ public class AnafSpvClientTests
         {
             typeof(AnafUploadException), typeof(AnafUnreachableException),
             typeof(AnafAuthException), typeof(AnafUploadTimeoutException),
+            typeof(AnafContentRejectedException),
         }.Should().Contain(thrown!.GetType());
     }
 

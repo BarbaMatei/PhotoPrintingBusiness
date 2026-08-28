@@ -283,10 +283,8 @@ public class PhotoPrintDbContext : DbContext
             entity.HasIndex(o => o.PaymentIntentId)
                   .HasDatabaseName("ix_orders_payment_intent_id");
             entity.Property(o => o.Status).HasConversion<string>();
-            entity.Property(o => o.PaymentProcessor).HasConversion<string>();
             entity.Property(o => o.DeliveryType).HasConversion<string>();
             entity.Property(o => o.PaymentIntentId).HasMaxLength(200);
-            entity.Property(o => o.EuPlatescTransactionId).HasMaxLength(200);
             entity.Property(o => o.OrderNumber).HasMaxLength(20);
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
@@ -306,7 +304,6 @@ public class PhotoPrintDbContext : DbContext
             // too long" on prod Postgres AFTER the Stripe charge exists if Stripe ever
             // lengthens IDs (InMemory doesn't enforce it, so those tests wouldn't catch it).
             entity.Property(o => o.StripeClientSecret).HasMaxLength(512);
-            entity.Property(o => o.EuPlatescRedirectUrl).HasMaxLength(1000);
 
             // At most one order may carry any given non-null IdempotencyKey.
             // Postgres permits multiple NULLs in a unique index, so key-less orders
@@ -396,7 +393,7 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(i => i.InvoiceNumber).HasMaxLength(50);
             entity.Property(i => i.Series).HasMaxLength(10);
             entity.Property(i => i.AnafStatus).HasConversion<string>().HasMaxLength(30);
-            entity.Property(i => i.AnafUploadId).HasMaxLength(100);
+            entity.Property(i => i.AnafUploadId).HasMaxLength(Invoice.AnafUploadIdMaxLength);
             entity.Property(i => i.PdfStoragePath).HasMaxLength(500);
             // Int-stored like Upload.StorageLocation, the other exception to the enums-as-strings rule.
             entity.Property(i => i.StorageLocation)

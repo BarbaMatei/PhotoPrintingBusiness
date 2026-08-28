@@ -123,7 +123,7 @@ created: 2026-06-03T14:00:00Z
 
 Two issues surfaced and were resolved during Stage 5:
 
-1. **`PaymentControllerIntegrationTests` failed initially** after bolt 039 wired `IInvoiceCreationService` into the Stripe / EuPlatesc webhook handlers. Root cause: tests use the InMemory provider, so DI falls through to `PostgresInvoiceNumberingService` (the `else` branch), and `nextval()` doesn't translate. Fix: added `FakeInvoiceNumberingService` to `PaymentFactory.ConfigureTestServices`, registered via the same swap pattern as `FakeStripePaymentGateway`. All 15 PaymentController tests now pass.
+1. **`PaymentControllerIntegrationTests` failed initially** after bolt 039 wired `IInvoiceCreationService` into the Stripe / the legacy processor webhook handlers. Root cause: tests use the InMemory provider, so DI falls through to `PostgresInvoiceNumberingService` (the `else` branch), and `nextval()` doesn't translate. Fix: added `FakeInvoiceNumberingService` to `PaymentFactory.ConfigureTestServices`, registered via the same swap pattern as `FakeStripePaymentGateway`. All 15 PaymentController tests now pass.
 
 2. **`InvoicePdfRendererTests.Pdf_bytes_contain_invoice_number_seller_name_and_totals` failed** initially. Root cause: QuestPDF FlateDecode-compresses text streams in the emitted PDF, so the literal "FT-2026-00042" is not searchable as ASCII bytes. Fix: rewrote the assertion to verify structural validity (PDF magic header + footer + non-trivial size) rather than literal text. Content correctness is covered at the XML builder layer (same data projection) and via manual inspection during the ADR-022 dual-write inspection week.
 

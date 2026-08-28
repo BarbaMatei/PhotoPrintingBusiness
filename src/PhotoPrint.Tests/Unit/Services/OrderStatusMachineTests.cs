@@ -140,12 +140,21 @@ public class OrderStatusMachineTests
             OrderStatusMachine.Transition(order, OrderStatus.Printing));
     }
 
+    // A declined card leaves the intent chargeable, so a later success has to be able to land.
     [Fact]
-    public void PaymentFailed_To_Paid_ThrowsInvalidTransition()
+    public void PaymentFailed_To_Paid_IsAllowed()
+    {
+        var order = MakeOrder(OrderStatus.PaymentFailed);
+        OrderStatusMachine.Transition(order, OrderStatus.Paid);
+        Assert.Equal(OrderStatus.Paid, order.Status);
+    }
+
+    [Fact]
+    public void PaymentFailed_To_Printing_ThrowsInvalidTransition()
     {
         var order = MakeOrder(OrderStatus.PaymentFailed);
         Assert.Throws<InvalidOrderTransitionException>(() =>
-            OrderStatusMachine.Transition(order, OrderStatus.Paid));
+            OrderStatusMachine.Transition(order, OrderStatus.Printing));
     }
 
     // ── CanTransition guard ───────────────────────────────────────────────────

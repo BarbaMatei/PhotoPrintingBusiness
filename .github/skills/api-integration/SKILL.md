@@ -1,6 +1,6 @@
 ---
 name: api-integration
-description: API integration patterns for FotoTipar — connecting Angular frontend to ASP.NET Core backend, Stripe payments, EuPlatesc, Sameday shipping, Google OAuth, and SendGrid email. Use this skill when implementing API calls, webhooks, or third-party service integrations.
+description: API integration patterns for FotoTipar — connecting Angular frontend to ASP.NET Core backend, Stripe payments, Sameday shipping, Google OAuth, and SendGrid email. Use this skill when implementing API calls, webhooks, or third-party service integrations.
 ---
 
 ## Internal API (Frontend ↔ Backend)
@@ -75,22 +75,6 @@ export class OrderService {
 - Stripe secret key: server-side only (environment variable)
 - Webhook signature verification mandatory
 - Idempotent webhook handling (check if order already marked paid)
-
-## EuPlatesc Integration
-
-### Flow
-
-1. Backend generates form data with HMAC-MD5 signature
-2. Frontend submits hidden form → user redirected to EuPlatesc
-3. EuPlatesc sends IPN callback to `POST /api/webhooks/euplatesc`
-4. User redirected back with result parameters
-
-### Backend Implementation
-
-- HMAC-MD5 signature over concatenated fields (per EuPlatesc docs)
-- IPN handler: verify HMAC signature, update order status
-- Idempotent: check if payment already processed before updating
-- Log all IPN data for audit trail
 
 ## Sameday Shipping API
 

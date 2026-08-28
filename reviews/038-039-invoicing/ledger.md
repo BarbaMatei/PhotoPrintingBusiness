@@ -1,7 +1,8 @@
 ---
 type: review-ledger
 target: 038-039-invoicing
-updated: 2026-08-21
+updated: 2026-08-27
+closed: 2026-08-27 — owner ruling, not certified: 11 rows left open, PPW-687..PPW-690 to fix before a real card
 ---
 
 # Ledger — 038-039-invoicing
@@ -50,9 +51,9 @@ updated: 2026-08-21
 | PPW-506 | 🟠 | v2 | Config comment and rollout runbook still promise the customer invoice email that does not exist | `docs/DEPLOYMENT.md:1409` | verified | `08e7746` |
 | PPW-507 | 🟡 | v2 | New `Anaf:ClaimTtlMinutes` knob has no config default entry and no deployment documentation | `Configuration/AnafSettings.cs:44` | verified | `08e7746` |
 | PPW-508 | 🟡 | v2 | Exhausted invoice-number retries now answer the payment processor 200 and count as `duplicate` | `Controllers/WebhooksController.cs:414` | verified | `07b0c1b` |
-| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | open | `08e7746` |
-| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | open | `08e7746` |
-| PPW-511 | 🟡 | v5 | EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | open | `07b0c1b` |
+| PPW-509 | 🟡 | v3 | `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally | `Configuration/InvoicingSettings.cs:18` | verified | `ec29613` |
+| PPW-510 | 🟡 | v3 | ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority | `docs/DEPLOYMENT.md:1309` | verified | `ec29613` |
+| PPW-511 | 🟡 | v5 | the legacy processor coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence | `memory-bank/standards/definition-of-done.md:52` | fixed | `06fd2b1` |
 | PPW-512 | 🔴 | v6 | Easybox orders emit e-Factura with empty mandatory buyer address elements | `Services/Invoicing/InvoiceXmlBuilder.cs:121` | verified | `2979ea0` |
 | PPW-513 | 🔴 | v6 | uq_invoices_series_year_number index expression is not IMMUTABLE, so Postgres aborts Migrate() at prod boot | `Migrations/20260603101910_AddVatAndInvoices.cs:112` | verified | `2979ea0` |
 | PPW-514 | 🔴 | v6 | Exhausted-retry rollback reload discards the processor transaction id and the Error log omits it | `Controllers/WebhooksController.cs:427` | verified | `2979ea0` |
@@ -65,9 +66,9 @@ updated: 2026-08-21
 | PPW-521 | 🟠 | v6 | InvoiceAddressFormatter.Truncate throws NRE on a null City/Street that the validators accept | `Services/Invoicing/InvoiceAddressFormatter.cs:12` | verified | `2979ea0` |
 | PPW-522 | 🟠 | v6 | Unbuildable invoice stays Pending forever and starves the upload batch | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:206` | verified | `2979ea0` |
 | PPW-523 | 🟠 | v6 | Missing invoice PDF blob surfaces as an unlogged generic 500 with no distinct event | `Controllers/InvoicesController.cs:69` | verified | `2979ea0` |
-| PPW-524 | 🟠 | v6 | The whole invoicing feature has no SPA consumer and no lens covered the frontend | `Controllers/InvoicesController.cs:1` | deferred | `2979ea0` |
+| PPW-524 | 🟠 | v6 | The whole invoicing feature has no SPA consumer and no lens covered the frontend | `Controllers/InvoicesController.cs:1` | verified | `5324a1c` |
 | PPW-525 | 🟠 | v6 | Guest invoice access is defeated by the unchanged guest-session lifetime and the never-implemented order transfer | `Controllers/InvoicesController.cs:52` | deferred | `2979ea0` |
-| PPW-526 | 🟠 | v6 | EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:205` | wont-fix | `2979ea0` |
+| PPW-526 | 🟠 | v6 | the legacy processor paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:205` | wont-fix | `2979ea0` |
 | PPW-527 | 🟠 | v6 | Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook | `Controllers/WebhooksController.cs:390` | verified | `2979ea0` |
 | PPW-528 | 🟠 | v6 | Charged-but-unpaid order emits the same metric label as a routine card decline | `Controllers/WebhooksController.cs:389` | deferred | `2979ea0` |
 | PPW-529 | 🟠 | v6 | No test applies the migration chain — the unique-index DDL is only ever proven via EnsureCreated from the model | `Tests/Integration/PostgresInvoiceNumberingServiceIntegrationTests.cs:79` | verified | `2979ea0` |
@@ -99,10 +100,10 @@ updated: 2026-08-21
 | PPW-557 | 🔴 | v9 | New mandatory-address guard makes every Easybox order permanently un-invoiceable | `Services/Invoicing/InvoiceXmlBuilder.cs:131` | verified | `f769e22` |
 | PPW-558 | 🔴 | v9 | Anonymous Stripe webhook buffers an unbounded request body into a string before any signature check | `Controllers/WebhooksController.cs:69` | verified | `f769e22` |
 | PPW-559 | 🔴 | v9 | Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:345` | verified | `f769e22` |
-| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | open | `c8d6bb4` |
-| PPW-561 | 🟠 | v9 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `Tests/Helpers/PostgresTestDatabase.cs:33` | open | `c8d6bb4` |
-| PPW-562 | 🟠 | v9 | PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run | `Tests/Helpers/PostgresTestDatabase.cs:25` | open | `c8d6bb4` |
-| PPW-563 | 🟠 | v9 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | open | `c8d6bb4` |
+| PPW-560 | 🟠 | v9 | Squashed InitialPostgres baseline has no upgrade path: a database that ran the deleted chain cannot boot | `Migrations/20260820133204_InitialPostgres.cs:10` | verified | `56eb9be` |
+| PPW-561 | 🟡 | v9 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `Tests/Helpers/PostgresTestDatabase.cs:33` | backlog | `c8d6bb4` |
+| PPW-562 | 🟠 | v9 | PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run | `Tests/Helpers/PostgresTestDatabase.cs:25` | fixed | `4dd6763` |
+| PPW-563 | 🟡 | v9 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | backlog | `c8d6bb4` |
 | PPW-564 | 🟠 | v9 | Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt | `Services/AdminOrderService.cs:425` | verified | `f769e22` |
 | PPW-565 | 🟠 | v9 | Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml | `Migrations/PhotoPrintDbContextModelSnapshot.cs:1` | verified | `f769e22` |
 | PPW-566 | 🟠 | v9 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | verified | `f769e22` |
@@ -118,51 +119,51 @@ updated: 2026-08-21
 | PPW-576 | ⚪ | v9 | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `Controllers/InvoicesController.cs:122` | backlog | `c8d6bb4` |
 | PPW-577 | ⚪ | v9 | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `Dockerfile:42` | backlog | `c8d6bb4` |
 | PPW-578 | 🟠 | v10 | Order-number sequence is created check-then-act, so two first orders of a year fail on a catalogue unique index | `Services/OrderNumberService.cs:37` | verified | `88f5ee6` |
-| PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | open | `090873d` |
-| PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | open | `090873d` |
-| PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | open | `090873d` |
-| PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | open | `090873d` |
-| PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | open | `090873d` |
-| PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | open | `090873d` |
-| PPW-585 | 🔴 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | open | `090873d` |
-| PPW-586 | 🔴 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | open | `090873d` |
-| PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | open | `090873d` |
-| PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | open | `090873d` |
-| PPW-589 | 🟠 | v12 | nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | open | `090873d` |
-| PPW-590 | 🟠 | v12 | PollSubmittedAsync takes no claim, so every replica polls every Submitted row on every tick | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | open | `090873d` |
-| PPW-591 | 🟠 | v12 | No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | open | `090873d` |
-| PPW-592 | 🟠 | v12 | ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop | `Services/Invoicing/Anaf/AnafSpvClient.cs:91` | open | `090873d` |
-| PPW-593 | 🟠 | v12 | Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered | `Tests/Unit/Controllers/AdminInvoicesControllerTests.cs:75` | open | `090873d` |
-| PPW-594 | 🟠 | v12 | The new Invoice.StorageLocation stamp is never asserted after a PDF save | `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:304` | open | `090873d` |
-| PPW-595 | 🟠 | v12 | QuestPDF licence is set by the test class itself, so the production licence wiring is unverified | `Tests/Unit/Services/Invoicing/InvoicePdfRendererTests.cs:23` | open | `090873d` |
-| PPW-596 | 🟠 | v12 | No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered | `Controllers/InvoicesController.cs:58` | open | `090873d` |
-| PPW-597 | 🟠 | v12 | Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped | `Services/Invoicing/InvoicePdfReadyNotifier.cs:31` | open | `090873d` |
-| PPW-598 | 🟠 | v12 | Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback | `Services/Invoicing/InvoiceLifecycle.cs:165` | open | `090873d` |
-| PPW-599 | 🟠 | v12 | Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout | `docs/DEPLOYMENT.md:1531` | open | `090873d` |
-| PPW-600 | 🟠 | v12 | FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99` | open | `090873d` |
-| PPW-601 | 🟠 | v12 | system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule | `memory-bank/standards/system-architecture.md:83` | open | `090873d` |
-| PPW-602 | 🟠 | v12 | Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away | `Controllers/InvoicesController.cs:68` | open | `090873d` |
-| PPW-603 | 🟠 | v12 | The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:414` | open | `090873d` |
-| PPW-604 | 🟠 | v12 | No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344` | open | `090873d` |
-| PPW-605 | 🟠 | v12 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | open | `090873d` |
-| PPW-606 | 🟠 | v12 | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `Services/Invoicing/InvoiceCreationService.cs:98` | open | `090873d` |
-| PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | open | `090873d` |
-| PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | open | `090873d` |
-| PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | open | `090873d` |
-| PPW-610 | 🟠 | v12 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:133` | open | `090873d` |
-| PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | open | `090873d` |
-| PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | open | `090873d` |
-| PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | open | `090873d` |
-| PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | open | `090873d` |
-| PPW-615 | 🟠 | v12 | A non-succeeded, non-error Stripe result leaves the user stranded with no feedback | `src/app/features/checkout/pages/payment-step.ts:221` | open | `090873d` |
-| PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | open | `090873d` |
-| PPW-617 | 🟠 | v12 | The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test | `Services/AdminOrderService.cs:437` | open | `090873d` |
-| PPW-618 | 🟠 | v12 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `Controllers/InvoicesController.cs:99` | open | `090873d` |
+| PPW-579 | 🔴 | v12 | Static ro-RO culture in InvoicePdfDocument throws on the Alpine production image, wedging every invoice PDF | `Services/Invoicing/InvoicePdfDocument.cs:19` | verified | `06fd2b1` |
+| PPW-580 | 🔴 | v12 | One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:102` | wont-fix | `090873d` |
+| PPW-581 | 🔴 | v12 | Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick | `Services/Invoicing/Anaf/AnafTokenProvider.cs:109` | wont-fix | `090873d` |
+| PPW-582 | 🔴 | v12 | Confirmation page races the payment webhook and redirects the paying customer home | `src/app/features/orders/pages/confirmation-page.ts:208` | verified | `901f8a2` |
+| PPW-583 | 🔴 | v12 | Switching payment tabs destroys the Stripe card element but leaves the pay button enabled | `src/app/features/checkout/pages/payment-step.ts:196` | fixed | `06fd2b1` |
+| PPW-584 | 🔴 | v12 | SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount | `src/app/core/services/payment.service.ts:18` | verified | `901f8a2` |
+| PPW-585 | 🟠 | v12 | Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour | `src/app/features/checkout/pages/review-step.spec.ts:126` | verified | `c03f99a` |
+| PPW-586 | 🟠 | v12 | Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified | `Tests/Unit/Controllers/InvoicesControllerTests.cs:52` | verified | `8950624` |
+| PPW-587 | 🟠 | v12 | A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | verified | `32d4eee` |
+| PPW-588 | 🟠 | v12 | Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355` | verified | `32d4eee` |
+| PPW-589 | 🟡 | v12 | nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | backlog | `090873d` |
+| PPW-590 | 🟡 | v12 | PollSubmittedAsync takes no claim, so every replica polls every Submitted row on every tick | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | backlog | `090873d` |
+| PPW-591 | 🟠 | v12 | No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order | `Services/Invoicing/PostgresInvoiceNumberingService.cs:40` | verified | `72202c0` |
+| PPW-592 | 🟠 | v12 | ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop | `Services/Invoicing/Anaf/AnafSpvClient.cs:91` | verified | `add7611` |
+| PPW-593 | 🟡 | v12 | Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered | `Tests/Unit/Controllers/AdminInvoicesControllerTests.cs:75` | backlog | `090873d` |
+| PPW-594 | 🟡 | v12 | The new Invoice.StorageLocation stamp is never asserted after a PDF save | `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:304` | backlog | `090873d` |
+| PPW-595 | 🟡 | v12 | QuestPDF licence is set by the test class itself, so the production licence wiring is unverified | `Tests/Unit/Services/Invoicing/InvoicePdfRendererTests.cs:23` | backlog | `090873d` |
+| PPW-596 | 🟠 | v12 | No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered | `Controllers/InvoicesController.cs:58` | verified | `e3f4bb8` |
+| PPW-597 | 🟠 | v12 | Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped | `Services/Invoicing/InvoicePdfReadyNotifier.cs:31` | verified | `5324a1c`, `beb7732` |
+| PPW-598 | 🟠 | v12 | Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback | `Services/Invoicing/InvoiceLifecycle.cs:165` | verified | `add7611` |
+| PPW-599 | 🟠 | v12 | Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout | `docs/DEPLOYMENT.md:1531` | verified | `add7611` |
+| PPW-600 | 🔴 | v12 | FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99` | verified | `6977d5b` |
+| PPW-601 | 🟡 | v12 | system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule | `memory-bank/standards/system-architecture.md:83` | backlog | `090873d` |
+| PPW-602 | 🟠 | v12 | Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away | `Controllers/InvoicesController.cs:68` | verified | `add7611` |
+| PPW-603 | 🟡 | v12 | The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:414` | backlog | `090873d` |
+| PPW-604 | 🔴 | v12 | No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344` | verified | `32d4eee` |
+| PPW-605 | 🟠 | v12 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | verified | `add7611` |
+| PPW-606 | ⚪ | v12 | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `Services/Invoicing/InvoiceCreationService.cs:98` | backlog | `090873d` |
+| PPW-607 | 🟠 | v12 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | verified | `166230a` |
+| PPW-608 | 🟠 | v12 | Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:19` | verified | `add7611` |
+| PPW-609 | 🟠 | v12 | One generic error string blames the cart for every payment failure, and the legacy processor failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | fixed | `06fd2b1` |
+| PPW-610 | 🟡 | v12 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `src/app/features/admin/pages/order-detail/admin-order-detail-page.ts:133` | backlog | `090873d` |
+| PPW-611 | 🟠 | v12 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | verified | `2acda1f` |
+| PPW-612 | 🟠 | v12 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | verified | `5cd48a5` |
+| PPW-613 | 🟠 | v12 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | verified | `6812453` |
+| PPW-614 | 🟠 | v12 | Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total | `src/app/features/checkout/pages/delivery-step.ts:327` | verified | `6812453` |
+| PPW-615 | 🟠 | v12 | A non-succeeded, non-error Stripe result leaves the user stranded with no feedback | `src/app/features/checkout/pages/payment-step.ts:221` | verified | `901f8a2` |
+| PPW-616 | 🟠 | v12 | Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in | `Validators/Account/SavedAddressValidator.cs:26` | verified | `5cd48a5` |
+| PPW-617 | 🟡 | v12 | The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test | `Services/AdminOrderService.cs:437` | backlog | `090873d` |
+| PPW-618 | 🟡 | v12 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `Controllers/InvoicesController.cs:99` | backlog | `090873d` |
 | PPW-619 | 🟡 | v12 | OrderNumberService's manually opened DbConnection is never closed, pinning it for the rest of the scope | `Services/OrderNumberService.cs:34` | backlog | `090873d` |
 | PPW-620 | 🟡 | v12 | Admin invoice paging orders by a non-unique CreatedAt with no unique tiebreaker | `Controllers/AdminInvoicesController.cs:57` | backlog | `090873d` |
 | PPW-621 | 🟡 | v12 | Per-customer invoice PDF is cached for a year with no revalidation | `Controllers/InvoicesController.cs:132` | backlog | `090873d` |
 | PPW-622 | 🟡 | v12 | Buyer fiscal address survives logout in sessionStorage and prefills the next account | `src/app/core/services/auth.service.ts:174` | backlog | `090873d` |
-| PPW-623 | 🟡 | v12 | EuPlatesc IPN fingerprint is verified with a non-fixed-time string compare | `Services/EuPlatescService.cs:92` | backlog | `090873d` |
+| PPW-623 | 🟡 | v12 | the legacy processor IPN fingerprint is verified with a non-fixed-time string compare | `Services/the legacy processorService.cs:92` | backlog | `090873d` |
 | PPW-624 | 🟡 | v12 | ANAF response body is read into memory with no size cap and then persisted unbounded | `Services/Invoicing/Anaf/AnafSpvClient.cs:73` | backlog | `090873d` |
 | PPW-625 | 🟡 | v12 | The PDF-ready notification fires inside the render-once branch, so a throw there loses it permanently | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:293` | backlog | `090873d` |
 | PPW-626 | 🟡 | v12 | Cloud blob is orphaned when the storage tier flips between a failed path-stamp and the retry | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:287` | backlog | `090873d` |
@@ -188,7 +189,7 @@ updated: 2026-08-21
 | PPW-646 | 🟡 | v12 | Polling loads the whole invoice row, including XmlPayload, to read two fields | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421` | backlog | `090873d` |
 | PPW-647 | ⚪ | v12 | AddInvoiceUnknownUploadOutcomes leaves a permanent DEFAULT 0 that the model does not declare | `Migrations/20260821110018_AddInvoiceUnknownUploadOutcomes.cs:18` | backlog | `090873d` |
 | PPW-648 | ⚪ | v12 | The VAT rounding-mode test mostly asserts decimal.Round's own behaviour and never pins the net-side mode | `Tests/Unit/Services/VatCalculatorTests.cs:57` | backlog | `090873d` |
-| PPW-649 | ⚪ | v12 | metrics.md still marks invoice_anaf_status_total as future and never incremented | `memory-bank/operations/metrics.md:69` | backlog | `090873d` |
+| PPW-649 | ⚪ | v12 | metrics.md still marks invoice_anaf_status_total as future and never incremented | `memory-bank/operations/metrics.md:69` | verified | `6977d5b` |
 | PPW-650 | ⚪ | v12 | Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done | `Services/VatCalculator.cs:14` | backlog | `090873d` |
 | PPW-651 | ⚪ | v12 | Both admin retry-refusal branches log nothing despite the class's audit-logged claim | `Controllers/AdminInvoicesController.cs:123` | backlog | `090873d` |
 | PPW-652 | ⚪ | v12 | Paid webhook spends two extra round-trips re-loading order relations it could have Included | `Controllers/WebhooksController.cs:402` | backlog | `090873d` |
@@ -197,6 +198,58 @@ updated: 2026-08-21
 | PPW-655 | ⚪ | v12 | Runtime Math.Max clamps duplicate ANAF ranges the settings validator already enforces, with a divergent floor | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:41` | backlog | `090873d` |
 | PPW-656 | ⚪ | v12 | Third copy of the mandatory-address field list in checkout-state.service.ts | `src/app/core/services/checkout-state.service.ts:51` | backlog | `090873d` |
 | PPW-657 | ⚪ | v12 | Lens manifest omits three changed files and names one that did not change | `Migrations/20260821110018_AddInvoiceUnknownUploadOutcomes.cs:1` | backlog | `090873d` |
+| PPW-659 | 🔴 | v15 | Not-yet-due Rejected invoices fill the upload batch and starve Pending uploads | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:103` | verified | `9527eba` |
+| PPW-660 | 🔴 | v15 | A succeeded webhook on an order already moved to PaymentFailed leaves the customer charged and the order unfulfillable | `Controllers/WebhooksController.cs:242` | verified | `c60260c` |
+| PPW-661 | 🔴 | v15 | Checkout idempotency key is never retired after a paid order, so the next checkout is redirected to the old order and the new basket deleted | `src/app/core/services/checkout-attempt.service.ts:49` | verified | `2302bec` |
+| PPW-662 | 🔴 | v15 | Retry after a declined card reuses the same client secret whose order the failure webhook already moved to PaymentFailed | `src/app/features/checkout/pages/payment-step.ts:208` | verified | `2302bec` |
+| PPW-663 | 🔴 | v15 | the legacy processor columns removed by editing the already-applied baseline migration, so existing databases keep Orders.PaymentProcessor NOT NULL | `Migrations/20260820133204_InitialPostgres.cs:216` | verified | `de1b70d` |
+| PPW-664 | 🟠 | v15 | Automatic rejection-resubmit nulls PdfStoragePath, revoking the customer's invoice | `Services/Invoicing/InvoiceLifecycle.cs:200` | verified | `9527eba` |
+| PPW-665 | 🟠 | v15 | Any non-2xx 4xx from ANAF maps to content-rejected and permanently parks the invoice as Failed | `Services/Invoicing/Anaf/AnafSpvClient.cs:74` | verified | `5d84a5e` |
+| PPW-666 | 🟠 | v15 | OrderService frees the idempotency key on a fresh PaymentFailed order while its PaymentIntent is still chargeable | `Services/OrderService.cs:129` | verified | `c60260c` |
+| PPW-667 | 🟠 | v15 | ANAF 429/503 counts as an unknown upload outcome and parks the invoice after 3 ticks | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:441` | verified | `5d84a5e` |
+| PPW-668 | 🟠 | v15 | Two concurrent same-key payment requests both call Stripe and one turns a 409 into a 500 | `Controllers/PaymentsController.cs:81` | verified | `18f0b1c` |
+| PPW-669 | 🟠 | v15 | Post-commit webhook side effects are lost for good when one throws, because the retry hits the already-paid guard | `Controllers/WebhooksController.cs:201` | verified | `18f0b1c` |
+| PPW-670 | 🟠 | v15 | One transient poll failure replaces the payment-submitted screen with "order not found" | `src/app/features/orders/pages/confirmation-page.ts:287` | verified | `2302bec` |
+| PPW-671 | 🟠 | v15 | combinedStreetLength group error is never rendered, so Continue is disabled with no explanation | `src/app/features/checkout/pages/delivery-step.ts:384` | verified | `2302bec` |
+| PPW-672 | 🟠 | v15 | Settle-poll setTimeout is never cancelled on destroy, so a late poll clears a newer basket | `src/app/features/orders/pages/confirmation-page.ts:282` | verified | `2302bec` |
+| PPW-673 | 🟠 | v15 | Invoice download uses a detached anchor and revokes the object URL in the same tick as click() | `src/app/features/orders/pages/confirmation-page.ts:322` | verified | `2302bec` |
+| PPW-674 | 🟠 | v15 | Admin cross-customer invoice read can be logged with an empty admin id | `Controllers/InvoicesController.cs:72` | verified | `5d84a5e` |
+| PPW-675 | 🟠 | v15 | Pooled test database is reused without checking the migration chain actually applied | `Tests/Helpers/PostgresTestDatabase.cs:227` | verified | `18f0b1c` |
+| PPW-676 | 🟡 | v15 | Content-rejected branch ignores a lost park CAS: claim stays held, no LastError, metric still counted | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:435` | verified | `5d84a5e` |
+| PPW-677 | 🟡 | v15 | Webhook AlreadyInvoiced return leaves the uncommitted Paid transition on the scoped context | `Controllers/WebhooksController.cs:328` | backlog | `5fca3cf` |
+| PPW-678 | 🟡 | v15 | Invoice number allocated outside the transaction that inserts the row, against the numbering service's contract | `Services/Invoicing/InvoiceCreationService.cs:93` | backlog | `5fca3cf` |
+| PPW-679 | 🟡 | v15 | After the 10-poll budget the payment-confirming spinner spins forever with no terminal message | `src/app/features/orders/pages/confirmation-page.ts:280` | verified | `2302bec` |
+| PPW-680 | 🟡 | v15 | canContinue ignores shippingCostsReady, so a restored session proceeds on a stale shipping cost | `src/app/features/checkout/pages/delivery-step.ts:393` | verified | `2302bec` |
+| PPW-681 | 🟡 | v15 | Non-owner invoice PDF served with a one-year immutable browser cache | `Controllers/InvoicesController.cs:149` | backlog | `5fca3cf` |
+| PPW-682 | 🟡 | v15 | ResetForTest deletes the migration's 42 EasyboxLocker seed rows and never restores them | `Tests/Helpers/PostgresTestDatabase.cs:106` | backlog | `5fca3cf` |
+| PPW-683 | 🟡 | v15 | DropAllForeignKeys does not mark the pooled database dirty, so a constraint-free schema can be handed on | `Tests/Helpers/PostgresTestDatabase.cs:166` | backlog | `5fca3cf` |
+| PPW-684 | 🟡 | v15 | Test-database sweep is scoped to its own salt, so pools from other worktrees are never reclaimed | `Tests/Helpers/PostgresTestDatabase.cs:292` | backlog | `5fca3cf` |
+| PPW-685 | 🟡 | v15 | ResetSequences drops every public sequence the migration script did not literally CREATE, including identity-owned ones | `Tests/Helpers/PostgresTestDatabase.cs:128` | backlog | `5fca3cf` |
+| PPW-686 | ⚪ | v15 | MaxBatchSize is used unclamped unlike the upload job's other settings | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:109` | verified | `9527eba` |
+| PPW-687 | 🔴 | v17 | payment-step's discardDeadIntent retires the idempotency key on every confirm error — card typos and already-succeeded charges included — wiping the form and creating a second order | `src/app/features/checkout/pages/payment-step.ts:221` | open | `e935fbb` |
+| PPW-688 | 🔴 | v17 | The server's PaymentFailed intent-abandon path is unreachable because the SPA retires the key instead of reusing it, so the declined order's intent stays chargeable and the widened PaymentFailed→Paid transition can auto-fulfil the duplicate | `Services/OrderService.cs:149` | open | `e935fbb` |
+| PPW-689 | 🔴 | v17 | Reclassified 403/404/405 misconfiguration responses now spend the blind-repost budget and park invoices with a false duplicate-filing reason, with no test over the join | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:598` | open | `e935fbb` |
+| PPW-690 | 🔴 | v17 | The new wasWaiting gate stops the cart from ever being cleared on the 409 "already paid" redirect | `src/app/features/orders/pages/confirmation-page.ts:286` | open | `e935fbb` |
+| PPW-691 | 🟠 | v17 | One failed status poll ends the confirmation page's settle wait permanently — no reschedule and no give-up message | `src/app/features/orders/pages/confirmation-page.ts:317` | open | `e935fbb` |
+| PPW-692 | 🟠 | v17 | The destroy guard clears the poll timer but not the in-flight status request, so the poll chain can restart after destroy and clear a new basket | `src/app/features/orders/pages/confirmation-page.ts:278` | open | `e935fbb` |
+| PPW-693 | 🟠 | v17 | The new rejected-invoice slice cap trades pending-starvation for rejection-starvation — not-yet-due rejections fill all 5 rows — and only the first case is tested | `Services/Invoicing/Anaf/InvoiceUploadJob.cs:221` | open | `e935fbb` |
+| PPW-694 | 🟠 | v17 | Widening the transition table silently widened the admin status endpoint, and its only guard test was inverted | `Services/OrderStatusMachine.cs:23` | open | `e935fbb` |
+| PPW-695 | 🟠 | v17 | RequeueRejectedAsync clears XmlPayload but keeps PdfStoragePath, so the filed XML and the customer's PDF can diverge — and the new test pins that stale path | `Services/Invoicing/InvoiceLifecycle.cs:177` | open | `e935fbb` |
+| PPW-696 | 🟠 | v17 | InvoicesController's ownership check still trusts the null-returning GetUserIdOrNull for merged principals; only the audit line was fixed | `Controllers/InvoicesController.cs:62` | open | `e935fbb` |
+| PPW-697 | 🟠 | v17 | EnsureSchemaApplied's pending-migrations early return skips both repair of an interrupted first use and the foreign-key drop on a reused slot | `Tests/Helpers/PostgresTestDatabase.cs:271` | open | `e935fbb` |
+| PPW-698 | 🟡 | v17 | Minting a key after retirement silently drops the stored orderId the settling page depends on, and the spec asserts before minting so it stays hidden | `src/app/core/services/checkout-attempt.service.ts:53` | backlog | `e935fbb` |
+| PPW-699 | 🟡 | v17 | delivery-step's shipping-costs continue gate is untested and the new per-field maxlength branch is unreachable in the case it was added for | `src/app/features/checkout/pages/delivery-step.ts:407` | backlog | `e935fbb` |
+| PPW-700 | 🟡 | v17 | TryDropDatabase drops the database without the ClearAllPools() its sibling Drop() documents as necessary | `Tests/Helpers/PostgresTestDatabase.cs:278` | backlog | `e935fbb` |
+| PPW-701 | 🟡 | v17 | The folded AddColumn left Invoices.UnknownUploadOutcomes with a permanent DEFAULT 0 that the model and snapshot do not declare | `Migrations/20260820133204_InitialPostgres.cs:384` | backlog | `e935fbb` |
+| PPW-702 | 🟡 | v17 | The irreversible Stripe intent cancellation runs before the local transaction commits | `Services/OrderService.cs:56` | backlog | `e935fbb` |
+| PPW-703 | 🟡 | v17 | The abandon-intent test asserts through the SUT's own DbContext, so a missing save stays green | `Tests/Unit/Services/OrderServiceTests.cs:488` | backlog | `e935fbb` |
+| PPW-704 | 🟡 | v17 | The new gateway idempotency-race branch has no test and cannot be reached with the existing fake | `Controllers/PaymentsController.cs:91` | backlog | `e935fbb` |
+| PPW-705 | 🟡 | v17 | The gateway-race 409's crafted message is never shown — the SPA's existing 409 branch swallows it | `Controllers/PaymentsController.cs:104` | backlog | `e935fbb` |
+| PPW-706 | 🟡 | v17 | The slot-repair test leases a second pool slot while its class fixture already holds one | `Tests/Unit/Data/PostgresTestDatabaseTests.cs:18` | backlog | `e935fbb` |
+| PPW-707 | 🟡 | v17 | No schema-level assertion covers the folded Invoices columns after the migration squash | `Migrations/20260820133204_InitialPostgres.cs:382` | backlog | `e935fbb` |
+| PPW-708 | 🟡 | v17 | The squash reuses the baseline migration id while a coexisting worktree still carries the two AddColumn migrations | `Migrations/20260820133204_InitialPostgres.cs:362` | backlog | `e935fbb` |
+| PPW-709 | ⚪ | v17 | A code comment on the confirmation page cites a finding ID, which CLAUDE.md forbids and the pre-commit hook blocks | `src/app/features/orders/pages/confirmation-page.ts:306` | backlog | `e935fbb` |
+| PPW-710 | ⚪ | v17 | The OrderStatusMachine transition-table doc comment was not updated with PaymentFailed → Paid | `Services/OrderStatusMachine.cs:8` | backlog | `e935fbb` |
 
 ## Details
 
@@ -222,7 +275,7 @@ updated: 2026-08-21
 
 - **What:** `CreateForOrderAsync` checks for an existing Invoice then inserts, with no unique constraint on `Invoices.OrderId`. Two near-concurrent webhook deliveries (Stripe retry-on-timeout) can each pass the check and each submit a separate legal invoice to ANAF for one order.
 - **Evidence:** `Services/Invoicing/InvoiceCreationService.cs:40`; migration `20260603101910_AddVatAndInvoices.cs` (OrderId is a non-unique index only).
-- **Suggested fix:** Add a unique index on `Invoices.OrderId` (new EF migration; SQLite `EnsureCreated` gets it free, Postgres needs the migration plus a pre-flight check for existing duplicate rows before it can run safely at boot). The catch does **not** belong inside `CreateForOrderAsync` — that method never calls `SaveChangesAsync` (by design, per `IInvoiceCreationService.cs:20`, so the Invoice insert rides the caller's transaction). Catch the provider-specific unique-violation (mirror `OrderService.IsIdempotencyKeyViolation`) at both `WebhooksController` `SaveChangesAsync` call sites (EuPlatesc `:206`, Stripe `:286`), detach the failed entities, re-read the winner, and gate the four side effects (email, cloud-promotion enqueue, AWB-notify, broadcast) behind a replay signal so they don't fire twice. Same catch site and pattern as PPW-490 — fix together. **Test shape:** two concurrent webhook deliveries for one order; assert exactly one Invoice row and side effects fire once. Trigger-list-shaped (concurrency model change) — **approach-check: revised** (drafted "catch inside `CreateForOrderAsync`" is a no-op; corrected to the controller call sites, with a replay signal and a migration pre-flight step).
+- **Suggested fix:** Add a unique index on `Invoices.OrderId` (new EF migration; SQLite `EnsureCreated` gets it free, Postgres needs the migration plus a pre-flight check for existing duplicate rows before it can run safely at boot). The catch does **not** belong inside `CreateForOrderAsync` — that method never calls `SaveChangesAsync` (by design, per `IInvoiceCreationService.cs:20`, so the Invoice insert rides the caller's transaction). Catch the provider-specific unique-violation (mirror `OrderService.IsIdempotencyKeyViolation`) at both `WebhooksController` `SaveChangesAsync` call sites (the legacy processor `:206`, Stripe `:286`), detach the failed entities, re-read the winner, and gate the four side effects (email, cloud-promotion enqueue, AWB-notify, broadcast) behind a replay signal so they don't fire twice. Same catch site and pattern as PPW-490 — fix together. **Test shape:** two concurrent webhook deliveries for one order; assert exactly one Invoice row and side effects fire once. Trigger-list-shaped (concurrency model change) — **approach-check: revised** (drafted "catch inside `CreateForOrderAsync`" is a no-op; corrected to the controller call sites, with a replay signal and a migration pre-flight step).
 - **History:**
   - v1: found — raised independently by 3 lenses (correctness + security + race)
   - v1: approach-check run — revised (catch site corrected to WebhooksController; replay-signal and migration pre-flight added)
@@ -570,9 +623,9 @@ updated: 2026-08-21
   - v2: fix round — relabelled to `failed` via a three-state PaidSaveOutcome; the approach-check refuted the drafted rethrow because `duplicate` sits in SLO 3's success numerator and an escaping throw records no metric at all (PPW-397). Rollback now reloads the entity rather than unwinding fields, after the micro-review found `UpdatedAt` was missed
   - v3: REOPENED @`08e7746` — the source is right, two of its three legs cannot go red. Relabel: putting both call sites back to `created ? ok : duplicate` while keeping the helper reintroduces the exact defect and leaves all 23 webhook controller tests green, measured; `ResultLabelFor_maps_each_outcome_to_its_slo_label` only invokes the private helper by reflection, and nothing asserts the label the handler records. Rollback: the test invokes `SaveOrderPaidWithInvoiceAsync` directly and never applies the Paid transition first, so `Status`, `PaidAt` and `UpdatedAt` are already at their rolled-back values — deleting the whole `ReloadAsync` block leaves the test green, measured, including the `UpdatedAt` assertion the micro-review added to pin it. Sentry capture holds: removing it reddens exactly one test. Third defect in the same mechanism: the rollback's catch excludes `OperationCanceledException`, so a cancelled token during the reload escapes the helper and `RecordPaymentWebhook` never runs — the PPW-397 hole the approach-check refused a rethrow to avoid
   - v3: fix round — both vacuous legs replaced by one test that drives `StripeWebhookAsync` end to end on SQLite and reads the metric through `MetricCapture`; each leg proven red separately (mislabel put back, then reload block deleted). The reload catch no longer excludes `OperationCanceledException`, closing the third defect
-  - v4: REOPENED @`0a250b9` — two of the three legs now hold. Reverting the Stripe call site to `created ? ok : duplicate` reddens only `StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid`, 23 green. Deleting the `ReloadAsync` block reddens the same test on `Status`; a partial unwind that leaves `UpdatedAt` behind reddens it on `UpdatedAt`, so the pin the v2 micro-review added is live at last. Two gaps remain. The EuPlatesc call site is unproven: reverting that site alone leaves all 24 green, so one of the two identical sites carries no test. The cancellation leg ships production code with no test, and the reason given for that is false. Forcing `ReloadAsync` to throw a cancellation needs no fake provider: set the `Sentry.IHub` mock this test file already builds to cancel a `CancellationTokenSource` from its `CaptureEvent` callback, which fires immediately before the reload. Measured — green with the fix, red without it, `OperationCanceledException` escaping `ReloadAsync` via `SqliteCommand.ExecuteReaderAsync`, in about 45 lines reusing existing helpers. Disagreement, not disputed: the resolution says both vacuous proofs were replaced, but `ResultLabelFor_maps_each_outcome_to_its_slo_label` was kept and survives the Stripe revert, so it still proves the helper and never the call sites. Class check clean otherwise — no-oping `RecordPaymentWebhook` reddens 14 of 24 tests here, and the only metric-asserting survivor is `Stripe_unhandled_event_type_records_nothing`, which asserts absence by design
-  - v4: fix round — cancellation proof added exactly as the pass described: the Sentry mock cancels a token source from its capture callback, so the token lands inside `ReloadAsync`. Red with the old `OperationCanceledException` filter restored, green without it. The EuPlatesc coverage gap is dropped on the owner's mid-round ruling that the integration is being removed and only Stripe will remain; a drafted test for that site was discarded rather than committed
-  - v5: verified @`07b0c1b` — all three legs redden on their own revert, each failing set predicted before the run and matched exactly. Label: the Stripe call site back to `created ? ok : duplicate` reddens only `StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid`, 24 green. Rollback: deleting the `ReloadAsync` block reddens that test on `Status` and the new cancellation test on its missing log; the partial unwind that keeps `UpdatedAt` reddens on `UpdatedAt`, so that pin bites. Cancellation: restoring `when (reloadEx is not OperationCanceledException)` reddens `SaveOrderPaidWithInvoiceAsync_WhenRollbackReloadIsCancelled_StillReturnsWithoutThrowing` with `System.OperationCanceledException` raised at `WebhooksController.cs:434` through `EntityEntry.ReloadAsync` → `GetDatabaseValuesAsync` → `SqliteCommand.ExecuteReaderAsync`, so the cancellation lands inside the reload, not earlier or later. The proof is not incidental. Its two assertions are separately load-bearing: an escaping throw fails the await, and the `rollback-reload-failed` assertion fails whenever the reload succeeds. It cannot rot into a vacuous test either, because deleting or moving the Sentry capture that triggers the cancel makes the reload succeed and the test red. Stable 5 of 5 alone and green in every 25-test run; the cancel fires synchronously inside the capture callback, so there is no race window. Class check repeated independently: no-oping `RecordPaymentWebhook` reddens 14 of 25, and the only metric-asserting survivor is `Stripe_unhandled_event_type_records_nothing`, which asserts absence by design. `ResultLabelFor_maps_each_outcome_to_its_slo_label` survives both call-site reverts, confirming the v4 disagreement; it is harmless beside the endpoint test. Regression: the round is test-only, the `InvokeSaveAsync` overload split leaves its 3 other callers green, and `MetricCapture` gates on an `AsyncLocal` token so the parallel metrics class cannot pollute it. The EuPlatesc gap is confirmed still live and not reopened, per the owner ruling — reverting `WebhooksController.cs:205` alone leaves all 25 green; the untracked removal that ruling rests on is PPW-511
+  - v4: REOPENED @`0a250b9` — two of the three legs now hold. Reverting the Stripe call site to `created ? ok : duplicate` reddens only `StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid`, 23 green. Deleting the `ReloadAsync` block reddens the same test on `Status`; a partial unwind that leaves `UpdatedAt` behind reddens it on `UpdatedAt`, so the pin the v2 micro-review added is live at last. Two gaps remain. The legacy processor call site is unproven: reverting that site alone leaves all 24 green, so one of the two identical sites carries no test. The cancellation leg ships production code with no test, and the reason given for that is false. Forcing `ReloadAsync` to throw a cancellation needs no fake provider: set the `Sentry.IHub` mock this test file already builds to cancel a `CancellationTokenSource` from its `CaptureEvent` callback, which fires immediately before the reload. Measured — green with the fix, red without it, `OperationCanceledException` escaping `ReloadAsync` via `SqliteCommand.ExecuteReaderAsync`, in about 45 lines reusing existing helpers. Disagreement, not disputed: the resolution says both vacuous proofs were replaced, but `ResultLabelFor_maps_each_outcome_to_its_slo_label` was kept and survives the Stripe revert, so it still proves the helper and never the call sites. Class check clean otherwise — no-oping `RecordPaymentWebhook` reddens 14 of 24 tests here, and the only metric-asserting survivor is `Stripe_unhandled_event_type_records_nothing`, which asserts absence by design
+  - v4: fix round — cancellation proof added exactly as the pass described: the Sentry mock cancels a token source from its capture callback, so the token lands inside `ReloadAsync`. Red with the old `OperationCanceledException` filter restored, green without it. The legacy processor coverage gap is dropped on the owner's mid-round ruling that the integration is being removed and only Stripe will remain; a drafted test for that site was discarded rather than committed
+  - v5: verified @`07b0c1b` — all three legs redden on their own revert, each failing set predicted before the run and matched exactly. Label: the Stripe call site back to `created ? ok : duplicate` reddens only `StripeWebhook_WhenInvoiceNumberRetriesExhaust_RecordsFailedNotDuplicateAndLeavesOrderUnpaid`, 24 green. Rollback: deleting the `ReloadAsync` block reddens that test on `Status` and the new cancellation test on its missing log; the partial unwind that keeps `UpdatedAt` reddens on `UpdatedAt`, so that pin bites. Cancellation: restoring `when (reloadEx is not OperationCanceledException)` reddens `SaveOrderPaidWithInvoiceAsync_WhenRollbackReloadIsCancelled_StillReturnsWithoutThrowing` with `System.OperationCanceledException` raised at `WebhooksController.cs:434` through `EntityEntry.ReloadAsync` → `GetDatabaseValuesAsync` → `SqliteCommand.ExecuteReaderAsync`, so the cancellation lands inside the reload, not earlier or later. The proof is not incidental. Its two assertions are separately load-bearing: an escaping throw fails the await, and the `rollback-reload-failed` assertion fails whenever the reload succeeds. It cannot rot into a vacuous test either, because deleting or moving the Sentry capture that triggers the cancel makes the reload succeed and the test red. Stable 5 of 5 alone and green in every 25-test run; the cancel fires synchronously inside the capture callback, so there is no race window. Class check repeated independently: no-oping `RecordPaymentWebhook` reddens 14 of 25, and the only metric-asserting survivor is `Stripe_unhandled_event_type_records_nothing`, which asserts absence by design. `ResultLabelFor_maps_each_outcome_to_its_slo_label` survives both call-site reverts, confirming the v4 disagreement; it is harmless beside the endpoint test. Regression: the round is test-only, the `InvokeSaveAsync` overload split leaves its 3 other callers green, and `MetricCapture` gates on an `AsyncLocal` token so the parallel metrics class cannot pollute it. The legacy processor gap is confirmed still live and not reopened, per the owner ruling — reverting `WebhooksController.cs:205` alone leaves all 25 green; the untracked removal that ruling rests on is PPW-511
 
 ### PPW-509 — `CustomerEmailAttachmentSettings` docstring still says the XML, ANAF and PDF pipeline runs unconditionally
 
@@ -581,6 +634,8 @@ updated: 2026-08-21
 - **Suggested fix:** Cut the pipeline sentence from the settings docstring and keep the sentence PPW-472 added, which is true. Reword the `Program.cs` comment to say the builders are registered but only the worker calls them. Doc-only.
 - **History:**
   - v3: found by the verification pass's class check on PPW-481 and PPW-506 — the false sentence is original bolt-039 text, not fix-caused, but two fix rounds edited this file and left it. The fix round's claim to have corrected every operator-facing site does not hold
+  - v13: fixed @`ec29613` — the pipeline sentence is gone from the settings docstring, which now points at `AnafSettings` for what the ANAF flag governs, and the registration comment says the builders are wired but only the worker calls them
+  - v13: verified by reading — the docstring and the registration comment were re-read against `AnafSettings` and the worker's call sites
 
 ### PPW-510 — ADR-022 left stale while the deployment guide and the decision index send an operator to it as current authority
 
@@ -589,14 +644,17 @@ updated: 2026-08-21
 - **Suggested fix:** Either add one superseded line at the head of the ADR pointing at the decision index, or drop the "use this ADR to recall what side effect is gated" clause and the two citations that present it as current. Doc-only.
 - **History:**
   - v3: found by the verification pass reviewing the fix round's decision to keep ADR-022 and ddd-02 as point-in-time records. The decision is agreed; the routing into it is the defect
+  - v13: fixed @`ec29613` — the ADR keeps its frozen-record convention and gains one note at the head naming both statements that no longer hold and sending the reader to the decision index
+  - v13: verified by reading — the ADR's note names both false statements and the decision index carries the current summary
 
-### PPW-511 — EuPlatesc coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence
+### PPW-511 — the legacy processor coverage waived twice on a removal that no work item tracks, against a standard that forbids the divergence
 
-- **What:** `definition-of-done.md` defect class 2 names Stripe/EuPlatesc as a pair whose every behaviour is "either verified symmetric or documented divergent". Two rounds have now left the EuPlatesc arm neither, both waived on the same removal: PPW-233 on 2026-07-27 and PPW-508 on 2026-08-14. The divergence is written only in review resolution files, which are not standards, and no work item tracks the removal — not the backlog, not `memory-bank/bolts/`, not `memory-bank/intents/`. Meanwhile the integration is fully live: `POST /api/webhooks/euplatesc`, `IEuPlatescService` registered, and its credentials required in Production. If the removal never lands, both coverage gaps stand forever with nothing recording that they were accepted. Measured: reverting the EuPlatesc call site alone leaves all 25 scoped tests green.
+- **What:** `definition-of-done.md` defect class 2 names Stripe/the legacy processor as a pair whose every behaviour is "either verified symmetric or documented divergent". Two rounds have now left the legacy processor arm neither, both waived on the same removal: PPW-233 on 2026-07-27 and PPW-508 on 2026-08-14. The divergence is written only in review resolution files, which are not standards, and no work item tracks the removal — not the backlog, not `memory-bank/bolts/`, not `memory-bank/intents/`. Meanwhile the integration is fully live: `POST /api/webhooks/legacy-processor`, `ILegacyProcessorService` registered, and its credentials required in Production. If the removal never lands, both coverage gaps stand forever with nothing recording that they were accepted. Measured: reverting the legacy processor call site alone leaves all 25 scoped tests green.
 - **Evidence:** `memory-bank/standards/definition-of-done.md:52-53`; `memory-bank/standards/system-architecture.md:90-92`; `Program.cs:211-214,223`; `Controllers/WebhooksController.cs:141,205`.
-- **Suggested fix:** Record the removal as one work item, and until it lands add one line to `definition-of-done.md` class 2 naming EuPlatesc coverage as an accepted divergence with its expiry. `system-architecture.md` still presents EuPlatesc as a current payment backend, so it needs the same line — CLAUDE.md requires a standard to be updated in the change that alters what it describes. Docs and tracking only; no code change, and the removal ruling itself is not in question.
+- **Suggested fix:** Record the removal as one work item, and until it lands add one line to `definition-of-done.md` class 2 naming the legacy processor coverage as an accepted divergence with its expiry. `system-architecture.md` still presents the legacy processor as a current payment backend, so it needs the same line — CLAUDE.md requires a standard to be updated in the change that alters what it describes. Docs and tracking only; no code change, and the removal ruling itself is not in question.
 - **History:**
-  - v5: found by the verification pass checking whether the owner ruling that dropped PPW-508 EuPlatesc leg is recorded anywhere as work. It is not, and the standard that mandates the coverage still reads as if it were being met
+  - v5: found by the verification pass checking whether the owner ruling that dropped PPW-508 the legacy processor leg is recorded anywhere as work. It is not, and the standard that mandates the coverage still reads as if it were being met
+  - v13: fixed @`06fd2b1` — the removal this row existed to track happened in PR #13, so the untracked-removal gap it named is closed
 
 ### PPW-512 — Easybox orders emit e-Factura with empty mandatory buyer address elements
 
@@ -622,9 +680,9 @@ updated: 2026-08-21
 
 ### PPW-514 — Exhausted-retry rollback reload discards the processor transaction id and the Error log omits it
 
-- **What:** EuPlatesc IPN pays order X; the invoice-number retry exhausts. The reload at line 434 discards the in-memory EuPlatescTransactionId, and the Error log carries only order_id plus previous_status (always AwaitingPayment, so no information). The ep_id of the captured charge then exists nowhere in our logs or DB.
+- **What:** the legacy processor IPN pays order X; the invoice-number retry exhausts. The reload at line 434 discards the in-memory the legacy processorTransactionId, and the Error log carries only order_id plus previous_status (always AwaitingPayment, so no information). The ep_id of the captured charge then exists nowhere in our logs or DB.
 - **Evidence:** `Controllers/WebhooksController.cs:199`; `Controllers/WebhooksController.cs:203`; `Controllers/WebhooksController.cs:423`; `Controllers/WebhooksController.cs:434`; `Services/OrderService.cs:395`; `Services/Invoicing/InvoiceCreationService.cs:60`
-- **Suggested fix:** Log ep_id / PaymentIntent id, order_number and amount in this Error line (drop the tautological previous_status) before the reload discards them. Suggested test: ExhaustedInvoiceRetry_PreservesProcessorTransactionId: arrange EuPlatesc IPN (ep_id=EP123) with numbering always returning a colliding number; act POST /api/webhooks/euplatesc; assert order.EuPlatescTransactionId or the exhausted log line contains "EP123".
+- **Suggested fix:** Log ep_id / PaymentIntent id, order_number and amount in this Error line (drop the tautological previous_status) before the reload discards them. Suggested test: ExhaustedInvoiceRetry_PreservesProcessorTransactionId: arrange the legacy processor IPN (ep_id=EP123) with numbering always returning a colliding number; act POST /api/webhooks/legacy-processor; assert order.the legacy processorTransactionId or the exhausted log line contains "EP123".
 - **History:**
   - v6: found by the delta pass — raised by observability (convergence 1), verdict confirmed
   - v6: fix round — order number, total and both processor references logged before the rollback reload discards them
@@ -642,12 +700,12 @@ updated: 2026-08-21
 
 ### PPW-516 — Exhausted invoice-number retry answers the payment processor 200, killing its last retry
 
-- **What:** Four consecutive InvoiceNumber collisions (SQLite MAX+1 path, or any provider under load) previously let DbUpdateException escape to ExceptionHandlerMiddleware -> 500 -> Stripe/EuPlatescu redelivers and the transient collision clears. Now it returns NumberExhausted, the handler still returns 200/`BuildIpnResponse`, and the charge stays permanently unpaid with only a log + Sentry event.
-- **Evidence:** `Controllers/WebhooksController.cs:423 (exhausted branch returns NumberExhausted)`; `Controllers/WebhooksController.cs:434 (ReloadAsync discards Paid transition)`; `Controllers/WebhooksController.cs:136 (return Ok() regardless of outcome)`; `Controllers/WebhooksController.cs:247 (EuPlatesc BuildIpnResponse 200)`; `Services/Invoicing/PostgresInvoiceNumberingService.cs:47 (CREATE SEQUENCE START 1)`; `Services/Invoicing/SqliteInvoiceNumberingService.cs:35 (unlocked MAX+1)`
-- **Suggested fix:** On NumberExhausted return a 5xx (or EuPlatescu's error body) so the processor redelivers, instead of acking success. Suggested test: StripeWebhook_WhenInvoiceNumberRetriesExhausted_DoesNotAckDelivery: arrange numbering to return a colliding number every call; POST a signed payment_intent.succeeded to the real endpoint; assert 5xx (retryable) and order still AwaitingPayment.
+- **What:** Four consecutive InvoiceNumber collisions (SQLite MAX+1 path, or any provider under load) previously let DbUpdateException escape to ExceptionHandlerMiddleware -> 500 -> Stripe/the legacy processoru redelivers and the transient collision clears. Now it returns NumberExhausted, the handler still returns 200/`BuildIpnResponse`, and the charge stays permanently unpaid with only a log + Sentry event.
+- **Evidence:** `Controllers/WebhooksController.cs:423 (exhausted branch returns NumberExhausted)`; `Controllers/WebhooksController.cs:434 (ReloadAsync discards Paid transition)`; `Controllers/WebhooksController.cs:136 (return Ok() regardless of outcome)`; `Controllers/WebhooksController.cs:247 (the legacy processor BuildIpnResponse 200)`; `Services/Invoicing/PostgresInvoiceNumberingService.cs:47 (CREATE SEQUENCE START 1)`; `Services/Invoicing/SqliteInvoiceNumberingService.cs:35 (unlocked MAX+1)`
+- **Suggested fix:** On NumberExhausted return a 5xx (or the legacy processoru's error body) so the processor redelivers, instead of acking success. Suggested test: StripeWebhook_WhenInvoiceNumberRetriesExhausted_DoesNotAckDelivery: arrange numbering to return a colliding number every call; POST a signed payment_intent.succeeded to the real endpoint; assert 5xx (retryable) and order still AwaitingPayment.
 - **History:**
   - v6: found by the delta pass — raised by correctness (convergence 1), verdict confirmed
-  - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: v2 approach-check refuted a rethrow and the owner-side ruling stood: an escaping throw records no metric at all (PPW-397), every EuPlatesc branch answers a signed ack, and duplicate sat in SLO 3 success numerator. Resolved by relabelling to failed, deliberately keeping the 200.
+  - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: v2 approach-check refuted a rethrow and the owner-side ruling stood: an escaping throw records no metric at all (PPW-397), every the legacy processor branch answers a signed ack, and duplicate sat in SLO 3 success numerator. Resolved by relabelling to failed, deliberately keeping the 200.
   - v6: correction to the line above, which is labelled verbatim but paraphrases. PPW-508s v2 History line reads: "relabelled to `failed` via a three-state PaidSaveOutcome; the approach-check refuted the drafted rethrow because `duplicate` sits in SLO 3s success numerator and an escaping throw records no metric at all (PPW-397)".
   - v6: re-affirmed @`2979ea0` — SQLite is dropped and Postgres `nextval()` is atomic, so the collision path is unreachable in normal operation; the resolution's "See Decisions" pointer names no PPW-516 decision block, and the exhaustion branch is not dead code
   - v12: re-raised by the certification pass — race, convergence 1, verdict re-raise. Prior decision: PPW-516 deferred: re-affirmed at v6: Postgres nextval is atomic and SQLite is gone, so the collision path is unreachable in normal use. Matched on same exhausted-retry 200 answer to the payment processor
@@ -736,6 +794,7 @@ updated: 2026-08-21
   - v6: fix round — deferred on the owner ruling that the missing SPA consumer is out of scope
   - v6: re-affirmed @`2979ea0` — the owner ruling parking this out of scope is on record (worklog.jsonl round 5 gate-closed, 2026-08-20)
   - v12: re-raised by the certification pass — frontend-ux, convergence 1, verdict re-raise. Prior decision: PPW-524 deferred: owner ruled it out of scope at v6; the frontend-ux lens runs for the first time in this pass. Matched on same missing SPA consumer for the invoice endpoint
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: renaming the download button's class reddened one `confirmation-page` spec, restored green
 
 ### PPW-525 — Guest invoice access is defeated by the unchanged guest-session lifetime and the never-implemented order transfer
 
@@ -747,19 +806,20 @@ updated: 2026-08-21
   - v6: fix round — deferred: needs the order-transfer capability that was never built
   - v6: re-affirmed @`2979ea0` — GuestSessionService.ClaimAsync still never transfers Order.UserId, and no alternate access path exists
 
-### PPW-526 — EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test
+### PPW-526 — the legacy processor paid leg's new three-state outcome and its rollback have no endpoint-driven test
 
-- **What:** Only the Stripe leg is driven end to end. Inject "EuPlatesc records Ok regardless of outcome", or leave EuPlatescTransactionId set after the rollback, and no test goes red — its metrics tests stub CreateForOrderAsync to return null, so AlreadyInvoiced/NumberExhausted never occur there.
+- **What:** Only the Stripe leg is driven end to end. Inject "the legacy processor records Ok regardless of outcome", or leave the legacy processorTransactionId set after the rollback, and no test goes red — its metrics tests stub CreateForOrderAsync to return null, so AlreadyInvoiced/NumberExhausted never occur there.
 - **Evidence:** `Controllers/WebhooksController.cs:205`; `Controllers/WebhooksController.cs:385`; `Controllers/WebhooksController.cs:392`; `Tests/Unit/Controllers/WebhooksControllerMetricsTests.cs:59`; `Tests/Unit/Controllers/WebhooksControllerInvoiceRaceTests.cs:252`; `Tests/Integration/PaymentControllerIntegrationTests.cs:541`
-- **Suggested fix:** Mirror StripeWebhook_WhenInvoiceNumberRetriesExhaust_... for EuPlatescIpnAsync: assert the failed label and that Status, PaidAt and EuPlatescTransactionId are all rolled back. Suggested test: EuPlatesc_ipn_when_invoice_number_retries_exhaust: seed a rival invoice with AlwaysSameInvoiceNumbering on SQLite, POST signed action=0 IPN; assert metric label failed (no duplicate/ok), order back to AwaitingPayment, PaidAt and EuPlatescTransactionId null.
+- **Suggested fix:** Mirror StripeWebhook_WhenInvoiceNumberRetriesExhaust_... for the legacy processorIpnAsync: assert the failed label and that Status, PaidAt and the legacy processorTransactionId are all rolled back. Suggested test: the legacy processor_ipn_when_invoice_number_retries_exhaust: seed a rival invoice with AlwaysSameInvoiceNumbering on SQLite, POST signed action=0 IPN; assert metric label failed (no duplicate/ok), order back to AwaitingPayment, PaidAt and the legacy processorTransactionId null.
 - **History:**
   - v6: found by the delta pass — raised by completeness-critic, tests-coverage (convergence 2), verdict confirmed
-  - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: Owner ruled 2026-08-20 that EuPlatesc is being removed and only Stripe will remain, so this coverage was waived rather than written; PPW-511 records that the removal is tracked nowhere.
+  - v6: re-raises a decided item, PPW-508. Prior decision, verbatim: Owner ruled 2026-08-20 that the legacy processor is being removed and only Stripe will remain, so this coverage was waived rather than written; PPW-511 records that the removal is tracked nowhere.
   - v6: correction to the line above, which is labelled verbatim but paraphrases. The ruling is recorded in the v4 resolution and on the PPW-511 row; PPW-508 carries no quotable History line for it.
-  - v6: fix round — wont-fix on the owner ruling that EuPlatesc is being removed; PPW-511 tracks that the removal is untracked
+  - v6: fix round — wont-fix on the owner ruling that the legacy processor is being removed; PPW-511 tracks that the removal is untracked
   - v6: re-affirmed @`2979ea0` — the owner ruling stands, and the untracked-removal gap stays tracked via open PPW-511
-  - v9: re-raised by the delta pass — completeness-critic, convergence 1, skeptics skipped as a decided re-raise. Prior decision, verbatim from the v6 line above: "fix round — wont-fix on the owner ruling that EuPlatesc is being removed; PPW-511 tracks that the removal is untracked". Re-affirmed at `c8d6bb4`: the ruling stands, PPW-511 is still open, and the new fact this pass adds is that both webhook legs now share one failure-metric wrapper whose EuPlatesc half answers a different response contract — still waived with the integration
-  - v12: re-raised by the certification pass — tests-coverage, convergence 1, verdict re-raise. Prior decision: PPW-526 wont-fix: owner ruled EuPlatesc is being removed; PPW-511 tracks that the removal is written down nowhere. Matched on same untested EuPlatesc paid leg
+  - v9: re-raised by the delta pass — completeness-critic, convergence 1, skeptics skipped as a decided re-raise. Prior decision, verbatim from the v6 line above: "fix round — wont-fix on the owner ruling that the legacy processor is being removed; PPW-511 tracks that the removal is untracked". Re-affirmed at `c8d6bb4`: the ruling stands, PPW-511 is still open, and the new fact this pass adds is that both webhook legs now share one failure-metric wrapper whose the legacy processor half answers a different response contract — still waived with the integration
+  - v12: re-raised by the certification pass — tests-coverage, convergence 1, verdict re-raise. Prior decision: PPW-526 wont-fix: owner ruled the legacy processor is being removed; PPW-511 tracks that the removal is written down nowhere. Matched on same untested the legacy processor paid leg
+  - v13: the waiver this row rests on is now moot — PR #13 deleted the legacy processor webhook leg whose coverage was waived, so there is no untested code left behind the ruling. Status stays wont-fix, the owner ruling that closed it
 
 ### PPW-527 — Only the classified exhaust path is metric-safe; other invoice-creation failures still escape RecordPaymentWebhook
 
@@ -773,7 +833,7 @@ updated: 2026-08-21
 
 ### PPW-528 — Charged-but-unpaid order emits the same metric label as a routine card decline
 
-- **What:** Invoice numbering breaks; every paid webhook charges the customer, leaves the order AwaitingPayment and emits result=failed — the identical label emitted for every payment_intent.payment_failed and every EuPlatesc non-zero action. In the Grafana webhook panel the incident hides inside normal decline volume; no alertable series isolates it.
+- **What:** Invoice numbering breaks; every paid webhook charges the customer, leaves the order AwaitingPayment and emits result=failed — the identical label emitted for every payment_intent.payment_failed and every the legacy processor non-zero action. In the Grafana webhook panel the incident hides inside normal decline volume; no alertable series isolates it.
 - **Evidence:** `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:389`; `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:423`; `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:342`; `d:\photo printing website\src\PhotoPrint.API\Controllers\WebhooksController.cs:302`; `d:\photo printing website\src\PhotoPrint.API\Observability\MetricNames.cs:58`; `d:\photo printing website\src\PhotoPrint.API\Services\Invoicing\SqliteInvoiceNumberingService.cs:6`
 - **Suggested fix:** Add a distinct WebhookResultValues entry (e.g. invoice_number_exhausted) to MetricNames and LabelContract, use it here, and graph/alert on it separately. Suggested test: WebhookMetricsTests.ExhaustedInvoiceNumberEmitsDistinctResult: arrange colliding invoice number + AwaitingPayment order; act POST /api/webhooks/stripe payment_intent.succeeded with a MeterListener; assert result tag differs from the payment_failed decline's "failed".
 - **History:**
@@ -1038,9 +1098,9 @@ updated: 2026-08-21
 - **Suggested fix:** Reject an oversized body inside the action, before verification, using the exception the middleware already maps to 413, and keep an attribute limit as the byte-level backstop. **Files:** `WebhooksController.cs:69`, `:73`, `:84`, `Extensions/SecurityExtensions.cs:59`, `Caddyfile:1`, `docker-compose.prod.yml:10`. **Path:** anonymous POST with a bogus signature and a multi-gigabyte body, no size cap anywhere, the body is buffered into a string, and only then is the signature rejected. **Test shape:** `WebhooksControllerTests.StripeWebhook_RejectsOversizedBody` — a body stream that never ends and no Content-Length, assert the 413-mapped exception and that the verifier was never called. **Trigger-list-shaped:** yes (adds a limiter) — approach pre-check run.
 - **History:**
   - v9: found by the delta pass — security, convergence 1, not hinted, verdict confirmed with a built trace. Not fix-generated: the attributes date from the initial commit; it surfaced now because the `security` lens had not run on this target since v1
-  - v9: Approach pre-check: revised (the drafted attribute alone answers 500 plus a Sentry capture, not 413, because the exception middleware maps exact types and Kestrel's oversize exception is not in the map; enforce in the action with the existing `RequestEntityTooLargeException` at a 1 MB cap — 256 KB risks rejecting a genuine event and buying a three-day Stripe retry — keep the attribute as the byte backstop that also covers a chunked body with no Content-Length, and fix two sibling sites in the same change: the EuPlatesc IPN materialises its whole form before checking its signature, and `Filters/DetectLegacyShippingCostFilter.cs:29` calls EnableBuffering with no limit on the payment endpoints, reachable with a free guest token. The drafted unit test can never pass, because the size filter never runs on a direct action call and TestHost does not surface the limit either)
+  - v9: Approach pre-check: revised (the drafted attribute alone answers 500 plus a Sentry capture, not 413, because the exception middleware maps exact types and Kestrel's oversize exception is not in the map; enforce in the action with the existing `RequestEntityTooLargeException` at a 1 MB cap — 256 KB risks rejecting a genuine event and buying a three-day Stripe retry — keep the attribute as the byte backstop that also covers a chunked body with no Content-Length, and fix two sibling sites in the same change: the legacy processor IPN materialises its whole form before checking its signature, and `Filters/DetectLegacyShippingCostFilter.cs:29` calls EnableBuffering with no limit on the payment endpoints, reachable with a free guest token. The drafted unit test can never pass, because the size filter never runs on a direct action call and TestHost does not surface the limit either)
   - v9 fix round: the Evidence line's read-to-end citation is off by two — at `c8d6bb4`, `:73` opens the `StreamReader` and `:75` is the `ReadToEndAsync` call. Corrected here rather than in the block, which the doc gate holds append-only
-  - v9: fix round — the action reads at most 1 MB and throws the 413-mapped exception before the signature check; the EuPlatesc IPN and DetectLegacyShippingCostFilter are capped in the same change, and the middleware now answers Kestrel’s own status instead of a 500 plus a Sentry capture
+  - v9: fix round — the action reads at most 1 MB and throws the 413-mapped exception before the signature check; the legacy processor IPN and DetectLegacyShippingCostFilter are capped in the same change, and the middleware now answers Kestrel’s own status instead of a 500 plus a Sentry capture
   - v10: verified @`f769e22` — revert-and-rerun over both fix commits reddened its four suites, restore greened them; the fix-diff review found no other anonymous endpoint buffering a body before authenticating
 
 ### PPW-559 — Upload-timeout branch holds a claim that always expires before the next tick, so the same invoice is re-uploaded to ANAF
@@ -1061,6 +1121,8 @@ updated: 2026-08-21
 - **Suggested fix:** Document and script a one-time migration-history reseed to the two surviving ids, or make the baseline's first steps tolerate existing objects. **Files:** `20260820133204_InitialPostgres.cs:12`, `Program.cs:332`, `Program.cs:93`, `Tests/Helpers/PostgresTestDatabase.cs:29`, `docs/DEPLOYMENT.md:157`, `memory-bank/standards/data-stack.md:29`. **Path:** a database carrying the deleted ids, boot-time Migrate, 42P07 on the first table, rolled-back migration, API down. **Test shape:** seed a migration-history row for a deleted id in a fresh test database, then Migrate and assert the failure is either handled or documented as impossible. **Trigger-list-shaped:** no (a one-time script plus documentation) — no approach pre-check run.
 - **History:**
   - v9: found by the delta pass — correctness, db-parity and completeness-critic, convergence 3, hinted, verdict plausible. The trace found the mechanism real but the state unreachable today: no deployed PostgreSQL exists, dev ran SQLite through EnsureCreated so the deleted ids were never recorded, and every test database is created fresh — only a hand-seeded history row reproduces the abort. The runbook section naming the deleted migrations is stale either way
+  - v13: fixed @`56eb9be` — the unreachable half is recorded, not scripted: no database has ever run the deleted chain (dev used SQLite through EnsureCreated, which writes no history rows), so §7 now states the real three-migration chain and gives the `__EFMigrationsHistory` reseed to run if such a database ever appears
+  - v13: verified by reading — a documented recovery procedure, checked against the three migration ids the assembly actually carries
 
 ### PPW-561 — PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry
 
@@ -1070,6 +1132,7 @@ updated: 2026-08-21
 - **History:**
   - v9: found by the delta pass — correctness, convergence 1, hinted, verdict confirmed with a built trace. The trace corrected the claimed cause: the concurrent-create leg is not constructible, because nothing connects to the template database; the reachable mislabels are a bad password and an exhausted connection limit
   - v9: Approach pre-check: revised (drop the retry entirely — the duplicate-name code cannot occur against a per-run unique database name and could never succeed on a retry of the same name, the concurrent-create code needs a session in the template database that nothing here opens, and the one genuinely transient code, too-many-connections, is caused by PPW-562 and disappears with it, while retrying a bad password or a missing privilege only makes an honest error slow. Ship the message split alone — a server that answered is reachable, so report its SQLSTATE — and wrap the migrate call, which sits outside the try and leaks a database plus its connections whenever it throws. Land together with PPW-563, whose default the message names)
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — a developer papercut with no CI or production exposure; the peer merge fixed the connection leak
 
 ### PPW-562 — PostgresTestDatabase is per-test, not per-class: about 100 real databases plus full migration chains per run
 
@@ -1079,6 +1142,7 @@ updated: 2026-08-21
 - **History:**
   - v9: found by the delta pass — completeness-critic, convergence 1, hinted, verdict confirmed with a built trace. The trace raised the count from the claimed 53 to about 100 and added that Dispose clears every pool in the process, which compounds the cost for whatever is running in parallel
   - v9: Approach pre-check: revised (it cannot be applied class-uniformly — one Sameday class drops the Orders table in 3 of its tests and the migration test's whole premise is a fresh database, so both need splitting or exempting, and two constructors run schema changes that must move into the shared fixture. "Reset between tests" hides two requirements: three families of standalone sequences must be restarted, including ones created lazily at run time, and the 42 seeded locker rows must survive, so truncating everything with restarted identities is the wrong primitive. The already-migrated-template variant races across parallel collections and fights connection pooling, so share per class and reset. Acceptance check: run a class twice in one process and see the two existing absolute-number tests still pass)
+  - v12: fixed @`4dd6763` by a peer branch, not by this loop — the merge of chore/faster-relational-tests replaced the per-test full migrate with per-class fixtures and pooled reuse; a verification pass still owes it a revert-and-rerun
 
 ### PPW-563 — Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose
 
@@ -1089,6 +1153,7 @@ updated: 2026-08-21
   - v9: found by the delta pass — completeness-critic, convergence 1, hinted, verdict confirmed with a built trace. The trace judged the pool-clearing half weak, because only idle connections are discarded, so parallel classes lose pooling rather than correctness; that half is PPW-571
   - v9: Approach pre-check: revised (the compose credentials are one of three local credential sets in the repository — the gitignored development settings use a third account, which is the real dev-box convention — so defaulting to compose swaps one wrong default for another. Guess nothing: fail fast naming the environment variable and both in-repo candidates, or restore a presence-gated skip together with a CI assertion that nothing skipped, because about 117 relational tests would otherwise vanish silently on a future workflow edit. Delete the process-wide pool clear rather than scoping it, since the drop already forces disconnection and it was never needed for correctness. CI sets the variable explicitly, so no default change can break it)
   - v12: re-raised by the certification pass — completeness-critic, convergence 1, hinted, verdict re-raise. Prior decision: PPW-563 open: v9 named it; same owner decision as PPW-561. Matched on same Postgres test-database helper gap; the finding also restates PPW-561, PPW-562 and PPW-571
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — local-only: CI is unaffected, tests hard-fail instead of skipping
 
 ### PPW-564 — Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt
 
@@ -1236,6 +1301,8 @@ updated: 2026-08-21
 - **Suggested fix:** Install icu-libs and set DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false in the Dockerfile (or use an -extra base), and add a test that asserts the renderer works under invariant globalization. **Files:** `Services/Invoicing/InvoicePdfDocument.cs:19`, `Services/Invoicing/InvoicePdfRenderer.cs:23`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:281`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:315`, `Dockerfile:28`, `PhotoPrint.API.csproj:3`. **Path:** Reproduced: with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1, InvoicePdfRendererTests fails with TypeInitializationException -> CultureNotFoundException "Only the invariant culture is supported... ro-ro is an invalid culture identifier" at line 19. Dockerfile's aspnet:8.0-alpine adds no icu-libs; csproj sets no InvariantGlobalization; no compose override. In prod: InvoiceUploadJob:281 Render throws, generic catch :315 records LastError, releases claim, returns — XML built, PDF and ANAF upload never happen, retried every tick forever. **Test shape:** InvoicePdfRendererTests.Renders_under_invariant_globalization: arrange a child dotnet run (or test host) with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1; act Render(order, invoice, seller); assert bytes start "%PDF" — today throws TypeInitializationException/CultureNotFoundException. **Trigger-list-shaped:** no (a base-image and configuration change plus a renderer test) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — correctness, convergence 1, verdict confirmed
+  - v12: fix round — the runtime stage installs `icu-libs` and `icu-data-full`, the stage's `ENV` turns the base image's invariant flag off, and the API's runtimeconfig pins `System.Globalization.Invariant` false, which a probe showed outranks the environment variable; the culture stays `ro-RO` on the owner's ruling. Two tests hold the shipped runtimeconfig and the runtime stage and were red on the revert; a third reads the renderer's culture by reflection and reddens in any invariant host (resolution-v12, commits `8e71c63` and `ed3ce30`)
+  - v13: verified @`06fd2b1` — revert-and-rerun (isolated worktree, commits `8e71c63` and `ed3ce30`) reddened `InvoicePdfCultureTests` and the restore greened it. The image package names remain unproven: no Docker on this machine, so a wrong name fails the deploy image build rather than shipping broken
 
 ### PPW-580 — One MaxBatchSize batch mixes cooldown-exempt Submitted polls with Pending uploads, so stuck polls starve new invoices out of filing
 
@@ -1245,6 +1312,7 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (the separate caps are right but aimed at the wrong trigger — 50 healthy in-progress rows starve Pending with no failure at all, because the poll writes nothing on an in-progress answer, and ordering by CreatedAt is the root cause. Order the Submitted query by UpdatedAt ascending and stamp UpdatedAt on every poll outcome, instead of using LastError as a scheduler. Record genuine poll failures through `IInvoiceLifecycle.RecordErrorAsync`, never a raw `ExecuteUpdateAsync`, or four existing tests break on the cooldown they do not advance. Per-tick ANAF fan-out becomes the sum of both caps, so the MaxBatchSize doc comment changes with it. claim-lost and row-missing stay exempt. The suite is real PostgreSQL per test and `Build` takes no batch-size parameter, so seed two Submitted rows and one Pending, not fifty)
+  - v12: owner ruled wont-fix on 2026-08-22 — reaching it needs the tax authority to keep erroring on stareMesaj until 50 rows are stuck, and he accepts that risk rather than pay for the fix now; the consequence if it happens is that newly paid invoices stop being filed
 
 ### PPW-581 — Expired or revoked ANAF credentials never reach the auth-outage alert; they fan out as N generic row-failed errors per tick
 
@@ -1254,6 +1322,7 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (the re-map does reach the alert on every leg — nothing swallows it — but classify by status, not by the error body the provider deliberately never reads: 400, 401 and 403 are auth; 408, 429, 5xx and transport stay unreachable, or a rate-limit answer pages as a dead credential. `AnafAuthException` has one constructor, hardcoding "ANAF returned 401 twice", so LastError and Sentry would lie about a rejected secret or a certificate failure until it takes a reason and an inner exception. The token client sits outside the Polly pipeline, SPV 403 is still unclassified, and the batch loop still needs its own unreachable arm. The drafted unit test is unwritable — the provider builds its own HttpClient and loads a real certificate — and the job-level test passes with the fix reverted)
+  - v12: owner ruled wont-fix on 2026-08-22 — reaching it needs revoked or expired ANAF credentials, and he accepts that risk; the consequence if it happens is that a credential outage pages nobody and shows only generic row failures
 
 ### PPW-582 — Confirmation page races the payment webhook and redirects the paying customer home
 
@@ -1263,15 +1332,18 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (polling fixes only the signed-in half: the order read is JWT-only, so a guest customer gets 401 and ten polls delete the guest token ten times. Close the server hole first — dual auth on a status read that checks the guest session, or a processor reconcile inside the read. Retry only a 200 that still says AwaitingPayment; abort at once on 401, 403, 404, 429 and PaymentFailed; on budget expiry show the order number, never the homepage. Gate the wait on an explicit payment-submitted marker set before the checkout reset, or a stale or foreign URL waits too. Zoneless: an rxjs timer writing signals under `takeUntilDestroyed`, and fake timers in the spec, because `fakeAsync` does not exist in this app)
+  - v12 fix round: fixed @`901f8a2` — a new guest-readable payment-status endpoint, which the confirmation page reads up to ten times over half a minute while the webhook lands, instead of reading the signed-in-only order and sending a paying customer home. Its pre-check was right that the SPA alone could not fix it
+  - v16: verified — clearing `settling` instead of setting it reddened 4 `confirmation-page` specs, restored green. The polling this added was then reworked by PPW-670, PPW-672 and PPW-679, each verified in the same pass
 
 ### PPW-583 — Switching payment tabs destroys the Stripe card element but leaves the pay button enabled
 
-- **What:** mountCardElement() mounts into #stripe-card-element, which lives inside *ngIf="activeTab()==='stripe'". User clicks the EuPlatesc tab (NgIf removes the div and the Stripe iframe with it), then clicks back. A new empty div renders, mountCardElement is never called again, yet stripeReady() is still true so 'Plătește acum' is enabled with no card field. Payment is unusable until a full page reload.
+- **What:** mountCardElement() mounts into #stripe-card-element, which lives inside *ngIf="activeTab()==='stripe'". User clicks the legacy processor tab (NgIf removes the div and the Stripe iframe with it), then clicks back. A new empty div renders, mountCardElement is never called again, yet stripeReady() is still true so 'Plătește acum' is enabled with no card field. Payment is unusable until a full page reload.
 - **Evidence:** `src/app/features/checkout/pages/payment-step.ts:196`
-- **Suggested fix:** Keep the Stripe panel in the DOM (hide with CSS/[hidden]) or re-mount the card element on switchTab('stripe'); reset stripeReady when unmounting. **Files:** `src/app/features/checkout/pages/payment-step.ts:46`, `src/app/features/checkout/pages/payment-step.ts:51`, `src/app/features/checkout/pages/payment-step.ts:54`, `src/app/features/checkout/pages/payment-step.ts:185`, `src/app/features/checkout/pages/payment-step.ts:196`, `src/app/features/checkout/pages/payment-step.ts:204`. **Path:** initStripe -> intent arrives -> mountCardElement mounts into #stripe-card-element and sets stripeReady=true. Click EuPlatesc: *ngIf (line 46) destroys the div and Stripe's iframe. Click Stripe: a fresh empty div renders; switchTab (204) only sets the signal — nothing remounts, no effect/afterRender exists. stripeReady stays true, so 'Plătește acum' is enabled with no card field. Worse: payWithStripe passes its guard (cardElement non-null) and awaits confirmCardPayment un-try/caught, so the rejection leaves stripeLoading stuck true. **Test shape:** payment-step.spec.ts: 'remounts the card element when returning to the Stripe tab' — inject fake stripeInstance/clientSecret, mount, switchTab('euplatesc')+detectChanges, switchTab('stripe')+detectChanges; expect card.mount called twice (currently once). **Trigger-list-shaped:** yes (a checkout state machine and an element lifecycle) — approach pre-check run.
+- **Suggested fix:** Keep the Stripe panel in the DOM (hide with CSS/[hidden]) or re-mount the card element on switchTab('stripe'); reset stripeReady when unmounting. **Files:** `src/app/features/checkout/pages/payment-step.ts:46`, `src/app/features/checkout/pages/payment-step.ts:51`, `src/app/features/checkout/pages/payment-step.ts:54`, `src/app/features/checkout/pages/payment-step.ts:185`, `src/app/features/checkout/pages/payment-step.ts:196`, `src/app/features/checkout/pages/payment-step.ts:204`. **Path:** initStripe -> intent arrives -> mountCardElement mounts into #stripe-card-element and sets stripeReady=true. Click the legacy processor: *ngIf (line 46) destroys the div and Stripe's iframe. Click Stripe: a fresh empty div renders; switchTab (204) only sets the signal — nothing remounts, no effect/afterRender exists. stripeReady stays true, so 'Plătește acum' is enabled with no card field. Worse: payWithStripe passes its guard (cardElement non-null) and awaits confirmCardPayment un-try/caught, so the rejection leaves stripeLoading stuck true. **Test shape:** payment-step.spec.ts: 'remounts the card element when returning to the Stripe tab' — inject fake stripeInstance/clientSecret, mount, switchTab('legacy-processor')+detectChanges, switchTab('stripe')+detectChanges; expect card.mount called twice (currently once). **Trigger-list-shaped:** yes (a checkout state machine and an element lifecycle) — approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (keep the panel in the DOM, but `[hidden]` alone is a no-op because the panel class sets `display: flex`, and a remount without a destroy leaks an orphaned Stripe iframe per toggle. Mount through a view-child element reference with an idempotent guard. The same commit must wrap the confirm call in try/catch/finally: the stuck spinner is reachable without switching tabs, and an unhandled rejection breaks the new spec's stability wait. The drafted spec cannot run — there is no seam for a fake Stripe, so the module needs mocking; today the card element is mounted zero times in specs, and two existing specs pass for the wrong reason)
+  - v13: fixed @`06fd2b1` — retired by deletion, not repaired: PR #13 removed the second payment processor, so the checkout has no tab switcher and no destroyed-element path. Nothing verifies it, because the surface it described no longer exists
 
 ### PPW-584 — SPA never sends an Idempotency-Key and PaymentStep mints a fresh order on every mount
 
@@ -1281,6 +1353,8 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
   - v12: Approach pre-check: revised (the server dedupe already exists and is tested; the storage choice is the defect — the checkout state service persists to sessionStorage, so two tabs still mint two orders. Put the key in its own localStorage entry, one per attempt and processor, cleared on success, on login, on logout, on a guest-token clear and on any 409; nesting it inside the guest session defeats the guest-token clear rule. Requiring the header without a SQLite arm in the violation classifier turns every dev-mode collision into a 500, and replay has no status check, so a stale key replays a paid order's secret. Checkout handles no 409 anywhere, so the key alone converts a silent double order into a 24-hour dead end)
+  - v12 fix round: fixed @`901f8a2` — the checkout mints one key per basket in localStorage, reuses it across mounts, and clears it when the order settles; the server answers a settled key with a 409 naming that order and the page sends the customer to it. The pre-check ruled out sessionStorage, which a second tab does not share
+  - v16: verified — sending no idempotency key reddened 3 `payment-step` specs, restored green. The one-key-per-basket half is covered by PPW-661, verified in the same pass
 
 ### PPW-585 — Recapitulare hides the new fiscal address for locker orders, and an unchanged spec pins that behaviour
 
@@ -1289,6 +1363,9 @@ updated: 2026-08-21
 - **Suggested fix:** Render the address on recapitulare for both methods (labelled billing for Easybox) and retarget the spec; refresh its Easybox fixtures that still use shippingAddress: null. **Files:** `src/app/features/checkout/pages/review-step.spec.ts:126`, `src/app/features/checkout/pages/review-step.ts:43`, `src/app/features/checkout/pages/delivery-step.ts:357`, `src/app/features/checkout/pages/delivery-step.ts:483`, `src/app/core/services/checkout-state.service.ts:39`, `src/app/features/checkout/pages/payment-step.ts:251`. **Path:** Pick Easybox, locker l1, fill address (Timiș/Timișoara). canContinue (delivery-step.ts:357) requires the address; continue() calls setEasyboxAddress, which keeps it. payment-step.ts:251 posts shippingAddress for Easybox too, so it lands on the invoice. But review-step.ts:43 gates the line on method==='Courier', so recapitulare shows only "Easybox — Box A". The spec's own premise is false: setMethod (line 26) clears shippingAddress, so no "leftover courier address" exists — line 146/147 pin real hiding. **Test shape:** ReviewStep spec "renders the fiscal address for an Easybox order": arrange Easybox state with shippingAddress (Timișoara); act createFixture; assert .delivery-summary textContent contains 'Str. Fantoma' and 'Timișoara' — reddens today. **Trigger-list-shaped:** no (renders a value already in state and retargets a spec) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, completeness-critic, convergence 2, verdict confirmed
+  - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the driver checked the code with him and the consequence is that a locker customer cannot proof-read the address printed on the invoice, not money or data loss
+  - v13: fixed @`c03f99a` — the recap renders the invoiced address for locker orders too, and the spec that pinned the old behaviour was retargeted
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-586 — Neither invoice controller has an HTTP-pipeline test, so endpoint authorization and DualAuth guest ownership are unverified
 
@@ -1298,6 +1375,9 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — tests-coverage, completeness-critic, convergence 2, verdict confirmed
   - v12: Approach pre-check: revised (the 403 is real and deterministic, but the fix belongs in the shared claims extension, whose claim scan makes every both-headers caller lose its user id — cart scope, and worse, order attribution, where a signed-in user carrying a stale guest token creates a guest order today. Make the read identity-scoped rather than deleting the guard, or guest-only requests start writing a session id into the user column. The existing factory chain boots the real pipeline, but the 200 leg needs a seed helper for a stored PDF, and the admin retry route can only be tested for 401 and 403 on the in-memory provider because its update runs as raw SQL. Any test-authentication override deletes the defect)
+  - v12: owner regraded 🔴 to 🟠 on 2026-08-22 — the 403 needs a caller sending a valid JWT and a live guest token together, which the shipped SPA never does, so it is unreachable through the site itself
+  - v13: fixed @`8950624` — six tests through the real pipeline: 401 anonymous, 403 for another customer, 403 for another guest session, 404 for the guest owner and for the order owner (with the Retry-After), and the admin role override. Reverting the admin branch reddens the last one
+  - v13: verified by reading — the commit changes only test files, so nothing can be reverted to redden it. Its own admin case was proved by reverting the production branch it covers (see PPW-596)
 
 ### PPW-587 — A permanent HTTP 4xx content rejection is classified as unreachable/transient, so the row retries forever and is never parked
 
@@ -1306,6 +1386,8 @@ updated: 2026-08-21
 - **Suggested fix:** Split 4xx (except 408/429) into its own exception and park the row as Failed via ParkUnbuildableAsync, mirroring the not-buildable path. **Files:** `Services/Invoicing/Anaf/AnafSpvClient.cs:70`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355`, `Services/Invoicing/InvoiceLifecycle.cs:44`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:98`, `Services/Invoicing/InvoiceLifecycle.cs:111`, `Services/Invoicing/Anaf/AnafExceptions.cs:44`. **Path:** Pending invoice, XML/PDF already built. ANAF answers 400 (bad CIF, duplicate number): AnafSpvClient.cs:70-71 throws AnafUnreachableException(httpStatus:400). Job's catch at line 355 calls RecordPendingErrorAsync — InvoiceLifecycle.cs:44-55 writes only LastError+UpdatedAt, keeps Pending, no UnknownUploadOutcomes bump, no Failed metric — then releases the claim. Next tick past the cooldown re-selects the row (line 98). No watchdog parks Pending elsewhere, so it loops forever. **Test shape:** InvoiceUploadJobTests.Upload_rejected_with_http_400_is_parked_after_budget: arrange fake IAnafSpvClient always throwing AnafUnreachableException(endpoint, httpStatus:400); act — run MaxUnknownUploadOutcomes+1 ticks; assert invoice.AnafStatus == Failed. Today it stays Pending forever. **Trigger-list-shaped:** yes (splits the exception mapping and adds a parking rule) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — correctness, convergence 1, verdict confirmed
+  - v13: fixed @`32d4eee` — a non-success HTTP status that is not 408/429/5xx now raises `AnafContentRejectedException`, and the job parks the row as Failed instead of retrying a document ANAF has refused
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: disabling only the `AnafContentRejectedException` catch reddened the parking test, restored green
 
 ### PPW-588 — Unknown-outcome budget covers only client timeouts, so AnafUnreachableException gets unlimited blind re-POSTs
 
@@ -1314,6 +1396,8 @@ updated: 2026-08-21
 - **Suggested fix:** Treat 5xx/unreachable on the upload endpoint as an unknown outcome too (count it against MaxUnknownUploadOutcomes), and exclude POST upload from the Polly retry set. **Files:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:364`, `Services/Invoicing/Anaf/AnafSpvClient.cs:68`, `Services/Invoicing/Anaf/AnafSpvClient.cs:181`, `Services/Invoicing/Anaf/AnafResilienceHandler.cs:36`, `Services/Invoicing/InvoiceLifecycle.cs:111`. **Path:** Upload POSTs (non-idempotent, no idempotency key). ANAF answers 502 after registering it: Polly retries 3x (AnafResilienceHandler:36), then AnafSpvClient:68 throws AnafUnreachableException. InvoiceUploadJob:355-363 only calls RecordPendingErrorAsync and releases the claim — UnknownUploadOutcomes untouched, status stays Pending. No other code parks Pending rows, so every tick re-POSTs forever. Sharper variant: a 200 body that fails XML parse (AnafSpvClient:181) — upload definitely accepted — takes the same unlimited path. **Test shape:** UploadJob_Reposts_Forever_On_Gateway_5xx: fake IAnafSpvClient.UploadAsync always throws AnafUnreachableException(httpStatus:502); run MaxUnknownUploadOutcomes+1 ticks; assert invoice parked Failed and UnknownUploadOutcomes>0 — today it stays Pending with 0 and uploads every tick. **Trigger-list-shaped:** yes (changes retry semantics and the blind-repost budget) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed. Fix-generated by PPW-559
+  - v13: fixed @`32d4eee` — an upload-leg outage spends the blind-repost budget through `RecordUnknownUploadOutcomeAsync` and **keeps the claim**: a row whose ANAF answer nobody has cannot be re-posted by a second replica
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: releasing the claim on the unreachable branch reddened the keeps-the-claim test, restored green
 
 ### PPW-589 — nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number
 
@@ -1322,6 +1406,7 @@ updated: 2026-08-21
 - **Suggested fix:** Allocate the number inside an explicit transaction that also inserts the row, or reconcile gaps: record burned numbers and reuse them on the next allocation. **Files:** `Services/Invoicing/PostgresInvoiceNumberingService.cs:40`, `Services/Invoicing/InvoiceCreationService.cs:77`, `Controllers/WebhooksController.cs:304`, `Controllers/WebhooksController.cs:449`, `Controllers/WebhooksController.cs:460`, `memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md:39`. **Path:** Mechanically real. Two Stripe deliveries both pass the status check (WebhooksController.cs:304), each allocates 41/42 via nextval (non-transactional, so unrollbackable), one SaveChanges wins, the loser detaches and returns AlreadyInvoiced (line 466) — 42 burnt. But this is exactly ADR-020's explicitly accepted gap-on-rollback, mitigated by a mandated quarterly gap audit plus accountant note; the ADR forbids reopening it. So: real gap, not a defect, and "nothing explains it to ANAF" is false. **Test shape:** None should be written: a test asserting a gap-free series contradicts ADR-020. Demonstrating the burn needs real Postgres (nextval absent from the EF InMemory default) and would assert the accepted behaviour, not a regression. **Trigger-list-shaped:** yes (changes the fiscal-number allocation scheme) — the row needs an owner ruling against ADR-020 before any fix — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — the driver verified it is ADR-020 accepted trade-off, already audited, not an open defect
 
 ### PPW-590 — PollSubmittedAsync takes no claim, so every replica polls every Submitted row on every tick
 
@@ -1330,6 +1415,7 @@ updated: 2026-08-21
 - **Suggested fix:** Apply the same ClaimedAt+TTL compare-and-swap before polling a Submitted row, and skip the row when the claim is lost. **Files:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:98`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:421`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:157`, `Services/Invoicing/InvoiceLifecycle.cs:38`, `Services/Invoicing/Anaf/AnafResilienceHandler.cs:33`, `Configuration/AnafSettings.cs:31`. **Path:** 50 Submitted rows; MarkSubmittedAsync nulls LastError, so the batch filter (line 98-100, no ClaimedAt predicate) selects all 50 on both replicas. PollSubmittedAsync only reads the row, then calls GetStatusAsync — no claim, no CAS. 100 stareMesaj calls/tick; each 429 is retried 3x (1/2/4s) by AnafResilienceHandler. The resulting AnafUnreachableException hits the generic catch (line 157), which only logs — LastError stays null, so no cooldown; every tick repeats. **Test shape:** InvoiceUploadJobTests: ProcessBatchAsync_SubmittedRowClaimedByPeerWithinTtl_SkipsPollWithoutCallingAnaf — seed Submitted row (anafUploadId, ClaimedAt = now-2min), run ProcessBatchAsync, assert AnafClient.Verify(GetStatusAsync, Times.Never). Mirrors the existing UploadPendingAsync_RowAlreadyClaimedWithinTtl test; reddens today. **Trigger-list-shaped:** yes (extends the claim-and-lease concurrency model to the poll leg) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — race, convergence 1, verdict confirmed. Fix-generated by PPW-476
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — dormant while production runs one API instance; it wakes if replicas are configured
 
 ### PPW-591 — No setval reconciliation: an invoice sequence that lags the Invoices table wedges every paid order
 
@@ -1338,6 +1424,8 @@ updated: 2026-08-21
 - **Suggested fix:** On numbering exhaustion (or at boot) run setval(seq, max(Number)) for the series/year from Invoices; add a Postgres test seeding rows ahead of the sequence. **Files:** `Services/Invoicing/PostgresInvoiceNumberingService.cs:38`, `Data/PostgresSequences.cs:25`, `Migrations/20260820133204_InitialPostgres.cs:746`, `Services/Invoicing/InvoiceCreationService.cs:77`, `Controllers/WebhooksController.cs:468`, `Services/AdminOrderService.cs:449`. **Path:** State: invoices hold FT/2026 numbers 1..500; sequence invoice_seq_ft_2026 sits at 1 (migration creates it START 1; EnsureAsync only CREATE IF NOT EXISTS; no setval or MAX(number) reconciliation exists anywhere). Paid webhook: nextval yields 1,2,3,4 across attempts 0-3, each SaveChanges hits uq_invoices_series_year_number, attempt 3 returns NumberExhausted — charged, order not Paid. Self-heals only after ~125 such burned orders, not "forever". **Test shape:** Postgres integration test NumberingLaggingSequenceWedgesPaidTransition: seed invoices FT/2026 numbers 1..5, setval sequence to 1, run the paid save path, assert NumberExhausted and order not Paid. **Trigger-list-shaped:** yes (adds a self-heal step to the numbering key scheme) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — db-parity, convergence 1, verdict confirmed
+  - v13: fixed @`72202c0` — a taken-number collision now runs `setval` past `MAX("Number")` for the series and the UTC year of `IssuedAt`, mirroring the unique index; three Postgres tests cover lagging, ahead-of-table and a foreign year
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: returning early from `ReconcileWithStoredInvoicesAsync` reddened the lagging-sequence Postgres test, restored green
 
 ### PPW-592 — ANAF-supplied index_incarcare is accepted unvalidated into a varchar(100) column, turning a filed invoice into a blind re-upload loop
 
@@ -1346,6 +1434,8 @@ updated: 2026-08-21
 - **Suggested fix:** Reject or truncate index_incarcare above the column width in AnafSpvClient, and treat a MarkSubmittedAsync failure as an unknown-outcome (increment the blind-repost budget) rather than a plain rethrow. **Files:** `Services/Invoicing/Anaf/AnafSpvClient.cs:91`, `Services/Invoicing/InvoiceLifecycle.cs:37`, `Data/PhotoPrintDbContext.cs:399`, `Migrations/20260820133204_InitialPostgres.cs:380`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:341`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:100`. **Path:** Line 91 only null/whitespace-checks index_incarcare. MarkSubmittedAsync writes it to character varying(100) (InitialPostgres.cs:380) via ExecuteUpdate — EF skips validation, Postgres raises 22001. Job:341 rethrows; PostgresException matches none of the catches at 347/355/364, so batch catch:157 only logs. Row stays Pending, LastError null, so filter:100 keeps it batch-eligible; claim never released, so re-upload every ClaimTtl (min 2 min) forever. Prod-only — SQLite/InMemory ignore length. **Test shape:** InvoiceUploadJobTests: MarkSubmittedAsync mock throws DbUpdateException after a successful upload. Assert invoice stays Pending with LastError null, ClaimedAt still set, UnknownUploadOutcomes 0 — proving the next tick re-files. Plus AnafSpvClient rejects a 101-char index_incarcare. **Trigger-list-shaped:** yes (adds input rejection plus an unknown-outcome mapping) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — db-parity, input-validation, convergence 2, verdict confirmed
+  - v13: fixed @`add7611` — the client rejects an `index_incarcare` wider than `Invoice.AnafUploadIdMaxLength`, and a failed status write after a successful upload counts as an unknown outcome instead of rethrowing into a re-file loop
+  - v13: verified — revert-and-rerun held; the only file this row shares with a later commit is `docs/DEPLOYMENT.md`, which is neither compiled nor a test input
 
 ### PPW-593 — Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered
 
@@ -1354,6 +1444,7 @@ updated: 2026-08-21
 - **Suggested fix:** Add controller tests: Accepted/Submitted/Pending each return 409 with error invoice-not-retryable, and lifecycle.RetryAsync is never called. Add one for the CAS-lost 409. **Files:** `Tests/Unit/Controllers/AdminInvoicesControllerTests.cs:75`, `Controllers/AdminInvoicesController.cs:105`, `Services/Invoicing/InvoiceLifecycle.cs:179`, `Services/Invoicing/IInvoiceLifecycle.cs:54`, `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:662`. **Path:** Delete AdminInvoicesController.cs:105-113 and all three tests still pass — the only retry test seeds AnafStatus=Rejected and asserts a log line. No other test (unit or integration) hits the endpoint or the "invoice-not-retryable" branch. Without the check, an Accepted invoice passes expected=Accepted to InvoiceLifecycle.RetryAsync:179, whose CAS matches, flipping it to Pending and clearing XmlPayload/AnafUploadId, so the worker re-files the same invoice number. **Test shape:** RetryAsync_Returns409_ForAcceptedInvoice: arrange invoice with AnafStatus=Accepted; act controller.RetryAsync; assert ConflictObjectResult carrying error "invoice-not-retryable" and lifecycle.RetryAsync never invoked (Moq Verify never). **Trigger-list-shaped:** no (controller tests only) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — tests-coverage, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — a test gap only; the shipped whitelist behaves correctly today
 
 ### PPW-594 — The new Invoice.StorageLocation stamp is never asserted after a PDF save
 
@@ -1362,6 +1453,7 @@ updated: 2026-08-21
 - **Suggested fix:** Re-read the row in both tier tests and assert StorageLocation equals Cloud/Local respectively, alongside PdfStoragePath. **Files:** `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:304`, `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:320`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:216`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:287`, `Models/Invoice.cs:47`, `Controllers/InvoicesController.cs:76`. **Path:** Delete InvoiceUploadJob.cs:287 (`invoice.StorageLocation = CloudEnabled ? Cloud : Local`). Line 216 still picks the Cloud adapter, so both tier tests (lines 315-316, 331) stay green — they only Verify SaveAsync on the mocks and never reload the row. The persisted row keeps the entity default Local (Invoice.cs:47) while bytes are in S3. InvoicesController.cs:76 then reads Local first: guaranteed miss, then a tier-mismatch warning at 109. No test in the suite asserts the job's stamp. **Test shape:** UploadPendingAsync_CloudEnabled_StampsTheRowWithTheCloudTier: arrange Build(cloudEnabled: true) + SeedOrderAndInvoice; act InvokeUploadPendingAsync; assert reloaded row.StorageLocation == StorageLocation.Cloud (and a cloudEnabled:false twin asserting Local). **Trigger-list-shaped:** no (assertions added to two existing tests) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — tests-coverage, convergence 1, hinted, verdict confirmed. Fix-generated by PPW-517
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — a test gap only; the fallback read self-heals even the hypothetical regression
 
 ### PPW-595 — QuestPDF licence is set by the test class itself, so the production licence wiring is unverified
 
@@ -1370,6 +1462,7 @@ updated: 2026-08-21
 - **Suggested fix:** Assert QuestPDF.Settings.License is configured after the host boots (WebApplicationFactory), and stop setting it in the test's static constructor. **Files:** `Tests/Unit/Services/Invoicing/InvoicePdfRendererTests.cs:23`, `Program.cs:262`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:281`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:315`, `Tests/Unit/Services/Invoicing/Anaf/InvoiceUploadJobTests.cs:109`, `Controllers/InvoicesController.cs:123`. **Path:** Empirically verified: QuestPDF 2024.12.3 GeneratePdf throws System.Exception ("Welcome to QuestPDF!") when Settings.License is unset. Only two files touch the licence: Program.cs:262 and this static ctor. Delete Program.cs:262 → renderer tests still pass (own static ctor), InvoiceUploadJobTests:109 mocks IInvoicePdfRenderer, no integration test renders through boot. Production: Render at InvoiceUploadJob.cs:281 throws, generic catch at :315 calls RecordPendingErrorAsync, invoice loops Pending, PDF never stored. **Test shape:** BootSetsQuestPdfLicence: arrange — set QuestPDF.Settings.License = null; act — construct WebApplicationFactory&lt;Program&gt; and force boot (CreateClient); assert — Settings.License == LicenseType.Community. Reddens when Program.cs:262 is deleted, immune to the renderer tests' static ctor ordering. **Trigger-list-shaped:** no (a boot test plus removing a test-only licence set) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — tests-coverage, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — a test gap only; the production licence wiring is untested, not wrong
 
 ### PPW-596 — No admin access to an invoice PDF, so FR-5's role override and the inspection-week runbook are undelivered
 
@@ -1378,6 +1471,8 @@ updated: 2026-08-21
 - **Suggested fix:** Allow Admin role to bypass the ownership check (or add GET /api/admin/invoices/{id}/pdf), with an audit log line; add a test for admin fetching another user's invoice. **Files:** `Controllers/InvoicesController.cs:56`, `Controllers/InvoicesController.cs:58`, `Controllers/AdminInvoicesController.cs:145`, `Extensions/GuestSessionExtensions.cs:22`, `memory-bank/intents/016-romanian-vat-efactura/requirements.md:68`, `docs/DEPLOYMENT.md:1470`. **Path:** Admin logs in (JWT with role Admin) and calls GET /api/orders/{customerOrderId}/invoice. DualAuth passes (RequireAuthenticatedUser only), then InvoicesController.cs:56-58 computes owns from UserId/GuestSessionId alone — no IsInRole("Admin") anywhere — so order.UserId != admin id yields Forbid() → 403. AdminInvoicesController offers only list, retry, and /xml; grep for "application/pdf" hits one route. So no admin path to any customer PDF, contradicting FR-5 requirements.md:68 and the DEPLOYMENT.md:1470 spot-check step. **Test shape:** GetInvoice_AdminOnAnotherUsersOrder_ReturnsPdf: arrange paid order owned by user A with rendered invoice PDF; act GET /api/orders/{A.orderId}/invoice with Admin-role JWT; assert 200 and application/pdf. Today returns 403. **Trigger-list-shaped:** no (an authorization branch and a route) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`e3f4bb8` — an Admin may read a customer invoice and the read is logged as `invoice.pdf.admin-read`
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: dropping `!isAdmin` from the ownership guard reddened `GetInvoice_AdminOnACustomersOrder_IsNotForbidden`, restored green
 
 ### PPW-597 — Invoice-by-email (FR-5, story 003) is not implemented while ddd-02 describes it as shipped
 
@@ -1386,6 +1481,8 @@ updated: 2026-08-21
 - **Suggested fix:** Either implement the attachment/follow-up send, or mark story 003/FR-5's email criterion explicitly descoped in ddd-02 and the story file, and give guests a retrieval path. **Files:** `Services/Invoicing/InvoicePdfReadyNotifier.cs:31`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:293`, `Services/IEmailSender.cs:5`, `EmailTemplates/OrderConfirmed.cshtml:1`, `Controllers/InvoicesController.cs:17`, `Controllers/OrdersController.cs:10`. **Path:** with one correction. Guest pays; InvoiceUploadJob:293 renders the PDF then calls NotifyAsync, which only logs — flag off logs "suppressed", flag on logs "no-email-integration". No IEmailService is even injected, IEmailSender.SendAsync has no attachment parameter, and OrderConfirmed.cshtml never mentions factura/invoice. But the invoice is not unreachable by API: InvoicesController:17 uses DualAuthPolicy and matches GuestSessionId. It is unreachable in practice — no UI code calls it and OrdersController:10 is JWT-only. **Test shape:** InvoicePdfReadyNotifierTests: flag enabled, NotifyAsync(invoice, order) → assert IEmailService received a send naming the invoice number for order.CustomerEmail. Red today (no IEmailService dependency, log-only body). **Trigger-list-shaped:** yes (adds an outbound email event, or removes a promised capability) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`5324a1c`, `beb7732` — the contradiction is resolved on the doc side plus a real route: ddd-02 now says the email is unshipped, and the confirmation page has a download button reading `GET /api/orders/{id}/invoice`. Story 003 (invoice by email) stays open as scope, not as a false claim
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: renaming the download button's class reddened one `confirmation-page` spec. The doc half (ddd-02) is verified by reading, not by a test
 
 ### PPW-598 — Admin retry never re-renders the PDF, contradicting the documented fix-forward-and-re-render rollback
 
@@ -1394,6 +1491,8 @@ updated: 2026-08-21
 - **Suggested fix:** Clear PdfStoragePath (and StorageLocation) on retry so the worker re-renders, or correct DEPLOYMENT §15.7 to state that retry cannot re-render and give the real procedure. **Files:** `Services/Invoicing/InvoiceLifecycle.cs:165`, `Services/Invoicing/InvoiceLifecycle.cs:178`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:247`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:279`, `Controllers/AdminInvoicesController.cs:105`, `docs/DEPLOYMENT.md:1482`. **Path:** Invoice Rejected, PdfStoragePath="invoices/FT-1.pdf" holding bytes from the buggy renderer. Ops deploy the fix, POST retry: RetryAsync (line 178) nulls XmlPayload but leaves PdfStoragePath, status Pending. Worker tick reaches UploadPendingAsync; line 279 `if (string.IsNullOrEmpty(invoice.PdfStoragePath))` is false, so Render is never called and no new bytes are stored. Customers keep downloading the stale PDF via InvoicesController line 92. Worse: an Accepted invoice 409s at AdminInvoicesController line 105, so the documented path fails outright. **Test shape:** InvoiceUploadJobTests.Retry_ReRendersPdf: arrange Failed invoice with PdfStoragePath set and a counting IInvoicePdfRenderer; act RetryAsync then one worker tick; assert Render called once and stored bytes replaced. Reddens today (zero calls). **Trigger-list-shaped:** yes (changes what the retry resets, so it changes retry semantics) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — `RetryAsync` clears `PdfStoragePath`, so a fixed renderer actually re-renders; the test that pinned the kept path was retargeted
+  - v13: verified — revert-and-rerun held, and the retargeted lifecycle test asserts the cleared path directly
 
 ### PPW-599 — Documented batch-retry SQL in DEPLOYMENT.md reposts the identical rejected XML and re-parks on the first timeout
 
@@ -1402,6 +1501,8 @@ updated: 2026-08-21
 - **Suggested fix:** Add "XmlPayload" = NULL, "UnknownUploadOutcomes" = 0, "ClaimedAt" = NULL to the documented SQL, or replace it with a loop over the retry endpoint. **Files:** `docs/DEPLOYMENT.md:1531`, `Services/Invoicing/InvoiceLifecycle.cs:163`, `Services/Invoicing/InvoiceLifecycle.cs:119`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:247`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:267`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:364`. **Path:** `RetryAsync` (InvoiceLifecycle.cs:180-188) also nulls `XmlPayload` and zeroes `UnknownUploadOutcomes`; the §15.9 SQL sets neither. So: Failed row keeps its old-CUI XML → `UploadPendingAsync`'s `if (string.IsNullOrEmpty(invoice.XmlPayload))` (InvoiceUploadJob.cs:267) skips the rebuild, reposting the rejected XML after the Seller:Cui fix. And a row parked at outcomes=3 stays 3, so one `AnafUploadTimeoutException` increments to 4 ≥ max (InvoiceLifecycle.cs:119-138) and re-parks on the first timeout. **Test shape:** InvoiceUploadJobTests.DocumentedBatchRetryFieldsAlone_RepostsStaleXmlAndParksOnFirstTimeout: seed Failed row (stale XmlPayload, UnknownUploadOutcomes=3); set only AnafStatus/AnafUploadId/LastError as §15.9 does; run tick with timeout client; assert xmlBuilder never called and status==Failed. **Trigger-list-shaped:** no (a documented SQL statement) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — the documented batch SQL now also clears `XmlPayload`, `PdfStoragePath`, `UnknownUploadOutcomes` and `ClaimedAt`, with a comment saying why each one matters
+  - v13: verified by reading — a documented SQL statement has nothing to redden; it was checked field by field against `RetryAsync`
 
 ### PPW-600 — FR-4's exponential backoff (1h/4h/16h/64h) never runs — Rejected is terminal until an admin acts
 
@@ -1410,6 +1511,9 @@ updated: 2026-08-21
 - **Suggested fix:** Either include Rejected rows on a backoff schedule derived from BackoffHours, or amend FR-4/story 002 and ddd-01's state table to state that rejections are admin-retry-only. **Files:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:99`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:440`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:462`, `Services/Invoicing/InvoiceLifecycle.cs:97`, `Configuration/AnafSettings.cs:33`, `Controllers/AdminInvoicesController.cs:105`. **Path:** Invoice created, uploaded, Submitted. Tick N: GetStatusAsync returns Rejected; elapsed < 85h so MarkRejectedAsync sets AnafStatus=Rejected. Tick N+1..∞: the batch Where only matches Pending|Submitted, so the row is never selected again — no 1h/4h/16h/64h re-upload. BackoffHours is used solely as a sum (IsBudgetExhausted) at rejection time. MarkFailedAsync CASes on Submitted, so Rejected→Failed is unreachable; only the admin retry endpoint frees the row. **Test shape:** InvoiceUploadJobTests.RejectedInvoice_IsRetriedAfterBackoff: arrange Submitted invoice + stub returning Rejected; act tick, advance clock 2h, tick; assert AnafStatus==Submitted and UploadAsync called twice. Reddens — row stays Rejected, upload called once. **Trigger-list-shaped:** yes (adds a backoff schedule to a background job, or amends the contract) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🔴 on 2026-08-24 — with PPW-604 it means an ANAF outage can let the filing deadline lapse while the only dashboard panel shows nothing wrong
+  - v13: fixed @`6977d5b` — Rejected rows re-enter the batch on cumulative `BackoffHours` milestones from `CreatedAt` (ADR-024, no persisted counter) and reach Failed through `GiveUpOnRejectedAsync` when the schedule is spent. Reverting the dispatch reddens two of the three new tests
+  - v13: verified — removing the Rejected dispatch case reddened two of the three new tests (the third is the negative control), restored green
 
 ### PPW-601 — system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule
 
@@ -1418,6 +1522,7 @@ updated: 2026-08-21
 - **Suggested fix:** Add InvoiceUploadJob to the job table, note Invoice.StorageLocation + invoices/{yyyy}/{MM} keys in the storage section, and add invoice creation to the Paid side-effect list. **Files:** `memory-bank/standards/system-architecture.md:74-87`, `memory-bank/standards/system-architecture.md:60-61`, `memory-bank/standards/system-architecture.md:99-100`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:52-104`, `Models/Invoice.cs:47`, `Controllers/WebhooksController.cs:40`. **Path:** Every clause checks out. InvoiceUploadJob is a DB-polling BackgroundService (PeriodicTimer over db.Invoices with ClaimedAt/TTL claims) — a durable queue table, contradicting "in-process, no durable queue table". Invoice.StorageLocation:47 and InvoiceStorageKeys exist; invoice PDFs route by storageRouter.CloudEnabled, not Upload.StorageLocation. WebhooksController allocates invoice numbers on payment success, absent from the doc's list. The job table says 9 and also omits AwbDispatcher/AwbRetryJob/ShipmentTrackingJob. **Test shape:** Doc-gate lint: assert every BackgroundService/IHostedService type name in src/PhotoPrint.API appears in system-architecture.md's job table. Reddens today on InvoiceUploadJob, AwbDispatcher, AwbRetryJob, ShipmentTrackingJob. **Trigger-list-shaped:** no (a standards document) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — paperwork only; no runtime behaviour differs
 
 ### PPW-602 — Invoice 404 advertises Retry-After 30 seconds although the PDF can be a 30-minute poll interval away
 
@@ -1426,6 +1531,8 @@ updated: 2026-08-21
 - **Suggested fix:** Send a Retry-After matching Anaf:PollIntervalMinutes, and either kick the worker on the Paid transition or restate the NFR in the bolt docs. **Files:** `Controllers/InvoicesController.cs:68`, `Controllers/WebhooksController.cs:449`, `Services/Invoicing/InvoiceCreationService.cs:90`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:279`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:54`, `appsettings.json:102`. **Path:** Webhook `SaveOrderPaidWithInvoiceAsync` (line 449) inserts the Invoice with `AnafStatus=Pending` and no `PdfStoragePath`. The only renderer is `InvoiceUploadJob.UploadPendingAsync` Step 2 (line 279-289), driven by a `PeriodicTimer` at `PollIntervalMinutes` = 30 (appsettings.json:102, AnafSettings default). So: pay, GET the invoice, hit line 66 -> `Retry-After: 30` (seconds) while the PDF is up to 30 minutes away; a failed row adds another cooldown interval. **Test shape:** InvoicesControllerTests.Invoice404_RetryAfter_MatchesProducerInterval: arrange paid order + Pending invoice, PollIntervalMinutes=30; act GET invoice; assert Retry-After seconds >= 1800. Reddens today (returns 30). **Trigger-list-shaped:** yes (either re-times the producer or wakes the background job) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — the 404 carries a `Retry-After` of `Anaf:PollIntervalMinutes`, so the hint matches the only producer of the PDF
+  - v13: verified — revert-and-rerun held, and the new controller test pins the header to 1800 seconds
 
 ### PPW-603 — The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable
 
@@ -1434,6 +1541,7 @@ updated: 2026-08-21
 - **Suggested fix:** Catch AnafUnreachableException/AnafUploadException in PollSubmittedAsync: RecordErrorAsync on the row and log anaf.upload-job.unreachable at Warning, matching the upload leg. **Files:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:425`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:157`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:100`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355`, `Services/Invoicing/Anaf/AnafSpvClient.cs:128`, `Services/Invoicing/InvoiceLifecycle.cs:38`. **Path:** Submitted row, AnafUploadId set, LastError null (MarkSubmittedAsync:38 nulls it). ANAF answers 503: GetStatusAsync (AnafSpvClient:128) throws AnafUnreachableException. PollSubmittedAsync:425 has no catch; ProcessOneAsync doesn't either, so the batch loop's generic catch (line 157) logs Error "row-failed" and no lifecycle call runs — LastError stays null, UpdatedAt unchanged. Query line 100 admits LastError==null unconditionally, so it re-polls every tick, no cooldown. Upload leg (355) logs Warning + records the error. **Test shape:** InvoiceUploadJobTests.PollOutage_RecordsErrorAndCoolsDown: seed Submitted invoice with AnafUploadId; fake IAnafSpvClient.GetStatusAsync throws AnafUnreachableException(503); run one tick; assert LastError non-null and no Error-level "row-failed" log. Reddens today (LastError null). **Trigger-list-shaped:** yes (adds a catch layer that drives the cooldown) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — needs an ANAF outage and costs log noise plus a wrong level, nothing more
 
 ### PPW-604 — No metric marks a stuck or retrying invoice, so the sole ANAF panel goes blind during an outage
 
@@ -1442,6 +1550,9 @@ updated: 2026-08-21
 - **Suggested fix:** Add a retry/stuck label value (or an anaf_submission_attempt_total counter with an outcome label) incremented on the unreachable, upload-errors and auth branches. **Files:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:355`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:344`, `Services/Invoicing/Anaf/AnafSpvClient.cs:68`, `Observability/MetricNames.cs:77`, `ops/dashboards/fototipar-overview.json:310`, `Services/Invoicing/Anaf/AnafOutageRegistry.cs:11`. **Path:** 400 Pending invoices; AnafSpvClient.UploadAsync throws AnafUnreachableException (line 68, HTTP 5xx) every tick for 3 days. InvoiceUploadJob's catch (line 355) only calls RecordPendingErrorAsync + LogWarning + ReleaseClaim — no counter, no Sentry, no MarkOutageOnce. Note line 344 labels a *successful* submit "pending", so during the outage no label ever increments. Dashboard expr (fototipar-overview.json:310) divides by status!="pending": empty denominator, "No Data" — identical to an idle shop. **Test shape:** AnafOutageEmitsMetric: arrange 1 Pending invoice + IAnafSpvClient throwing AnafUnreachableException; act one job tick; assert a collected invoice_anaf_status_total sample with a non-pending/retrying status. Reddens now (zero measurements). **Trigger-list-shaped:** no (a counter and a dashboard expression) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
+  - v12: owner regraded 🟠 to 🔴 on 2026-08-24 — with PPW-600 it means an ANAF outage is invisible: no metric marks a stuck or retrying invoice
+  - v13: fixed @`32d4eee` — a `retrying` value joins `invoice_anaf_status_total` on the unreachable, upload-error and auth branches; the cardinality budget was raised deliberately from 4 to 5 and metrics.md no longer calls the instrument future
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: removing only the `retrying` emission reddened the metric test. Renaming the constant does **not** redden it: the assertion reads the same constant, so the label value itself is pinned only by the cardinality budget and metrics.md
 
 ### PPW-605 — Manual admin mark-Paid issues a fiscal invoice with no log naming the admin
 
@@ -1450,6 +1561,8 @@ updated: 2026-08-21
 - **Suggested fix:** Log admin.order.mark-paid with admin_user_id, order_id and the committed invoice_number, matching AdminInvoicesController's admin_user_id convention. **Files:** `Controllers/AdminOrdersController.cs:52`, `Services/AdminOrderService.cs:154`, `Services/AdminOrderService.cs:428`, `Services/Invoicing/InvoiceCreationService.cs:96`, `Extensions/SerilogExtensions.cs:9`, `Controllers/AdminInvoicesController.cs:74`. **Path:** Admin (user U) PATCHes /status Paid on an order with PaidAt null. UpdateStatusAsync:149-155 calls SaveWithInvoiceAsync, which commits Invoice FT-2026-000123. Emitted logs: InvoiceCreationService:96 (order_id, invoice_number) and the default Serilog request log (method/path/status/elapsed only — SerilogExtensions adds no user enricher). No admin_user_id anywhere, no metric. Contrast AdminInvoicesController:74, which logs admin_user_id even for a list. **Test shape:** AdminOrderStatusTests.MarkPaid_LogsIssuingAdmin: arrange admin-authenticated PATCH status=Paid on unpaid order with a capturing ILogger; act; assert a log event carries admin_user_id plus the new invoice_number. Reddens — no such event exists. **Trigger-list-shaped:** no (one audit log line) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict confirmed
+  - v13: fixed @`add7611` — `admin.order.mark-paid` carries admin_user_id, order_id, order_number and the committed invoice_number; the id is passed from the controller rather than through a new HttpContext dependency
+  - v13: verified — revert-and-rerun held, and the new test asserts admin_user_id and the committed invoice number in one log line
 
 ### PPW-606 — Only the pre-commit attempted invoice number is logged; the committed number is never logged
 
@@ -1458,6 +1571,7 @@ updated: 2026-08-21
 - **Suggested fix:** Emit invoice.creation.issued with order_id and invoice_number after the successful SaveChanges, and include the abandoned number in the collision-retry line.
 - **History:**
   - v12: found by the certification pass — observability, convergence 1, verdict plausible. No failing execution exists. Nothing mutates invoice.InvoiceNumber between the log (line 98) and SaveChangesAsync, so per order_id the last number-attempted line before a successful save IS the committed number; retries re-log a fresh number, and exhaustion/duplicate lines mark the non-committing cases. The committed number also lives permanently in Invoices.InvoiceNumber, a stronger record than 30-day logs. Burned values are the attempted lines. Observability nit, no wrong result. Guard hunt: No guard. Both commit paths return success with no log: WebhooksController.cs:457-458 and AdminOrderService.cs:441-442 log nothing after SaveChanges; retry/exhausted logs (WebhooksController.cs:472, 480) omit the number; downstream logs use invoice_id only. The single incidental carrier is InvoiceUploadJob.cs:291 logging key=invoices/yyyy/MM/{InvoiceNumber}.pdf — a later background job that can fail or lag, not a commit-time record.
+  - v12: owner regraded 🟠 to ⚪ on 2026-08-24 and moved it to backlog — the committed number is already permanent on the row, so there is no real gap
 
 ### PPW-607 — Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation
 
@@ -1466,6 +1580,8 @@ updated: 2026-08-21
 - **Suggested fix:** Strip/reject XML-invalid chars and truncate inside InvoiceXmlBuilder (covers product name, size, finish, AWB note, seller); also add TextValidation.HasNoXmlInvalidChars plus a length rule to the product/size/finish validators. **Files:** `Services/Invoicing/InvoiceXmlBuilder.cs:204`, `Services/Invoicing/InvoiceXmlBuilder.cs:67`, `Validators/Admin/CreateProductRequestValidator.cs:10`, `Validators/TextValidation.cs:10`, `Services/OrderService.cs:89`, `Services/Invoicing/Anaf/InvoiceUploadJob.cs:269`. **Path:** CreateProductRequestValidator.Name has only NotEmpty+MaximumLength (no TextValidation.HasNoXmlInvalidChars, unlike address/name validators). Admin saves name "PosterMare"; OrderService.cs:89 snapshots it; InvoiceUploadJob:269 builds the Item/Name from it. I ran the builder's exact writer setup: XmlTextWriter emits `Poster&#xB;Mare` without throwing, and XDocument.Parse of that output throws "hexadecimal value 0x0B, is an invalid character". The bad XML is persisted to XmlPayload and re-sent each tick. Caveat: retries are budget-capped, not literally forever; the description is also untruncated (>100 chars possible). **Test shape:** InvoiceXmlBuilderTests.ProductNameWithControlChar_StillProducesParseableXml: arrange an order whose ProductSnapshot.ProductName contains (char)0x0B; act Build(...); assert XDocument.Parse(UTF8 bytes) succeeds and Item/Name has no 0x0B. Reddens today with XmlException. **Trigger-list-shaped:** no (character filtering and truncation in the builder and validators) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — input-validation, completeness-critic, convergence 2, verdict confirmed
+  - v13: fixed @`166230a` — every field routed through the address formatter drops XML-invalid characters, and the UBL line description is wrapped in it
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-608 — Admin cannot mark an order Paid by hand — NEXT_STATUSES has no AwaitingPayment entry
 
@@ -1474,14 +1590,17 @@ updated: 2026-08-21
 - **Suggested fix:** Add AwaitingPayment: ['Paid', 'Cancelled', 'PaymentFailed'] to NEXT_STATUSES and confirm the mark-Paid action in the template.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict plausible. Mechanically true: status 'AwaitingPayment' misses NEXT_STATUSES, nextStatuses is [], and html:114's @if hides the card. But it is not a failure — the admin state-machine page's own rule (line 90) tells admins exactly this: manual Paid marking for offline reconciliation "exists only via the API — the panel has no button for it." Behaviour matches the documented contract, so this is a feature gap, not a defect. Guard hunt: No guard. NEXT_STATUSES (admin-order-detail-page.ts:19-23) has no AwaitingPayment key, so nextStatuses is [] and the "Schimbă status" card is hidden by @if in admin-order-detail-page.html:114. That page is the only UI caller of AdminService.updateOrderStatus. The closest thing is documentation, not a check: admin-state-machine-page.ts:90 states manual marking as Paid "există doar prin API — panoul nu are buton pentru ea", confirming the gap.
+  - v13: fixed @`add7611` — `NEXT_STATUSES` gains `AwaitingPayment: [Paid, PaymentFailed, Cancelled]`, so an offline transfer can be reconciled from the UI the API already supported
+  - v13: verified — revert-and-rerun held, and the new spec asserts `Paid` is offered for an order awaiting payment
 
-### PPW-609 — One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent
+### PPW-609 — One generic error string blames the cart for every payment failure, and the legacy processor failures are silent
 
-- **What:** Any createStripeIntent failure (400 address validation, 409 idempotency divergence with divergentFields, 500, network) renders 'Verificați că aveți articole în coș.' while the pay button stays disabled forever — a dead end at the last checkout step. payWithEuPlatesc's error handler only clears the spinner, so the same failure on that tab shows nothing at all.
+- **What:** Any createStripeIntent failure (400 address validation, 409 idempotency divergence with divergentFields, 500, network) renders 'Verificați că aveți articole în coș.' while the pay button stays disabled forever — a dead end at the last checkout step. payWithLegacyProcessor's error handler only clears the spinner, so the same failure on that tab shows nothing at all.
 - **Evidence:** `src/app/features/checkout/pages/payment-step.ts:188`
-- **Suggested fix:** Branch on HttpErrorResponse status, surface the API ProblemDetails detail/divergentFields, add a retry button, and show a message on the EuPlatesc error path. **Files:** `src/app/features/checkout/pages/payment-step.ts:188`, `src/app/features/checkout/pages/payment-step.ts:54`, `src/app/features/checkout/pages/payment-step.ts:235`, `src/app/core/interceptors/error.interceptor.ts:35`, `src/app/core/services/payment.service.ts:18`. **Path:** Delivery complete, Stripe loads, POST /payments/stripe/intent returns 409 (idempotency divergence). error handler (188) sets "Verificați că aveți articole în coș."; stripeReady stays false, so "Plătește acum" is permanently disabled (54) with no retry. Switching to EuPlatesc and clicking gives the same 409: handler (235-237) only clears the spinner, and errorInterceptor toasts only 403/5xx/status-0, so nothing is shown. 500/network do get a generic toast. **Test shape:** payment-step.spec.ts: "surfaces the server reason on intent 409 and on EuPlatesc failure". Arrange delivery-complete state, flush POST 409 with divergentFields. Assert error text is not the cart string and pay is retryable; on EuPlatesc click + 409, assert a visible error. **Trigger-list-shaped:** yes (a payment-step error state machine) — no approach pre-check run.
+- **Suggested fix:** Branch on HttpErrorResponse status, surface the API ProblemDetails detail/divergentFields, add a retry button, and show a message on the legacy processor error path. **Files:** `src/app/features/checkout/pages/payment-step.ts:188`, `src/app/features/checkout/pages/payment-step.ts:54`, `src/app/features/checkout/pages/payment-step.ts:235`, `src/app/core/interceptors/error.interceptor.ts:35`, `src/app/core/services/payment.service.ts:18`. **Path:** Delivery complete, Stripe loads, POST /payments/stripe/intent returns 409 (idempotency divergence). error handler (188) sets "Verificați că aveți articole în coș."; stripeReady stays false, so "Plătește acum" is permanently disabled (54) with no retry. Switching to the legacy processor and clicking gives the same 409: handler (235-237) only clears the spinner, and errorInterceptor toasts only 403/5xx/status-0, so nothing is shown. 500/network do get a generic toast. **Test shape:** payment-step.spec.ts: "surfaces the server reason on intent 409 and on the legacy processor failure". Arrange delivery-complete state, flush POST 409 with divergentFields. Assert error text is not the cart string and pay is retryable; on the legacy processor click + 409, assert a visible error. **Trigger-list-shaped:** yes (a payment-step error state machine) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: fixed @`06fd2b1` — retired by deletion: with one processor there is no shared error string to mislabel, and the legacy processor branch it named is gone
 
 ### PPW-610 — The invoice-number-exhausted 409 message is replaced by a generic admin failure toast
 
@@ -1490,6 +1609,7 @@ updated: 2026-08-21
 - **Suggested fix:** Read err.error.detail/title from the ProblemDetails body into actionError instead of a fixed string.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict plausible. Not reachable from this page. The 409 comes only from the newStatus==Paid branch (AdminOrderService.cs:149-164), but the UI's NEXT_STATUSES map (admin-order-detail-page.ts:19-23) offers Printing/Cancelled/Shipped/Delivered only — never Paid — and an AwaitingPayment order yields an empty list, so the form is not even rendered (html:114). This page is the sole UI caller of updateOrderStatus, so no click can produce that message. Other 409s in the status path don't exist (transition errors are 400). Guard hunt: No guard. admin-order-detail-page.ts:132-136 `error: () =>` drops the HttpErrorResponse and hardcodes 'Actualizarea statusului a eșuat.'; nothing reads err.error message/detail. error.interceptor.ts:22-41 handles only 401/403/>=500/0, so 409 shows nothing. Backend does throw it: AdminOrderService.cs:163-164 ConflictException on PaidSaveOutcome.NumberExhausted from the admin Paid path. Finding is real.
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — the path is unreachable until PPW-608 ships a Paid transition in the admin UI
 
 ### PPW-611 — SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning
 
@@ -1498,6 +1618,8 @@ updated: 2026-08-21
 - **Suggested fix:** Drop shippingCostRon from CreateOrderRequest and from buildOrderRequest in payment-step.ts; the server already re-derives the cost. **Files:** `src/app/core/models/payment.model.ts:8`, `src/app/features/checkout/pages/payment-step.ts:252`, `src/app/core/services/checkout-state.service.ts:12`, `src/app/core/services/payment.service.ts:19`, `Controllers/PaymentsController.cs:17`, `Filters/DetectLegacyShippingCostFilter.cs:69`. **Path:** Checkout: checkout-state seeds shippingCostRon: 0 (line 12), so buildOrderRequest (payment-step.ts:252) always sets the key; payment.service.ts:19 POSTs it to /api/payments/stripe/intent. PaymentsController.cs:17 attaches DetectLegacyShippingCostFilter, whose case-insensitive key scan (line 69) matches and logs WARN "payments.shipping-cost-tampering-attempt". Every legitimate checkout warns, so the "zero WARNs" removal criterion is unreachable and real tampering is indistinguishable. **Test shape:** payment-step.spec.ts: "stripe intent body omits the deprecated shipping cost". Arrange checkout state with method Courier (cost 20); act payWithStripe(); assert HttpTestingController's expectOne body has no own key matching /shippingcostron/i. Reddens today. **Trigger-list-shaped:** no (drops a deprecated request field) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v12 fix round: fixed @`2acda1f` — the deprecated shippingCostRon left the request and its model, so a checkout no longer logs a tampering warning that would mask a real one
+  - v16: verified by the compiler rather than a red test — putting `shippingCostRon` back on the request no longer type-checks, because the field is gone from `CreateOrderRequest`. A type error is a stronger guarantee here than a spec, but it is not a red leg, so it is recorded as what it is
 
 ### PPW-612 — Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step
 
@@ -1506,6 +1628,8 @@ updated: 2026-08-21
 - **Suggested fix:** Add Validators.maxLength mirroring the server caps plus a group-level combined street+number+block <=150 validator and maxlength attributes on the inputs. **Files:** `src/app/features/checkout/pages/delivery-step.ts:336`, `src/app/features/checkout/pages/delivery-step.ts:354`, `src/app/features/checkout/pages/review-step.ts:187`, `src/app/core/services/checkout-state.service.ts:52`, `src/app/features/checkout/pages/payment-step.ts:188`, `Validators/Payments/CreateOrderRequestValidator.cs:42`. **Path:** Type street = 140 chars, number "12", block "Bl A2 Sc 1 Ap 45" (combined 160 > 150). addressForm only has Validators.required (+phone rules), so it is VALID, canContinue() true, "Continuă" navigates; review-step validates only the terms checkbox; isDeliveryComplete() checks non-blank only. payment-step's initStripe POSTs, FluentValidation auto-validation returns 400, and the error callback shows "Nu s-a putut crea sesiunea de plată. Verificați că aveți articole în coș." City > 50 behaves identically. **Test shape:** delivery-step.spec.ts: "blocks continue when street+number+block exceed 150 chars" — patch addressForm with a 140-char street, number, long block; expect canContinue() false (and a length field-error). Currently true, so it reddens. **Trigger-list-shaped:** no (client validators mirroring server caps) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — input-validation, frontend-ux, convergence 2, verdict confirmed
+  - v13: fixed @`5cd48a5` — the checkout address form mirrors the server caps, including a group-level combined street length, so an over-long field fails where it is typed
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: widening every new cap to 100000 reddened the combined-street-line spec, restored green
 
 ### PPW-613 — VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate
 
@@ -1514,6 +1638,8 @@ updated: 2026-08-21
 - **Suggested fix:** Add netTotalRon/vatRon/vatRate to the FE model and render a 'TVA (19%)' line on the review, confirmation and order-detail totals. **Files:** `src/app/core/models/order.model.ts:33`, `src/app/features/orders/pages/order-detail-page.ts:91`, `src/app/features/orders/pages/confirmation-page.ts:41`, `src/app/features/checkout/pages/review-step.ts:57`, `DTOs/Orders/OrderDetailDto.cs:8`, `Controllers/InvoicesController.cs:38`. **Path:** GET /api/orders/{id} returns NetTotalRon/VatRon/VatRate (OrderDetailDto.cs:8-10). order.model.ts:33 omits all three; order-detail-page.ts:91-101 renders Subtotal/Transport/Total, confirmation-page.ts:41 only Total, review-step.ts:57 Subtotal/Transport/Total. UI-wide grep for vatRon|vatRate|netTotalRon = zero hits; "TVA" = one static pricing-page sentence. The customer invoice-PDF endpoint (InvoicesController:38) is called by no UI service either. No runtime error — pure disclosure gap; VAT never reaches the customer's screen. **Test shape:** order-detail-page.spec.ts "renders the TVA line": arrange stub order with vatRon 19.44, vatRate 0.19; render component; assert host text contains "TVA" and "19.44". Reddens today — template has no TVA row. **Trigger-list-shaped:** no (three model fields and a template line) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: fixed @`6812453` — order detail and the confirmation page render a TVA line from the server `vatRon`/`vatRate`; the payment-status DTO carries the two fields, and the review step is deliberately left out (no order exists yet, so the rate would have to be hardcoded in the SPA)
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-614 — Hardcoded 20/25 RON shipping defaults with no error handling can differ from the invoiced total
 
@@ -1522,14 +1648,19 @@ updated: 2026-08-21
 - **Suggested fix:** Block method selection until both costs resolve (or re-read the cost inside selectMethod), and surface an error when getShippingCost fails instead of silently keeping the defaults. **Files:** `src/app/features/checkout/pages/delivery-step.ts:327`, `src/app/features/checkout/pages/delivery-step.ts:363`, `src/app/features/checkout/pages/delivery-step.ts:445`, `src/app/core/services/checkout-state.service.ts:25`, `src/app/features/checkout/pages/review-step.ts:62`, `Services/OrderService.cs:100`. **Path:** Set Shipping:EasyboxCostRon=15. On /checkout/livrare ngOnInit fires GET /shipping/cost with no error callback; easyboxCostRon stays 20 while pending (or forever if it 500s). User clicks Easybox now: selectMethod stores 20 via setMethod, persisted to sessionStorage. Nothing re-syncs when 15 arrives. Recap renders Transport 20.00 and Total subtotal+20; OrderService.cs:100 re-derives 15 (client can't send it — DetectLegacyShippingCostFilter), so charge and invoice line read 15. **Test shape:** delivery-step.spec: "stores the server cost, not the 20 RON default" — arrange HttpTestingController without flushing (or flush an error), click the Easybox radio, then flush {costRon:15}; assert checkoutState.snapshot.shippingCostRon === 15. **Trigger-list-shaped:** yes (gates the delivery-step state machine on a pending call) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: fixed @`6812453` — the cost signals start null, both cards stay disabled until the server answers, a failure offers a retry, and a price arriving after a restored method updates the stored cost without wiping the locker or address
+  - v13: verified — revert-and-rerun held, and the row's files were touched by no later commit in the round
 
 ### PPW-615 — A non-succeeded, non-error Stripe result leaves the user stranded with no feedback
 
 - **What:** payWithStripe only handles result.error and status==='succeeded'. For 'processing' or 'requires_capture' nothing happens: no message, no navigation, spinner cleared. A user whose payment is genuinely processing sees the button simply re-enable and will click again. A rejected confirmCardPayment promise (network drop) is worse — stripeLoading stays true, so the button is disabled forever.
 - **Evidence:** `src/app/features/checkout/pages/payment-step.ts:221`
-- **Suggested fix:** Wrap the await in try/catch that clears stripeLoading and shows an error, and add an else branch messaging any status other than 'succeeded'. **Files:** `src/app/features/checkout/pages/payment-step.ts:213`, `src/app/features/checkout/pages/payment-step.ts:217`, `src/app/features/checkout/pages/payment-step.ts:219`, `src/app/features/checkout/pages/payment-step.ts:46`, `src/app/features/checkout/pages/payment-step.ts:200`, `Services/StripePaymentGateway.cs:21`. **Path:** Line 213 awaits confirmCardPayment with no try/catch: any rejection skips line 217, so stripeLoading stays true and the button is disabled forever with no message. Reachable trigger: switch to EuPlatesc and back — *ngIf (line 46) destroys #stripe-card-element while stripeReady stays true, so pay runs against a detached element and Stripe rejects. Resolved 'processing' also falls through silently. 'requires_capture' is unreachable (no CaptureMethod set, StripePaymentGateway.cs:21). **Test shape:** payment-step.spec.ts: inject fake stripeInstance/cardElement; confirmCardPayment rejects (and a second case resolves status 'processing'); await payWithStripe(); expect stripeLoading() false and stripeError() non-null. Both fail today. **Trigger-list-shaped:** yes (adds the missing catch and status branches to the pay state machine) — no approach pre-check run.
+- **Suggested fix:** Wrap the await in try/catch that clears stripeLoading and shows an error, and add an else branch messaging any status other than 'succeeded'. **Files:** `src/app/features/checkout/pages/payment-step.ts:213`, `src/app/features/checkout/pages/payment-step.ts:217`, `src/app/features/checkout/pages/payment-step.ts:219`, `src/app/features/checkout/pages/payment-step.ts:46`, `src/app/features/checkout/pages/payment-step.ts:200`, `Services/StripePaymentGateway.cs:21`. **Path:** Line 213 awaits confirmCardPayment with no try/catch: any rejection skips line 217, so stripeLoading stays true and the button is disabled forever with no message. Reachable trigger: switch to the legacy processor and back — *ngIf (line 46) destroys #stripe-card-element while stripeReady stays true, so pay runs against a detached element and Stripe rejects. Resolved 'processing' also falls through silently. 'requires_capture' is unreachable (no CaptureMethod set, StripePaymentGateway.cs:21). **Test shape:** payment-step.spec.ts: inject fake stripeInstance/cardElement; confirmCardPayment rejects (and a second case resolves status 'processing'); await payWithStripe(); expect stripeLoading() false and stripeError() non-null. Both fail today. **Trigger-list-shaped:** yes (adds the missing catch and status branches to the pay state machine) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — frontend-ux, convergence 1, verdict confirmed
+  - v13: partly retired by PR #13 — the tab-switch path that detached the mounted Stripe element is gone with the second processor. The finding stays open on its other path: a Stripe result that is neither succeeded nor an error still leaves the customer with no feedback
+  - v12 fix round: fixed @`901f8a2` — a result that is neither success nor error now tells the customer, a rejected confirm call clears the spinner, and an intent that never got created offers a retry. The tab-switch half of this finding had already died with the second processor
+  - v16: verified — removing the neither-success-nor-error message reddened its `payment-step` spec, restored green
 
 ### PPW-616 — Saved addresses allow City 100 while checkout caps it at 50, and the new prefill copies them in
 
@@ -1538,6 +1669,8 @@ updated: 2026-08-21
 - **Suggested fix:** Align SavedAddressValidator and the Angular form to InvoiceAddressFormatter.CityNameMaxLength / PartyNameMaxLength, and add maxlength attributes plus client validators mirroring the server caps. **Files:** `Validators/Account/SavedAddressValidator.cs:26`, `Validators/Payments/CreateOrderRequestValidator.cs:45`, `Services/Invoicing/InvoiceAddressFormatter.cs:8`, `Data/PhotoPrintDbContext.cs:436`, `src/app/features/checkout/pages/delivery-step.ts:340`, `src/app/features/checkout/pages/delivery-step.ts:429`. **Path:** Save an address with a 60-char city: SavedAddressValidator caps City at 100 and the column is HasMaxLength(100), so it persists. At checkout, prefillFromSavedAddress patches city into addressForm, whose city control is `['', Validators.required]` only, and the input has no maxlength attribute — form valid, Continue enabled. POST create-order hits CreateOrderRequestValidator line 45, MaximumLength(50) → 400 on a field the user never typed, with no hint. **Test shape:** CreateOrderRequestValidator_rejects_city_that_SavedAddressValidator_accepts: arrange a 60-char city; assert SavedAddressValidator passes while CreateOrderRequest fails on ShippingAddress.City — reddens once both share CityNameMaxLength (plus UI spec: prefilled 60-char city leaves addressForm invalid). **Trigger-list-shaped:** no (aligns two validators and the form) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — completeness-critic, convergence 1, verdict confirmed
+  - v13: fixed @`5cd48a5` — the saved-address city cap is aligned to `InvoiceAddressFormatter.CityNameMaxLength`, so a prefill cannot carry an over-long value into checkout
+  - v13: verified — the mechanical red leg is not trustworthy here — this row's commit touches a file a later commit in the round touched again, so a file-level revert can break compilation and read as red. Re-proved by hand in isolation: putting the city cap back to 100 reddened `SavedAddressValidator`, restored green
 
 ### PPW-617 — The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test
 
@@ -1546,6 +1679,7 @@ updated: 2026-08-21
 - **Suggested fix:** Extract the collision-retry loop into one service used by both callers, or add a parameterised test forcing the same number collision through both entry points and asserting identical end state.
 - **History:**
   - v12: found by the certification pass — quality, completeness-critic, convergence 2, verdict plausible. Not constructible. The only IInvoiceCreationService implementation returns exactly two shapes: an existing row from a tracking query (Unchanged) or a freshly Added invoice — no AsNoTracking, no pre-modified invoice on either scoped context. For both shapes the guards `== Unchanged` and `!= Added` agree exactly, so no input, state, or timing yields divergent behaviour. Modified/Detached needs a future code change. Each path also has its own race test file; only the shared harness is missing. Real as a maintainability risk, not a defect. Guard hunt: No guard. The two predicates really do diverge: AdminOrderService.cs:436 (`== EntityState.Unchanged`) vs WebhooksController.cs:450 (`!= EntityState.Added`). Nothing pins the returned entity's state — InvoiceCreationService.cs:60-72 just returns the query result or an Added row, and IInvoiceCreationService.cs:26 documents idempotency only, not tracking state. No shared collision test: only WebhooksControllerInvoiceRaceTests.cs exercises the webhook copy. Today's two states coincide, so this is latent, not live.
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — latent today; it becomes a trap only when the duplicated state machine is next changed
 
 ### PPW-618 — Cloud tier and the new cross-tier fallback read are proven only against fakes
 
@@ -1554,14 +1688,15 @@ updated: 2026-08-21
 - **Suggested fix:** Run the MinIO suite with STORAGE_TEST_* set in the certification evidence, and add a fallback-read test on the real S3 service covering missing key versus missing bucket. **Files:** `Controllers/InvoicesController.cs:86`, `Controllers/InvoicesController.cs:99`, `Controllers/InvoicesController.cs:122`, `Services/S3StorageService.cs:119`, `Services/LocalStorageService.cs:74`, `Tests/Unit/Controllers/InvoicesControllerTests.cs:398`. **Path:** Provider=S3, bucket deleted; invoice stamped Local, PDF absent on disk. Local throws bare FileNotFoundException (LocalStorageService.cs:74); the Cloud fallback maps NoSuchBucket 404 to FileNotFoundException with an AmazonS3Exception inner (S3StorageService.cs:119), so RecordMiss swaps it in. But S3 attaches that same inner for a merely missing key, so bucket-vs-key is indistinguishable and the comment's claim is false. All six test doubles throw inner-less exceptions, leaving the discriminating branch unexercised. **Test shape:** InvoicesControllerTests.BlobMissing_KeepsBucketFault: local mock throws bare FileNotFoundException, cloud mock throws one wrapping AmazonS3Exception(404 NoSuchKey); assert logged miss_cause is the local miss, not the S3 key message. Reddens today. **Trigger-list-shaped:** yes (changes the storage-miss classification layer) — no approach pre-check run.
 - **History:**
   - v12: found by the certification pass — completeness-critic, convergence 1, hinted, verdict confirmed
+  - v12: owner regraded 🟠 to 🟡 on 2026-08-24 and moved it to backlog — the customer sees the correct 404 either way; only the diagnostics are unproven
 
 ### PPW-619 — OrderNumberService's manually opened DbConnection is never closed, pinning it for the rest of the scope
 
-- **What:** Every Postgres order creation opens the EF connection by hand for the nextval call and never closes it. EF did not open it, so it stays open until the scoped DbContext is disposed at end of request, holding a pool slot across all remaining work (Stripe/EuPlatesc round-trips included).
+- **What:** Every Postgres order creation opens the EF connection by hand for the nextval call and never closes it. EF did not open it, so it stays open until the scoped DbContext is disposed at end of request, holding a pool slot across all remaining work (Stripe/the legacy processor round-trips included).
 - **Evidence:** `Services/OrderNumberService.cs:34`; `Services/OrderNumberService.cs:32-39`, `Services/OrderService.cs:150,189`, `Controllers/PaymentsController.cs:132,163-164`, `Program.cs:190`
 - **Suggested fix:** Use _db.Database.SqlQueryRaw<long>("SELECT nextval(...) AS \"Value\"").SingleAsync(ct) like PostgresInvoiceNumberingService does, so EF owns open/close.
 - **History:**
-  - v12: found by the certification pass — correctness, convergence 1, verdict confirmed. Confirmed via code: on Postgres, GenerateAsync calls conn.OpenAsync() directly on the raw ADO.NET connection (bypassing EF's Database.OpenConnectionAsync). EF only auto-closes a connection it opened itself; since this connection was already Open when EF next touches it (SaveChangesAsync), EF treats it as externally-owned and never closes it. In PaymentsController.CreateIntentAsync, after CreateFromCartAsync (which calls GenerateAsync then SaveChangesAsync), the scoped _db's connection stays open through the Stripe/EuPlatesc network round-trip and the second SaveChangesAsync, closing only when the request-scoped DbContext disposes.
+  - v12: found by the certification pass — correctness, convergence 1, verdict confirmed. Confirmed via code: on Postgres, GenerateAsync calls conn.OpenAsync() directly on the raw ADO.NET connection (bypassing EF's Database.OpenConnectionAsync). EF only auto-closes a connection it opened itself; since this connection was already Open when EF next touches it (SaveChangesAsync), EF treats it as externally-owned and never closes it. In PaymentsController.CreateIntentAsync, after CreateFromCartAsync (which calls GenerateAsync then SaveChangesAsync), the scoped _db's connection stays open through the Stripe/the legacy processor network round-trip and the second SaveChangesAsync, closing only when the request-scoped DbContext disposes.
 
 ### PPW-620 — Admin invoice paging orders by a non-unique CreatedAt with no unique tiebreaker
 
@@ -1587,13 +1722,13 @@ updated: 2026-08-21
 - **History:**
   - v12: found by the certification pass — security, convergence 1, verdict confirmed. Customer A fills delivery-step form; CheckoutStateService.saveToStorage writes name/phone/street/city/etc to sessionStorage['fotoTipar_checkout']. A logs out via header.ts -> AuthService.logout() (auth.service.ts:174-180), which clears only access_token/isAuthenticated/isAdmin/currentUser - not that sessionStorage key. Customer B logs in in the same tab, opens checkout. delivery-step.ts:366-367 reads checkoutState.snapshot.shippingAddress (still A's data) and patchValue's the form immediately. prefillAddress()/prefillFromSavedAddress() (lines 397-430) then run but only fill fields that are still empty, so B's own guest/account data is skipped and A's stale name/phone/address stays displayed and submittable.
 
-### PPW-623 — EuPlatesc IPN fingerprint is verified with a non-fixed-time string compare
+### PPW-623 — the legacy processor IPN fingerprint is verified with a non-fixed-time string compare
 
-- **What:** The unauthenticated /api/webhooks/euplatesc endpoint compares the computed HMAC-MD5 to the attacker-supplied fp via string.Equals(OrdinalIgnoreCase), which short-circuits on first mismatch. An attacker with many attempts has a timing side channel on the only gate protecting order-status transitions.
-- **Evidence:** `Services/EuPlatescService.cs:92`; `Services/EuPlatescService.cs:92`, `Services/EuPlatescService.cs:60-67`, `Controllers/WebhooksController.cs:158-176`
+- **What:** The unauthenticated /api/webhooks/legacy-processor endpoint compares the computed HMAC-MD5 to the attacker-supplied fp via string.Equals(OrdinalIgnoreCase), which short-circuits on first mismatch. An attacker with many attempts has a timing side channel on the only gate protecting order-status transitions.
+- **Evidence:** `Services/the legacy processorService.cs:92`; `Services/the legacy processorService.cs:92`, `Services/the legacy processorService.cs:60-67`, `Controllers/WebhooksController.cs:158-176`
 - **Suggested fix:** Compare the raw MAC bytes with CryptographicOperations.FixedTimeEquals after parsing both hex strings; reject on length mismatch first.
 - **History:**
-  - v12: found by the certification pass — security, convergence 1, verdict plausible. Confirmed: EuPlatescService.cs:92 compares HMAC-MD5 via string.Equals(OrdinalIgnoreCase) on a 32-hex fp, called from WebhooksController.cs:170 on the [AllowAnonymous] /api/webhooks/euplatesc endpoint gating order status. The code fact is real, but the claimed harm (timing-oracle brute force) needs statistical timing measurement across many HTTP round-trips, not a single deterministic input->wrong-output case; network jitter dwarfs any per-character comparison delta, so no fixed-input unit test can redden to prove exploitability. Guard hunt: EuPlatescService.cs:92 uses string.Equals(computed, receivedFp, OrdinalIgnoreCase) — short-circuiting, not constant-time. WebhooksController.cs:170 calls ValidateIpnSignature directly on the unauthenticated endpoint with no rate-limit/lockout/IP-allowlist wrapping it. No constant-time comparison (e.g. CryptographicOperations.FixedTimeEquals) or throttling guard exists anywhere in the collaborators.
+  - v12: found by the certification pass — security, convergence 1, verdict plausible. Confirmed: the legacy processorService.cs:92 compares HMAC-MD5 via string.Equals(OrdinalIgnoreCase) on a 32-hex fp, called from WebhooksController.cs:170 on the [AllowAnonymous] /api/webhooks/legacy-processor endpoint gating order status. The code fact is real, but the claimed harm (timing-oracle brute force) needs statistical timing measurement across many HTTP round-trips, not a single deterministic input->wrong-output case; network jitter dwarfs any per-character comparison delta, so no fixed-input unit test can redden to prove exploitability. Guard hunt: the legacy processorService.cs:92 uses string.Equals(computed, receivedFp, OrdinalIgnoreCase) — short-circuiting, not constant-time. WebhooksController.cs:170 calls ValidateIpnSignature directly on the unauthenticated endpoint with no rate-limit/lockout/IP-allowlist wrapping it. No constant-time comparison (e.g. CryptographicOperations.FixedTimeEquals) or throttling guard exists anywhere in the collaborators.
 
 ### PPW-624 — ANAF response body is read into memory with no size cap and then persisted unbounded
 
@@ -1786,6 +1921,7 @@ updated: 2026-08-21
 - **Suggested fix:** Either add .HasDefaultValue(0) to the model so the snapshot records it, or append migrationBuilder.Sql to ALTER COLUMN "UnknownUploadOutcomes" DROP DEFAULT after the backfill.
 - **History:**
   - v12: found by the certification pass — db-parity, convergence 1, verdict unverified-cleanup. Fix-generated by PPW-559
+  - v15: still open, moved — the chain was squashed to the single `20260820133204_InitialPostgres` on the owner ruling that this branch ships one migration, so the permanent `DEFAULT 0` this row describes now sits on the baseline CreateTable for `Invoices.StorageLocation` and `Invoices.UnknownUploadOutcomes` rather than in a follow-up AddColumn. The defect is unchanged; only its address is.
 
 ### PPW-648 — The VAT rounding-mode test mostly asserts decimal.Round's own behaviour and never pins the net-side mode
 
@@ -1802,6 +1938,8 @@ updated: 2026-08-21
 - **Suggested fix:** Drop the "future" markers, note the increment sites in InvoiceUploadJob, and pick a different never-incremented example for the dashboard caveat.
 - **History:**
   - v12: found by the certification pass — requirements, convergence 1, verdict unverified-cleanup
+  - v13: fixed @`6977d5b` — metrics.md drops the "future" marker, documents the new `retrying` value and corrects the series counts
+  - v13: verified by reading — a metrics.md row has nothing to redden; it shares its commit with PPW-600, whose tests carry the code half
 
 ### PPW-650 — Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done
 
@@ -1866,3 +2004,493 @@ updated: 2026-08-21
 - **Suggested fix:** Regenerate the manifest from the diff file list, and assign the third migration to whichever lens verifies boot-time DDL against Postgres.
 - **History:**
   - v12: found by the certification pass — completeness-critic, convergence 1, verdict unverified-cleanup
+
+### PPW-659 — Not-yet-due Rejected invoices fill the upload batch and starve Pending uploads
+
+- **What:** Seller CUI is wrong, so ANAF rejects everything. 50+ Rejected rows exist. The coarse filter admits any Rejected row with UpdatedAt older than MinBackoffHours (1h), but real due slots are +5h/+21h/+85h. Ordered by CreatedAt, those 50 oldest rows fill Take(MaxBatchSize=50) every tick, each only logging "rejected-not-due" — no Pending invoice is ever uploaded for up to 85h.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:103`
+- **Suggested fix:** Compute due-ness in SQL (CreatedAt + cumulative backoff <= now) instead of MinBackoffHours, or fetch Rejected rows in a separate slice with its own cap so they cannot consume the Pending budget. **Trace:** Real. Defaults BackoffHours [1,4,16,64], MaxBatchSize 50, interval 30min. Invoice created T0, rejected at T0+21.5h (MarkRejectedAsync stamps UpdatedAt); NextResubmitAt returns T0+85h, but the coarse filter admits it from T0+22.5h. Not-due path only LogDebug-returns, leaving UpdatedAt untouched, so the row re-enters every tick. 50 such older rows, OrderBy(CreatedAt), fill Take(50); a Pending invoice created later never enters the batch for ~62h. **Test shape:** NotDueRejectedRowsDoNotStarvePending: seed 50 Rejected invoices CreatedAt=T0, UpdatedAt=T0+21.5h, plus one Pending created T0+22h; clock T0+25h; run one tick; assert IAnafSpvClient.UploadAsync called for the Pending invoice.
+- **History:**
+  - v15: found by the delta pass — correctness, convergence 1, verdict confirmed
+  - v15: fixed @`9527eba` — rejections are a separate slice capped at `MaxBatchSize / 10` and ordered by oldest transition, so they cannot crowd out Pending uploads. Re-merging the two queries reddens the new test
+  - v16: verified — re-merging the two batch queries reddened the starvation test, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-660 — A succeeded webhook on an order already moved to PaymentFailed leaves the customer charged and the order unfulfillable
+
+- **What:** Card declined -> payment_intent.payment_failed sets order PaymentFailed. The customer re-clicks 'Plătește acum' (payment-step reuses the same clientSecret) with a good card; it succeeds. payment_intent.succeeded finds status PaymentFailed, not AwaitingPayment, so it only logs. PaymentFailed->Paid is not in OrderStatusMachine, so even admin mark-paid throws. Cart already cleared; confirmation page shows 'Comanda nu a fost găsită'.
+- **Evidence:** `Controllers/WebhooksController.cs:242`
+- **Suggested fix:** Allow PaymentFailed -> Paid in OrderStatusMachine and treat succeeded-on-PaymentFailed as a normal Paid transition (invoice + side effects), rather than a log-only dead end. **Trace:** Real. Decline: payment_step keeps the same clientSecret and mounted card, button re-enabled (payment-step.ts:208), while payment_failed sets PaymentFailed (Webhooks:242). Second confirm with a good card succeeds; Stripe reuses the PI. succeeded handler: HasBeenPaid false, Status != AwaitingPayment, so it only logs (Webhooks:190-217). No PaymentFailed->Paid edge exists (OrderStatusMachine:18-27), so nothing recovers. Cart cleared, confirmation shows the not-found text (confirmation-page.ts:271). **Test shape:** WebhooksControllerTests.StripeSucceeded_AfterPaymentFailed_MarksOrderPaid: arrange order Status=PaymentFailed with PaymentIntentId pi_1; act POST /api/webhooks/stripe payment_intent.succeeded for pi_1; assert Status==Paid, PaidAt set, invoice created. Reddens today (stays PaymentFailed).
+- **History:**
+  - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`c60260c` — `PaymentFailed → Paid` is legal and the succeeded webhook treats it like `AwaitingPayment`, so a second card that works completes the order instead of logging over a real charge
+  - v16: verified without a revert proof — covered by the new webhook test plus the retargeted transition tests; a revert would have to undo the transition table, which the retargeted tests already pin from both directions. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-661 — Checkout idempotency key is never retired after a paid order, so the next checkout is redirected to the old order and the new basket deleted
+
+- **What:** Guest pays; the settling screen says "you may close the page", so they do — attempts.clear() never runs. Same day they build a new basket and open /checkout/plata. The stored key is reused; the server 409s with the OLD paid order id; payment-step routes there; the confirmation page shows "Comandă confirmată #old" and clearCart() deletes the new basket. Nothing was ordered.
+- **Evidence:** `src/app/core/services/checkout-attempt.service.ts:49`
+- **Suggested fix:** Retire the key as soon as confirmCardPayment succeeds (keep only orderId for the settle wait), so the next checkout mints a fresh key. **Trace:** Real. Guest pays: payWithStripe navigates to confirmation without clearing; only a settled read clears, so closing the settling page leaves the key stored (24h TTL, same guest fingerprint). New basket, /checkout/plata reuses it. OrderService.cs:118 throws IdempotencyKeyConsumedException for a fresh non-AwaitingPayment/non-Failed holder before any divergence check, so 409 carries the old paid order id; handleIntentError navigates there; confirmation clears cart. New basket gone, nothing ordered. **Test shape:** payment-step.spec: "reused key after a paid order starts a fresh attempt". Arrange stored attempt (orderId set, <24h) + createStripeIntent stubbed 409 {orderId:'old'}. Act createIntent. Assert no navigate to /comanda/old, retry sent with a new key.
+- **History:**
+  - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — the key is retired as soon as the card is confirmed, keeping only the order id for the settle wait. Dropping the `retired` check reddens the new spec
+  - v16: verified — dropping the `retired` check reddened the retire-key spec, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-662 — Retry after a declined card reuses the same client secret whose order the failure webhook already moved to PaymentFailed
+
+- **What:** Card declined: confirmCardPayment returns error and Stripe's payment_intent.payment_failed sets the order PaymentFailed. The user retypes the card and clicks "Plătește acum" again — same clientSecret, succeeds, money taken. The succeeded webhook cannot do PaymentFailed→Paid (OrderStatusMachine), so it logs "manual reconciliation required"; the confirmation page shows "Comanda nu a fost găsită".
+- **Evidence:** `src/app/features/checkout/pages/payment-step.ts:208`
+- **Suggested fix:** After result.error, discard clientSecret/cardElement and force a fresh createIntent (new attempt key) before allowing another confirm. **Trace:** Decline: confirmCardPayment returns error; payment-step.ts:206-211 only sets a message — stripeLoading false, stripeReady true, clientSecret unchanged, so the pay button stays live. Stripe's payment_failed webhook flips the order AwaitingPayment→PaymentFailed (WebhooksController.cs:242). Declined intents stay requires_payment_method, so a second click on the same secret with a fresh card succeeds and charges. The succeeded handler sees PaymentFailed (not AwaitingPayment, not paid) and only logs "manual reconciliation required" (:206-212); PaymentFailed→Paid isn't in OrderStatusMachine. Confirmation page shows "nu a fost găsită". **Test shape:** payment-step.spec.ts "second attempt after a decline does not reuse the dead client secret": stub confirmCardPayment to return {error}, click pay twice; assert createStripeIntent ran again and the second confirm got the new secret.
+- **History:**
+  - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — a decline discards the client secret and unmounts the card, so a retry must mint a fresh key and intent. Removing the discard call reddens the new spec
+  - v16: verified — removing the discard call reddened the dead-secret spec, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-663 — the legacy processor columns removed by editing the already-applied baseline migration, so existing databases keep Orders.PaymentProcessor NOT NULL
+
+- **What:** Verified on the dev DB: __EFMigrationsHistory holds 20260820133204_InitialPostgres and Orders."PaymentProcessor" is text NOT NULL, no default. Migrate() at boot skips the edited baseline, and the model no longer maps the column, so the first checkout INSERT (and --seed-dev) dies with 23502 not-null violation. Checkout is dead in every already-migrated environment.
+- **Evidence:** `Migrations/20260820133204_InitialPostgres.cs:216`
+- **Suggested fix:** Restore the baseline's Up() and add a forward migration that drops PaymentProcessor, the legacy processorTransactionId and the legacy processorRedirectUrl; add a test that migrates from the old baseline, not just a fresh DB. **Trace:** Constructed and confirmed against the live dev DB. `psql` shows `Orders."PaymentProcessor"` = text NOT NULL, no default, and `__EFMigrationsHistory` holds only `20260820133204_InitialPostgres` — so `Migrate()` (Program.cs:329) skips the edited baseline; the two pending migrations touch only Invoices. Grep finds zero `PaymentProcessor` in src/, so the EF INSERT at OrderService.cs:171 (and DevDataSeed.cs:166) omits it → Postgres 23502. Checkout dead on every migrated DB. **Test shape:** Relational test: apply chain on PostgresTestDatabase, `ALTER TABLE "Orders" ADD "PaymentProcessor" text NOT NULL` (legacy state), run `Migrate()`, then insert an Order — reddens with 23502 until a DropColumn migration exists.
+- **History:**
+  - v15: found by the delta pass — db-parity, convergence 1, verdict confirmed
+  - v15: fixed @`de1b70d` — the applied baseline is restored and a forward `DropLegacyProcessorColumns` migration drops the three columns. Confirmed on the dev database before the change: history held only the baseline, `Orders."PaymentProcessor"` was `text NOT NULL` with no default, and the model no longer mapped it. The new chain test starts from that legacy state and reddens when the drop is emptied
+  - v16: verified — emptying the drop migration's `Up` reddened the legacy-state chain test, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+  - v15: owner ruling on 2026-08-27 — the forward drop migration is withdrawn. This pre-deploy branch ships one migration, so the three columns come out of `InitialPostgres` itself and no reference to the removed processor stays anywhere in the repository. The forward migration and its legacy-state test are deleted; the dev database was reconciled with `ALTER TABLE "Orders" DROP COLUMN`, keeping its 6 orders. The trade-off is recorded in resolution-v15: a database that already ran the old baseline does not pick this up, and no other one exists.
+
+### PPW-664 — Automatic rejection-resubmit nulls PdfStoragePath, revoking the customer's invoice
+
+- **What:** Invoice rejected by ANAF but PDF already rendered and downloadable. At the 1h backoff slot ResubmitRejectedAsync calls RetryAsync, which now sets PdfStoragePath=null; GET /api/orders/{id}/invoice returns 404 ("Factura se pregătește") until the worker re-renders on a later tick — 30 min at default PollIntervalMinutes, longer while ANAF is unreachable. Repeats at every backoff slot.
+- **Evidence:** `Services/Invoicing/InvoiceLifecycle.cs:200`
+- **Suggested fix:** Keep PdfStoragePath on the worker's automatic resubmit (clear it only on the admin retry endpoint), or re-render the PDF before flipping the row back to Pending. **Trace:** Real. UploadPendingAsync renders and stores the PDF (step 2) before submitting (step 3), so a Rejected row always has PdfStoragePath and is downloadable — InvoicesController checks ownership and path only, never status. At the due backoff slot ResubmitRejectedAsync calls RetryAsync(Rejected), which nulls PdfStoragePath and LastError. The row re-enters the next Pending batch, so the customer sees 404 / "Factura se pregătește" for up to one poll interval (30 min default), repeating each slot, plus a duplicate PDF-ready notification. **Test shape:** InvoiceUploadJobTests.RejectedResubmit_KeepsRenderedPdf: arrange Rejected invoice, PdfStoragePath="x", UpdatedAt past first backoff slot; act one job tick; assert status Pending and PdfStoragePath still "x".
+- **History:**
+  - v15: found by the delta pass — correctness, convergence 1, verdict confirmed
+  - v15: fixed @`9527eba` — the worker resubmits through a new `RequeueRejectedAsync` that keeps `PdfStoragePath`; only the admin retry drops it. Swapping back to `RetryAsync` reddens the new test
+  - v16: verified — swapping back to `RetryAsync` reddened the kept-PDF test, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-665 — Any non-2xx 4xx from ANAF maps to content-rejected and permanently parks the invoice as Failed
+
+- **What:** A wrong Anaf:BaseUrl (404) or a scope-less token (403) makes UploadAsync throw AnafContentRejectedException, and InvoiceUploadJob parks the row Pending→Failed with "no number of retries changes the answer". There is no batch short-circuit like the auth one, so all 50 Pending invoices in the first tick go Failed and each needs a manual admin retry.
+- **Evidence:** `Services/Invoicing/Anaf/AnafSpvClient.cs:74`
+- **Suggested fix:** Restrict AnafContentRejectedException to 400/422 (ideally only with an ANAF error body); treat 403/404/405 as AnafUnreachableException, and short-circuit the batch after the first content rejection. **Trace:** Set Anaf:BaseUrl to a wrong path (404) or issue a scope-less token (403). AnafResilienceHandler.IsRetryable rejects both (only 5xx/408/429); AnafAuthHandler only refreshes on 401. AnafSpvClient.cs:74 falls through to AnafContentRejectedException. InvoiceUploadJob catches it, calls ParkUnbuildableAsync → Pending becomes Failed with the claim cleared. Only `authFailed` short-circuits the batch, so the loop repeats this for every Pending row up to MaxBatchSize=50, each needing the admin retry endpoint. **Test shape:** UploadJob_ParksEveryPendingRow_WhenAnafReturns404: arrange three Pending invoices + stub handler answering 404 to upload; act one tick; assert all three are Failed (expected: stay Pending, batch short-circuits after the first misconfiguration).
+- **History:**
+  - v15: found by the delta pass — correctness, convergence 1, verdict confirmed
+  - v15: fixed @`5d84a5e` — only 400 and 422 are content rejections; 403, 404 and 405 read as unreachable, so one wrong setting no longer parks every Pending invoice
+  - v16: verified — restoring the catch-all 4xx mapping reddened the misconfiguration theory, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-666 — OrderService frees the idempotency key on a fresh PaymentFailed order while its PaymentIntent is still chargeable
+
+- **What:** Tab 1 gets order O1, card declines, webhook sets PaymentFailed; tab 1 still holds O1's StripeClientSecret. Tab 2 posts the same Idempotency-Key: the holder is fresh but PaymentFailed, so the key is freed and order O2 with a new PaymentIntent is created. Tab 1 retries with a good card and tab 2 pays — two charges, two orders, two invoices, no gateway-level dedupe (Stripe is keyed by order id).
+- **Evidence:** `Services/OrderService.cs:129`
+- **Suggested fix:** When freeing the key from a fresh PaymentFailed holder, also cancel/void that order's PaymentIntent and clear its StripeClientSecret so only one intent per basket stays confirmable. **Trace:** Real. WebhooksController:242 only flips status; no cancel exists on IStripePaymentGateway, so O1's PaymentIntent stays requires_payment_method and payment-step.ts:197 keeps clientSecret, re-confirming after a decline. OrderService:117 lets a fresh PaymentFailed holder fall to :129, freeing the key; O2 gets a new intent keyed by O2.Id (PaymentsController:82). Both cards charge. Correction: O1's later success hits the else at WebhooksController:208 — one invoice, not two. **Test shape:** OrderServiceIdempotencyTests.FreshPaymentFailedHolder_DoesNotFreeKey: arrange an order holding the key, Status=PaymentFailed, CreatedAt=now; act CreateFromCartAsync with the same key and caller; assert no second order is inserted (replay or 409). Today it creates O2.
+- **History:**
+  - v15: found by the delta pass — correctness + race, convergence 2, verdict confirmed
+  - v15: fixed @`c60260c` — handing the key on from a fresh failed holder cancels that order's PaymentIntent and clears its client secret, so one basket cannot hold two confirmable intents
+  - v16: verified without a revert proof — covered by the new abandon-intent test; the recording gateway asserts the cancel by id, which cannot pass without the call. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-667 — ANAF 429/503 counts as an unknown upload outcome and parks the invoice after 3 ticks
+
+- **What:** AnafSpvClient maps 429 and 5xx to AnafUnreachableException, which the job records via RecordUnknownUploadOutcomeAsync. A 429 (or a maintenance 503) definitively filed nothing, yet three such ticks (~90 min at defaults) exhaust MaxUnknownUploadOutcomes=3 and park the row Failed with 'reconcile the invoice number in ANAF SPV'. Only a manual admin retry resumes it, inside the 5-business-day deadline.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:441`
+- **Suggested fix:** Only count genuinely ambiguous outcomes (timeout, connection drop, unparseable 200) against the blind-repost budget; treat 429 and 503 as plain retryable outages via RecordPendingErrorAsync. **Trace:** Real. ANAF answers 429 (or 503) to every upload; Polly's 3 retries exhaust, client throws AnafUnreachableException(429). Job's catch calls RecordUnknownUploadOutcomeAsync, incrementing persisted UnknownUploadOutcomes. The cooldown makes the row eligible every other 30-min tick, so at t0, t0+60, t0+120 the third increment hits MaxUnknownUploadOutcomes=3 and ParkPendingAsFailedAsync sets Failed with the "reconcile in ANAF SPV" text. Nothing auto-resumes Failed; only the admin retry endpoint does. Timing ~2 h, not 90 min. **Test shape:** InvoiceUploadJobTests: "Rate_limited_upload_does_not_spend_blind_repost_budget" — stub IAnafSpvClient throwing AnafUnreachableException(httpStatus:429) on three due ticks; assert invoice stays Pending with UnknownUploadOutcomes 0, not Failed.
+- **History:**
+  - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`5d84a5e` — 429 and 503 are refusals before ANAF reads anything, so they record a plain pending error instead of spending the blind-repost budget
+  - v16: verified — making `FiledNothing` always false reddened the 429/503 theory, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-668 — Two concurrent same-key payment requests both call Stripe and one turns a 409 into a 500
+
+- **What:** Customer opens the payment step in two tabs. Both send the same Idempotency-Key; one inserts the order, the other replays with StripeClientSecret still null and takes the replay-recovery path. Both then call CreatePaymentIntentAsync with order.Id as Stripe's idempotency key while the first is in flight. Stripe answers 409 idempotency_error; StripeException has no mapping in ExceptionHandlerMiddleware, so the tab gets a 500 and the generic 'Nu s-a putut crea sesiunea de plată'.
+- **Evidence:** `Controllers/PaymentsController.cs:81`
+- **Suggested fix:** Catch StripeException with type idempotency_error on the recovery path and re-read the order's persisted StripeClientSecret (or retry briefly) instead of letting it surface as a 500. **Trace:** Tab A saves the order (AwaitingPayment, secret null), then calls Stripe. Tab B, inside that window, has FindKeyHolderAsync return A's fresh AwaitingPayment row → ReplayOrConflict → WasIdempotentReplay with null secret → controller line 81 calls Stripe with the same order-id key while A is in flight → 409 idempotency_error. StripeException is absent from _exceptionMappings, so the else branch returns 500. Caveat: stripe-dotnet auto-retries 409s, masking short races; no double charge occurs. **Test shape:** Integration: CreateStripeIntent_WhenGatewayRejectsConcurrentIdempotentCall_DoesNotReturn500. Arrange existing AwaitingPayment order with null StripeClientSecret plus fake gateway throwing StripeException (409 idempotency_error); act POST same Idempotency-Key; assert 502/409, not 500.
+- **History:**
+  - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`18f0b1c` — a gateway `idempotency_error` re-reads the persisted secret or answers 409, never the 500 that told the customer their basket was broken
+  - v16: verified without a revert proof — covered by the new gateway-race path; no test double throws a real `StripeException` with an `idempotency_error` type, so this rests on the code path plus the compile-time filter, not on a red leg. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-669 — Post-commit webhook side effects are lost for good when one throws, because the retry hits the already-paid guard
+
+- **What:** After the Paid+invoice commit, LoadOrderDetailsForEmailAsync (or the promoter/AWB enqueue) throws on a transient DB blip. The exception escapes the action, Stripe gets a 500 and retries; the retry sees HasBeenPaid, records Duplicate and returns before any side effect runs. The order-confirmation email is never sent and has no recovery sweep behind it.
+- **Evidence:** `Controllers/WebhooksController.cs:201`
+- **Suggested fix:** Wrap each post-commit side effect in its own try/catch that logs and continues, or drive them from a restartable outbox keyed on the order so a retry can replay only what is missing. **Trace:** Real. Paid+invoice commits at line 195. Then line 200/288 hits a transient failure (hub SendAsync, or Entry(order).Collection(Items).LoadAsync). Nothing catches it; the exception is unmapped, so ExceptionHandlerMiddleware returns 500. Stripe retries; line 183 HasBeenPaid(Paid) is true, records Duplicate, returns. FireOrderConfirmedEmail never ran, so no Pending email row exists for EmailRetryJob to pick up. Promotion and AWB do have sweeps (PromotionRecoveryScanner, AwbRetryJob); the email has none. **Test shape:** WebhooksController test: first payment_intent.succeeded delivery with hub or Items-load throwing once -> 500; replay same event; assert IOrderEmailService.FireOrderConfirmedEmail never invoked and metric records Duplicate.
+- **History:**
+  - v15: found by the delta pass — race, convergence 1, verdict confirmed
+  - v15: fixed @`18f0b1c` — each post-paid side effect runs in its own try/catch with a Sentry capture. The outbox half is deliberately not done: a confirmation email lost to a transient fault stays lost, now visibly. Recorded in resolution-v15 Decisions
+  - v16: verified — disabling the per-effect catch reddened the side-effect test, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-670 — One transient poll failure replaces the payment-submitted screen with "order not found"
+
+- **What:** Payment submitted, page polling and showing "Plata a fost trimisă pentru comanda #X". Poll 3 fails (Wi-Fi blip, 500, or a guest 401 that also makes errorInterceptor clear the guest token). settling is set to null and order() is null, so the customer sees "Comanda nu a fost găsită sau nu a fost finalizată" plus a home link, while the payment is actually in flight.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:287`
+- **Suggested fix:** Keep the last settling snapshot on a poll error (only the very first read may fall through to the not-found state) and show a retry link. **Trace:** Real. Read 1 returns AwaitingPayment and attempts.isWaitingFor is true, so settling is set and the "Plata a fost trimisă… #FT-20260001" panel renders. Poll 3 (t=6s) rejects; the error handler at line 287-290 unconditionally does settling.set(null) with order() still null and no retry, so the only remaining template branch is .state-error — "Comanda nu a fost găsită sau nu a fost finalizată" plus the home link — while the payment is still in flight. **Test shape:** confirmation-page.spec.ts: "keeps the settling panel when a later poll fails". Arrange AwaitingPayment + submitted, advance 0, assert .settling; switch getPaymentStatus to throwError(500), advance 3000; assert .settling still shown with FT-20260001 and .state-error null.
+- **History:**
+  - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — only the first read may fall through to not-found; a later failure keeps the settling panel and says the check failed
+  - v16: verified — removing the settling guard reddened the later-poll-failure spec, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-671 — combinedStreetLength group error is never rendered, so Continue is disabled with no explanation
+
+- **What:** Customer pastes a full address into "Strada" and adds block/apartment detail; street+number+block exceeds 150 chars. Every field control is individually valid, so no field-error appears, but addressForm.invalid makes canContinue() false — "Continuă →" is permanently greyed out with nothing on screen explaining why, and continue()/markAllAsTouched can never run. Length breaches on street/city/recipientName render "Câmp obligatoriu" on a filled field.
+- **Evidence:** `src/app/features/checkout/pages/delivery-step.ts:384`
+- **Suggested fix:** Render addressForm.errors.streetLineTooLong as a form-level message, and give maxlength breaches their own message instead of "Câmp obligatoriu". **Trace:** Pick Courier (costs loaded). Fill every field validly, street = 160 chars (control's maxLength is 255, so street is valid; number/block empty-or-short). combinedStreetLength joins parts → 160 > 150 → group error {streetLineTooLong}. statusChanges emits INVALID → addressValid() false → canContinue() false → "Continuă →" is [disabled], so continue()/markAllAsTouched never run. No control is invalid, so no @if field-error renders. grep confirms streetLineTooLong appears in no template. **Test shape:** delivery-step.spec: "shows a message when street+number+block exceed 150" — arrange Courier + valid address with 160-char street; act detectChanges; assert Continue disabled AND some .field-error text present (fails today).
+- **History:**
+  - v15: found by the delta pass — frontend-ux, convergence 1, verdict confirmed
+  - v15: fixed @`2302bec` — the combined-street-line error renders as a form-level message, and an over-long field says so rather than claiming it is empty
+  - v16: verified — disabling both error templates reddened the too-long-together spec, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-672 — Settle-poll setTimeout is never cancelled on destroy, so a late poll clears a newer basket
+
+- **What:** Webhook lags; page is polling. Customer navigates to /tipareste and adds new photos. 3 s later the pending timer fires, the poll returns Paid, and the destroyed component runs checkoutState.reset() + cartService.clearCart() — a DELETE that wipes the freshly built basket. Up to 10 requests and signal writes also continue after destroy.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:282`
+- **Suggested fix:** Clear the pending timeout in a DestroyRef.onDestroy callback (or use timer+takeUntilDestroyed), and gate the cart clear on attempts.isWaitingFor(orderId). **Trace:** Real. Poll pending at line 282; component has no OnDestroy/DestroyRef and never clears the timer. Guest on AwaitingPayment page (attempts.isWaitingFor true) navigates to /tipareste and adds photos. Within the remaining 30 s budget a timer fires, read() re-subscribes, webhook has landed so status is Paid, and the settled branch (262-267) runs unconditionally: checkoutState.reset() plus cartService.clearCart() — a DELETE that empties the server cart and localStorage of the new basket. **Test shape:** confirmation-page.spec: "does not clear a new cart after destroy" — arrange AwaitingPayment + isWaitingFor true, fixture.destroy(), tick(3000), flush Paid response; assert httpMock.expectNone(DELETE /cart) and clearCart spy not called.
+- **History:**
+  - v15: found by the delta pass — correctness + frontend-ux, convergence 2, verdict confirmed
+  - v15: fixed @`2302bec` — the poll timer is cleared on destroy and the cart is only cleared for an order this browser was waiting on
+  - v16: verified — removing the `clearTimeout` reddened the destroyed-page spec, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-673 — Invoice download uses a detached anchor and revokes the object URL in the same tick as click()
+
+- **What:** Guest on Firefox clicks "Descarcă factura". The blob arrives, but link is never appended to the document and URL.revokeObjectURL runs synchronously after click(), so no file is saved and no error is shown — invoiceMessage stays null. This page is the guest's only route to a legally required invoice. admin.service.downloadZip already appends/removes the anchor.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:322`
+- **Suggested fix:** Follow the existing pattern: document.body.appendChild(link), click, removeChild, and revoke the URL in a setTimeout/next tick. **Trace:** Confirmed code: line 319 builds an anchor never inserted, 322 clicks it, 323 revokes in the same tick. Guest clicks "Descarcă factura"; blob arrives; the anchor's download fetch is queued as a task, so the URL is already revoked when it runs — download aborts. invoiceLoading clears, invoiceMessage stays null, so nothing is shown. The detached-anchor half is browser-version dependent; the same-tick revoke and the silent failure are not. **Test shape:** confirmation-page.spec: "attaches the invoice link and revokes after the click" — stub URL.createObjectURL/revokeObjectURL, spy body.appendChild and anchor.click; call downloadInvoice with a blob; assert anchor was connected at click and revoke ran after, not same tick.
+- **History:**
+  - v15: found by the delta pass — correctness + frontend-ux, convergence 2, verdict confirmed
+  - v15: fixed @`2302bec` — the anchor is attached before the click and the object URL revoked on the next tick, matching the pattern `admin.service.downloadZip` already used
+  - v16: verified — reverting to the detached anchor reddened the download spec, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-674 — Admin cross-customer invoice read can be logged with an empty admin id
+
+- **What:** Admin sends Authorization: Bearer <admin JWT> plus X-Guest-Token: <any valid guest GUID> to GET /api/orders/{victimOrder}/invoice. DualAuth authenticates both schemes and merges identities, so GetUserIdOrNull() returns null (guest_session_id claim present) while IsInRole("Admin") stays true: the PDF is served and the audit line reads admin_id= with no id.
+- **Evidence:** `Controllers/InvoicesController.cs:72`
+- **Suggested fix:** Take the admin id from the Bearer ClaimsIdentity (FindFirst on that identity) rather than GetUserIdOrNull, and/or refuse the admin override when a guest identity is also attached. **Trace:** Admin sends Bearer admin JWT + X-Guest-Token of any valid session, GET /api/orders/{victim}/invoice. The DualAuth policy authenticates both schemes; PolicyEvaluator merges identities into one principal. ClaimsPrincipalExtensions.cs:12 sees the guest_session_id claim and returns null, so userId=null; guestSessionId doesn't match the order, so owns=false. IsInRole scans all identities, finds the JWT's ClaimTypes.Role=Admin, so the PDF is served and line 72 logs admin_id= empty. **Test shape:** InvoicesControllerTests "AdminReadWithGuestTokenLogsAdminId": arrange principal holding both a JWT identity (NameIdentifier=adminId, Role=Admin) and a GuestToken identity (guest_session_id=other), act GetInvoiceAsync on a foreign order, assert captured log contains adminId.
+- **History:**
+  - v15: found by the delta pass — security, convergence 1, verdict confirmed
+  - v15: fixed @`5d84a5e` — the audit line reads the admin id from the Bearer identity through a new `GetBearerUserIdOrNull`, so a request also carrying a guest token cannot log an empty one
+  - v16: verified — reading the merged principal again reddened the admin-id test, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-675 — Pooled test database is reused without checking the migration chain actually applied
+
+- **What:** CREATE DATABASE commits, then Migrate() throws (Ctrl+C on this machine mid-run, server restart, bad migration) and the database is left behind. The next run sees DatabaseExists, truncates nothing, and hands out a schema-less slot; every test fails 'relation "Orders" does not exist'. The sweep skips current-prefix names, so it never self-heals.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:227`
+- **Suggested fix:** Drop the database in LeaseSlot's catch, and on the reuse path assert GetPendingMigrations() is empty (or call Migrate()) before returning the lease. **Trace:** Real. Run 1: slot created (line 233), then Ctrl+C kills the process mid-Migrate (or during AwbCreatorTests, which drops "Orders" at line 236 and relies on Dispose to drop the DB). The database survives with no/partial schema. Run 2: same salt+fingerprint, so the sweep's `NOT LIKE current%` (line 289) skips it; DatabaseExists (227) takes the truncate path, whose pg_tables aggregate tolerates missing tables; the slot is handed out schema-less and every test throws relation "Orders" does not exist. **Test shape:** LeaseSlot_RepairsAnExistingSlotMissingItsSchema: arrange — pre-create the pool-named database (salt/fingerprint prefix) empty; act — construct PostgresTestDatabase; assert — NewContext().Orders.CountAsync() returns 0 instead of throwing "relation does not exist".
+- **History:**
+  - v15: found by the delta pass — db-parity, convergence 1, verdict confirmed
+  - v15: fixed @`18f0b1c` — a leased slot with pending migrations is migrated before use, and a slot whose first migration fails is dropped rather than left to poison later runs
+  - v16: verified — removing the repair `Migrate()` reddened the lost-schema test, restored green. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-676 — Content-rejected branch ignores a lost park CAS: claim stays held, no LastError, metric still counted
+
+- **What:** Another replica flips the row out of Pending between the upload and the park. ParkUnbuildableAsync returns false but the return value is discarded: the Failed metric is incremented anyway, no LastError is written, and the worker's ClaimedAt is left set — so the admin list shows a stuck invoice with no reason until the claim TTL expires.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:435`
+- **Suggested fix:** Mirror the InvoiceNotBuildableException branch: on parked==false, call RecordPendingErrorAsync and ReleaseClaimAsync, and only count the Failed metric when the park actually succeeded. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — correctness, convergence 1, verdict unverified-low
+  - v15: fixed @`5d84a5e` — a lost park CAS records the error, releases the claim and logs, instead of counting a park that did not happen
+  - v16: verified without a revert proof — no test: the branch needs a park CAS to lose, which needs a concurrent status change mid-call. Recorded as untested. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-677 — Webhook AlreadyInvoiced return leaves the uncommitted Paid transition on the scoped context
+
+- **What:** Two Stripe deliveries race; the loser finds the winner's committed invoice and returns AlreadyInvoiced without saving or reloading, leaving Order.Status=Paid and PaidAt modified on the request-scoped DbContext. The admin twin (AbandonToWinnerAsync) reloads for exactly this reason. Any later SaveChangesAsync added to this request would commit the loser's PaidAt over the winner's.
+- **Evidence:** `Controllers/WebhooksController.cs:328`
+- **Suggested fix:** Reload the order entity (as AbandonToWinnerAsync does) before returning AlreadyInvoiced from both the pre-insert check and the unique-index catch. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — correctness, convergence 1, verdict unverified-low
+  - v15: backlogged — unverified-low tier with no trace built; it cannot strand a payment or an invoice
+
+### PPW-678 — Invoice number allocated outside the transaction that inserts the row, against the numbering service's contract
+
+- **What:** PostgresInvoiceNumberingService documents 'callers must invoke this inside the same transaction that persists the Invoice row', but no caller opens a transaction: nextval autocommits, then SaveChanges runs separately. Two orders paid concurrently can commit numbers out of order relative to IssuedAt (FT-2026-00007 committed before 00006), and every failed insert burns a number outside any rollback scope.
+- **Evidence:** `Services/Invoicing/InvoiceCreationService.cs:93`
+- **Suggested fix:** Either open one transaction spanning NextNumberAsync and SaveChanges, or update the numbering service's doc comment to state the real (transaction-free) contract. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — race, convergence 1, verdict unverified-low
+  - v15: backlogged — a contract nit against the numbering service's own doc comment; ADR-020 already accepts the gap-on-rollback this describes
+
+### PPW-679 — After the 10-poll budget the payment-confirming spinner spins forever with no terminal message
+
+- **What:** Webhook is delayed beyond 30 s (Stripe retry, worker restart). Polling stops at poll 10 but settling stays set, so the customer is left staring at an animated "Se confirmă plata..." spinner indefinitely, with no way to re-check and no statement that the app has stopped looking.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:280`
+- **Suggested fix:** When polls hit MAX_SETTLE_POLLS, swap the spinner for a settled-message plus a "Verifică din nou" button that calls read(). **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — frontend-ux, convergence 1, verdict unverified-low
+  - v15: fixed @`2302bec` — a spent poll budget ends with a message instead of a spinner that never stops
+  - v16: verified without a revert proof — covered by the existing spent-budget spec, which now also asserts the terminal message. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-680 — canContinue ignores shippingCostsReady, so a restored session proceeds on a stale shipping cost
+
+- **What:** Customer picked Courier earlier (cost 25 in sessionStorage), then reloads /checkout/livrare while the shipping endpoint is down. Radios are disabled and prices show "se încarcă…", but the restored address keeps the form valid, so Continue is enabled and review/payment display the stale 25 RON — exactly the "customer agrees to a total nobody bills" case the new gate was added to prevent.
+- **Evidence:** `src/app/features/checkout/pages/delivery-step.ts:393`
+- **Suggested fix:** Include shippingCostsReady() in canContinue() (or re-gate on a confirmed cost for the selected method) so the cost-error banner blocks progress. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — frontend-ux, convergence 1, verdict unverified-low
+  - v15: fixed @`2302bec` — `canContinue` requires both shipping prices, so a restored session cannot proceed on a stored one
+  - v16: verified without a revert proof — covered by the existing before-prices spec through `canContinue`. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-681 — Non-owner invoice PDF served with a one-year immutable browser cache
+
+- **What:** An ops admin fetches /api/orders/{X}/invoice; the response still carries private, max-age=31536000, immutable, so customer X's name/address PDF is written to that browser profile's disk cache under a stable URL. Anyone else using that profile who reopens the URL gets the PDF from cache with no server authorization check.
+- **Evidence:** `Controllers/InvoicesController.cs:149`
+- **Suggested fix:** Now that non-owners can fetch this endpoint, send private, no-store (or a short max-age) for the invoice PDF, matching OrderPaymentStatusController. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — security, convergence 1, verdict unverified-low
+  - v15: backlogged — restates the caching half of PPW-621, which the owner already sent to the backlog
+
+### PPW-682 — ResetForTest deletes the migration's 42 EasyboxLocker seed rows and never restores them
+
+- **What:** Verified: every pooled database has EasyboxLockers count 0, while a freshly migrated one has 42. The reset excludes only __EFMigrationsHistory. A Postgres-backed test that reads seeded lockers, or inserts an order whose EasyboxLockerId is a seeded id, passes on a fresh slot and fails (23503) on a reused one — result depends on pool age.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:106`
+- **Suggested fix:** Exclude the migration's seeded reference tables from the wipe, or re-insert the seed rows after each reset — the same treatment sequences already get. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
+
+### PPW-683 — DropAllForeignKeys does not mark the pooled database dirty, so a constraint-free schema can be handed on
+
+- **What:** A test class using IClassFixture<PostgresTestDatabase> (std pool) calls DropAllForeignKeys(); ExecuteInternal skips _schemaTouched, so Dispose returns the slot instead of dropping it. The next class leasing that slot runs with no referential integrity, and a test asserting an FK violation goes false-green. Latent today — the only caller uses Throwaway().
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:166`
+- **Suggested fix:** Route DropAllForeignKeys() through Execute() so it sets _schemaTouched, or make it private to the ForeignKeyFreeTestDatabase construction path. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
+
+### PPW-684 — Test-database sweep is scoped to its own salt, so pools from other worktrees are never reclaimed
+
+- **What:** The sweep's prefix is pp_test_<salt>_, so it only removes stale schemas from the same output directory. Each worktree (the owner runs 2-3) leaves a permanent pool, and a deleted worktree's pool survives forever. Measured now: 40 pp_test_* databases, 347 MB, across three salts — unbounded growth on a machine already described as overloaded.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:292`
+- **Suggested fix:** Sweep on the pp_test_ prefix across salts when the advisory lock is free, or stamp a last-used timestamp per pool and drop pools unused for N days. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
+
+### PPW-685 — ResetSequences drops every public sequence the migration script did not literally CREATE, including identity-owned ones
+
+- **What:** The whitelist is regex-scraped from CREATE SEQUENCE statements, but identity/serial sequences are created implicitly by the column definition and never appear. Add one int identity column and its sequence gets DROP SEQUENCE ... CASCADE on the first reset, breaking that column permanently in the pooled database while __EFMigrationsHistory still claims the migration applied.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:128`
+- **Suggested fix:** Skip sequences that pg_sequences reports as owned by a column (pg_depend/pg_get_serial_sequence) instead of relying only on the scraped whitelist. **Trace:** (unchallenged lens verdict, not a refutation)
+- **History:**
+  - v15: found by the delta pass — db-parity, convergence 1, verdict unverified-low
+  - v15: backlogged — test-database helper, not product
+
+### PPW-686 — MaxBatchSize is used unclamped unlike the upload job's other settings
+
+- **What:** PollIntervalMinutes, ClaimTtlMinutes and MaxUnknownUploadOutcomes are all floored with Math.Max, but Take(_settings.MaxBatchSize) is raw. Anaf:MaxBatchSize=0 silently stops all e-Factura submission with a healthy-looking "batch size=0" absence, and a negative value makes Postgres reject the LIMIT on every tick.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:109`
+- **Suggested fix:** Clamp in the constructor, e.g. _maxBatchSize = Math.Clamp(_settings.MaxBatchSize, 1, 500), and use that field in the query. **Trace:** (cleanup — not verified)
+- **History:**
+  - v15: found by the delta pass — correctness, convergence 1, verdict unverified-cleanup
+  - v15: fixed @`9527eba` — `MaxBatchSize` is clamped to 1–500 in the constructor, like `PollIntervalMinutes` and `MaxUnknownUploadOutcomes`
+  - v16: verified without a revert proof — a clamp with no test of its own; the settings validator bounds `MaxBatchSize` upstream. Full touched surface green in sequential batches: 1290 API tests (10 skipped) across Unit.Services, Unit.Controllers, Unit.Data, Unit.Observability, Unit.Middleware, Unit.Validators and Integration, plus all 520 UI specs.
+
+### PPW-687 — payment-step's discardDeadIntent retires the idempotency key on every confirm error — card typos and already-succeeded charges included — wiping the form and creating a second order
+
+- **What:** Customer mistypes the card number. confirmCardPayment returns {error:{code:'incomplete_number'}} — nothing was charged, the intent is still confirmable, the order is still AwaitingPayment. discardDeadIntent retires the key; retryPayment posts a fresh key, so the server finds no holder and creates a SECOND order plus a second PaymentIntent. Every typo adds one.
+- **Evidence:** `src/app/features/checkout/pages/payment-step.ts:221`
+- **Suggested fix:** Only discard when Stripe reports an actual decline (card_error from a charge attempt); for validation/network errors keep clientSecret and the key so the retry replays the same order.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + frontend-ux + tests-coverage, convergence 3, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-688 — The server's PaymentFailed intent-abandon path is unreachable because the SPA retires the key instead of reusing it, so the declined order's intent stays chargeable and the widened PaymentFailed→Paid transition can auto-fulfil the duplicate
+
+- **What:** Card declined: payment-step calls retireKey(), so the retry POSTs a NEW key and the server never re-sees the old one — AbandonPaymentIntentAsync never runs and intent I1 stays chargeable. Order #2 is paid. I1 later succeeds; the webhook now allows PaymentFailed→Paid, so order #1 also gets PaidAt, an ANAF-filed invoice and an AWB.
+- **Evidence:** `Services/OrderService.cs:149`
+- **Suggested fix:** Cancel the intent where the decline is known (the payment_failed webhook), not only on key reuse; add an integration test driving decline→retry→late success.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + completeness-critic + frontend-ux, convergence 3, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-689 — Reclassified 403/404/405 misconfiguration responses now spend the blind-repost budget and park invoices with a false duplicate-filing reason, with no test over the join
+
+- **What:** Anaf:BaseUrl typo returns 404. AnafSpvClient now throws AnafUnreachableException instead of ContentRejected; FiledNothing(404) is false, so each invoice counts an unknown outcome and after MaxUnknownUploadOutcomes=3 is parked Failed with "reconcile this invoice number in ANAF SPV" — ops hunt duplicate filings that never happened.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:598`
+- **Suggested fix:** Treat every 4xx as filed-nothing (only 5xx, timeouts and dropped connections are ambiguous); add a job-level test for a 404/403 on the upload leg.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + tests-coverage + completeness-critic, convergence 3, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-690 — The new wasWaiting gate stops the cart from ever being cleared on the 409 "already paid" redirect
+
+- **What:** Customer pays, then a second tab posts the intent: server 409s with orderId, payment-step.ts:155 calls attempts.clear() then redirects here. isWaitingFor is now false, so cart + checkoutState are left intact. "Comandă confirmată" shows while the cart badge still holds the paid photos; re-checkout mints a new key and charges again.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:286`
+- **Suggested fix:** Clear cart/checkoutState in handleIntentError's settled-order branch before navigating, or pass a flag so the confirmation page still cleans up when it was redirected there. **Trace:** Real. Payment-step.ts:155 calls attempts.clear() (removes localStorage AND nulls the in-memory fallback) before redirecting, so confirmation-page.ts:283 isWaitingFor() reads null → false; clear/reset/clearCart at 287-289 are skipped. Reachable state: tab closed mid-confirm, so retireKey/clearCart never ran; the key stays live, order becomes Paid, OrderService.cs:144 throws consumed → 409. Nothing clears the cart server-side, so the paid photos remain and re-checkout mints a fresh key. **Test shape:** confirmation-page.spec: "clears cart when the order is already paid and no local attempt exists" — arrange empty attempt storage + getPaymentStatus returning status 'Paid'; act ngOnInit; assert cartService.clearCart and checkoutState.reset were called. Reddens today.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — frontend-ux, convergence 1, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-691 — One failed status poll ends the confirmation page's settle wait permanently — no reschedule and no give-up message
+
+- **What:** Poll 1 hits a 502 during a rolling deploy while the webhook is still in flight. pollFailed is set and the error branch returns without arming a new timer, so the remaining 9 poll slots are never used, settleGaveUp never fires, and the spinner "Se confirmă plata..." spins forever until the customer manually reloads.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:317`
+- **Suggested fix:** In the error branch, if polls < MAX_SETTLE_POLLS increment and reschedule the read alongside setting pollFailed, so a transient failure self-heals inside the budget.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + frontend-ux + completeness-critic, convergence 3, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-692 — The destroy guard clears the poll timer but not the in-flight status request, so the poll chain can restart after destroy and clear a new basket
+
+- **What:** Customer navigates away ~200ms after a poll fires. destroyRef clears the pending timer, but the live subscription still delivers: if the order settled, clearCart() wipes the basket they build next; if not, a fresh settleTimer is armed after onDestroy ran and polls on unguarded for 30s. The new test uses a synchronous `of()`, so it misses this.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:278`
+- **Suggested fix:** Pipe the getPaymentStatus subscription through takeUntilDestroyed(this.destroyRef) (as delivery-step already does) instead of relying on the timer handle alone. **Trace:** Real. `read()` subscribes to `getPaymentStatus` with no `takeUntilDestroyed`, so HttpClient keeps the request alive. Poll 3 fires; 200ms later the user navigates — onDestroy clears only the (already-fired) timer. The response lands: still 'AwaitingPayment' + attempt live, so line 307 arms a fresh timer after destroy and polls up to 7 more times (~21s). When one returns 'Paid', `clearCart()` DELETEs the basket built meanwhile. **Test shape:** confirmation-page.spec: "no poll or cart clear after destroy with an in-flight read" — arrange getPaymentStatus returning a Subject; act: init, fixture.destroy(), then subject.next(AwaitingPayment), advance 3000ms; assert getPaymentStatus called once and clearCart never.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — frontend-ux + tests-coverage, convergence 2, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-693 — The new rejected-invoice slice cap trades pending-starvation for rejection-starvation — not-yet-due rejections fill all 5 rows — and only the first case is tested
+
+- **What:** Five rows deep in backoff (created 50h ago, last rejected at +21h, next slot +85h) have the oldest UpdatedAt but are not due. ORDER BY UpdatedAt puts them at the head of the 5-row slice (MaxBatchSize 50 / 10) every tick for 35h, so every other due rejection is never resubmitted and outlives the 5-business-day ANAF deadline.
+- **Evidence:** `Services/Invoicing/Anaf/InvoiceUploadJob.cs:221`
+- **Suggested fix:** Filter due-ness in SQL (or order by computed dueAt) instead of discarding not-due rows in memory; test that a due rejection still runs behind five not-due ones. **Trace:** Real. Defaults [1,4,16,64] (cumulative 1,5,21,85), cap = 50/10 = 5. Five rows created 50h ago, last rejected at +21h: UpdatedAt 29h old passes the coarse >1h filter, but NextResubmitAt returns created+85h, so line 260 returns without writing UpdatedAt. They hold the ORDER BY UpdatedAt head for 35h of ticks, so a due rejection updated 1.3h ago is never fetched. Starvation bounded by one backoff step (~64h); deadline breach only marginal. **Test shape:** ProcessBatchAsync_NotYetDueRejectionsFillingTheSlice_StillResubmitsADueRejection: seed 5 Rejected (created -4h, updated -2h) plus one due (created -1.8h, updated -1.3h), maxBatchSize 5, backoff [1,4]; assert the due row becomes Pending.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + completeness-critic, convergence 2, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-694 — Widening the transition table silently widened the admin status endpoint, and its only guard test was inverted
+
+- **What:** AdminOrderService.UpdateStatusAsync uses the same table. An admin sets a PaymentFailed order to Paid: PaidAt is stamped, SaveWithInvoiceAsync issues a real fiscal invoice (later filed at ANAF, irreversible) and the confirmation email fires — for an order nobody paid. PaymentFailed_To_Paid_ThrowsInvalidTransition, which blocked this, was rewritten to assert the opposite.
+- **Evidence:** `Services/OrderStatusMachine.cs:23`
+- **Suggested fix:** Keep the webhook-only widening out of the shared table, or add an admin-side guard, plus an AdminOrderService test asserting PaymentFailed→Paid is rejected (or explicitly allowed and audited). **Trace:** Mechanically reachable — no status whitelist on PATCH /admin/orders/{id}/status, so PaymentFailed→Paid stamps PaidAt, invoices, emails. But nothing goes wrong for any input: it needs an admin deliberately typing Status="Paid", the identical audited manual-reconciliation path already reachable from AwaitingPayment (logged via admin.order.mark-paid with admin_user_id). No customer, webhook, or timing sequence triggers it. The test change matches the deliberate table widening, not an inverted intact guard.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage + completeness-critic, convergence 2, verdict plausible
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-695 — RequeueRejectedAsync clears XmlPayload but keeps PdfStoragePath, so the filed XML and the customer's PDF can diverge — and the new test pins that stale path
+
+- **What:** ANAF rejects an invoice over a wrong buyer CUI; an admin corrects the order. The worker's automatic requeue rebuilds XML from the corrected order but skips the PDF render (path present), so ANAF holds corrected data while the customer downloads the old, wrong fiscal PDF. The new test asserts only that the path survives.
+- **Evidence:** `Services/Invoicing/InvoiceLifecycle.cs:177`
+- **Suggested fix:** Re-render the PDF whenever the XML is rebuilt (write the new PDF before swapping the path); assert PDF and XML agree after a requeue. **Trace:** Order carries no CUI, so the finding's stated cause is wrong, but the divergence is real: buyer name in both XML and PDF comes from live order.User. Rejected row → RequeueRejectedAsync nulls XmlPayload, keeps PdfStoragePath. Customer edits profile name (AccountService:58). Next worker cycle UploadPendingAsync rebuilds XML with the new name, skips the PDF render because the path is non-empty. ANAF gets the new name; InvoicesController still streams the old PDF. **Test shape:** InvoiceUploadJobTests: RejectedRequeue_AfterBuyerNameChange_RebuildsXmlButServesOldPdf — arrange rejected invoice with PDF path past its backoff slot, rename order.User, run two batches, assert rebuilt XmlPayload holds the new name while PdfStoragePath/bytes still hold the old.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage + completeness-critic, convergence 2, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-696 — InvoicesController's ownership check still trusts the null-returning GetUserIdOrNull for merged principals; only the audit line was fixed
+
+- **What:** A non-SPA client (ops tool, curl) sends both a JWT and X-Guest-Token. GetUserIdOrNull returns null because a guest claim exists, so owns is false; a non-admin owner of the order gets Forbid on their own invoice. The new test covers only the admin log line.
+- **Evidence:** `Controllers/InvoicesController.cs:62`
+- **Suggested fix:** Use GetBearerUserIdOrNull (or both ids) in the owns computation; add a test for a merged-principal non-admin owner. **Trace:** REAL. Order created while logged in: UserId=owner, GuestSessionId=null (OrderService.cs:185-186). Later GET /api/orders/{id}/invoice with Bearer JWT plus a still-valid X-Guest-Token: the DualAuth policy authenticates both schemes and merges identities, so the principal carries a guest_session_id claim. GetUserIdOrNull sees that claim and returns null; the guest branch compares against null GuestSessionId. owns=false, non-admin, so Forbid on the owner's own invoice. **Test shape:** Integration: GetInvoice_WithBearerAndGuestToken_ReturnsPdfForOwner. Arrange a user-owned order with a rendered invoice, a valid GuestSession row. Act: GET invoice sending both Authorization: Bearer and X-Guest-Token. Assert 200 application/pdf (today: 403).
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage + completeness-critic, convergence 2, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-697 — EnsureSchemaApplied's pending-migrations early return skips both repair of an interrupted first use and the foreign-key drop on a reused slot
+
+- **What:** A ForeignKeyFreeTestDatabase slot is created: Migrate() commits, then the run is killed (this machine saturates) before the separate DropForeignKeysSql connection runs. Next lease: GetPendingMigrations() is empty, so EnsureSchemaApplied returns early and the FK drop under it never executes. AwbCreatorTests/AwbRetryJobTests then fail on 23503 in that slot forever — the sweep skips it (same fingerprint).
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:271`
+- **Suggested fix:** Verify the schema, not the history row: check expected tables exist and (for nofk slots) that pg_constraint has no contype='f' rows; otherwise drop and recreate the slot database. **Trace:** REAL. Fresh "nofk" slot: CREATE DATABASE, Migrate() commits history, process killed before ExecuteOn(DropForeignKeysSql) — FKs still present. Dispose never ran, so the database survives; the sweep excludes the current fingerprint prefix, and _schemaTouched is false so nothing drops it. Next lease: DatabaseExists true, GetPendingMigrations empty, EnsureSchemaApplied returns at line 271, FK drop skipped. AwbCreator/AwbRetryJob fixture seeds OrderItem.UploadId = random Guid → 23503, permanently. **Test shape:** EnsureSchemaApplied_drops_foreign_keys_when_schema_already_current: arrange a Throwaway (already migrated, FKs intact); act EnsureSchemaApplied(its ConnectionString, dropForeignKeys: true); assert SELECT count(*) FROM pg_constraint WHERE contype='f' is 0. Reddens today (early return).
+- **History:**
+  - v17: found by the fix-diff review of round 15 — db-parity + tests-coverage, convergence 2, verdict confirmed
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-698 — Minting a key after retirement silently drops the stored orderId the settling page depends on, and the spec asserts before minting so it stays hidden
+
+- **What:** Payment returns `processing`; the key is retired and the confirmation page polls on the stored orderId. Any later idempotencyKey() call (customer starts a new checkout in another tab) overwrites the record without orderId, so the next poll sees isWaitingFor false, blanks `settling` and shows "Comanda nu a fost găsită" for a payment still in flight.
+- **Evidence:** `src/app/core/services/checkout-attempt.service.ts:53`
+- **Suggested fix:** Carry orderId across the mint (`{ key: mintKey(), owner, createdAt: Date.now(), orderId: stored?.orderId }`) or keep the waiting order id under its own storage entry.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — frontend-ux + tests-coverage, convergence 2, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-699 — delivery-step's shipping-costs continue gate is untested and the new per-field maxlength branch is unreachable in the case it was added for
+
+- **What:** The guard exists for a restored method whose price came from storage, but the only new test flushes costs first, so removing the guard reddens nothing. The new street maxlength message fires at 255 chars while the combined cap is 150, so the 120-char test never reaches it — errors.length > 0 passes purely on the group-level message.
+- **Evidence:** `src/app/features/checkout/pages/delivery-step.ts:407`
+- **Suggested fix:** Add a test with a restored Easybox method asserting canContinue() is false before the cost calls flush; assert the specific message text, not just a count.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage + completeness-critic, convergence 2, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-700 — TryDropDatabase drops the database without the ClearAllPools() its sibling Drop() documents as necessary
+
+- **What:** EnsureSchemaApplied throws on the create path; TryDropDatabase runs DROP DATABASE ... WITH (FORCE) while the connector EnsureSchemaApplied opened is still in the Npgsql pool for that database name. The next run that leases the same slot can take that dead connector from the pool and fail with a connection error instead of migrating.
+- **Evidence:** `Tests/Helpers/PostgresTestDatabase.cs:278`
+- **Suggested fix:** Call NpgsqlConnection.ClearAllPools() before the DROP in TryDropDatabase, as Drop() already does.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + db-parity, convergence 2, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-701 — The folded AddColumn left Invoices.UnknownUploadOutcomes with a permanent DEFAULT 0 that the model and snapshot do not declare
+
+- **What:** CreateTable emits UnknownUploadOutcomes integer NOT NULL DEFAULT 0, but PhotoPrintDbContext configures no default and the snapshot has none (unlike StorageLocation, where HasDefaultValue(Local) matches). No test can see it: HasPendingModelChanges compares model to snapshot only. Re-scaffolding the baseline silently drops the default, so two developer databases differ.
+- **Evidence:** `Migrations/20260820133204_InitialPostgres.cs:384`
+- **Suggested fix:** Drop defaultValue: 0 from the UnknownUploadOutcomes column in CreateTable (the folded AddColumn needed it, a CreateTable does not), or declare HasDefaultValue(0) on the property.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — db-parity + completeness-critic, convergence 2, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-702 — The irreversible Stripe intent cancellation runs before the local transaction commits
+
+- **What:** Key reused after a decline: the old intent is cancelled at Stripe, then the new-order INSERT fails (order-number retries exhausted, an FK/NOT NULL error, or the IdempotencyKeyTakenException path). The in-memory nulls roll back, so the old order still stores PaymentIntentId and StripeClientSecret pointing at a dead intent, and no replacement order exists.
+- **Evidence:** `Services/OrderService.cs:56`
+- **Suggested fix:** Cancel after the SaveChanges that frees the key succeeds, or null PaymentIntentId/StripeClientSecret in the same committed transaction as the cancel.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-703 — The abandon-intent test asserts through the SUT's own DbContext, so a missing save stays green
+
+- **What:** _db.Orders.FindAsync returns the entity the SUT already mutated in the change tracker. If AbandonPaymentIntentAsync's holder were ever fetched AsNoTracking, or an early return skipped the SaveChanges that flushes it, the cleared StripeClientSecret would never reach the row and this test would still pass.
+- **Evidence:** `Tests/Unit/Services/OrderServiceTests.cs:488`
+- **Suggested fix:** Re-read the order from a second DbContext over the same InMemory database name before asserting, and also assert the new order was created with the key.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-704 — The new gateway idempotency-race branch has no test and cannot be reached with the existing fake
+
+- **What:** FakeStripePaymentGateway can only succeed, so nothing exercises the new catch. For a first-time order the row exists with a NULL StripeClientSecret, so the branch throws ConflictException and the SPA renders "Coșul s-a schimbat între timp" — telling the customer their cart broke — with no test to notice.
+- **Evidence:** `Controllers/PaymentsController.cs:91`
+- **Suggested fix:** Give the fake a queued-throw hook and add two tests: persisted secret replayed as 200, and null secret returning a retry-shaped 409 the SPA renders as "try again".
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-705 — The gateway-race 409's crafted message is never shown — the SPA's existing 409 branch swallows it
+
+- **What:** Two tabs race; the second gets the new ConflictException. payment-step.handleIntentError sees status 409 with no orderId and no divergentFields, so it prints "Coșul s-a schimbat între timp. Reîncărcați pagina" — wrong cause, and no automatic retry for a condition that resolves in a second. No frontend test covers the new 409 shape.
+- **Evidence:** `Controllers/PaymentsController.cs:104`
+- **Suggested fix:** Give the race a distinct code the SPA can recognise (or return 202/retry-after) and add a payment-step test asserting the retry-in-a-moment message.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — completeness-critic, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-706 — The slot-repair test leases a second pool slot while its class fixture already holds one
+
+- **What:** PostgresTestDatabaseTests is IClassFixture<PostgresTestDatabase> (one slot) and the new test calls Throwaway() for a second, concurrently. Under the repo's batched-run policy with other Postgres-backed classes in flight, the pool can run out and the run fails on the "no free slot" path rather than on the code under test.
+- **Evidence:** `Tests/Unit/Data/PostgresTestDatabaseTests.cs:18`
+- **Suggested fix:** Reuse the fixture's own database (drop and repair its schema) instead of leasing a second slot, or mark the test in a serial collection.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — completeness-critic, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-707 — No schema-level assertion covers the folded Invoices columns after the migration squash
+
+- **What:** MigrationChainTests only proves the chain applies and that the model matches the snapshot; neither compares the migrated database to the model. A hand-edit that made StorageLocation nullable, or typed a folded column bigint, would apply cleanly and stay green because relational tests only read and write values.
+- **Evidence:** `Migrations/20260820133204_InitialPostgres.cs:382`
+- **Suggested fix:** Mirror UploadMigrationSchemaTests for Invoices: query information_schema.columns on a migrated database and assert type, nullability and default for StorageLocation and UnknownUploadOutcomes.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — tests-coverage, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-708 — The squash reuses the baseline migration id while a coexisting worktree still carries the two AddColumn migrations
+
+- **What:** .claude/worktrees/loop-speed still has 20260821054658/20260821110018. Recreate the shared dev database from this branch (history: InitialPostgres only), then boot the API from that worktree: Migrate() replays AddColumn StorageLocation on a table that already has it and dies with 42701, so that worktree cannot boot until someone edits __EFMigrationsHistory.
+- **Evidence:** `Migrations/20260820133204_InitialPostgres.cs:362`
+- **Suggested fix:** Note the two retired ids in data-stack.md with the one-line repair (insert both rows into __EFMigrationsHistory) so a coexisting branch's boot failure is self-diagnosing.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — db-parity, convergence 1, verdict unverified-low
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-709 — A code comment on the confirmation page cites a finding ID, which CLAUDE.md forbids and the pre-commit hook blocks
+
+- **What:** `// PPW-672: a timer that outlives the page would clear a basket built after it.` is in the committed diff, so the comment hook was bypassed (COMMENTS_OK or --no-verify). Reviewers reading the file are pointed at review history the file must not carry.
+- **Evidence:** `src/app/features/orders/pages/confirmation-page.ts:306`
+- **Suggested fix:** Drop the ID prefix, keeping the constraint sentence; check whether other commits in this round were pushed with COMMENTS_OK.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness + frontend-ux + completeness-critic, convergence 3, verdict unverified-cleanup
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this
+
+### PPW-710 — The OrderStatusMachine transition-table doc comment was not updated with PaymentFailed → Paid
+
+- **What:** The class doc's "Valid transitions" list still shows six transitions and omits PaymentFailed → Paid, so the next reader trusts a table that no longer matches ValidTransitions. Same drift in AnafExceptions.cs ("A 4xx other than 408/429 is ANAF refusing this document"), now false after the client change.
+- **Evidence:** `Services/OrderStatusMachine.cs:8`
+- **Suggested fix:** Add PaymentFailed → Paid to the doc list and correct the AnafContentRejectedException comment to 400/422 only.
+- **History:**
+  - v17: found by the fix-diff review of round 15 — correctness, convergence 1, verdict unverified-cleanup
+  - v17: recorded at close on the owner's ruling; the loop closed without certification and without fixing this

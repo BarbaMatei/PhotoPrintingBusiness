@@ -289,7 +289,6 @@ public class UploadCleanupJobTests
             Status = OrderStatus.Paid,
             GuestSessionId = upload.GuestSessionId,
             GuestEmail = "buyer@example.com",
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Courier,
             ShippingAddress = new ShippingAddressSnapshot
             {
@@ -521,7 +520,6 @@ public class UploadCleanupJobTests
             Status = status,
             GuestSessionId = upload.GuestSessionId,
             GuestEmail = "buyer@example.com",
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Courier,
             ShippingAddress = new ShippingAddressSnapshot
             {

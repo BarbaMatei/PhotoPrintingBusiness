@@ -56,6 +56,8 @@ import { tmpdir } from 'node:os'
   writeFileSync(join(dir, 'review-v1.md'), '---\ntype: review\ntarget: 951-unparsed-ledger-row\nversion: 1\ncommit: ddddde1\n---\n\n# Review v1\n')
   writeFileSync(join(dir, 'metrics.jsonl'), JSON.stringify({
     target, pass: 1, type: 'discovery', date: '2026-08-22', commit: 'ddddde1', verdict: 'approve-with-followups',
+    // Every manifest lens listed: this fixture is about an unparsable ledger row, not lens debt.
+    lenses: ['correctness', 'security', 'requirements', 'quality', 'tests-coverage', 'completeness-critic', 'db-parity', 'input-validation', 'observability', 'race', 'frontend-ux'],
     new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0,
   }) + '\n')
   writeFileSync(join(dir, 'ledger.md'), `---
@@ -85,4 +87,25 @@ updated: 2026-08-22
   const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '907-correction-target'])
   check("router surfaces the latest round's correction", r.out.includes('for fix round 1'), r.out.trim())
   check("router hides other rounds' and pass-keyed corrections behind a fix-round line", !r.out.includes('fix round 99') && !r.out.includes('new_findings'), r.out.trim())
+}
+
+// ---------- convergence rule + lens-coverage debt (audit R5, 2026-08-28) ----------
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '915-lens-debt'])
+  check('router refuses row 6 on lens-coverage debt and routes the owed lens', r.code === 0 && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), `exit ${r.code}: ${r.out.trim()}`)
+}
+
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '916-unmeasured-seed'])
+  check('router flags an unmeasured seed rate at the delta-worthiness gate', r.code === 3 && r.out.includes('seed rate is unmeasured'), `exit ${r.code}: ${r.out.trim()}`)
+}
+
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '917-non-convergent'])
+  check('router declares a component non-convergent at s >= 0.3 on two consecutive rounds', r.code === 2 && r.out.includes('GATE_KIND: design-pass') && r.out.includes('"payments"'), `exit ${r.code}: ${r.out.trim()}`)
+}
+
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '918-design-capped'])
+  check('router routes a fix round once the component used its one design pass', r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('design pass per loop already ran'), `exit ${r.code}: ${r.out.trim()}`)
 }

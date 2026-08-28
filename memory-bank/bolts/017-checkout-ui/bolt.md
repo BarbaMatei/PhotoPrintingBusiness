@@ -25,11 +25,11 @@ Angular checkout flow with 4 pages and supporting services/components.
 
 ### Models
 - `core/models/shipping.model.ts` — LockerDto, ShippingCostDto, DeliveryType, ShippingAddressForm, DeliveryState, ROMANIAN_COUNTIES
-- `core/models/payment.model.ts` — CreateOrderRequest, StripeIntentResponse, EuPlatescInitiateResponse, OrderDto, OrderStatus
+- `core/models/payment.model.ts` — CreateOrderRequest, StripeIntentResponse, the legacy processorInitiateResponse, OrderDto, OrderStatus
 
 ### Services
 - `core/services/shipping.service.ts` — getLockers, getShippingCost
-- `core/services/payment.service.ts` — createStripeIntent, initiateEuPlatesc, getOrder
+- `core/services/payment.service.ts` — createStripeIntent, initiateLegacyProcessor, getOrder
 - `core/services/checkout-state.service.ts` — BehaviorSubject with sessionStorage persistence
 
 ### Components / Pages
@@ -37,7 +37,7 @@ Angular checkout flow with 4 pages and supporting services/components.
 - `features/checkout/components/locker-map.ts` — Leaflet map (lazy-loaded) with locker pins
 - `features/checkout/pages/delivery-step.ts` — Easybox/Courier selection, city search, address form
 - `features/checkout/pages/review-step.ts` — Cart summary, delivery info, terms checkbox
-- `features/checkout/pages/payment-step.ts` — Stripe Elements + EuPlatesc tabs
+- `features/checkout/pages/payment-step.ts` — Stripe Elements + the legacy processor tabs
 - `features/orders/pages/confirmation-page.ts` — Order success page with status stepper
 
 ### Routes

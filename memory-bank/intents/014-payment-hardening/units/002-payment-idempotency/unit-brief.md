@@ -11,7 +11,7 @@ updated: 2026-05-25T10:05:00Z
 
 ## Purpose
 
-Make `POST /api/payments/stripe/intent` and `POST /api/payments/euplatesc/initiate` idempotent on a per-request key. A repeated call within 24 h returns the same `OrderId` + `ClientSecret` (Stripe) or redirect URL (EuPlatesc), and Stripe's own idempotency is engaged via `RequestOptions.IdempotencyKey`.
+Make `POST /api/payments/stripe/intent` and `POST /api/payments/legacy-processor/initiate` idempotent on a per-request key. A repeated call within 24 h returns the same `OrderId` + `ClientSecret` (Stripe) or redirect URL (the legacy processor), and Stripe's own idempotency is engaged via `RequestOptions.IdempotencyKey`.
 
 ## Scope
 
@@ -34,7 +34,7 @@ Make `POST /api/payments/stripe/intent` and `POST /api/payments/euplatesc/initia
 | FR | Requirement | Priority |
 |----|-------------|----------|
 | FR-3 | Stripe payment intent idempotency | Must |
-| FR-4 | EuPlatesc payment idempotency | Must |
+| FR-4 | the legacy processor payment idempotency | Must |
 | FR-5 | Schema migration for IdempotencyKey | Must |
 
 ---
@@ -45,7 +45,7 @@ Make `POST /api/payments/stripe/intent` and `POST /api/payments/euplatesc/initia
 |----------|-------|----------|
 | 001-idempotency-key-migration | Add nullable `Orders.IdempotencyKey` + partial unique index | Must |
 | 002-stripe-intent-idempotency | Wire idempotency to Stripe intent endpoint + SDK request options | Must |
-| 003-euplatesc-initiate-idempotency | Reuse persisted EuPlatesc redirect URL on repeat calls | Must |
+| 003-legacy-processor-initiate-idempotency | Reuse persisted the legacy processor redirect URL on repeat calls | Must |
 
 ---
 

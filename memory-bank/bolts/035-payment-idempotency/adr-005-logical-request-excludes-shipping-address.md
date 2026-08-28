@@ -60,6 +60,6 @@ The FE contract is the mitigation: generate a fresh `Idempotency-Key` whenever t
 
 ## Related
 
-- **Stories**: 002-stripe-intent-idempotency, 003-euplatesc-initiate-idempotency
+- **Stories**: 002-stripe-intent-idempotency, 003-legacy-processor-initiate-idempotency
 - **Standards**: `api-conventions.md` (document the `Idempotency-Key` generation contract)
 - **Previous ADRs**: ADR-004 (state conflict → 409) — defines the response when `LogicalRequest` equality fails

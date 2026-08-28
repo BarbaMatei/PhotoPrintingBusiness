@@ -1,5 +1,6 @@
 import {
   Component,
+  DestroyRef,
   inject,
   OnInit,
   ChangeDetectionStrategy,
@@ -7,20 +8,28 @@ import {
   input,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, PercentPipe } from '@angular/common';
 import { isAtLeast as isAtLeastFn } from '../../../core/models/order-status.constants';
 import { PaymentService } from '../../../core/services/payment.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
+import { CheckoutAttemptService } from '../../../core/services/checkout-attempt.service';
 import { CartService } from '../../../core/services/cart.service';
-import { OrderDto } from '../../../core/models/payment.model';
+import { OrderPaymentStatusDto } from '../../../core/models/payment.model';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+
+const SETTLED_STATUSES = ['Paid', 'Printing', 'Shipped', 'Delivered'];
+
+// Three seconds between reads, ten reads: half a minute covers a normal webhook, and the page
+// then keeps the order number on screen instead of pretending the payment failed.
+const SETTLE_POLL_MS = 3000;
+const MAX_SETTLE_POLLS = 10;
 
 @Component({
   selector: 'app-confirmation',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, RouterLink, SpinnerComponent],
+  imports: [DecimalPipe, PercentPipe, RouterLink, SpinnerComponent],
   template: `
     <div class="confirmation-page">
       @if (loading()) {
@@ -39,6 +48,10 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
           <div class="summary-row">
             <span>Total plătit:</span>
             <strong>{{ order()!.totalRon | number:'1.2-2' }} RON</strong>
+          </div>
+          <div class="summary-row">
+            <span>din care TVA ({{ order()!.vatRate | percent:'1.0-2' }}):</span>
+            <span>{{ order()!.vatRon | number:'1.2-2' }} RON</span>
           </div>
           <div class="summary-row">
             <span>Livrare:</span>
@@ -73,6 +86,20 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
           </div>
         </div>
 
+        <div class="invoice-actions">
+          <button
+            type="button"
+            class="btn btn--ghost download-invoice"
+            [disabled]="invoiceLoading()"
+            (click)="downloadInvoice()"
+          >
+            {{ invoiceLoading() ? 'Se descarcă...' : 'Descarcă factura' }}
+          </button>
+          @if (invoiceMessage()) {
+            <p class="invoice-message">{{ invoiceMessage() }}</p>
+          }
+        </div>
+
         <!-- CTA based on auth state -->
         @if (!isAuthenticated()) {
           <div class="guest-cta">
@@ -88,7 +115,31 @@ import { SpinnerComponent } from '../../../shared/components/spinner/spinner.com
         </div>
       }
 
-      @if (!loading() && !order()) {
+      @if (!loading() && settling()) {
+        <div class="settling">
+          <app-spinner label="Se confirmă plata..." [showLabel]="true" />
+          <p>
+            Plata a fost trimisă pentru comanda <strong>#{{ settling()!.orderNumber }}</strong>.
+            Confirmarea de la procesatorul de plăți poate întârzia câteva momente.
+          </p>
+          <p class="settling-hint">
+            Puteți închide pagina — comanda este înregistrată și veți primi un e-mail.
+          </p>
+          @if (pollFailed()) {
+            <p class="settling-warning">
+              Nu am putut verifica starea acum. Comanda este trimisă; reîncărcați pagina în câteva momente.
+            </p>
+          }
+          @if (settleGaveUp()) {
+            <p class="settling-warning">
+              Confirmarea întârzie mai mult decât de obicei. Comanda este înregistrată — reîncărcați
+              pagina sau verificați e-mailul.
+            </p>
+          }
+        </div>
+      }
+
+      @if (!loading() && !order() && !settling()) {
         <div class="state-error">
           <p>Comanda nu a fost găsită sau nu a fost finalizată.</p>
           <a routerLink="/" class="btn btn--primary">Înapoi acasă</a>
@@ -195,30 +246,115 @@ export class ConfirmationPage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly checkoutState = inject(CheckoutStateService);
   private readonly cartService = inject(CartService);
+  private readonly attempts = inject(CheckoutAttemptService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(true);
-  readonly order = signal<OrderDto | null>(null);
+  readonly order = signal<OrderPaymentStatusDto | null>(null);
+  readonly settling = signal<OrderPaymentStatusDto | null>(null);
+  readonly invoiceMessage = signal<string | null>(null);
+  readonly invoiceLoading = signal(false);
+  readonly pollFailed = signal(false);
+  readonly settleGaveUp = signal(false);
+
+  private polls = 0;
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly isAuthenticated = () => this.authService.isAuthenticated();
 
   ngOnInit(): void {
-    this.paymentService.getOrder(this.orderId()).subscribe({
+    this.destroyRef.onDestroy(() => {
+      if (this.settleTimer !== null) clearTimeout(this.settleTimer);
+      this.settleTimer = null;
+    });
+    this.read();
+  }
+
+  // The card confirmation returns before the payment webhook has marked the order paid, so a
+  // customer who just paid arrives here on an order still awaiting payment. Sending them home
+  // for that loses the confirmation and their emptied basket, so wait instead — but only for an
+  // order this browser submitted, and only until the budget runs out.
+  private read(): void {
+    this.paymentService.getPaymentStatus(this.orderId()).subscribe({
       next: order => {
         this.loading.set(false);
-        if (order.status !== 'Paid' && order.status !== 'Printing' && order.status !== 'Shipped' && order.status !== 'Delivered') {
-          // Order not in a success state — redirect home
-          this.router.navigate(['/']);
+
+        if (SETTLED_STATUSES.includes(order.status)) {
+          const wasWaiting = this.attempts.isWaitingFor(this.orderId());
+          this.settling.set(null);
+          this.order.set(order);
+          if (wasWaiting) {
+            this.attempts.clear();
+            this.checkoutState.reset();
+            this.cartService.clearCart().subscribe();
+          }
           return;
         }
-        this.order.set(order);
-        // Reset checkout state now that we've confirmed success
-        this.checkoutState.reset();
-        this.cartService.clearCart().subscribe();
+
+        const stillPaying = order.status === 'AwaitingPayment';
+        if (!stillPaying || !this.attempts.isWaitingFor(this.orderId())) {
+          // Either the payment came back failed, or this browser never submitted this order:
+          // nothing to wait for, so show the not-finalised state rather than polling.
+          this.settling.set(null);
+          return;
+        }
+
+        this.settling.set(order);
+        this.pollFailed.set(false);
+        if (this.polls < MAX_SETTLE_POLLS) {
+          this.polls++;
+          // PPW-672: a timer that outlives the page would clear a basket built after it.
+          this.settleTimer = setTimeout(() => this.read(), SETTLE_POLL_MS);
+          return;
+        }
+        this.settleGaveUp.set(true);
       },
+      // A later read failing says nothing about the payment, which is still in flight; only the
+      // very first read may fall through to the not-found state.
       error: () => {
         this.loading.set(false);
+        if (this.settling()) {
+          this.pollFailed.set(true);
+          return;
+        }
+        this.settling.set(null);
       },
     });
+  }
+
+  // A guest has no order list, so this page is their only route to a legally required document.
+  downloadInvoice(): void {
+    this.invoiceLoading.set(true);
+    this.invoiceMessage.set(null);
+
+    this.paymentService.downloadInvoice(this.orderId()).subscribe({
+      next: blob => {
+        this.invoiceLoading.set(false);
+        this.saveBlob(blob);
+      },
+      error: (err: { status?: number }) => {
+        this.invoiceLoading.set(false);
+        this.invoiceMessage.set(
+          err?.status === 404
+            ? 'Factura se pregătește. Încercați din nou în câteva minute.'
+            : 'Factura nu a putut fi descărcată. Încercați din nou mai târziu.',
+        );
+      },
+    });
+  }
+
+  private saveBlob(blob: Blob): void {
+    const order = this.order();
+    const name = order ? `factura-${order.orderNumber}.pdf` : 'factura.pdf';
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    // A detached anchor saves nothing in Firefox, and revoking in the same tick can beat the save.
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   isAtLeast(status: string): boolean {

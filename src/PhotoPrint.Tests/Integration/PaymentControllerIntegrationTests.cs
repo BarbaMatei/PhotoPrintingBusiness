@@ -17,7 +17,6 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     private readonly HttpClient _client;
 
     private static readonly CreateOrderRequest ValidRequest = new(
-        PaymentProcessor: PaymentProcessor.Stripe,
         DeliveryType: DeliveryType.Easybox,
         EasyboxLockerId: Guid.NewGuid(),
         ShippingAddress: new PhotoPrint.API.Models.ShippingAddressSnapshot
@@ -25,16 +24,6 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
             RecipientName = "Test", Phone = "0700000000",
             Street = "Str. Test", Number = "1", City = "Cluj-Napoca",
             County = "Cluj", PostalCode = "400100",
-        });
-
-    private static readonly CreateOrderRequest EuPlatescRequest = new(
-        PaymentProcessor: PaymentProcessor.EuPlatesc,
-        DeliveryType: DeliveryType.Courier,
-        EasyboxLockerId: null,
-        ShippingAddress: new PhotoPrint.API.Models.ShippingAddressSnapshot
-        {
-            Street = "Str. Test", Number = "1", City = "București",
-            County = "Ilfov", PostalCode = "010101", RecipientName = "Test", Phone = "0700000000",
         });
 
     public PaymentControllerIntegrationTests(PaymentFactory factory)
@@ -121,7 +110,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     }
 
     [Fact]
-    public async Task CreateStripeIntent_SameKey_DivergentProcessor_Returns409()
+    public async Task CreateStripeIntent_SameKey_DivergentLocker_Returns409()
     {
         var (userId, token) = await _factory.SeedUserWithJwtAsync();
         await _factory.SeedCartItemAsync(userId: userId, unitPrice: 2.00m, quantity: 5);
@@ -135,8 +124,8 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         var first = await SendStripeIntent(client, ValidRequest, key);
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
-        // Same key, different processor → conflict.
-        var divergent = ValidRequest with { PaymentProcessor = PaymentProcessor.EuPlatesc };
+        // Same key, different locker → conflict.
+        var divergent = ValidRequest with { EasyboxLockerId = Guid.NewGuid() };
         var second = await SendStripeIntent(client, divergent, key);
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
@@ -145,7 +134,7 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         using var body = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
         var divergentFields = body.RootElement.GetProperty("divergentFields")
             .EnumerateArray().Select(e => e.GetString()).ToArray();
-        Assert.Contains("paymentProcessor", divergentFields);
+        Assert.Contains("easyboxLockerId", divergentFields);
     }
 
     [Fact]
@@ -167,36 +156,6 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         var response = await SendStripeIntent(client, ValidRequest, overLength);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task InitiateEuPlatesc_SameIdempotencyKey_ReturnsSameUrlAndOneOrder()
-    {
-        var (userId, token) = await _factory.SeedUserWithJwtAsync();
-        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 1.50m, quantity: 4);
-
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-        var key = Guid.NewGuid().ToString();
-
-        var first = await SendEuPlatescInitiate(client, EuPlatescRequest, key);
-        var second = await SendEuPlatescInitiate(client, EuPlatescRequest, key);
-
-        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
-
-        var dto1 = await first.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
-        var dto2 = await second.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
-
-        Assert.Equal(dto1!.OrderId, dto2!.OrderId);
-        // Same redirect URL verbatim (persisted, not rebuilt with a fresh nonce).
-        Assert.Equal(dto1.RedirectUrl, dto2.RedirectUrl);
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
-        Assert.Equal(1, db.Orders.Count(o => o.IdempotencyKey == key));
     }
 
     [Fact]
@@ -248,10 +207,6 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
     private static Task<HttpResponseMessage> SendStripeIntent(
         HttpClient client, CreateOrderRequest body, string idempotencyKey)
         => client.PostStripeIntentAsync(body, idempotencyKey);
-
-    private static Task<HttpResponseMessage> SendEuPlatescInitiate(
-        HttpClient client, CreateOrderRequest body, string idempotencyKey)
-        => client.PostEuPlatescInitiateAsync(body, idempotencyKey);
 
     // ── POST /api/payments/stripe/intent ──────────────────────────────────────
 
@@ -311,10 +266,9 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         // Send raw JSON that includes the now-removed shippingCostRon field with
         // a tampered (negative) value. The server must ignore it entirely.
         // Enums are serialized as integers on the wire (no JsonStringEnumConverter
-        // is registered on the API). PaymentProcessor.Stripe = 0, DeliveryType.Easybox = 0.
+        // is registered on the API). DeliveryType.Easybox = 0.
         var tamperedJson = $$"""
             {
-              "paymentProcessor": 0,
               "deliveryType": 0,
               "easyboxLockerId": "{{Guid.NewGuid()}}",
               "shippingAddress": { "recipientName": "Test", "phone": "0700000000", "street": "Str. Test", "number": "1", "city": "Cluj-Napoca", "county": "Cluj", "postalCode": "400100" },
@@ -341,41 +295,6 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         // Subtotal 10.00 + shipping 20.00 = 30.00 RON. NEVER -90.00.
         Assert.Equal(10.00m, order.SubtotalRon);
         Assert.Equal(30.00m, order.TotalRon);
-    }
-
-    // ── POST /api/payments/euplatesc/initiate ─────────────────────────────────
-
-    [Fact]
-    public async Task InitiateEuPlatesc_ValidCart_Returns200WithRedirectUrl()
-    {
-        var (userId, token) = await _factory.SeedUserWithJwtAsync();
-        await _factory.SeedCartItemAsync(userId: userId, unitPrice: 1.50m, quantity: 4);
-
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-        var response = await client.PostAsJsonAsync("/api/payments/euplatesc/initiate", EuPlatescRequest);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var dto = await response.Content.ReadFromJsonAsync<EuPlatescInitiateResponse>();
-        Assert.NotNull(dto);
-        Assert.Contains("euplatesc.ro", dto!.RedirectUrl);
-        Assert.NotEqual(Guid.Empty, dto.OrderId);
-    }
-
-    [Fact]
-    public async Task InitiateEuPlatesc_EmptyCart_Returns400()
-    {
-        var (_, token) = await _factory.SeedUserWithJwtAsync();
-
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-
-        var response = await client.PostAsJsonAsync("/api/payments/euplatesc/initiate", EuPlatescRequest);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     // ── POST /api/webhooks/stripe ─────────────────────────────────────────────
@@ -537,99 +456,4 @@ public class PaymentControllerIntegrationTests : IClassFixture<PaymentFactory>
         Assert.Equal(OrderStatus.Paid, updated!.Status);
     }
 
-    // ── POST /api/webhooks/euplatesc ──────────────────────────────────────────
-
-    [Fact]
-    public async Task EuPlatescIpn_ValidSignature_Action0_OrderPaid()
-    {
-        var order = await _factory.SeedOrderAsync(totalRon: 31.00m);
-
-        // Build valid IPN fields with HMAC
-        var fields = new Dictionary<string, string>
-        {
-            ["amount"]     = "31.00",
-            ["curr"]       = "RON",
-            ["invoice_id"] = order.Id.ToString(),
-            ["ep_id"]      = "EP12345",
-            ["merch_id"]   = "TEST_MERCH",
-            ["action"]     = "0",
-            ["message"]    = "Approved",
-            ["approval"]   = "123456",
-            ["timestamp"]  = "20260521120000",
-            ["nonce"]      = "abcd1234abcd1234abcd1234abcd1234",
-        };
-        var ipnOrder = new[] { "amount", "curr", "invoice_id", "ep_id", "merch_id", "action", "message", "approval", "timestamp", "nonce" };
-        fields["fp"] = PhotoPrint.API.Services.EuPlatescService.ComputeHmac(
-            "000102030405060708090a0b0c0d0e0f",
-            ipnOrder.Select(k => fields[k]).ToArray());
-
-        var content = new FormUrlEncodedContent(fields);
-        var response = await _client.PostAsync("/api/webhooks/euplatesc", content);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.StartsWith("<epayment>", body);
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
-        var updated = await db.Orders.FindAsync(order.Id);
-        Assert.Equal(OrderStatus.Paid, updated!.Status);
-        Assert.Equal("EP12345", updated.EuPlatescTransactionId);
-        // The EuPlatesc Paid branch must enqueue the AWB too (mirrors the Stripe path).
-        Assert.Contains(order.Id, _factory.AwbNotifier.Enqueued);
-    }
-
-    [Fact]
-    public async Task EuPlatescIpn_InvalidSignature_ReturnsErrorXml()
-    {
-        var fields = new Dictionary<string, string>
-        {
-            ["invoice_id"] = Guid.NewGuid().ToString(),
-            ["fp"] = "deadbeefdeadbeefdeadbeefdeadbeef",
-        };
-
-        var response = await _client.PostAsync(
-            "/api/webhooks/euplatesc",
-            new FormUrlEncodedContent(fields));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Equal("<epayment>error</epayment>", body);
-    }
-
-    [Fact]
-    public async Task EuPlatescIpn_AmountMismatch_NoStatusChange()
-    {
-        var order = await _factory.SeedOrderAsync(totalRon: 50.00m);
-
-        // Build valid signature but with wrong amount
-        var wrongAmount = "99.00"; // actual total is 50.00
-        var fields = new Dictionary<string, string>
-        {
-            ["amount"]     = wrongAmount,
-            ["curr"]       = "RON",
-            ["invoice_id"] = order.Id.ToString(),
-            ["ep_id"]      = "EP99",
-            ["merch_id"]   = "TEST_MERCH",
-            ["action"]     = "0",
-            ["message"]    = "Approved",
-            ["approval"]   = "999",
-            ["timestamp"]  = "20260521130000",
-            ["nonce"]      = "ffffffffffffffffffffffffffffffff",
-        };
-        var ipnOrder = new[] { "amount", "curr", "invoice_id", "ep_id", "merch_id", "action", "message", "approval", "timestamp", "nonce" };
-        fields["fp"] = PhotoPrint.API.Services.EuPlatescService.ComputeHmac(
-            "000102030405060708090a0b0c0d0e0f",
-            ipnOrder.Select(k => fields[k]).ToArray());
-
-        var response = await _client.PostAsync("/api/webhooks/euplatesc", new FormUrlEncodedContent(fields));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PhotoPrint.API.Data.PhotoPrintDbContext>();
-        var updated = await db.Orders.FindAsync(order.Id);
-        // Status must remain unchanged
-        Assert.Equal(OrderStatus.AwaitingPayment, updated!.Status);
-    }
 }

@@ -78,6 +78,8 @@ run journal (not guesswork) explains an empty result.
 | Router says | Do |
 |---|---|
 | full discovery · delta discovery · certification | Follow `reviews/runbooks/runbook-discovery.md` exactly — scoping, lens manifest, launch args, synthesis. The delta lens cap (5) and token budget (600k) are script-enforced; don't fight them. |
+| lens-coverage discovery (<lens>) | A discovery pass per the same runbook, full scope, lenses = the one owed lens + completeness-critic. It exists to clear lens-coverage debt before certification (README note ³). |
+| design pass (owner gate) | Only on the owner's go-ahead: a fix round per the `/fix-review` skill whose first artifact is a component-level protocol block, reimplementation against it, then discovery. Its metrics `notes` must carry `design-pass:<area>` — that is how the router counts the one-per-component cap. |
 | verification | Follow `reviews/runbooks/runbook-verification.md`. You must not be the fixer — sole exception: the test-only rule written in its step 1. Self-verification is the exact bias the loop exists to prevent. |
 | fix round | Invoke the **/fix-review** skill and stop there — it is the sole owner of the fixer contract. Do not fix findings inline. |
 | loop CLOSED | Report the closure line and stop. The target is under watch: a new serious finding in its files re-arms the loop and may be a `post-cert-escape` (reviews/state/track-record.md). |
@@ -171,7 +173,7 @@ the records, never from the subagent's prose):
 | Pass | How |
 |---|---|
 | full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
-| verification | first commit any pending `reviews/<target>/` record appends (worklog/metrics/ledger) — one records commit, `docs(review): …` subject, because `verify-fixes.mjs` refuses a dirty tree by design; then run `node reviews/lib/verify-fixes.mjs <target>` yourself, then one subagent for the runbook's judgment items, its three per-cluster questions, and the records — given the script's JSON output, the resolution, and the fix diff |
+| verification | first commit any pending `reviews/<target>/` record appends (worklog/metrics/ledger) — one records commit, `docs(review): …` subject, because `verify-fixes.mjs` refuses a dirty tree by design; then the runbook's step 2: an **evidence audit** (2–3 sampled rows via `--only`) when the round recorded per-fix revert proofs, the full `node reviews/lib/verify-fixes.mjs <target>` run otherwise; then one subagent for the runbook's judgment items and the records — given the script's JSON output, the round review's findings, the resolution, and the fix diff |
 | fix round | one subagent instructed to load the `/fix-review` skill and follow its **Unattended variant** section |
 
 The session-model guard still applies: on a Fable session, discovery-scale launches

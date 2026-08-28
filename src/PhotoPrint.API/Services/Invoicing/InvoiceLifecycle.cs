@@ -108,6 +108,21 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
         return LogAndReturn(invoiceId, InvoiceAnafStatus.Submitted, InvoiceAnafStatus.Failed, affected);
     }
 
+    public async Task<bool> GiveUpOnRejectedAsync(
+        Guid invoiceId, string reason, CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var affected = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Rejected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.AnafStatus, InvoiceAnafStatus.Failed)
+                .SetProperty(i => i.LastError,  (string?)reason)
+                .SetProperty(i => i.ClaimedAt,  (DateTimeOffset?)null)
+                .SetProperty(i => i.UpdatedAt,  (DateTimeOffset?)now),
+                ct);
+        return LogAndReturn(invoiceId, InvoiceAnafStatus.Rejected, InvoiceAnafStatus.Failed, affected);
+    }
+
     public async Task<UnknownUploadOutcome> RecordUnknownUploadOutcomeAsync(
         Guid invoiceId, string errorMessage, string budgetSpentMessage, int maxOutcomes,
         CancellationToken ct = default)
@@ -159,10 +174,28 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
         return LogAndReturn(invoiceId, InvoiceAnafStatus.Pending, InvoiceAnafStatus.Failed, parked);
     }
 
+    public async Task<bool> RequeueRejectedAsync(
+        Guid invoiceId, CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var affected = await _db.Invoices
+            .Where(i => i.Id == invoiceId && i.AnafStatus == InvoiceAnafStatus.Rejected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(i => i.AnafStatus,   InvoiceAnafStatus.Pending)
+                .SetProperty(i => i.AnafUploadId, (string?)null)
+                .SetProperty(i => i.LastError,    (string?)null)
+                .SetProperty(i => i.XmlPayload,   (string?)null)
+                .SetProperty(i => i.UnknownUploadOutcomes, 0)
+                .SetProperty(i => i.ClaimedAt,    (DateTimeOffset?)null)
+                .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),
+                ct);
+        return LogAndReturn(invoiceId, InvoiceAnafStatus.Rejected, InvoiceAnafStatus.Pending, affected);
+    }
+
     public async Task<bool> RetryAsync(
         Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default)
     {
-        // PdfStoragePath stays untouched — clearing it would re-trigger the customer "ready" notification once that integration ships, and it plays no role in the ANAF path.
+        // PdfStoragePath is cleared so the worker re-renders: ops fix a renderer bug and retry, and a kept path would serve the broken PDF for ever.
         var before = await _db.Invoices
             .Where(i => i.Id == invoiceId)
             .Select(i => new { i.XmlPayload, i.LastError })
@@ -182,6 +215,7 @@ public sealed class InvoiceLifecycle : IInvoiceLifecycle
                 .SetProperty(i => i.AnafUploadId, (string?)null)
                 .SetProperty(i => i.LastError,    (string?)null)
                 .SetProperty(i => i.XmlPayload,   (string?)null)
+                .SetProperty(i => i.PdfStoragePath, (string?)null)
                 .SetProperty(i => i.UnknownUploadOutcomes, 0)
                 .SetProperty(i => i.ClaimedAt,    (DateTimeOffset?)null)
                 .SetProperty(i => i.UpdatedAt,    (DateTimeOffset?)now),

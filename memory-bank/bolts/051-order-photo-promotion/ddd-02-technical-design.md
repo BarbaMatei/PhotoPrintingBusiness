@@ -21,7 +21,7 @@ updated: 2026-05-29T10:00:00Z
 │       ├── _db.SaveChangesAsync()              ← Paid is durable          │
 │       └── _promoter.EnqueueAsync(order.Id)    ← NEW: fire-and-forget     │
 │                                                                          │
-│  WebhooksController.EuPlatescIpnAsync                                    │
+│  WebhooksController.LegacyProcessorIpnAsync                                    │
 │       └── (same three calls, same order)                                 │
 │                                                                          │
 │  BackfillCommand (CLI)                                                   │
@@ -90,7 +90,7 @@ After reading the existing payment surface:
 
 - `OrderStatusMachine.Transition(order, OrderStatus.Paid)` is called from **exactly two places** — both in `WebhooksController`:
   - `HandleStripePaymentSucceededAsync` (private helper for `payment_intent.succeeded`).
-  - `EuPlatescIpnAsync` (the `action == "0"` branch when current status is `AwaitingPayment`).
+  - `LegacyProcessorIpnAsync` (the `action == "0"` branch when current status is `AwaitingPayment`).
 - Both call sites already perform `_db.SaveChangesAsync` immediately after the transition.
 
 **Design choice:** Add `await _promoter.EnqueueAsync(order.Id, ct)` as the **last line** of each branch, after `SaveChangesAsync`. Two new lines total. Why not embed in `OrderStatusMachine.Transition`?
@@ -377,7 +377,7 @@ if (args.Length > 0 && args[0] == "backfill-archive")
 |------|-----|
 | **Bolt 042 (thumbnail cache)** | Promoter calls `_imageProcessor.GenerateThumbnailAsync` if local thumb missing; reuses `MaxDecodeDimension`. |
 | **Bolt 043 (storage layer)** | All byte movements go via `IStorageRouter.Local` / `.Cloud`; keys built via `StorageKeys.*`. No direct `IAmazonS3` or `File.*` calls in promoter code. |
-| **Existing payments code** | Two new lines: `_promoter.EnqueueAsync(order.Id, ct)` after `SaveChangesAsync` in `HandleStripePaymentSucceededAsync` and `EuPlatescIpnAsync`. |
+| **Existing payments code** | Two new lines: `_promoter.EnqueueAsync(order.Id, ct)` after `SaveChangesAsync` in `HandleStripePaymentSucceededAsync` and `LegacyProcessorIpnAsync`. |
 | **`OrderStatusMachine`** | Untouched. Promoter respects the machine (only runs on `Status ≥ Paid`) but doesn't drive transitions. |
 | **Existing `IHostedService` registrations** | Worker + recovery scanner registered via `services.AddHostedService<T>()` from inside `AddPhotoArchive(IConfiguration)` (new extension method, parallel to bolt-043's `AddPhotoStorage`). |
 | **Unit 002 (retention)** | Provides `OriginalPurgedAt` column. The unit-002 purge job will populate it. |

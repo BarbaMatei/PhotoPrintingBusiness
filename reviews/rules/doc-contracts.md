@@ -65,6 +65,14 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    links (kept true by `lib/fix-links.mjs`), definitions, and commands.
 5. **Append-only detail.** A ledger detail block never changes after creation,
    except new History lines. Status fields in the table may change.
+6. **Grandfathering cut-offs.** A new gate rule carries a dated cut-off, kept as
+   a constant in the checker — `V4_CUTOFF` in `lib/vocab.mjs` (2026-08-28, the
+   accepted fix-round audit) is the current one. A rule applies to a round only
+   when the resolution's `closed:` date or its fix-round metrics line's date is
+   on/after the cut-off; every earlier record (the sixteen passes of history,
+   resolution-v15 included) is grandfathered, never repaired retroactively. A
+   resolution turning `resolved` must set `closed:` — from the cut-off the
+   auditor refuses one without it.
 
 ## Language rules
 
@@ -128,8 +136,16 @@ Allowed system terms. Anything else must be everyday English.
   broken records, or the no-progress guard.
 - **parked** — a gate decision taken by written default during an unattended run,
   awaiting the owner's ruling in the run-end report.
-- **approach-check** — an adversarial pre-implementation check of a fix's design (trigger list in the `/fix-review` skill).
-- **micro-review** — the anchored per-cluster diff review a fix round dispatches on its own work.
+- **approach-check** — an adversarial pre-implementation check of a fix's design (trigger list in the `/fix-review` skill). For a protocol cluster it critiques the protocol block, not the patches — one check per protocol.
+- **micro-review** — retired 2026-08-28, replaced by the round review; the word survives in earlier records only.
+- **protocol block** — a cluster-level spec in the resolution's Decisions (`### Protocol — <label>`): the states, the invariant(s) each with a quantifier, the ordered rules for who mints/retires/cancels what. Written at triage, before any of the cluster's fixes.
+- **round review** — the one anchored composition review over a fix round's entire diff plus its resolution notes, dispatched before hand-back; replaces per-cluster micro-reviews (2026-08-28).
+- **test audit** — the sidecar check that a round's new tests assert what the fix brief's test shape states (three rules in the `/fix-review` skill); required whenever the round ran a red test run.
+- **evidence audit** — the verification mode for a round whose resolution records a per-fix revert proof for every fixed row: an independent agent reads the recorded red/green evidence and re-runs a random 2–3 rows; any non-reproduction reverts the target to full re-runs.
+- **seed rate** — `s(r)`: serious (🟠+) fix-caused findings the next blind pass attributes to fix round r (`seed_round` in metrics `findings[]`), divided by round r's fix count. Missing lineage means *not yet measured*, never zero.
+- **lens-coverage pass** — a lean full-scope discovery run on one manifest lens that has never run on the target; certification is refused while any is owed.
+- **design pass** — the owner-gated pass replacing fix rounds for a component whose patching measured non-convergent (two consecutive rounds seeding it at s ≥ 0.3): a protocol block at component level, reimplementation against it, then discovery. At most one per component per loop; recorded as a fix round whose metrics notes carry `design-pass:<area>`.
+- **override log** — `reviews/state/overrides.jsonl`, untracked: the pre-commit hook's record of every `COMMENTS_OK`/`DOCGATE_OK` use. An entry newer than an unattended run's start stops the run.
 - **reconciliation** — after the blinded pass, matching its finds to ledger rows and
   minting a `PPW-<n>` for each one that is new.
 - **class sidecar** — `reviews/state/defect-classes.jsonl`, one line per classified
@@ -165,6 +181,14 @@ defect proposed at this round's gate from outside the finding set. Every row who
 status is not `fixed` needs a `### ` heading under `Decisions` naming its `PPW-<n>`;
 the gate enforces this. `verified` is
 not a legal value in the Status column.
+
+Rounds closed on/after the 2026-08-28 cut-off: the scope table's columns are
+Cluster · Findings · Files · **Protocol** — the old free-text Approach-check
+column is retired (the check is a machine-read worklog event). The Protocol
+cell names the cluster's `### Protocol — <label>` block under `Decisions`, or
+`—`. A protocol block states at least one quantified invariant ("never",
+"at most one", "exactly once"); one describing only mechanisms is spec-theatre
+and the gate refuses it. The block counts as a decision (≤ 15 lines).
 
 ### summary-v<n>.md — template `templates/summary.md`
 
@@ -202,6 +226,20 @@ string `t` and a string `ev`. Events cover the fix round's work as it happens
 plus `pass-launch`, `pass-records-done` and the owner-gate stamps. It is the
 crash-safe evidence trail: every metrics `runtime` value is computed from it and
 never estimated.
+
+Since the 2026-08-28 cut-off it is also the hand-back evidence the auditor
+refuses `status: resolved` without:
+
+- `protocol-written` (`round`, `cluster`, `ids`) — appended when a cluster's
+  protocol block is written, **before** any of that cluster's `finding` events.
+- `check-dispatched` events carry `ids`: the `PPW-<n>` list the approach-check
+  covers. A trigger-classified fix with no consumed pre-check verdict must
+  appear in one.
+- `round-review-dispatched` / `round-review-returned` (`round`, on return
+  `found`) — the one composition review over the round's whole diff.
+- `test-audit-dispatched` / `test-audit-returned` (`round`, on return
+  `verdict`) — the test-meaning check; required whenever the round ran a red
+  test run.
 
 ### metrics.jsonl — schema `metrics-schema.md`
 

@@ -50,7 +50,7 @@ updating or explicitly clearing each. *(043 F1/F2 — the only High of the bolt;
 collision lived outside the diff.)*
 
 **2. Second-path symmetry.** Anything with two implementations or two user types — InMemory/
-PostgreSQL, local/cloud storage, Stripe/EuPlatesc, logged-in/guest — gets every behavior either
+PostgreSQL, local/cloud storage, Stripe, logged-in/guest — gets every behavior either
 verified symmetric or documented divergent. Exception contracts must be uniform across
 implementations of one interface. *(043 F3: S3 threw `AmazonS3Exception` where local threw
 `FileNotFoundException` → preview 500s; 042 D23: DDL that only one provider exercised.)*

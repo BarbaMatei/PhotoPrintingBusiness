@@ -1,0 +1,10 @@
+{"t":"2026-08-30T09:00:00Z","ev":"round-start","round":1}
+{"t":"2026-08-30T09:05:00Z","ev":"triage-done","round":1,"clusters":1,"pre_cleared":0}
+{"t":"2026-08-30T09:10:00Z","ev":"test-run","round":1,"kind":"red","filter":"Fixture","passed":0,"failed":2}
+{"t":"2026-08-30T09:20:00Z","ev":"finding","round":1,"id":"PPW-9211","status":"fixed","commit":"abcd122"}
+{"t":"2026-08-30T09:21:00Z","ev":"finding","round":1,"id":"PPW-9212","status":"fixed","commit":"abcd122"}
+{"t":"2026-08-30T09:22:00Z","ev":"finding","round":1,"id":"PPW-9213","status":"fixed","commit":"abcd122"}
+{"t":"2026-08-30T09:23:00Z","ev":"finding","round":1,"id":"PPW-9214","status":"fixed","commit":"abcd122"}
+{"t":"2026-08-30T09:24:00Z","ev":"finding","round":1,"id":"PPW-9215","status":"fixed","commit":"abcd122"}
+{"t":"2026-08-30T09:30:00Z","ev":"protocol-written","round":1,"cluster":"A","ids":["PPW-9214","PPW-9215"]}
+{"t":"2026-08-30T09:40:00Z","ev":"round-end","round":1}

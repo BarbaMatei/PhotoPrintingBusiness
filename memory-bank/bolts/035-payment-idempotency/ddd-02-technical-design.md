@@ -13,7 +13,7 @@ updated: 2026-05-25T13:25:00Z
 **Existing layered architecture preserved** (per the project's `system-architecture.md` and the implementations behind bolts 001–034):
 
 - **Presentation**: ASP.NET Core controllers + filters.
-- **Application/Domain**: services (`OrderService`, `IStripePaymentGateway`, `IEuPlatescService`) + validators (FluentValidation).
+- **Application/Domain**: services (`OrderService`, `IStripePaymentGateway`, `ILegacyProcessorService`) + validators (FluentValidation).
 - **Infrastructure**: EF Core (`PhotoPrintDbContext`) + external SDKs (Stripe.NET).
 
 **No new architectural pattern introduced.** This bolt adds one domain service (`IdempotencyResolver`) and extends existing services and the `Order` entity. The pattern choice is **"optimistic application-layer lookup + DB-arbitrated unique constraint"**:
@@ -48,7 +48,7 @@ This pattern is deliberate over a distributed lock or Redis cache (out of scope 
 │  ─ IStripePaymentGateway                                │
 │     • CreatePaymentIntentAsync(..., idempotencyKey?, ct)│
 │       (signature extended)                              │
-│  ─ IEuPlatescService                                    │
+│  ─ ILegacyProcessorService                                    │
 │     • BuildInitiateUrl(order) — already deterministic   │
 └────────────────────────────────────────────────────────┘
                           │
@@ -106,7 +106,7 @@ This pattern is deliberate over a distributed lock or Redis cache (out of scope 
 
 **Response 422** (existing — validation): unchanged. Idempotency conflicts do **not** flow through the validation pipeline.
 
-### `POST /api/payments/euplatesc/initiate`
+### `POST /api/payments/legacy-processor/initiate`
 
 Identical contract additions. Response body is `{ redirectUrl, orderId }` instead of `{ clientSecret, orderId }`. The replay path returns the same `redirectUrl` for the same key (deterministic HMAC from the persisted order).
 
@@ -292,7 +292,7 @@ public async Task<IActionResult> CreateStripeIntent(
 
 **`Order.StripeClientSecret` (new persisted field)** — required so a replay caller receives the **identical** `ClientSecret` without a Stripe round-trip. Adding it to the same migration: `varchar(255) NULL`. Documented in the Data Model addendum.
 
-The EuPlatesc controller method is structurally identical but its replay path calls `_euPlatescService.BuildInitiateUrl(existing)` to reconstruct the URL (no persisted secret needed — already deterministic from order fields).
+The legacy processor controller method is structurally identical but its replay path calls `_legacyProcessorService.BuildInitiateUrl(existing)` to reconstruct the URL (no persisted secret needed — already deterministic from order fields).
 
 ### Behaviour during Stripe-gateway idempotency conflict
 
@@ -334,7 +334,7 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 - Stripe enforces gateway-side dedupe for 24 h (matches our window — convenient alignment).
 - On Stripe-side conflict (`StripeError.Code == "idempotency_error"`), translate to our `IdempotencyConflictException`.
 
-### EuPlatesc
+### the legacy processor
 
 - No gateway-side primitive. The redirect URL is reconstructed deterministically from the persisted order via the existing `BuildInitiateUrl(order)`. Replay returns the same URL because the same `Order` row produces the same HMAC.
 - No SDK options to forward.
@@ -349,7 +349,7 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 
 - **Unit**: `IsSameLogicalRequest` true/false matrix; resolver decision-table (4 rows) on in-memory fixtures; `IdempotencyConflictException` payload shape.
 - **Integration — Stripe**: replay returns same body; conflict returns 409 with `divergentFields`; missing-key logs Information (OBS-3, v8) + still succeeds; Stripe `RequestOptions.IdempotencyKey` verified via test-double assertion that the key bytes reach the SDK.
-- **Integration — EuPlatesc**: replay returns same `redirectUrl`; conflict returns 409.
+- **Integration — the legacy processor**: replay returns same `redirectUrl`; conflict returns 409.
 - **Concurrency**: two parallel calls with the same key, no body divergence — exactly one new order, one 200, one 409 (DB-arbitrated). Captured via xUnit `await Task.WhenAll(...)` against the in-memory DB; the unique index is what makes this work.
 
 ---

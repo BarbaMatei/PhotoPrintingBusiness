@@ -214,9 +214,7 @@ namespace PhotoPrint.API.Migrations
                     UserId = table.Column<Guid>(type: "uuid", nullable: true),
                     GuestSessionId = table.Column<Guid>(type: "uuid", nullable: true),
                     Status = table.Column<string>(type: "text", nullable: false),
-                    PaymentProcessor = table.Column<string>(type: "text", nullable: false),
                     PaymentIntentId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    EuPlatescTransactionId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     ShippingAddress = table.Column<string>(type: "jsonb", nullable: false),
                     DeliveryType = table.Column<string>(type: "text", nullable: false),
                     EasyboxLockerId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -233,7 +231,6 @@ namespace PhotoPrint.API.Migrations
                     AwbClaimedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     IdempotencyKey = table.Column<string>(type: "character varying(80)", maxLength: 80, nullable: true),
                     StripeClientSecret = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    EuPlatescRedirectUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     GuestEmail = table.Column<string>(type: "text", nullable: true),
                     InternalNotes = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -382,7 +379,9 @@ namespace PhotoPrint.API.Migrations
                     LastError = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    ClaimedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    ClaimedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    StorageLocation = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    UnknownUploadOutcomes = table.Column<int>(type: "integer", nullable: false, defaultValue: 0)
                 },
                 constraints: table =>
                 {

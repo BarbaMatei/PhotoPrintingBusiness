@@ -25,7 +25,7 @@ created: 2026-05-25T12:55:00Z
 **Story 001 — remove-client-shipping-cost**
 
 - ✅ **Tampered `ShippingCostRon: -100` in body does NOT reduce `order.TotalRon`.** Integration test `CreateStripeIntent_TamperedShippingCostInBody_IsIgnored_OrderTotalReflectsServerResolvedCost` verifies: persisted `order.TotalRon == 30.00m` (10.00 subtotal + 20.00 Easybox server-resolved cost). The tampered −100 is silently dropped by System.Text.Json's default handling of unknown fields.
-- ✅ **`DeliveryType: Courier` yields server-resolved courier cost.** Covered by pre-existing `InitiateEuPlatesc_ValidCart_Returns200WithRedirectUrl` continuing to pass against the new server-side resolution path.
+- ✅ **`DeliveryType: Courier` yields server-resolved courier cost.** Covered by pre-existing `InitiateLegacyProcessor_ValidCart_Returns200WithRedirectUrl` continuing to pass against the new server-side resolution path.
 - ✅ **`CreateOrderRequest` no longer compiles with `ShippingCostRon`.** Verified by Stage 2 build break in `PaymentControllerIntegrationTests` static request literals and `OrderServiceTests` `MakeRequest` helper — both updated to the 4-arg shape; project compiles clean now.
 - ✅ **Legacy field silently ignored + Warning logged.** Filter unit tests confirm: warning emitted (`BodyContainingShippingCostRon_LogsWarning`, `…_CaseInsensitive_LogsWarning`), no warning when absent, no exception on edge cases.
 

@@ -67,7 +67,7 @@ are on you**.
 
 | File | Role |
 |------|------|
-| `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. |
+| `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. The runtime stage installs `icu-libs` + `icu-data-full` and sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, because the invoice PDF is rendered in `ro-RO` (§15.1) and the Alpine base ships no ICU at all. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
 | `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
 | `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
@@ -83,7 +83,7 @@ are on you**.
 - A **domain** with DNS you control (e.g. `fototipar.ro`).
 - A **container registry** — GHCR is used automatically (`ghcr.io/<owner>/fototipar/api`). Make the package visible to the deploy host or use a PAT.
 - A **managed PostgreSQL 16** instance (connection string), or accept the in-compose Postgres + your own backups.
-- **Secrets ready**: JWT keypair, Stripe keys, EuPlatesc credentials, SendGrid API key, Google OAuth client ID. See `.env.example` and the [README env matrix](../README.md#environment--secret-matrix).
+- **Secrets ready**: JWT keypair, Stripe keys, SendGrid API key, Google OAuth client ID. See `.env.example` and the [README env matrix](../README.md#environment--secret-matrix).
 - For Proposal A: an SSH-reachable Linux VM with Docker Engine + Compose v2.
 
 ---
@@ -161,12 +161,35 @@ PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). Ever
 environment — local dev included — uses that same path, so a normal deploy needs no
 manual migration step.
 
-There is a single migration, `20260820133204_InitialPostgres`, scaffolded under the Npgsql
-design-time provider: `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial
-unique index on `Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox
-locker seed rows, the `uq_invoices_series_year_number` expression index, and the
-`invoice_seq_ft_2026` sequence. It has been applied against a real PostgreSQL 16 instance
-from an empty database.
+**There is exactly one migration:** `20260820133204_InitialPostgres`, scaffolded under the Npgsql
+design-time provider. It carries `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial
+unique index on `Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox locker
+seed rows, the `uq_invoices_series_year_number` expression index, and the `invoice_seq_ft_2026`
+sequence. It has been applied against a real PostgreSQL 16 instance from an empty database.
+
+**Until the first deploy there is only ever one migration, edited in place.** Nothing is deployed,
+so no database history has to be respected, and the branch that reaches `main` carries a single
+migration rather than a trail of corrections. A schema change means editing
+`20260820133204_InitialPostgres` and its `.Designer.cs`, never scaffolding a second file.
+
+The cost is that `Database.Migrate()` compares ids, not contents: an id already in
+`__EFMigrationsHistory` is skipped whatever it now says, so an edited baseline never reaches a
+database that already ran it. A developer whose database predates the edit brings it in line by
+hand — `ALTER TABLE ... ADD COLUMN` / `DROP COLUMN` keeps the data, and recreating the database is
+always safe while nothing is live. A `NOT NULL` column the model no longer maps fails every
+`INSERT` with `23502`; a column the model expects and the database lacks fails every read of that
+table. Neither shows up as a pending migration, so neither is caught at boot.
+
+**This stops at the first deploy.** From the moment a real environment has run the chain, an
+applied migration is frozen and a column is removed by adding a migration, never by rewriting an
+old one.
+
+**If a database ever carries a migration id this repo no longer contains**, boot tries to apply
+the baseline over existing tables and aborts with `42P07`. No such database exists — the deleted
+pre-squash chain was never applied anywhere, and dev ran on SQLite through `EnsureCreated`, which
+records no migration history at all. Should one appear, do not delete data: replace its
+`__EFMigrationsHistory` rows with the single id above so EF sees the migration as already applied,
+then restart the API.
 
 Seeding the product catalog (first deploy only):
 ```sh
@@ -184,7 +207,7 @@ docker compose -f docker-compose.prod.yml run --rm api dotnet PhotoPrint.API.dll
 - [ ] API reachable (e.g. `GET /api/products` returns catalog JSON).
 - [ ] A test login / registration succeeds (JWT signing key wired).
 - [ ] Logs clean: `docker compose -f docker-compose.prod.yml logs --tail=100 api` — no `OptionsValidationException` (means a required secret is missing) and no migration errors.
-- [ ] A Stripe test-mode payment completes end-to-end (and the EuPlatesc redirect builds).
+- [ ] A Stripe test-mode payment completes end-to-end.
 
 ---
 
@@ -208,11 +231,12 @@ backwards-compatible migrations.
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Caddy can't get a cert | DNS not pointing at the VM yet, or port 80/443 blocked | Fix DNS/firewall; use the staging `acme_ca` line in `Caddyfile` while testing. |
-| API exits on boot with `OptionsValidationException` | A required secret (Stripe/EuPlatesc/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
+| API exits on boot with `OptionsValidationException` | A required secret (Stripe/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
 | `docker compose pull` 403/denied | GHCR package private and host not logged in | `docker login ghcr.io` with a PAT that has `read:packages`. |
 | Migration error on first PG connect | Role lacks DDL rights, or a partially-created schema | Confirm the role owns the database, then re-run against a scratch Postgres per §7. |
 | Uploaded images vanish on redeploy | `Storage` not on a volume | Confirm the `apidata:/app/Storage` volume in `docker-compose.prod.yml`. |
 | Site shows API 404 instead of the app | UI not built into `wwwroot` (image built without the UI stage) | Rebuild with the standard `Dockerfile`; the `ui-build` stage populates `wwwroot`. |
+| Every invoice sits at `Pending` with no PDF, and `GET /api/orders/{id}/invoice` 404s forever. `Invoice.LastError` reads "The type initializer for … `InvoicePdfDocument` threw an exception"; the `anaf.upload-job.build-failed` log line carries a `CultureNotFoundException` | The image is running in globalization-invariant mode, so the `ro-RO` invoice culture does not exist | Rebuild with the standard `Dockerfile` (it installs `icu-libs` + `icu-data-full`), and make sure nothing in the server `.env` or a compose `environment:` block sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT`. The API's own `runtimeconfig` pins it off, which outranks the variable. The stuck rows are still `Pending`, so they file themselves on the next worker tick — no admin retry needed. |
 
 ---
 
@@ -1286,7 +1310,7 @@ For every paid order the API:
 2. **Allocates an invoice number** inside the payment webhook's existing transaction (bolt 039), via `IInvoiceNumberingService.NextNumberAsync("FT", year)`, which uses `nextval()` on a per-`(series, year)` `SEQUENCE`. The number is `FT-YYYY-NNNNN`. See [ADR-020](../memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md) for the gap-on-rollback trade-off and the quarterly audit (§15.8).
 3. **Inserts the `Invoice` row** in the same transaction as the Order → Paid transition. The Invoice is the frozen legal artefact; the Order can be modified later (admin notes, status corrections) but the Invoice's monetary snapshot is immutable.
 4. **Builds a UBL 2.1 + CIUS-RO compliant XML payload** ([`InvoiceXmlBuilder`](../src/PhotoPrint.API/Services/Invoicing/InvoiceXmlBuilder.cs)) asynchronously via `InvoiceUploadJob`. Stored on `Invoice.XmlPayload`.
-5. **Renders a customer-facing PDF** ([`InvoicePdfRenderer`](../src/PhotoPrint.API/Services/Invoicing/InvoicePdfRenderer.cs)) via QuestPDF; stores it via `IStorageService` at `invoices/yyyy/MM/{InvoiceNumber}.pdf`. See [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md) for why QuestPDF over PuppeteerSharp.
+5. **Renders a customer-facing PDF** ([`InvoicePdfRenderer`](../src/PhotoPrint.API/Services/Invoicing/InvoicePdfRenderer.cs)) via QuestPDF; stores it via `IStorageService` at `invoices/yyyy/MM/{InvoiceNumber}.pdf`. See [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md) for why QuestPDF over PuppeteerSharp. Dates and amounts print in `ro-RO` (`03 august 2026`, `1.234,56`), so the host must carry real ICU data — the image installs it and pins globalization-invariant mode off (§2); a host without it renders no PDF at all (§10).
 6. **Uploads the XML to ANAF SPV** via OAuth 2 client-credentials + PKCS#12 client cert, polls for status, and lands the invoice in `Accepted` / `Rejected` / `Failed`. `InvoiceUploadJob : BackgroundService` runs every 30 minutes by default.
 7. **Exposes admin tooling** at `/api/admin/invoices` — list, retry, raw-XML download.
 
@@ -1528,10 +1552,17 @@ If the result is empty: no gaps, nothing to explain. If the result lists numbers
 **Batch retry** (no built-in endpoint — use the admin UI loop or a one-shot SQL):
 ```sql
 -- Flip all Failed invoices from a specific date back to Pending. The worker picks up next tick.
+-- Every column below matters: keeping XmlPayload reposts the same rejected XML, keeping
+-- PdfStoragePath serves the old PDF, and keeping UnknownUploadOutcomes re-parks the row on its
+-- first timeout. A stale ClaimedAt makes the worker skip the row until the claim TTL expires.
 UPDATE "Invoices"
    SET "AnafStatus" = 'Pending',
        "AnafUploadId" = NULL,
        "LastError" = NULL,
+       "XmlPayload" = NULL,
+       "PdfStoragePath" = NULL,
+       "UnknownUploadOutcomes" = 0,
+       "ClaimedAt" = NULL,
        "UpdatedAt" = NOW()
  WHERE "AnafStatus" = 'Failed'
    AND "CreatedAt" >= '2026-06-01';

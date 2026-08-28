@@ -103,10 +103,6 @@ Jwt__Audience=fototipar.ro
 Stripe__SecretKey=sk_live_xxx
 Stripe__WebhookSecret=whsec_xxx
 
-# EuPlatesc
-EuPlatesc__MerchantId=xxx
-EuPlatesc__SecretKey=xxx
-
 # Google OAuth
 Google__ClientId=xxx.apps.googleusercontent.com
 

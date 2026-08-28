@@ -4,7 +4,7 @@ namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
 /// Creates the <see cref="Invoice"/> row at the Paid transition. Called
-/// from the Stripe / EuPlatesc webhook handlers inside their existing
+/// from the Stripe webhook handler and the admin Paid transition inside their existing
 /// transactional scope — adding the Invoice INSERT to the same
 /// <c>SaveChangesAsync</c> preserves the gap-free numbering posture
 /// (ADR-020): if the Paid transition rolls back, both the Order mutation
@@ -25,4 +25,9 @@ public interface IInvoiceCreationService
 
     /// <summary>Same idempotent-create contract, for a caller that already holds the tracked <see cref="Order"/>.</summary>
     Task<Invoice?> CreateForOrderAsync(Order order, CancellationToken ct = default);
+
+    /// <summary>Realigns the number allocator with the invoices already stored for the series and
+    /// year <paramref name="order"/> would be invoiced under. Call after a taken-number collision;
+    /// safe to call when nothing is wrong.</summary>
+    Task ReconcileNumberingAsync(Order order, CancellationToken ct = default);
 }

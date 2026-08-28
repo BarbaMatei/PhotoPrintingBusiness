@@ -64,7 +64,6 @@ public class OrderNumberServiceTests : IDisposable
         {
             OrderNumber = await _service.GenerateAsync(),
             Status = PhotoPrint.API.Models.OrderStatus.AwaitingPayment,
-            PaymentProcessor = PhotoPrint.API.Models.PaymentProcessor.Stripe,
             DeliveryType = PhotoPrint.API.Models.DeliveryType.Easybox,
             ShippingAddress = new PhotoPrint.API.Models.ShippingAddressSnapshot
             {

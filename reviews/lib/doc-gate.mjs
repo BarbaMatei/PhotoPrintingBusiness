@@ -12,6 +12,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { V4_CUTOFF } from './vocab.mjs'
 import { BACKLOG, INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
 
 const argv = process.argv.slice(2)
@@ -238,6 +239,29 @@ if (existsSync(join(dir, resolutionFile))) {
     for (const d of decisions) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1
       if (n > 15) bad(resolutionFile, `decision "${d.split('\n')[0]}" is ${n} lines — cap is 15`)
+    }
+    // Rounds closed on/after the V4 cut-off: the scope table names the cluster's protocol
+    // block instead of carrying approach-check prose, and every protocol states a
+    // quantified invariant (accepted fix-round audit R1/R2).
+    const closed = fmVal(p.fm, 'closed')
+    if (closed && closed >= V4_CUTOFF) {
+      const scope = p.body.split(/^## /m).find(s => s.startsWith('Scope')) ?? ''
+      const scopeRows = scope.split('\n').filter(l => /^\|/.test(l))
+      const header = scopeRows[0] ?? ''
+      if (/Approach-check/i.test(header)) bad(resolutionFile, 'the scope table carries an Approach-check column — retired 2026-08-28: the check is a machine-read worklog event, and "not needed" is not a writable value (doc-contracts.md)')
+      if (!/\|\s*Protocol\s*\|/.test(header)) bad(resolutionFile, 'the scope table has no Protocol column — since 2026-08-28 the columns are Cluster · Findings · Files · Protocol (doc-contracts.md)')
+      const protoBlocks = [...p.body.matchAll(/^### Protocol — (.+?)\s*$/gm)].map(m => m[1])
+      for (const r of scopeRows.slice(1)) {
+        const cells = r.split('|').map(c => c.trim())
+        if (/^:?-{2,}/.test(cells[1] ?? '') || cells[1] === 'Cluster') continue
+        const label = cells[4] ?? ''
+        if (!label || label === '—') continue
+        if (!protoBlocks.includes(label)) bad(resolutionFile, `scope row "${cells[1]}" names protocol "${label}" but no "### Protocol — ${label}" block exists under Decisions`)
+      }
+      const QUANT = /\b(never|always|at most|exactly|only once|only one|at least one)\b/i
+      for (const m of p.body.matchAll(/^### Protocol — (.+?)\s*\n([\s\S]*?)(?=^### |(?![\s\S]))/gm)) {
+        if (!QUANT.test(m[2])) bad(resolutionFile, `protocol block "${m[1]}" states no quantified invariant ("never", "at most one", "exactly one" …) — a protocol that only describes mechanisms is spec-theatre (doc-contracts.md)`)
+      }
     }
     const decisionHeadings = decisions.map(d => d.split('\n')[0])
     for (const { id, status } of resolutionRows) {

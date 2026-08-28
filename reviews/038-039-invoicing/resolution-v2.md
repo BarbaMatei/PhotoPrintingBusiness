@@ -48,14 +48,14 @@ the loop had already found. Recorded for the owner to overrule.
 
 The approach-check refuted the drafted rethrow. Three reasons decided it. `RecordPaymentWebhook`
 runs after the helper returns, so an escaping exception leaves the webhook out of the metric
-entirely — a fresh instance of PPW-397, still open. Every branch of the EuPlatesc endpoint
+entirely — a fresh instance of PPW-397, still open. Every branch of the legacy processor endpoint
 answers a signed ack, so a 500 there is unverified against the processor's contract. And
 `duplicate` sits in SLO 3's success numerator, so the old label inflated the SLO rather than
 merely hiding a failure. Relabelling to `failed` fixes the measurement instead of deleting it.
 
 ### The rollback reloads instead of unwinding fields (PPW-508)
 
-The first attempt reset `Status`, `PaidAt` and `EuPlatescTransactionId` by hand. The
+The first attempt reset `Status`, `PaidAt` and `LegacyProcessorTransactionId` by hand. The
 micro-review found it missed `UpdatedAt`, which `OrderStatusMachine.Transition` also sets — the
 same bug the next added field would reintroduce. `Entry(order).ReloadAsync` discards every
 uncommitted mutation instead, and a test now pins `UpdatedAt` alongside the other fields.

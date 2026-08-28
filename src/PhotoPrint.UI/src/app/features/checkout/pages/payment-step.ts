@@ -10,10 +10,9 @@ import { NgIf } from '@angular/common';
 import { PaymentService } from '../../../core/services/payment.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
 import { CartService } from '../../../core/services/cart.service';
+import { CheckoutAttemptService } from '../../../core/services/checkout-attempt.service';
 import { CreateOrderRequest } from '../../../core/models/payment.model';
 import { environment } from '../../../../environments/environment';
-
-type PaymentTab = 'stripe' | 'euplatesc';
 
 @Component({
   selector: 'app-payment-step',
@@ -24,27 +23,16 @@ type PaymentTab = 'stripe' | 'euplatesc';
     <div class="payment-step">
       <h2 class="step-title">Plată</h2>
 
-      <!-- Tab switcher -->
-      <div class="payment-tabs">
-        <button
-          class="tab-btn"
-          [class.active]="activeTab() === 'stripe'"
-          (click)="switchTab('stripe')"
-        >
-          💳 Card internațional (Stripe)
-        </button>
-        <button
-          class="tab-btn"
-          [class.active]="activeTab() === 'euplatesc'"
-          (click)="switchTab('euplatesc')"
-        >
-          🏦 Card românesc (EuPlatesc)
-        </button>
-      </div>
-
-      <!-- Stripe tab -->
-      <div *ngIf="activeTab() === 'stripe'" class="tab-panel">
+      <div class="payment-panel">
         <div *ngIf="stripeError()" class="payment-error">{{ stripeError() }}</div>
+        <button
+          *ngIf="canRetry()"
+          type="button"
+          class="btn btn--ghost retry-payment"
+          (click)="retryPayment()"
+        >
+          Încearcă din nou
+        </button>
         <div *ngIf="!stripeReady() && !stripeError()" class="loading-placeholder">
           Se inițializează formularul de plată...
         </div>
@@ -59,21 +47,6 @@ type PaymentTab = 'stripe' | 'euplatesc';
         </button>
       </div>
 
-      <!-- EuPlatesc tab -->
-      <div *ngIf="activeTab() === 'euplatesc'" class="tab-panel">
-        <p class="euplatesc-info">
-          Vei fi redirecționat în mod securizat către pagina EuPlatesc pentru a finaliza plata.
-        </p>
-        <button
-          class="btn btn--primary"
-          [disabled]="euPlatescLoading()"
-          (click)="payWithEuPlatesc()"
-        >
-          <span *ngIf="euPlatescLoading()">Se redirecționează...</span>
-          <span *ngIf="!euPlatescLoading()">Plătește cu EuPlatesc</span>
-        </button>
-      </div>
-
       <div class="step-actions">
         <button type="button" class="btn btn--ghost" (click)="back()">← Înapoi</button>
       </div>
@@ -83,29 +56,7 @@ type PaymentTab = 'stripe' | 'euplatesc';
     .payment-step { display: flex; flex-direction: column; gap: 1.5rem; }
     .step-title { font-size: 1.4rem; font-weight: 600; margin: 0; }
 
-    .payment-tabs {
-      display: flex;
-      gap: 0;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 0.75rem;
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: 0.9rem;
-      color: #495057;
-      transition: background 0.2s;
-
-      &.active { background: #f0f6ff; color: #1a73e8; font-weight: 600; }
-      &:first-child { border-right: 1px solid #dee2e6; }
-    }
-
-    .tab-panel { display: flex; flex-direction: column; gap: 1rem; }
+    .payment-panel { display: flex; flex-direction: column; gap: 1rem; }
 
     .stripe-card-element {
       padding: 0.75rem;
@@ -131,11 +82,7 @@ type PaymentTab = 'stripe' | 'euplatesc';
       font-size: 0.9rem;
     }
 
-    .euplatesc-info { color: #6c757d; font-size: 0.95rem; line-height: 1.5; }
-
     .step-actions { padding-top: 0.5rem; }
-
-
   `],
 })
 export class PaymentStep implements OnInit {
@@ -143,12 +90,12 @@ export class PaymentStep implements OnInit {
   private readonly paymentService = inject(PaymentService);
   private readonly checkoutState = inject(CheckoutStateService);
   private readonly cartService = inject(CartService);
+  private readonly attempts = inject(CheckoutAttemptService);
 
-  readonly activeTab = signal<PaymentTab>('stripe');
   readonly stripeReady = signal(false);
   readonly stripeLoading = signal(false);
   readonly stripeError = signal<string | null>(null);
-  readonly euPlatescLoading = signal(false);
+  readonly canRetry = signal(false);
 
   // Stripe internals (no strong typing to avoid hard dep at compile time)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,25 +119,71 @@ export class PaymentStep implements OnInit {
       const { loadStripe } = await import('@stripe/stripe-js');
       this.stripeInstance = await loadStripe(environment.stripePublishableKey);
       if (!this.stripeInstance) {
-        this.stripeError.set('Stripe nu s-a putut inițializa. Folosiți EuPlatesc.');
+        this.stripeError.set('Plata nu s-a putut inițializa. Încercați din nou mai târziu.');
         return;
       }
 
-      // Create order + PaymentIntent
-      const req = this.buildOrderRequest('Stripe');
-      this.paymentService.createStripeIntent(req).subscribe({
-        next: resp => {
-          this.orderId = resp.orderId;
-          this.clientSecret = resp.clientSecret;
-          this.mountCardElement();
-        },
-        error: () => {
-          this.stripeError.set('Nu s-a putut crea sesiunea de plată. Verificați că aveți articole în coș.');
-        },
-      });
+      this.createIntent(false);
     } catch {
-      this.stripeError.set('Stripe nu este disponibil momentan. Folosiți EuPlatesc.');
+      this.stripeError.set('Plata nu este disponibilă momentan. Încercați din nou mai târziu.');
     }
+  }
+
+  // One key per basket, reused across mounts, so a second tab or a Back-then-forward cannot
+  // turn one basket into two orders. The server answers 409 two ways and they mean opposites:
+  // a divergent payload means the stored key belongs to another basket, a named order means
+  // the customer already paid and must be sent there instead of charged again.
+  private createIntent(afterDivergence: boolean): void {
+    const key = this.attempts.idempotencyKey();
+    this.paymentService.createStripeIntent(this.buildOrderRequest(), key).subscribe({
+      next: resp => {
+        this.orderId = resp.orderId;
+        this.clientSecret = resp.clientSecret;
+        this.attempts.markOrderCreated(resp.orderId);
+        this.mountCardElement();
+      },
+      error: err => this.handleIntentError(err, afterDivergence),
+    });
+  }
+
+  private handleIntentError(err: unknown, afterDivergence: boolean): void {
+    const response = err as { status?: number; error?: { orderId?: string; divergentFields?: string[] } };
+    const settledOrderId = response?.error?.orderId;
+    const diverged = !!response?.error?.divergentFields?.length;
+
+    if (response?.status === 409 && settledOrderId) {
+      this.attempts.clear();
+      this.router.navigate(['/comanda', settledOrderId, 'confirmare']);
+      return;
+    }
+
+    if (response?.status === 409 && diverged && !afterDivergence) {
+      this.attempts.clear();
+      this.createIntent(true);
+      return;
+    }
+
+    this.stripeError.set(
+      response?.status === 409
+        ? 'Coșul s-a schimbat între timp. Reîncărcați pagina și încercați din nou.'
+        : 'Nu s-a putut crea sesiunea de plată. Verificați că aveți articole în coș.',
+    );
+    this.canRetry.set(true);
+  }
+
+  private discardDeadIntent(): void {
+    this.clientSecret = null;
+    this.stripeReady.set(false);
+    this.cardElement?.unmount?.();
+    this.cardElement = null;
+    this.attempts.retireKey();
+    this.canRetry.set(true);
+  }
+
+  retryPayment(): void {
+    this.canRetry.set(false);
+    this.stripeError.set(null);
+    this.createIntent(false);
   }
 
   private mountCardElement(): void {
@@ -201,55 +194,60 @@ export class PaymentStep implements OnInit {
     this.stripeReady.set(true);
   }
 
-  switchTab(tab: PaymentTab): void {
-    this.activeTab.set(tab);
-  }
-
   async payWithStripe(): Promise<void> {
     if (!this.stripeInstance || !this.cardElement || !this.clientSecret) return;
     this.stripeLoading.set(true);
     this.stripeError.set(null);
 
-    const result = await this.stripeInstance.confirmCardPayment(this.clientSecret, {
-      payment_method: { card: this.cardElement },
-    });
+    // A rejected confirm call (the network dropped, Stripe.js threw) must not leave the button
+    // spinning with nothing said.
+    let result: { error?: { message?: string }; paymentIntent?: { status?: string } };
+    try {
+      result = await this.stripeInstance.confirmCardPayment(this.clientSecret, {
+        payment_method: { card: this.cardElement },
+      });
+    } catch {
+      this.stripeLoading.set(false);
+      this.stripeError.set('Plata nu a putut fi trimisă. Verificați conexiunea și încercați din nou.');
+      return;
+    }
 
     this.stripeLoading.set(false);
 
     if (result.error) {
       this.stripeError.set(result.error.message ?? 'Plata a eșuat. Verificați datele cardului.');
-    } else if (result.paymentIntent?.status === 'succeeded') {
+      // The webhook moves this order to PaymentFailed, and its intent stays chargeable: confirming
+      // the same secret again takes money the order can no longer be settled against.
+      this.discardDeadIntent();
+      return;
+    }
+
+    // A payment still in flight is submitted, not failed: the confirmation page waits for the
+    // webhook. Any other status means nothing was charged, so say so rather than stranding.
+    const status = result.paymentIntent?.status;
+    if (status === 'succeeded' || status === 'processing' || status === 'requires_capture') {
+      this.attempts.retireKey();
       this.checkoutState.reset();
       this.cartService.clearCart().subscribe();
       this.router.navigate(['/comanda', this.orderId, 'confirmare']);
+      return;
     }
-  }
 
-  payWithEuPlatesc(): void {
-    this.euPlatescLoading.set(true);
-    const req = this.buildOrderRequest('EuPlatesc');
-    this.paymentService.initiateEuPlatesc(req).subscribe({
-      next: resp => {
-        window.location.href = resp.redirectUrl;
-      },
-      error: () => {
-        this.euPlatescLoading.set(false);
-      },
-    });
+    this.stripeError.set(
+      'Plata nu a fost finalizată. Verificați datele cardului și încercați din nou.',
+    );
   }
 
   back(): void {
     this.router.navigate(['/checkout/recapitulare']);
   }
 
-  private buildOrderRequest(processor: 'Stripe' | 'EuPlatesc'): CreateOrderRequest {
+  private buildOrderRequest(): CreateOrderRequest {
     const s = this.checkoutState.snapshot;
     return {
-      paymentProcessor: processor,
       deliveryType: s.method ?? 'Courier',
       easyboxLockerId: s.lockerId,
       shippingAddress: s.shippingAddress,
-      shippingCostRon: s.shippingCostRon,
     };
   }
 }

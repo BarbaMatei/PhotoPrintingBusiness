@@ -52,7 +52,7 @@ tests: { dotnet: "1455/1465 — 10 skipped, 0 failed", frontend: "48/48 test fil
 | PPW-605 | 🟠 | Manual admin mark-Paid issues a fiscal invoice with no log naming the admin | `Services/AdminOrderService.cs:154` | yes |
 | PPW-606 | 🟠 | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `Services/Invoicing/InvoiceCreationService.cs:98` | yes |
 | PPW-607 | 🟠 | Admin- and config-sourced fields (invoice line name) reach the UBL XML with no control-char guard and no truncation | `Services/Invoicing/InvoiceXmlBuilder.cs:204` | yes |
-| PPW-609 | 🟠 | One generic error string blames the cart for every payment failure, and EuPlatesc failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | yes |
+| PPW-609 | 🟠 | One generic error string blames the cart for every payment failure, and the legacy processor failures are silent | `src/app/features/checkout/pages/payment-step.ts:188` | yes |
 | PPW-611 | 🟠 | SPA still sends the deprecated shippingCostRon, so every checkout logs a tampering warning | `src/app/core/models/payment.model.ts:8` | yes |
 | PPW-612 | 🟠 | Checkout address form mirrors only the phone rule, so the new fiscal-address length/charset caps surface as a 400 at the payment step | `src/app/features/checkout/pages/delivery-step.ts:336` | yes |
 | PPW-613 | 🟠 | VAT is never shown in the SPA although the API now returns NetTotalRon/VatRon/VatRate | `src/app/core/models/order.model.ts:32` | yes |
@@ -65,7 +65,7 @@ tests: { dotnet: "1455/1465 — 10 skipped, 0 failed", frontend: "48/48 test fil
 | PPW-618 | 🟠 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `Controllers/InvoicesController.cs:99` | yes |
 | PPW-516 | 🟠 | Exhausted invoice-number retry answers the payment processor 200, killing its last retry | `Controllers/WebhooksController.cs:304` | no — decision first |
 | PPW-520 | 🟠 | Per-line PriceAmount x InvoicedQuantity no longer equals LineExtensionAmount, and nothing asserts it | `Services/Invoicing/InvoiceXmlBuilder.cs:219` | no — decision first |
-| PPW-526 | 🟠 | EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:205` | no — decision first |
+| PPW-526 | 🟠 | the legacy processor paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:205` | no — decision first |
 | — | 🟡 | Invoicing worker and ANAF client minors — PPW-624, PPW-625, PPW-626, PPW-634, PPW-635, PPW-636, PPW-645, PPW-646, PPW-498 | `Services/Invoicing/Anaf/` | no |
 | — | 🟡 | Invoice numbering and provider-behaviour minors — PPW-619, PPW-627, PPW-628, PPW-505 | `Services/Invoicing/PostgresInvoiceNumberingService.cs` | no |
 | — | 🟡 | Invoice API, admin API and log-signal minors — PPW-620, PPW-621, PPW-629, PPW-632, PPW-637, PPW-519, PPW-501 | `Controllers/InvoicesController.cs` | no |

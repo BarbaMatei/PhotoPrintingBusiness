@@ -11,7 +11,7 @@ completed: 2026-05-21T12:00:00Z
 
 ## Overview
 
-**Intent**: Photo upload, cart management, and full checkout flow — from bulk photo upload through delivery selection, dual-processor payment (Stripe + EuPlatesc), and order confirmation.
+**Intent**: Photo upload, cart management, and full checkout flow — from bulk photo upload through delivery selection, dual-processor payment (Stripe + the legacy processor), and order confirmation.
 **Type**: green-field
 **Created**: 2026-05-21T10:00:00Z
 **Completed**: 2026-05-21T10:00:00Z
@@ -67,7 +67,7 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 - **Cart management**: server-side cart for authenticated users, localStorage fallback for guests, cart merge on login
 - **Delivery selection**: Sameday Easybox locker (Phase 1: seeded static list with Leaflet map) or home delivery (address form); Sameday AWB manual in Phase 1
 - **Checkout review**: read-only order summary with terms acceptance gate
-- **Dual payment**: Stripe (embedded Elements, webhook-confirmed) and EuPlatesc (redirect + IPN, HMAC-MD5 — Romanian market)
+- **Dual payment**: Stripe (embedded Elements, webhook-confirmed) and the legacy processor (redirect + IPN, HMAC-MD5 — Romanian market)
 - **Order creation**: FT-YYYYNNNN order numbers, OrderStatus state machine, pricing snapshot at order time
 - **Order confirmation page**: status stepper, guest-to-registered CTA
 
@@ -153,9 +153,9 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 - **Acceptance Criteria**: `POST /api/payments/stripe/intent` returns `{ clientSecret, orderId }`; `POST /api/webhooks/stripe` validates `Stripe-Signature` header; `payment_intent.succeeded` → Order Paid + OrderConfirmedEmail; `payment_intent.payment_failed` → PaymentFailed; idempotent on duplicate events.
 - **Priority**: Must
 
-### FR-15: EuPlatesc payment integration
-- **Description**: Backend generates an EuPlatesc redirect URL with HMAC-MD5 signature and confirms orders via IPN callback.
-- **Acceptance Criteria**: `POST /api/payments/euplatesc/initiate` returns `{ redirectUrl, orderId }`; `POST /api/webhooks/euplatesc` validates HMAC, sets Order Paid on `action=0`; amount in IPN must match order amount; response format as per EuPlatesc spec.
+### FR-15: the legacy processor payment integration
+- **Description**: Backend generates a legacy-processor redirect URL with HMAC-MD5 signature and confirms orders via IPN callback.
+- **Acceptance Criteria**: `POST /api/payments/legacy-processor/initiate` returns `{ redirectUrl, orderId }`; `POST /api/webhooks/legacy-processor` validates HMAC, sets Order Paid on `action=0`; amount in IPN must match order amount; response format as per the legacy processor spec.
 - **Priority**: Must
 
 ### FR-16: Delivery step UI (checkout Step 1)
@@ -169,8 +169,8 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 - **Priority**: Must
 
 ### FR-18: Payment step & order confirmation UI (checkout Steps 3 + Confirmation)
-- **Description**: Step 3 offers two tabs — Stripe Elements (embedded card form) and EuPlatesc (redirect button). On success, `/comanda/{orderId}/confirmare` shows the order number, status stepper, and delivery details.
-- **Acceptance Criteria**: Stripe tab: calls `POST /api/payments/stripe/intent`, initializes Stripe Elements with clientSecret, `stripe.confirmCardPayment()` on submit; EuPlatesc tab: calls `POST /api/payments/euplatesc/initiate`, `window.location.href` redirect; confirmation page fetches `GET /api/orders/{orderId}`, redirects home if order not Paid; guest CTA on confirmation page.
+- **Description**: Step 3 offers two tabs — Stripe Elements (embedded card form) and the legacy processor (redirect button). On success, `/comanda/{orderId}/confirmare` shows the order number, status stepper, and delivery details.
+- **Acceptance Criteria**: Stripe tab: calls `POST /api/payments/stripe/intent`, initializes Stripe Elements with clientSecret, `stripe.confirmCardPayment()` on submit; the legacy processor tab: calls `POST /api/payments/legacy-processor/initiate`, `window.location.href` redirect; confirmation page fetches `GET /api/orders/{orderId}`, redirects home if order not Paid; guest CTA on confirmation page.
 - **Priority**: Must
 
 ---
@@ -178,11 +178,11 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 ## Non-Functional Requirements
 
 ### NFR-1: Security — no card data on server
-- Card details must never touch the FotoTipar server. Stripe Elements is client-side only. EuPlatesc uses a redirect to their hosted page.
+- Card details must never touch the FotoTipar server. Stripe Elements is client-side only. the legacy processor uses a redirect to their hosted page.
 - **Measurement**: Security audit — zero card fields in any API request/response logs.
 
 ### NFR-2: Payment webhook idempotency
-- Webhook handlers for both Stripe and EuPlatesc must be idempotent. Replaying a webhook for an already-paid order must not fire duplicate emails or create duplicate order transitions.
+- Webhook handlers for both Stripe and the legacy processor must be idempotent. Replaying a webhook for an already-paid order must not fire duplicate emails or create duplicate order transitions.
 - **Measurement**: Unit test verifies 200 OK and no side effects on duplicate delivery.
 
 ### NFR-3: MIME validation at byte level
@@ -197,7 +197,7 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 - The `Stripe-Signature` header must be verified using `EventUtility.ConstructEvent` before processing any webhook event.
 - **Measurement**: Unit test: tampered signature returns 400.
 
-### NFR-6: EuPlatesc IPN amount validation
+### NFR-6: the legacy processor IPN amount validation
 - Amount in the IPN callback must be cross-checked against the stored order amount. Mismatches must be rejected.
 - **Measurement**: Unit test: IPN with different amount logs warning and returns error.
 
@@ -220,11 +220,11 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 | # | Decision | Alternatives Considered | Rationale | Status |
 |---|----------|------------------------|-----------|--------|
 | ADR-1 | Stripe card payment via Stripe Elements (no redirect) | Stripe Checkout hosted page | Seamless embedded UX; better brand consistency; easier error handling inline | Approved |
-| ADR-2 | EuPlatesc via redirect to hosted payment page | Self-hosted PCI form | PCI compliance — never handle card data; EuPlatesc only supports redirect model for IPN | Approved |
+| ADR-2 | the legacy processor via redirect to hosted payment page | Self-hosted PCI form | PCI compliance — never handle card data; the legacy processor only supports redirect model for IPN | Approved |
 | ADR-3 | Phase 1 Sameday: seeded static locker list; Phase 2: live Sameday API | Live API only | Sameday API credentials not available at build time; static seed unblocks UI delivery; `IShippingService` abstraction allows swap | Approved |
 | ADR-4 | Cart replace strategy (POST /api/cart replaces all) | Delta add/remove endpoints | Simpler server state; Angular CartService holds source-of-truth; reduces conflict resolution complexity | Approved |
 | ADR-5 | Product pricing snapshot at order time (JSON column) | Live join to Products table | Historical accuracy: price at order time is preserved even if admin changes prices later | Approved |
-| ADR-6 | Order created before payment completes (AwaitingPayment) | Create order only on webhook | Required by both Stripe and EuPlatesc: orderId needed in payment request before payment is confirmed | Approved |
+| ADR-6 | Order created before payment completes (AwaitingPayment) | Create order only on webhook | Required by both Stripe and the legacy processor: orderId needed in payment request before payment is confirmed | Approved |
 | ADR-7 | IStorageService abstraction for file storage | Direct disk access in service | Enables future S3/Azure Blob migration; testable via in-memory mock | Approved |
 | ADR-8 | LocalStorage cart for guests synced to server on change | Server-only or LocalStorage-only | Works offline; server sync provides resilience; merge on login preserves guest work | Approved |
 | ADR-9 | HEIC preview via `heic2any` (client-side) | Server-side HEIC conversion | No server processing overhead; browser-only concern; `heic2any` is well-tested for this use case | Approved |
@@ -240,7 +240,7 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 | Auth core — JWT + Guest Sessions | 005, 007 | All upload/cart/payment endpoints accept Bearer JWT or X-Guest-Token |
 | Product catalog | 009 | Products, sizes, finishes, pricing tiers for cart line items and quality badge thresholds |
 | Angular App Shell | 004 | Route guards, interceptors, lazy-loaded route registration |
-| Email infrastructure | 003 | `IEmailService` — called on `payment_intent.succeeded` and EuPlatesc IPN success |
+| Email infrastructure | 003 | `IEmailService` — called on `payment_intent.succeeded` and the legacy processor IPN success |
 
 ### Downstream Dependents (what depends on this intent)
 
@@ -304,15 +304,15 @@ This intent delivers the entire customer purchase journey for FotoTipar — from
 1. `001-order-service.md` — IOrderService: create order from cart, snapshot pricing, order number
 2. `002-stripe-payment-intent.md` — POST /api/payments/stripe/intent + PaymentIntent creation
 3. `003-stripe-webhook-handler.md` — POST /api/webhooks/stripe + sig verification + idempotency
-4. `004-euplatesc-initiate.md` — POST /api/payments/euplatesc/initiate + HMAC-MD5 signing
-5. `005-euplatesc-ipn-handler.md` — POST /api/webhooks/euplatesc + IPN validation + amount check
+4. `004-legacy-processor-initiate.md` — POST /api/payments/legacy-processor/initiate + HMAC-MD5 signing
+5. `005-legacy-processor-ipn-handler.md` — POST /api/webhooks/legacy-processor + IPN validation + amount check
 
 ### Unit 005 — checkout-ui (6 stories)
 1. `001-checkout-stepper.md` — CheckoutStepper component + CheckoutStateService (US-301 scaffold)
 2. `002-delivery-step.md` — Delivery method cards + shipping cost display + address form (US-301)
 3. `003-locker-map-component.md` — Leaflet.js map + locker search + pin selection (US-301)
 4. `004-order-review-step.md` — Read-only summary + terms checkbox + totals display (US-303)
-5. `005-payment-step.md` — Stripe Elements tab + EuPlatesc redirect tab (US-304)
+5. `005-payment-step.md` — Stripe Elements tab + the legacy processor redirect tab (US-304)
 6. `006-order-confirmation-page.md` — /comanda/{orderId}/confirmare + status stepper + guest CTA (US-307)
 
 ---

@@ -26,6 +26,9 @@ public class FakeStripePaymentGateway : IStripePaymentGateway
     /// <summary>The most recent idempotency key forwarded to the gateway.</summary>
     public string? LastIdempotencyKey { get; private set; }
 
+    /// <summary>Every PaymentIntent this fake was asked to make unconfirmable.</summary>
+    public List<string> CancelledIntents { get; } = [];
+
     public Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
         long amountBani, string currency, string orderIdMetadata,
         string? idempotencyKey = null, CancellationToken ct = default)
@@ -33,6 +36,12 @@ public class FakeStripePaymentGateway : IStripePaymentGateway
         CreateCallCount++;
         LastIdempotencyKey = idempotencyKey;
         return Task.FromResult(("pi_test_secret_fake", "pi_test_fake_id"));
+    }
+
+    public Task<bool> CancelPaymentIntentAsync(string paymentIntentId, CancellationToken ct = default)
+    {
+        CancelledIntents.Add(paymentIntentId);
+        return Task.FromResult(true);
     }
 }
 
@@ -115,7 +124,7 @@ public class RecordingAwbCreationNotifier : IAwbCreationNotifier
 
 /// <summary>
 /// Extends <see cref="ShippingFactory"/> for payment/webhook integration tests.
-/// Replaces Stripe and EuPlatesc services with test doubles.
+/// Replaces Stripe services with test doubles.
 /// </summary>
 public class PaymentFactory : ShippingFactory
 {
@@ -141,9 +150,6 @@ public class PaymentFactory : ShippingFactory
             {
                 ["Stripe:SecretKey"]     = "sk_test_fake",
                 ["Stripe:WebhookSecret"] = "whsec_fake",
-                ["EuPlatesc:MerchantId"] = "TEST_MERCH",
-                ["EuPlatesc:SecretKey"]  = "000102030405060708090a0b0c0d0e0f",
-                ["EuPlatesc:GatewayUrl"] = "https://secure.euplatesc.ro/tdsprocess/tranzactd.php",
                 // Bolt 039: Seller fiscal identity is validated at boot when
                 // bolt 038's invoice path is reachable. Populate test values
                 // matching SellerSettingsValidator (Cui matches ^RO\d{2,10}$,
@@ -214,7 +220,6 @@ public class PaymentFactory : ShippingFactory
         {
             OrderNumber = "FT-20260001",
             Status = status,
-            PaymentProcessor = PaymentProcessor.Stripe,
             PaymentIntentId = paymentIntentId,
             ShippingAddress = new PhotoPrint.API.Models.ShippingAddressSnapshot
             {

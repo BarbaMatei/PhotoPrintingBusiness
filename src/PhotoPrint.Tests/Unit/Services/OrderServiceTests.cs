@@ -71,10 +71,8 @@ public class OrderServiceTests : IDisposable
         return (userId, graph.Product.Id, graph.Upload.Id);
     }
 
-    private static CreateOrderRequest MakeRequest(
-        PaymentProcessor processor = PaymentProcessor.Stripe)
+    private static CreateOrderRequest MakeRequest()
         => new CreateOrderRequest(
-            PaymentProcessor: processor,
             DeliveryType: DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(),
             ShippingAddress: null);
@@ -262,20 +260,20 @@ public class OrderServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateFromCart_SameKey_DivergentProcessor_ThrowsConflictNamingField()
+    public async Task CreateFromCart_SameKey_DivergentDeliveryType_ThrowsConflictNamingField()
     {
         var (userId, _, _) = await SeedCartAsync();
         const string key = "idem-key-002";
 
-        // Same base request; vary ONLY the processor so the divergence is unambiguous.
-        var request = MakeRequest(PaymentProcessor.Stripe);
+        // Same base request; vary ONLY the delivery type so the divergence is unambiguous.
+        var request = MakeRequest();
         await _service.CreateFromCartAsync(userId, null, request, key);
 
-        var divergent = request with { PaymentProcessor = PaymentProcessor.EuPlatesc };
+        var divergent = request with { DeliveryType = DeliveryType.Courier };
         var ex = await Assert.ThrowsAsync<IdempotencyConflictException>(
             () => _service.CreateFromCartAsync(userId, null, divergent, key));
 
-        Assert.Contains("paymentProcessor", ex.DivergentFields);
+        Assert.Contains("deliveryType", ex.DivergentFields);
         Assert.DoesNotContain("easyboxLockerId", ex.DivergentFields);
         // Still only one order — the conflicting second request created nothing.
         Assert.Equal(1, await _db.Orders.CountAsync());
@@ -372,7 +370,6 @@ public class OrderServiceTests : IDisposable
             IdempotencyKey = key,
             StripeClientSecret = "pi_secret_owner",
             CreatedAt = DateTimeOffset.UtcNow,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Easybox,
             TotalRon = 26.00m,
             ShippingAddress = new ShippingAddressSnapshot
@@ -423,6 +420,88 @@ public class OrderServiceTests : IDisposable
 
         var freed = await _db.Orders.FindAsync(staleOrder.Id);
         Assert.Null(freed!.IdempotencyKey);                 // old row's key was nulled
+    }
+
+    [Fact]
+    public async Task CreateFromCart_SameKey_AfterOrderPaid_DoesNotReplayThePaidOrder()
+    {
+        var (userId, _, _) = await SeedCartAsync(unitPrice: 2.00m, quantity: 3);
+        const string key = "idem-key-settled";
+
+        var request = MakeRequest();
+        var first = await _service.CreateFromCartAsync(userId, null, request, key);
+        first.Order.Status = OrderStatus.Paid;
+        first.Order.StripeClientSecret = "pi_secret_paid";
+        first.Order.PaidAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var ex = await Assert.ThrowsAsync<IdempotencyKeyConsumedException>(
+            () => _service.CreateFromCartAsync(userId, null, request, key));
+
+        Assert.Equal(first.Order.Id, ex.OrderId);
+        Assert.Equal(1, await _db.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateFromCart_SameKey_AfterPaymentFailed_FreesTheKeyAndCreatesANewOrder()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "idem-key-failed-attempt";
+
+        var request = MakeRequest();
+        var first = await _service.CreateFromCartAsync(userId, null, request, key);
+        first.Order.Status = OrderStatus.PaymentFailed;
+        await _db.SaveChangesAsync();
+
+        var second = await _service.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.False(second.WasIdempotentReplay);
+        Assert.NotEqual(first.Order.Id, second.Order.Id);
+        Assert.Equal(key, second.Order.IdempotencyKey);
+        var freed = await _db.Orders.FindAsync(first.Order.Id);
+        Assert.Null(freed!.IdempotencyKey);
+    }
+
+    // Handing the key on leaves the failed order's intent chargeable, so one basket would hold
+    // two confirmable intents — the double charge the idempotency key exists to prevent.
+    [Fact]
+    public async Task CreateFromCart_SameKey_AfterPaymentFailed_AbandonsTheOldPaymentIntent()
+    {
+        var (userId, _, _) = await SeedCartAsync();
+        const string key = "idem-key-failed-intent";
+        var gateway = new RecordingGateway();
+        var sut = new OrderService(
+            _db, _orderNumberServiceMock.Object, _shippingMock.Object, _storageRouterMock.Object,
+            Options.Create(new StorageSettings()), Options.Create(new VatSettings()), gateway);
+
+        var request = MakeRequest();
+        var first = await sut.CreateFromCartAsync(userId, null, request, key);
+        first.Order.Status = OrderStatus.PaymentFailed;
+        first.Order.PaymentIntentId = "pi_declined";
+        first.Order.StripeClientSecret = "secret_declined";
+        await _db.SaveChangesAsync();
+
+        await sut.CreateFromCartAsync(userId, null, request, key);
+
+        Assert.Contains("pi_declined", gateway.Cancelled);
+        var abandoned = await _db.Orders.FindAsync(first.Order.Id);
+        Assert.Null(abandoned!.StripeClientSecret);
+    }
+
+    private sealed class RecordingGateway : IStripePaymentGateway
+    {
+        public List<string> Cancelled { get; } = [];
+
+        public Task<(string ClientSecret, string PaymentIntentId)> CreatePaymentIntentAsync(
+            long amountBani, string currency, string orderIdMetadata,
+            string? idempotencyKey = null, CancellationToken ct = default) =>
+            Task.FromResult(("secret", "pi_new"));
+
+        public Task<bool> CancelPaymentIntentAsync(string paymentIntentId, CancellationToken ct = default)
+        {
+            Cancelled.Add(paymentIntentId);
+            return Task.FromResult(true);
+        }
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────
@@ -696,17 +775,16 @@ public class OrderServiceTests : IDisposable
     // ── orders_created_total emission ─────────────────────────────────────────
 
     [Fact]
-    public async Task CreateFromCartAsync_RecordsOrdersCreatedWithTheRequestedProcessor()
+    public async Task CreateFromCartAsync_RecordsOrdersCreatedWithTheStripeProcessorLabel()
     {
         var (userId, _, _) = await SeedCartAsync();
         using var metrics = new MetricCapture(MetricNames.Instruments.OrdersCreatedTotal);
 
-        await _service.CreateFromCartAsync(
-            userId, null, MakeRequest(PaymentProcessor.EuPlatesc));
+        await _service.CreateFromCartAsync(userId, null, MakeRequest());
 
         var recorded = metrics.For(
             MetricNames.Instruments.OrdersCreatedTotal,
-            (MetricNames.Labels.Processor, MetricNames.ProcessorValues.EuPlatesc),
+            (MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe),
             (MetricNames.Labels.Status, MetricNames.OrderStatusValues.Created));
         Assert.Single(recorded);
         Assert.Equal(1, recorded[0].Value);

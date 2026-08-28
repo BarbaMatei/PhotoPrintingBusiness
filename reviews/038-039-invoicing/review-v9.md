@@ -30,7 +30,7 @@ tests: { dotnet: "382/392 — 10 skipped, scoped filter", frontend: "n/a — bac
 | PPW-563 | 🟠 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `Tests/Helpers/PostgresTestDatabase.cs:28` | yes |
 | PPW-564 | 🟠 | Admin Paid path swallows the invoice-already-created race but still fires Paid side effects and overwrites the webhook's PaidAt | `Services/AdminOrderService.cs:425` | yes |
 | PPW-565 | 🟠 | Changed files no lens owns: EF model snapshot and Designers, Sameday registry, both .csproj, ci.yml | `Migrations/PhotoPrintDbContextModelSnapshot.cs:1` | yes |
-| PPW-526 | 🟠 | EuPlatesc paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:204` | no — re-affirmed |
+| PPW-526 | 🟠 | the legacy processor paid leg's new three-state outcome and its rollback have no endpoint-driven test | `Controllers/WebhooksController.cs:204` | no — re-affirmed |
 | PPW-566 | 🟠 | AnafSpvClient timeout-versus-shutdown classifier is untested, and Polly retries inside the 30 s budget misclassify definite failures | `Services/Invoicing/Anaf/AnafSpvClient.cs:56` | yes |
 | PPW-567 | 🟡 | Exhausted invoice-number collision retry escapes AdminOrderService with the order still tracked Paid | `Services/AdminOrderService.cs:417` | no |
 | PPW-568 | 🟡 | Admin manual-Paid retry loop: only the happy retry is tested, the exhausted and already-invoiced branches are not | `Services/AdminOrderService.cs:414` | no |

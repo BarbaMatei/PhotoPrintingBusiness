@@ -1,8 +1,8 @@
 ---
 type: review-metrics-schema
-status: active — v3
+status: active — v4
 created: 2026-07-04
-updated: 2026-08-03
+updated: 2026-08-27
 owner: Matei Barba
 ---
 
@@ -132,6 +132,31 @@ non-gate events **≤ 30 minutes**; a longer unexplained gap means nobody was at
 `idle_s` = (`ended` − `started`) − `active_s` − `blocked_s`. The cap deliberately errs
 toward **over**-counting active time — a speed metric must not look better by under-counting
 work (long silent stretches count as work; only clear absences count as idle).
+
+## v4 (2026-08-28): seed lineage and the round review
+
+Additions from the accepted fix-round audit; they apply only from the cut-off
+(`V4_CUTOFF` in `reviews/lib/vocab.mjs`) — earlier lines are grandfathered and never
+backfilled with estimates.
+
+- **`findings[]` entries gain two optional keys** (discovery, delta *and* verification
+  entries): `seed_round` — the fix round whose commits this fix-caused finding is
+  attributed to (the reconciler's judgment, written at reconciliation; `null` or absent
+  means *not yet measured*, never guessed) — and `area` — one of the twelve backlog area
+  words, the component for convergence accounting. The router computes the seed rate
+  `s(r)` from them (README note ³); a missing value refuses certification as
+  "unmeasured", it never reads as zero.
+- **`micro_reviews` counts round reviews.** From the cut-off a fix round dispatches one
+  round-scope composition review instead of per-cluster micro-reviews;
+  `round-review-dispatched`/`-returned` events count into the same
+  `{count, follow_up_fixes}` field, and `test-audit-dispatched` agents count into
+  `cost.agents`.
+- **A design pass** is recorded as an ordinary fix round whose `notes` carry
+  `design-pass:<area>` — the router's one-design-pass-per-component cap reads that marker.
+- **Hand-back evidence events** (see the worklog contract in doc-contracts.md):
+  `protocol-written`, `round-review-dispatched`/`-returned`,
+  `test-audit-dispatched`/`-returned`. The auditor refuses a `resolved` resolution
+  whose round lacks the evidence its content requires.
 
 ## Corrections
 

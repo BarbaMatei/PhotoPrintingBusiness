@@ -18,4 +18,8 @@ public interface IStripePaymentGateway
         string orderIdMetadata,
         string? idempotencyKey = null,
         CancellationToken ct = default);
+
+    /// <summary>Makes a PaymentIntent unconfirmable. Returns false when the gateway refuses —
+    /// an intent already succeeded, or already cancelled — which callers treat as benign.</summary>
+    Task<bool> CancelPaymentIntentAsync(string paymentIntentId, CancellationToken ct = default);
 }

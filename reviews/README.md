@@ -51,6 +51,11 @@ certification and close included — as if the owner approved each step:
   a policy `stop`, a fixer question only the owner can answer, records that stay broken
   after one repair attempt, or the no-progress guard — a pass repeating without
   recording anything.
+- **Gate overrides are a hard stop (2026-08-28).** `COMMENTS_OK=1` and `DOCGATE_OK=1` are
+  never used inside a run: the pre-commit hook logs every use to the override log
+  (`reviews/state/overrides.jsonl`, untracked), and the policy answers `stop` at the next
+  gate when an override was logged after the run's start. A design-pass gate also always
+  stops — reimplementing a component is the owner's call.
 - Passes execute in subagents; the driver only routes, records, and reports. A killed run
   resumes by repeating the same phrase — the router reads state from the records alone.
 
@@ -78,12 +83,15 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | Resolution `resolved`, not yet re-reviewed | **Verification** |
 | Verification clean (0 reopened) + fix round was **delta-worthy**¹ + no delta since | **Delta discovery** |
 | Verification clean + fix round patch-grade | Loop **quiet** |
-| Loop quiet | **Certification**² |
+| Loop quiet, a manifest lens never ran on the target | **Lens-coverage pass**³ — certification refused until every manifest lens has run |
+| Loop quiet, no blind pass since the last substantive fix round | **Delta discovery** — that round's seed rate³ is unmeasured, and unmeasured is not quiet |
+| Loop quiet, lens coverage complete, final round's seed rate measured 0 | **Certification**² |
 | Certification quiet | **Certified** — verdict `approved`; loop done |
 | A new 🔴 anywhere · a fix-caused 🟠 regression · a reopened fix | **Fix round** (quiet counter resets) |
+| Two consecutive fix rounds seed the same component at s ≥ 0.3³ | **Design pass**³ — further fix rounds there are refused (owner gate) |
 
 ¹ **Delta-worthy** = the fix round fixed a 🔴, added/converted a mechanism, or changed a
-design. Anything else is patch-grade and exits on verification + the fixer's micro-review.
+design. Anything else is patch-grade and exits on verification + the fixer's round review.
 
 ² **Certification** (full-loop tier): the feature's **first** certification attempt is a pair —
 two parallel blinded full-manifest passes against one frozen commit, folding in any still-owed
@@ -95,6 +103,22 @@ without a fresh full-manifest pass after its last fix round. Lower tiers certify
 without one (recorded in the index). Every certification index row records the 🟠 still open at
 close. A backlogged minor fixed later needs only normal fix-verification — unless the fix
 touches full-loop-tier code.
+
+³ **The convergence rule (2026-08-28, accepted fix-round audit).** The **seed rate** of fix
+round r, `s(r)`, is the count of serious (🟠+) fix-caused findings the next blind pass
+attributes to round r's commits (`seed_round` in that pass's metrics `findings[]`), divided
+by round r's fix count. A round is **substantive** when it fixed ≥ 1 finding and ran tests.
+Certification needs: every manifest lens run at least once on the target (a **lens-coverage
+pass** — one lean full-scope pass on the owed lens — clears one), a blind pass after the
+final substantive fix round, zero new 🔴, zero fix-caused 🟠, and `s` measured 0 on serious
+findings for that final round; a missing `seed_round` value means *not yet measured*, never
+zero. Each fix round should be strictly smaller (fix count) than the one before — the router
+warns when it is not. When two consecutive substantive rounds seed the same component (the
+backlog `area` word) at `s ≥ 0.3`, patching is non-convergent there: the router refuses
+further fix rounds and gates a **design pass** — a protocol block at component level,
+reimplementation against it, then discovery — recorded as a fix round whose metrics `notes`
+carry `design-pass:<area>`, at most one per component per loop. The full suites run exactly
+once per loop, at the certification freeze; every other pass and round runs scoped.
 
 **What re-arms the loop — exactly three things:** a new 🔴; a fix-caused 🟠 regression; a
 reopened fix. New non-regression 🟠 get fixed and verified but do not re-arm a delta. New

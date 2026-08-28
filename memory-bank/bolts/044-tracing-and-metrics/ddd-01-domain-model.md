@@ -24,7 +24,7 @@ this bolt observes about them:
     sampled at the moment `Order.Status` transitions to `Shipped`)
 - **`PaymentWebhook` events** — observed via:
   - `payment_webhook_total{processor, result}` counter (incremented in
-    `WebhooksController.Stripe` and `WebhooksController.EuPlatesc`)
+    `WebhooksController.Stripe` and `WebhooksController.the legacy processor`)
 - **`Upload`** — observed via:
   - `upload_size_bytes` histogram (recorded in `UploadService.UploadAsync`)
 - **`AwbCreation`** — observed via:
@@ -54,7 +54,7 @@ Metric
   `_bytes` for byte histograms).
 - Label keys are stable (no free-form values that would explode cardinality).
 - `ValueSet` for a label is enumerated, not arbitrary. Examples:
-  `processor ∈ {stripe, euplatesc}`, `result ∈ {ok, failed, duplicate, rejected}`.
+  `processor ∈ {stripe, legacy-processor}`, `result ∈ {ok, failed, duplicate, rejected}`.
 
 #### Span
 

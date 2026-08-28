@@ -95,7 +95,7 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
 | PPW-230 | ⚪ | v7 | A freshly generated local thumbnail is re-read from disk on a cache miss | `Services/UploadService.cs:240` | backlog | `ac97e42` |
 | PPW-231 | ⚪ | v7 | Order detail shows both the interceptor toast and an inline error for one failure | `UI/…/order-detail-page.ts:403` | backlog | `ac97e42` |
 | PPW-232 | 🟠 | v9 | "Photos no longer available" is shown for a just-paid order and for pending orders | `UI/…/order-detail-page.ts` | fixed | `b9af326` |
-| PPW-233 | 🟠 | v9 | No test asserts that the EuPlatesc payment notification enqueues promotion | `Tests/…/PaymentControllerIntegrationTests.cs` | wont-fix | — |
+| PPW-233 | 🟠 | v9 | No test asserts that the legacy processor payment notification enqueues promotion | `Tests/…/PaymentControllerIntegrationTests.cs` | wont-fix | — |
 | PPW-234 | 🟠 | v9 | The backfill command was outside the review file list, and backfill against the live worker is untested | `Cli/BackfillCommand.cs` | deferred | `d041295` |
 | PPW-235 | 🟡 | v9 | Retention deletes the blobs before it persists the null keys → a broken-URL window | `BackgroundJobs/ArchiveRetentionJob.cs:146` | backlog | `ac97e42` |
 | PPW-236 | 🟡 | v9 | The retention sweep query has no soft-delete filter, so it reprocesses deleted rows | `BackgroundJobs/ArchiveRetentionJob.cs:96` | backlog | `ac97e42` |
@@ -1087,13 +1087,14 @@ closed: 2026-07-22 — certified (v9 single-pass) @ac97e42
   - 2026-07-27: owner ruled fix now
   - round 9: fixed @`d041295` and `b9af326` — the message is gated on the order's lifecycle, with specs across the whole status matrix
 
-### PPW-233 — No test asserts that the EuPlatesc payment notification enqueues promotion
+### PPW-233 — No test asserts that the legacy processor payment notification enqueues promotion
 
-- **What:** The Stripe path has a wiring test; the EuPlatesc path does not, so deleting its enqueue call
+- **What:** The Stripe path has a wiring test; the legacy processor path does not, so deleting its enqueue call
   would ship green.
 - **History:**
   - v9: found — coverage sibling of PPW-208
-  - 2026-07-27: owner ruled wont-fix — the EuPlatesc gateway is slated for removal, so its coverage is not worth building
+  - 2026-07-27: owner ruled wont-fix — the legacy processor is slated for removal, so its coverage is not worth building
+  - post-close: the waiver is moot @`06fd2b1` — the legacy processor notification path whose test was waived was deleted with the processor (PR #13). Status stays wont-fix, the ruling that closed it
 
 ### PPW-234 — The backfill command was outside the review file list, and backfill against the live worker is untested
 

@@ -34,9 +34,8 @@ public static class MetricNames
     public static class ProcessorValues
     {
         public const string Stripe    = "stripe";
-        public const string EuPlatesc = "euplatesc";
 
-        public static readonly string[] All = [Stripe, EuPlatesc];
+        public static readonly string[] All = [Stripe];
     }
 
     public static class OrderStatusValues
@@ -53,13 +52,12 @@ public static class MetricNames
         public const string Ok                = "ok";
         public const string SignatureInvalid  = "signature_invalid";
         public const string OrderNotFound     = "order_not_found";
-        public const string AmountMismatch    = "amount_mismatch";
         public const string Duplicate         = "duplicate";
         public const string Failed            = "failed";
         public const string BodyTooLarge      = "body_too_large";
 
         public static readonly string[] All =
-            [Ok, SignatureInvalid, OrderNotFound, AmountMismatch, Duplicate, Failed, BodyTooLarge];
+            [Ok, SignatureInvalid, OrderNotFound, Duplicate, Failed, BodyTooLarge];
     }
 
     public static class AwbResultValues
@@ -81,7 +79,10 @@ public static class MetricNames
         public const string Pending  = "pending";
         public const string Failed   = "failed";
 
-        public static readonly string[] All = [Accepted, Rejected, Pending, Failed];
+        // Without its own value an ANAF outage looks like no activity at all on the panel.
+        public const string Retrying = "retrying";
+
+        public static readonly string[] All = [Accepted, Rejected, Pending, Failed, Retrying];
     }
 
     // The label contract every instrument is held to. A cardinality budget computed from the

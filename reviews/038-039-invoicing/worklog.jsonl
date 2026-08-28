@@ -105,7 +105,7 @@
 {"t":"2026-08-14T12:27:30+03:00","ev":"pass-launch","pass":4,"type":"verification","commit":"0a250b9","note":"anchored per-leg check of resolution v3; worktree reset from a stale c09675d to 8237945 before any reading. Test-run stamps up to 12:45 are reconstructed to the minute from run order, anchored on the 12:39:33 assertion timestamp the partial-unwind revert printed"}
 {"t":"2026-08-14T12:32:10+03:00","ev":"test-run","pass":4,"kind":"baseline","filter":"Unit.Controllers.WebhooksController","passed":24,"failed":0}
 {"t":"2026-08-14T12:34:20+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 1, Stripe call site put back to created ? ok : duplicate","passed":23,"failed":1}
-{"t":"2026-08-14T12:36:40+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 1, EuPlatesc call site put back alone — defect reintroduced, nothing red, so the sibling site is unproven","passed":24,"failed":0}
+{"t":"2026-08-14T12:36:40+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 1, the legacy processor call site put back alone — defect reintroduced, nothing red, so the sibling site is unproven","passed":24,"failed":0}
 {"t":"2026-08-14T12:38:30+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 2, whole ReloadAsync block deleted — reddens on Status","passed":23,"failed":1}
 {"t":"2026-08-14T12:39:40+03:00","ev":"test-run","pass":4,"kind":"red","finding":"PPW-508","note":"leg 2, partial unwind of Status and PaidAt only — reddens on UpdatedAt, so that pin is live","passed":23,"failed":1}
 {"t":"2026-08-14T12:41:30+03:00","ev":"test-run","pass":4,"kind":"green","finding":"PPW-508","note":"leg 3 probe added, cancellation forced from the Sentry hub callback — passes with the fix in place","passed":9,"failed":0}
@@ -127,7 +127,7 @@
 {"t":"2026-08-20T14:58:55+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 2 finer revert, Status and PaidAt unwound but UpdatedAt left behind - reddens on UpdatedAt, so the pin bites","passed":23,"failed":2}
 {"t":"2026-08-20T14:59:30+03:00","ev":"test-run","pass":5,"kind":"red","finding":"PPW-508","note":"leg 3, old when (reloadEx is not OperationCanceledException) filter restored - reddens the cancellation test with System.OperationCanceledException raised at WebhooksController.cs:434 inside EntityEntry.ReloadAsync via GetDatabaseValuesAsync and NpgsqlCommand.ExecuteReaderAsync","passed":24,"failed":1}
 {"t":"2026-08-20T15:01:20+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-508","note":"cancellation test run 5 times alone at HEAD, 5 of 5 green - the cancel fires synchronously inside the capture callback, so there is no race window","passed":5,"failed":0}
-{"t":"2026-08-20T15:01:50+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-511","note":"EuPlatesc call site put back alone - defect reintroduced, all 25 green, so that site is still proven by nothing; not reopened, per the owner ruling","passed":25,"failed":0}
+{"t":"2026-08-20T15:01:50+03:00","ev":"test-run","pass":5,"kind":"green","finding":"PPW-511","note":"the legacy processor call site put back alone - defect reintroduced, all 25 green, so that site is still proven by nothing; not reopened, per the owner ruling","passed":25,"failed":0}
 {"t":"2026-08-20T15:02:20+03:00","ev":"test-run","pass":5,"kind":"red","note":"class check, RecordPaymentWebhook no-oped - 14 of 25 redden; the only metric-asserting survivor is Stripe_unhandled_event_type_records_nothing, which asserts absence by design","passed":11,"failed":14}
 {"t":"2026-08-20T15:03:00+03:00","ev":"test-run","pass":5,"kind":"final","filter":"Unit.Controllers.WebhooksController","note":"all 8 source mutations reverted, tree clean","passed":25,"failed":0}
 {"t":"2026-08-20T15:06:30+03:00","ev":"finding","id":"PPW-508","status":"verified","commit":"07b0c1b","note":"all three legs redden on their own revert; the cancellation proof holds for the claimed reason, not incidentally"}
@@ -330,3 +330,154 @@
 {"t":"2026-08-21T20:41:00+03:00","ev":"pass-records-done","pass":12,"type":"certification","subtype":"certification-single","commit":"090873d","verdict":"request-changes","outcome":"not-certified"}
 {"t":"2026-08-21T20:44:05+03:00","ev":"run-end","passes":3,"parked":0,"note":"certification does not certify; 11 high-severity rows open, 7 owner decisions listed in summary-v12"}
 {"t":"2026-08-21T20:51:20+03:00","ev":"doc-gate","verdict":"approve","pass":12,"note":"judge independently confirmed PPW-579, PPW-584 and PPW-586 against the code and re-derived the severity and id math"}
+{"t":"2026-08-24T11:09:13+03:00","ev":"round-start","round":12,"note":"unattended fix round on review-v12, scope PPW-579 only per owner ruling"}
+{"t":"2026-08-24T11:16:04+03:00","ev":"test-run","round":12,"kind":"red","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdfCultureTests","passed":1,"failed":2,"duration_s":0.14,"note":"csproj and Dockerfile contract tests red before the fix; the ro-RO formatting test passes on an ICU host"}
+{"t":"2026-08-24T11:19:35+03:00","ev":"test-run","round":12,"kind":"green","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdf","passed":10,"failed":0,"duration_s":0.96}
+{"t":"2026-08-24T11:21:19+03:00","ev":"finding","round":12,"id":"PPW-579","status":"fixed","commit":"8e71c63"}
+{"t":"2026-08-24T11:21:19+03:00","ev":"micro-review-dispatched","round":12,"cluster":"A — production image globalization","commit":"8e71c63"}
+{"t":"2026-08-24T11:26:50+03:00","ev":"micro-review-returned","round":12,"cluster":"A — production image globalization","found":1,"note":"the culture-formatting test passed in both the fixed and broken states; tests retargeted at the shipped runtimeconfig and at the renderer own culture field"}
+{"t":"2026-08-24T11:28:49+03:00","ev":"test-run","round":12,"kind":"red","filter":"InvoicePdfCultureTests (fix reverted to 8e71c63~1)","passed":1,"failed":2,"duration_s":0.15,"note":"runtimeconfig and Dockerfile tests red on the revert; the culture canary passes on an ICU host"}
+{"t":"2026-08-24T11:28:49+03:00","ev":"test-run","round":12,"kind":"final","filter":"PhotoPrint.Tests.Unit.Services.Invoicing.InvoicePdf","passed":10,"failed":0,"duration_s":0.83}
+{"t":"2026-08-24T11:28:50+03:00","ev":"test-run","round":12,"kind":"red","filter":"InvoicePdfCultureTests with DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1","passed":2,"failed":1,"duration_s":0.07,"note":"the culture canary fails loudly in an invariant host with TypeInitializationException -> CultureNotFoundException"}
+{"t":"2026-08-24T11:28:50+03:00","ev":"finding","round":12,"id":"PPW-579","status":"fixed","commit":"ed3ce30","note":"micro-review follow-up folded in"}
+{"t":"2026-08-24T11:29:45+03:00","ev":"round-end","round":12,"note":"PPW-579 fixed; 9 other blockers recorded without code — 2 wont-fix on the owner ruling, 7 deferred"}
+{"t":"2026-08-24T11:31:47+03:00","ev":"doc-gate","round":12,"verdict":"clean","note":"doc-gate.mjs 038-039-invoicing 12 clean and doc-gate.mjs state clean; records-auditor reports one error — no pushed ref reaches ed3ce30, because pushing was withheld"}
+{"t":"2026-08-24T12:22:31+03:00","ev":"note","text":"owner triage of 2026-08-24 applied: 13 rows regraded down and backlogged, PPW-600 and PPW-604 regraded up to high, PPW-562 recorded fixed by the peer merge 4dd6763; each ruling is a history line on its ledger row"}
+{"t":"2026-08-24T14:53:04+03:00","ev":"pass-launch","pass":13,"type":"verification"}
+{"t":"2026-08-24T14:53:04+03:00","ev":"pass-records-done","pass":13,"type":"verification"}
+{"t":"2026-08-24T15:06:25+03:00","ev":"round-start","round":13,"note":"final fix round on review-v12, cluster 1 of 3 (payment flow: PPW-584, PPW-582, PPW-615, PPW-611); unattended; rows append to resolution-v12.md which stays in-progress for the two later clusters"}
+{"t":"2026-08-24T15:12:32+03:00","ev":"check-dispatched","cluster":"payment-flow","note":"adversarial approach-check on the 409 handling, the stale-key paid replay, the polling state machine and the new payment-status endpoint (PPW-584, PPW-582, PPW-615)"}
+{"t":"2026-08-24T15:15:02+03:00","ev":"triage-done","round":13,"clusters":1,"checks_needed":1,"pre_cleared":2,"gates":0,"note":"cluster 1 of 3 = payment flow; PPW-611 is a deprecated-field drop (no check), PPW-584/PPW-582 ride their v12 pre-check revisions, PPW-615 shares the new check"}
+{"t":"2026-08-24T15:27:28+03:00","ev":"test-run","kind":"red","filter":"dotnet test src/PhotoPrint.Tests --filter \"FullyQualifiedName~OrderPaymentStatus|FullyQualifiedName~OrderServiceTests|FullyQualifiedName~ExceptionHandlerMiddlewareTests\"","passed":90,"failed":12,"duration_s":2,"note":"8 of 9 payment-status endpoint tests fail (route absent: 401 and 403 legs answer NotFound), plus the two consumed-key OrderService tests and the two consumed-key middleware tests"}
+{"t":"2026-08-27T17:06:13+03:00","ev":"test-run","kind":"green","filter":"full backend suite + full frontend suite","passed":1451,"failed":0}
+{"t":"2026-08-27T17:06:13+03:00","ev":"finding","id":"PPW-584","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-582","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-615","status":"fixed","commit":"901f8a2"}
+{"t":"2026-08-27T17:06:14+03:00","ev":"finding","id":"PPW-611","status":"fixed","commit":"2acda1f"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-585","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-524","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-596","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-607","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-612","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-616","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-597","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-587","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-588","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-604","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-591","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-600","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-649","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-592","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-598","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-599","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-602","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-605","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-608","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-613","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-614","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-586","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-560","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-509","status":"verified"}
+{"t":"2026-08-27T19:40:00+03:00","ev":"finding","id":"PPW-510","status":"verified"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-659","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-660","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-661","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-662","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-663","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-664","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-665","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-666","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-667","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-668","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-669","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-670","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-671","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-672","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-673","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-674","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-675","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-676","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-677","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-678","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-679","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-680","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-681","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-682","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-683","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-684","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-685","status":"open"}
+{"t":"2026-08-27T19:02:00+03:00","ev":"finding","id":"PPW-686","status":"open"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-663","status":"fixed","commit":"de1b70d"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-659","status":"fixed","commit":"9527eba"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-664","status":"fixed","commit":"9527eba"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-686","status":"fixed","commit":"9527eba"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-660","status":"fixed","commit":"c60260c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-666","status":"fixed","commit":"c60260c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-661","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-662","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-670","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-671","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-672","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-673","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-679","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-680","status":"fixed","commit":"2302bec"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-665","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-667","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-674","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-676","status":"fixed","commit":"5d84a5e"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-668","status":"fixed","commit":"18f0b1c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-669","status":"fixed","commit":"18f0b1c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-675","status":"fixed","commit":"18f0b1c"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-677","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-678","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-681","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-682","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-683","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-684","status":"backlog"}
+{"t":"2026-08-27T20:05:00+03:00","ev":"finding","id":"PPW-685","status":"backlog"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-663","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-659","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-664","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-686","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-660","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-666","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-661","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-662","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-670","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-671","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-672","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-673","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-679","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-680","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-665","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-667","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-674","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-676","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-668","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-669","status":"verified"}
+{"t":"2026-08-27T20:20:00+03:00","ev":"finding","id":"PPW-675","status":"verified"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-687","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-688","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-689","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-690","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-691","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-692","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-693","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-694","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-695","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-696","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-697","status":"open"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-698","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-699","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-700","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-701","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-702","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-703","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-704","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-705","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-706","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-707","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-708","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-709","status":"backlog"}
+{"t":"2026-08-27T21:30:00+03:00","ev":"finding","id":"PPW-710","status":"backlog"}
+{"t":"2026-08-27T21:35:00+03:00","ev":"loop-closed","note":"owner ruling, not certified"}

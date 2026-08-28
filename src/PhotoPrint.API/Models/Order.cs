@@ -9,9 +9,7 @@ public class Order
     public Guid? GuestSessionId { get; set; }
 
     public OrderStatus Status { get; set; } = OrderStatus.AwaitingPayment;
-    public PaymentProcessor PaymentProcessor { get; set; }
     public string? PaymentIntentId { get; set; }
-    public string? EuPlatescTransactionId { get; set; }
 
     public ShippingAddressSnapshot ShippingAddress { get; set; } = null!;
     public DeliveryType DeliveryType { get; set; }
@@ -74,11 +72,6 @@ public class Order
     /// <summary>Cached Stripe ClientSecret so an idempotent replay returns the exact
     /// same secret without a second Stripe round-trip.</summary>
     public string? StripeClientSecret { get; set; }
-
-    /// <summary>Cached EuPlatesc redirect URL. Persisted on first initiate because
-    /// the URL embeds a timestamp + nonce and is therefore NOT reproducible on a
-    /// later call; replay returns this stored value verbatim.</summary>
-    public string? EuPlatescRedirectUrl { get; set; }
 
     /// <summary>Captured at order creation for guest orders (no User nav property).</summary>
     public string? GuestEmail { get; set; }

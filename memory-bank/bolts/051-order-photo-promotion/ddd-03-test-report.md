@@ -50,7 +50,7 @@ caller-supplied keys made the new code drop in cleanly).
 
 ### Story 003 — Promote on Paid
 
-- ✅ Promotion enqueued from webhook (Stripe + EuPlatesc) after `SaveChangesAsync` — wired in `WebhooksController` (verified by inspection; the integration of an enqueue call on a webhook is impossible to assert via a unit test without a webhook integration harness, which would duplicate bolt 035's existing webhook coverage).
+- ✅ Promotion enqueued from webhook (Stripe + the legacy processor) after `SaveChangesAsync` — wired in `WebhooksController` (verified by inspection; the integration of an enqueue call on a webhook is impossible to assert via a unit test without a webhook integration harness, which would duplicate bolt 035's existing webhook coverage).
 - ✅ Background worker processes the queue with bounded concurrency — `OrderPhotoPromotionWorker` reads `Channel<PromotionJob>` with `SemaphoreSlim(MaxConcurrentOrders)`.
 - ✅ **Confirmed-Write-Then-Delete** (ADR-011) — verified by `HappyPath_WritesThreeCloudObjects_FlipsRow_DeletesLocal` (cloud writes happen, then row update, then local delete) and by `CloudOriginalSaveFails_LeavesRowLocal_CountsFailed` (no local delete attempted when cloud write fails).
 - ✅ **Idempotent** — verified by `AlreadyCloud_Skips`: an upload at `StorageLocation = Cloud` produces `Skipped = 1, Promoted = 0`, no storage calls made.

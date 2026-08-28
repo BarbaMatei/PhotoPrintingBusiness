@@ -58,3 +58,17 @@ public sealed class AnafUnreachableException : Exception
             ? $"ANAF endpoint {endpoint} unreachable."
             : $"ANAF endpoint {endpoint} returned HTTP {status}.";
 }
+
+// A 4xx other than 408/429 is ANAF refusing this document, not an outage.
+public sealed class AnafContentRejectedException : Exception
+{
+    public string Endpoint { get; }
+    public int HttpStatus { get; }
+
+    public AnafContentRejectedException(string endpoint, int httpStatus)
+        : base($"ANAF rejected the document at {endpoint} with HTTP {httpStatus}.")
+    {
+        Endpoint = endpoint;
+        HttpStatus = httpStatus;
+    }
+}

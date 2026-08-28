@@ -61,11 +61,11 @@ This intent closes both holes: shipping cost is resolved server-side from the ch
 - **Priority**: Must
 - **Related Stories**: US-014-3
 
-### FR-4: EuPlatesc payment idempotency
-- **Description**: `POST /api/payments/euplatesc/initiate` accepts the same `Idempotency-Key` header; reuses `Order` + redirect URL within 24 h on a repeat call. EuPlatesc has no idempotency primitive, so only the server-side order de-duplication applies.
+### FR-4: the legacy processor payment idempotency
+- **Description**: `POST /api/payments/legacy-processor/initiate` accepts the same `Idempotency-Key` header; reuses `Order` + redirect URL within 24 h on a repeat call. the legacy processor has no idempotency primitive, so only the server-side order de-duplication applies.
 - **Acceptance Criteria**:
   - Repeat call within 24 h returns the same redirect URL.
-  - The persisted EuPlatesc order ref + HMAC payload is reused.
+  - The persisted the legacy processor order ref + HMAC payload is reused.
 - **Priority**: Must
 - **Related Stories**: US-014-4
 

@@ -34,7 +34,7 @@ description: Testing conventions and patterns for FotoTipar. Use this skill when
   - Database operations (migrations, queries, constraints)
   - Middleware behavior (error handling, CORS, rate limiting)
   - Authentication/authorization enforcement
-  - Webhook handling (Stripe, EuPlatesc)
+  - Webhook handling (Stripe)
 - **Patterns**:
   - Use `WebApplicationFactory` to create test server
   - Use Testcontainers for real PostgreSQL instance

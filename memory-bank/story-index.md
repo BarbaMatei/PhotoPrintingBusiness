@@ -418,16 +418,16 @@
 **Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/003-stripe-webhook-handler.md`
 **Bolt**: 016 | **Epic story**: US-305
 
-### 004-euplatesc-initiate.md ✅ IMPLEMENTED
-**Title**: POST /api/payments/euplatesc/initiate — HMAC-MD5 signed redirect URL generation
+### 004-legacy-processor-initiate.md ✅ IMPLEMENTED
+**Title**: POST /api/payments/legacy-processor/initiate — HMAC-MD5 signed redirect URL generation
 **Priority**: Must
-**Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/004-euplatesc-initiate.md`
+**Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/004-legacy-processor-initiate.md`
 **Bolt**: 016 | **Epic story**: US-306
 
-### 005-euplatesc-ipn-handler.md ✅ IMPLEMENTED
-**Title**: POST /api/webhooks/euplatesc — IPN validation, amount check, EuPlatesc spec response
+### 005-legacy-processor-ipn-handler.md ✅ IMPLEMENTED
+**Title**: POST /api/webhooks/legacy-processor — IPN validation, amount check, the legacy processor spec response
 **Priority**: Must
-**Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/005-euplatesc-ipn-handler.md`
+**Path**: `intents/004-checkout-payment/units/004-payment-backends/stories/005-legacy-processor-ipn-handler.md`
 **Bolt**: 016 | **Epic story**: US-306
 
 ---
@@ -459,7 +459,7 @@
 **Bolt**: 017 | **Epic story**: US-303
 
 ### 005-payment-step.md ✅ IMPLEMENTED
-**Title**: Payment step with Stripe Elements tab and EuPlatesc redirect tab
+**Title**: Payment step with Stripe Elements tab and the legacy processor redirect tab
 **Priority**: Must
 **Path**: `intents/004-checkout-payment/units/005-checkout-ui/stories/005-payment-step.md`
 **Bolt**: 017 | **Epic story**: US-304
@@ -727,10 +727,10 @@
 **Path**: `intents/014-payment-hardening/units/002-payment-idempotency/stories/002-stripe-intent-idempotency.md`
 **Bolt**: 035
 
-### 003-euplatesc-initiate-idempotency.md ✅ IMPLEMENTED
-**Title**: Reuse persisted EuPlatesc redirect URL on repeat calls
+### 003-legacy-processor-initiate-idempotency.md ✅ IMPLEMENTED
+**Title**: Reuse persisted the legacy processor redirect URL on repeat calls
 **Priority**: Must
-**Path**: `intents/014-payment-hardening/units/002-payment-idempotency/stories/003-euplatesc-initiate-idempotency.md`
+**Path**: `intents/014-payment-hardening/units/002-payment-idempotency/stories/003-legacy-processor-initiate-idempotency.md`
 **Bolt**: 035
 
 ---

@@ -15,18 +15,34 @@ feature clean?".
    **test-only** fix round (zero production-code changes) may be self-verified when every fix
    carries a revert-and-rerun proof whose failing-test set was predicted before the revert and
    matched exactly, recorded in the resolution. Any production-code change voids the exception.
-2. **Revert-and-rerun every `fixed` finding:** revert the fix (source only), its regression
+2. **Evidence audit — when the round recorded its own proofs (2026-08-28).** A round whose
+   resolution records a single-lever revert proof for **every** `fixed` row (the lever and
+   the red evidence, per the `/fix-review` contract) is not re-proven wholesale: an agent
+   who is not the fixer reads the recorded red/green evidence and **re-runs a random 2–3
+   rows** (`verify-fixes.mjs --only`, or the recorded lever by hand). Every sampled row
+   reproduces → the evidence stands, proceed to step 3. **Any sampled row that fails to
+   reproduce reverts this target to full re-runs, this round and every later one.** The
+   `verified` flip still belongs to this re-review, never to the fixer's own record.
+
+   **Full revert-and-rerun — every other round:** revert the fix (source only), its regression
    test must go red with clean attribution and zero collateral; restore, green. A fix whose
    test cannot go red is not verified — reopen it.
    `node reviews/lib/verify-fixes.mjs <target>` runs this step mechanically and prints one
    verdict line per fix; `test-never-red`, `revert-failed` and `green-failed` rows come back
-   to you for a reopen or a hand check.
+   to you for a reopen or a hand check. The red leg counts only when the runner output
+   names a failing test (recorded in `red_evidence`); a revert that breaks compilation —
+   or reddens with nothing attributable — is `revert-broke-build`: re-prove that row by
+   its smallest lever by hand, never by trusting the non-zero exit.
 3. **Judgment items** (doc fixes; `wont-fix` / `deferred` / `disputed` rationales): first run
    `git diff <last-affirmed-commit>..HEAD -- <cited files>` yourself. Unchanged → record
    "unchanged since `<commit>`, stands" with **no agent**. Changed → one anchored Explore
    agent, given the finding + resolution note + fix delta, not the whole feature. Update each
    ledger row's last-affirmed commit.
-4. **Review the fix diffs — three questions per fix cluster**, asked by the owning lens:
+4. **Read the round review before dispatching anything.** Rounds from 2026-08-28 carry one
+   round-scope composition review (`round-review-returned` in the worklog, findings folded
+   into the resolution) — read what it found and left open; do not re-run its questions
+   with new agents. Only for an older round without one, ask the three questions per fix
+   cluster yourself, by the owning lens:
    - *Class or instance* — do sibling sites still carry the defect?
    - *New surface at the bar* — does each added mechanism have sized defaults, a signal,
      failure-mode tests, docs?
@@ -38,7 +54,10 @@ feature clean?".
    line and the [index.md](../state/index.md) row (then run
    `node reviews/lib/records-auditor.mjs <target>` — must exit clean). A verification that
    names **new** defects reconciles them like any pass and adds a `findings[]` entry per new
-   defect — `{d, new, sev, fix_generated}` — so fix lineage is counted where it surfaces. The verdict — at most
+   defect — `{d, new, sev, fix_generated, seed_round, area}` — so fix lineage is counted
+   where it surfaces; `seed_round` names the fix round whose commits caused it and `area`
+   its component word, both the reconciler's judgment, `null` when unattributable (never
+   guessed — the router reads a missing value as "not yet measured"). The verdict — at most
    `approve-with-followups`; a quiet verification means "the fixes held", never "the code is
    clean" — goes in the index row. Report the outcome at the owner gate in chat; any owner
    decision made there is recorded on the ledger row it concerns.

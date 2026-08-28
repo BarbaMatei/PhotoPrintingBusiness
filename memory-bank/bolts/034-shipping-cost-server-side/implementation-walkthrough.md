@@ -23,7 +23,7 @@ Six production-side files (2 new, 4 modified) plus two test-side updates (constr
 - [x] `src/PhotoPrint.API/Controllers/PaymentsController.cs` — class-level `[ServiceFilter(typeof(DetectLegacyShippingCostFilter))]` so both payment-create endpoints inspect the body.
 - [x] `src/PhotoPrint.API/Program.cs` — singleton DI registration for the new filter, alongside the existing middleware registrations.
 - [x] `src/PhotoPrint.Tests/Unit/Services/OrderServiceTests.cs` — constructor wires a `Mock<IShippingService>` returning `ShippingCostDto(20.00m)` for any input. `MakeRequest` helper became a 3-arg constructor (no `shippingCost` parameter). One test that previously asserted against the helper-supplied cost now asserts against the server-mocked cost — semantically equivalent, both 20.00 RON.
-- [x] `src/PhotoPrint.Tests/Integration/PaymentControllerIntegrationTests.cs` — the two static `CreateOrderRequest` instances (`ValidRequest`, `EuPlatescRequest`) updated to the 4-arg shape.
+- [x] `src/PhotoPrint.Tests/Integration/PaymentControllerIntegrationTests.cs` — the two static `CreateOrderRequest` instances (`ValidRequest`, `LegacyProcessorRequest`) updated to the 4-arg shape.
 
 ### Key Decisions
 

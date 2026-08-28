@@ -99,10 +99,10 @@ findable) · `present, missed` = findable, not found · `not yet` = didn't exist
 
 | # | Problem | v1 | v5 | v8 | Born | Final status |
 |---|---------|----|----|----|------|--------------|
-| P17 | Replay/compute/persist duplicated across Stripe + EuPlatesc branches | QUAL-4 🟠 | fixed pre (`CreateIntentAsync<T>`) | fixed pre | bolt | verified |
+| P17 | Replay/compute/persist duplicated across Stripe + the legacy processor branches | QUAL-4 🟠 | fixed pre (`CreateIntentAsync<T>`) | fixed pre | bolt | verified |
 | P18 | Client's key forwarded to Stripe (recycled-key collision at gateway) | BUG-4 | fixed pre (keyed by order.Id) | fixed pre | bolt | verified |
 | P19 | Recovery-replay path (replay + null cached) unobserved / undocumented | ~ T6 test-gap row, no ID ("intentional, add a test") | OBS-3 | fixed pre (log + doc + test) | bolt | verified |
-| P20 | EuPlatesc recovery rebuilds a *different* signed URL (verbatim-replay invariant broken) | present, missed *(unverified)* | ~ seen inside OBS-3, judged benign, no ID | BUG-2 (×3 convergence) | bolt | accepted-deferred (row-lock needs Postgres arm; asymmetry documented) |
+| P20 | the legacy processor recovery rebuilds a *different* signed URL (verbatim-replay invariant broken) | present, missed *(unverified)* | ~ seen inside OBS-3, judged benign, no ID | BUG-2 (×3 convergence) | bolt | accepted-deferred (row-lock needs Postgres arm; asymmetry documented) |
 | P21 | Replay-logging branches duplicated in `CreateIntentAsync` | not yet | largely not yet (worsened by P19's fix) | QUAL-5 | fix (v5 round) | verified (single switch) |
 | P22 | Two-phase save: order saved in service, again in controller after gateway | QUAL-6 | ~ adjacent QUAL-3 (different claim) | present, not re-raised | bolt | **wont-fix stands** (intentional crash-recovery) |
 | P23 | Controller persists via `_db.SaveChangesAsync` directly (altitude) | ~ subsumed under QUAL-6's view, no ID | QUAL-3 | present, not re-raised | pre-existing convention | accepted-deferred (codebase-wide boundary decision) |

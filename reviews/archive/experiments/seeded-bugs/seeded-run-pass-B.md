@@ -35,7 +35,7 @@ defect+location; `lenses` = how many of the 7 independently raised it.
 | B16 | PaymentsController.cs:42-47 | gateway 502 (BadGatewayException) not in ProducesResponseType | minor | 1/7 | medium |
 | B17 | Postgres arm untested / vacuous InMemory greens | provider-only branches + cross-tenant InMemory test prove non-prod behavior | medium | 2/7 | high |
 
-Lower-signal singletons: EuPlatesc recovery-replay path untested (B tests); `GetByIdAsync`/
+Lower-signal singletons: the legacy processor recovery-replay path untested (B tests); `GetByIdAsync`/
 `GetByPaymentIntentIdAsync` unscoped (low, caller-dependent); stale-key update-then-insert EF
 ordering reliance (low); missing-header = all dedup bypassed today (transitional, by design).
 

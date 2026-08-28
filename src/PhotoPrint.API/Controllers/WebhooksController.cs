@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,12 +26,8 @@ public class WebhooksController : ControllerBase
     public const int StripeMaxBodyBytes = 1024 * 1024;
     private const int StripeBodyBackstopBytes = 2 * StripeMaxBodyBytes;
 
-    // An EuPlatesc IPN is ~10 short form fields; the form is materialised by model binding, before any code here runs, so only a byte ceiling bounds it.
-    private const int EuPlatescIpnMaxBodyBytes = 64 * 1024;
-
     private readonly IOrderService _orderService;
     private readonly IStripeSignatureVerifier _stripeVerifier;
-    private readonly IEuPlatescService _euPlatescService;
     private readonly PhotoPrintDbContext _db;
     private readonly IOrderEmailService _orderEmailService;
     private readonly IOrderPhotoPromoter _photoPromoter;
@@ -40,13 +35,11 @@ public class WebhooksController : ControllerBase
     private readonly IInvoiceCreationService _invoiceCreator;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly StripeSettings _stripeSettings;
-    private readonly EuPlatescSettings _euPlatescSettings;
     private readonly ILogger<WebhooksController> _logger;
 
     public WebhooksController(
         IOrderService orderService,
         IStripeSignatureVerifier stripeVerifier,
-        IEuPlatescService euPlatescService,
         PhotoPrintDbContext db,
         IOrderEmailService orderEmailService,
         IOrderPhotoPromoter photoPromoter,
@@ -54,12 +47,10 @@ public class WebhooksController : ControllerBase
         IInvoiceCreationService invoiceCreator,
         IHubContext<AdminOrderHub> hub,
         IOptions<StripeSettings> stripeSettings,
-        IOptions<EuPlatescSettings> euPlatescSettings,
         ILogger<WebhooksController> logger)
     {
         _orderService = orderService;
         _stripeVerifier = stripeVerifier;
-        _euPlatescService = euPlatescService;
         _db = db;
         _orderEmailService = orderEmailService;
         _photoPromoter = photoPromoter;
@@ -67,7 +58,6 @@ public class WebhooksController : ControllerBase
         _invoiceCreator = invoiceCreator;
         _hub = hub;
         _stripeSettings = stripeSettings.Value;
-        _euPlatescSettings = euPlatescSettings.Value;
         _logger = logger;
     }
 
@@ -153,118 +143,6 @@ public class WebhooksController : ControllerBase
         return Ok();
     }
 
-    // ── POST /api/webhooks/euplatesc ──────────────────────────────────────────
-
-    [HttpPost("euplatesc")]
-    [AllowAnonymous]
-    [RequestSizeLimit(EuPlatescIpnMaxBodyBytes)]
-    [Consumes("application/x-www-form-urlencoded")]
-    public async Task<IActionResult> EuPlatescIpnAsync(
-        [FromForm] IFormCollection form,
-        CancellationToken cancellationToken)
-    {
-        var fields = form.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToString());
-        var secretKey = _euPlatescSettings.SecretKey;
-
-        // Validate HMAC signature
-        if (!EuPlatescService.ValidateIpnSignature(fields, secretKey))
-        {
-            _logger.LogWarning("EuPlatesc IPN signature validation failed");
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.SignatureInvalid);
-            return Content("<epayment>error</epayment>", "text/plain");
-        }
-
-        // Resolve order
-        if (!fields.TryGetValue("invoice_id", out var invoiceIdStr) ||
-            !Guid.TryParse(invoiceIdStr, out var orderId))
-        {
-            _logger.LogWarning("EuPlatesc IPN: missing or invalid invoice_id");
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.Failed);
-            return Content("<epayment>error</epayment>", "text/plain");
-        }
-
-        var order = await _orderService.GetByIdAsync(orderId, cancellationToken);
-        if (order == null)
-        {
-            _logger.LogWarning("EuPlatesc IPN: order {OrderId} not found", orderId);
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.OrderNotFound);
-            return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
-        }
-
-        // Amount validation — reject silently (per EuPlatesc spec, still return 200)
-        if (fields.TryGetValue("amount", out var amountStr))
-        {
-            var expected = order.TotalRon.ToString("F2", CultureInfo.InvariantCulture);
-            if (amountStr != expected)
-            {
-                _logger.LogWarning(
-                    "EuPlatesc IPN amount mismatch: expected {Expected}, received {Received} for order {OrderId}",
-                    expected, amountStr, orderId);
-                RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                    MetricNames.WebhookResultValues.AmountMismatch);
-                return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
-            }
-        }
-
-        // Process action
-        var action = fields.GetValueOrDefault("action", "");
-
-        if (action == "0" && order.Status == OrderStatus.AwaitingPayment)
-        {
-            var transactionId = fields.GetValueOrDefault("ep_id", "");
-            var statusBeforeTransition = order.Status;
-            OrderStatusMachine.Transition(order, OrderStatus.Paid);
-            order.PaidAt = DateTimeOffset.UtcNow;
-            order.EuPlatescTransactionId = transactionId;
-            var outcome = await SaveOrderPaidRecordingFailuresAsync(order, statusBeforeTransition, MetricNames.ProcessorValues.EuPlatesc, cancellationToken);
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc, ResultLabelFor(outcome));
-            var created = outcome == PaidSaveOutcome.Created;
-            if (created)
-            {
-                await BroadcastNewOrderAsync(order, cancellationToken);
-                await FireOrderConfirmedEmailAsync(order, cancellationToken);
-                // Enqueue cloud promotion off the hot path. Returns immediately;
-                // the worker picks up and uploads asynchronously.
-                await _photoPromoter.EnqueueAsync(order.Id, cancellationToken);
-                // Enqueue Sameday AWB creation off the hot path.
-                // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
-                await _awbNotifier.NotifyPaidAsync(order.Id, cancellationToken);
-            }
-        }
-        else if (action == "0" && OrderStatusMachine.HasBeenPaid(order.Status))
-        {
-            // Duplicate IPN for an already-paid order — Stripe-equivalent duplicate path.
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.Duplicate);
-        }
-        else if (action != "0" && order.Status == OrderStatus.AwaitingPayment)
-        {
-            OrderStatusMachine.Transition(order, OrderStatus.PaymentFailed);
-            await _db.SaveChangesAsync(cancellationToken);
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.Failed);
-        }
-        else
-        {
-            if (action == "0")
-                _logger.LogError(
-                    "EuPlatesc IPN: paid notification for order {OrderId} in status {Status} — customer charged, order not Paid, manual reconciliation required",
-                    orderId, order.Status);
-            else
-                _logger.LogWarning(
-                    "EuPlatesc IPN: action {Action} for order {OrderId} in status {Status} — no transition applied",
-                    action, orderId, order.Status);
-
-            RecordPaymentWebhook(MetricNames.ProcessorValues.EuPlatesc,
-                MetricNames.WebhookResultValues.Failed);
-        }
-
-        return Content(EuPlatescService.BuildIpnResponse(secretKey), "text/plain");
-    }
-
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static async Task<byte[]> ReadBodyUpToAsync(Stream body, int maxBytes, CancellationToken ct)
@@ -309,7 +187,9 @@ public class WebhooksController : ControllerBase
             return;
         }
 
-        if (order.Status == OrderStatus.AwaitingPayment)
+        // PaymentFailed included: the same intent stays chargeable after a decline, so a second
+        // attempt that succeeds must complete the order rather than strand the charge.
+        if (order.Status is OrderStatus.AwaitingPayment or OrderStatus.PaymentFailed)
         {
             var statusBeforeTransition = order.Status;
             OrderStatusMachine.Transition(order, OrderStatus.Paid);
@@ -319,14 +199,11 @@ public class WebhooksController : ControllerBase
             var created = outcome == PaidSaveOutcome.Created;
             if (created)
             {
-                await BroadcastNewOrderAsync(order, ct);
-                await FireOrderConfirmedEmailAsync(order, ct);
-                // Enqueue cloud promotion off the hot path. Returns immediately;
-                // the worker picks up and uploads asynchronously.
-                await _photoPromoter.EnqueueAsync(order.Id, ct);
-                // Enqueue Sameday AWB creation off the hot path.
-                // No-op when Sameday:Jobs:Enabled = false (NullAwbCreationNotifier).
-                await _awbNotifier.NotifyPaidAsync(order.Id, ct);
+                await RunSideEffectAsync("broadcast", order.Id, () => BroadcastNewOrderAsync(order, ct), ct);
+                await RunSideEffectAsync("confirmation-email", order.Id, () => FireOrderConfirmedEmailAsync(order, ct), ct);
+                // Cloud promotion and AWB creation are enqueued off the hot path; the workers upload.
+                await RunSideEffectAsync("photo-promotion", order.Id, async () => await _photoPromoter.EnqueueAsync(order.Id, ct), ct);
+                await RunSideEffectAsync("awb-notify", order.Id, () => _awbNotifier.NotifyPaidAsync(order.Id, ct), ct);
             }
         }
         else
@@ -383,6 +260,24 @@ public class WebhooksController : ControllerBase
                 { MetricNames.Labels.Processor, processor },
                 { MetricNames.Labels.Result,    result },
             });
+    }
+
+    // Each runs on its own: the order is committed Paid before any of them, so a 500 here would
+    // only earn a Stripe retry that the already-paid guard turns into a no-op, losing the rest.
+    private async Task RunSideEffectAsync(
+        string name, Guid orderId, Func<Task> effect, CancellationToken ct)
+    {
+        try
+        {
+            await effect();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogError(ex,
+                "payments.paid.side-effect-failed order_id={OrderId} effect={Effect} — the order is Paid; this step did not run",
+                orderId, name);
+            HttpContext?.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(ex);
+        }
     }
 
     private async Task BroadcastNewOrderAsync(Order order, CancellationToken ct)
@@ -471,14 +366,15 @@ public class WebhooksController : ControllerBase
                 _logger.LogWarning(
                     "invoice.creation.number-collision-retry order_id={OrderId} attempt={Attempt}",
                     order.Id, attempt);
+                await _invoiceCreator.ReconcileNumberingAsync(order, ct);
             }
             catch (DbUpdateException ex) when (IsInvoiceNumberViolation(ex))
             {
                 if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
                 // Logged before the reload below discards them: these are the only handles on a real charge.
                 _logger.LogError(ex,
-                    "invoice.creation.number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} euplatesc_transaction_id={EuPlatescTransactionId} — customer charged, order not Paid, manual reconciliation required",
-                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId, order.EuPlatescTransactionId);
+                    "invoice.creation.number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} — customer charged, order not Paid, manual reconciliation required",
+                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId);
                 HttpContext?.RequestServices?.GetService<Sentry.IHub>()?.CaptureException(ex);
 
                 // Reload rather than unwind field by field: the uncommitted Paid transition stays on the scoped context otherwise, and a later SaveChanges would commit a Paid order with no invoice.

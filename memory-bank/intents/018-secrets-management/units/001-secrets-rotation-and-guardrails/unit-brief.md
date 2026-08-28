@@ -25,7 +25,7 @@ Rotate the JWT keypair, remove the leaked one from source, and stand up controls
 
 ### Out of Scope
 - Vault / KMS adoption
-- Full audit of every potentially leaked secret (cover Stripe, EuPlatesc keys too if discovered, but as ops tasks)
+- Full audit of every potentially leaked secret (cover Stripe, the legacy processor keys too if discovered, but as ops tasks)
 
 ---
 

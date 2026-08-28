@@ -14,7 +14,7 @@ closed: 2026-08-14
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-508 | fixed | `07b0c1b` | Added the cancellation proof the pass showed was cheap: the Sentry mock cancels the token from its capture callback, landing it inside the reload. Red with the old filter restored, green without. EuPlatesc leg dropped on the owner's word |
+| PPW-508 | fixed | `07b0c1b` | Added the cancellation proof the pass showed was cheap: the Sentry mock cancels the token from its capture callback, landing it inside the reload. Red with the old filter restored, green without. Second-processor leg dropped |
 
 ## Scope
 
@@ -35,10 +35,10 @@ from its callback lands cancellation inside `ReloadAsync`. Restoring the old
 escaping through `NpgsqlCommand.ExecuteReaderAsync`; removing the filter turns it green. Forty-six
 lines, existing helpers only.
 
-### The EuPlatesc coverage gap is dropped, not fixed (PPW-508)
+### The legacy processor coverage gap is dropped, not fixed (PPW-508)
 
 The verification pass found the second call site proven by nothing — reverting it alone left
-every test green. The owner ruled mid-round that the EuPlatesc integration is being removed and
+every test green. The owner ruled mid-round that the legacy processor integration is being removed and
 only Stripe will remain, so a test written against that path would be deleted with it. A drafted
 test for the site was removed rather than committed. The source at both sites is correct; what
 is missing is a proof for a path scheduled for deletion.

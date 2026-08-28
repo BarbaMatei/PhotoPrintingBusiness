@@ -33,7 +33,6 @@ narrowed to the half that survives.
 | PPW-12 | 035-payment-idempotency | 🟡 | The ddd-02 design sketch puts conflict resolution in the controller, the code puts it in the order service | `records` |
 | PPW-32 | 035-payment-idempotency | ⚪ | The controller saves through the database context itself rather than through the order service | `payments` |
 | PPW-39 | 035-payment-idempotency | 🟡 | Global single-column idempotency-key uniqueness = cross-tenant existence oracle + key-squatting; durable fix needs a per-tenant composite index (migration) | `payments` |
-| PPW-40 | 035-payment-idempotency | 🟡 | EuPlatesc recovery-replay regenerates a different redirect URL (no gateway idempotency key); row-lock fix now unblocked (PPW-36 fixed) | `payments` |
 | PPW-79 | 042-thumbnail-cache | 🟡 | The storage contract assumes a rewindable stream with a readable length; deferred to bolt 043, which closed without taking it | `uploads` |
 | PPW-82 | 042-thumbnail-cache | 🟡 | Nothing reclaims a thumbnail written between the cleanup job's read and its commit; deferred to bolt 043, which closed without taking it | `uploads` |
 | PPW-85 | 042-thumbnail-cache | 🟠 | The cache-fill write races the cleanup job and strands a thumbnail on the dead row; the liveness re-read narrows the window but does not close it | `uploads` |

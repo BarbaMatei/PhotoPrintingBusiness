@@ -28,7 +28,7 @@ Full `dotnet test src/PhotoPrint.Tests` run: **457 / 457 passed**, 7 s. (449 pre
 | 002 | Same key + divergent body → 409 naming divergent fields | ✅ `CreateStripeIntent_SameKey_DivergentProcessor_Returns409` + unit `…DivergentProcessor_ThrowsConflictNamingField` (asserts `divergentFields` contains `paymentProcessor`, excludes `easyboxLockerId`) |
 | 002 | Missing key behaves as today + Warning | ✅ existing `CreateStripeIntent_ValidCart_*` tests pass with no key (warning path is logged; not asserted on log text) |
 | 002 | Stripe `RequestOptions.IdempotencyKey` set | ✅ `FakeStripePaymentGateway.LastIdempotencyKey` asserted equal to the sent key |
-| 003 | Same key on EuPlatesc → same redirect URL + OrderId | ✅ `InitiateEuPlatesc_SameIdempotencyKey_ReturnsSameUrlAndOneOrder` (byte-identical URL, one row) |
+| 003 | Same key on the legacy processor → same redirect URL + OrderId | ✅ `InitiateLegacyProcessor_SameIdempotencyKey_ReturnsSameUrlAndOneOrder` (byte-identical URL, one row) |
 | 003 | First-call-fails-before-persist → retry allowed | ✅ covered by design (no row written → resolver returns NewOrder); unit `…NoKey_DoesNotReplay` + stale-key test exercise the create path |
 
 ## Unit Tests
@@ -47,7 +47,7 @@ Full `dotnet test src/PhotoPrint.Tests` run: **457 / 457 passed**, 7 s. (449 pre
 
 - Stripe replay: two POSTs, same `Idempotency-Key` → same OrderId + secret, one Stripe create, one order row.
 - Stripe conflict: same key, `PaymentProcessor` changed → `409 Conflict`.
-- EuPlatesc replay: two POSTs, same key → identical redirect URL, one order row.
+- the legacy processor replay: two POSTs, same key → identical redirect URL, one order row.
 
 ## Security Tests
 

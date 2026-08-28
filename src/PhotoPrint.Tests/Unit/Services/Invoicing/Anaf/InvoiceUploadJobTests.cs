@@ -12,6 +12,7 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 using PhotoPrint.API.Services.Invoicing;
+using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services.Invoicing.Anaf;
 using PhotoPrint.Tests.Helpers;
 using Xunit;
@@ -102,7 +103,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         LogCapture? logCapture = null, int claimTtlMinutes = 10, Action<string>? sqlLog = null,
         TimeProvider? clock = null, int[]? backoffHours = null, bool realLifecycle = false,
         AnafOutageRegistry? outages = null, int pollIntervalMinutes = 30,
-        bool realXmlBuilder = false)
+        bool realXmlBuilder = false, int maxBatchSize = 50)
     {
         var router = new Mock<IStorageRouter>();
         var cloud = new Mock<IStorageService>();
@@ -160,6 +161,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
                 {
                     ClaimTtlMinutes = claimTtlMinutes,
                     PollIntervalMinutes = pollIntervalMinutes,
+                    MaxBatchSize = maxBatchSize,
                     BackoffHours = backoffHours ?? new AnafSettings().BackoffHours,
                 }),
                 outages ?? new AnafOutageRegistry(new MemoryCache(new MemoryCacheOptions())),
@@ -180,7 +182,8 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     private static (Guid orderId, Guid invoiceId) SeedOrderAndInvoice(
         PostgresTestDatabase database, InvoiceAnafStatus status = InvoiceAnafStatus.Pending,
         DateTimeOffset? claimedAt = null, string? xmlPayload = "<Invoice/>", string? anafUploadId = null,
-        DateTimeOffset? createdAt = null)
+        DateTimeOffset? createdAt = null, DateTimeOffset? updatedAt = null,
+        string? pdfStoragePath = null)
     {
         var orderId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
@@ -196,6 +199,8 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         invoice.ClaimedAt = claimedAt;
         invoice.AnafUploadId = anafUploadId;
         if (createdAt is not null) invoice.CreatedAt = createdAt.Value;
+        if (updatedAt is not null) invoice.UpdatedAt = updatedAt.Value;
+        invoice.PdfStoragePath = pdfStoragePath;
         seed.Invoices.Add(invoice);
         seed.SaveChanges();
         return (orderId, invoiceId);
@@ -338,7 +343,7 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     }
 
     [Fact]
-    public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyAndRethrows()
+    public async Task UploadPendingAsync_AnafSucceedsButMarkSubmittedFails_LogsDistinctlyWithoutRethrowing()
     {
         var database = _database;
         var logs = new LogCapture();
@@ -352,7 +357,8 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
 
         var act = () => InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().NotThrowAsync(
+            "a rethrow leaves the row Pending and claimed, so the next tick files a duplicate");
         logs.Records.Should().ContainSingle(
             r => r.Level == LogLevel.Error &&
                  r.Message.StartsWith("anaf.upload-job.submitted-but-not-recorded", StringComparison.Ordinal) &&
@@ -405,21 +411,88 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
     }
 
     [Fact]
-    public async Task UploadPendingAsync_AnafUnreachable_RecordsErrorAndReleasesClaim()
+    public async Task UploadPendingAsync_AnafUnreachable_CountsTheUnknownOutcomeAndKeepsTheClaim()
     {
         var database = _database;
-        var h = Build(database, cloudEnabled: false);
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
         var (orderId, invoiceId) = SeedOrderAndInvoice(database);
 
         h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 400));
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 502));
 
         await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
 
-        h.Lifecycle.Verify(l => l.RecordPendingErrorAsync(invoiceId, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         using var verify = CreateDb(database);
-        var claimedAt = await verify.Invoices.Where(i => i.Id == invoiceId).Select(i => i.ClaimedAt).FirstAsync();
-        claimedAt.Should().BeNull();
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.UnknownUploadOutcomes.Should().Be(1, "ANAF may already hold this number");
+        row.LastError.Should().NotBeNullOrEmpty();
+        row.ClaimedAt.Should().NotBeNull("a second replica must not re-post it before the claim expires");
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafUnreachable_CountsTheRowAsRetryingOnTheStatusMetric()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: 502));
+
+        using var metrics = new MetricCapture(MetricNames.Instruments.InvoiceAnafStatusTotal);
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        metrics.For(MetricNames.Instruments.InvoiceAnafStatusTotal,
+                    (MetricNames.Labels.Status, MetricNames.AnafStatusValues.Retrying))
+               .Should().HaveCount(1, "an outage that emits nothing looks like an idle queue");
+        metrics.ContractViolations().Should().BeEmpty();
+    }
+
+    // A 429 is refused before ANAF reads anything, so it must not spend the budget that exists
+    // for uploads whose outcome nobody knows.
+    [Theory]
+    [InlineData(429)]
+    [InlineData(503)]
+    public async Task UploadPendingAsync_UploadRefusedAtTheDoor_DoesNotSpendTheBlindRepostBudget(int httpStatus)
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("upload", httpStatus: httpStatus));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.UnknownUploadOutcomes.Should().Be(0, "nothing was filed, so no blind re-post has happened");
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Pending);
+        row.LastError.Should().NotBeNullOrEmpty();
+    }
+
+    // ANAF holds the document and we lost its id, so re-posting files a duplicate under a new number.
+    [Fact]
+    public async Task UploadPendingAsync_StatusWriteFailsAfterASuccessfulUpload_CountsItAsAnUnknownOutcome()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: false);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("index-42", DateTimeOffset.UtcNow));
+        h.Lifecycle.Setup(l => l.MarkSubmittedAsync(invoiceId, "index-42", It.IsAny<CancellationToken>()))
+                   .ThrowsAsync(new InvalidOperationException("value too long for type character varying(100)"));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        h.Lifecycle.Verify(l => l.RecordUnknownUploadOutcomeAsync(
+            invoiceId,
+            It.Is<string>(m => m.Contains("index-42")),
+            It.IsAny<string>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -548,6 +621,114 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
 
         h.Lifecycle.Verify(l => l.MarkFailedAsync(invoiceId, "date incorecte", It.IsAny<CancellationToken>()), Times.Once);
         h.Lifecycle.Verify(l => l.MarkRejectedAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_RejectedInvoicePastItsBackoffSlot_IsRequeuedForResubmission()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-2), updatedAt: now.AddHours(-2));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Pending,
+            "the 1h slot has passed, so the next tick must re-upload it");
+        row.AnafUploadId.Should().BeNull("a resubmission gets its own upload id");
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_RejectedInvoiceBeforeItsNextBackoffSlot_IsLeftAlone()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-4), updatedAt: now.AddHours(-2));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Rejected,
+            "the 5h slot is still an hour away — resubmitting sooner ignores the schedule");
+    }
+
+    [Fact]
+    public async Task ProcessBatchAsync_RejectedInvoiceWithNoBackoffSlotLeft_IsGivenUpOnAsFailed()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-10), updatedAt: now.AddHours(-4));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Failed,
+            "Rejected must reach Failed on its own, or the admin retry endpoint is the only way out");
+        row.ClaimedAt.Should().BeNull("the admin retry endpoint cannot take a claimed row");
+    }
+
+    // A queue of rejections must not push Pending uploads out of the batch they share.
+    [Fact]
+    public async Task ProcessBatchAsync_ManyNotYetDueRejections_StillUploadsAPendingInvoice()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true, maxBatchSize: 5);
+
+        for (var i = 0; i < 5; i++)
+            SeedOrderAndInvoice(database, status: InvoiceAnafStatus.Rejected,
+                anafUploadId: "upload-" + i,
+                createdAt: now.AddHours(-4), updatedAt: now.AddHours(-2));
+
+        var (_, pendingId) = SeedOrderAndInvoice(database, createdAt: now.AddHours(-1));
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(new AnafUploadResult("fresh-upload", now));
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var pending = await verify.Invoices.FirstAsync(i => i.Id == pendingId);
+        pending.AnafStatus.Should().Be(InvoiceAnafStatus.Submitted,
+            "five not-yet-due rejections must not fill a batch of five and starve the upload");
+    }
+
+    // The customer can already download this PDF; an automatic resubmit must not revoke it.
+    [Fact]
+    public async Task ProcessBatchAsync_AutomaticRejectionResubmit_KeepsTheRenderedPdf()
+    {
+        var database = _database;
+        var now = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+        var h = Build(database, cloudEnabled: false, clock: new FakeClock(now),
+                      backoffHours: [1, 4], realLifecycle: true);
+        var (_, invoiceId) = SeedOrderAndInvoice(
+            database, status: InvoiceAnafStatus.Rejected, anafUploadId: "upload-1",
+            createdAt: now.AddHours(-2), updatedAt: now.AddHours(-2),
+            pdfStoragePath: "invoices/2026/FT-2026-00001.pdf");
+
+        await InvokeProcessBatchAsync(h.Job);
+
+        using var verify = CreateDb(database);
+        var row = await verify.Invoices.FirstAsync(i => i.Id == invoiceId);
+        row.AnafStatus.Should().Be(InvoiceAnafStatus.Pending);
+        row.PdfStoragePath.Should().Be("invoices/2026/FT-2026-00001.pdf",
+            "clearing it 404s the customer download until a later tick re-renders");
     }
 
     private static Task InvokeRunTickAsync(InvoiceUploadJob job, CancellationToken ct)
@@ -933,5 +1114,38 @@ public class InvoiceUploadJobTests : IClassFixture<PostgresTestDatabase>
         public AdvanceableClock(DateTimeOffset now) { _now = now; }
         public override DateTimeOffset GetUtcNow() => _now;
         public void Advance(TimeSpan delta) => _now = _now.Add(delta);
+    }
+    [Fact]
+    public async Task UploadPendingAsync_AnafRejectsTheContentPermanently_ParksTheRowInsteadOfRetryingForEver()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafContentRejectedException("/upload", httpStatus: 400));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var db = database.NewContext();
+        var invoice = db.Invoices.Single(i => i.Id == invoiceId);
+        invoice.AnafStatus.Should().Be(InvoiceAnafStatus.Failed);
+    }
+
+    [Fact]
+    public async Task UploadPendingAsync_AnafUnreachableOnUpload_CountsAgainstTheBlindRepostBudget()
+    {
+        var database = _database;
+        var h = Build(database, cloudEnabled: false, realLifecycle: true);
+        var (orderId, invoiceId) = SeedOrderAndInvoice(database);
+
+        h.AnafClient.Setup(c => c.UploadAsync(It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                    .ThrowsAsync(new AnafUnreachableException("/upload", httpStatus: 502));
+
+        await InvokeUploadPendingAsync(h.Job, h.Sp, invoiceId, orderId);
+
+        using var db = database.NewContext();
+        var invoice = db.Invoices.Single(i => i.Id == invoiceId);
+        invoice.UnknownUploadOutcomes.Should().Be(1);
     }
 }

@@ -224,21 +224,28 @@ public class PostgresTestDatabase : IDisposable
 
             try
             {
+                var slotConnectionString = ConnectionStringFor(adminConnectionString, name);
+
                 if (DatabaseExists(adminConnectionString, name))
                 {
-                    TruncateEverything(ConnectionStringFor(adminConnectionString, name));
+                    // An interrupted first use leaves the database created but unmigrated, and
+                    // truncating that hands on a slot with no tables at all.
+                    EnsureSchemaApplied(slotConnectionString, dropForeignKeys);
+                    TruncateEverything(slotConnectionString);
                 }
                 else
                 {
                     ExecuteOnAdmin(adminConnectionString, $"CREATE DATABASE \"{name}\"");
-                    var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-                        .UseNpgsql(ConnectionStringFor(adminConnectionString, name))
-                        .Options;
-                    using (var db = new PhotoPrintDbContext(options))
-                        db.Database.Migrate();
-
-                    if (dropForeignKeys)
-                        ExecuteOn(ConnectionStringFor(adminConnectionString, name), DropForeignKeysSql);
+                    try
+                    {
+                        EnsureSchemaApplied(slotConnectionString, dropForeignKeys);
+                    }
+                    catch
+                    {
+                        // Leaving it behind would poison the slot for every later run.
+                        TryDropDatabase(adminConnectionString, name);
+                        throw;
+                    }
                 }
 
                 return (name, lease);
@@ -253,6 +260,31 @@ public class PostgresTestDatabase : IDisposable
         throw new InvalidOperationException(
             $"All {MaxPoolSlots} pooled test databases are leased. Either test parallelism grew " +
             "past the pool, or leases are being held open by a stuck process.");
+    }
+
+    internal static void EnsureSchemaApplied(string slotConnectionString, bool dropForeignKeys)
+    {
+        var options = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseNpgsql(slotConnectionString)
+            .Options;
+        using var db = new PhotoPrintDbContext(options);
+        if (!db.Database.GetPendingMigrations().Any()) return;
+
+        db.Database.Migrate();
+        if (dropForeignKeys)
+            ExecuteOn(slotConnectionString, DropForeignKeysSql);
+    }
+
+    private static void TryDropDatabase(string adminConnectionString, string name)
+    {
+        try
+        {
+            ExecuteOnAdmin(adminConnectionString, $"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)");
+        }
+        catch
+        {
+            /* the sweep collects it later */
+        }
     }
 
     private static bool TryLock(NpgsqlConnection lease, string name)

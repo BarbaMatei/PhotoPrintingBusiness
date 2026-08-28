@@ -37,6 +37,19 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
   return digits >= 9 && digits <= 15 ? null : { phone: true };
 }
 
+// The invoice line takes street, number and block as one field, so the server caps their total.
+const CITY_MAX = 50;
+const RECIPIENT_MAX = 200;
+const STREET_LINE_MAX = 150;
+
+function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
+  const parts = ['street', 'number', 'block']
+    .map(name => (group.get(name)?.value ?? '').toString().trim())
+    .filter(part => part.length > 0);
+  const combined = parts.join(' ');
+  return combined.length > STREET_LINE_MAX ? { streetLineTooLong: true } : null;
+}
+
 @Component({
   selector: 'app-delivery-step',
   standalone: true,
@@ -46,6 +59,13 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
     <div class="delivery-step">
       <h2 class="step-title">Metoda de livrare</h2>
 
+      @if (shippingCostsFailed()) {
+        <div class="cost-error" role="alert">
+          <span>Nu am putut încărca costurile de livrare.</span>
+          <button type="button" class="btn-retry-costs" (click)="loadShippingCosts()">Reîncearcă</button>
+        </div>
+      }
+
       <!-- Delivery method cards -->
       <div class="delivery-cards">
         <label class="delivery-card" [class.selected]="deliveryMethod() === 'Easybox'">
@@ -53,11 +73,18 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             type="radio"
             name="delivery"
             value="Easybox"
+            [disabled]="!shippingCostsReady()"
             (change)="selectMethod('Easybox')"
           />
           <div class="card-body">
             <div class="card-title">📦 Easybox Sameday</div>
-            <div class="card-price">{{ easyboxCostRon() | number:'1.2-2' }} RON</div>
+            <div class="card-price">
+              @if (easyboxCostRon() !== null) {
+                {{ easyboxCostRon() | number:'1.2-2' }} RON
+              } @else {
+                <span class="card-price--pending">se încarcă…</span>
+              }
+            </div>
             <div class="card-desc">Ridicare dintr-un easybox în 24h</div>
           </div>
         </label>
@@ -67,11 +94,18 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             type="radio"
             name="delivery"
             value="Courier"
+            [disabled]="!shippingCostsReady()"
             (change)="selectMethod('Courier')"
           />
           <div class="card-body">
             <div class="card-title">🚚 Livrare la ușă</div>
-            <div class="card-price">{{ courierCostRon() | number:'1.2-2' }} RON</div>
+            <div class="card-price">
+              @if (courierCostRon() !== null) {
+                {{ courierCostRon() | number:'1.2-2' }} RON
+              } @else {
+                <span class="card-price--pending">se încarcă…</span>
+              }
+            </div>
             <div class="card-desc">Curier la domiciliu în 2–4 zile</div>
           </div>
         </label>
@@ -140,7 +174,9 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             <div class="form-group">
               <label for="street">Strada</label>
               <input id="street" type="text" formControlName="street" />
-              @if (touched('street') && addressForm.get('street')?.invalid) {
+              @if (touched('street') && addressForm.get('street')?.errors?.['maxlength']) {
+                <span class="field-error">Prea lung pentru factură</span>
+              } @else if (touched('street') && addressForm.get('street')?.invalid) {
                 <span class="field-error">Câmp obligatoriu</span>
               }
             </div>
@@ -201,6 +237,12 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             }
           </div>
         </form>
+      }
+
+      @if (addressForm.errors?.['streetLineTooLong']) {
+        <div class="field-error form-error" role="alert">
+          Strada, numărul și blocul depășesc împreună 150 de caractere, limita liniei de adresă de pe factură.
+        </div>
       }
 
       <div class="step-actions">
@@ -294,6 +336,7 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
       font-size: 0.95rem;
     }
     .field-error { color: #dc3545; font-size: 0.8rem; }
+    .form-error { margin: 0.5rem 0; }
 
     .step-actions {
       display: flex;
@@ -324,8 +367,11 @@ export class DeliveryStep implements OnInit {
   readonly deliveryMethod = signal<DeliveryType | null>(
     this.checkoutState.snapshot.method,
   );
-  readonly easyboxCostRon = signal(20);
-  readonly courierCostRon = signal(25);
+  // Null until the server answers: a default that differs from the configured price is charged
+  // and invoiced at the server value, so the customer would agree to a total nobody bills.
+  readonly easyboxCostRon = signal<number | null>(null);
+  readonly courierCostRon = signal<number | null>(null);
+  readonly shippingCostsFailed = signal(false);
   readonly lockers = signal<LockerDto[]>([]);
   readonly selectedLockerId = signal<string | null>(this.checkoutState.snapshot.lockerId);
   readonly showLockerError = signal(false);
@@ -333,16 +379,18 @@ export class DeliveryStep implements OnInit {
 
   readonly citySearch = this.fb.control('');
 
+  // Mirrors the server caps: a value the API rejects should be caught on the screen that asks
+  // for it, not two screens later as a 400 on a field the customer can no longer see.
   readonly addressForm = this.fb.group({
-    street: ['', Validators.required],
-    number: ['', Validators.required],
-    block: [''],
-    city: ['', Validators.required],
-    county: ['', Validators.required],
-    postalCode: ['', Validators.required],
-    recipientName: ['', Validators.required],
+    street: ['', [Validators.required, Validators.maxLength(255)]],
+    number: ['', [Validators.required, Validators.maxLength(50)]],
+    block: ['', Validators.maxLength(100)],
+    city: ['', [Validators.required, Validators.maxLength(CITY_MAX)]],
+    county: ['', [Validators.required, Validators.maxLength(100)]],
+    postalCode: ['', [Validators.required, Validators.maxLength(20)]],
+    recipientName: ['', [Validators.required, Validators.maxLength(RECIPIENT_MAX)]],
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
-  });
+  }, { validators: combinedStreetLength });
 
   // Form validity is not a signal, so mirror it into one — otherwise the computed
   // below memoizes a stale value and the button never re-enables after typing.
@@ -354,14 +402,15 @@ export class DeliveryStep implements OnInit {
   readonly canContinue = computed(() => {
     const method = this.deliveryMethod();
     if (!method) return false;
+    // A restored method carries a stored price; continuing before the server confirms it invoices
+    // a total the customer never agreed to.
+    if (!this.shippingCostsReady()) return false;
     if (method === 'Easybox') return !!this.selectedLockerId() && this.addressValid();
     return this.addressValid();
   });
 
   ngOnInit(): void {
-    // Load shipping costs
-    this.shippingService.getShippingCost('Easybox').subscribe(r => this.easyboxCostRon.set(r.costRon));
-    this.shippingService.getShippingCost('Courier').subscribe(r => this.courierCostRon.set(r.costRon));
+    this.loadShippingCosts();
 
     const saved = this.checkoutState.snapshot.shippingAddress;
     if (saved) this.addressForm.patchValue(saved);
@@ -434,7 +483,30 @@ export class DeliveryStep implements OnInit {
       });
   }
 
+  loadShippingCosts(): void {
+    this.shippingCostsFailed.set(false);
+    this.shippingService.getShippingCost('Easybox').subscribe({
+      next: r => this.applyCost('Easybox', r.costRon),
+      error: () => this.shippingCostsFailed.set(true),
+    });
+    this.shippingService.getShippingCost('Courier').subscribe({
+      next: r => this.applyCost('Courier', r.costRon),
+      error: () => this.shippingCostsFailed.set(true),
+    });
+  }
+
+  private applyCost(method: DeliveryType, costRon: number): void {
+    if (method === 'Easybox') this.easyboxCostRon.set(costRon);
+    else this.courierCostRon.set(costRon);
+    if (this.deliveryMethod() === method) this.checkoutState.setShippingCost(costRon);
+  }
+
+  readonly shippingCostsReady = computed(
+    () => this.easyboxCostRon() !== null && this.courierCostRon() !== null,
+  );
+
   selectMethod(method: DeliveryType): void {
+    if (!this.shippingCostsReady()) return;
     if (this.deliveryMethod() === method) return; // a no-op re-click must not wipe a restored locker
     this.deliveryMethod.set(method);
     // Mirror the state setMethod clears: without this the stale selectedLockerId leaves canContinue
@@ -442,7 +514,7 @@ export class DeliveryStep implements OnInit {
     this.selectedLockerId.set(null);
     this.showLockerError.set(false);
     this.lockerSearchError.set(false);
-    const cost = method === 'Easybox' ? this.easyboxCostRon() : this.courierCostRon();
+    const cost = method === 'Easybox' ? this.easyboxCostRon()! : this.courierCostRon()!;
     this.checkoutState.setMethod(method, cost);
     if (method === 'Easybox') this.primeLockers$.next();
   }

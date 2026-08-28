@@ -48,6 +48,8 @@ public class Invoice
 
     /// <summary>ANAF SPV upload identifier returned on submission. Populated
     /// by bolt 039's <c>InvoiceUploadJob</c>.</summary>
+    public const int AnafUploadIdMaxLength = 100;
+
     public string? AnafUploadId { get; set; }
 
     /// <summary>ANAF submission lifecycle state. Defaults to

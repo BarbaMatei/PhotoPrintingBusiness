@@ -31,7 +31,7 @@ This minimizes third-party data footprint (abandoned/unpaid photos never reach t
 ## Functional Requirements
 
 ### FR-1: Promote photos on order payment
-- **Description**: When an order transitions to **Paid** (Stripe webhook / EuPlatesc IPN), asynchronously promote each of its uploads to cloud: upload the original, generate + upload a ~2000 px large preview, ensure the thumbnail exists; set `Upload.StorageLocation = Cloud` and the cloud keys; **delete the local copies only after** the cloud writes are confirmed.
+- **Description**: When an order transitions to **Paid** (Stripe webhook / the legacy processor IPN), asynchronously promote each of its uploads to cloud: upload the original, generate + upload a ~2000 px large preview, ensure the thumbnail exists; set `Upload.StorageLocation = Cloud` and the cloud keys; **delete the local copies only after** the cloud writes are confirmed.
 - **Acceptance Criteria**:
   - Promotion runs **off the webhook hot path** (enqueue → background worker).
   - Idempotent: re-running for an already-promoted order is a no-op.
@@ -105,7 +105,7 @@ This minimizes third-party data footprint (abandoned/unpaid photos never reach t
 
 ## Constraints
 
-- **Triggers**: order→**Paid** (Stripe webhook / EuPlatesc IPN) for promotion; order→**Shipped** (configurable) for original purge; both via the existing order status machine.
+- **Triggers**: order→**Paid** (Stripe webhook / the legacy processor IPN) for promotion; order→**Shipped** (configurable) for original purge; both via the existing order status machine.
 - Depends on intent **019** (`S3StorageService`, presigned URLs) and **bolt 043** (`StorageLocation`, location-aware preview).
 - Pre-payment previews are served from local disk → single-node serving for the pre-payment phase (acceptable on the current single-VM deployment; revisit for multi-node).
 

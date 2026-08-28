@@ -14,6 +14,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(ConflictException)]             = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(IdempotencyConflictException)]  = (StatusCodes.Status409Conflict, "Idempotency conflict"),
         [typeof(IdempotencyKeyTakenException)]  = (StatusCodes.Status409Conflict, "Conflict"),
+        [typeof(IdempotencyKeyConsumedException)] = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(ForbiddenException)]            = (StatusCodes.Status403Forbidden, "Forbidden"),
         [typeof(UnauthorizedException)]         = (StatusCodes.Status401Unauthorized, "Unauthorized"),
         [typeof(BadGatewayException)]           = (StatusCodes.Status502BadGateway, "Bad Gateway"),
@@ -129,6 +130,11 @@ public class ExceptionHandlerMiddleware : IMiddleware
                     "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
                     correlationId);
 
+            if (exception is IdempotencyKeyConsumedException consumed)
+                _logger.LogWarning(
+                    "payments.idempotency.key-consumed correlation_id={CorrelationId} order_id={OrderId}",
+                    correlationId, consumed.OrderId);
+
             // A rejected decompression bomb 422s like an ordinary
             // "unreadable image" 422, so ops can't alert on a bomb spike. Emit a distinct
             // reserved event carrying the offending dimensions (no file data / no PII).
@@ -200,6 +206,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         // so a FE built against the dev API never saw the contract field. Field NAMES only,
         // never values (no PII).
         var divergentFields = (exception as IdempotencyConflictException)?.DivergentFields;
+        var consumedOrderId = (exception as IdempotencyKeyConsumedException)?.OrderId;
 
         object response;
 
@@ -217,6 +224,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 detail,
                 correlationId,
                 divergentFields,
+                orderId = consumedOrderId,
                 exception = new
                 {
                     type = exception.GetType().FullName,
@@ -238,6 +246,9 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
             if (divergentFields is not null)
                 problem.Extensions["divergentFields"] = divergentFields;
+
+            if (consumedOrderId is not null)
+                problem.Extensions["orderId"] = consumedOrderId.ToString();
 
             response = problem;
         }

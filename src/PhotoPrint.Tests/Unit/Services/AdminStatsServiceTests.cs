@@ -29,7 +29,6 @@ public class AdminStatsServiceTests
         {
             OrderNumber = $"FT-{Guid.NewGuid():N}",
             Status = status,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Courier,
             ShippingAddress = new ShippingAddressSnapshot
             {

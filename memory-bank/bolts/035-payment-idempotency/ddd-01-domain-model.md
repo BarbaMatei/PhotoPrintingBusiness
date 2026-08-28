@@ -10,7 +10,7 @@ updated: 2026-05-25T13:15:00Z
 
 ## Bounded Context
 
-**Payment processing within the e-commerce checkout flow.** This unit augments the existing `Order` aggregate with idempotent-creation semantics across both supported payment processors (Stripe, EuPlatesc). It does not introduce a new bounded context — it tightens an invariant on the existing one.
+**Payment processing within the e-commerce checkout flow.** This unit augments the existing `Order` aggregate with idempotent-creation semantics across both supported payment processors (Stripe, the legacy processor). It does not introduce a new bounded context — it tightens an invariant on the existing one.
 
 **Relevant prior decisions**:
 
@@ -89,7 +89,7 @@ The 24-hour window is a domain rule, not a storage detail — it caps how long a
 |------------|--------|------------------------------------------------|
 | `IOrderService` (existing) | `Order` | ~~`GetByIdempotencyKeyAsync(...)`~~ **removed as dead code (QUAL-1, review 035-v8)** — idempotency resolution lives entirely inside `CreateFromCartAsync` via the private `FindKeyHolderAsync`; the standalone public lookup had no production caller. `IsSameLogicalRequest(Order existing, LogicalRequest current) -> bool` — pure comparison; no I/O (as-built: `DivergentFields`) |
 
-The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) so `Replay` can return it directly. EuPlatesc has no equivalent secret — the redirect URL is reconstructed deterministically from the persisted `Order` (HMAC-MD5 of stable fields).
+The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) so `Replay` can return it directly. the legacy processor has no equivalent secret — the redirect URL is reconstructed deterministically from the persisted `Order` (HMAC-MD5 of stable fields).
 
 ---
 
@@ -103,7 +103,7 @@ The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) 
 | **Conflict** | A repeat call with the same key but a divergent logical request. Yields 409 ProblemDetails. The client must either change the key or change the request. |
 | **Idempotency Window** | The 24-hour interval starting at `Order.CreatedAt` during which the key dedupes. After the window, the key is *stale* — it remains on the row for audit but no longer matches in lookup. |
 | **Missing Key (transitional)** | A request without the `Idempotency-Key` header. The endpoint accepts it (preserving current behaviour during the FE migration window) and logs `INFO payments.idempotency.missing-key` (OBS-3, review 035-v8: Information, not Warning — it is the expected transitional state on ~100% of requests, so a Warning is constant alert noise). After the FE adopts the header globally, missing-key should escalate to 400 (and the log back to Warning) — that decision is out of scope for this bolt. |
-| **Replay Token** | The Stripe `ClientSecret` returned to a replay caller. Identical bytes to the original response. Equivalent for EuPlatesc is the redirect URL. |
+| **Replay Token** | The Stripe `ClientSecret` returned to a replay caller. Identical bytes to the original response. Equivalent for the legacy processor is the redirect URL. |
 
 ---
 
@@ -117,7 +117,7 @@ The Stripe `ClientSecret` already lives on the `Order` aggregate (no new field) 
 | 002 | Same key + divergent body → 409 "Idempotency conflict" naming divergent fields | `Conflict(divergentFields)` outcome → 409 ProblemDetails (NOT 422, per ADR-002) |
 | 002 | Missing key behaves as today + Information log (OBS-3, v8 — was Warning) | `MissingIdempotencyKeyObserved` event (logged) + resolver short-circuit (treat as `NewOrder`) |
 | 002 | Stripe SDK `RequestOptions.IdempotencyKey` set | Stage-2 wiring; modelled here as "Replay Token" parity requirement |
-| 003 | Same key on EuPlatesc → same redirect URL + OrderId | `Replay(existingOrder)` outcome; EuPlatesc redirect URL is deterministic from the persisted order |
+| 003 | Same key on the legacy processor → same redirect URL + OrderId | `Replay(existingOrder)` outcome; the legacy processor redirect URL is deterministic from the persisted order |
 | 003 | First-call failure before persist → retry allowed | Resolver returns `NewOrder` because no row was ever written; no special state to clean up |
 
 ---

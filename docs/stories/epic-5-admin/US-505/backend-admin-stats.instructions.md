@@ -11,7 +11,7 @@ BACKEND — ASP.NET Core
 EPIC-5 | Panou Admin
 
 ## Dependencies
-- US-305/US-306 (Orders with payment data must exist)
+- US-305 (Orders with payment data must exist)
 - US-802 (Admin authorization)
 
 ## Acceptance Criteria

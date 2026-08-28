@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Stripe;
 using PhotoPrint.API.Authentication;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Payments;
+using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Extensions;
 using PhotoPrint.API.Filters;
-using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
 
 namespace PhotoPrint.API.Controllers;
@@ -18,26 +20,22 @@ namespace PhotoPrint.API.Controllers;
 [ServiceFilter(typeof(IdempotencyKeyFilter))]
 public class PaymentsController : ControllerBase
 {
-    // CreateOrderRequest is an enum pair plus one length-bounded address (~2 KB at its longest), and a guest token is free, so the body DetectLegacyShippingCostFilter buffers needs a ceiling.
+    // CreateOrderRequest is an enum plus one length-bounded address (~2 KB at its longest), and a guest token is free, so the body DetectLegacyShippingCostFilter buffers needs a ceiling.
     public const int MaxRequestBodyBytes = 64 * 1024;
-
 
     private readonly IOrderService _orderService;
     private readonly IStripePaymentGateway _stripeGateway;
-    private readonly IEuPlatescService _euPlatescService;
     private readonly PhotoPrintDbContext _db;
     private readonly ILogger<PaymentsController> _logger;
 
     public PaymentsController(
         IOrderService orderService,
         IStripePaymentGateway stripeGateway,
-        IEuPlatescService euPlatescService,
         PhotoPrintDbContext db,
         ILogger<PaymentsController> logger)
     {
         _orderService = orderService;
         _stripeGateway = stripeGateway;
-        _euPlatescService = euPlatescService;
         _db = db;
         _logger = logger;
     }
@@ -50,118 +48,66 @@ public class PaymentsController : ControllerBase
     // The 409 body carries the divergentFields extension — type it so
     // generated clients see the field that tells the FE which inputs to fix.
     [ProducesResponseType(typeof(IdempotencyConflictProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<IActionResult> CreateStripeIntentAsync(
+    public async Task<IActionResult> CreateStripeIntentAsync(
         [FromBody] CreateOrderRequest request,
         CancellationToken cancellationToken)
-        => CreateIntentAsync(
-            request,
-            processor: "Stripe",
-            cachedValue: o => o.StripeClientSecret,
-            computeAndApplyAsync: async o =>
-            {
-                var amountBani = (long)(o.TotalRon * 100);
-                // Key Stripe by the order id (stable per order), not the client
-                // Idempotency-Key, so a recycled client key can't collide at Stripe.
-                var (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
-                    amountBani, "ron", o.Id.ToString(), o.Id.ToString(), cancellationToken);
-                o.PaymentIntentId = paymentIntentId;
-                o.StripeClientSecret = clientSecret;
-                return clientSecret;
-            },
-            buildResponse: (o, secret) => new StripeIntentResponse(secret, o.Id),
-            cancellationToken);
-
-    // ── POST /api/payments/euplatesc/initiate ─────────────────────────────────
-
-    [HttpPost("euplatesc/initiate")]
-    [ProducesResponseType(typeof(EuPlatescInitiateResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    // Typed 409 body — see the Stripe endpoint above.
-    [ProducesResponseType(typeof(IdempotencyConflictProblemDetails), StatusCodes.Status409Conflict)]
-    public Task<IActionResult> InitiateEuPlatescAsync(
-        [FromBody] CreateOrderRequest request,
-        CancellationToken cancellationToken)
-        => CreateIntentAsync(
-            request,
-            processor: "EuPlatesc",
-            cachedValue: o => o.EuPlatescRedirectUrl,
-            computeAndApplyAsync: o =>
-            {
-                // The redirect URL embeds a timestamp + nonce, so it is persisted and
-                // replayed verbatim rather than rebuilt on a later call.
-                //
-                // Gateway asymmetry — durable fix deferred: Stripe has
-                // gateway-side idempotency (RequestOptions.IdempotencyKey keyed by order.Id), so
-                // a re-call can't create a second intent. EuPlatesc has NO gateway idempotency
-                // key — its only protection is persist-URL-once + replay. In the recovery-replay
-                // path (WasIdempotentReplay with a null cached URL, e.g. crash-before-persist),
-                // two truly concurrent retries could each rebuild a DIFFERENT signed URL
-                // (fresh timestamp+nonce), last-writer-wins on the row. No double CHARGE — the
-                // stable invoice_id (== order.Id) makes EuPlatesc map both to one order — but the
-                // "replay returns the stored value verbatim" invariant is momentarily violated.
-                // Durable fix: re-read the persisted URL under a short row lock (Postgres
-                // SELECT … FOR UPDATE). That needs the not-yet-built Postgres arm, so it is
-                // deferred to the migration/deploy phase alongside the untested-Postgres-arm gap.
-                var redirectUrl = _euPlatescService.BuildInitiateUrl(o);
-                o.EuPlatescRedirectUrl = redirectUrl;
-                return Task.FromResult(redirectUrl);
-            },
-            buildResponse: (o, url) => new EuPlatescInitiateResponse(url, o.Id),
-            cancellationToken);
-
-    /// <summary>
-    /// The replay/compute/persist shape shared by both processors. Resolve the
-    /// (idempotent) order; if this is a replay and the processor's value is already
-    /// cached, return it without touching the gateway; otherwise compute it
-    /// (<paramref name="computeAndApplyAsync"/> calls the gateway and writes the order's
-    /// fields), persist, and return. The Idempotency-Key is read from
-    /// <see cref="HttpContext"/> where <see cref="IdempotencyKeyFilter"/> stashed it.
-    /// </summary>
-    private async Task<IActionResult> CreateIntentAsync<TResponse>(
-        CreateOrderRequest request,
-        string processor,
-        Func<Order, string?> cachedValue,
-        Func<Order, Task<string>> computeAndApplyAsync,
-        Func<Order, string, TResponse> buildResponse,
-        CancellationToken ct)
     {
         var userId = User.GetUserIdOrNull();
         var guestSessionId = User.GetGuestSessionIdOrNull();
         var idempotencyKey = HttpContext.GetIdempotencyKey();
 
         var result = await _orderService.CreateFromCartAsync(
-            userId, guestSessionId, request, idempotencyKey, ct);
+            userId, guestSessionId, request, idempotencyKey, cancellationToken);
         var order = result.Order;
 
-        // One switch over (replay?, value-already-cached?) instead of
-        // two separate `WasIdempotentReplay` checks with duplicated log shapes.
-        var cached = cachedValue(order);
-        switch (result.WasIdempotentReplay, HasCachedValue: cached is not null)
+        if (result.WasIdempotentReplay && order.StripeClientSecret is not null)
         {
-            case (true, true):
-                // Replay with the value already persisted → return it, no gateway call.
-                _logger.LogInformation(
-                    "payments.idempotency.replay processor={Processor} order_id={OrderId}",
-                    processor, order.Id);
-                return Ok(buildResponse(order, cached!));
-
-            case (true, false):
-                // Recovery replay — an earlier attempt created this
-                // order but died before persisting the gateway value, so the service resolves
-                // the same order yet nothing is cached. Re-invoking the gateway below is safe
-                // (Stripe is keyed by the stable order id → same PaymentIntent, no double
-                // charge; EuPlatesc just rebuilds the caller's own redirect URL) but it is a
-                // distinct completion path, so log it as such rather than as a fresh request.
-                _logger.LogInformation(
-                    "payments.idempotency.replay-recovery processor={Processor} order_id={OrderId}",
-                    processor, order.Id);
-                break;
-
-            // (false, _) → a genuinely fresh order: compute + persist below, no replay log.
+            // Replay with the secret already persisted → return it, no gateway call.
+            _logger.LogInformation(
+                "payments.idempotency.replay order_id={OrderId}", order.Id);
+            return Ok(new StripeIntentResponse(order.StripeClientSecret, order.Id));
         }
 
-        var value = await computeAndApplyAsync(order);
-        await _db.SaveChangesAsync(ct);
-        return Ok(buildResponse(order, value));
+        if (result.WasIdempotentReplay)
+        {
+            // Recovery replay — an earlier attempt created this order but died before
+            // persisting the client secret. Re-invoking Stripe below is safe (the intent
+            // is keyed by the stable order id → same PaymentIntent, no double charge)
+            // but it is a distinct completion path, so log it as such.
+            _logger.LogInformation(
+                "payments.idempotency.replay-recovery order_id={OrderId}", order.Id);
+        }
+
+        var amountBani = (long)(order.TotalRon * 100);
+        string clientSecret;
+        string paymentIntentId;
+        try
+        {
+            // Key Stripe by the order id (stable per order), not the client
+            // Idempotency-Key, so a recycled client key can't collide at Stripe.
+            (clientSecret, paymentIntentId) = await _stripeGateway.CreatePaymentIntentAsync(
+                amountBani, "ron", order.Id.ToString(), order.Id.ToString(), cancellationToken);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Type == "idempotency_error")
+        {
+            // The other tab is mid-flight with the same gateway key. Its secret lands in a moment;
+            // a 500 here would tell the customer the basket is broken.
+            _logger.LogInformation(
+                "payments.idempotency.gateway-race order_id={OrderId}", order.Id);
+            var persisted = await _db.Orders
+                .Where(o => o.Id == order.Id)
+                .Select(o => o.StripeClientSecret)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (persisted is not null)
+                return Ok(new StripeIntentResponse(persisted, order.Id));
+
+            throw new ConflictException(
+                "Sesiunea de plată se pregătește deja în altă filă. Reîncărcați pagina în câteva secunde.");
+        }
+
+        order.PaymentIntentId = paymentIntentId;
+        order.StripeClientSecret = clientSecret;
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new StripeIntentResponse(clientSecret, order.Id));
     }
 }

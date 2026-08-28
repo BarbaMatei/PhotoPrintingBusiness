@@ -63,7 +63,7 @@ red run proved the old code throws `OutOfMemoryException` on a chunked body that
 1 MB, not the 256 KB first drafted, because rejecting a genuine Stripe event costs a three-day
 retry cycle at Stripe; `[RequestSizeLimit]` at 2 MB stays as the byte backstop.
 
-Three sibling sites carried the same class and are fixed in the same commit: the EuPlatesc IPN
+Three sibling sites carried the same class and are fixed in the same commit: the legacy processor IPN
 (model binding materialises its form before any code runs, so only a byte ceiling bounds it),
 `DetectLegacyShippingCostFilter` (buffered the whole body with no limit for anyone holding a
 free guest token) and the middleware gap above, which now answers Kestrel's own status for
@@ -180,7 +180,7 @@ not need a real unique index.
 exhaustion also escapes untyped. Left alone on purpose: nothing is charged on that path (the order
 is being created, not paid), the loop's own comment states that the escape is the intended signal
 for a persistent clash, and on PostgreSQL the per-year sequence cannot reach it. The two
-invoice-creating Paid paths are now both gated on an outcome — the webhook's Stripe and EuPlatesc
+invoice-creating Paid paths are now both gated on an outcome — the webhook's Stripe and the legacy processor
 branches already were.
 
 ### Cluster D's micro-review: eight gaps folded in (PPW-564, PPW-567)

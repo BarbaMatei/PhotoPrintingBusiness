@@ -17,6 +17,7 @@ import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.
 import { BreadcrumbComponent } from '../../../../shared/components/breadcrumb/breadcrumb.component';
 
 const NEXT_STATUSES: Record<string, string[]> = {
+  AwaitingPayment: ['Paid', 'PaymentFailed', 'Cancelled'],
   Paid:     ['Printing', 'Cancelled'],
   Printing: ['Shipped',  'Cancelled'],
   Shipped:  ['Delivered'],

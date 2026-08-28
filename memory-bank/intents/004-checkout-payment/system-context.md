@@ -9,7 +9,7 @@ updated: 2026-05-21T12:00:00Z
 
 ## System Overview
 
-The checkout-payment intent adds the complete purchase funnel to FotoTipar: photo upload, cart management, delivery selection, and dual-processor payment (Stripe + EuPlatesc). It sits at the intersection of every platform capability — consuming auth, products, and email, and producing orders that downstream intent 005-order-management will operate on.
+The checkout-payment intent adds the complete purchase funnel to FotoTipar: photo upload, cart management, delivery selection, and dual-processor payment (Stripe + the legacy processor). It sits at the intersection of every platform capability — consuming auth, products, and email, and producing orders that downstream intent 005-order-management will operate on.
 
 ## Context Diagram
 
@@ -22,12 +22,12 @@ C4Context
 
   System_Boundary(fotoTipar, "FotoTipar Platform") {
     System(uploadCart, "Upload & Cart Backend", "Accepts photo uploads, validates MIME, stores files, manages server-side cart (bolts 012, 013)")
-    System(checkoutFlow, "Checkout & Order Backend", "Delivery selection, order creation, Stripe & EuPlatesc payment processing (bolts 015, 016)")
+    System(checkoutFlow, "Checkout & Order Backend", "Delivery selection, order creation, Stripe & the legacy processor payment processing (bolts 015, 016)")
     System(angularUI, "Angular SPA", "Upload UI, format/finish selector, cart page, checkout wizard, confirmation page (bolts 014, 017)")
   }
 
   System_Ext(stripe, "Stripe", "International card payment — PaymentIntent + webhook confirmation")
-  System_Ext(euplatesc, "EuPlatesc", "Romanian card payment — redirect + IPN HMAC-MD5 confirmation")
+  System_Ext(legacy-processor, "the legacy processor", "Romanian card payment — redirect + IPN HMAC-MD5 confirmation")
   System_Ext(sameday, "Sameday / Easybox", "Phase 1: seeded static locker data. Phase 2: live API proxy")
   System_Ext(sendgrid, "SendGrid / MailKit", "Transactional email (OrderConfirmedEmail) via IEmailService abstraction")
   System_Ext(storage, "Local Filesystem (Phase 1)", "IStorageService — stores uploaded photos; Phase 2: S3 / Azure Blob")
@@ -35,10 +35,10 @@ C4Context
   Rel(customer, angularUI, "Uploads photos, selects format, pays")
   Rel(guest, angularUI, "Uploads photos, checks out without registering")
   Rel(angularUI, uploadCart, "POST /api/uploads, GET/POST/DELETE /api/cart")
-  Rel(angularUI, checkoutFlow, "GET /api/shipping/lockers, POST /api/payments/stripe/intent, POST /api/payments/euplatesc/initiate")
+  Rel(angularUI, checkoutFlow, "GET /api/shipping/lockers, POST /api/payments/stripe/intent, POST /api/payments/legacy-processor/initiate")
   Rel(uploadCart, storage, "Saves / deletes photo files via IStorageService")
   Rel(checkoutFlow, stripe, "Creates PaymentIntent; receives webhook on payment_intent.succeeded/failed")
-  Rel(checkoutFlow, euplatesc, "Generates HMAC-MD5 redirect URL; receives IPN callback")
+  Rel(checkoutFlow, legacy-processor, "Generates HMAC-MD5 redirect URL; receives IPN callback")
   Rel(checkoutFlow, sameday, "Phase 1: seeded DB query; Phase 2: proxied API call")
   Rel(checkoutFlow, sendgrid, "Calls IEmailService.SendOrderConfirmedAsync on payment success")
 ```
@@ -70,9 +70,9 @@ C4Context
 - **Events handled**: `payment_intent.succeeded`, `payment_intent.payment_failed`
 - **Constraint**: Card data never touches FotoTipar server — Stripe Elements is entirely client-side
 
-### EuPlatesc
+### the legacy processor
 - **Direction**: Outbound (redirect URL generation) + Inbound (IPN POST callback)
-- **Auth**: HMAC-MD5 signature with merchant key (per EuPlatesc specification — cannot be upgraded)
+- **Auth**: HMAC-MD5 signature with merchant key (per the legacy processor specification — cannot be upgraded)
 - **IPN validation**: Amount in callback cross-checked against stored order amount; mismatch → reject
 - **Constraint**: PCI compliance via hosted redirect; no card fields in FotoTipar
 
@@ -88,16 +88,16 @@ C4Context
 
 ## Key NFR Goals (for Construction Agent context)
 
-- **No card data on server** — Stripe Elements is client-side only; EuPlatesc uses hosted redirect
+- **No card data on server** — Stripe Elements is client-side only; the legacy processor uses hosted redirect
 - **MIME validation by magic bytes** — first 8 bytes checked, not file extension or Content-Type header
-- **Webhook idempotency** — both Stripe and EuPlatesc handlers are idempotent; duplicate delivery → 200 OK, no side effects
+- **Webhook idempotency** — both Stripe and the legacy processor handlers are idempotent; duplicate delivery → 200 OK, no side effects
 - **Cart merge atomicity** — `POST /api/cart/merge` executes in a single DB transaction
 - **Upload path traversal prevention** — UUID filenames enforced; no original filename stored in path
 - **Checkout state resilience** — Angular checkout survives page refresh via sessionStorage or cart-page redirect
 
 ## High-Level Constraints
 
-- Order must be created **before** payment initiates (required by both Stripe and EuPlatesc — `orderId` needed in payment request)
+- Order must be created **before** payment initiates (required by both Stripe and the legacy processor — `orderId` needed in payment request)
 - Product pricing is **snapshotted as JSON** on the Order at creation time (historical accuracy if prices change later)
 - HEIC preview is handled **client-side** via `heic2any` — no server HEIC processing
 - Sameday AWB is **manual in Phase 1** — admin enters AWB number; `IShippingService` stub prepared for Phase 2

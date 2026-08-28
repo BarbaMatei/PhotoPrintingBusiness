@@ -52,4 +52,38 @@ public sealed class PostgresInvoiceNumberingService : IInvoiceNumberingService
 
         return new InvoiceNumber(series, year, (int)next);
     }
+
+    public async Task ReconcileWithStoredInvoicesAsync(
+        string series, int year, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(series))
+            throw new ArgumentException("series is required", nameof(series));
+        if (year is < 2000 or > 9999)
+            throw new ArgumentOutOfRangeException(nameof(year));
+
+        var seqName = $"invoice_seq_{series.ToLowerInvariant()}_{year}";
+        await PostgresSequences.EnsureAsync(_db.Database, seqName, ct);
+
+        // Mirrors uq_invoices_series_year_number: the year is derived from IssuedAt in UTC, not stored.
+        var highest = await _db.Database.SqlQuery<int>($"""
+            SELECT COALESCE(MAX("Number"), 0) AS "Value" FROM "Invoices"
+            WHERE "Series" = {series}
+              AND (EXTRACT(YEAR FROM ("IssuedAt" AT TIME ZONE 'UTC'))::int) = {year}
+            """).SingleAsync(ct);
+
+        if (highest <= 0) return;
+
+        var reconciled = await _db.Database.SqlQuery<long>($"""
+            SELECT setval(
+                {seqName}::regclass,
+                GREATEST({(long)highest}, COALESCE((
+                    SELECT last_value FROM pg_sequences
+                    WHERE schemaname = current_schema() AND sequencename = {seqName}), 0)),
+                true) AS "Value"
+            """).SingleAsync(ct);
+
+        _logger.LogWarning(
+            "invoice.numbering.sequence-reconciled series={Series} year={Year} highest_stored={Highest} sequence_now={Reconciled}",
+            series, year, highest, reconciled);
+    }
 }

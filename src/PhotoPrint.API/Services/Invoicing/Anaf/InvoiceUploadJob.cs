@@ -23,6 +23,7 @@ public sealed class InvoiceUploadJob : BackgroundService
     private readonly TimeProvider _clock;
     private readonly ILogger<InvoiceUploadJob> _logger;
     private readonly int _pollIntervalMinutes;
+    private readonly int _maxBatchSize;
     private readonly int _maxUnknownUploadOutcomes;
     private readonly TimeSpan _authOutageAlertWindow;
 
@@ -40,6 +41,7 @@ public sealed class InvoiceUploadJob : BackgroundService
         _logger = logger;
         _pollIntervalMinutes = Math.Max(1, _settings.PollIntervalMinutes);
         _maxUnknownUploadOutcomes = Math.Max(1, _settings.MaxUnknownUploadOutcomes);
+        _maxBatchSize = Math.Clamp(_settings.MaxBatchSize, 1, 500);
         _authOutageAlertWindow = AuthOutageAlertWindowFor(_pollIntervalMinutes);
     }
 
@@ -90,18 +92,34 @@ public sealed class InvoiceUploadJob : BackgroundService
 
             var pendingStatus   = InvoiceAnafStatus.Pending;
             var submittedStatus = InvoiceAnafStatus.Submitted;
+            var rejectedStatus  = InvoiceAnafStatus.Rejected;
 
             // A row that just failed gets a cooldown, or the oldest broken invoice heads every batch
             // forever and starves the healthy ones out of a batch capped at MaxBatchSize.
-            var retryNotBefore = _clock.GetUtcNow() - TimeSpan.FromMinutes(Math.Max(2, _settings.PollIntervalMinutes));
+            var now = _clock.GetUtcNow();
+            var retryNotBefore = now - TimeSpan.FromMinutes(Math.Max(2, _settings.PollIntervalMinutes));
+
+            // Coarse filter only: the exact schedule needs CreatedAt too, so due-ness is settled in memory below.
+            var rejectedNotBefore = now - TimeSpan.FromHours(Math.Max(1, MinBackoffHours));
 
             var batch = await db.Invoices
                 .Where(i => (i.AnafStatus == pendingStatus || i.AnafStatus == submittedStatus)
                             && (i.LastError == null || i.UpdatedAt == null || i.UpdatedAt < retryNotBefore))
                 .OrderBy(i => i.CreatedAt)
-                .Take(_settings.MaxBatchSize)
-                .Select(i => new { i.Id, i.OrderId, i.AnafStatus })
+                .Take(_maxBatchSize)
+                .Select(i => new BatchRow(i.Id, i.OrderId, i.AnafStatus, i.CreatedAt, i.UpdatedAt))
                 .ToListAsync(ct);
+
+            // Oldest transition first: a row that just moved is the least likely to be due.
+            var rejected = await db.Invoices
+                .Where(i => i.AnafStatus == rejectedStatus
+                            && (i.UpdatedAt == null || i.UpdatedAt < rejectedNotBefore))
+                .OrderBy(i => i.UpdatedAt)
+                .Take(RejectedSliceCap)
+                .Select(i => new BatchRow(i.Id, i.OrderId, i.AnafStatus, i.CreatedAt, i.UpdatedAt))
+                .ToListAsync(ct);
+
+            batch.AddRange(rejected);
 
             if (batch.Count == 0) return;
 
@@ -125,7 +143,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                 using var perRowScope = _scopeFactory.CreateScope();
                 try
                 {
-                    await ProcessOneAsync(perRowScope.ServiceProvider, row.Id, row.OrderId, row.AnafStatus, ct);
+                    await ProcessOneAsync(perRowScope.ServiceProvider, row, ct);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (AnafAuthException ex)
@@ -138,6 +156,7 @@ public sealed class InvoiceUploadJob : BackgroundService
                         if (_outages.MarkOutageOnce("auth", _authOutageAlertWindow))
                         {
                             // Urgent (expiring cert / revoked credential) — no per-replica-safe counter backs "escalate after N tries", so treat as urgent on first sight.
+                            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
                             _logger.LogError(ex, "anaf.upload-job.auth-failed invoice_id={InvoiceId}", row.Id);
                             perRowScope.ServiceProvider.GetService<Sentry.IHub>()?.CaptureException(ex);
                         }
@@ -191,19 +210,80 @@ public sealed class InvoiceUploadJob : BackgroundService
         }
     }
 
+    private sealed record BatchRow(
+        Guid Id, Guid OrderId, InvoiceAnafStatus AnafStatus,
+        DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+
+    private int MinBackoffHours =>
+        _settings.BackoffHours.Length == 0 ? 1 : _settings.BackoffHours.Min();
+
+    // Its own budget, so a backlog of rejections cannot push Pending uploads out of the batch.
+    private int RejectedSliceCap => Math.Max(1, _maxBatchSize / 10);
+
     private async Task ProcessOneAsync(
-        IServiceProvider sp, Guid invoiceId, Guid orderId,
-        InvoiceAnafStatus status, CancellationToken ct)
+        IServiceProvider sp, BatchRow row, CancellationToken ct)
     {
-        switch (status)
+        switch (row.AnafStatus)
         {
             case InvoiceAnafStatus.Pending:
-                await UploadPendingAsync(sp, invoiceId, orderId, ct);
+                await UploadPendingAsync(sp, row.Id, row.OrderId, ct);
                 break;
             case InvoiceAnafStatus.Submitted:
-                await PollSubmittedAsync(sp, invoiceId, ct);
+                await PollSubmittedAsync(sp, row.Id, ct);
+                break;
+            case InvoiceAnafStatus.Rejected:
+                await ResubmitRejectedAsync(sp, row, ct);
                 break;
         }
+    }
+
+    // Rejections are re-submitted on the configured schedule, then given up on: a rejected row nobody
+    // resubmits silently outlives the 5-business-day ANAF submission deadline.
+    private async Task ResubmitRejectedAsync(
+        IServiceProvider sp, BatchRow row, CancellationToken ct)
+    {
+        var lifecycle = sp.GetRequiredService<IInvoiceLifecycle>();
+        var lastChange = row.UpdatedAt ?? row.CreatedAt;
+        var now = _clock.GetUtcNow();
+
+        var dueAt = NextResubmitAt(row.CreatedAt, lastChange);
+        if (dueAt is null)
+        {
+            var gaveUp = await lifecycle.GiveUpOnRejectedAsync(
+                row.Id,
+                $"ANAF rejected this invoice on every attempt within {_settings.BackoffHours.Sum()}h; manual correction required.",
+                ct);
+            if (gaveUp) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+            return;
+        }
+
+        if (now < dueAt)
+        {
+            _logger.LogDebug(
+                "anaf.upload-job.rejected-not-due invoice_id={InvoiceId} due_at={DueAt}", row.Id, dueAt);
+            return;
+        }
+
+        var requeued = await lifecycle.RequeueRejectedAsync(row.Id, ct);
+        if (requeued)
+        {
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
+            _logger.LogInformation(
+                "anaf.upload-job.rejected-resubmitted invoice_id={InvoiceId} due_at={DueAt}", row.Id, dueAt);
+        }
+    }
+
+    // Attempt count is not persisted: the next slot is the first cumulative milestone after the last transition.
+    private DateTimeOffset? NextResubmitAt(DateTimeOffset createdAt, DateTimeOffset lastChange)
+    {
+        var cumulativeHours = 0d;
+        foreach (var step in _settings.BackoffHours)
+        {
+            cumulativeHours += step;
+            var slot = createdAt.AddHours(cumulativeHours);
+            if (slot > lastChange) return slot;
+        }
+        return null;
     }
 
     private async Task UploadPendingAsync(
@@ -338,7 +418,17 @@ public sealed class InvoiceUploadJob : BackgroundService
                 _logger.LogError(ex,
                     "anaf.upload-job.submitted-but-not-recorded invoice_id={InvoiceId} anaf_upload_id={AnafUploadId}",
                     invoiceId, result.UploadId);
-                throw;
+
+                var lost = await lifecycle.RecordUnknownUploadOutcomeAsync(
+                    invoiceId,
+                    $"Uploaded to ANAF as {result.UploadId} but the status write failed: {ex.Message}",
+                    BudgetSpentMessage(ex),
+                    _maxUnknownUploadOutcomes,
+                    ct);
+                IncrementAnafStatusMetric(lost.Parked
+                    ? MetricNames.AnafStatusValues.Failed
+                    : MetricNames.AnafStatusValues.Retrying);
+                return;
             }
 
             if (ok) IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Pending);
@@ -348,18 +438,62 @@ public sealed class InvoiceUploadJob : BackgroundService
         {
             // 200-with-errors: store the message and stay Pending; next tick retries.
             await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
             _logger.LogWarning(ex,
                 "anaf.upload-job.upload-errors invoice_id={InvoiceId}", invoiceId);
             await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
         }
+        catch (AnafContentRejectedException ex)
+        {
+            // ANAF refused the document itself, so no number of retries changes the answer.
+            var parked = await lifecycle.ParkUnbuildableAsync(invoiceId, ex.Message, ct);
+            if (parked)
+            {
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+                _logger.LogError(ex,
+                    "anaf.upload-job.content-rejected invoice_id={InvoiceId} status={HttpStatus} — parked as Failed for an admin",
+                    invoiceId, ex.HttpStatus);
+            }
+            else
+            {
+                // The CAS lost, so this row is no longer Pending: leave a trace and let the claim go
+                // rather than counting a park that never happened.
+                await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+                await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+                _logger.LogWarning(ex,
+                    "anaf.upload-job.content-rejected-park-lost invoice_id={InvoiceId} status={HttpStatus}",
+                    invoiceId, ex.HttpStatus);
+            }
+        }
+        catch (AnafUnreachableException ex) when (FiledNothing(ex.HttpStatus))
+        {
+            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
+            IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
+            _logger.LogWarning(ex,
+                "anaf.upload-job.upload-refused invoice_id={InvoiceId} status={HttpStatus} — nothing was filed, so the blind-repost budget is untouched",
+                invoiceId, ex.HttpStatus);
+        }
         catch (AnafUnreachableException ex)
         {
-            // Also covers a hard content rejection (HTTP 400) AnafSpvClient can't tell apart from a real outage.
-            await lifecycle.RecordPendingErrorAsync(invoiceId, ex.Message, ct);
-            _logger.LogWarning(ex,
-                "anaf.upload-job.unreachable invoice_id={InvoiceId} status={HttpStatus}",
-                invoiceId, ex.HttpStatus);
-            await ReleaseClaimAsync(db, invoiceId, claimedAt, ct);
+            // On the upload leg an outage is an unknown outcome: ANAF may hold this number already.
+            var outcome = await lifecycle.RecordUnknownUploadOutcomeAsync(
+                invoiceId, ex.Message, BudgetSpentMessage(ex), _maxUnknownUploadOutcomes, ct);
+
+            if (outcome.Parked)
+            {
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Failed);
+                _logger.LogError(ex,
+                    "anaf.upload-job.blind-repost-budget-spent invoice_id={InvoiceId} outcomes={Outcomes} max={Max} — parked as Failed, reconcile the invoice number in ANAF SPV",
+                    invoiceId, outcome.Outcomes, _maxUnknownUploadOutcomes);
+            }
+            else
+            {
+                // The claim stays so a second replica cannot re-post a row whose answer is unknown.
+                IncrementAnafStatusMetric(MetricNames.AnafStatusValues.Retrying);
+                _logger.LogWarning(ex,
+                    "anaf.upload-job.unreachable invoice_id={InvoiceId} status={HttpStatus} outcomes={Outcomes}",
+                    invoiceId, ex.HttpStatus, outcome.Outcomes);
+            }
         }
         catch (AnafUploadTimeoutException ex)
         {
@@ -394,7 +528,7 @@ public sealed class InvoiceUploadJob : BackgroundService
         $"Invoice cannot be built and will not be retried: {ex.Message} " +
         "Retrying repeats the same failure until the order's own data is corrected.";
 
-    private string BudgetSpentMessage(AnafUploadTimeoutException ex) =>
+    private string BudgetSpentMessage(Exception ex) =>
         $"{ex.Message} {_maxUnknownUploadOutcomes} attempts ended without an answer, so no further upload will be made: reconcile this invoice number in ANAF SPV, then retry the invoice.";
 
     private async Task ReleaseClaimAsync(PhotoPrintDbContext db, Guid invoiceId, DateTimeOffset claimedAt, CancellationToken ct)
@@ -458,6 +592,10 @@ public sealed class InvoiceUploadJob : BackgroundService
                 break;
         }
     }
+
+    // 429 and 503 are refused before ANAF reads anything, unlike a 502, a 504 or a dropped
+    // connection, where the document may already be filed.
+    private static bool FiledNothing(int? httpStatus) => httpStatus is 429 or 503;
 
     private bool IsBudgetExhausted(Invoice invoice)
     {

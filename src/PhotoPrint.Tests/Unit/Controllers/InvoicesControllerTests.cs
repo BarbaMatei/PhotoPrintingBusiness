@@ -3,9 +3,12 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using PhotoPrint.API.Authentication;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Controllers;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.Models;
@@ -43,11 +46,98 @@ public class InvoicesControllerTests
     private static InvoicesController MakeController(PhotoPrintDbContext db, IStorageRouter router, Guid userId, LogCapture? logs = null) =>
         MakeControllerWithClaim(db, router, new Claim(ClaimTypes.NameIdentifier, userId.ToString()), logs);
 
+    private static InvoicesController MakeAdminController(PhotoPrintDbContext db, IStorageRouter router, LogCapture? logs = null) =>
+        new(db, router, AnafOptions(), logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                         new Claim(ClaimTypes.Role, "Admin")],
+                        authenticationType: "Test")),
+                },
+            },
+        };
+
     private static InvoicesController MakeGuestController(PhotoPrintDbContext db, IStorageRouter router, Guid guestSessionId) =>
         MakeControllerWithClaim(db, router, new Claim(GuestAuthenticationHandler.GuestSessionIdClaimType, guestSessionId.ToString()));
 
+    [Fact]
+    public async Task GetInvoice_PdfNotRenderedYet_SendsARetryAfterMatchingTheProducerInterval()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, userId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00099",
+            AnafStatus = InvoiceAnafStatus.Pending,
+        });
+        await _db.SaveChangesAsync();
+
+        var controller = MakeController(_db, new Mock<IStorageRouter>().Object, userId);
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+        controller.Response.Headers["Retry-After"].ToString().Should().Be("1800",
+            "the 30-minute poll is the only producer of the PDF, so a 30-second hint just burns requests");
+    }
+    // With a guest token attached too, the merged principal reports no user id, so the audit line
+    // for one person reading another's fiscal document named nobody.
+    [Fact]
+    public async Task GetInvoice_AdminAlsoCarryingAGuestToken_LogsTheAdminId()
+    {
+        var adminId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, customerId));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-00077",
+            AnafStatus = InvoiceAnafStatus.Pending,
+        });
+        await _db.SaveChangesAsync();
+
+        var logs = new LogCapture();
+        var principal = new ClaimsPrincipal(
+        [
+            new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, adminId.ToString()),
+                 new Claim(ClaimTypes.Role, "Admin")],
+                authenticationType: "Bearer"),
+            new ClaimsIdentity(
+                [new Claim(GuestAuthenticationHandler.GuestSessionIdClaimType, Guid.NewGuid().ToString())],
+                authenticationType: "Guest"),
+        ]);
+
+        var controller = new InvoicesController(
+            _db, new Mock<IStorageRouter>().Object, AnafOptions(), logs.LoggerFor<InvoicesController>())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext { User = principal },
+            },
+        };
+
+        await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("invoice.pdf.admin-read", StringComparison.Ordinal) &&
+                 r.Message.Contains(adminId.ToString()));
+    }
+
+    private static int _pollIntervalMinutes = 30;
+
+    private static IOptions<AnafSettings> AnafOptions() =>
+        Options.Create(new AnafSettings { PollIntervalMinutes = _pollIntervalMinutes });
+
     private static InvoicesController MakeControllerWithClaim(PhotoPrintDbContext db, IStorageRouter router, Claim claim, LogCapture? logs = null) =>
-        new(db, router, logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
+        new(db, router, AnafOptions(), logs is null ? NullLogger<InvoicesController>.Instance : logs.LoggerFor<InvoicesController>())
         {
             ControllerContext = new ControllerContext
             {
@@ -422,5 +512,54 @@ public class InvoicesControllerTests
                  r.Message.Contains("tiers_tried=2"));
         logs.Records.Should().NotContain(
             r => r.Message.StartsWith("invoice.pdf.tier-mismatch", StringComparison.Ordinal));
+    }
+    [Fact]
+    public async Task GetInvoiceAsync_AdminReadsAnotherCustomersInvoice_ReturnsFileAndLogsTheAccess()
+    {
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, Guid.NewGuid()));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-09001",
+            PdfStoragePath = "invoices/2026/FT-2026-09001.pdf",
+        });
+        await _db.SaveChangesAsync();
+
+        var local = new Mock<IStorageService>();
+        local.Setup(x => x.GetStreamAsync("invoices/2026/FT-2026-09001.pdf", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MemoryStream([1, 2, 3]));
+        var router = new Mock<IStorageRouter>();
+        router.SetupGet(r => r.CloudEnabled).Returns(false);
+        router.SetupGet(r => r.Local).Returns(local.Object);
+        router.Setup(r => r.For(StorageLocation.Local)).Returns(local.Object);
+
+        var logs = new LogCapture();
+        var controller = MakeAdminController(_db, router.Object, logs);
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<FileStreamResult>();
+        logs.CountStartingWith("invoice.pdf.admin-read", LogLevel.Information).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetInvoiceAsync_NonAdminStillCannotReadAnotherCustomersInvoice()
+    {
+        var orderId = Guid.NewGuid();
+        _db.Orders.Add(MakeOrder(orderId, Guid.NewGuid()));
+        _db.Invoices.Add(new Invoice
+        {
+            OrderId = orderId,
+            InvoiceNumber = "FT-2026-09002",
+            PdfStoragePath = "invoices/2026/FT-2026-09002.pdf",
+        });
+        await _db.SaveChangesAsync();
+
+        var controller = MakeController(_db, Mock.Of<IStorageRouter>(), Guid.NewGuid());
+
+        var result = await controller.GetInvoiceAsync(orderId, CancellationToken.None);
+
+        result.Should().BeOfType<ForbidResult>();
     }
 }

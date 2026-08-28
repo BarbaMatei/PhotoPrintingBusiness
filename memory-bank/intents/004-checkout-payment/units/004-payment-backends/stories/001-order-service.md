@@ -15,7 +15,7 @@ implemented: true
 
 **As a** developer
 **I want** an `IOrderService` that creates an order from the current cart
-**So that** both Stripe and EuPlatesc payment initiation have a single, consistent way to create a pending order
+**So that** both Stripe and the legacy processor payment initiation have a single, consistent way to create a pending order
 
 ## Acceptance Criteria
 
@@ -41,7 +41,7 @@ implemented: true
 
 ### Enables
 - Story 002-stripe-payment-intent (needs IOrderService.CreateFromCartAsync)
-- Story 004-euplatesc-initiate (same)
+- Story 004-legacy-processor-initiate (same)
 
 ## Edge Cases
 

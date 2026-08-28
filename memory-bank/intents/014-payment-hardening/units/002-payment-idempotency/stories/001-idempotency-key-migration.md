@@ -53,7 +53,7 @@ migrationBuilder.CreateIndex(
 - bolt 015-shipping-and-order-core (Orders table)
 
 ### Enables
-- 002-stripe-intent-idempotency, 003-euplatesc-initiate-idempotency
+- 002-stripe-intent-idempotency, 003-legacy-processor-initiate-idempotency
 
 ## Edge Cases
 

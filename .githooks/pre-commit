@@ -11,10 +11,22 @@ hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
   }
 ')
 
+# Every gate override leaves a machine-readable trace: an unattended run reading one
+# newer than its own start stops (autonomy-policy.mjs, audit R2).
+log_override() {
+  mkdir -p reviews/state
+  printf '{"t":"%s","var":"%s","files":"%s"}\n' "$(date -Is)" "$1" \
+    "$(printf '%s' "$2" | tr '\n' ' ' | sed 's/"/\\"/g')" >> reviews/state/overrides.jsonl
+}
+
 # Doc-gate backstop: staged review artifacts of contracts-era targets must pass the
 # structure lint. Targets without detail blocks in the ledger are exempt.
+if [ -n "$DOCGATE_OK" ]; then
+  staged=$(git diff --cached --name-only -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' reviews/state/backlog.md reviews/state/index.md)
+  [ -n "$staged" ] && log_override DOCGATE_OK "$staged"
+fi
 if [ -z "$DOCGATE_OK" ]; then
-  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u | grep -v '^reviews/lib/')
+  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' ':!reviews/lib/**' | sed 's|/[^/]*$||' | sort -u)
   for d in $dirs; do
     [ -f "$d/ledger.md" ] || continue
     grep -q "^### PPW-" "$d/ledger.md" || continue
@@ -50,7 +62,11 @@ if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')"
   fi
 fi
 
-if [ -n "$COMMENTS_OK" ] || [ -z "$hits" ]; then exit 0; fi
+if [ -z "$hits" ]; then exit 0; fi
+if [ -n "$COMMENTS_OK" ]; then
+  log_override COMMENTS_OK "$(printf '%s\n' "$hits" | cut -d: -f1 | sort -u)"
+  exit 0
+fi
 
 n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
 {

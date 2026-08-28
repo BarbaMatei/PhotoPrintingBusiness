@@ -51,6 +51,14 @@ public interface IInvoiceLifecycle
 
     /// <summary>Rejected|Failed → Pending on an admin retry.
     /// Clears <c>AnafUploadId</c>, <c>LastError</c> and the blind re-post count.</summary>
+    /// <summary>Gives up on a rejected invoice once its backoff schedule is spent: Rejected to
+    /// Failed, claim released so the admin retry endpoint can pick it up.</summary>
+    Task<bool> GiveUpOnRejectedAsync(Guid invoiceId, string reason, CancellationToken ct = default);
+
+    /// <summary>The worker's own resubmission of a rejected invoice: same reset as a retry, except
+    /// the rendered PDF stays, because the customer can already download it.</summary>
+    Task<bool> RequeueRejectedAsync(Guid invoiceId, CancellationToken ct = default);
+
     Task<bool> RetryAsync(Guid invoiceId, InvoiceAnafStatus expected, CancellationToken ct = default);
 }
 

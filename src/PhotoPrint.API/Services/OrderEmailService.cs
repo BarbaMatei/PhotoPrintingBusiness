@@ -148,7 +148,6 @@ public sealed class OrderEmailService : IOrderEmailService
         var orderNumber = order.OrderNumber;
         var orderId = order.Id;
         var total = order.TotalRon;
-        var processor = order.PaymentProcessor.ToString();
         var orderUrl = $"{_baseUrl}/comenzile-mele/{orderId}";
 
         _ = Task.Run(async () =>
@@ -160,7 +159,7 @@ public sealed class OrderEmailService : IOrderEmailService
                     "Comanda ta a fost anulată — FotoTipar",
                     "OrderCancelled",
                     new OrderCancelledEmailModel(
-                        firstName, orderNumber, total, processor, reason, orderUrl),
+                        firstName, orderNumber, total, reason, orderUrl),
                     CancellationToken.None);
             }
             catch (Exception ex)
@@ -223,6 +222,5 @@ public sealed record OrderCancelledEmailModel(
     string FirstName,
     string OrderNumber,
     decimal TotalRon,
-    string PaymentProcessor,
     string? CancellationReason,
     string OrderUrl);

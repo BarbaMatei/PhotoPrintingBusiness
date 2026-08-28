@@ -12,12 +12,14 @@ const MOCK_DETAIL: OrderDetailDto = {
   status: 'Paid',
   totalRon: 120,
   subtotalRon: 100,
+  netTotalRon: 100.84,
+  vatRon: 19.16,
+  vatRate: 0.19,
   shippingCostRon: 20,
   createdAt: '2026-05-01T12:00:00Z',
   paidAt: '2026-05-01T12:05:00Z',
   deliveryType: 'Easybox',
   itemCount: 1,
-  paymentProcessor: 'Stripe',
   lockerId: 'locker-1',
   lockerName: 'Easybox Mega Mall',
   lockerAddress: 'Str. Exemplu 1, București',
@@ -111,6 +113,15 @@ describe('OrderDetailPage', () => {
     expect(el.textContent).toContain('100.00 RON');
     expect(el.textContent).toContain('20.00 RON');
     expect(el.textContent).toContain('120.00 RON');
+  });
+
+  // The customer is invoiced VAT-inclusive, so the amount has to be visible somewhere.
+  it('renders the TVA line with the rate the server sent', async () => {
+    await setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('TVA');
+    expect(el.textContent).toContain('19.16 RON');
+    expect(el.textContent).toContain('19%');
   });
 
   it('shows locker name for Easybox orders', async () => {

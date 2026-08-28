@@ -26,6 +26,13 @@ export class CheckoutStateService {
     this.patch({ method, shippingCostRon: costRon, lockerId: null, lockerName: null, shippingAddress: null });
   }
 
+  // The shipping price arrives after the method is chosen on a restored session, and re-running
+  // setMethod there would wipe the locker and address the customer already picked.
+  setShippingCost(costRon: number): void {
+    if (!this.state$$.value.method) return;
+    this.patch({ shippingCostRon: costRon });
+  }
+
   setLocker(locker: LockerDto): void {
     // Keep any Easybox address already entered — only switching delivery method resets it.
     this.patch({ lockerId: locker.id, lockerName: locker.name });

@@ -201,7 +201,7 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
 
         var lines = order.Items
             .Select(item => (
-                Description: $"{item.ProductSnapshot.ProductName} ({item.ProductSnapshot.Size}, {item.ProductSnapshot.Finish})",
+                Description: InvoiceAddressFormatter.StripXmlInvalid($"{item.ProductSnapshot.ProductName} ({item.ProductSnapshot.Size}, {item.ProductSnapshot.Finish})"),
                 Quantity: item.Quantity,
                 GrossTotal: item.LineTotalRon))
             .ToList();

@@ -41,9 +41,7 @@ const MOCK_ORDER: AdminOrderDetailDto = {
     postalCode: '010000',
     phone: '0700000000',
   },
-  paymentProcessor: 'Stripe',
   paymentIntentId: 'pi_test',
-  euPlatescTransactionId: null,
   awbNumber: null,
   trackingUrl: null,
   internalNotes: null,
@@ -96,6 +94,15 @@ describe('AdminOrderDetailPage', () => {
 
   it('creates the component', () => {
     expect(component).toBeTruthy();
+  });
+
+  // An offline bank transfer is reconciled by hand, and the API has always supported it.
+  it('offers Paid for an order that is still awaiting payment', () => {
+    fixture.detectChanges();
+    flushOrder({ ...MOCK_ORDER, status: 'AwaitingPayment', paidAt: null });
+    fixture.detectChanges();
+
+    expect(component.nextStatuses).toContain('Paid');
   });
 
   it('loads order detail on init', () => {

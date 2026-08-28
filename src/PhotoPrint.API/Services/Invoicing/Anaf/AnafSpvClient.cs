@@ -2,6 +2,7 @@ using System.Net;
 using System.Xml.Linq;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Models;
 
 namespace PhotoPrint.API.Services.Invoicing.Anaf;
 
@@ -67,6 +68,15 @@ public sealed class AnafSpvClient : IAnafSpvClient
         if ((int)response.StatusCode >= 500 || response.StatusCode == HttpStatusCode.RequestTimeout)
             throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
 
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
+
+        // Only these two mean ANAF read the document and refused it. Every other 4xx is us
+        // calling wrong — a bad base URL, a token without the scope — and parking the invoice
+        // for that costs an admin retry per row once the configuration is fixed.
+        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
+            throw new AnafContentRejectedException(endpoint, httpStatus: (int)response.StatusCode);
+
         if (!response.IsSuccessStatusCode)
             throw new AnafUnreachableException(endpoint, httpStatus: (int)response.StatusCode);
 
@@ -93,6 +103,12 @@ public sealed class AnafSpvClient : IAnafSpvClient
 
         if (string.IsNullOrWhiteSpace(indexAttr))
             throw new AnafUploadException("ANAF upload response missing 'index_incarcare'.");
+
+        // A proxy error page can parse as XML; an over-long id would fail the status write, not the upload.
+        if (indexAttr.Length > Invoice.AnafUploadIdMaxLength)
+            throw new AnafUploadException(
+                $"ANAF upload response 'index_incarcare' is {indexAttr.Length} characters, " +
+                $"over the {Invoice.AnafUploadIdMaxLength} this system stores.");
 
         _logger.LogInformation("anaf.spv.upload upload_id={UploadId}", indexAttr);
         return new AnafUploadResult(indexAttr, _clock.GetUtcNow());

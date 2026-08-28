@@ -73,9 +73,7 @@ export interface AdminOrderDetailDto {
   lockerName: string | null;
   lockerAddress: string | null;
   shippingAddress: AdminShippingAddressDto | null;
-  paymentProcessor: string;
   paymentIntentId: string | null;
-  euPlatescTransactionId: string | null;
   awbNumber: string | null;
   trackingUrl: string | null;
   internalNotes: string | null;

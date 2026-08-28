@@ -472,7 +472,8 @@ Fixture copy: one conforming row.
   writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${sha}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9501 | fixed | \`${sha}\` | fixture fix |\n`)
   g('add', '.'); g('commit', '-qm', 'resolution')
-  const redGreen = `node -e "process.exit(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')?1:0)"`
+  // Prints a failing-test line: since SF39 a red leg counts only when one is named.
+  const redGreen = `node -e "if(require('fs').readFileSync('src/app/calc.txt','utf8').includes('buggy')){console.log('Failed CalcTests.Fixture');process.exit(1)}"`
 
   const wlRel = 'reviews/950-verify-target/worklog.jsonl'
   const wlPath = join(T, wlRel)
@@ -560,7 +561,7 @@ Fixture copy: one conforming row.
   writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${shaB}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9510 | fixed | \`${shaA}\` | two-row fixture: row A |\n| PPW-9511 | fixed | \`${shaB}\` | two-row fixture: row B |\n`)
   g('add', '.'); g('commit', '-qm', 'two-row resolution')
-  const twoRowTpl = `node -e "const fs=require('fs'); const f=process.argv[1].indexOf('ATests')>=0?'src/app2/a.txt':'src/app2/b.txt'; process.exit(fs.readFileSync(f,'utf8').indexOf('buggy')>=0?1:0)" {filter}`
+  const twoRowTpl = `node -e "const fs=require('fs'); const f=process.argv[1].indexOf('ATests')>=0?'src/app2/a.txt':'src/app2/b.txt'; if(fs.readFileSync(f,'utf8').indexOf('buggy')>=0){console.log('Failed '+process.argv[1]);process.exit(1)}" {filter}`
   const twoRow = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', twoRowTpl])
   check('verify-fixes holds both rows of the two-row run', twoRow.code === 0 && twoRow.out.includes('SUMMARY: 2/2 held'), twoRow.out.trim())
   {
@@ -585,7 +586,7 @@ Fixture copy: one conforming row.
   writeFileSync(join(T, 'reviews', '950-verify-target', 'resolution-v1.md'),
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${shaC}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9520 | fixed | \`${shaC}\` | fixture: fix commit also touches worklog.jsonl |\n`)
   g('add', '.'); g('commit', '-qm', 'worklog-in-fix resolution')
-  const worklogInFixTpl = `node -e "process.exit(require('fs').readFileSync('src/app2/c.txt','utf8').includes('buggy')?1:0)"`
+  const worklogInFixTpl = `node -e "if(require('fs').readFileSync('src/app2/c.txt','utf8').includes('buggy')){console.log('Failed WorklogTests.Fixture');process.exit(1)}"`
   const wlFix = run('verify-fixes.mjs', ['--root', T, '950-verify-target', '--test-cmd-api', worklogInFixTpl])
   check('verify-fixes holds a row whose fix commit also touches worklog.jsonl', wlFix.code === 0 && wlFix.out.includes('"verdict":"held"'), wlFix.out.trim())
   const worklogAfterFix = wlLines()
@@ -612,4 +613,31 @@ Fixture copy: one conforming row.
   check('verify-fixes refuses a frontend row with no installed dependencies', ui.out.includes('"verdict":"env-missing"') && ui.out.includes('node_modules'), ui.out.trim())
   check('verify-fixes ran no test for the refused frontend row', ui.out.includes('"red_exits":[]'), ui.out.trim())
   rmSync(T, { recursive: true, force: true })
+}
+
+// ---------- pre-commit hook: gate overrides leave a trace in the override log ----------
+{
+  const sh = spawnSync('sh', ['-c', 'true'], { encoding: 'utf8' })
+  if (sh.error || sh.status !== 0) {
+    console.log('note: sh unavailable — the pre-commit override-log checks were skipped')
+  } else {
+    const T = mkdtempSync(join(tmpdir(), 'hook-override-'))
+    // A git hook's own GIT_DIR/GIT_INDEX_FILE would override -C and land these commits
+    // on the real repository, so the throwaway repo gets a scrubbed environment.
+    const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8', env: scrubbedGitEnv() })
+    g('init', '-q', '-b', 'main')
+    g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
+    mkdirSync(join(T, 'src'), { recursive: true })
+    writeFileSync(join(T, 'src', 'Fixture.cs'), 'var x = 1; // narrating comment\n')
+    g('add', '.')
+    const hook = join(REVIEWS, '..', '.githooks', 'pre-commit')
+    const blocked = spawnSync('sh', [hook], { cwd: T, encoding: 'utf8', env: { ...scrubbedGitEnv(), COMMENTS_OK: '', DOCGATE_OK: '' } })
+    check('hook blocks a staged comment line without an override', blocked.status === 1 && !existsSync(join(T, 'reviews', 'state', 'overrides.jsonl')), `exit ${blocked.status}: ${(blocked.stderr ?? '').trim().slice(0, 200)}`)
+    const overridden = spawnSync('sh', [hook], { cwd: T, encoding: 'utf8', env: { ...scrubbedGitEnv(), COMMENTS_OK: '1', DOCGATE_OK: '' } })
+    const logPath = join(T, 'reviews', 'state', 'overrides.jsonl')
+    const logged = existsSync(logPath) ? readFileSync(logPath, 'utf8') : ''
+    check('hook passes with COMMENTS_OK=1 but logs the override', overridden.status === 0 && logged.includes('"var":"COMMENTS_OK"') && logged.includes('src/Fixture.cs'), `exit ${overridden.status}: log=${logged.trim() || '(missing)'}`)
+    check('the override-log line parses as JSON with a timestamp', (() => { try { const o = JSON.parse(logged.trim().split('\n')[0]); return Number.isFinite(Date.parse(o.t)) } catch { return false } })(), logged.trim())
+    rmSync(T, { recursive: true, force: true })
+  }
 }

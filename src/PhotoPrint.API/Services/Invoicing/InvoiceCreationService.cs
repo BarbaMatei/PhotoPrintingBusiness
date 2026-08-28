@@ -71,6 +71,22 @@ public sealed class InvoiceCreationService : IInvoiceCreationService
         return await CreateForLoadedOrderAsync(order, ct);
     }
 
+    public async Task ReconcileNumberingAsync(Order order, CancellationToken ct = default)
+    {
+        var issuedAt = order.PaidAt ?? _clock.GetUtcNow();
+        try
+        {
+            await _numbering.ReconcileWithStoredInvoicesAsync(
+                _vatSettings.InvoiceSeries, issuedAt.UtcDateTime.Year, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // A failed self-heal must not replace the collision the caller is already handling.
+            _logger.LogWarning(ex,
+                "invoice.numbering.reconcile-failed order_id={OrderId}", order.Id);
+        }
+    }
+
     private async Task<Invoice?> CreateForLoadedOrderAsync(Order order, CancellationToken ct)
     {
         var issuedAt = order.PaidAt ?? _clock.GetUtcNow();

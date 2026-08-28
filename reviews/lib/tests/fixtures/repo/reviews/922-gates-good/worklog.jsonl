@@ -1,0 +1,15 @@
+{"t":"2026-08-30T09:00:00Z","ev":"round-start","round":1}
+{"t":"2026-08-30T09:04:00Z","ev":"protocol-written","round":1,"cluster":"A","ids":["PPW-9222","PPW-9223"]}
+{"t":"2026-08-30T09:05:00Z","ev":"triage-done","round":1,"clusters":1,"pre_cleared":0}
+{"t":"2026-08-30T09:06:00Z","ev":"check-dispatched","round":1,"cluster":"A","ids":["PPW-9221","PPW-9222","PPW-9223"]}
+{"t":"2026-08-30T09:12:00Z","ev":"check-returned","round":1,"cluster":"A","verdict":"revised"}
+{"t":"2026-08-30T09:15:00Z","ev":"test-run","round":1,"kind":"red","filter":"Fixture","passed":0,"failed":3}
+{"t":"2026-08-30T09:20:00Z","ev":"finding","round":1,"id":"PPW-9221","status":"fixed","commit":"abcd222"}
+{"t":"2026-08-30T09:21:00Z","ev":"finding","round":1,"id":"PPW-9222","status":"fixed","commit":"abcd222"}
+{"t":"2026-08-30T09:22:00Z","ev":"finding","round":1,"id":"PPW-9223","status":"fixed","commit":"abcd222"}
+{"t":"2026-08-30T09:25:00Z","ev":"test-run","round":1,"kind":"green","filter":"Fixture","passed":9,"failed":0}
+{"t":"2026-08-30T09:30:00Z","ev":"round-review-dispatched","round":1,"commit":"abcd222"}
+{"t":"2026-08-30T09:36:00Z","ev":"round-review-returned","round":1,"found":0}
+{"t":"2026-08-30T09:37:00Z","ev":"test-audit-dispatched","round":1}
+{"t":"2026-08-30T09:39:00Z","ev":"test-audit-returned","round":1,"verdict":"clean"}
+{"t":"2026-08-30T09:40:00Z","ev":"round-end","round":1}

@@ -56,6 +56,66 @@ describe('DeliveryStep', () => {
     http.expectOne(`${BASE}/lockers?city=`).flush(prime);
   }
 
+  it('stores the price the server sent, not a built-in default', () => {
+    const fixture = createFixture();
+    http.expectOne(`${BASE}/cost?type=Easybox`).flush({ costRon: 15 });
+    http.expectOne(`${BASE}/cost?type=Courier`).flush({ costRon: 18 });
+    fixture.detectChanges();
+
+    selectEasybox(fixture);
+
+    const state = TestBed.inject(CheckoutStateService);
+    expect(state.snapshot.shippingCostRon).toBe(15);
+  });
+
+  it('ignores a delivery choice made before the prices arrive', () => {
+    const fixture = createFixture();
+
+    fixture.componentInstance.selectMethod('Courier');
+    fixture.detectChanges();
+
+    const state = TestBed.inject(CheckoutStateService);
+    expect(state.snapshot.method).toBeNull();
+    flushCosts();
+  });
+
+  it('offers a retry when the delivery prices cannot be loaded', () => {
+    const fixture = createFixture();
+    http.expectOne(`${BASE}/cost?type=Easybox`).flush(null, { status: 500, statusText: 'Server Error' });
+    http.expectOne(`${BASE}/cost?type=Courier`).flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    const retry = fixture.debugElement.query(By.css('.btn-retry-costs'));
+    expect(retry).toBeTruthy();
+
+    retry.nativeElement.click();
+    flushCosts();
+  });
+
+  // Continue greying out with nothing on screen is indistinguishable from a broken page.
+  it('says why Continue is disabled when street, number and block are too long together', () => {
+    const fixture = createFixture();
+    flushCosts();
+    fixture.componentInstance.selectMethod('Courier');
+    fixture.detectChanges();
+
+    fixture.componentInstance.addressForm.setValue({
+      street: 'S'.repeat(120),
+      number: '4'.repeat(20),
+      block: 'B'.repeat(20),
+      city: 'Cluj-Napoca',
+      county: 'Cluj',
+      postalCode: '400100',
+      recipientName: 'Ana Pop',
+      phone: '0712345678',
+    });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.canContinue()).toBe(false);
+    const errors = fixture.debugElement.queryAll(By.css('.field-error'));
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
   it('renders two delivery option cards', () => {
     const fixture = createFixture();
     flushCosts();
@@ -359,5 +419,39 @@ describe('DeliveryStep', () => {
     fixture.detectChanges();
     // http.verify() in afterEach fails if an /account/addresses request was made.
     expect(fixture.componentInstance.addressForm.value.city).toBeFalsy();
+  });
+  it('refuses a city longer than the server accepts, on the screen that collects it', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+    const comp = fixture.componentInstance;
+    comp.selectLocker(locker('l1'));
+
+    comp.addressForm.setValue({ ...FISCAL_ADDRESS, city: 'C'.repeat(51) });
+    fixture.detectChanges();
+
+    expect(comp.addressForm.get('city')!.valid).toBe(false);
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('refuses a street, number and block that exceed the invoice line together', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+    const comp = fixture.componentInstance;
+    comp.selectLocker(locker('l1'));
+
+    comp.addressForm.setValue({
+      ...FISCAL_ADDRESS,
+      street: 'S'.repeat(120),
+      number: '4'.repeat(20),
+      block: 'B'.repeat(20),
+    });
+    fixture.detectChanges();
+
+    expect(comp.addressForm.valid).toBe(false);
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
   });
 });

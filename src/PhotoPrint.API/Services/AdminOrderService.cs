@@ -21,7 +21,6 @@ public class AdminOrderService : IAdminOrderService
 {
     private readonly PhotoPrintDbContext _db;
     private readonly IOrderEmailService _orderEmailService;
-    private readonly IEuPlatescService _euPlatescService;
     private readonly IStripeClient _stripeClient;
     private readonly IStorageRouter _storageRouter;
     private readonly IOriginalPurger _originalPurger;
@@ -35,7 +34,6 @@ public class AdminOrderService : IAdminOrderService
     public AdminOrderService(
         PhotoPrintDbContext db,
         IOrderEmailService orderEmailService,
-        IEuPlatescService euPlatescService,
         IStripeClient stripeClient,
         IStorageRouter storageRouter,
         IOriginalPurger originalPurger,
@@ -49,7 +47,6 @@ public class AdminOrderService : IAdminOrderService
     {
         _db = db;
         _orderEmailService = orderEmailService;
-        _euPlatescService = euPlatescService;
         _stripeClient = stripeClient;
         _storageRouter = storageRouter;
         _originalPurger = originalPurger;
@@ -115,7 +112,7 @@ public class AdminOrderService : IAdminOrderService
 
     public async Task<AdminOrderDetailDto> UpdateStatusAsync(
         Guid orderId, string statusStr, string? awbNumber, string? trackingUrl,
-        CancellationToken ct = default)
+        Guid? adminUserId = null, CancellationToken ct = default)
     {
         if (!Enum.TryParse<OrderStatus>(statusStr, true, out var newStatus))
             throw new BadRequestException($"Unknown order status '{statusStr}'.");
@@ -153,6 +150,8 @@ public class AdminOrderService : IAdminOrderService
             order.PaidAt = DateTimeOffset.UtcNow;
             paidOutcome = await SaveWithInvoiceAsync(order, ct);
             savedWithInvoice = true;
+            if (paidOutcome == PaidSaveOutcome.Created)
+                await LogManualInvoiceIssueAsync(order, adminUserId, ct);
         }
 
         if (!savedWithInvoice)
@@ -280,19 +279,12 @@ public class AdminOrderService : IAdminOrderService
 
         try
         {
-            if (order.PaymentProcessor == Models.PaymentProcessor.Stripe &&
-                !string.IsNullOrEmpty(order.PaymentIntentId))
+            if (!string.IsNullOrEmpty(order.PaymentIntentId))
             {
                 var refundSvc = new RefundService(_stripeClient);
                 await refundSvc.CreateAsync(
                     new RefundCreateOptions { PaymentIntent = order.PaymentIntentId },
                     cancellationToken: ct);
-            }
-            else if (order.PaymentProcessor == Models.PaymentProcessor.EuPlatesc &&
-                     !string.IsNullOrEmpty(order.EuPlatescTransactionId))
-            {
-                await _euPlatescService.RefundAsync(
-                    order.EuPlatescTransactionId, order.TotalRon, ct);
             }
         }
         catch (Exception ex)
@@ -409,9 +401,7 @@ public class AdminOrderService : IAdminOrderService
             order.EasyboxLocker?.Name,
             order.EasyboxLocker?.Address,
             shippingAddress,
-            order.PaymentProcessor.ToString(),
             order.PaymentIntentId,
-            order.EuPlatescTransactionId,
             order.AwbNumber,
             order.TrackingUrl,
             order.AwbLabelUrl,
@@ -422,6 +412,19 @@ public class AdminOrderService : IAdminOrderService
     }
 
     // Only Created may run the caller's Paid side effects; the webhook's own enum is private and pinned by a test that reflects on it.
+    // Outside the payment processors this is the only line that can answer who issued a fiscal number.
+    private async Task LogManualInvoiceIssueAsync(Order order, Guid? adminUserId, CancellationToken ct)
+    {
+        var invoiceNumber = await _db.Invoices
+            .Where(i => i.OrderId == order.Id)
+            .Select(i => i.InvoiceNumber)
+            .FirstOrDefaultAsync(ct);
+
+        _logger.LogInformation(
+            "admin.order.mark-paid admin_user_id={AdminUserId} order_id={OrderId} order_number={OrderNumber} invoice_number={InvoiceNumber} total_ron={TotalRon}",
+            adminUserId, order.Id, order.OrderNumber, invoiceNumber, order.TotalRon);
+    }
+
     private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
 
     // Mirrors the webhook Paid path: a concurrent delivery or taken number must not 500 an admin status change.
@@ -452,14 +455,15 @@ public class AdminOrderService : IAdminOrderService
                 _logger.LogWarning(
                     "admin.order.invoice-number-collision-retry order_id={OrderId} attempt={Attempt}",
                     order.Id, attempt);
+                await _invoiceCreator.ReconcileNumberingAsync(order, ct);
             }
             catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsNumberViolation(ex))
             {
                 if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
                 // Logged before the rollback discards them: on an offline reconciliation these are the only handles on the payment being recorded.
                 _logger.LogError(ex,
-                    "admin.order.invoice-number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} euplatesc_transaction_id={EuPlatescTransactionId} — order not marked Paid, manual reconciliation required",
-                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId, order.EuPlatescTransactionId);
+                    "admin.order.invoice-number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} — order not marked Paid, manual reconciliation required",
+                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId);
                 // A conflict is a 4xx and the request pipeline captures only 5xx, so nothing downstream would page anyone.
                 _sentry?.CaptureException(ex);
 

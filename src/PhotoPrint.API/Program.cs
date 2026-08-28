@@ -200,12 +200,6 @@ builder.Services
     .Validate(s => !paymentsRequired || !string.IsNullOrWhiteSpace(s.SecretKey),
         "Stripe:SecretKey is required in Production.")
     .ValidateOnStart();
-builder.Services
-    .AddOptions<PhotoPrint.API.Configuration.EuPlatescSettings>()
-    .Bind(builder.Configuration.GetSection(PhotoPrint.API.Configuration.EuPlatescSettings.SectionName))
-    .Validate(s => !paymentsRequired || (!string.IsNullOrWhiteSpace(s.MerchantId) && !string.IsNullOrWhiteSpace(s.SecretKey)),
-        "EuPlatesc:MerchantId and EuPlatesc:SecretKey are required in Production.")
-    .ValidateOnStart();
 builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 {
     var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.StripeSettings>>().Value;
@@ -213,7 +207,6 @@ builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 });
 builder.Services.AddScoped<PhotoPrint.API.Services.IStripePaymentGateway, PhotoPrint.API.Services.StripePaymentGateway>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IStripeSignatureVerifier, PhotoPrint.API.Services.StripeSignatureVerifier>();
-builder.Services.AddScoped<PhotoPrint.API.Services.IEuPlatescService, PhotoPrint.API.Services.EuPlatescService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderService, PhotoPrint.API.Services.OrderService>();
 
 // ── Invoicing ─────────────────────────────────────────────────────────────────
@@ -261,9 +254,9 @@ builder.Services.AddOptions<PhotoPrint.API.Configuration.InvoicingSettings>().Va
 // tier annually (see DEPLOYMENT.md).
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-// Application-layer + domain services for bolt 039 — always wired even when
-// Anaf:Enabled = false (so the Invoice row is still created at Paid and the
-// admin endpoints still work; only the ANAF upload pipeline is conditional).
+// Always wired even when Anaf:Enabled = false: the Invoice row is still created at Paid and the
+// admin endpoints still work. The builders are registered either way, but the worker is their
+// only caller, so with the flag off no XML and no PDF is ever built.
 builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceCreationService,
                             PhotoPrint.API.Services.Invoicing.InvoiceCreationService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceXmlBuilder,

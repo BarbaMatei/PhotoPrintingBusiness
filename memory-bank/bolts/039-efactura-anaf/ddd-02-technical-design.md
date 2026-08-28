@@ -182,9 +182,14 @@ This is the load-bearing step the gap-free promise depends on. The
 transition rolls back, both are gone together, and ADR-020's
 accepted gap-on-rollback is the only failure mode.
 
-**`InvoicePdfReadyNotifier`** — small façade over the existing
-`IEmailService`. Sends a follow-up email when an invoice's PDF
+**`InvoicePdfReadyNotifier`** — designed as a small façade over the existing
+`IEmailService`, to send a follow-up email when an invoice's PDF
 becomes available after the confirmation email already fired.
+
+> **Not shipped.** No `IEmailService` send path exists for it, so the class only logs in both
+> flag states. The customer's route to the invoice today is the download button on the order
+> confirmation page, which reads `GET /api/orders/{id}/invoice`. Story 003 (invoice by email)
+> stays open; nothing below this line about attachments describes running behaviour.
 
 ```text
 NotifyAsync(invoice: Invoice, order: Order, ct: CancellationToken)

@@ -32,7 +32,7 @@ implemented: true
   - `items: OrderItemDto[]` — each with `uploadId`, `previewUrl`, `productName`, `finishName`, `quantity`, `unitPriceRon`, `lineTotal`
   - `shippingAddress: ShippingAddressDto | null`
   - `lockerId: string | null`, `lockerName: string | null`
-  - `paymentProcessor: 'Stripe' | 'EuPlatesc'`
+  - `paymentProcessor: 'Stripe' | 'the legacy processor'`
   - `paidAt: string | null`
 - Join: `Order → OrderItems → Uploads` (for `previewUrl`)
 - Endpoint: `[Authorize] GET /api/orders/{id:guid}`

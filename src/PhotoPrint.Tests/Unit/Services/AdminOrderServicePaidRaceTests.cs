@@ -52,7 +52,6 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         => new(
             db,
             _email.Object,
-            Mock.Of<IEuPlatescService>(),
             Mock.Of<Stripe.IStripeClient>(),
             Mock.Of<IStorageRouter>(),
             Mock.Of<IOriginalPurger>(),
@@ -71,13 +70,13 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
             TimeProvider.System,
             NullLogger<InvoiceCreationService>.Instance);
 
-    private async Task<Guid> SeedAwaitingPaymentAsync(string? euTransactionId = null)
+    private async Task<Guid> SeedAwaitingPaymentAsync(string? paymentIntentId = null)
     {
         var id = Guid.NewGuid();
         using var seed = _database.NewContext();
         var order = TestOrders.Make(id);
         order.Status = OrderStatus.AwaitingPayment;
-        order.EuPlatescTransactionId = euTransactionId;
+        order.PaymentIntentId = paymentIntentId;
         seed.Orders.Add(order);
         await seed.SaveChangesAsync();
         return id;
@@ -119,6 +118,26 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
     {
         _email.Verify(e => e.FireOrderConfirmedEmail(It.IsAny<Order>()), Times.Never);
         _awb.Verify(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // Asked later who issued a fiscal number outside the processors, only this line can answer.
+    [Fact]
+    public async Task ManualPaid_LogsTheAdminWhoIssuedTheInvoice()
+    {
+        var orderId = await SeedAwaitingPaymentAsync();
+        var adminUserId = Guid.NewGuid();
+
+        using var db = _database.NewContext();
+        var logs = new LogCapture();
+        var sut = BuildService(db, RealCreator(db, new FixedNumbering(910)),
+                               logs.LoggerFor<AdminOrderService>());
+
+        await sut.UpdateStatusAsync(orderId, "Paid", null, null, adminUserId);
+
+        logs.Records.Should().ContainSingle(
+            r => r.Message.StartsWith("admin.order.mark-paid", StringComparison.Ordinal) &&
+                 r.Message.Contains(adminUserId.ToString()) &&
+                 r.Message.Contains("FT-2026-00910"));
     }
 
     [Fact]
@@ -198,7 +217,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         var logger = new CancellingLogger(logs, "admin.order.invoice-already-created", cts);
         var sut = BuildService(db, creator, logger);
 
-        var dto = await sut.UpdateStatusAsync(orderId, "Paid", null, null, cts.Token);
+        var dto = await sut.UpdateStatusAsync(orderId, "Paid", null, null, null, cts.Token);
 
         dto.Should().NotBeNull();
         logs.Records.Should().ContainSingle(
@@ -210,7 +229,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
     public async Task ManualPaid_WhenInvoiceNumberRetriesExhaust_LeavesTheOrderUnpaidAndAnswersConflict()
     {
         await SeedInvoicedOrderAsync(number: 700);
-        var orderId = await SeedAwaitingPaymentAsync(euTransactionId: "EP-ADMIN-RECONCILE");
+        var orderId = await SeedAwaitingPaymentAsync(paymentIntentId: "pi_admin_reconcile");
 
         using var db = _database.NewContext();
         var numbering = new FixedNumbering(700);
@@ -234,7 +253,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
                  r.Message.StartsWith("admin.order.invoice-number-collision-exhausted", StringComparison.Ordinal) &&
                  r.Message.Contains(order.OrderNumber) &&
                  r.Message.Contains("100") &&
-                 r.Message.Contains("EP-ADMIN-RECONCILE"),
+                 r.Message.Contains("pi_admin_reconcile"),
             "the order number, the total and the payment handles are what a manual reconciliation needs");
         AssertNoPaidSideEffects();
         _clientProxy.Verify(
@@ -276,7 +295,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
             logs, "admin.order.invoice-number-collision-exhausted", cts);
         var sut = BuildService(db, RealCreator(db, new FixedNumbering(701)), logger);
 
-        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null, cts.Token);
+        var act = () => sut.UpdateStatusAsync(orderId, "Paid", null, null, null, cts.Token);
 
         await act.Should().ThrowAsync<ConflictException>();
         logs.Records.Should().ContainSingle(
@@ -311,7 +330,6 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         var services = new ServiceCollection();
         services.AddDbContext<PhotoPrintDbContext>(o => o.UseNpgsql(_database.ConnectionString));
         services.AddSingleton(_email.Object);
-        services.AddSingleton(Mock.Of<IEuPlatescService>());
         services.AddSingleton(Mock.Of<Stripe.IStripeClient>());
         services.AddSingleton(Mock.Of<IStorageRouter>());
         services.AddSingleton(Mock.Of<IOriginalPurger>());
@@ -349,6 +367,9 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
 
         public Task<Invoice?> CreateForOrderAsync(Order order, CancellationToken ct = default)
             => RunAsync(() => _inner.CreateForOrderAsync(order, ct));
+
+        public Task ReconcileNumberingAsync(Order order, CancellationToken ct = default)
+            => _inner.ReconcileNumberingAsync(order, ct);
 
         private async Task<Invoice?> RunAsync(Func<Task<Invoice?>> inner)
         {

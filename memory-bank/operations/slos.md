@@ -82,8 +82,8 @@ check Stripe SDK call duration.
 
 ## 3. Payment-webhook success — `≥ 99.9% rolling 7 days`
 
-**What it measures:** the share of `POST /api/webhooks/stripe` and
-`POST /api/webhooks/euplatesc` requests that result in the order being
+**What it measures:** the share of `POST /api/webhooks/stripe`
+requests that result in the order being
 successfully marked Paid (or correctly rejected with a `200` for known
 duplicate/idempotency cases).
 
