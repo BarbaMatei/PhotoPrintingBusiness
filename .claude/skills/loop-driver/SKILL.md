@@ -173,7 +173,7 @@ the records, never from the subagent's prose):
 | Pass | How |
 |---|---|
 | full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
-| verification | first commit any pending `reviews/<target>/` record appends (worklog/metrics/ledger) — one records commit, `docs(review): …` subject, because `verify-fixes.mjs` refuses a dirty tree by design; then run `node reviews/lib/verify-fixes.mjs <target>` yourself, then one subagent for the runbook's judgment items, its three per-cluster questions, and the records — given the script's JSON output, the resolution, and the fix diff |
+| verification | first commit any pending `reviews/<target>/` record appends (worklog/metrics/ledger) — one records commit, `docs(review): …` subject, because `verify-fixes.mjs` refuses a dirty tree by design; then the runbook's step 2: an **evidence audit** (2–3 sampled rows via `--only`) when the round recorded per-fix revert proofs, the full `node reviews/lib/verify-fixes.mjs <target>` run otherwise; then one subagent for the runbook's judgment items and the records — given the script's JSON output, the round review's findings, the resolution, and the fix diff |
 | fix round | one subagent instructed to load the `/fix-review` skill and follow its **Unattended variant** section |
 
 The session-model guard still applies: on a Fable session, discovery-scale launches

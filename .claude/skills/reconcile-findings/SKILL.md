@@ -46,6 +46,11 @@ review loop measure overlap, stop re-arguing settled decisions, and keep one can
   they have different fixes).
 - **Fix-residual ≠ re-find.** A new defect living inside the fix of an earlier finding is NEW,
   linked as lineage (`residual-of: PPW-<n>`), never merged — chains run generations deep.
+  Since 2026-08-28 the lineage also names the round: the metrics `findings[]` entry carries
+  `seed_round` (the fix round whose commits caused the defect — locate the causing commit in
+  its resolution) and `area` (the backlog area word). Write `null` when the round cannot be
+  named with confidence — the router treats missing as "not yet measured", never as zero, and
+  a guessed round corrupts the convergence rule it feeds.
 - **A defect inside code an earlier pass explicitly cleared or judged benign** is distinct,
   and the match note must say it re-opens that judgment.
 - **A re-find of a decided item** (wont-fix / deferred / disputed / false-positive): match it

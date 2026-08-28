@@ -91,7 +91,7 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | Two consecutive fix rounds seed the same component at s ≥ 0.3³ | **Design pass**³ — further fix rounds there are refused (owner gate) |
 
 ¹ **Delta-worthy** = the fix round fixed a 🔴, added/converted a mechanism, or changed a
-design. Anything else is patch-grade and exits on verification + the fixer's micro-review.
+design. Anything else is patch-grade and exits on verification + the fixer's round review.
 
 ² **Certification** (full-loop tier): the feature's **first** certification attempt is a pair —
 two parallel blinded full-manifest passes against one frozen commit, folding in any still-owed
