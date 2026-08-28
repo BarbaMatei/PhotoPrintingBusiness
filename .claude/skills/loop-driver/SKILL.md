@@ -14,8 +14,9 @@ description: >-
 
 # Loop driver
 
-The executable form of the README's standing instruction. One invocation = one pass, driven
-end to end: **route → announce → (gate) → execute → record → report**. The README and the
+The executable form of the README's standing instruction. One invocation = one **reviewed
+unit** — a pass, or a fix round together with the verification that closes it — driven end to
+end: **route → announce → (gate) → execute → record → report**. The README and the
 runbooks own every rule; this skill only sequences them — when in doubt about a rule, the
 rule file wins.
 
@@ -42,6 +43,12 @@ node reviews/lib/route-next-pass.mjs <target>     # state → next pass → cost
   `reviews/<target>/worklog.jsonl` when relaying, and the invocation that consumes the
   answer appends `gate-closed` first thing — that span is the loop's measured
   blocked-on-owner time.
+- A `QUEUED:` line means open 🟠 below the queue threshold: they wait rather than earn a
+  round of their own, and they must drain in a **sweep** fix round before certification —
+  both the router and the autonomy policy answer `fix round` for that sweep. At the
+  loop-close gate the router prints no `QUEUED:` line by design, because 🟠 open at a
+  certification are the documented norm; the close reads the open 🟠 from the ledger itself
+  (section 6).
 - If the router prints "no row matched", route by hand from
   [reviews/README.md](../../../reviews/README.md)'s router table using the facts it printed,
   and say in the report that this pass was hand-routed.
@@ -80,17 +87,72 @@ run journal (not guesswork) explains an empty result.
 | full discovery · delta discovery · certification | Follow `reviews/runbooks/runbook-discovery.md` exactly — scoping, lens manifest, launch args, synthesis. The delta lens cap (5) and token budget (600k) are script-enforced; don't fight them. |
 | lens-coverage discovery (<lens>) | A discovery pass per the same runbook, full scope, lenses = the one owed lens + completeness-critic. It exists to clear lens-coverage debt before certification (README note ³). |
 | design pass (owner gate) | Only on the owner's go-ahead: a fix round per the `/fix-review` skill whose first artifact is a component-level protocol block, reimplementation against it, then discovery. Its metrics `notes` must carry `design-pass:<area>` — that is how the router counts the one-per-component cap. |
-| verification | Follow `reviews/runbooks/runbook-verification.md`. You must not be the fixer — sole exception: the test-only rule written in its step 1. Self-verification is the exact bias the loop exists to prevent. |
-| fix round | Invoke the **/fix-review** skill and stop there — it is the sole owner of the fixer contract. Do not fix findings inline. |
+| verification (reviewed unit) | Follow `reviews/runbooks/runbook-verification.md`. A fix round and its verification are **one reviewed unit**: run the verification immediately after the round's hand-back, in this same invocation, at the round's tip — then render the unit's records and sit its single doc gate (section 4). You must not be the fixer — sole exception: the test-only rule written in its step 1. Self-verification is the exact bias the loop exists to prevent. |
+| fix round | Invoke the **/fix-review** skill for the fixing — it is the sole owner of the fixer contract, and you never fix findings inline. You do not stop at its hand-back, though: the round is half a reviewed unit, so its verification, records and gate are yours in this same invocation. A sweep of queued 🟠 routes here too; drain the ids the router named. |
 | loop CLOSED | Report the closure line and stop. The target is under watch: a new serious finding in its files re-arms the loop and may be a `post-cert-escape` (reviews/state/track-record.md). |
+
+### Persistent fixer
+
+Inside one target, keep **one** fixer subagent and continue it: the next unit's findings go
+to the same agent, not to a fresh spawn. A fixer that already carries this target's protocol
+blocks, cluster map, trigger classifications and revert proofs re-reads none of it, and its
+round-scope review gets sharper across units.
+
+Retire the fixer — the next unit gets a fresh agent — after **any** discovery-type pass (full,
+delta, lens-coverage, certification), **any reopened fix**, or the target's close. Those are
+exactly the moments a carried-over mental model is the hazard: a blind pass exists to find what
+the fixer could not see, and a reopened fix is proof its author's reading of the code was
+wrong. The rule is the same in an unattended run, and the run-end report names how many units
+each fixer served.
 
 ## 4 · Records — the pass didn't happen until they exist
 
-**Stamp the pass's runtime:** append `pass-launch` (`{pass, type}`) to
-`reviews/<target>/worklog.jsonl` immediately before executing step 3, and
-`pass-records-done` after the auditor exits clean below — the metrics line's
-`runtime: {started, ended}` copies these two timestamps. Fix rounds stamp themselves
+**Stamp the pass's runtime** — through the stamper, never by hand (it owns the timestamp and
+enforces each event's required fields):
+
+```
+node reviews/lib/wl.mjs <target> pass-launch --pass v<n> --type verification
+node reviews/lib/wl.mjs <target> pass-records-done --pass v<n>
+```
+
+`pass-launch` goes immediately before executing step 3. `pass-records-done` goes **before**
+the renderer runs, not after the auditor: the renderer measures the
+`pass-launch`→`pass-records-done` span and refuses to render an unclosed one. The metrics
+line's `runtime: {started, ended}` copies those two timestamps. Fix rounds stamp themselves
 (the `/fix-review` skill owns its own worklog events).
+
+**The reviewed unit — a fix round and its verification record once, together.** When the fixer
+hands back (`round-end` stamped, code and resolution committed, `status: resolved`), continue
+in this same invocation:
+
+1. Commit any pending `reviews/<target>/` record appends — one records commit, `docs(review): …`
+   subject — because `verify-fixes.mjs` refuses a dirty tree by design.
+2. Stamp `pass-launch`, then verify at the round's tip: `node reviews/lib/verify-fixes.mjs
+   <target>` in full, or `--only PPW-1,PPW-2` as the sampled evidence audit when the round
+   recorded per-fix revert proofs — plus the runbook's judgment items. The script buffers its
+   `verify-result` events and flushes them once after the last row, so the run **ends with
+   `worklog.jsonl` dirty**: that is by design, and committing it is yours.
+3. Stamp `pass-records-done`, then render both halves — the round first (it reads the
+   resolution's Findings rows), the verification second (it reads the span's `verify-result`
+   events):
+
+```
+node reviews/lib/render-records.mjs <target> --outcome "<what the round did>"
+node reviews/lib/render-records.mjs <target> --verification v<n> --outcome "<what held>" [--commit <sha>]
+```
+
+   `--outcome` is mandatory on both, at most 50 words, and may carry neither a `|` nor a line
+   break. Every check runs before the first write, so a refusal leaves `metrics.jsonl`,
+   `index.md` and `ledger.md` all untouched — read what it named, repair that record, re-run.
+4. `node reviews/lib/records-auditor.mjs <target>` — must exit clean.
+5. **One doc-gate sitting for the whole unit** (below): the lint plus one judge dispatch over
+   the round's and the verification's changed files together, never one per half. The gate is
+   keyed to the round's number because a verification writes no files of its own.
+
+For a reviewed unit the fix-round and verification records are **rendered, not hand-written**
+— the renderer writes the two metrics lines, the two index rows and the ledger status flips
+the `verify-result` events imply; the prose that stays a human's is the resolution body and
+the summary. Discovery-type passes keep their existing records flow, below.
 
 In the runbooks' order: ledger update via **reconcile-findings** (discovery-type passes,
 *before* the review file so it can reference the minted ids; verification updates statuses per its own
@@ -114,10 +176,14 @@ node reviews/lib/doc-gate.mjs <target> <pass>     # structure lint — must exit
 then spawn the **Sonnet judge** (Agent, `model: sonnet`): input = `reviews/rules/doc-contracts.md`
 plus the round's new/changed `reviews/` files; output = approve, or disapprove with per-file
 reasons (language vs the vocabulary, evidence links supporting their claims, real reasons in
-"Reasons to doubt"). Append a `doc-gate` worklog event with the verdict. On disapprove: fix
-the files, re-run both halves. The summary is not handed to the owner and the review file is
-not declared immutable until both halves pass. The gate judges, never edits — read its
-reasons; don't game the lint.
+"Reasons to doubt"). Append a `doc-gate` worklog event with the verdict.
+
+**The judge is dispatched once per reviewed unit** — one sitting over the round's and the
+verification's files together. On disapprove, apply the judge's returned replacement text
+**verbatim** and re-run the lint; re-judge only when it returned a question instead of text.
+Re-judging text it already wrote is a second dispatch that decides nothing. The summary is not
+handed to the owner and the review file is not declared immutable until both halves pass. The
+gate judges, never edits — read its reasons; don't game the lint.
 
 ## 5 · Close out
 
@@ -156,15 +222,26 @@ the end.
 3. Router exit 2/3: run `node reviews/lib/autonomy-policy.mjs <target> decide
    <GATE_KIND>` — in an unattended run, an exit 3 always goes to the policy this way and
    is never hand-routed from the README table (step 1's manual fallback does not apply
-   here). `ACTION: auto` → append `gate-parked` (`{kind, default, reason}`) and
-   take the printed `NEXT`: a pass name is executed like a router answer (back to 2);
-   `close the loop` executes section 6's close sequence — the standing approval is the
-   owner's word it requires. `ACTION: stop` → end the run with the gate's question in
-   the report.
-4. No-progress guard: if the routed pass repeats the previous pass type and
-   `metrics.jsonl` gained no line in between, end the run — a pass is not recording.
-   This is a breakage detector, not a limit.
-5. Router prints `loop CLOSED` → the run is done; close it out.
+   here). `ACTION: auto` → append `gate-parked` (`{kind, default, reason}`) and take the
+   printed `NEXT`. The policy's whole vocabulary is `fix round` · `delta discovery` ·
+   `lens-coverage discovery (<lens>)` · `certification (pair)` · `certification (single)` ·
+   `close the loop`, and every one of them is executed exactly like a router answer (back to
+   2) — including `fix round`, which is how the policy answers a pre-certification sweep of
+   open 🟠, and `lens-coverage discovery (<lens>)`, the lean full-scope pass on one owed lens.
+   `close the loop` executes section 6's close sequence — the standing approval is the owner's
+   word it requires. `ACTION: stop` → end the run with the gate's question in the report; a
+   `design-pass` gate always stops, as does any gate override logged after the run started.
+4. No-progress guard — measured in **units**, not passes: a fix round and its verification
+   append their metrics lines together, at the unit's end, so a round mid-unit legitimately
+   shows no new line. If the routed work repeats the previous unit's shape and
+   `metrics.jsonl` gained no line across that whole completed unit, end the run — something
+   is not recording. This is a breakage detector, not a limit.
+5. Sweep stall detector: when a `fix round` is routed to drain queued 🟠, record the id set
+   the router or the policy named. If a later sweep is routed and the ledger's open-🟠 set is
+   the same or larger, the sweep is not draining — end the run and report those ids with what
+   each round did to them. A queue that never drains is a loop that can never certify, and it
+   will otherwise route `fix round` forever without ever repeating a pass type.
+6. Router prints `loop CLOSED` → the run is done; close it out.
 
 **Pass execution — always in subagents in this mode** (the driver only routes, records,
 and reports; subagents return a summary of at most 20 lines, and state is re-read from
@@ -173,8 +250,9 @@ the records, never from the subagent's prose):
 | Pass | How |
 |---|---|
 | full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
-| verification | first commit any pending `reviews/<target>/` record appends (worklog/metrics/ledger) — one records commit, `docs(review): …` subject, because `verify-fixes.mjs` refuses a dirty tree by design; then the runbook's step 2: an **evidence audit** (2–3 sampled rows via `--only`) when the round recorded per-fix revert proofs, the full `node reviews/lib/verify-fixes.mjs <target>` run otherwise; then one subagent for the runbook's judgment items and the records — given the script's JSON output, the round review's findings, the resolution, and the fix diff |
-| fix round | one subagent instructed to load the `/fix-review` skill and follow its **Unattended variant** section |
+| lens-coverage discovery (<lens>) | the same runbook, full scope, lenses = the one owed lens + completeness-critic; it clears one lens of the coverage debt that refuses certification |
+| reviewed unit (fix round + verification) | one subagent — the **persistent fixer** above — instructed to load the `/fix-review` skill and follow its **Unattended variant** section; it hands back at `round-end` plus the round's commit. Then, in the driver and in this same iteration: the records commit, `verify-fixes.mjs` at that tip (the sampled `--only` evidence audit when the round recorded per-fix revert proofs, the full run otherwise), one subagent for the runbook's judgment items — given the script's JSON output, the round review's findings, the resolution and the fix diff — then the two renderer calls, the auditor, and ONE doc-gate sitting for the unit (section 4) |
+| design pass | never automatic: `autonomy-policy.mjs` answers `stop` on the `design-pass` gate kind, because reimplementing a component is the owner's call. The run ends with that question |
 
 The session-model guard still applies: on a Fable session, discovery-scale launches
 proceed resume-ready, and the workflow runId goes into the worklog event.
@@ -191,9 +269,14 @@ Archiving is the last step of recording the close, in exactly this order (README
 conventions):
 
 1. `closed: <date> — <how>` into the ledger frontmatter; the index row records the story.
-2. **Backlog rollup:** every ledger row still at `backlog` gets one line in
-   `reviews/state/backlog.md` (`PPW-<n>`, target, severity, what, area — template
-   `templates/backlog.md`).
+2. **Backlog rollup — read the ledger, not the router.** At the close gate the router prints
+   no `QUEUED:` line: 🟠 still open when a certification passes are the documented norm, and
+   they must not pre-empt the owner's close decision. So open `ledger.md` and give one line
+   in `reviews/state/backlog.md` (`PPW-<n>`, target, severity, what, area — template
+   `templates/backlog.md`) to every row still at `backlog` **and** to every 🟠 still
+   `open`/`in-progress`, which stands down here rather than arming another round. 🔴,
+   reopened fixes and fix-caused 🟠 regressions still arm the loop even at this gate — if one
+   is open, the close is not what comes next.
 3. `archived: <date>` on the target's index row.
 4. `git mv reviews/<target> reviews/archive/<target>` — contents unchanged, nothing rewritten.
 
@@ -210,6 +293,8 @@ re-armed pass runs.
   word, and the index row records how it closed. An unattended run carries that word
   (standing approval 2026-08-20); the close is reported at run end.
 - Mark anything `verified` while being the fixer, outside the written test-only exemption.
+- Render or gate a fix round before its verification has run — the unit records once, after
+  the verification, and a rendered half-unit is a record that has to be corrected later.
 - Edit a `review-v*.md`, skip a record, or hand back with the auditor red.
 - Create a `reviews/<target>/` folder except by executing a pass the owner requested for
   that target — a defect noticed along the way is proposed at the round's owner gate, and
