@@ -75,7 +75,8 @@ const target = '960-run-scoped-target'
 {
   const before = backupLock()
   try {
-    writeFileSync(LOCK_PATH, JSON.stringify({ pid: process.pid, started: new Date().toISOString() }), { flag: 'wx' })
+    const fakeLock = JSON.stringify({ pid: process.pid, started: new Date().toISOString() })
+    writeFileSync(LOCK_PATH, fakeLock, { flag: 'wx' })
     const marker = join(T, 'lock-marker.txt')
     try { unlinkSync(marker) } catch { /* not created yet */ }
     const cmd = `node -e "require('fs').writeFileSync(${JSON.stringify(marker)},'ran')"`
@@ -84,6 +85,8 @@ const target = '960-run-scoped-target'
     check('the exit-3 message names the holder pid and the machine-wide rule',
       r.out.includes(`another test process is running (pid ${process.pid}) — the machine takes one at a time`), r.out.trim())
     check('a run refused by the lock never executes the command', !existsSync(marker), 'the marker file was created despite the lock')
+    check('a run refused by the lock leaves the foreign lock file byte-identical (a run that never acquired it never releases it)',
+      readFileSync(LOCK_PATH, 'utf8') === fakeLock, 'the foreign lock file content changed')
   } finally {
     restoreLock(before)
   }
@@ -106,6 +109,12 @@ const target = '960-run-scoped-target'
     ['--root', T, target, '--kind', 'green', '--filter', 'Foo.DryRun', '--cmd', passDotnet, '--dry-run'])
   check('--dry-run exits 0 and prints the command without running it', r.code === 0 && r.out.trim() === passDotnet, r.out.trim())
   check('--dry-run never touches the lock', !existsSync(LOCK_PATH), 'lock file present after a dry run')
+}
+{
+  const r = run('run-scoped-tests.mjs',
+    ['--root', T, target, '--kind', 'green', '--ui', '--include', 'Widget', '--dry-run'])
+  check('the default UI command has no single quotes (cmd.exe would not strip them)', r.code === 0 && !r.out.includes("'"), r.out.trim())
+  check('the default UI command substitutes the include fragment into the glob', r.out.includes('**/Widget*.spec.ts'), r.out.trim())
 }
 {
   const before = lastEvent(T, target)
@@ -132,6 +141,8 @@ const target = '960-run-scoped-target'
   check('missing --filter (api mode, no --cmd) is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
   r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--ui'])
   check('missing --include (ui mode, no --cmd) is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
+  r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--cmd', 'node -e "process.exit(0)"'])
+  check('missing --filter is a usage error even when --cmd is given (every stamp must carry the field)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
 }
 
 rmSync(T, { recursive: true, force: true })

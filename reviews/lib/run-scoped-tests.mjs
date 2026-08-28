@@ -9,18 +9,27 @@
 //   "<name>") [--cluster <c>] [--round <n>] [--note "<text>"]
 //   [--cmd "<template with {filter}/{name}>"] [--dry-run] [--no-events]
 // Commands: API `dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"`;
-// UI `npm --prefix src/PhotoPrint.UI test -- --watch=false --include='**/{name}*.spec.ts'`.
-// --cmd overrides the built command (fixtures use `node -e` stand-ins) and still accepts
-// {filter}/{name} substitution when present.
+// UI `npm --prefix src/PhotoPrint.UI test -- --watch=false --include=**/{name}*.spec.ts`
+// (unquoted — spawnSync's shell on Windows is cmd.exe, which does not strip single quotes,
+// so a quoted glob never reaches the runner as a glob). --cmd overrides the built command
+// (fixtures use `node -e` stand-ins) and still accepts {filter}/{name} substitution when
+// present; --filter/--include are required even then, so every stamped event carries the
+// field.
 // Lock: <os.tmpdir()>/photoprint-test.lock, created with 'wx' holding {pid, started}. A
-// live holder's pid means exit 3 before running anything; a dead one is stolen. The lock is
-// only ever removed by the run that acquired it, always on exit (finally + SIGINT/SIGTERM).
+// live holder's pid means exit 3 before running anything, and that lock file is left
+// untouched. A dead holder's lock is stolen, but only once per attempt — if the retried
+// 'wx' create collides again right after a steal, that second collision is treated as a
+// live holder (exit 3) rather than stolen again, so two processes racing the same stale
+// lock can't unlink each other's fresh lock forever. The lock is released in a finally
+// block after the run, and only when the file's own pid still matches ours. SIGINT/SIGTERM
+// handlers do the same release on POSIX; Windows does not reliably deliver a targeted kill
+// to these handlers, so there the dead-pid steal above is the real recovery path.
 // Output parsing: dotnet's `Failed: n, Passed: n(, Skipped: n)?` summary line, or (--ui)
 // vitest's `Tests (n failed )?n passed`. Unparsable output stamps passed/failed as null with
 // a note, but the process still exits with the runner's own exit code.
 // Exit: N the runner's own exit code (0 on a green run, non-zero on red) · 2 usage error ·
 // 3 another test process already holds the lock.
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs'
+import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,7 +37,7 @@ import { tmpdir } from 'node:os'
 import { appendEvent } from './wl.mjs'
 
 const DEFAULT_API_CMD = 'dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"'
-const DEFAULT_UI_CMD = "npm --prefix src/PhotoPrint.UI test -- --watch=false --include='**/{name}*.spec.ts'"
+const DEFAULT_UI_CMD = 'npm --prefix src/PhotoPrint.UI test -- --watch=false --include=**/{name}*.spec.ts'
 const LOCK_PATH = join(tmpdir(), 'photoprint-test.lock')
 const DOTNET_RE = /Failed:\s*(\d+), Passed:\s*(\d+)(?:, Skipped:\s*(\d+))?/
 const VITEST_RE = /Tests\s+(?:(\d+) failed[^\d]*)?(\d+) passed/
@@ -66,9 +75,12 @@ function isAlive(pid) {
 }
 
 // Only the run that successfully creates the lock owns it, so only that run may delete it —
-// a run that exits 3 because another pid holds it must never touch that file.
+// a run that exits 3 because another pid holds it must never touch that file. A steal is
+// attempted at most once: a second collision right after stealing means a sibling won the
+// race, and is treated as live rather than stolen again (no unlink-fight between siblings).
 function acquireLock() {
   const payload = JSON.stringify({ pid: process.pid, started: new Date().toISOString() })
+  let stolenOnce = false
   for (;;) {
     try {
       writeFileSync(LOCK_PATH, payload, { flag: 'wx' })
@@ -77,11 +89,12 @@ function acquireLock() {
       if (e.code !== 'EEXIST') throw e
       let existing = null
       try { existing = JSON.parse(readFileSync(LOCK_PATH, 'utf8')) } catch { existing = null }
-      if (isAlive(existing?.pid)) {
-        console.error(`another test process is running (pid ${existing.pid}) — the machine takes one at a time`)
+      if (stolenOnce || isAlive(existing?.pid)) {
+        console.error(`another test process is running (pid ${existing?.pid ?? 'unknown'}) — the machine takes one at a time`)
         process.exit(3)
       }
       try { unlinkSync(LOCK_PATH) } catch { /* raced with the dead holder's own cleanup */ }
+      stolenOnce = true
     }
   }
 }
@@ -104,7 +117,7 @@ function main() {
   const REPO = args.root ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..')
   if (!args.target) usageError('missing <target>')
   if (!args.kind) usageError('missing --kind')
-  if (!args.cmd && !(args.ui ? args.include : args.filter)) {
+  if (args.ui ? !args.include : !args.filter) {
     usageError(args.ui ? 'missing --include' : 'missing --filter')
   }
 
@@ -120,7 +133,14 @@ function main() {
 
   acquireLock()
   let lockHeld = true
-  const releaseLock = () => { if (lockHeld) { lockHeld = false; try { unlinkSync(LOCK_PATH) } catch { /* already gone */ } } }
+  const releaseLock = () => {
+    if (!lockHeld) return
+    lockHeld = false
+    try {
+      const existing = JSON.parse(readFileSync(LOCK_PATH, 'utf8'))
+      if (existing?.pid === process.pid) unlinkSync(LOCK_PATH)
+    } catch { /* nothing to release, or already gone */ }
+  }
   process.on('SIGINT', () => { releaseLock(); process.exit(130) })
   process.on('SIGTERM', () => { releaseLock(); process.exit(143) })
 
