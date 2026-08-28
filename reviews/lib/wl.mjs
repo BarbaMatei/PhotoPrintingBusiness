@@ -96,7 +96,7 @@ function validateShape(event) {
   for (const key of REQUIRED[ev] ?? []) {
     if (event[key] === undefined) throw new Error(`"${ev}" requires "${key}"`)
   }
-  if ((ev === 'round-start' || ev === 'round-end' || ev === 'triage-done') && typeof event.round !== 'number') {
+  if (['round-start', 'round-end', 'triage-done', 'protocol-written', 'round-review-dispatched', 'round-review-returned', 'test-audit-dispatched', 'test-audit-returned'].includes(ev) && typeof event.round !== 'number') {
     throw new Error(`"${ev}" requires "round" to be a number`)
   }
   if (ev === 'test-run' && !TEST_KINDS.has(event.kind)) {
@@ -187,7 +187,7 @@ if (isMain()) {
       const a = argv[i]
       if (a === '--root') root = argv[++i]
       else if (a === '--json') Object.assign(event, JSON.parse(argv[++i]))
-      else if (a === '--ids') event.ids = argv[++i].split(',')
+      else if (a === '--ids') event.ids = argv[++i].split(',').map(s => s.trim()).filter(Boolean)
       else if (a.startsWith('--')) event[a.slice(2)] = coerce(argv[++i])
       else rest.push(a)
     }

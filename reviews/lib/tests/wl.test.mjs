@@ -202,5 +202,21 @@ import { tmpdir } from 'node:os'
   r = run('wl.mjs', ['--root', T, target, 'check-dispatched', '--round', '1', '--cluster', 'c1', '--json', '{"ids":"PPW-1"}'])
   check('wl refuses ids that is a string instead of an array', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
 
+  r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--round', '1', '--cluster', 'c1', '--ids', 'PPW-1, PPW-2'])
+  check('wl accepts a spaced --ids list, trimming each element', r.code === 0, r.out.trim())
+  const spaced = r.code === 0 && lines().length ? JSON.parse(lines()[lines().length - 1]) : null
+  check('wl trims both elements of a spaced --ids list', !!spaced && Array.isArray(spaced.ids) && spaced.ids.length === 2 && spaced.ids[0] === 'PPW-1' && spaced.ids[1] === 'PPW-2', JSON.stringify(spaced))
+
+  r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--round', '1', '--cluster', 'c1', '--ids', 'PPW-1,PPW-2,'])
+  check('wl accepts a trailing comma in --ids, dropping the empty element', r.code === 0, r.out.trim())
+  const trailing = r.code === 0 && lines().length ? JSON.parse(lines()[lines().length - 1]) : null
+  check('wl drops the empty element from a trailing comma in --ids', !!trailing && Array.isArray(trailing.ids) && trailing.ids.length === 2 && trailing.ids[0] === 'PPW-1' && trailing.ids[1] === 'PPW-2', JSON.stringify(trailing))
+
+  r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--round', '1', '--cluster', 'c1', '--ids', 'PPW-1,BUG-2'])
+  check('wl still refuses a non-PPW element inside a comma-separated --ids list', r.code === 1 && r.out.includes('ERROR'), r.out.trim())
+
+  r = run('wl.mjs', ['--root', T, target, 'protocol-written', '--cluster', 'c1', '--ids', 'PPW-1', '--json', '{"round":"one"}'])
+  check('wl refuses a non-numeric round on a new audit event', r.code === 1 && r.out.includes('ERROR') && r.out.includes('number'), r.out.trim())
+
   rmSync(T, { recursive: true, force: true })
 }
