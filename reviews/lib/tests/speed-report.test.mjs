@@ -1,5 +1,5 @@
 // Tests for speed-report.mjs: the bucket state machine, the acceptance metrics, --json
-// round-tripping, and the mislabelled/duplicate round stamps a live worklog carries.
+// round-tripping, and the mislabelled/duplicate/stray round stamps a live worklog carries.
 //
 // The fixtures are verbatim copies of 038-039-invoicing's worklog.jsonl and metrics.jsonl.
 // They carry five worklog events and three correction lines appended after the owner's
@@ -27,12 +27,13 @@ function rootWith(worklog, metrics, target = TARGET) {
   const T = mkdtempSync(join(tmpdir(), 'speed-report-'))
   const dir = join(T, 'reviews', target)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'worklog.jsonl'), worklog.join('\n') + '\n')
+  writeFileSync(join(dir, 'worklog.jsonl'), worklog.map(e => typeof e === 'string' ? e : JSON.stringify(e)).join('\n') + '\n')
   if (metrics) writeFileSync(join(dir, 'metrics.jsonl'), metrics.join('\n') + '\n')
   roots.push(T)
   return T
 }
 const jsonOf = r => { try { return JSON.parse(r.out) } catch { return null } }
+const reportOf = (T, ...args) => jsonOf(run('speed-report.mjs', ['--root', T, TARGET, ...args, '--json']))
 const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
 
 // ---------- the frozen baseline: every number the day currently computes to ----------
@@ -54,40 +55,46 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
     check('the five buckets add up to the span', Math.abs(sum - j.span_min) <= 0.3, `${sum} vs ${j.span_min}`)
     check('bucket percentages are of the span', Math.abs(j.buckets['fix-round work'].pct - 34.3) < 0.1, String(j.buckets['fix-round work'].pct))
     const m = j.metrics
-    check('frozen baseline median all-in min per fixed finding', m.all_in_min_per_fixed_finding.median_min_per_fixed === 25.2, JSON.stringify(m.all_in_min_per_fixed_finding.median_min_per_fixed))
-    check('four rounds get an all-in row', m.all_in_min_per_fixed_finding.per_round.length === 4, JSON.stringify(m.all_in_min_per_fixed_finding.per_round.map(x => x.round)))
-    const r9 = m.all_in_min_per_fixed_finding.per_round.find(x => x.round === 9)
-    check("round 9's three parts run to its v10 verification", r9 && r9.all_in_min === 231.8 && r9.fixed === 8 && r9.verification_pass === 10, JSON.stringify(r9))
-    const r10 = m.all_in_min_per_fixed_finding.per_round.find(x => x.round === 10)
-    check('a round no verification pass follows still reports its gate time', r10 && r10.all_in_min === 42.8 && r10.verification_pass === null, JSON.stringify(r10))
-    check('frozen baseline doc-gate sittings', m.doc_gate_first_pass_approval.sittings === 12 && m.doc_gate_first_pass_approval.first_pass === 8, JSON.stringify(m.doc_gate_first_pass_approval))
+    const rows = m.all_in_min_per_fixed_finding.per_round
+    check('frozen baseline median all-in min per fixed finding', m.all_in_min_per_fixed_finding.median_min_per_fixed === 25.2, String(m.all_in_min_per_fixed_finding.median_min_per_fixed))
+    check('the day yields four round rows, keyed 6/8/9/10', JSON.stringify(rows.map(x => x.round)) === '[6,8,9,10]', JSON.stringify(rows.map(x => x.round)))
+    const r6 = rows.find(x => x.round === 6)
+    check('the restamped 08:07:59 round reads as 6, and no verification follows its gate', r6 && r6.all_in_min === 124 && r6.fixed === 16 && r6.verification_pass === null && r6.per_fixed_min === 7.8, JSON.stringify(r6))
+    const r8 = rows.find(x => x.round === 8)
+    check('round 8 keeps the v8 verification that follows its gate', r8 && r8.all_in_min === 123.5 && r8.fixed === 3 && r8.verification_pass === 8, JSON.stringify(r8))
+    const r9 = rows.find(x => x.round === 9)
+    check("round 9's three parts run to its v10 verification", r9 && r9.all_in_min === 231.8 && r9.fixed === 8 && r9.verification_pass === 10 && r9.per_fixed_min === 29, JSON.stringify(r9))
+    const r10 = rows.find(x => x.round === 10)
+    check('a round no verification pass follows still reports its gate time', r10 && r10.all_in_min === 42.8 && r10.fixed === 2 && r10.verification_pass === null, JSON.stringify(r10))
+    check('frozen baseline doc-gate sittings', m.doc_gate_first_pass_approval.sittings === 12 && m.doc_gate_first_pass_approval.first_pass === 8 && m.doc_gate_first_pass_approval.rate === 0.667, JSON.stringify(m.doc_gate_first_pass_approval))
     check('frozen baseline record sittings per fixed finding', m.record_sittings_per_fixed_finding.fixed_findings === 29 && m.record_sittings_per_fixed_finding.per_fixed === 0.414, JSON.stringify(m.record_sittings_per_fixed_finding))
-    check('correction lines are counted cumulatively to --day', m.correction_lines === 25, String(m.correction_lines))
+    check('the corrections count is named cumulative and is 25', m.correction_lines_cumulative === 25, JSON.stringify(m))
   }
 
-  // The live log mislabels rounds 6/7/8/9; none of it may abort the report.
+  // The live log restamps and mislabels rounds 6/7/8/9; none of it may abort the report.
   const notes = (j?.notes ?? []).join('\n')
-  check('the duplicate round-start names both round numbers', /round-start at 2026-08-21T08:07:59\+03:00 \(round 6\) opens while round 7/.test(notes), notes)
+  check('the same-instant round-6 stamp is read as a restamp of round 7', /round-start at 2026-08-21T08:07:59\+03:00 \(round 6\) restamps the round 7 opened at the same instant/.test(notes), notes)
+  check("that span's round-end carries a different number and is named", /round-end at 2026-08-21T08:57:07\+03:00 carries round 7 but closes the span opened at 2026-08-21T08:07:59\+03:00 with round 6/.test(notes), notes)
   check('the round-6 round-end that closes nothing is named', /round-end at 2026-08-21T08:57:07\+03:00 \(round 6\) closes nothing/.test(notes), notes)
-  check('the round-end mislabelled 7 is named as round 8\'s end', /round-end at 2026-08-21T10:44:01\+03:00 carries round 7 but closes the span opened at 2026-08-21T10:15:47\+03:00 with round 8/.test(notes), notes)
+  check("the round-end mislabelled 7 is named as round 8's end", /round-end at 2026-08-21T10:44:01\+03:00 carries round 7 but closes the span opened at 2026-08-21T10:15:47\+03:00 with round 8/.test(notes), notes)
   check("round 9's two unstamped resumptions are named with their triage-done", /round-end at 2026-08-21T15:35:04\+03:00 closes a resumed round 9 .* opened at 2026-08-21T14:57:17\+03:00/.test(notes) && /round-end at 2026-08-21T16:58:06\+03:00 closes a resumed round 9 .* opened at 2026-08-21T16:15:29\+03:00/.test(notes), notes)
-  check('the unopened gate-closed is named, not counted', /gate-closed at 2026-08-21T12:35:27\+03:00 .* closes nothing/.test(notes), notes)
+  check('the unopened gate-closed is named with its reason truncated', /gate-closed at 2026-08-21T12:35:27\+03:00 \(reason owner ruled the 4 parked items and authorised the push: P…\) closes nothing/.test(notes), notes)
 
   // ---------- --json round-trips: the text report prints the same numbers ----------
   const txt = run('speed-report.mjs', ['--root', T, TARGET, '--day', DAY])
   check('the text report exits 0', txt.code === 0, `exit ${txt.code}: ${txt.out.trim()}`)
   check('the text report prints the span', txt.out.includes('span 763.4 min'), txt.out.split('\n')[1])
   check('the text report prints the buckets', txt.out.includes('fix-round work     262.1 min') && txt.out.includes('records+gates      201.7 min'), txt.out)
-  check('the text report prints the metrics', txt.out.includes('median of 4 round(s)): 25.2') && txt.out.includes('0.667  (8 of 12 sitting(s))') && txt.out.includes('correction lines: 25'), txt.out)
+  check('the text report prints the metrics', txt.out.includes('median of 4 round(s)): 25.2') && txt.out.includes('0.667  (8 of 12 sitting(s))') && txt.out.includes('correction lines (cumulative to 2026-08-21): 25'), txt.out)
   check('every NOTE reaches both outputs', (j?.notes ?? []).every(n => txt.out.includes(n)), txt.out)
-  const j2 = jsonOf(run('speed-report.mjs', ['--root', T, TARGET, '--day', DAY, '--json']))
+  const j2 = reportOf(T, '--day', DAY)
   check('--json is stable across runs', JSON.stringify(j2) === JSON.stringify(j), 'two --json runs of the same input differ')
 }
 
 // ---------- the owner's reference measurement of 2026-08-21, reproduced ----------
 {
   const T = rootWith(fixtureLines('worklog.jsonl').filter(l => Date.parse(JSON.parse(l).t) <= REF_CUT), fixtureLines('metrics.jsonl'))
-  const j = jsonOf(run('speed-report.mjs', ['--root', T, TARGET, '--day', DAY, '--json']))
+  const j = reportOf(T, '--day', DAY)
   check('the reference snapshot reports', j != null)
   if (j) {
     check('reference snapshot has the 175 events the measurement saw', j.events === 175, String(j.events))
@@ -95,13 +102,13 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
     check('fix-round work 255-275 min', within(j.buckets['fix-round work'].min, 255, 275), String(j.buckets['fix-round work'].min))
     check('records+gates 185-215 min', within(j.buckets['records+gates'].min, 185, 215), String(j.buckets['records+gates'].min))
     check('doc-gate first-pass approval 0.5-0.65', within(j.metrics.doc_gate_first_pass_approval.rate, 0.5, 0.65), String(j.metrics.doc_gate_first_pass_approval.rate))
-    check('correction lines = 25', j.metrics.correction_lines === 25, String(j.metrics.correction_lines))
+    check('correction lines = 25', j.metrics.correction_lines_cumulative === 25, String(j.metrics.correction_lines_cumulative))
   }
 }
 
 // ---------- the state machine on a hand-built day ----------
 {
-  const wl = [
+  const T = rootWith([
     { t: '2019-03-01T09:00:00+03:00', ev: 'round-start', round: 1 },
     { t: '2019-03-01T09:10:00+03:00', ev: 'triage-done', round: 1, clusters: 2 },
     { t: '2019-03-01T09:40:00+03:00', ev: 'finding', id: 'PPW-1', status: 'fixed' },
@@ -113,9 +120,8 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
     { t: '2019-03-01T12:30:00+03:00', ev: 'gate-closed', reason: 'owner ruling' },
     { t: '2019-03-01T13:00:00+03:00', ev: 'pass-records-done', pass: 2, type: 'verification' },
     { t: '2019-03-01T15:00:00+03:00', ev: 'run-end', passes: 1 },
-  ].map(e => JSON.stringify(e))
-  const T = rootWith(wl, ['{"target":"t","date":"2019-03-01","correction_for":{"round":1,"field":"findings"},"note":"x"}'])
-  const j = jsonOf(run('speed-report.mjs', ['--root', T, TARGET, '--json']))
+  ], ['{"target":"t","date":"2019-03-01","correction_for":{"round":1,"field":"findings"},"note":"x"}'])
+  const j = reportOf(T)
   check('the hand-built day reports', j != null)
   if (j) {
     check('a round span is fix-round work', j.buckets['fix-round work'].min === 60, JSON.stringify(j.buckets['fix-round work']))
@@ -125,45 +131,154 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
     check('a gap past the 30-minute cap is idle, not records', j.buckets['idle/other'].min === 120, JSON.stringify(j.buckets['idle/other']))
     check('a doc-gate sitting groups adjacent same-key events', j.metrics.doc_gate_first_pass_approval.sittings === 1, JSON.stringify(j.metrics.doc_gate_first_pass_approval))
     check('a sitting opening on a disapprove is not a first-pass approval', j.metrics.doc_gate_first_pass_approval.rate === 0, JSON.stringify(j.metrics.doc_gate_first_pass_approval))
-    check('all-in runs round-start to the approve plus the verification that follows', j.metrics.all_in_min_per_fixed_finding.per_round[0].all_in_min === 210, JSON.stringify(j.metrics.all_in_min_per_fixed_finding.per_round[0]))
-    check('an untagged fixed finding is attributed to the round span it sits in', j.metrics.all_in_min_per_fixed_finding.per_round[0].fixed === 1, JSON.stringify(j.metrics.all_in_min_per_fixed_finding.per_round[0]))
-    check('a correction line without --day still counts', j.metrics.correction_lines === 1, String(j.metrics.correction_lines))
+    const row = j.metrics.all_in_min_per_fixed_finding.per_round[0]
+    check('all-in runs round-start to the approve plus the verification that follows', row.all_in_min === 210, JSON.stringify(row))
+    check('an untagged fixed finding is attributed to the round span it sits in', row.fixed === 1, JSON.stringify(row))
+    check('a correction line without --day still counts', j.metrics.correction_lines_cumulative === 1, String(j.metrics.correction_lines_cumulative))
   }
-  const other = jsonOf(run('speed-report.mjs', ['--root', T, TARGET, '--day', '2019-03-01', '--json']))
+  const other = reportOf(T, '--day', '2019-03-01')
   check('--day keeps a day the events are on', other && other.events === 11, JSON.stringify(other?.events))
+}
+
+// ---------- a stray round-end may not reach back across a run or a whole pass ----------
+{
+  const strayDay = [
+    { t: '2019-06-01T09:00:00+03:00', ev: 'round-start', round: 1 },
+    { t: '2019-06-01T09:10:00+03:00', ev: 'triage-done', round: 1 },
+    { t: '2019-06-01T09:30:00+03:00', ev: 'round-end', round: 1 },
+    { t: '2019-06-01T09:45:00+03:00', ev: 'triage-done', round: 1 },
+    { t: '2019-06-01T10:00:00+03:00', ev: 'run-end', passes: 1 },
+    { t: '2019-06-01T11:00:00+03:00', ev: 'pass-launch', pass: 2, type: 'verification' },
+    { t: '2019-06-01T13:00:00+03:00', ev: 'pass-records-done', pass: 2, type: 'verification' },
+    { t: '2019-06-01T15:30:00+03:00', ev: 'round-end', round: 1 },
+  ]
+  const j = reportOf(rootWith(strayDay, null))
+  check('the stray end is not charged as fix-round work', j != null && j.buckets['fix-round work'].min === 30, JSON.stringify(j?.buckets))
+  check('the pass it spans keeps its own time', j != null && j.buckets['pass work'].min === 120 && j.buckets['idle/other'].min === 210, JSON.stringify(j?.buckets))
+  check('the refusal NOTE names the span it would have charged, in minutes', j != null && j.notes.some(n => /round-end at 2019-06-01T15:30:00\+03:00 \(round 1\) would resume 345 min back at the triage-done at 2019-06-01T09:45:00\+03:00, across the run-end at 2019-06-01T10:00:00\+03:00 — the stray end is reported, not charged/.test(n)), JSON.stringify(j?.notes))
+
+  const noRunEnd = strayDay.filter(e => e.ev !== 'run-end')
+  const k = reportOf(rootWith(noRunEnd, null))
+  check('a whole pass inside the would-be span refuses it too', k != null && k.buckets['fix-round work'].min === 30 && k.notes.some(n => /across the whole of pass 2 — the stray end is reported, not charged/.test(n)), JSON.stringify(k?.notes))
+
+  const resumable = [
+    { t: '2019-06-02T09:00:00+03:00', ev: 'round-start', round: 1 },
+    { t: '2019-06-02T09:30:00+03:00', ev: 'round-end', round: 1 },
+    { t: '2019-06-02T10:00:00+03:00', ev: 'triage-done', round: 1 },
+    { t: '2019-06-02T10:15:00+03:00', ev: 'triage-done', round: 1 },
+    { t: '2019-06-02T11:00:00+03:00', ev: 'round-end', round: 1 },
+  ]
+  const g = reportOf(rootWith(resumable, null))
+  check('a clean resumption opens at the LAST triage-done before the stray end', g != null && g.buckets['fix-round work'].min === 75, JSON.stringify(g?.buckets))
+  check('the resumption is named', g != null && g.notes.some(n => /closes a resumed round 1 .* opened at 2019-06-02T10:15:00\+03:00/.test(n)), JSON.stringify(g?.notes))
+
+  const preSpan = [
+    { t: '2019-06-03T09:00:00+03:00', ev: 'round-start', round: 1 },
+    { t: '2019-06-03T09:10:00+03:00', ev: 'triage-done', round: 1 },
+    { t: '2019-06-03T09:30:00+03:00', ev: 'round-end', round: 1 },
+    { t: '2019-06-03T10:00:00+03:00', ev: 'round-end', round: 1 },
+  ]
+  const p = reportOf(rootWith(preSpan, null))
+  check('a resumption never reaches back into the round\'s own closed span', p != null && p.buckets['fix-round work'].min === 30 && p.notes.some(n => /closes nothing and no resumption stamp precedes it/.test(n)), JSON.stringify(p?.notes))
+}
+
+// ---------- a verification launched after the next round has started is not this round's ----------
+{
+  const T = rootWith([
+    { t: '2019-07-01T09:00:00+03:00', ev: 'round-start', round: 1 },
+    { t: '2019-07-01T09:20:00+03:00', ev: 'finding', id: 'PPW-1', status: 'fixed' },
+    { t: '2019-07-01T09:30:00+03:00', ev: 'round-end', round: 1 },
+    { t: '2019-07-01T09:40:00+03:00', ev: 'doc-gate', round: 1, verdict: 'approve' },
+    { t: '2019-07-01T09:50:00+03:00', ev: 'round-start', round: 2 },
+    { t: '2019-07-01T10:00:00+03:00', ev: 'pass-launch', pass: 3, type: 'verification' },
+    { t: '2019-07-01T10:30:00+03:00', ev: 'pass-records-done', pass: 3, type: 'verification' },
+    { t: '2019-07-01T10:40:00+03:00', ev: 'round-end', round: 2 },
+  ], null)
+  const j = reportOf(T)
+  const row = j?.metrics.all_in_min_per_fixed_finding.per_round.find(x => x.round === 1)
+  check('an intervening round-start bounds the verification search', row && row.all_in_min === 40 && row.verification_pass === null, JSON.stringify(row))
+  const row2 = j?.metrics.all_in_min_per_fixed_finding.per_round.find(x => x.round === 2)
+  check('a round with no approve after it is unmeasured, not zero', row2 && row2.all_in_min === null && j.notes.some(n => /round 2 has no doc-gate approve/.test(n)), JSON.stringify(row2))
+}
+
+// ---------- two round-starts on one instant: the later is the correction ----------
+{
+  const j = reportOf(rootWith([
+    { t: '2019-08-01T09:00:00+03:00', ev: 'round-start', round: 5 },
+    { t: '2019-08-01T09:00:00+03:00', ev: 'round-start', round: 6 },
+    { t: '2019-08-01T10:00:00+03:00', ev: 'round-end', round: 6 },
+  ], null))
+  check('the restamped span is keyed by the later stamp', j != null && JSON.stringify(j.metrics.all_in_min_per_fixed_finding.per_round.map(x => x.round)) === '[6]', JSON.stringify(j?.metrics.all_in_min_per_fixed_finding.per_round))
+  check('the restamp costs no time', j != null && j.buckets['fix-round work'].min === 60, JSON.stringify(j?.buckets))
+  check('the restamp is named', j != null && j.notes.some(n => /round-start at 2019-08-01T09:00:00\+03:00 \(round 6\) restamps the round 5 opened at the same instant/.test(n)), JSON.stringify(j?.notes))
+}
+
+// ---------- --day buckets by the parsed instant's UTC day, not the ISO-string prefix ----------
+{
+  const T = rootWith([
+    { t: '2026-08-21T23:30:00+03:00', ev: 'round-start', round: 1 },
+    { t: '2026-08-22T01:00:00+03:00', ev: 'round-end', round: 1 },
+    { t: '2026-08-22T04:00:00+03:00', ev: 'doc-gate', round: 1, verdict: 'approve' },
+  ], null)
+  const j = reportOf(T, '--day', DAY)
+  check('an after-midnight local stamp still on the UTC day is kept', j != null && j.events === 2 && j.ended === '2026-08-22T01:00:00+03:00', JSON.stringify({ events: j?.events, ended: j?.ended }))
+  check('the kept event is measured, not just counted', j != null && j.buckets['fix-round work'].min === 90, JSON.stringify(j?.buckets))
+  const next = reportOf(T, '--day', '2026-08-22')
+  check('the event past the UTC boundary lands on the next day', next != null && next.events === 1, JSON.stringify(next?.events))
 }
 
 // ---------- void events drop what they match, before anything is measured ----------
 {
-  const wl = [
+  const T = rootWith([
     { t: '2019-04-01T09:00:00+03:00', ev: 'round-start', round: 1 },
     { t: '2019-04-01T09:30:00+03:00', ev: 'round-end', round: 1 },
     { t: '2019-04-01T10:00:00+03:00', ev: 'round-start', round: 2 },
     { t: '2019-04-01T11:00:00+03:00', ev: 'round-end', round: 2 },
     { t: '2019-04-01T11:05:00+03:00', ev: 'void', of: { ev: 'round-end', t: '2019-04-01T09:30:00+03:00', round: 1 } },
-  ].map(e => JSON.stringify(e))
-  const T = rootWith(wl, null)
-  const j = jsonOf(run('speed-report.mjs', ['--root', T, TARGET, '--json']))
+  ], null)
+  const j = reportOf(T)
   check('a voided round-end is gone before pairing, so round 1 stays open to 11:00', j != null && j.buckets['fix-round work'].min === 120, JSON.stringify(j?.buckets))
   check("the voided round's start is reported as closed by the next round-end", j != null && j.notes.some(n => /carries round 2 but closes the span opened at 2019-04-01T09:00:00\+03:00 with round 1/.test(n)), JSON.stringify(j?.notes))
-  check('the round-start left with no end of its own is named as a duplicate', j != null && j.notes.some(n => /round-start at 2019-04-01T10:00:00\+03:00 \(round 2\) opens while round 1/.test(n)), JSON.stringify(j?.notes))
-  check('a missing metrics.jsonl is a note, not a failure', j != null && j.metrics.correction_lines === 0 && j.notes.some(n => /metrics\.jsonl/.test(n)), JSON.stringify(j?.notes))
+  check('a later start on a different instant is a duplicate, not a restamp', j != null && j.notes.some(n => /round-start at 2019-04-01T10:00:00\+03:00 \(round 2\) opens while round 1 .* the duplicate is ignored/.test(n)), JSON.stringify(j?.notes))
+  check('a missing metrics.jsonl is a note, not a failure', j != null && j.metrics.correction_lines_cumulative === 0 && j.notes.some(n => /metrics\.jsonl/.test(n)), JSON.stringify(j?.notes))
+}
+
+// ---------- an undated correction line is left out, not dated by guess ----------
+{
+  const T = rootWith([{ t: '2019-09-01T09:00:00+03:00', ev: 'note', text: 'x' }], [
+    '{"target":"t","date":"2019-09-01","correction_for":{"round":1,"field":"findings"},"note":"a"}',
+    '{"target":"t","correction_for":{"round":2,"field":"findings"},"note":"b"}',
+    '{"target":"t","date":"2019-09-09","correction_for":{"round":3,"field":"findings"},"note":"c"}',
+  ])
+  const j = reportOf(T, '--day', '2019-09-01')
+  check('only dated corrections at or before --day count', j != null && j.metrics.correction_lines_cumulative === 1, String(j?.metrics.correction_lines_cumulative))
+  check('the undated correction is reported', j != null && j.notes.some(n => /1 correction line\(s\) carry no date/.test(n)), JSON.stringify(j?.notes))
+  const all = reportOf(T)
+  check('without --day the undated line is still left out', all != null && all.metrics.correction_lines_cumulative === 2, String(all?.metrics.correction_lines_cumulative))
 }
 
 // ---------- refusals ----------
 {
-  const T = rootWith(['{"t":"2019-05-01T09:00:00+03:00","ev":"note","text":"x"}'], null)
+  const T = rootWith([{ t: '2019-05-01T09:00:00+03:00', ev: 'note', text: 'x' }], null)
   const bad = run('speed-report.mjs', ['--root', T, 'no-such-target'])
   check('an unknown target exits 1', bad.code === 1 && /no reviews\/no-such-target\//.test(bad.out), `exit ${bad.code}: ${bad.out.trim()}`)
   const badDay = run('speed-report.mjs', ['--root', T, TARGET, '--day', 'yesterday'])
   check('a malformed --day exits 1', badDay.code === 1 && /--day "yesterday"/.test(badDay.out), `exit ${badDay.code}: ${badDay.out.trim()}`)
   const emptyDay = run('speed-report.mjs', ['--root', T, TARGET, '--day', '2019-05-02'])
   check('a --day with no events exits 1', emptyDay.code === 1 && /no events on 2019-05-02/.test(emptyDay.out), `exit ${emptyDay.code}: ${emptyDay.out.trim()}`)
+  const dayNoValue = run('speed-report.mjs', ['--root', T, TARGET, '--day'])
+  check('--day with no value exits 1', dayNoValue.code === 1 && /--day needs a value/.test(dayNoValue.out), `exit ${dayNoValue.code}: ${dayNoValue.out.trim()}`)
+  const rootNoValue = run('speed-report.mjs', [TARGET, '--root', '--json'])
+  check('--root swallowing the next flag exits 1', rootNoValue.code === 1 && /--root needs a value/.test(rootNoValue.out), `exit ${rootNoValue.code}: ${rootNoValue.out.trim()}`)
   check('no target exits 1 with the usage line', run('speed-report.mjs', ['--root', T]).code === 1)
 
   const broken = rootWith(['{"t":"2019-05-01T09:00:00+03:00","ev":"round-start","round":1}', '{oops'], null)
   const r = run('speed-report.mjs', ['--root', broken, TARGET])
   check('an unparseable worklog line exits 1 naming the line', r.code === 1 && /worklog line 2/.test(r.out), `exit ${r.code}: ${r.out.trim()}`)
+
+  const badTime = rootWith(['{"t":"the other day","ev":"round-start","round":1}'], null)
+  const r3 = run('speed-report.mjs', ['--root', badTime, TARGET])
+  check('an unparseable timestamp exits 1', r3.code === 1 && /unparseable timestamp/.test(r3.out), `exit ${r3.code}: ${r3.out.trim()}`)
 
   const noLog = mkdtempSync(join(tmpdir(), 'speed-report-'))
   mkdirSync(join(noLog, 'reviews', TARGET), { recursive: true })
