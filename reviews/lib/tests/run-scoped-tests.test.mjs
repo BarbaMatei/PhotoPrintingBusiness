@@ -92,6 +92,35 @@ const target = '960-run-scoped-target'
   }
 }
 {
+  // The wrapper still holds its own lock while --cmd runs (spawnSync is synchronous), so a
+  // --cmd that overwrites LOCK_PATH mid-run simulates a foreign process taking over the
+  // slot. releaseLock() must see a pid that is no longer ours and refuse to delete it. The
+  // foreign pid is the test file's own process.ppid — genuinely alive throughout this run,
+  // so a guard that only special-cases dead pids can't pass this by accident.
+  const before = backupLock()
+  const savedEnv = { path: process.env.RST_LOCK_PATH, payload: process.env.RST_FOREIGN_PAYLOAD }
+  try {
+    try { unlinkSync(LOCK_PATH) } catch { /* nothing to clear */ }
+    // Nested double-quoted JS string literals inside a node -e "..." command don't survive
+    // cmd.exe's quote handling on Windows — env vars sidestep needing any quoting at all.
+    const foreignPayload = JSON.stringify({ pid: process.ppid, started: '2020-01-01T00:00:00.000Z' })
+    process.env.RST_LOCK_PATH = LOCK_PATH
+    process.env.RST_FOREIGN_PAYLOAD = foreignPayload
+    const stealMidRun = 'node -e "require(\'fs\').writeFileSync(process.env.RST_LOCK_PATH, process.env.RST_FOREIGN_PAYLOAD); process.exit(0)"'
+    const r = run('run-scoped-tests.mjs',
+      ['--root', T, target, '--kind', 'green', '--filter', 'Foo.MidRunSteal', '--cmd', stealMidRun])
+    check('the wrapper still exits with its own command\'s code after the lock is swapped mid-run', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+    const afterExists = existsSync(LOCK_PATH)
+    check('releaseLock refuses to delete a lock whose pid no longer matches ours (foreign content survives byte-identical)',
+      afterExists && readFileSync(LOCK_PATH, 'utf8') === foreignPayload,
+      `lock exists=${afterExists}, content=${afterExists ? readFileSync(LOCK_PATH, 'utf8') : '(absent)'}, expected=${foreignPayload}`)
+  } finally {
+    if (savedEnv.path === undefined) delete process.env.RST_LOCK_PATH; else process.env.RST_LOCK_PATH = savedEnv.path
+    if (savedEnv.payload === undefined) delete process.env.RST_FOREIGN_PAYLOAD; else process.env.RST_FOREIGN_PAYLOAD = savedEnv.payload
+    restoreLock(before)
+  }
+}
+{
   const before = backupLock()
   try {
     writeFileSync(LOCK_PATH, JSON.stringify({ pid: 999999, started: new Date().toISOString() }), { flag: 'wx' })
