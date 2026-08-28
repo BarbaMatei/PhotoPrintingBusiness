@@ -31,10 +31,42 @@ const targetDir = name => existsSync(join(REVIEWS, name)) ? join(REVIEWS, name) 
 const metricsPath = join(targetDir(target), 'metrics.jsonl')
 if (!existsSync(metricsPath)) { console.error(USAGE); process.exit(2) }
 
-const lines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
-const matches = lines.filter(l => Number.isFinite(l.pass) && l.pass === pass)
-if (!matches.length) { console.error(USAGE); process.exit(2) }
-const L = matches[matches.length - 1]
+const allLines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
+const lines = allLines.filter(l => !l.correction_for)
+
+// A certification pair writes two lines sharing one `pass`, subtypes A/B (metrics-schema.md);
+// treat every discovery-type line at a pass number as one unit — union lenses, sum
+// new_findings/budget_skipped, concatenate findings[] — so a pair reads as one pass, not two
+// contradictory halves. A same-numbered non-discovery-type line (verification) never merges in.
+const isDiscoveryType = l => l.type === 'discovery' || l.type === 'delta-discovery'
+const discoveryGroups = new Map()
+for (const l of lines) {
+  if (!isDiscoveryType(l) || !Number.isFinite(l.pass)) continue
+  if (!discoveryGroups.has(l.pass)) discoveryGroups.set(l.pass, [])
+  discoveryGroups.get(l.pass).push(l)
+}
+function mergeGroup(group) {
+  const lensSet = new Set()
+  const nf = { high: 0, medium: 0, low: 0, cleanup: 0 }
+  const findings = []
+  let budgetSkipped = 0
+  for (const l of group) {
+    for (const k of (Array.isArray(l.lenses) ? l.lenses : [])) lensSet.add(k)
+    for (const sev of Object.keys(nf)) nf[sev] += l.new_findings?.[sev] ?? 0
+    if (Array.isArray(l.findings)) findings.push(...l.findings)
+    budgetSkipped += l.cost?.agents_by_stage?.budget_skipped ?? 0
+  }
+  return { type: group[0].type, lenses: [...lensSet], new_findings: nf, findings, cost: { agents_by_stage: { budget_skipped: budgetSkipped } } }
+}
+
+let L
+if (discoveryGroups.has(pass)) {
+  L = mergeGroup(discoveryGroups.get(pass))
+} else {
+  const others = lines.filter(l => Number.isFinite(l.pass) && l.pass === pass)
+  if (!others.length) { console.error(USAGE); process.exit(2) }
+  L = others[others.length - 1]
+}
 
 const out = []
 const say = s => out.push(s)
@@ -43,12 +75,11 @@ const ran = new Set(Array.isArray(L.lenses) ? L.lenses : [])
 const owed = MANIFEST_LENSES.filter(k => !ran.has(k))
 if (owed.length) say(`- Owed manifest lenses: ${owed.join(', ')}`)
 
-// The decay curve is blind (full-scope) passes only, matching route-next-pass.mjs's grouping;
-// lines after this pass are excluded so a re-run for an old pass never leaks later history.
-const isDiscoveryType = l => l.type === 'discovery' || l.type === 'delta-discovery'
-for (const l of lines) {
-  if (!isDiscoveryType(l) || !Number.isFinite(l.pass) || l.pass > pass) continue
-  say(`- v${l.pass}: ${l.new_findings?.high ?? 0}+${l.new_findings?.medium ?? 0}`)
+// Lines after this pass are excluded so a re-run for an old pass never leaks later history.
+for (const [p, group] of discoveryGroups) {
+  if (p > pass) continue
+  const merged = mergeGroup(group)
+  say(`- v${p}: ${merged.new_findings.high}+${merged.new_findings.medium}`)
 }
 
 const findings = Array.isArray(L.findings) ? L.findings : []

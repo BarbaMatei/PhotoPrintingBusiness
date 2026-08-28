@@ -1,6 +1,7 @@
 // Tests for summary-data.mjs: bullet fragments computed from one pass's metrics.jsonl line
 // (owed manifest lenses, the new-serious trend, findings[] counts, budget skips, the
-// pass-type-cap reminder, backlog filings) plus the missing-pass usage/exit-2 path.
+// pass-type-cap reminder, backlog filings), certification-pair merging (two lines, one pass
+// number, read as one unit), and the missing-pass usage/exit-2 path.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only summary-data
 import { check, run } from './lib.mjs'
@@ -96,6 +97,49 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
     check("the earlier delta-discovery pass's trend entry still shows through", r.out.includes('- v5: 0+0'), r.out.trim())
     check('null lenses means every manifest lens is owed', r.out.includes('Owed manifest lenses:') && r.out.includes('frontend-ux'), r.out.trim())
   }
+  rmSync(T, { recursive: true, force: true })
+}
+
+// ---------- certification pair: two lines share one pass number ----------
+// Real shape (metrics-schema.md ~line 41): a certification pair writes subtypes A/B at the
+// same `pass`. "requirements" ran only in A and "quality" only in B — the pre-fix script (last
+// matching line wins) would have wrongly called "requirements" owed, since it isn't in B's own
+// lenses array. A correction line for this pass is also on file and must be ignored, not
+// double-counted or crash the parse (it carries no top-level `pass`).
+{
+  const T = mkdtempSync(join(tmpdir(), 'summary-data-pair-'))
+  const target = '973-summary-data-pair'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'metrics.jsonl'), jsonl([
+    {
+      target, pass: 7, type: 'discovery', subtype: 'certification-pair-A', date: '2026-08-20', commit: 'eeeeeee',
+      lenses: ['correctness', 'security', 'requirements', 'db-parity'],
+      new_findings: { high: 1, medium: 2, low: 3, cleanup: 1 }, reopened: 0, verified: 0,
+      cost: { agents: 12, tokens: 600000, agents_by_stage: { lenses: 4, budget_skipped: 1 } },
+      findings: [{ f: 'F1', d: 'PPW-10', new: true, sev: 'high', lenses: ['correctness'], conv: 1, hinted: true, verdict: 'confirmed', fix_generated: null, sev_delta: null }],
+    },
+    {
+      target, pass: 7, type: 'discovery', subtype: 'certification-pair-B', date: '2026-08-20', commit: 'eeeeeee',
+      lenses: ['correctness', 'quality', 'tests-coverage', 'completeness-critic'],
+      new_findings: { high: 0, medium: 4, low: 1, cleanup: 0 }, reopened: 0, verified: 0,
+      cost: { agents: 14, tokens: 700000, agents_by_stage: { lenses: 4, budget_skipped: 2 } },
+      findings: [{ f: 'F2', d: 'PPW-11', new: true, sev: 'medium', lenses: ['quality'], conv: 1, hinted: false, verdict: 'unverified-needs-repro', fix_generated: null, sev_delta: null }],
+    },
+    { target, date: '2026-08-21', correction_for: { pass: 7, field: 'new_findings' }, note: 'test-only correction, must not be picked up as a pass line' },
+  ]))
+
+  const r = run('summary-data.mjs', ['--root', T, target, '7'])
+  check('exits 0 for a paired pass', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+  check('owed lenses are the manifest minus the UNION of A and B — "requirements" (A-only) and "quality" (B-only) both count as run',
+    r.out.includes('- Owed manifest lenses: input-validation, observability, race, frontend-ux'), r.out.trim())
+  check('the trend prints ONE summed bullet for the pair, not two contradictory halves',
+    r.out.includes('- v7: 1+6') && (r.out.match(/v7:/g) || []).length === 1, r.out.trim())
+  check('backlog sums both halves\' low+cleanup (3+1 and 1+0 = 5)', r.out.includes('- 5 new low/cleanup findings filed to backlog automatically'), r.out.trim())
+  check('budget_skipped sums across both halves (1+2)', r.out.includes('- 3 budget-skipped agents this pass'), r.out.trim())
+  check("findings[] concatenates across both halves: A's hinted finding and B's unverified finding both count",
+    r.out.includes("- 1 unverified-* verdict in this pass's findings") && r.out.includes("- 1 hinted finding in this pass's findings"), r.out.trim())
+  check('a full certification pair (type discovery) gets no pass-type-cap line', !r.out.includes('cannot certify'), r.out.trim())
   rmSync(T, { recursive: true, force: true })
 }
 
