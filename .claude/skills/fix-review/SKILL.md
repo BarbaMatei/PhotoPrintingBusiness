@@ -102,14 +102,19 @@ the runtime metric read. Never edit a past line: a stamp that was wrong is retra
 | Event | When | Extra fields |
 |---|---|---|
 | `round-start` / `round-end` | first action / after hand-back summary | `round` |
-| `triage-done` | cluster plan written | `clusters`, `checks_needed`, `pre_cleared` (review pre-checks consumed), `gates` |
+| `triage-done` | cluster plan written | `round`, `clusters` (both required), plus `checks_needed`, `pre_cleared` (review pre-checks consumed), `gates` |
 | `protocol-written` | a cluster's protocol block is written — BEFORE any of its `finding` events | `round`, `cluster`, `ids` (the cluster's PPW ids) |
 | `gate-open` / `gate-closed` | before asking the owner / when the answer arrives | `reason` |
-| `check-dispatched` / `check-returned` | approach-check out / verdict in | `round`, `cluster`, `ids` (the PPW ids the check covers — the auditor matches on them), on return `verdict`, `tokens` if known |
+| `check-dispatched` / `check-returned` | approach-check out / verdict in | out: `round`, `cluster`, `ids` (the PPW ids the check covers — the auditor matches on them); back: `round`, `cluster`, `verdict`, and `tokens` if known. `ids` belongs to the dispatch only |
 | `test-run` | stamped for you by `run-scoped-tests.mjs` when a run finishes — never by hand | `kind: red\|green\|final\|baseline\|revert-and-rerun`, `filter`, `passed`, `failed`, `duration_s` |
 | `finding` | a finding reaches a status | `id`, `status`, `commit` |
 | `round-review-dispatched` / `round-review-returned` | once, when the last cluster's commits land | `round`, on return `found` |
 | `test-audit-dispatched` / `test-audit-returned` | once, alongside the round review | `round`, on return `verdict` |
+
+Every field named above is one `wl.mjs` refuses the event without — the stamper prints
+`ERROR` and appends nothing, so a stamp you thought you took is simply missing. `round` must
+be a number (an unquoted `--round 3` becomes one); `ids` must be a non-empty list of
+`PPW-<n>`.
 
 The auditor refuses `status: resolved` without this evidence (rounds closed on/after
 2026-08-28): a `protocol-written` event timestamped before each protocol cluster's first
@@ -276,7 +281,9 @@ Two rules against runs whose result is thrown away:
 - **Skip the rebuild when no source changed since the previous run** — a rebuild of an
   unchanged tree costs ~15 s per invocation and proves nothing. The wrapper has no
   `--no-build` flag of its own; hand it the command instead, `{filter}` and all:
-  `--cmd "dotnet test src/PhotoPrint.Tests --no-build --filter \"FullyQualifiedName~{filter}\""`.
+  `--cmd "dotnet test src/PhotoPrint.Tests --no-build --filter \"FullyQualifiedName~{filter}\""`
+  — and keep passing `--filter` (or `--ui --include`) alongside it, or the wrapper exits 2:
+  the flag is what the stamped event records as the scope, whatever command ran.
   Docs-only and records-only steps between two runs do not invalidate the build.
 - **Never launch the final run while the round review is in flight.** Its follow-up fixes
   land after, so the run is dead on arrival and pays full cost. Wait for
@@ -358,8 +365,11 @@ When the round review and the test audit are folded in and the final scoped run 
 
 1. **Close the round.** `node reviews/lib/wl.mjs <target> round-end --round <n>`, then commit
    the code and the resolution together — frontmatter `status: resolved`, `fixed_commit:`,
-   `closed:`. The tree must be clean at the round's tip: `verify-fixes.mjs` refuses a dirty
-   tree by design, and that tip is the commit its reverts are measured against.
+   `closed:`. `worklog.jsonl` is tracked and your round's stamps are still uncommitted, so
+   either include the worklog in that commit or leave it for the driver's records commit,
+   which takes it up before the verification — but say in the hand-back which you did. The
+   tree must be clean at the round's tip: `verify-fixes.mjs` refuses a dirty tree by design,
+   and that tip is the commit its reverts are measured against.
 2. **Hand to the driver.** A fix round and its verification are **one reviewed unit**: the
    verification runs now, at this tip, and the unit's records follow it — the renderer, then
    the auditor, then one doc-gate sitting covering both halves. So you do **not** run

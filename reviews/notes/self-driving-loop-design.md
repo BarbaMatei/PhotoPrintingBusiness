@@ -2,7 +2,7 @@
 type: review-system-design
 status: research notes — v2, updated 2026-08-11
 created: 2026-07-04
-updated: 2026-08-20
+updated: 2026-08-28
 owner: Matei Barba
 extends: README.md
 ---
@@ -389,4 +389,3 @@ renderer and the stamper already made.
 None of these is queued. Each stays unbuilt until the lint-miner habit surfaces it as a
 measured cost — the same way the ledger miner is meant to rank defect classes — or the owner
 asks for it outright.
-

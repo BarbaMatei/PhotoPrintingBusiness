@@ -93,8 +93,9 @@ run journal (not guesswork) explains an empty result.
 
 ### Persistent fixer
 
-Inside one target, keep **one** fixer subagent and continue it: the next unit's findings go
-to the same agent, not to a fresh spawn. A fixer that already carries this target's protocol
+Inside one target, keep **one** fixer subagent and continue it: send the next unit's findings
+to the **same** agent with `SendMessage` (its id or name from the first launch) — never a
+fresh `Agent` call, which starts a new agent with none of the context. A fixer that already carries this target's protocol
 blocks, cluster map, trigger classifications and revert proofs re-reads none of it, and its
 round-scope review gets sharper across units.
 
@@ -111,43 +112,66 @@ each fixer served.
 enforces each event's required fields):
 
 ```
-node reviews/lib/wl.mjs <target> pass-launch --pass v<n> --type verification
-node reviews/lib/wl.mjs <target> pass-records-done --pass v<n>
+node reviews/lib/wl.mjs <target> pass-launch --pass v<pass> --type verification
+node reviews/lib/wl.mjs <target> pass-records-done --pass v<pass>
 ```
 
-`pass-launch` goes immediately before executing step 3. `pass-records-done` goes **before**
+`pass-launch` goes immediately before the pass's work starts — for a reviewed unit that
+means before the records commit, not after it (step 1 below). `pass-records-done` goes **before**
 the renderer runs, not after the auditor: the renderer measures the
 `pass-launch`→`pass-records-done` span and refuses to render an unclosed one. The metrics
 line's `runtime: {started, ended}` copies those two timestamps. Fix rounds stamp themselves
 (the `/fix-review` skill owns its own worklog events).
 
+**Two numbers, never the same one.** `<pass>` is the verification's own pass number — the
+next free one in `metrics.jsonl`, counted across every pass type (a target can read
+discovery v1, verification v2, v3, v4, delta v6). `<round>` is the fix round's number, which
+is also its resolution's version. The stamps and the renderer take `v<pass>`; the doc gate
+takes `<round>`, because the round's resolution is the only file the unit writes.
+
 **The reviewed unit — a fix round and its verification record once, together.** When the fixer
 hands back (`round-end` stamped, code and resolution committed, `status: resolved`), continue
 in this same invocation:
 
-1. Commit any pending `reviews/<target>/` record appends — one records commit, `docs(review): …`
-   subject — because `verify-fixes.mjs` refuses a dirty tree by design.
-2. Stamp `pass-launch`, then verify at the round's tip: `node reviews/lib/verify-fixes.mjs
-   <target>` in full, or `--only PPW-1,PPW-2` as the sampled evidence audit when the round
-   recorded per-fix revert proofs — plus the runbook's judgment items. The script buffers its
-   `verify-result` events and flushes them once after the last row, so the run **ends with
-   `worklog.jsonl` dirty**: that is by design, and committing it is yours.
+1. Stamp `pass-launch` **first**, then commit every pending `reviews/<target>/` record append
+   — one records commit, `docs(review): …` subject — so the stamp itself is inside that
+   commit. The order matters: `worklog.jsonl` is tracked, so a stamp taken after the commit
+   dirties the tree again and `verify-fixes.mjs` exits 2 before doing anything. The commit
+   also picks up whatever worklog stamps the fixer left uncommitted.
+2. Verify at the round's tip: `node reviews/lib/verify-fixes.mjs <target>`. The mechanical
+   revert-and-rerun covers **every** `fixed` row of the resolution — `--only PPW-1,PPW-2`
+   narrows a **re-run**, never the first one, and the runbook's evidence-audit sampling audits
+   the fixer's recorded claims rather than replacing this run. Then the runbook's judgment
+   items. The script buffers its `verify-result` events and flushes them once after the last
+   row, so the run **ends with `worklog.jsonl` dirty**: that is by design, and committing it
+   is yours.
+
+   A row the script cannot verdict mechanically — `revert-broke-build`, `env-missing`,
+   `no-test`, anything you settled with a hand proof — gets its stamp from you, explicitly:
+   `node reviews/lib/wl.mjs <target> verify-result --id PPW-<n> --verdict held --commit <sha>`.
+   Skip it and `render-records.mjs --verification` finds no result for that id and leaves the
+   row at `fixed` — a fix that reads unverified forever.
 3. Stamp `pass-records-done`, then render both halves — the round first (it reads the
    resolution's Findings rows), the verification second (it reads the span's `verify-result`
    events):
 
 ```
 node reviews/lib/render-records.mjs <target> --outcome "<what the round did>"
-node reviews/lib/render-records.mjs <target> --verification v<n> --outcome "<what held>" [--commit <sha>]
+node reviews/lib/render-records.mjs <target> --verification v<pass> --outcome "<what held>" [--commit <sha>]
 ```
 
    `--outcome` is mandatory on both, at most 50 words, and may carry neither a `|` nor a line
    break. Every check runs before the first write, so a refusal leaves `metrics.jsonl`,
    `index.md` and `ledger.md` all untouched — read what it named, repair that record, re-run.
 4. `node reviews/lib/records-auditor.mjs <target>` — must exit clean.
-5. **One doc-gate sitting for the whole unit** (below): the lint plus one judge dispatch over
-   the round's and the verification's changed files together, never one per half. The gate is
-   keyed to the round's number because a verification writes no files of its own.
+5. **One doc-gate sitting for the whole unit** (below): `node reviews/lib/doc-gate.mjs
+   <target> <round>` plus one judge dispatch over the round's and the verification's changed
+   files together, never one per half.
+
+**Resuming a round you did not run.** A fix round handed back in an earlier invocation is the
+same unit: the router answers `verification (reviewed unit — render records once, after it)`,
+and you enter the sequence at step 1 exactly as above — nothing in it needs you to have been
+the fixer, and nothing may be re-rendered ahead of the verification.
 
 For a reviewed unit the fix-round and verification records are **rendered, not hand-written**
 — the renderer writes the two metrics lines, the two index rows and the ledger status flips
@@ -174,16 +198,20 @@ node reviews/lib/doc-gate.mjs <target> <pass>     # structure lint — must exit
 ```
 
 then spawn the **Sonnet judge** (Agent, `model: sonnet`): input = `reviews/rules/doc-contracts.md`
-plus the round's new/changed `reviews/` files; output = approve, or disapprove with per-file
-reasons (language vs the vocabulary, evidence links supporting their claims, real reasons in
-"Reasons to doubt"). Append a `doc-gate` worklog event with the verdict.
+plus the round's new/changed `reviews/` files. Its scope is the **hand-written prose** —
+language against the vocabulary, evidence links that support the claims they hang on, real
+reasons in "Reasons to doubt" — not the rendered cells. Its output is approve, or disapprove
+with, per violation, the **exact replacement text** to use; a correction it cannot make
+without changing a recorded fact (a number, an id, a sha, a verdict) comes back as a
+**question** instead of text. Append a `doc-gate` worklog event with the verdict.
 
 **The judge is dispatched once per reviewed unit** — one sitting over the round's and the
-verification's files together. On disapprove, apply the judge's returned replacement text
-**verbatim** and re-run the lint; re-judge only when it returned a question instead of text.
-Re-judging text it already wrote is a second dispatch that decides nothing. The summary is not
-handed to the owner and the review file is not declared immutable until both halves pass. The
-gate judges, never edits — read its reasons; don't game the lint.
+verification's files together. On disapprove, apply its returned replacement text **verbatim**
+and re-run the lint; re-judge only the items it returned as questions, once you have answered
+them. Re-judging text it wrote itself is a second dispatch that decides nothing. Neither half
+of the gate edits anything — the lint reports, the judge writes the text, you apply it; don't
+game the lint. The summary is not handed to the owner and the review file is not declared
+immutable until both halves pass.
 
 ## 5 · Close out
 
@@ -216,8 +244,8 @@ the end.
 **Each iteration:**
 
 1. Audit + route as in step 1. Auditor red → one repair attempt; still red → end the run.
-2. Router exit 0: append `pass-launch` as usual and execute the pass in a subagent
-   (table below). If a fix-round subagent reports a decision blocking a 🔴 fix (the
+2. Router exit 0: stamp `pass-launch` as usual — before the records commit, per section 4's
+   step 1 — and execute the pass in a subagent (table below). If a fix-round subagent reports a decision blocking a 🔴 fix (the
    `/fix-review` skill's Blocker exception), end the run with that question in the report.
 3. Router exit 2/3: run `node reviews/lib/autonomy-policy.mjs <target> decide
    <GATE_KIND>` — in an unattended run, an exit 3 always goes to the policy this way and
@@ -236,11 +264,14 @@ the end.
    shows no new line. If the routed work repeats the previous unit's shape and
    `metrics.jsonl` gained no line across that whole completed unit, end the run — something
    is not recording. This is a breakage detector, not a limit.
-5. Sweep stall detector: when a `fix round` is routed to drain queued 🟠, record the id set
-   the router or the policy named. If a later sweep is routed and the ledger's open-🟠 set is
-   the same or larger, the sweep is not draining — end the run and report those ids with what
-   each round did to them. A queue that never drains is a loop that can never certify, and it
-   will otherwise route `fix round` forever without ever repeating a pass type.
+5. Sweep stall detector: when a `fix round` is routed to drain queued 🟠, stamp the id set
+   the router or the policy named, so a restarted run recovers the basis instead of
+   re-deriving it — `node reviews/lib/wl.mjs <target> note --reason "sweep basis" --ids
+   PPW-1,PPW-2`. If a later sweep is routed and the ledger's open-🟠 set is the same or
+   larger than the newest such note, the sweep is not draining — end the run and report those
+   ids with what each round did to them. A queue that never drains is a loop that can never
+   certify, and it will otherwise route `fix round` forever without ever repeating a pass
+   type.
 6. Router prints `loop CLOSED` → the run is done; close it out.
 
 **Pass execution — always in subagents in this mode** (the driver only routes, records,
@@ -251,7 +282,7 @@ the records, never from the subagent's prose):
 |---|---|
 | full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
 | lens-coverage discovery (<lens>) | the same runbook, full scope, lenses = the one owed lens + completeness-critic; it clears one lens of the coverage debt that refuses certification |
-| reviewed unit (fix round + verification) | one subagent — the **persistent fixer** above — instructed to load the `/fix-review` skill and follow its **Unattended variant** section; it hands back at `round-end` plus the round's commit. Then, in the driver and in this same iteration: the records commit, `verify-fixes.mjs` at that tip (the sampled `--only` evidence audit when the round recorded per-fix revert proofs, the full run otherwise), one subagent for the runbook's judgment items — given the script's JSON output, the round review's findings, the resolution and the fix diff — then the two renderer calls, the auditor, and ONE doc-gate sitting for the unit (section 4) |
+| reviewed unit (fix round + verification) | one subagent — the **persistent fixer** above — instructed to load the `/fix-review` skill and follow its **Unattended variant** section; it hands back at `round-end` plus the round's commit. Then, in the driver and in this same iteration: `pass-launch` and then the records commit that contains it, `verify-fixes.mjs` at that tip (the sampled `--only` evidence audit when the round recorded per-fix revert proofs, the full run otherwise), one subagent for the runbook's judgment items — given the script's JSON output, the round review's findings, the resolution and the fix diff — then the two renderer calls, the auditor, and ONE doc-gate sitting for the unit (section 4) |
 | design pass | never automatic: `autonomy-policy.mjs` answers `stop` on the `design-pass` gate kind, because reimplementing a component is the owner's call. The run ends with that question |
 
 The session-model guard still applies: on a Fable session, discovery-scale launches
@@ -259,7 +290,8 @@ proceed resume-ready, and the workflow runId goes into the worklog event.
 
 **Close the run.** Append `run-end` (`{passes, parked}`). Report in one message: each
 pass with its one-line outcome, every parked item (kind, the default taken, what needs
-the owner's ruling), and how the run ended (loop closed, or the question it stopped on).
+the owner's ruling), how many units each fixer served before it was retired (the persistent-fixer
+rule above), and how the run ended (loop closed, or the question it stopped on).
 This report is the batched owner sitting — each ruling made on it is recorded where that
 round's rules say (resolution `Decisions`, ledger rows, the backlog).
 
