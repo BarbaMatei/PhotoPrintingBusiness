@@ -1,7 +1,7 @@
 ---
 type: runbook
 for: verification passes (after a fix round)
-updated: 2026-08-12
+updated: 2026-08-28
 ---
 
 # Verification runbook
@@ -10,8 +10,10 @@ Anchored, per-fix, cheap — the opposite posture of discovery. No blinding, no 
 codePack, no workflow script. The question is "did each specific fix hold?", never "is the
 feature clean?".
 
-1. Read the latest `review-v<n>.md` + `resolution-v<n>.md`; check out the resolution's
-   `fixed_commit`. You must not be the fixer — sole exception (calibration 2026-07-29): a
+1. The verification runs at the fixed round's tip, immediately after the fixer's hand-back,
+   inside the same reviewed unit — commit any pending `reviews/` edits first (the script refuses
+   a dirty tree). Read the latest `review-v<n>.md` + `resolution-v<n>.md`; check out the
+   resolution's `fixed_commit`. You must not be the fixer — sole exception (calibration 2026-07-29): a
    **test-only** fix round (zero production-code changes) may be self-verified when every fix
    carries a revert-and-rerun proof whose failing-test set was predicted before the revert and
    matched exactly, recorded in the resolution. Any production-code change voids the exception.
@@ -48,11 +50,20 @@ feature clean?".
      failure-mode tests, docs?
    - *Regression* — did the fix change adjacent behavior?
    Asking only the regression question is the documented failure mode ([rationale](../notes/rationale.md)).
-5. **Write no files** (artifact rules of 2026-08-10, [doc-contracts.md](../rules/doc-contracts.md)).
-   The pass's record is: ledger status flips (`verified` for held fixes, reopen failures) with
-   one History line per row touched, worklog events, the [metrics.jsonl](../rules/metrics-schema.md)
-   line and the [index.md](../state/index.md) row (then run
-   `node reviews/lib/records-auditor.mjs <target>` — must exit clean). A verification that
+5. **Write no prose files** (artifact rules of 2026-08-10, [doc-contracts.md](../rules/doc-contracts.md)).
+   Run
+
+   ```
+   node reviews/lib/render-records.mjs <target> --verification <pass> --outcome "<one line>"
+   ```
+
+   — it renders the [metrics.jsonl](../rules/metrics-schema.md) line, the
+   [index.md](../state/index.md) row, and the ledger flips (`verified` at the proved-at commit
+   for a held fix, back to `open` for a reopened one, one History line each) from the
+   `verify-result` events `verify-fixes.mjs` stamped in step 2. Add `--new-findings h,m,l,c`
+   when the pass named new defects. Commit the worklog the run left behind. Then run
+   `node reviews/lib/records-auditor.mjs <target>` — it must exit clean — and the unit's single
+   doc gate covers this pass's records together with the fix round's. A verification that
    names **new** defects reconciles them like any pass and adds a `findings[]` entry per new
    defect — `{d, new, sev, fix_generated, seed_round, area}` — so fix lineage is counted
    where it surfaces; `seed_round` names the fix round whose commits caused it and `area`

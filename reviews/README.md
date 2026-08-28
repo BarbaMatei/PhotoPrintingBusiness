@@ -2,7 +2,7 @@
 type: review-system
 status: active
 created: 2026-06-18
-updated: 2026-08-11
+updated: 2026-08-28
 owner: Matei Barba
 ---
 
@@ -79,16 +79,35 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | State | Next pass |
 |---|---|
 | No `review-v1.md` | **Full discovery** |
-| Latest review has open 🔴/🟠 with no `resolved` resolution answering it | **Fix round** — new 🟡/⚪ go to the ledger backlog, not the fix round |
-| Resolution `resolved`, not yet re-reviewed | **Verification** |
-| Verification clean (0 reopened) + fix round was **delta-worthy**¹ + no delta since | **Delta discovery** |
-| Verification clean + fix round patch-grade | Loop **quiet** |
-| Loop quiet, a manifest lens never ran on the target | **Lens-coverage pass**³ — certification refused until every manifest lens has run |
+| The ledger frontmatter carries `closed:` | **Terminal** — loop done; the target stays under watch |
+| An open 🔴 in the ledger · a reopened fix on the latest line · a still-open fix-caused 🟠 regression | **Fix round now** (quiet counter resets) |
+| ≥ 3 open non-regression 🟠 in the ledger, with no resolution answering them | **Fix round** (the batch) |
+| 1–2 open non-regression 🟠 | **Queued** — proceed as if quiet; the sweep row fires before certification |
+| Two consecutive fix rounds seeded the same component at s ≥ 0.3³ | **Design pass**³ — it intercepts any fix-round answer above; further fix rounds there are refused (owner gate) |
+| Certification passed on the latest pass, no post-cert fix round pending | **Close the loop** (owner gate) — open 🟠 stand down here and roll into the backlog² |
+| Latest line is a verification with reopened fixes, or with serious findings still open | **Fix round** |
+| Latest line is a clean verification | **Judgment call**: delta-worthy¹ → **delta discovery**; patch-grade → loop **quiet** |
+| Resolution `resolved`, not yet re-reviewed | **Verification** — runs at the round's tip; round + verification are one **reviewed unit** with one set of records and one doc gate |
+| Resolution `open` or `in-progress` answering the latest review | **Fix round** |
+| Open serious findings with no resolution answering the latest review | **Fix round** |
+| Loop quiet, any 🟠 still open (queued or not) | **Sweep round**, then its verification, then certification |
+| Loop quiet, a manifest lens never ran on the target | **Lens-coverage discovery**³ — certification refused until every manifest lens has run |
 | Loop quiet, no blind pass since the last substantive fix round | **Delta discovery** — that round's seed rate³ is unmeasured, and unmeasured is not quiet |
-| Loop quiet, lens coverage complete, final round's seed rate measured 0 | **Certification**² |
+| Loop quiet, nothing open, lens coverage complete | **Certification**² (owner gate) |
 | Certification quiet | **Certified** — verdict `approved`; loop done |
-| A new 🔴 anywhere · a fix-caused 🟠 regression · a reopened fix | **Fix round** (quiet counter resets) |
-| Two consecutive fix rounds seed the same component at s ≥ 0.3³ | **Design pass**³ — further fix rounds there are refused (owner gate) |
+
+**The reviewed unit.** A fix round and the verification of its fixes are one unit: the
+verification runs immediately at the round's tip, in the same driver invocation, and the unit
+writes one set of records and passes one doc gate. The verifier is never the fixer. The threshold
+(3) and the sweep guarantee no 🟠 outlives the loop: queued findings still block certification.
+While a resolved round waits for its verification the ledger is not read for open work — its rows
+still read `open`, because the unit's records render only after the verification.
+
+The two convergence refusals land in different places: the router refuses certification itself on
+lens-coverage debt, and reports an unmeasured seed rate as a note on the clean-verification row.
+Both refusals are then executed at the certification gate — by the owner, or by
+[lib/autonomy-policy.mjs](lib/autonomy-policy.mjs) in an unattended run, which answers the gate
+with the owed lens-coverage discovery or the delta discovery instead.
 
 ¹ **Delta-worthy** = the fix round fixed a 🔴, added/converted a mechanism, or changed a
 design. Anything else is patch-grade and exits on verification + the fixer's round review.
@@ -157,8 +176,9 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   auto-apply fixes mid-review.
 - Every pass appends its [metrics.jsonl](rules/metrics-schema.md) line and its [index.md](state/index.md)
   row — at synthesis time, unreconstructable later. **Fix rounds record too** (since
-  2026-08-03), at hand-back: `reviews/lib/render-records.mjs` appends the metrics line;
-  the fixer hand-writes the index row, adapting the suggestion the renderer prints.
+  2026-08-03): `reviews/lib/render-records.mjs` appends the metrics line, the unit's index
+  rows, and the ledger flips, from the worklog; the fixer hand-writes the resolution and its
+  Decisions.
 - A target holding a certification is **under watch** ([track-record.md](state/track-record.md)): a
   later serious finding whose defect existed in the certified code is marked
   `post-cert-escape` and appended there the same day — the reconciler flags it, the
@@ -181,7 +201,11 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   disagree, doc-contracts.md is right.
 - **Who writes what:** the `/fix-review` skill appends the fix round's worklog events as the
   work happens; the loop-driver appends the pass and owner-gate events, and carries out the
-  archive-on-close sequence. Dormant targets (no pass in 30+ days, nothing serious open) are
+  archive-on-close sequence. Every stamp goes through [lib/wl.mjs](lib/wl.mjs), the stamper —
+  never a hand-appended line — and every test run goes through
+  [lib/run-scoped-tests.mjs](lib/run-scoped-tests.mjs), the test wrapper, which holds a
+  machine-global lock so only one test process runs at a time and stamps the run itself.
+  Dormant targets (no pass in 30+ days, nothing serious open) are
   *offered* for archiving at the next loop-driver run, never moved silently.
 - This README and the runbooks are the system spec; matured theory graduates to
   `analysis/architect-review` as connected concept notes — not before the loop has
