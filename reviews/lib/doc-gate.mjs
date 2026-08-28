@@ -240,9 +240,7 @@ if (existsSync(join(dir, resolutionFile))) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1
       if (n > 15) bad(resolutionFile, `decision "${d.split('\n')[0]}" is ${n} lines — cap is 15`)
     }
-    // Rounds closed on/after the V4 cut-off: the scope table names the cluster's protocol
-    // block instead of carrying approach-check prose, and every protocol states a
-    // quantified invariant (accepted fix-round audit R1/R2).
+    // From the V4 cut-off a scope table names its cluster's protocol block, and a protocol states an invariant.
     const closed = fmVal(p.fm, 'closed')
     if (closed && closed >= V4_CUTOFF) {
       const scope = p.body.split(/^## /m).find(s => s.startsWith('Scope')) ?? ''

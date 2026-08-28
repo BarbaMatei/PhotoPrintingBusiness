@@ -139,7 +139,7 @@ Allowed system terms. Anything else must be everyday English.
   allowed; the list and the tiebreak rule sit under `backlog.md` below.
 - **worklog** — `worklog.jsonl`, the per-target append-only event trail.
 - **stamper** — `lib/wl.mjs`, the only sanctioned way to append a worklog event; it owns the timestamp and enforces the event vocabulary and each event's required fields.
-- **void** — an appended worklog event that repairs a mis-stamped one. Every reader of the worklog — stamper, renderer, speed report, auditor (hand-back gates included) and lint miner — drops the events it matches.
+- **void** — an appended worklog event that repairs a mis-stamped one. Every reader of the worklog — stamper, renderer, speed report, auditor (hand-back gates included), unattended policy and lint miner — drops the events it matches.
 - **sitting** — one visit to the doc gate: a run of adjacent `doc-gate` events sharing a round or pass key.
 - **`verify-result`** — the worklog event a verification appends per checked row: its id, its verdict, and the commit the row was proved at.
 - **renderer** — `lib/render-records.mjs`, which turns a unit's worklog into its metrics line, its index rows and its ledger flips.
@@ -261,7 +261,7 @@ Every event goes in through the stamper, which owns the timestamp and rejects an
 event outside the vocabulary or missing a required field. Two events serve the
 records. `void` repairs a mis-stamped event by naming it in `of`; every reader —
 the stamper, the renderer, the speed report, the auditor including its hand-back
-gates, and the lint miner — then drops what it matches, so one void is the whole
+gates, the unattended policy and the lint miner — then drops what it matches, so one void is the whole
 repair and no reader keeps counting the mis-stamp. `verify-result`
 carries a checked row's id, verdict and proved-at commit for the verification to
 render from.
