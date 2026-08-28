@@ -20,6 +20,8 @@ import { tmpdir } from 'node:os'
   check('wl prints exactly the appended line', lines().length === 1 && r.out.trim() === lines()[0], r.out.trim())
   let firstEvent = lines().length ? JSON.parse(lines()[0]) : null
   check('wl stamps a timestamp with the local UTC offset', !!firstEvent && /[+-]\d{2}:\d{2}$/.test(firstEvent.t), JSON.stringify(firstEvent))
+  // The records key passes by number; a "v12" from a caller must not become a string key nobody matches.
+  check('wl coerces a v<n> pass to the number n', firstEvent?.pass === 1, JSON.stringify(firstEvent))
 
   r = run('wl.mjs', ['--root', T, target, 'not-a-real-event'])
   check('wl refuses an unknown ev', r.code === 1 && r.out.includes('ERROR') && r.out.includes('unknown ev'), r.out.trim())

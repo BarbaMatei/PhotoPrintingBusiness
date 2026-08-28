@@ -112,8 +112,8 @@ each fixer served.
 enforces each event's required fields):
 
 ```
-node reviews/lib/wl.mjs <target> pass-launch --pass v<pass> --type verification
-node reviews/lib/wl.mjs <target> pass-records-done --pass v<pass>
+node reviews/lib/wl.mjs <target> pass-launch --pass <pass> --type verification
+node reviews/lib/wl.mjs <target> pass-records-done --pass <pass>
 ```
 
 `pass-launch` goes immediately before the pass's work starts — for a reviewed unit that
