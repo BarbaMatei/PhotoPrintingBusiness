@@ -16,7 +16,7 @@ import { execSync } from 'node:child_process'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
-import { AREAS, V4_CUTOFF } from './vocab.mjs'
+import { AREAS, V3_CUTOFF, V4_CUTOFF } from './vocab.mjs'
 import { live } from './wl.mjs'
 
 const argv = process.argv.slice(2)
@@ -30,7 +30,6 @@ if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const REVIEWS = join(ROOT, 'reviews')
 
 const V2_CUTOFF = '2026-07-30'
-const V3_CUTOFF = '2026-08-03' // fix-round lines + runtime fields exist only from here
 const TYPES = new Set(['discovery', 'delta-discovery', 'verification'])
 const SUBTYPES = new Set(['certification-pair-A', 'certification-pair-B', 'certification-single'])
 const SEVS = new Set(['high', 'medium', 'low', 'cleanup'])

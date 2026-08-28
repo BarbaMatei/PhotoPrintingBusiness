@@ -18,6 +18,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readLedger, openIds, standsDown } from './ledger.mjs'
+import { live } from './wl.mjs'
 import { MANIFEST_LENSES } from './vocab.mjs'
 
 const argv = process.argv.slice(2)
@@ -70,11 +71,11 @@ function certificationBlocker(targetDir) {
   const wl = join(dir, 'worklog.jsonl')
   if (existsSync(overridesPath) && existsSync(wl)) {
     let runStart = null
-    for (const l of readFileSync(wl, 'utf8').split(/\r?\n/).filter(x => x.trim())) {
-      try {
-        const e = JSON.parse(l)
-        if (e.ev === 'run-start' && Number.isFinite(Date.parse(e.t)) && (runStart === null || Date.parse(e.t) > runStart)) runStart = Date.parse(e.t)
-      } catch { }
+    // Voided events are dropped here too: a mis-stamped run-start must not move the cut-off.
+    const events = live(readFileSync(wl, 'utf8').split(/\r?\n/).filter(x => x.trim())
+      .map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean))
+    for (const e of events) {
+      if (e.ev === 'run-start' && Number.isFinite(Date.parse(e.t)) && (runStart === null || Date.parse(e.t) > runStart)) runStart = Date.parse(e.t)
     }
     if (runStart !== null) {
       for (const l of readFileSync(overridesPath, 'utf8').split(/\r?\n/).filter(x => x.trim())) {

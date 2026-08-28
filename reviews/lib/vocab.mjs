@@ -11,6 +11,9 @@ export const MANIFEST_LENSES = [
 export const AREAS = ['payments', 'orders', 'shipping', 'uploads', 'gallery', 'auth',
   'edge', 'observability', 'jobs', 'data', 'tests', 'records']
 
+// Fix-round lines and the runtime split exist only from this date; earlier rounds never get one.
+export const V3_CUTOFF = '2026-08-03'
+
 // Rules from the accepted fix-round audit apply to rounds closed on/after this date;
 // every earlier record is grandfathered (doc-contracts.md, "Grandfathering cut-offs").
 export const V4_CUTOFF = '2026-08-28'

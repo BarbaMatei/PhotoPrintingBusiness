@@ -4,6 +4,7 @@
 // Row shape (doc-contracts.md): | PPW-<n> | 🔴|🟠|🟡|⚪ | first seen | title | file | status | affirmed |
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { V3_CUTOFF } from './vocab.mjs'
 
 export const OPEN_STATUSES = ['open', 'in-progress']
 const STATUSES = [...OPEN_STATUSES, 'fixed', 'verified', 'wont-fix', 'deferred', 'disputed', 'false-positive', 'backlog']
@@ -20,7 +21,8 @@ export function readLedger(file) {
 
 export const openIds = (rows, sev) => rows.filter(r => r.sev === sev && OPEN_STATUSES.includes(r.status)).map(r => r.id)
 
-// The ledger is not the authority while a resolved round's records are unrendered (resolved-no-line).
+// The ledger is not the authority while a resolved round's records are unrendered — unless the round
+// closed before V3_CUTOFF, when fix-round lines did not exist yet and its records will never come.
 export function standsDown(dir) {
   const files = readdirSync(dir)
   const newest = re => {
@@ -30,8 +32,10 @@ export function standsDown(dir) {
   const RN = newest(/^resolution-v(\d+)\.md$/)
   if (!RN || RN < newest(/^review-v(\d+)\.md$/)) return false
   const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, `resolution-v${RN}.md`), 'utf8'))
-  const status = block ? /^status:\s*(.+?)\s*$/m.exec(block[1])?.[1] ?? null : null
-  if (status !== 'resolved') return false
+  const fm = block ? block[1] : ''
+  if ((/^status:\s*(.+?)\s*$/m.exec(fm)?.[1] ?? null) !== 'resolved') return false
+  const closed = /^closed:\s*(\d{4}-\d{2}-\d{2})/m.exec(fm)?.[1] ?? null
+  if (closed && closed < V3_CUTOFF) return false
   const metrics = join(dir, 'metrics.jsonl')
   if (!existsSync(metrics)) return true
   return !readFileSync(metrics, 'utf8').split(/\r?\n/).filter(l => l.trim())

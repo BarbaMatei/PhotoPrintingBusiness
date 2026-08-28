@@ -79,6 +79,16 @@ const REVIEWED_UNIT = 'NEXT: verification (reviewed unit — render records once
   check('the stale verification line does not arm the loop over the resolved round',
     !r.out.includes('the loop is armed') && r.out.includes('resolution-v2 resolved, not yet re-reviewed (row 3)'), r.out.trim())
 }
+// A round closed before fix-round lines existed never gets one, so its resolved-no-line window is
+// permanent: standing down there would park the loop on a verification that already ran (035's shape).
+{
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '955-pre-cutoff-resolved'])
+  check('a resolution closed before the v3 cut-off does not stand the router down',
+    r.code === 3 && r.out.includes('GATE_KIND: delta-worthiness') && !r.out.includes('not yet re-reviewed'), `exit ${r.code}: ${r.out.trim()}`)
+  const p = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '955-pre-cutoff-resolved', 'decide', 'certification-go-ahead'])
+  check('the policy reads the ledger for a pre-cut-off round instead of standing down',
+    p.out.includes('sweep before certification') && p.out.includes('PPW-9552'), p.out.trim())
+}
 for (const gate of ['certification-go-ahead', 'delta-worthiness']) {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '953-round-answers-verification', 'decide', gate])
   check(`the policy neither arms nor sweeps at the ${gate} gate while the round awaits its verification`,
@@ -275,8 +285,7 @@ Fixture copy: one conforming row.
     check('renderer refuses an --outcome over the 50-word index cap', r.code === 1 && r.out.includes('51 words') && r.out.includes('50'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the over-cap refusal wrote nothing either', untouched(), 'one of metrics.jsonl / index.md / ledger.md changed')
   }
-  // A "|" or a newline in the outcome would be written straight into the pipe-delimited row, and the
-  // broken row only surfaces at the next doc gate — by then it needs hand repair.
+  // A "|" or a newline in the outcome breaks the pipe-delimited row, which only surfaces at the doc gate.
   for (const [label, text] of [['a "|"', 'Both rows closed | and the queue drained'], ['a newline', 'Both rows closed\nand the queue drained']]) {
     const r = run('render-records.mjs', ['--root', T, target, '--outcome', text])
     check(`renderer refuses an --outcome carrying ${label}`, r.code === 1 && r.out.includes('one pipe-delimited line'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
@@ -312,8 +321,7 @@ Fixture copy: one conforming row.
       read(ledgerPath).split('\n').filter(l => l.includes('PPW-938') || l.includes('fix round')).join('\n'))
   }
 
-  // A Windows checkout keeps index.md and ledger.md CRLF, so the verification stage runs against
-  // CRLF copies: an inserted line has to match its neighbours, not leave a lone LF behind.
+  // index.md and ledger.md are CRLF here, so an inserted line must match its neighbours.
   const crlf = t => t.replace(/\r?\n/g, '\r\n')
   writeFileSync(indexPath, crlf(read(indexPath)))
   writeFileSync(ledgerPath, crlf(read(ledgerPath)))
@@ -546,8 +554,7 @@ Fixture copy: one conforming row.
   check('verify-fixes refuses a dirty tree', dirty.code === 2, `exit ${dirty.code}: ${dirty.out.trim()}`)
   g('checkout', '--', '.')
 
-  // A fix that took a follow-up commit lists both in the Commit cell; reverting only the first
-  // would leave the follow-up's code in place and the test green for the wrong reason.
+  // A follow-up commit is listed too: reverting only the first leaves the test green for the wrong reason.
   writeFileSync(join(T, 'src', 'app', 'calc.txt'), 'fixed and polished\n')
   g('add', '.'); g('commit', '-qm', 'follow-up')
   const sha2 = g('rev-parse', '--short', 'HEAD').stdout.trim()
@@ -613,8 +620,7 @@ Fixture copy: one conforming row.
     lastLine?.id === 'PPW-9520' && lastLine?.verdict === 'held', JSON.stringify(worklogAfterFix))
   commitWorklog('worklog after worklog-in-fix run')
 
-  // A frontend spec with no installed dependencies must not be run: the runner would fail to
-  // start in both legs, which reads as a red that reddened for the wrong reason.
+  // A frontend spec with no installed dependencies fails to start in both legs — a red for the wrong reason.
   mkdirSync(join(T, 'src', 'PhotoPrint.UI', 'src'), { recursive: true })
   writeFileSync(join(T, 'src', 'app', 'widget.txt'), 'buggy\n')
   writeFileSync(join(T, 'src', 'PhotoPrint.UI', 'src', 'widget.spec.ts'), 'spec body\n')

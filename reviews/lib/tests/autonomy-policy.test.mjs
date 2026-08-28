@@ -63,3 +63,9 @@ import { check, run, GOOD_ROOT } from './lib.mjs'
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-clean', 'decide', 'loop-close'])
   check('policy ignores overrides logged before the run started', r.out.includes('ACTION: auto'), r.out.trim())
 }
+
+// A mis-stamped run-start would push the override cut-off past a real override and hide it.
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '956-override-voided-run-start', 'decide', 'loop-close'])
+  check('a voided run-start does not set the override cut-off', r.out.includes('ACTION: stop') && r.out.includes('2026-08-28T11:00:00Z'), r.out.trim())
+}

@@ -1,0 +1,2 @@
+{"target":"955-pre-cutoff-resolved","pass":1,"type":"discovery","date":"2026-07-01","commit":"5555560","verdict":"request-changes","new_findings":{"high":1,"medium":1,"low":0,"cleanup":0},"reopened":0,"verified":0}
+{"target":"955-pre-cutoff-resolved","pass":1,"type":"verification","date":"2026-07-04","commit":"5555562","verdict":"approve-with-followups","new_findings":{"high":0,"medium":0,"low":0,"cleanup":0},"reopened":0,"verified":1}
