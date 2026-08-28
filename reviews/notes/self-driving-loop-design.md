@@ -352,3 +352,41 @@ until one external adoption target actually exists.
 **The one question the owner must answer:** approve seeded-bug run 2 now, at ~2–2.5M
 tokens — or explicitly choose to keep building on unproven recall? Everything else in this
 file follows from that answer.
+
+## Script backlog (2026-08-22)
+
+Seven small scripts the loop keeps hand-doing. Each is an afternoon at most, and each one
+removes a step a human currently performs from memory — the same trade the router, the
+renderer and the stamper already made.
+
+- **Discovery prep** — collects the pass's diff set, checks the target branch's HEAD is the
+  commit the pass will name, and suggests lenses from the touched areas. Removes the
+  hand-assembled scoping block at the top of every discovery, and the mis-stated `commit:`
+  frontmatter that a stale HEAD produces.
+- **Close-target sequence** — writes `closed:` into the ledger frontmatter, rolls every
+  `backlog` row and every 🟠 standing down into [backlog.md](../state/backlog.md), stamps
+  `archived:` on the index row, and `git mv`s the folder into `archive/`. Removes the
+  four-step close checklist whose order is the part that gets dropped.
+- **Run-end report printer** — reads a run's `gate-parked` events and prints the parked
+  items (kind, default taken, what needs a ruling) as the report's skeleton. Removes the
+  hand-reconstruction of what an unattended run decided alone, which is the one part of the
+  report the owner actually acts on.
+- **Commit-subject lint** — a `.githooks/pre-commit` check for the one-sentence,
+  subject-only, no-trailer rule, with the finding/round id where one is expected. Removes
+  the after-the-fact discovery that a commit body or a `Co-Authored-By` trailer landed.
+- **Judge input packager** — lists the round's changed `reviews/` files from git and packs
+  them with doc-contracts.md into the judge's prompt. Removes the judge's re-read of a
+  target's whole file set, which is why judge rounds cost what they cost.
+- **Blinding auditor** — scans a lens's inputs before launch for `reviews/` content, git
+  history and `PPW-` id strings, and refuses the launch on a hit. Removes the "blinded
+  best-effort, enforced by prompts" caveat in the README's hard rules — the one claim the
+  system makes and cannot currently check.
+- **Reconcile pre-matcher** — offers fuzzy same-problem candidates (file, symbol, title
+  overlap) for each new finding against the ledger, for the reconciler to accept or reject.
+  Removes the full-ledger read per finding, without moving the same/new judgment off the
+  reconciler.
+
+None of these is queued. Each stays unbuilt until the lint-miner habit surfaces it as a
+measured cost — the same way the ledger miner is meant to rank defect classes — or the owner
+asks for it outright.
+
