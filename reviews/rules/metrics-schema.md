@@ -2,7 +2,7 @@
 type: review-metrics-schema
 status: active — v4
 created: 2026-07-04
-updated: 2026-08-27
+updated: 2026-08-28
 owner: Matei Barba
 ---
 
@@ -108,8 +108,26 @@ drives them: the `/fix-review` skill during fix rounds (`round-start`, `triage-d
 (`pass-launch`, `pass-records-done`) and owner gates. It is the crash-safe evidence trail
 and the input `reviews/lib/render-records.mjs` computes runtime from.
 
-**The fix-round line** — appended by `render-records.mjs` at hand-back (one per round;
-a wrong line is corrected by a correction line, never edited):
+The **stamper** (`reviews/lib/wl.mjs`) is the only sanctioned way to append an event. It owns
+the timestamp, refuses an unknown event name, refuses an event missing a required field, and
+refuses a second `round-start` while a round is open. Its vocabulary carries the hand-back
+evidence events of the 2026-08-28 audit (`protocol-written`,
+`check-dispatched`/`check-returned` with `ids`, `round-review-dispatched`/`-returned`,
+`test-audit-dispatched`/`-returned`) and two events the renderer reads:
+
+- `void` — `{"ev":"void","of":{...}}`. The renderer and every reader drop the events `of`
+  matches. This is how a mis-stamped event is repaired; the log stays append-only.
+- `verify-result` — `{"ev":"verify-result","id":"PPW-<n>","verdict":"held|...","commit":"..."}`,
+  appended by `reviews/lib/verify-fixes.mjs` as each row finishes. `commit` is the commit the
+  row's fix was proved at; the renderer writes it into the ledger row's Affirmed cell. The run
+  buffers its events and flushes them after the last row, so it ends with a worklog the driver
+  commits.
+
+**The fix-round line** — appended by `render-records.mjs` (a wrong line is corrected by a
+correction line, never edited). The renderer appends it **once per round, when the resolution
+is `resolved`** — an in-progress round has no line; the worklog carries everything until then.
+In the same run the renderer also appends the round's index row and applies the ledger status
+flips (doc-contracts.md names these as its two mechanical writes):
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -125,13 +143,46 @@ a wrong line is corrected by a correction line, never edited):
 | `runtime` | `{started, ended, active_s, blocked_s, idle_s, blocked: [{reason, s}]}` | see derivation below |
 | `notes` | string | e.g. `pilot`, deviations, what broke |
 
-**Runtime derivation (declared convention, not precision):** `blocked_s` = Σ
-`gate-open`→`gate-closed` spans (each listed in `blocked[]` with its reason — a question the
-owner saw an hour later is an hour of `blocked_s`). `active_s` = Σ gaps between consecutive
-non-gate events **≤ 30 minutes**; a longer unexplained gap means nobody was at the wheel.
-`idle_s` = (`ended` − `started`) − `active_s` − `blocked_s`. The cap deliberately errs
+**Runtime derivation (declared convention, not precision):** `runtime` sums the round's paired
+`round-start`→`round-end` spans; time between spans belongs to records and gates and is counted
+nowhere in the round line. A mis-stamped event is repaired by an appended `void` event, never
+edited. A round stopped and resumed re-stamps `round-start` for each part, so such a round has
+one span per part; an unpairable stamp aborts the render instead of over-counting. Inside the
+spans: `blocked_s` = Σ `gate-open`→`gate-closed` spans (each listed in `blocked[]` with its
+reason — a question the owner saw an hour later is an hour of `blocked_s`). `active_s` = Σ gaps
+between consecutive non-gate events **≤ 30 minutes**; a longer unexplained gap means nobody was
+at the wheel. `idle_s` = Σ span durations − `active_s` − `blocked_s`. The cap deliberately errs
 toward **over**-counting active time — a speed metric must not look better by under-counting
 work (long silent stretches count as work; only clear absences count as idle).
+
+**The verification line** — appended by `render-records.mjs --verification <pass>` from the same
+worklog. `verified` counts the `verify-result` events whose verdict is `held`, `reopened` the
+rest; `runtime` is the paired `pass-launch`→`pass-records-done` spans; `tests` is the last
+scored `test-run` event in them. The same run appends the pass's index row and flips each row's
+ledger status — `verified` at the `commit` its `verify-result` carries, or back to `open` with
+the verdict that reopened it. `--commit <sha>` names the reviewed commit; without it the
+renderer reads the newest resolution's `fixed_commit`.
+
+**The speed report** — `reviews/lib/speed-report.mjs <target>` reads the worklog and this file
+and writes nothing. It charges every gap between consecutive events to exactly one bucket,
+priority gate > round > pass: `owner wait` inside a gate span, `fix-round work` inside a round
+span, `pass work` inside a pass span. Outside those a gap is `records+gates` when it touches a
+`doc-gate` event, and also when it runs on from a `round-end`, a `pass-records-done` or a
+`doc-gate` and is no longer than the 30-minute cap this schema already uses; the rest is
+`idle/other`. Its metrics: **all-in min per fixed finding** = per round, its first `round-start`
+to the first approving `doc-gate` after its last `round-end`, plus the verification that follows
+before the next round starts, over that round's fixed findings (median across rounds);
+**doc-gate first-pass approval** = the share of gate sittings whose first event is not a
+disapproval, a *sitting* being a run of adjacent `doc-gate` events sharing a round or pass key;
+**record sittings per fixed finding** = sittings ÷ fixed findings; **correction lines** = the
+`correction_for` lines of this file, counted cumulatively up to `--day`.
+
+**The measured baseline (038-039, reference snapshot of 2026-08-21, 175 events):** span 702.0
+min — fix-round work 262.1, records+gates 191.3, idle 114.6; doc-gate first-pass 0.636;
+correction lines 25. All-in min per fixed finding: r6 7.8 · r8 41.2 · r9 29.0 · r10 21.4, median
+25.2. The frozen full-day fixture (5 later events) reads span 763.4, first-pass 0.667, sittings
+per fix 0.414. Targets: ≤ 15 min per fix, ≥ 90% first-pass, ≤ 0.15 sittings per fix, ~0
+corrections.
 
 ## v4 (2026-08-28): seed lineage and the round review
 
@@ -168,6 +219,9 @@ A past line is never edited. A correction is its own appended line:
 
 This works for **closed targets** too (the v1 rule "a note in the next line" silently failed
 once a target stopped producing next lines).
+
+Corrections exist for facts discovered wrong after the fact; a value the renderer can recompute
+is fixed by `void` + re-render before the line is written, not by a correction.
 
 **Correcting a fix-round line** (added 2026-08-05): fix rounds have a `round`, not a `pass`, so
 the key is `correction_for.round`:
@@ -211,6 +265,10 @@ Readers of old lines need this table:
 - `refinds_identity` / `reraises_of_decided` / `fix_generated` use the **`reconcile-findings`
   skill's** judgment (labeling rules per
   .claude/skills/reconcile-findings/overlap-ground-truth.md).
+- **Readers merge a certification pair.** `reviews/lib/summary-data.mjs` treats every
+  discovery-type line at one `pass` as a single unit — lenses unioned, `new_findings` summed,
+  `findings[]` concatenated — so a pair reads as one pass. A verification line sharing that
+  number never merges in.
 - No global roll-up file: compute cross-feature summaries on demand from the per-feature files
   (they are labeled pass-cost-only); a hand-maintained roll-up would drift.
 - Run the auditor after every append.

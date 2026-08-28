@@ -8,10 +8,18 @@ owner: Matei Barba
 # Doc contracts — review artifacts
 
 Every review artifact follows a fixed template, a size cap, and the language rules
-below. The round-end gate (lint + Sonnet judge) enforces this file. It judges and
-explains; it never edits. `doc-gate.mjs <target> <pass>` lints a round's files plus the
+below. The round-end gate (lint + Sonnet judge) enforces this file. The deterministic lint
+never edits and covers the target's files and the state files in one run. The judge returns,
+per violation, the exact replacement text; the driver applies it verbatim and re-runs the
+lint — one judge sitting per reviewed unit. A correction that would change a recorded fact (a
+count, a commit, a status) is returned as a question, never as text. Judge scope: hand-written
+prose (summaries, Decisions, glance cells); machine-rendered rows are the lint's alone.
+`doc-gate.mjs <target> <pass>` lints a round's files plus the
 cross-target files keyed to that target, `doc-gate.mjs state` the cross-target files
-alone, and `lib/tests/run-tests.mjs` lints the gate itself against fixtures. Scope: every
+alone, and `lib/tests/run-tests.mjs` lints the gate itself against fixtures. The lint also
+checks every `PPW-<n>` and every commit sha written into a state-file cell for this target:
+an id absent from the target's ledger, or a sha `git cat-file -e` cannot resolve, is a
+violation. Scope: every
 per-target artifact, plus the cross-target `index.md` and `backlog.md`. `reviews/system/`
 and `track-record.md` have no contract
 here — but the system target keeps its own lightweight records: `SF<n>` ids (outside
@@ -27,8 +35,11 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
 `summary-v<n>.md`, `ledger.md`, `worklog.jsonl`, `metrics.jsonl`.
 
 - `findings-v<n>.md` no longer exists. Defect detail lives on the ledger row.
-- Verification passes write no files. Their record is worklog events, ledger
-  status changes, and the index row. The result is reported at the owner gate.
+- Verification passes write no prose files. Their record — ledger flips, the metrics
+  line, the index row — is rendered by `render-records.mjs --verification` from the
+  worklog's `verify-result` events. The result is reported at the owner gate.
+- A fix round and the verification of its fixes are one **reviewed unit**: the unit
+  renders one set of records and passes one doc gate, after the verification.
 - A summary is written only for passes that can need an owner decision:
   discovery, delta-discovery, certification.
 - One-off measurement files are banned. Measurements go to `metrics.jsonl` or
@@ -73,6 +84,10 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    resolution-v15 included) is grandfathered, never repaired retroactively. A
    resolution turning `resolved` must set `closed:` — from the cut-off the
    auditor refuses one without it.
+7. **The renderer's exception.** `render-records.mjs` owns exactly two writes into
+   prose files: appending a fix-round or verification row to the index's Passes
+   table, and flipping a ledger row's Status/Affirmed cells plus appending its
+   History line. Every other prose line stays a person's or agent's hand.
 
 ## Language rules
 
@@ -110,6 +125,9 @@ Allowed system terms. Anything else must be everyday English.
 - **verification** — an anchored pass checking that specific fixes held.
 - **certification** — the closing full pass; its verdict can be `approved`.
 - **fix round** — the fixer working through a review's findings.
+- **reviewed unit** — one fix round plus the verification of its fixes: the verification runs at the round's tip, and the unit renders one set of records and passes one doc gate; the verifier is never the fixer.
+- **queued** — an open 🟠 below the fix-round threshold, waiting for a batch; it still blocks certification.
+- **sweep round** — the fix round that drains every queued 🟠 before certification.
 - **blinded / anchored** — finder cannot see prior findings / checker deliberately starts from them.
 - **`PPW-<n>`** — a defect's permanent id, one global sequence across all targets.
 - **id counter** — `reviews/state/id-counter`, holding the next free `PPW-<n>` and nothing else.
@@ -119,6 +137,12 @@ Allowed system terms. Anything else must be everyday English.
 - **area** — the one word on a backlog row naming where that row's fix lands. Twelve are
   allowed; the list and the tiebreak rule sit under `backlog.md` below.
 - **worklog** — `worklog.jsonl`, the per-target append-only event trail.
+- **stamper** — `lib/wl.mjs`, the only sanctioned way to append a worklog event; it owns the timestamp and enforces the event vocabulary and each event's required fields.
+- **void** — an appended worklog event that repairs a mis-stamped one; readers drop what it matches.
+- **`verify-result`** — the worklog event a verification appends per checked row: its id, its verdict, and the commit the row was proved at.
+- **renderer** — `lib/render-records.mjs`, which turns a unit's worklog into its metrics line, its index rows and its ledger flips.
+- **test wrapper** — `lib/run-scoped-tests.mjs`, which runs one scoped suite under a machine-global lock and stamps its `test-run` event.
+- **speed report** — `lib/speed-report.mjs`, the read-only acceptance measurement of where a loop's wall-clock time went (definitions in `metrics-schema.md`).
 - **index** — `reviews/state/index.md`, one row per pass, repo-wide.
 - **severity** — 🔴 High · 🟠 Medium · 🟡 Low · ⚪ Cleanup.
 - **verdict** — `request-changes` · `approve-with-followups` · `approved`.
@@ -208,7 +232,10 @@ number beside it.
 
 A row runs `open → in-progress → fixed → verified`, or ends at terminal
 `wont-fix`, `deferred`, `disputed`, `false-positive`, `backlog` — a terminal
-status needs its rationale in the resolution. Terminal rows feed the discovery
+status needs its rationale in the resolution. The flips along that flow are
+rendered, not hand-written: `render-records.mjs` writes the Status and Affirmed
+cells and appends the History line, from the resolution's `## Findings` table for
+a fix round and from the `verify-result` events for a verification (core rule 7). Terminal rows feed the discovery
 script's `decidedFindings`, and each deferral row records the commit at which it
 was last affirmed. A re-raise of a decided row gets the prior decision attached
 to it, never suppressed: of the first 5 recorded re-raises, 3 overturned the
@@ -226,6 +253,12 @@ string `t` and a string `ev`. Events cover the fix round's work as it happens
 plus `pass-launch`, `pass-records-done` and the owner-gate stamps. It is the
 crash-safe evidence trail: every metrics `runtime` value is computed from it and
 never estimated.
+
+Every event goes in through the stamper, which owns the timestamp and rejects an
+event outside the vocabulary or missing a required field. Two events serve the
+records: `void`, which repairs a mis-stamped event by naming it in `of` so every
+reader drops it, and `verify-result`, which carries a checked row's id, verdict
+and proved-at commit for the verification to render from.
 
 Since the 2026-08-28 cut-off it is also the hand-back evidence the auditor
 refuses `status: resolved` without:
