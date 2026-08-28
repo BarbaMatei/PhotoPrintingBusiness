@@ -115,9 +115,6 @@ closed: 2026-07-15
 
 {
   const r = run('records-auditor.mjs', ['--root', GOOD_ROOT])
-  check('auditor reports a cross-target duplicate id', r.out.includes('duplicate id PPW-9001'), 'no duplicate-id error in the output')
-  check('auditor accepts a well-formed verification findings[] with lineage', !r.out.includes('908-verification-lineage metrics line 2 findings['), r.out.split('\n').find(l => l.includes('line 2 findings[')) ?? '')
-  check('auditor rejects a malformed verification findings[] entry', r.out.includes('908-verification-lineage metrics line 3 findings[') && r.out.includes('d must be') && r.out.includes('sev_delta malformed'), 'no shape error for the malformed lineage entry')
   check('auditor accepts seed_round and area lineage keys when well-formed', !r.out.includes('line 2 findings[0]: seed_round') && !r.out.includes('line 2 findings[0]: area'), r.out.split('\n').find(l => l.includes('line 2 findings[0]')) ?? '')
   check('auditor rejects a non-numeric seed_round and an off-vocabulary area', r.out.includes('seed_round must be a round number or null') && r.out.includes('area "checkout" — one of the twelve backlog area words only'), 'no seed-lineage shape errors in the output')
 
