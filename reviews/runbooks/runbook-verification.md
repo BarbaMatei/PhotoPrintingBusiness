@@ -82,7 +82,9 @@ feature clean?".
    `verify-result` events of step 2 — the script's, plus any you stamped by hand. A `fixed` row
    with no `verify-result` in this pass's span is not flipped and stays `fixed`; the renderer
    says so when it finds no events at all. Add `--new-findings h,m,l,c`
-   when the pass named new defects. Commit the worklog the run left behind. Then run
+   when the pass named new defects. Commit the worklog the run left behind, then **push** — the
+   round's tip and the records commit both, because the auditor refuses a commit reachable from
+   no pushed ref and these records carry shas written a moment ago. Then run
    `node reviews/lib/records-auditor.mjs <target>` — it must exit clean — and the unit's single
    doc gate covers this pass's records together with the fix round's. A verification that
    names **new** defects reconciles them like any pass and adds a `findings[]` entry per new

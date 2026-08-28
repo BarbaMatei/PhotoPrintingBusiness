@@ -163,8 +163,12 @@ node reviews/lib/render-records.mjs <target> --verification v<pass> --outcome "<
    `--outcome` is mandatory on both, at most 50 words, and may carry neither a `|` nor a line
    break. Every check runs before the first write, so a refusal leaves `metrics.jsonl`,
    `index.md` and `ledger.md` all untouched — read what it named, repair that record, re-run.
-4. `node reviews/lib/records-auditor.mjs <target>` — must exit clean.
-5. **One doc-gate sitting for the whole unit** (below): `node reviews/lib/doc-gate.mjs
+4. Commit the records the renderer just wrote, then **push the branch** — the round's tip and
+   the records commit both. The auditor refuses a commit that is reachable from no pushed ref
+   ("evidence is single-machine"), and step 3 just wrote fresh shas into the records, so the
+   auditor cannot pass before the push.
+5. `node reviews/lib/records-auditor.mjs <target>` — must exit clean.
+6. **One doc-gate sitting for the whole unit** (below): `node reviews/lib/doc-gate.mjs
    <target> <round>` plus one judge dispatch over the round's and the verification's changed
    files together, never one per half.
 
@@ -282,7 +286,7 @@ the records, never from the subagent's prose):
 |---|---|
 | full / delta discovery / certification | as section 3 — the workflow script already fans out; run synthesis + records per runbook-discovery (certification pair = two blinded passes per README note ²) |
 | lens-coverage discovery (<lens>) | the same runbook, full scope, lenses = the one owed lens + completeness-critic; it clears one lens of the coverage debt that refuses certification |
-| reviewed unit (fix round + verification) | one subagent — the **persistent fixer** above — instructed to load the `/fix-review` skill and follow its **Unattended variant** section; it hands back at `round-end` plus the round's commit. Then, in the driver and in this same iteration: `pass-launch` and then the records commit that contains it, `verify-fixes.mjs` at that tip (the sampled `--only` evidence audit when the round recorded per-fix revert proofs, the full run otherwise), one subagent for the runbook's judgment items — given the script's JSON output, the round review's findings, the resolution and the fix diff — then the two renderer calls, the auditor, and ONE doc-gate sitting for the unit (section 4) |
+| reviewed unit (fix round + verification) | one subagent — the **persistent fixer** above — instructed to load the `/fix-review` skill and follow its **Unattended variant** section; it hands back at `round-end` plus the round's commit. Then, in the driver and in this same iteration: `pass-launch` and then the records commit that contains it, `verify-fixes.mjs` at that tip — the full mechanical run over every `fixed` row, plus the runbook's sampled evidence audit of the fixer's recorded proofs when the round recorded per-fix levers (`--only` is for re-runs) — one subagent for the runbook's judgment items — given the script's JSON output, the round review's findings, the resolution and the fix diff — then the two renderer calls, the records commit, the **push** of the round tip and that commit, the auditor, and ONE doc-gate sitting for the unit (section 4) |
 | design pass | never automatic: `autonomy-policy.mjs` answers `stop` on the `design-pass` gate kind, because reimplementing a component is the owner's call. The run ends with that question |
 
 The session-model guard still applies: on a Fable session, discovery-scale launches
