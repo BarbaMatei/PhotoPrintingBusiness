@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Id minting + scaffold generator. `mint` reads/writes reviews/state/id-counter (its whole
 // content is the next free PPW-<n>, doc-contracts.md rule 3). `scaffold-ledger` appends a
-// Findings row + a Details block skeleton to a target's ledger.md (from templates/ledger.md
-// on first use). `scaffold-resolution` seeds resolution-v<N>.md from review-v<N>.md's
-// findings table (templates/resolution.md). Templates are law: only the fields named below
-// are filled in; everything else is copied from the template verbatim as <fill in>.
+// Findings row + a Details block to a target's ledger.md, reading templates/ledger.md at
+// runtime to build a fresh one when absent. `scaffold-resolution` seeds resolution-v<N>.md
+// from review-v<N>.md's findings table, reading templates/resolution.md at runtime. Reading
+// the templates (not hand-duplicated strings) means a template edit reaches every scaffold
+// without a script change.
 //
 // Usage:
 //   node reviews/lib/mint-id.mjs [--root <repoRoot>] mint --count N [--dry-run]
@@ -13,14 +14,16 @@
 //   node reviews/lib/mint-id.mjs [--root <repoRoot>] scaffold-resolution <target>
 //     --version N [--dry-run]
 // --dry-run: prints what would happen, writes nothing.
-// Exit: 0 done · 2 refusal (non-numeric counter, duplicate id, existing file, usage error).
+// Exit: 0 done · 2 refusal (non-numeric counter, duplicate id, existing file, usage error,
+// unrecognized template shape).
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { REVIEWS as REVIEWS_HOME, ID_COUNTER } from './paths.mjs'
+import { REVIEWS as REVIEWS_HOME, ID_COUNTER, TEMPLATES } from './paths.mjs'
 
 const SEV = ['🔴', '🟠', '🟡', '⚪']
 const todayIso = () => new Date().toISOString().slice(0, 10)
 const fail = msg => { console.error(`ERROR ${msg}`); process.exit(2) }
+const strip = l => l.replace(/\r$/, '')
 
 function parseArgs(argv) {
   let root = null
@@ -48,29 +51,33 @@ function mint(counterPath, opts) {
   if (!opts.dryRun) writeFileSync(counterPath, `${b + 1}\n`)
 }
 
-// The blank-line-before-heading anchor every ledger.md carries (fresh or not), so a row can
-// always be inserted right before it and a block right after the file's last one.
-const DETAILS_SPLIT = '\n\n## Details'
+// Builds a fresh ledger.md from templates/ledger.md: keeps its frontmatter (minus `closed:`,
+// absent while the loop is open) and its Findings/Details headings + table header, drops the
+// template's illustrative example row and detail block. Always LF — there is no pre-existing
+// file whose bytes need preserving.
+function freshLedger(target, templatesDir) {
+  const lines = readFileSync(join(templatesDir, 'ledger.md'), 'utf8').split(/\r?\n/)
+  const fmClose = lines.findIndex((l, i) => i > 0 && l === '---')
+  const titleAt = lines.findIndex((l, i) => i > fmClose && /^# /.test(l))
+  const findingsAt = lines.indexOf('## Findings')
+  const headerAt = lines.findIndex((l, i) => i > findingsAt && /^\|/.test(l))
+  const detailsAt = lines.indexOf('## Details')
+  if ([fmClose, titleAt, findingsAt, headerAt, detailsAt].some(i => i === -1))
+    fail('templates/ledger.md is missing an expected heading or table — template shape changed')
 
-function freshLedger(target) {
-  return `---
-type: review-ledger
-target: ${target}
-updated: ${todayIso()}
----
+  const fm = lines.slice(1, fmClose).filter(l => !/^closed:/.test(l)).map(l =>
+    /^target:/.test(l) ? `target: ${target}` : /^updated:/.test(l) ? `updated: ${todayIso()}` : l)
 
-# Ledger — ${target}
-
-## Findings
-
-| ID | Sev | First seen | Title | File | Status | Affirmed |
-|---|---|---|---|---|---|---|
-
-## Details
-`
+  return [
+    '---', ...fm, '---', '',
+    lines[titleAt].replace('<target>', target), '',
+    '## Findings', '',
+    lines[headerAt], lines[headerAt + 1], '',
+    '## Details', '',
+  ].join('\n')
 }
 
-function scaffoldLedger(reviewsDir, target, opts) {
+function scaffoldLedger(reviewsDir, target, opts, templatesDir) {
   const id = opts.id
   if (!id || !/^PPW-\d+$/.test(id)) fail('--id must look like PPW-<n>')
   if (!SEV.includes(opts.sev)) fail(`--sev must be one of ${SEV.join(' ')}`)
@@ -81,23 +88,74 @@ function scaffoldLedger(reviewsDir, target, opts) {
   const dir = join(reviewsDir, target)
   const ledgerPath = join(dir, 'ledger.md')
   const existing = existsSync(ledgerPath)
-  let body = existing ? readFileSync(ledgerPath, 'utf8') : freshLedger(target)
-  if (existing && new RegExp(`\\b${id}\\b`).test(body)) fail(`${id} already exists in ${ledgerPath}`)
+  const raw = existing ? readFileSync(ledgerPath, 'utf8') : freshLedger(target, templatesDir)
+  if (existing && new RegExp(`\\b${id}\\b`).test(raw)) fail(`${id} already exists in ${ledgerPath}`)
 
-  const idx = body.indexOf(DETAILS_SPLIT)
-  if (idx === -1) fail(`${ledgerPath} has no "## Details" heading — not a valid ledger`)
-  const row = `| ${id} | ${opts.sev} | ${opts.pass} | ${opts.title} | \`${opts.file}\` | open | |`
-  const block = `\n\n### ${id} — ${opts.title}\n\n- **What:** <fill in>\n- **Evidence:** <fill in>\n- **Suggested fix:** <fill in>\n- **History:** <append-only, one line per event>\n  - ${opts.pass}: found by <fill in>\n`
-  let next = body.slice(0, idx) + '\n' + row + body.slice(idx) + block
-  next = next.replace(/^updated:.*$/m, `updated: ${todayIso()}`)
+  // A Windows checkout keeps real ledgers CRLF: splitting on plain '\n' leaves the '\r' on
+  // every existing line untouched, so only the lines we insert need one added to match their
+  // neighbours (render-records.mjs's crOf pattern) — every pre-existing byte stays as-is.
+  const lines = raw.split('\n')
+  const cr = lines.some(l => l.endsWith('\r')) ? '\r' : ''
+  const detailsAt = lines.findIndex(l => strip(l) === '## Details')
+  if (detailsAt === -1) fail(`${ledgerPath} has no "## Details" heading — not a valid ledger`)
+
+  const row = `| ${id} | ${opts.sev} | ${opts.pass} | ${opts.title} | \`${opts.file}\` | open | |${cr}`
+  const rowAt = detailsAt > 0 && strip(lines[detailsAt - 1]) === '' ? detailsAt - 1 : detailsAt
+  lines.splice(rowAt, 0, row)
+
+  const block = [
+    '', `### ${id} — ${opts.title}`, '',
+    '- **What:** <fill in>', '- **Evidence:** <fill in>', '- **Suggested fix:** <fill in>',
+    '- **History:** <append-only, one line per event>', `  - ${opts.pass}: found by <fill in>`,
+  ].map(l => l + cr)
+  const tailAt = lines.length && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+  lines.splice(tailAt, 0, ...block)
+
+  const updatedAt = lines.findIndex(l => /^updated:/.test(strip(l)))
+  if (updatedAt !== -1) lines[updatedAt] = `updated: ${todayIso()}${cr}`
 
   if (opts.dryRun) { console.log(`(dry-run) would ${existing ? 'append' : 'create'} ${ledgerPath} with ${id}`); return }
   mkdirSync(dir, { recursive: true })
-  writeFileSync(ledgerPath, next)
+  writeFileSync(ledgerPath, lines.join('\n'))
   console.log(`MINT-ID: ${existing ? 'appended' : 'created'} ${ledgerPath} (${id})`)
 }
 
-function scaffoldResolution(reviewsDir, target, opts) {
+// Reads templates/resolution.md at runtime: fills the frontmatter scalars (drops `closed:`),
+// replaces the Findings table's one illustrative row with one row per id, and keeps Scope and
+// Decisions — including the template's "### Protocol — <label>" block — verbatim, since
+// neither is named as filled by the caller.
+function resolutionSkeleton(target, N, ids, templatesDir) {
+  const lines = readFileSync(join(templatesDir, 'resolution.md'), 'utf8').split(/\r?\n/)
+  const fmClose = lines.findIndex((l, i) => i > 0 && l === '---')
+  const titleAt = lines.findIndex((l, i) => i > fmClose && /^# /.test(l))
+  const findingsAt = lines.indexOf('## Findings')
+  const headerAt = lines.findIndex((l, i) => i > findingsAt && /^\|/.test(l))
+  const scopeAt = lines.indexOf('## Scope')
+  const decisionsAt = lines.indexOf('## Decisions')
+  if ([fmClose, titleAt, findingsAt, headerAt, scopeAt, decisionsAt].some(i => i === -1))
+    fail('templates/resolution.md is missing an expected heading or table — template shape changed')
+
+  const fm = lines.slice(1, fmClose).filter(l => !/^closed:/.test(l)).map(l => {
+    if (/^target:/.test(l)) return `target: ${target}`
+    if (/^version:/.test(l)) return `version: ${N}`
+    if (/^answers:/.test(l)) return `answers: review-v${N}.md`
+    if (/^status:/.test(l)) return 'status: open'
+    if (/^fixed_commit:/.test(l)) return 'fixed_commit: <fill in>'
+    return l
+  })
+
+  return [
+    '---', ...fm, '---', '',
+    lines[titleAt].replace('<n>', N).replace('<target>', target), '',
+    '## Findings', '',
+    lines[headerAt], lines[headerAt + 1],
+    ...ids.map(id => `| ${id} | open | — | — |`), '',
+    ...lines.slice(scopeAt, decisionsAt),
+    ...lines.slice(decisionsAt),
+  ].join('\n')
+}
+
+function scaffoldResolution(reviewsDir, target, opts, templatesDir) {
   const N = Number(opts.version)
   if (!Number.isInteger(N) || N < 1) fail('--version must be a positive integer')
   const dir = join(reviewsDir, target)
@@ -111,37 +169,7 @@ function scaffoldResolution(reviewsDir, target, opts) {
   const ids = [...findingsSection.matchAll(/^\|\s*(PPW-\d+)\s*\|/gm)].map(m => m[1])
   if (!ids.length) fail(`review-v${N}.md has no PPW-<n> findings rows`)
 
-  const rows = ids.map(id => `| ${id} | open | — | — |`).join('\n')
-  const content = `---
-type: resolution
-target: ${target}
-version: ${N}
-answers: review-v${N}.md
-status: open
-fixed_commit: <fill in>
----
-
-# Resolution v${N} — ${target}
-
-## Findings
-
-| ID | Status | Commit | Note |
-|---|---|---|---|
-${rows}
-
-## Scope
-
-| Cluster | Findings | Files | Protocol |
-|---|---|---|---|
-| A — <fill in> | ${ids.join(', ')} | \`<fill in>\` | — |
-
-## Decisions
-
-### <One-line decision title (PPW-<n>)>
-
-<Why the fix took this shape and not the obvious alternative. What was measured.
-Max 15 lines per decision. Longer history belongs on the ledger row.>
-`
+  const content = resolutionSkeleton(target, N, ids, templatesDir)
   if (opts.dryRun) { console.log(`(dry-run) would create ${resolutionPath} with ${ids.length} finding(s)`); return }
   mkdirSync(dir, { recursive: true })
   writeFileSync(resolutionPath, content)
@@ -151,6 +179,7 @@ Max 15 lines per decision. Longer history belongs on the ledger row.>
 function main() {
   const { root, rest, opts } = parseArgs(process.argv.slice(2))
   const reviewsDir = root ? join(root, 'reviews') : REVIEWS_HOME
+  const templatesDir = root ? join(reviewsDir, 'templates') : TEMPLATES
   const [cmd, target] = rest
   if (cmd === 'mint') {
     const counterPath = root ? join(reviewsDir, 'state', 'id-counter') : ID_COUNTER
@@ -158,11 +187,11 @@ function main() {
   }
   if (cmd === 'scaffold-ledger') {
     if (!target) fail('scaffold-ledger requires a target')
-    return scaffoldLedger(reviewsDir, target, opts)
+    return scaffoldLedger(reviewsDir, target, opts, templatesDir)
   }
   if (cmd === 'scaffold-resolution') {
     if (!target) fail('scaffold-resolution requires a target')
-    return scaffoldResolution(reviewsDir, target, opts)
+    return scaffoldResolution(reviewsDir, target, opts, templatesDir)
   }
   console.error('usage: node reviews/lib/mint-id.mjs [--root <repoRoot>] mint --count N [--dry-run]')
   console.error('       node reviews/lib/mint-id.mjs [--root <repoRoot>] scaffold-ledger <target> --id PPW-<n> --sev <emoji> --title "<t>" --file "<path:line>" --pass v<p> [--dry-run]')
@@ -170,5 +199,10 @@ function main() {
   process.exit(2)
 }
 
-main()
-process.exit(0)
+try {
+  main()
+  process.exit(0)
+} catch (e) {
+  console.error(`ERROR ${e.message}`)
+  process.exit(2)
+}

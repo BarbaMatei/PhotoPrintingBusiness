@@ -1,14 +1,30 @@
 // Tests for mint-id.mjs: counter mint/increment, ledger scaffolding, resolution scaffolding.
 // Every case runs against a throwaway mkdtemp tree — the real reviews/state/id-counter is
-// read-only for this suite.
+// read-only for this suite. Scaffold cases seed the tree's reviews/templates/ from the real
+// templates (the script reads them at runtime), so a template edit is exercised here too.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only mint-id
 import { check, run } from './lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { TEMPLATES } from '../paths.mjs'
 
-// ---------- mint: increments the counter, refuses garbage, --dry-run writes nothing ----------
+function seedTemplates(T) {
+  const dst = join(T, 'reviews', 'templates')
+  mkdirSync(dst, { recursive: true })
+  for (const f of ['ledger.md', 'resolution.md']) writeFileSync(join(dst, f), readFileSync(join(TEMPLATES, f), 'utf8'))
+}
+const headingsOf = text => text.replace(/\r\n/g, '\n').split('\n').filter(l => /^#{1,2} /.test(l))
+const rowLine = (id, sev, pass, title, file) => `| ${id} | ${sev} | ${pass} | ${title} | \`${file}\` | open | |`
+const blockLines = (id, title, pass) => [
+  '', `### ${id} — ${title}`, '',
+  '- **What:** <fill in>', '- **Evidence:** <fill in>', '- **Suggested fix:** <fill in>',
+  '- **History:** <append-only, one line per event>', `  - ${pass}: found by <fill in>`,
+]
+const today = () => new Date().toISOString().slice(0, 10)
+
+// ---------- mint: increments the counter, refuses garbage, --dry-run writes nothing, CRLF-safe ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'mint-id-mint-'))
   mkdirSync(join(T, 'reviews', 'state'), { recursive: true })
@@ -33,12 +49,18 @@ import { tmpdir } from 'node:os'
   r = run('mint-id.mjs', ['--root', T, 'mint'])
   check('mint refuses a missing --count', r.code === 2 && r.out.includes('ERROR'), r.out.trim())
 
+  writeFileSync(counterPath, '12\r\n')
+  r = run('mint-id.mjs', ['--root', T, 'mint', '--count', '2'])
+  check('mint parses a CRLF-terminated counter correctly', r.out.trim() === 'PPW-12..PPW-13', r.out.trim())
+  check('mint writes a clean counter back after a CRLF-terminated input', readFileSync(counterPath, 'utf8') === '14\n', JSON.stringify(readFileSync(counterPath, 'utf8')))
+
   rmSync(T, { recursive: true, force: true })
 }
 
-// ---------- scaffold-ledger: creates from template, appends, refuses a duplicate id ----------
+// ---------- scaffold-ledger: creates from the real template, appends, refuses a duplicate id ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'mint-id-ledger-'))
+  seedTemplates(T)
   const target = '960-fixture-target'
   const ledgerPath = join(T, 'reviews', target, 'ledger.md')
 
@@ -49,11 +71,15 @@ import { tmpdir } from 'node:os'
 
   const afterFirst = readFileSync(ledgerPath, 'utf8')
   check('ledger frontmatter names the target', afterFirst.includes(`target: ${target}`), afterFirst)
-  check('ledger carries the template headings', afterFirst.includes('# Ledger — 960-fixture-target') && afterFirst.includes('## Findings') && afterFirst.includes('## Details'), afterFirst)
+  const templateLedgerHeadings = headingsOf(readFileSync(join(TEMPLATES, 'ledger.md'), 'utf8')).map(l => l.replace('<target>', target))
+  check('the scaffolded ledger carries every top-level heading of templates/ledger.md, read at test time',
+    templateLedgerHeadings.every(h => afterFirst.includes(h)), JSON.stringify(templateLedgerHeadings))
   check('ledger table gets the new row', /\|\s*PPW-9601\s*\|\s*🔴\s*\|\s*v1\s*\|\s*Fixture defect one\s*\|\s*`Fixture\.cs:10`\s*\|\s*open\s*\|\s*\|/.test(afterFirst), afterFirst)
   check('ledger detail block uses <fill in> placeholders', afterFirst.includes('### PPW-9601 — Fixture defect one') &&
     afterFirst.includes('- **What:** <fill in>') && afterFirst.includes('- **Evidence:** <fill in>') && afterFirst.includes('- **Suggested fix:** <fill in>'), afterFirst)
   check('ledger history first line names the pass and <fill in> finder', afterFirst.includes('  - v1: found by <fill in>'), afterFirst)
+  check('exactly one blank line separates "## Details" from the first block',
+    afterFirst.includes('## Details\n\n### PPW-9601 —') && !afterFirst.includes('## Details\n\n\n### PPW-9601'), afterFirst)
 
   r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9602', '--sev', '🟠', '--title', 'Fixture defect two', '--file', 'Fixture.cs:20', '--pass', 'v1'])
@@ -61,6 +87,8 @@ import { tmpdir } from 'node:os'
   const afterSecond = readFileSync(ledgerPath, 'utf8')
   check('the appended ledger keeps the first block intact', afterSecond.includes('### PPW-9601 — Fixture defect one'), afterSecond)
   check('the appended ledger carries the second row and block', afterSecond.includes('PPW-9602') && afterSecond.includes('### PPW-9602 — Fixture defect two'), afterSecond)
+  check('exactly one blank line separates the first block from the second',
+    afterSecond.includes('found by <fill in>\n\n### PPW-9602 —') && !afterSecond.includes('found by <fill in>\n\n\n### PPW-9602'), afterSecond)
 
   r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9601', '--sev', '🟡', '--title', 'Duplicate attempt', '--file', 'Fixture.cs:30', '--pass', 'v2'])
@@ -75,9 +103,53 @@ import { tmpdir } from 'node:os'
   rmSync(T, { recursive: true, force: true })
 }
 
+// ---------- scaffold-ledger: an existing CRLF ledger stays CRLF and byte-identical elsewhere ----------
+{
+  const T = mkdtempSync(join(tmpdir(), 'mint-id-crlf-'))
+  seedTemplates(T)
+  const target = '962-crlf-target'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  const ledgerPath = join(dir, 'ledger.md')
+
+  const existingRow = rowLine('PPW-9620', '🟠', 'v1', 'Pre-existing finding', 'Existing.cs:5')
+  const existingBlock = blockLines('PPW-9620', 'Pre-existing finding', 'v1')
+  const originalLF = [
+    '---', 'type: review-ledger', `target: ${target}`, 'updated: 2026-08-20', '---', '',
+    `# Ledger — ${target}`, '',
+    '## Findings', '',
+    '| ID | Sev | First seen | Title | File | Status | Affirmed |',
+    '|---|---|---|---|---|---|---|',
+    existingRow, '',
+    '## Details',
+    ...existingBlock, '',
+  ].join('\n')
+  const original = originalLF.replace(/\n/g, '\r\n')
+  writeFileSync(ledgerPath, original)
+
+  const r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
+    '--id', 'PPW-9621', '--sev', '🔴', '--title', 'New CRLF finding', '--file', 'New.cs:9', '--pass', 'v2'])
+  check('scaffold-ledger exits 0 against a CRLF-terminated existing ledger', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+
+  const after = readFileSync(ledgerPath, 'utf8')
+  check('scaffold-ledger keeps the whole file CRLF (no bare \\n anywhere)', after.length > 0 && !/(?<!\r)\n/.test(after), JSON.stringify(after))
+
+  const newRow = rowLine('PPW-9621', '🔴', 'v2', 'New CRLF finding', 'New.cs:9')
+  const newBlockCRLF = blockLines('PPW-9621', 'New CRLF finding', 'v2').join('\n').replace(/\n/g, '\r\n')
+  const expected = original
+    .replace(`${existingRow}\r\n`, `${existingRow}\r\n${newRow}\r\n`)
+    .replace('updated: 2026-08-20', `updated: ${today()}`)
+    + newBlockCRLF + '\r\n'
+  check('the CRLF ledger matches byte-for-byte against a hand-built original.replace(...) expectation',
+    after === expected, `--- actual ---\n${JSON.stringify(after)}\n--- expected ---\n${JSON.stringify(expected)}`)
+
+  rmSync(T, { recursive: true, force: true })
+}
+
 // ---------- scaffold-resolution: copies review ids, refuses overwrite, --dry-run writes nothing ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'mint-id-resolution-'))
+  seedTemplates(T)
   const target = '961-fixture-target'
   const dir = join(T, 'reviews', target)
   mkdirSync(dir, { recursive: true })
@@ -123,7 +195,18 @@ Fixture only.
   const resolution = readFileSync(resolutionPath, 'utf8')
   check('resolution frontmatter fills target/version/answers', resolution.includes(`target: ${target}`) && resolution.includes('version: 1') && resolution.includes('answers: review-v1.md'), resolution)
   check('resolution copies one Findings row per review id', /\|\s*PPW-9601\s*\|\s*open\s*\|\s*—\s*\|\s*—\s*\|/.test(resolution) && /\|\s*PPW-9602\s*\|\s*open\s*\|\s*—\s*\|\s*—\s*\|/.test(resolution), resolution)
-  check('resolution carries the template headings', resolution.includes('# Resolution v1 — 961-fixture-target') && resolution.includes('## Findings') && resolution.includes('## Scope') && resolution.includes('## Decisions'), resolution)
+
+  const templateResolutionRaw = readFileSync(join(TEMPLATES, 'resolution.md'), 'utf8')
+  const templateResolutionHeadings = headingsOf(templateResolutionRaw).map(l => l.replace('<n>', '1').replace('<target>', target))
+  check('the scaffolded resolution carries every top-level heading of templates/resolution.md, read at test time',
+    templateResolutionHeadings.every(h => resolution.includes(h)), JSON.stringify(templateResolutionHeadings))
+  const resolutionLines = resolution.replace(/\r\n/g, '\n').split('\n')
+  const protocolHeading = templateResolutionRaw.replace(/\r\n/g, '\n').split('\n').find(l => /^### Protocol — /.test(l))
+  check('scaffold-resolution includes the template\'s "### Protocol — <label>" Decisions block verbatim as its own heading line',
+    !!protocolHeading && resolutionLines.includes(protocolHeading), protocolHeading)
+  const decisionTitleHeading = templateResolutionRaw.replace(/\r\n/g, '\n').split('\n').find(l => /^### <One-line decision title/.test(l))
+  check('scaffold-resolution includes the template\'s one-line-decision-title placeholder too, as its own heading line',
+    !!decisionTitleHeading && resolutionLines.includes(decisionTitleHeading), decisionTitleHeading)
 
   r = run('mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '1'])
   check('scaffold-resolution refuses to overwrite an existing file', r.code === 2 && r.out.includes('ERROR'), r.out.trim())
