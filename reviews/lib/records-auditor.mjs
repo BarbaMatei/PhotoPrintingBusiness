@@ -17,6 +17,7 @@ import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
 import { AREAS, V4_CUTOFF } from './vocab.mjs'
+import { live } from './wl.mjs'
 
 const argv = process.argv.slice(2)
 let ROOT = null
@@ -370,7 +371,8 @@ function auditTarget(t) {
     warn(`${tag}: ${fixRounds.size} fix-round metrics line(s) but no worklog.jsonl — runtime is not backed by events`)
   }
 
-  auditHandBackGates(t, tag, roundDates, worklogEvents, strictTier)
+  // Every reader drops voided events: a mis-stamp repaired with a void must not gate hand-back.
+  auditHandBackGates(t, tag, roundDates, live(worklogEvents), strictTier)
 
   // commit resolvability + reachability from a pushed ref
   for (const [sha, where] of shas) {

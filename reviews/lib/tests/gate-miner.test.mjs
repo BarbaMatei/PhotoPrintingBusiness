@@ -17,11 +17,14 @@ import { tmpdir } from 'node:os'
   const REASON_A = 'heading order mismatch in review-v1.md'
   const JUDGE_C = 'disapprove-then-fixed: fixed_commit rendered as the closing sentence text'
   const NOTE_B = 'nothing unusual, quick approve'
+  const REASON_VOIDED = 'disapprove stamped against the wrong round, repaired with a void'
   const STUB = '[ ] lintable? -> add a check to doc-gate.mjs + a fixture to run-tests.mjs'
   writeFileSync(join(dir, 'worklog.jsonl'), [
     { t: '2019-01-01T10:00:00+03:00', ev: 'doc-gate', verdict: 'disapprove', round: 1, reason: REASON_A },
+    { t: '2019-01-05T10:00:00+03:00', ev: 'doc-gate', verdict: 'disapprove', round: 4, reason: REASON_VOIDED },
     { t: '2019-01-15T09:00:00+03:00', ev: 'doc-gate', verdict: 'approve', round: 2, note: NOTE_B },
     { t: '2019-01-20T11:00:00+03:00', ev: 'doc-gate', round: 9, lint: 'clean', judge: JUDGE_C, auditor: '0 errors' },
+    { t: '2019-01-21T12:00:00+03:00', ev: 'void', of: { ev: 'doc-gate', t: '2019-01-05T10:00:00+03:00', reason: REASON_VOIDED } },
   ].map(e => JSON.stringify(e)).join('\n') + '\n')
 
   {
@@ -29,6 +32,7 @@ import { tmpdir } from 'node:os'
     check('gate-miner exits 0 with no --since', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
     check('both disapprovals print their full reason/judge text', r.out.includes(REASON_A) && r.out.includes(JUDGE_C), r.out.trim())
     check('the approve event does not print', !r.out.includes(NOTE_B), r.out.trim())
+    check('a voided disapproval is neither printed nor counted', !r.out.includes(REASON_VOIDED), r.out.trim())
     check('default --since (30 days before the newest event seen) counts both', r.out.includes('total disapprovals: 2'), r.out.trim())
     check('the summary breaks the count down per target', r.out.includes(`${target}: 2`), r.out.trim())
     const stubCount = r.out.split(STUB).length - 1

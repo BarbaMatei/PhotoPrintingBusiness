@@ -128,5 +128,9 @@ closed: 2026-07-15
   check('auditor refuses an overlap cluster with no protocol block event (R1)', r.out.includes('PPW-9212, PPW-9213 share a stateful surface') && r.out.includes('no protocol-written event covers them'), 'no R1 missing-protocol refusal in the output')
   check('auditor refuses a protocol written after the cluster was fixed (R1 spec-theatre)', r.out.includes('PPW-9214, PPW-9215') && r.out.includes('timestamped after the cluster\'s first finding event'), 'no R1 ordering refusal in the output')
   check('auditor accepts a round carrying all four kinds of hand-back evidence', !r.out.includes('922-gates-good resolution-v1.md:'), r.out.split('\n').find(l => l.includes('922-gates-good resolution-v1.md:')) ?? '')
+  // A mis-stamp repaired with a void is erased for every reader, so it cannot gate hand-back:
+  // 954's early finding event would otherwise put its cluster's protocol after the first fix.
+  check('a voided mis-stamp no longer trips the R1 ordering gate',
+    !r.out.includes('954-voided-misstamp resolution-v1.md:'), r.out.split('\n').find(l => l.includes('954-voided-misstamp resolution-v1.md:')) ?? '')
   check('auditor grandfathers resolved rounds from before the 2026-08-28 cut-off', !r.out.includes('901-good-target resolution-v1.md:') && !r.out.includes('901-good-target: resolved without'), r.out.split('\n').find(l => l.includes('901-good-target resolution')) ?? '')
 }

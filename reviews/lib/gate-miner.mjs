@@ -14,6 +14,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { live } from './wl.mjs'
 
 const TARGETLESS = new Set(['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'])
 // The field that trips the match isn't necessarily the one worth printing — priority differs.
@@ -33,12 +34,13 @@ function listTargets(reviewsDir, filters) {
   return filters.length ? out.filter(t => filters.some(f => t.name.includes(f))) : out
 }
 
+// live() drops what a void erased: a voided mis-stamp is not a disapproval anyone must triage.
 function readWorklog(dir) {
   const p = join(dir, 'worklog.jsonl')
   if (!existsSync(p)) return []
-  return readFileSync(p, 'utf8').split(/\r?\n/).filter(l => l.trim())
+  return live(readFileSync(p, 'utf8').split(/\r?\n/).filter(l => l.trim())
     .map(l => { try { return JSON.parse(l) } catch { return null } })
-    .filter(Boolean)
+    .filter(Boolean))
 }
 
 const isDisapproval = e => MATCH_FIELDS.some(k => typeof e[k] === 'string' && /disapprove/i.test(e[k]))

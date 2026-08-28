@@ -76,9 +76,8 @@ function deepEqual(a, b) {
   return ak.length === bk.length && ak.every(k => deepEqual(a[k], b[k]))
 }
 
-// Every reader of the log has to agree on what a void erased, or the stamper and the renderer
-// disagree about which round is open after a repair.
-function live(events) {
+// Every reader of the log drops what a void erased, or two readers disagree after a repair.
+export function live(events) {
   const voids = events.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
   return events.filter(e => e.ev !== 'void' && !voids.some(v => Object.keys(v.of).every(k => deepEqual(e[k], v.of[k]))))
 }

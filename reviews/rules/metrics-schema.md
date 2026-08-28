@@ -103,8 +103,11 @@ are validated strictly against v3.
 **The worklog** — `reviews/<target>/worklog.jsonl`, append-only, one JSON event per line,
 each with `t` (ISO timestamp) and `ev`. Written **at the moment events happen** by whoever
 drives them: the `/fix-review` skill during fix rounds (`round-start`, `triage-done`,
-`gate-open`/`gate-closed`, `check-dispatched`/`check-returned`, `test-run`, `finding`,
-`micro-review-dispatched`/`-returned`, `round-end`), the loop-driver around passes
+`gate-open`/`gate-closed`, `protocol-written`, `check-dispatched`/`check-returned`, `test-run`,
+`finding`, `round-review-dispatched`/`-returned`, `test-audit-dispatched`/`-returned`,
+`round-end` — the per-cluster `micro-review-dispatched`/`-returned` pair was retired on
+2026-08-28 by the round-scope review; the stamper still accepts it so old logs stay
+readable), the loop-driver around passes
 (`pass-launch`, `pass-records-done`) and owner gates. It is the crash-safe evidence trail
 and the input `reviews/lib/render-records.mjs` computes runtime from.
 
@@ -116,12 +119,13 @@ evidence events of the 2026-08-28 audit (`protocol-written`,
 `test-audit-dispatched`/`-returned`) and two events the renderer reads:
 
 - `void` — `{"ev":"void","of":{...}}`. This is how a mis-stamped event is repaired; the log
-  stays append-only. Three readers drop the events `of` matches: the stamper, the renderer and
-  the speed report. Two do not: the auditor (`records-auditor.mjs`, its hand-back gates
-  included) and the lint miner (`gate-miner.mjs`) read the log unfiltered. The restructure phase
-  consolidates them; until then a void repairs the rendered records, not what the auditor sees.
+  stays append-only. **Every reader drops the events `of` matches** — the stamper, the renderer,
+  the speed report, the auditor (`records-auditor.mjs`, its hand-back gates included) and the
+  lint miner (`gate-miner.mjs`) all read the log through the stamper's `live()` filter, so a
+  void repairs what every one of them sees.
 - `verify-result` — `{"ev":"verify-result","id":"PPW-<n>","verdict":"held|...","commit":"..."}`,
-  appended by `reviews/lib/verify-fixes.mjs` as each row finishes. `commit` is the commit the
+  appended by `reviews/lib/verify-fixes.mjs`, which buffers them and flushes them once after the
+  last row (never row by row, so an aborted run leaves no half-written verdicts). `commit` is the commit the
   row's fix was proved at; the renderer writes it into the ledger row's Affirmed cell. The run
   buffers its events and flushes them after the last row, so it ends with a worklog the driver
   commits.
