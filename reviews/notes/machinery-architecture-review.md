@@ -8,6 +8,69 @@ charter: machinery-restructure-plan.md
 
 # Review machinery — architecture review (phase 7a)
 
+## In plain words — read this first
+
+This document is the stock-taking you asked for before we rebuild the machine's structure.
+This section says everything in plain language; the numbered sections after it are the same
+content in precise form, for the agents that will do the work. You only need this section
+to answer the six questions at the end.
+
+**What the machine is today.** Seven different jobs grew up inside one folder, all called
+"the review machinery": finding problems (Review) · proving a fix really fixed something
+(Verify) · doing the fixing (Fix) · deciding what happens next (Drive) · keeping the books
+(Records) · measuring the process itself (Measure) · blocking bad commits (Enforce). Because
+they share one name and one folder, nobody — human or agent — can see where one job ends and
+the next begins.
+
+**What we found when we took stock.**
+
+- The same small routine is written in up to six places (24 cases counted). Fix one copy and
+  the other copies stay wrong. This caused real bugs this month.
+- Sixteen rules are written in more than one place — in the code and again in the guides.
+  Three of the copies disagree with each other right now.
+- Thirteen pieces of "tolerance" code exist only to accept old record formats that can never
+  occur again. About ninety lines do nothing but tolerate history.
+- Two tools we built this month are connected to nothing (nobody calls them), and one older
+  tool reads a file that has never existed.
+- The tests grew the same way: about forty-five test folders where six would do, and a
+  couple of test blocks pasted in twice. The safety suite takes 2–3 minutes; it could run
+  in under one.
+
+**What we propose (the restructure itself, phase 7b).** Sort every piece into exactly one of
+the seven jobs. Give each job its own folder, named for what it does. Move every routine and
+every rule to exactly one home; the guides then quote the code instead of restating it — and
+a new check fails the test suite whenever a guide and the code drift apart, which is the
+disease that keeps causing rework. Delete what nothing uses. All of it in small steps, with
+the full safety suite green after every step, so nothing hard-won is lost.
+
+**The six decisions that are yours** (details in section 9; answer like "1: yes, 2: …"):
+
+1. **The redesign brake.** When two fix rounds in a row keep causing new serious problems in
+   the same area, the machine refuses a third patch and asks you for a redesign of that
+   component. The guide used to claim this brake applies to every path into a fix round; the
+   code applies it only on some paths. The guide has been corrected to match the code — the
+   open question is whether the code itself should brake on every path. *Recommendation:
+   decide after one real project run; the narrow brake has not misfired yet.*
+2. **Old closed projects.** Keep re-auditing their bookkeeping forever, or only keep the
+   check that no defect number is ever reused? *Recommendation: keep only the number check —
+   the closed books never change, and dropping the rest deletes most of the tolerance code.*
+3. **The lesson-mining tool** was built, never fed, never run. Delete it and rebuild when the
+   work is actually scheduled? *Recommendation: delete — the idea itself stays written down.*
+4. **The AI proofreader** that checks wording currently also reviews internal notes you never
+   read. Limit it to the pages written for your eyes? *Recommendation: wait for one real run
+   to see what it actually catches elsewhere, then cut.*
+5. **The comment scan** that counts review-ticket numbers left in code comments has found
+   zero for a month. Move it into the commit gate, or delete it? *Recommendation: move it —
+   it costs nothing there.*
+6. **Two stale test folders** for the skills point at files that no longer exist. Delete them
+   after copying their last results into the notes? *Recommendation: yes.*
+
+Standing recommendation on top of all six: run **one real feature** through the rebuilt loop
+before the deletions become final — the run shows which gates fire and what is truly dead,
+so we cut on evidence instead of reading.
+
+---
+
 Read-only inventory of everything under `reviews/`, the four review skills and the hook, at
 branch tip `ee828e6` (loop-speed phases 1–5 landed). Every piece gets one of the seven systems (Review · Verify · Fix · Drive ·
 Records · Measure · Enforce) and a verdict. The suite measured today: 565 assertions in 13 files,
