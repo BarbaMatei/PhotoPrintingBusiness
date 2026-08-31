@@ -27,8 +27,8 @@ export const NEXT = {
 
 export const POLICY_NEXT = Object.values(NEXT)
 
-// One row per gate kind, in the order the router can reach them: what the router means by it and
-// what the written delegation does with it. `delegated: false` = the policy stops on this kind.
+// One row per gate kind — the three with a written delegation first, then the four that stop an
+// unattended run: what the router means by it and what the policy does with it.
 export const GATE_DOCS = [
   { kind: GATES.loopClose, exit: 2, router: 'certification passed and no post-cert fix round is pending', policy: `auto — \`${NEXT.closeLoop}\` on the standing approval`, delegated: true },
   { kind: GATES.deltaWorthiness, exit: 3, router: 'the latest line is a clean verification', policy: `auto — \`${NEXT.deltaDiscovery}\` when the round fixed a 🔴, else the certification answer`, delegated: true },

@@ -255,11 +255,11 @@ the end.
    <GATE_KIND>` — in an unattended run, an exit 3 always goes to the policy this way and
    is never hand-routed from the README table (step 1's manual fallback does not apply
    here). `ACTION: auto` → append `gate-parked` (`{kind, default, reason}`) and take the
-   printed `NEXT`. The policy's whole vocabulary is `fix round` · `delta discovery` ·
-   `lens-coverage discovery (<lens>)` · `certification (pair)` · `certification (single)` ·
-   `close the loop`, and every one of them is executed exactly like a router answer (back to
-   2) — including `fix round`, which is how the policy answers a pre-certification sweep of
-   open 🟠, and `lens-coverage discovery (<lens>)`, the lean full-scope pass on one owed lens.
+   printed `NEXT`. The policy's whole answer vocabulary is the generated list under
+   "Unattended runs" in reviews/README.md, and every answer there is executed exactly like a
+   router answer (back to 2) — including `fix round`, which is how the policy answers a
+   pre-certification sweep of open 🟠, and `lens-coverage discovery (<lens>)`, the lean
+   full-scope pass on one owed lens.
    `close the loop` executes section 6's close sequence — the standing approval is the owner's
    word it requires. `ACTION: stop` → end the run with the gate's question in the report; a
    `design-pass` gate always stops, as does any gate override logged after the run started.
