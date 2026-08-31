@@ -4,7 +4,7 @@ target: 930-batch-non-convergent
 version: 2
 answers: review-v2.md
 status: resolved
-fixed_commit: ddd939
+fixed_commit: ddd9399
 ---
 
 # Resolution v2 — 930-batch-non-convergent
@@ -13,8 +13,8 @@ fixed_commit: ddd939
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-9307 | fixed | `ddd939` | Second round. |
-| PPW-9308 | fixed | `ddd939` | Second round. |
+| PPW-9307 | fixed | `ddd9399` | Second round. |
+| PPW-9308 | fixed | `ddd9399` | Second round. |
 
 ## Scope
 

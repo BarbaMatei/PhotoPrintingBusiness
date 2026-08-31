@@ -11,12 +11,13 @@ export const QUEUE_THRESHOLD = 3
 
 // The ledger's open work by severity, or null when the target has no ledger at all — a caller
 // with no ledger falls back to the metrics tally, which is a different (weaker) question.
-// `rows`/`idRows` let a caller report the rows it could not parse: a row the router cannot read
-// can only make the loop quieter, so the gap is never silent.
+// `parsedRows`/`idRows` let a caller report the rows it could not parse: a row the router cannot
+// read can only make the loop quieter, so the gap is never silent. Both are counts — the row
+// objects themselves stay behind records/ledger.mjs, which is the only reader of the row shape.
 export function openLedger(dir) {
   const led = readLedger(join(dir, 'ledger.md'))
   if (!led) return null
-  return { high: openIds(led.rows, '🔴'), medium: openIds(led.rows, '🟠'), rows: led.rows.length, idRows: led.idRows }
+  return { high: openIds(led.rows, '🔴'), medium: openIds(led.rows, '🟠'), parsedRows: led.rows.length, idRows: led.idRows }
 }
 
 export const isBatch = medium => medium.length >= QUEUE_THRESHOLD

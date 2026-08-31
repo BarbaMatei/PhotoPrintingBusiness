@@ -3,7 +3,7 @@ type: review
 target: 931-sweep-non-convergent
 version: 4
 supersedes: null
-commit: ddd94a
+commit: ddd949a
 branch: fixture/gate-tests
 pass-type: delta-discovery
 date: 2026-07-07

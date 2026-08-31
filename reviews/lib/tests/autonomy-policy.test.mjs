@@ -68,6 +68,10 @@ for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '929-armed-non-convergent', 'decide', 'certification-go-ahead'])
   check('policy stops rather than arming a fix round on a non-convergent component',
     r.out.includes('ACTION: stop') && r.out.includes('"payments"'), r.out.trim())
+  // The stop is the owner's whole report in an unattended run, so it must say what is waiting:
+  // an open blocker and one queued medium must not read the same.
+  check('the stop carries the work that was waiting behind it, ids and severity included',
+    r.out.includes('waiting behind it: the loop is armed — 1 open 🔴 (PPW-9291)'), r.out.trim())
 }
 {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '918-open-blocker', 'decide', 'certification-go-ahead'])

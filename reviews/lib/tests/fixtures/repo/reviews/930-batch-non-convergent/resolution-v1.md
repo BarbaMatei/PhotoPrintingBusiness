@@ -4,7 +4,7 @@ target: 930-batch-non-convergent
 version: 1
 answers: review-v1.md
 status: resolved
-fixed_commit: ddd938
+fixed_commit: ddd9398
 ---
 
 # Resolution v1 — 930-batch-non-convergent
@@ -13,9 +13,9 @@ fixed_commit: ddd938
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-9304 | fixed | `ddd938` | First round. |
-| PPW-9305 | fixed | `ddd938` | First round. |
-| PPW-9306 | fixed | `ddd938` | First round. |
+| PPW-9304 | fixed | `ddd9398` | First round. |
+| PPW-9305 | fixed | `ddd9398` | First round. |
+| PPW-9306 | fixed | `ddd9398` | First round. |
 
 ## Scope
 

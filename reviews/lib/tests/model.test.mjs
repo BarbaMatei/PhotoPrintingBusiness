@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { newest, resolveDir, targetDirs, versions } from '../model/target.mjs'
 import { covers, lenientSpans, REFUSED, short, sliceSpans, spanOf, strictSpans } from '../model/spans.mjs'
+import { convergenceCheck } from '../model/convergence.mjs'
 import { repoRoot, takeRoot } from '../cli/args.mjs'
 import { REPO, REVIEWS } from '../records/schema.mjs'
 
@@ -179,4 +180,38 @@ import { REPO, REVIEWS } from '../records/schema.mjs'
   const c = takeRoot(['038-039', '--root'])
   check('a trailing --root with no value reads as no root, and swallows nothing',
     c.root === null && JSON.stringify(c.rest) === JSON.stringify(['038-039']), JSON.stringify(c))
+}
+
+// ---------- model/convergence.mjs: the brake's edges ----------
+// Every fix-round answer in both drivers consults the brake, so its decision edges are asserted
+// here directly rather than only through whichever fixture happens to exercise one of them.
+{
+  const fix = (round, fixed, notes = '') => ({ type: 'fix-round', round, findings: { fixed }, tests: { invocations: 1 }, notes })
+  const blind = findings => ({ type: 'delta-discovery', lenses: ['correctness'], findings })
+  const seed = (round, area) => ({ f: 'F1', d: 'PPW-1', new: true, sev: 'high', seed_round: round, ...(area ? { area } : {}) })
+
+  check('one substantive round is not two, so the brake has nothing to say',
+    convergenceCheck([fix(1, 3), blind([seed(1, 'payments')])]) === null, 'expected null')
+  check('a round that fixed nothing is not substantive, so it cannot be one of the two',
+    convergenceCheck([{ type: 'fix-round', round: 1, findings: { fixed: 0 }, tests: { invocations: 4 } }, fix(2, 1)]) === null, 'expected null')
+
+  // A seeded finding with no area word cannot be named in a design pass, so it never brakes one.
+  const unstated = convergenceCheck([fix(1, 1), blind([seed(1)]), fix(2, 1), blind([seed(2)])])
+  check('a seed with no area never brakes, however high the rate',
+    unstated.nonConvergent === false && unstated.area === null && unstated.s1 === 1 && unstated.s2 === 1, JSON.stringify(unstated))
+
+  const capped = convergenceCheck([fix(1, 1), blind([seed(1, 'payments')]), fix(2, 1, 'design-pass:payments'), blind([seed(2, 'payments')])])
+  check('the component stays non-convergent once its one design pass has run — the cap only lifts the gate',
+    capped.nonConvergent === true && capped.area === 'payments' && capped.capped === true, JSON.stringify(capped))
+  const otherArea = convergenceCheck([fix(1, 1), blind([seed(1, 'payments')]), fix(2, 1, 'design-pass:uploads'), blind([seed(2, 'payments')])])
+  check('a design pass recorded for another component does not cap this one',
+    otherArea.nonConvergent === true && otherArea.capped === false, JSON.stringify(otherArea))
+
+  // The shrink warning and the rate gate are separate readings of the same pair.
+  const growing = convergenceCheck([fix(1, 2), fix(2, 3)])
+  check('rounds that are not shrinking are reported even when nothing seeded — s = 0 on both',
+    growing.notShrinking === true && growing.nonConvergent === false && growing.s1 === 0 && growing.s2 === 0, JSON.stringify(growing))
+  const shrinking = convergenceCheck([fix(1, 3), blind([seed(1, 'payments')]), fix(2, 2), blind([seed(2, 'payments')])])
+  check('a shrinking pair still brakes when both rates clear the threshold',
+    shrinking.notShrinking === false && shrinking.nonConvergent === true, JSON.stringify(shrinking))
 }

@@ -3,7 +3,7 @@ type: review
 target: 930-batch-non-convergent
 version: 1
 supersedes: null
-commit: ddd937
+commit: ddd9397
 branch: fixture/gate-tests
 pass-type: discovery
 date: 2026-07-01

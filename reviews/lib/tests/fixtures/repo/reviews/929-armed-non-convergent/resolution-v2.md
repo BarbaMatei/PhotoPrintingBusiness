@@ -4,7 +4,7 @@ target: 929-armed-non-convergent
 version: 2
 answers: review-v2.md
 status: resolved
-fixed_commit: ddd929
+fixed_commit: ddd9299
 ---
 
 # Resolution v2 — 929-armed-non-convergent
@@ -13,8 +13,8 @@ fixed_commit: ddd929
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-9297 | fixed | `ddd929` | Second round. |
-| PPW-9298 | fixed | `ddd929` | Second round. |
+| PPW-9297 | fixed | `ddd9299` | Second round. |
+| PPW-9298 | fixed | `ddd9299` | Second round. |
 
 ## Scope
 

@@ -125,6 +125,10 @@ for (const [target, row, reason] of [
     r.code === 2 && r.out.includes('GATE_KIND: design-pass') && !r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
   check(`the braked ${row} row still states the row it matched and names the component and both rounds`,
     r.out.includes(reason) && r.out.includes('"payments"') && r.out.includes('rounds r1 and r2'), r.out.trim())
+  // A GATE line is read on its own at the owner gate, so it names the work it refuses.
+  const gate = r.out.split('\n').find(l => l.startsWith('GATE:')) ?? ''
+  check(`the ${row} row's gate line names the trigger it refuses, not only the design pass`,
+    gate.includes('The fix round it refuses was triggered by:') && gate.includes(reason.replace('ROUTER: ', '')), gate || r.out.trim())
 }
 for (const [target, row] of [['918-open-blocker', 'armed'], ['916-medium-batch', 'batch'], ['917-sweep-before-cert', 'sweep']]) {
   const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, target])

@@ -3,7 +3,7 @@ type: review
 target: 929-armed-non-convergent
 version: 3
 supersedes: null
-commit: ddd929
+commit: ddd9299
 branch: fixture/gate-tests
 pass-type: delta-discovery
 date: 2026-07-05

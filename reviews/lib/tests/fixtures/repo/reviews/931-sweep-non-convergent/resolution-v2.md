@@ -4,7 +4,7 @@ target: 931-sweep-non-convergent
 version: 2
 answers: review-v2.md
 status: resolved
-fixed_commit: ddd949
+fixed_commit: ddd9499
 ---
 
 # Resolution v2 — 931-sweep-non-convergent
@@ -13,8 +13,8 @@ fixed_commit: ddd949
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-9317 | fixed | `ddd949` | Second round. |
-| PPW-9318 | fixed | `ddd949` | Second round. |
+| PPW-9317 | fixed | `ddd9499` | Second round. |
+| PPW-9318 | fixed | `ddd9499` | Second round. |
 
 ## Scope
 

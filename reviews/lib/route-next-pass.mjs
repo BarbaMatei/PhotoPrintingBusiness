@@ -128,7 +128,9 @@ function routeFixRound(reason) {
     if (c.nonConvergent) {
       if (!c.capped) {
         say(`ROUTER: rounds r${c.r1.round} and r${c.r2.round} both seeded serious findings in "${c.area}" at s ≥ 0.3 (s=${c.s1.toFixed(2)}, ${c.s2.toFixed(2)}) — patching declared non-convergent for that component; further fix rounds there are refused (convergence rule, 2026-08-28).`)
-        finish(2, null, `design pass for "${c.area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${c.area}; at most one per component per loop — owner decision`, 'design-pass')
+        // The gate names the work it refuses: a gate line read on its own must say what is waiting.
+        const trigger = reason.replace(/^ROUTER: /, '').replace(/\.$/, '')
+        finish(2, null, `design pass for "${c.area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${c.area}; at most one per component per loop — owner decision. The fix round it refuses was triggered by: ${trigger}`, 'design-pass')
       }
       say(`NOTE: rounds r${c.r1.round}/r${c.r2.round} still seed "${c.area}" at s ≥ 0.3, but its one design pass per loop already ran — the fix round proceeds; raise it with the owner if it seeds again.`)
     }
@@ -149,7 +151,7 @@ const openHigh = led ? led.high : []
 const openMedium = led ? led.medium : []
 if (led) {
   say(`STATE: ledger open 🔴 ${openHigh.length} · open 🟠 ${openMedium.length} (queue threshold ${QUEUE_THRESHOLD})`)
-  const unread = led.idRows - led.rows
+  const unread = led.idRows - led.parsedRows
   if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
 }
 
