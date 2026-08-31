@@ -18,14 +18,62 @@ import { meta as resolutionMeta, tallies as resolutionTallies } from './resoluti
 import { live, readLines as readWorklogLines } from './worklog.mjs'
 import { readLines as readMetricsLines } from './metrics.mjs'
 
+// The metrics line's field lists, in the order rules/metrics-schema.md prints them: the key sets
+// below are derived from them, so a field this validator accepts and a row in the schema table are
+// the same fact. The Type and Meaning cells are prose for cli/docs-sync.mjs and nothing reads them.
+export const V2_FIELDS = [
+  { cell: '`target`', type: 'string', meaning: 'the reviewed unit, e.g. `"043-cloud-storage-provider"`' },
+  { cell: '`pass`', type: 'int', meaning: 'review version (matches `review-v<n>.md`); a certification **pair** writes two lines with the same `pass` and subtypes A/B' },
+  { cell: '`type`', type: '`"discovery"` \\| `"delta-discovery"` \\| `"verification"`', meaning: 'certification passes are `discovery` (they are full-manifest passes and belong on the decay curve)' },
+  { cell: '`subtype`', type: '`"certification-pair-A"` \\| `"certification-pair-B"` \\| `"certification-single"` \\| absent', meaning: 'discovery lines only' },
+  { cell: '`date`', type: 'ISO date', meaning: 'when the pass ran' },
+  { cell: '`commit`', type: 'string', meaning: 'the commit reviewed' },
+  { cell: '`code_tip`', type: 'string, optional', meaning: 'tree tip when it differs from the reviewed commit' },
+  { cell: '`delta_base`', type: 'string, delta passes', meaning: 'base commit of the reviewed diff' },
+  { cell: '`lenses`', type: 'array of lens keys \\| null', meaning: 'keys only (e.g. `"correctness"`), never prose' },
+  { cell: '`verdict`', type: 'string \\| null', meaning: 'the review\'s verdict' },
+  { cell: '`outcome`', type: '`"certified"` \\| `"not-certified"` \\| absent', meaning: 'certification lines only' },
+  { cell: '`mediums_open_at_close`', type: 'int', meaning: '**required when `outcome: "certified"`** — 🟠 count not `fixed`/`verified` at close (mirrors the index-row rule, calibration 2026-07-29)' },
+  { cell: '`new_findings`', type: '`{high, medium, low, cleanup}`', meaning: '**new** problems this pass named (info items count as `cleanup`, note it)' },
+  { cell: '`findings`', type: 'array', meaning: '**required on strict discovery/delta lines** — one entry per canonical finding, see below. **Optional on verification lines** that name new defects: one entry per new defect, carrying only `{d, new, sev, fix_generated, sev_delta?}` — this is where fix lineage gets counted, since fix-caused defects surface mainly in verifications' },
+  { cell: '`refinds_identity`', type: 'int', meaning: 'same problem as an earlier finding (reconciler judgment)' },
+  { cell: '`reraises_of_decided`', type: 'int', meaning: 'findings re-raising an accepted wont-fix / deferral / dismissal' },
+  { cell: '`refuted`', type: 'int', meaning: 'candidate findings recorded as false positives this pass' },
+  { cell: '`deferrals_upheld`', type: 'int, optional', meaning: 'prior terminal decisions re-affirmed this pass (canonical name)' },
+  { cell: '`disputed`', type: 'historical only', meaning: 'trace-first verification (2026-07-27) can no longer produce it' },
+  { cell: '`verified`', type: 'int', meaning: 'findings flipped to `verified` this pass' },
+  { cell: '`reopened`', type: 'int', meaning: 'findings reopened this pass' },
+  { cell: '`tests`', type: '`{passed, failed}` \\| null', meaning: '**combined** suites (backend + frontend) at the reviewed commit; per-suite splits go in `notes`' },
+  { cell: '`cost`', type: '`{agents, tokens, agents_by_stage?}`', meaning: '`tokens` = output tokens the pass\'s workflow(s) reported (never `subagent_tokens`); `agents_by_stage` keys: `lenses, dedup, skeptics_guard, skeptics_trace, reraise_skipped, budget_skipped, approach_checks` — copy from the discovery script\'s `_canonical` line; `approach_checks` counts the synthesis-time pre-checks (v3)' },
+  { cell: '`runtime`', type: '`{started, ended}`, v3', meaning: 'ISO timestamps from the loop-driver\'s `pass-launch` / `pass-records-done` worklog stamps' },
+  { cell: '`notes`', type: 'string', meaning: 'anything a future analysis will wish it knew' },
+]
+
+export const V3_FIX_FIELDS = [
+  { cell: '`target` / `type` / `date`', type: 'string / `"fix-round"` / ISO date', meaning: 'as for passes' },
+  { cell: '`round`', type: 'int', meaning: 'matches `resolution-v<n>.md` (fix rounds have no `pass`)' },
+  { cell: '`base_commit`', type: 'string', meaning: 'the reviewed commit the round answers (review frontmatter)' },
+  { cell: '`fixed_commit`', type: 'string \\| null', meaning: 'the resolution\'s `fixed_commit` (null while `in-progress`)' },
+  { cell: '`findings`', type: '`{fixed, wont_fix, deferred, disputed, false_positive, open}`', meaning: 'counts from the resolution\'s `## Findings` body table (`in-progress` counts as `open`; `backlog` counts as `deferred`)' },
+  { cell: '`tests`', type: '`{invocations, red_runs, green_runs, final: {passed, failed}}`', meaning: 'from `test-run` events; `final` from the last `kind:final` event, null if none' },
+  { cell: '`approach_checks`', type: '`{pre_cleared_consumed, run, tokens}`', meaning: 'review-time verdicts used vs checks this round ran (`check-*` events); `tokens` null if unreported' },
+  { cell: '`micro_reviews`', type: '`{count, follow_up_fixes}`', meaning: 'per-cluster micro-reviews and the extra fixes they caused' },
+  { cell: '`cost`', type: '`{agents, tokens}`', meaning: 'subagents this round dispatched; tokens null unless known' },
+  { cell: '`runtime`', type: '`{started, ended, active_s, blocked_s, idle_s, blocked: [{reason, s}]}`', meaning: 'see derivation below' },
+  { cell: '`notes`', type: 'string', meaning: 'e.g. `pilot`, deviations, what broke' },
+]
+
+// Every key a field row names, whole-cell backticks only.
+const keysOf = rows => new Set(rows.flatMap(r => [...r.cell.matchAll(/`([a-z_]+)`/g)].map(m => m[1])))
+
 const TYPES = new Set(['discovery', 'delta-discovery', 'verification'])
 const SUBTYPES = new Set(['certification-pair-A', 'certification-pair-B', 'certification-single'])
 const SEVS = new Set(['high', 'medium', 'low', 'cleanup'])
 const VERDICTS = new Set(['confirmed', 'plausible', 'refuted', 're-raise', 'unverified-cleanup', 'unverified-low', 'unverified-over-budget'])
-const TOP_KEYS = new Set(['target', 'pass', 'type', 'subtype', 'date', 'commit', 'code_tip', 'delta_base', 'lenses', 'verdict', 'outcome', 'mediums_open_at_close', 'new_findings', 'findings', 'refinds_identity', 'reraises_of_decided', 'refuted', 'disputed', 'deferrals_upheld', 'verified', 'reopened', 'tests', 'cost', 'runtime', 'notes'])
+const TOP_KEYS = keysOf(V2_FIELDS)
 const STAGE_KEYS = new Set(['lenses', 'dedup', 'skeptics_guard', 'skeptics_trace', 'reraise_skipped', 'budget_skipped', 'approach_checks'])
 const LEGACY_TOP = new Set(['base', 'certified', 'deferred_reaffirmed', 'disputed_upheld'])
-const FIX_KEYS = new Set(['target', 'round', 'type', 'date', 'base_commit', 'fixed_commit', 'findings', 'tests', 'approach_checks', 'micro_reviews', 'cost', 'runtime', 'notes'])
+const FIX_KEYS = keysOf(V3_FIX_FIELDS)
 const FIX_TALLY_KEYS = ['fixed', 'wont_fix', 'deferred', 'disputed', 'false_positive', 'open']
 const RUNTIME_KEYS = new Set(['started', 'ended', 'active_s', 'blocked_s', 'idle_s', 'blocked'])
 

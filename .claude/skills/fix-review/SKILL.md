@@ -105,6 +105,7 @@ to be reconstructed from commits must stay impossible — and it is the source t
 the runtime metric read. Never edit a past line: a stamp that was wrong is retracted by a
 `void` event naming it, never by rewriting history.
 
+<!-- generated:fixer-events -->
 | Event | When | Extra fields |
 |---|---|---|
 | `round-start` / `round-end` | first action / after hand-back summary | `round` |
@@ -116,6 +117,7 @@ the runtime metric read. Never edit a past line: a stamp that was wrong is retra
 | `finding` | a finding reaches a status | `id`, `status`, `commit` |
 | `round-review-dispatched` / `round-review-returned` | once, when the last cluster's commits land | `round`, on return `found` |
 | `test-audit-dispatched` / `test-audit-returned` | once, alongside the round review | `round`, on return `verdict` |
+<!-- /generated:fixer-events -->
 
 Every field named above is one `wl.mjs` refuses the event without — the stamper prints
 `ERROR` and appends nothing, so a stamp you thought you took is simply missing. `round` must

@@ -278,6 +278,18 @@ the end.
    type.
 6. Router prints `loop CLOSED` → the run is done; close it out.
 
+<!-- generated:gate-kinds -->
+| Gate kind | Router exit | The router means | The written policy answers |
+|---|---|---|---|
+| `loop-close` | 2 | certification passed and no post-cert fix round is pending | auto — `close the loop` on the standing approval |
+| `delta-worthiness` | 3 | the latest line is a clean verification | auto — `delta discovery` when the round fixed a 🔴, else the certification answer |
+| `certification-go-ahead` | 2 | loop quiet, nothing open, lens coverage complete | auto — `certification (pair)` or `certification (single)`, unless open work or a convergence blocker answers first |
+| `design-pass` | 2 | two consecutive rounds seeded the same component at s ≥ 0.3 | stop — reimplementing a component is the owner's call |
+| `no-metrics` | 3 | review files exist but there is no `metrics.jsonl` | stop — no written delegation |
+| `records-broken` | 3 | `metrics.jsonl` carries no usable pass line | stop — no written delegation |
+| `no-row-matched` | 3 | no router row matched mechanically | stop — no written delegation |
+<!-- /generated:gate-kinds -->
+
 **Pass execution — always in subagents in this mode** (the driver only routes, records,
 and reports; subagents return a summary of at most 20 lines, and state is re-read from
 the records, never from the subagent's prose):

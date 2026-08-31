@@ -62,6 +62,11 @@ certification and close included — as if the owner approved each step:
 The loop-driver skill owns the sequence; the fixer's side lives in the `/fix-review`
 skill's unattended variant.
 
+<!-- generated:policy-vocabulary -->
+The policy's whole answer vocabulary is `fix round` · `delta discovery` · `lens-coverage discovery (<lens>)` · `certification (pair)` · `certification (single)` · `close the loop` —
+each executed exactly like a router answer.
+<!-- /generated:policy-vocabulary -->
+
 ## Entry tiers — does a change get the loop at all?
 
 | Change touches… | Treatment |
@@ -76,6 +81,7 @@ Escalate upward on any serious finding; never de-escalate mid-loop.
 
 The state of `reviews/<target>/` decides the next pass — first matching row wins:
 
+<!-- generated:router-rows -->
 | State | Next pass |
 |---|---|
 | No `review-v1.md` | **Full discovery** |
@@ -96,6 +102,7 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | Loop quiet, no blind pass since the last substantive fix round | **Delta discovery** — a note and a gate refusal, not a routed row (below); that round's seed rate³ is unmeasured, and unmeasured is not quiet |
 | Loop quiet, nothing open, lens coverage complete | **Certification**² (owner gate) |
 | Certification quiet | **Certified** — verdict `approved`; loop done |
+<!-- /generated:router-rows -->
 
 **The reviewed unit.** A fix round and the verification of its fixes are one unit: the
 verification runs immediately at the round's tip, in the same driver invocation, and the unit

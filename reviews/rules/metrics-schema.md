@@ -35,6 +35,7 @@ node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 
 ## v2 fields (one JSON object per line; lines dated ≥ 2026-07-30 are validated strictly)
 
+<!-- generated:metrics-v2-fields -->
 | Field | Type | Meaning |
 |---|---|---|
 | `target` | string | the reviewed unit, e.g. `"043-cloud-storage-provider"` |
@@ -62,6 +63,7 @@ node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 | `cost` | `{agents, tokens, agents_by_stage?}` | `tokens` = output tokens the pass's workflow(s) reported (never `subagent_tokens`); `agents_by_stage` keys: `lenses, dedup, skeptics_guard, skeptics_trace, reraise_skipped, budget_skipped, approach_checks` — copy from the discovery script's `_canonical` line; `approach_checks` counts the synthesis-time pre-checks (v3) |
 | `runtime` | `{started, ended}`, v3 | ISO timestamps from the loop-driver's `pass-launch` / `pass-records-done` worklog stamps |
 | `notes` | string | anything a future analysis will wish it knew |
+<!-- /generated:metrics-v2-fields -->
 
 ### `findings[]` — the per-finding record (new in v2)
 
@@ -137,6 +139,7 @@ is `resolved`** — an in-progress round has no line; the worklog carries everyt
 any status without writing. In the same run the renderer also appends the round's index row and
 applies the ledger status flips (doc-contracts.md names these as its two mechanical writes):
 
+<!-- generated:metrics-v3-fix-fields -->
 | Field | Type | Meaning |
 |---|---|---|
 | `target` / `type` / `date` | string / `"fix-round"` / ISO date | as for passes |
@@ -150,6 +153,7 @@ applies the ledger status flips (doc-contracts.md names these as its two mechani
 | `cost` | `{agents, tokens}` | subagents this round dispatched; tokens null unless known |
 | `runtime` | `{started, ended, active_s, blocked_s, idle_s, blocked: [{reason, s}]}` | see derivation below |
 | `notes` | string | e.g. `pilot`, deviations, what broke |
+<!-- /generated:metrics-v3-fix-fields -->
 
 **Runtime derivation (declared convention, not precision):** `runtime` sums the round's paired
 `round-start`→`round-end` spans; time between spans belongs to records and gates and is counted

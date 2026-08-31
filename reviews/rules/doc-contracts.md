@@ -75,7 +75,7 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    name ("the backlog", "the ledger"); the vocabulary entry owns the path, and
    `lib/records/schema.mjs` owns it for scripts (a per-target folder comes from
    `lib/model/target.mjs`, never from a constant). Literal paths appear only in markdown
-   links (kept true by `lib/fix-links.mjs`), definitions, and commands.
+   links (kept true by `lib/cli/docs-sync.mjs`), definitions, and commands.
 5. **Append-only detail.** A ledger detail block never changes after creation,
    except new History lines. Status fields in the table may change.
 6. **Grandfathering cut-offs.** A new gate rule carries a dated cut-off, kept as
@@ -107,6 +107,7 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
 
 ## Size caps
 
+<!-- generated:size-caps -->
 | File | Cap |
 |---|---|
 | `summary-v<n>.md` | 60 lines of body |
@@ -114,6 +115,7 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
 | `resolution-v<n>.md` | 200 lines of body (the Findings table rows live here); `Note` cell ≤ 240 characters; each Decision ≤ 15 lines |
 | `ledger.md` detail block | 20 lines per defect; table cells one line; Status cell is the status word only |
 | `backlog.md` row | 1 table line |
+<!-- /generated:size-caps -->
 
 ## Vocabulary
 
@@ -270,6 +272,7 @@ render from.
 Since the 2026-08-28 cut-off it is also the hand-back evidence the auditor
 refuses `status: resolved` without:
 
+<!-- generated:handback-events -->
 - `protocol-written` (`round`, `cluster`, `ids`) — appended when a cluster's
   protocol block is written, **before** any of that cluster's `finding` events.
 - `check-dispatched` events carry `ids`: the `PPW-<n>` list the approach-check
@@ -280,6 +283,7 @@ refuses `status: resolved` without:
 - `test-audit-dispatched` / `test-audit-returned` (`round`, on return
   `verdict`) — the test-meaning check; required whenever the round ran a red
   test run.
+<!-- /generated:handback-events -->
 
 ### metrics.jsonl — schema `metrics-schema.md`
 
@@ -293,6 +297,7 @@ Audience: the owner and bolt-opening agents. One line per row, keyed by
 
 `Area` is one of these twelve words, lowercase, and nothing else:
 
+<!-- generated:areas -->
 | Area | Covers |
 |---|---|
 | `payments` | charging, webhooks, idempotency, invoices |
@@ -307,6 +312,7 @@ Audience: the owner and bolt-opening agents. One line per row, keyed by
 | `data` | EF, migrations, schema fidelity |
 | `tests` | test infrastructure: flakes, helpers, coverage gaps whose fix is test-only |
 | `records` | docs, memory-bank, process records |
+<!-- /generated:areas -->
 
 When two areas fit, pick the one where the fix would land, not the one where
 the symptom shows. A file path, a line number or a second area in this cell is a
