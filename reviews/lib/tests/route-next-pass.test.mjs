@@ -135,3 +135,45 @@ for (const [target, row] of [['918-open-blocker', 'armed'], ['916-medium-batch',
   check(`a convergent ${row} row still routes its fix round`,
     r.code === 0 && r.out.includes('NEXT: fix round') && !r.out.includes('GATE_KIND: design-pass'), `exit ${r.code}: ${r.out.trim()}`)
 }
+
+// ---------- the rows as data: the walk's seam ----------
+{
+  const { ROWS, COST, walkableRows } = await import('../drive/rows.mjs')
+  const { GATES, GATE_DOCS, POLICY_NEXT, NEXT } = await import('../drive/gates.mjs')
+  const kinds = ['row', 'guard', 'note', 'prose']
+  check('every row carries the README cells', ROWS.every(r => r.name && r.state && r.next),
+    ROWS.filter(r => !(r.name && r.state && r.next)).map(r => r.name).join(', '))
+  check('row names are unique', new Set(ROWS.map(r => r.name)).size === ROWS.length)
+  check('only the four implementation kinds exist', ROWS.every(r => kinds.includes(r.impl)),
+    ROWS.filter(r => !kinds.includes(r.impl)).map(r => `${r.name}: ${r.impl}`).join(', '))
+  check('a walked row has both a predicate and an answer',
+    walkableRows().every(r => typeof r.when === 'function' && typeof r.answer === 'function'),
+    walkableRows().filter(r => typeof r.when !== 'function' || typeof r.answer !== 'function').map(r => r.name).join(', '))
+  check('a row that is not walked carries no predicate',
+    ROWS.filter(r => r.impl !== 'row').every(r => !r.when && !r.answer),
+    ROWS.filter(r => r.impl !== 'row' && (r.when || r.answer)).map(r => r.name).join(', '))
+  // The walk is first-match-wins, so the order is the contract.
+  const walked = walkableRows().map(r => r.name)
+  check('the unit-records row is walked first', walked[0] === 'unit-records-pending', walked.join(' → '))
+  check('the certification row is walked last', walked.at(-1) === 'certification', walked.join(' → '))
+  check('the armed row outranks the batch and queued rows',
+    walked.indexOf('armed') < walked.indexOf('batch') && walked.indexOf('batch') < walked.indexOf('queued'), walked.join(' → '))
+  check('the design-pass row stays a guard — no row may outrank the convergence brake',
+    ROWS.find(r => r.name === 'design-pass').impl === 'guard')
+  check('every gate a row names is in the gate enum',
+    ROWS.filter(r => r.gate).every(r => Object.values(GATES).includes(r.gate)),
+    ROWS.filter(r => r.gate && !Object.values(GATES).includes(r.gate)).map(r => r.name).join(', '))
+  check('every gate kind is documented exactly once',
+    GATE_DOCS.length === Object.keys(GATES).length && new Set(GATE_DOCS.map(g => g.kind)).size === GATE_DOCS.length,
+    `${GATE_DOCS.length} docs rows vs ${Object.keys(GATES).length} kinds`)
+  check('only the gates with a written delegation are marked delegated',
+    GATE_DOCS.filter(g => g.delegated).map(g => g.kind).join(',') === [GATES.loopClose, GATES.deltaWorthiness, GATES.certificationGoAhead].join(','),
+    GATE_DOCS.filter(g => g.delegated).map(g => g.kind).join(','))
+  check('the policy vocabulary is the NEXT map', POLICY_NEXT.length === 6
+    && POLICY_NEXT.includes(NEXT.fixRound) && POLICY_NEXT.includes(NEXT.closeLoop), POLICY_NEXT.join(' · '))
+  // finish() prefix-matches its NEXT text against COST, so every key must start a real answer.
+  const answers = [...POLICY_NEXT, 'full discovery', 'verification (reviewed unit — render records once, after it)']
+  check('every cost key is the prefix of an answer the loop can print',
+    Object.keys(COST).every(k => answers.some(n => n.toLowerCase().startsWith(k))),
+    Object.keys(COST).filter(k => !answers.some(n => n.toLowerCase().startsWith(k))).join(' · '))
+}

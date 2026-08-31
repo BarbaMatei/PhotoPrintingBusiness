@@ -25,6 +25,7 @@ import { parse } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { fixedRows } from './records/resolution.mjs'
 import { readEvents } from './records/worklog.mjs'
+import { GATES, NEXT } from './drive/gates.mjs'
 
 const { root, rest } = takeRoot(process.argv.slice(2))
 const [target, cmd, gateKind] = rest
@@ -93,18 +94,18 @@ function sweepFirst() {
   if (c?.nonConvergent && !c.capped)
     stop(`rounds r${c.r1.round} and r${c.r2.round} both seeded serious findings in "${c.area}" at s ≥ 0.3 (s=${c.s1.toFixed(2)}, ${c.s2.toFixed(2)}) — patching is non-convergent there and the answer is a design pass, which reimplements a component against a new protocol spec: an owner decision with no written delegation — waiting behind it: ${reason}`)
   say('ACTION', 'auto')
-  say('NEXT', 'fix round')
+  say('NEXT', NEXT.fixRound)
   say('REASON', reason)
   process.exit(0)
 }
 
-if (gateKind === 'loop-close') {
+if (gateKind === GATES.loopClose) {
   say('ACTION', 'auto')
-  say('NEXT', 'close the loop')
+  say('NEXT', NEXT.closeLoop)
   say('REASON', 'standing owner approval (2026-08-20): the run closes the loop itself and reports the close')
   process.exit(0)
 }
-if (gateKind === 'delta-worthiness') {
+if (gateKind === GATES.deltaWorthiness) {
   // Judge the round that just ran, which is the newest resolution. A round answering a
   // verification pass raises no review file, so it has no blocker list and is patch-grade
   // unless its own review file says otherwise.
@@ -126,7 +127,7 @@ if (gateKind === 'delta-worthiness') {
   const hit = blockers.filter(b => fixed.has(b))
   if (hit.length) {
     say('ACTION', 'auto')
-    say('NEXT', 'delta discovery')
+    say('NEXT', NEXT.deltaDiscovery)
     say('REASON', `the fix round fixed high-severity ${hit.join(', ')} — delta-worthy by the mechanical half of the rule`)
     process.exit(0)
   }
@@ -140,11 +141,11 @@ if (gateKind === 'delta-worthiness') {
   }
   const hasCert = hasCertification(dir)
   say('ACTION', 'auto')
-  say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')
+  say('NEXT', hasCert ? NEXT.certificationSingle : NEXT.certificationPair)
   say('REASON', 'patch-grade by the mechanical half of the rule (no high-severity id fixed); loop quiet — certification proceeds on the standing owner approval (2026-08-20)')
   process.exit(0)
 }
-if (gateKind === 'certification-go-ahead') {
+if (gateKind === GATES.certificationGoAhead) {
   sweepFirst()
   const blocker = certBlocker(dir)
   if (blocker) {
@@ -155,11 +156,11 @@ if (gateKind === 'certification-go-ahead') {
   }
   const hasCert = hasCertification(dir)
   say('ACTION', 'auto')
-  say('NEXT', hasCert ? 'certification (single)' : 'certification (pair)')
+  say('NEXT', hasCert ? NEXT.certificationSingle : NEXT.certificationPair)
   say('REASON', 'loop quiet — certification proceeds on the standing owner approval (2026-08-20)')
   process.exit(0)
 }
-if (gateKind === 'design-pass') {
+if (gateKind === GATES.designPass) {
   stop('a design pass reimplements a component against a new protocol spec — an owner decision with no written delegation')
 }
 stop(`gate "${gateKind}" has no written delegation — fail closed`)

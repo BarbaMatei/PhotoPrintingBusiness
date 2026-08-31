@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 // Mechanical router for the review loop: reads a target's records and prints the next pass
 // per the README router (first matching row wins), with cost estimate and gates.
+// The rows themselves are data — drive/rows.mjs, which the README table is generated from; this
+// file assembles the state they judge, walks them in order, and owns the two guard shapes that
+// resist a row: the early guards that decide while the state is still being read, and the
+// convergence brake every fix-round answer passes through.
 // State sources (machine-readable only): the ledger's Findings table (which findings are still
 // open) and its frontmatter `closed:`, metrics.jsonl (auditor-validated), resolution frontmatter
 // (status/fixed_commit), review file inventory.
@@ -18,27 +22,18 @@ import { join } from 'node:path'
 import { newest, versions } from './model/target.mjs'
 import { atLoopClose, standsDown } from './model/open-work.mjs'
 import { convergenceCheck, lastSubstantive, owedLenses, seedMeasured } from './model/convergence.mjs'
-import { QUEUE_THRESHOLD, isBatch, openLedger, seriousCount } from './model/queue.mjs'
+import { QUEUE_THRESHOLD, openLedger, seriousCount } from './model/queue.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { parse, value } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { TARGETLESS } from './records/schema.mjs'
+import { COST, ROWS } from './drive/rows.mjs'
+import { GATES } from './drive/gates.mjs'
 
 const { root, rest } = takeRoot(process.argv.slice(2))
 const arg = rest.at(-1) ?? null
 const REVIEWS = join(repoRoot(import.meta.url, root), 'reviews')
 if (!arg) { console.error('usage: node reviews/lib/route-next-pass.mjs [--root <repoRoot>] <target>'); process.exit(1) }
-
-// Pass-cost estimates from the recorded history (metrics.jsonl roll-ups, 2026-07-30).
-const COST = {
-  'full discovery': '~2.5–3M tokens / ~48 agents (11-lens manifest; lean 5-lens ≈ 1.6M)',
-  'delta discovery': '~0.6–1.2M tokens (5-lens cap, 600k output budget script-enforced)',
-  'verification': '~60–250k agent tokens + main-agent revert-and-rerun work',
-  'lens-coverage discovery': '~0.3–0.5M tokens (one owed lens, full scope, plus dedup/skeptics)',
-  'fix round': 'unmetered; scales with finding count (/fix-review)',
-  'certification (pair)': '~4.0–4.6M tokens (two blinded full passes)',
-  'certification (single)': '~2.9M tokens (re-certification after a small verified fix round)',
-}
 
 function findDir(name) {
   const hits = []
@@ -98,9 +93,9 @@ if (!reviews.length) { say('STATE: folder exists, no review-v1.md'); say('ROUTER
 const N = Math.max(...reviews)
 
 const metrics = readMetrics(t.dir, { strict: true })
-if (!metrics) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null, 'no-metrics') }
+if (!metrics) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null, GATES.noMetrics) }
 const { lines, corrections } = metrics
-if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null, 'records-broken') }
+if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null, GATES.recordsBroken) }
 const L = lines[lines.length - 1]
 // Corrections are authoritative but not machine-applied here — surface the ones that
 // correct the latest line: round-keyed for a fix-round line, pass-keyed for a pass line.
@@ -119,6 +114,7 @@ const lastFixIdx = lastSubstantive(lines)
 const measured = seedMeasured(lines, lastFixIdx)
 // EVERY fix-round answer goes through here, so the convergence brake guards them all: a component
 // two rounds have failed to converge on is not patched a third time by whichever row answered first.
+// That is why the design-pass row is a guard and not a row of its own — no row can outrank it.
 function routeFixRound(reason) {
   say(reason)
   const c = convergenceCheck(lines)
@@ -130,7 +126,7 @@ function routeFixRound(reason) {
         say(`ROUTER: rounds r${c.r1.round} and r${c.r2.round} both seeded serious findings in "${c.area}" at s ≥ 0.3 (s=${c.s1.toFixed(2)}, ${c.s2.toFixed(2)}) — patching declared non-convergent for that component; further fix rounds there are refused (convergence rule, 2026-08-28).`)
         // The gate names the work it refuses: a gate line read on its own must say what is waiting.
         const trigger = reason.replace(/^ROUTER: /, '').replace(/\.$/, '')
-        finish(2, null, `design pass for "${c.area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${c.area}; at most one per component per loop — owner decision. The fix round it refuses was triggered by: ${trigger}`, 'design-pass')
+        finish(2, null, `design pass for "${c.area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${c.area}; at most one per component per loop — owner decision. The fix round it refuses was triggered by: ${trigger}`, GATES.designPass)
       }
       say(`NOTE: rounds r${c.r1.round}/r${c.r2.round} still seed "${c.area}" at s ≥ 0.3, but its one design pass per loop already ran — the fix round proceeds; raise it with the owner if it seeds again.`)
     }
@@ -155,80 +151,35 @@ if (led) {
   if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
 }
 
-// Row 3 outranks the ledger rows and the verification row: both describe work this round answered.
-if (standsDown(t.dir)) {
-  say(`ROUTER: resolution-v${RN} resolved, not yet re-reviewed (row 3).`)
-  finish(0, 'verification (reviewed unit — render records once, after it)', null)
-}
 // 🟠 open at a passing certification roll into the backlog, so they never pre-empt the owner's close.
 const closing = atLoopClose(L, N, RN)
-let queued = []
+// A fix-caused 🟠 re-arms the loop where a plain 🟠 would queue — for as long as it stays open.
+const regression = !led ? null : lines.filter(l => l.type === 'verification')
+  .flatMap(l => l.findings ?? [])
+  .find(f => f && f.fix_generated != null && f.sev === 'medium' && openMedium.includes(f.d))
+const armed = []
 if (led) {
-  // A fix-caused 🟠 re-arms the loop where a plain 🟠 would queue — for as long as it stays open.
-  const regression = lines.filter(l => l.type === 'verification')
-    .flatMap(l => l.findings ?? [])
-    .find(f => f && f.fix_generated != null && f.sev === 'medium' && openMedium.includes(f.d))
-  const armed = []
   if (openHigh.length) armed.push(`${openHigh.length} open 🔴 in the ledger (${openHigh.join(', ')})`)
   if ((L.reopened || 0) > 0) armed.push(`${count(L.reopened, 'reopened fix', 'reopened fixes')} on the latest line`)
   if (regression) armed.push(`a fix-caused 🟠 regression (${regression.d}, from the fix for ${regression.fix_generated})`)
-  if (armed.length) routeFixRound(`ROUTER: the loop is armed — ${armed.join(' · ')}.`)
-  if (isBatch(openMedium) && !closing) {
-    routeFixRound(`ROUTER: batch of ${count(openMedium.length, 'open medium')} at or over the queue threshold of ${QUEUE_THRESHOLD} (${openMedium.join(', ')}).`)
-  }
-  if (openMedium.length && !closing) {
-    say(`QUEUED: ${openMedium.join(', ')} (${openMedium.length} below the threshold of ${QUEUE_THRESHOLD})`)
-    queued = openMedium
-  }
 }
 // Still-open serious work for the later rows: a ledger'd target counts 🔴 always, 🟠 only as a batch.
 const openSerious = led ? seriousCount(led) : serious
 const cleanBasis = led ? 'nothing open in the ledger' : '0 new serious'
 
-// Certified with NO post-cert fix round pending → close decision belongs to the owner.
-// A resolved post-cert fix round must fall through to the verification branch below (row 3):
-// 015's post-cert round is the precedent — its verification reopened 4 fixes.
-if (closing) {
-  say('ROUTER: certification passed on the latest pass; no post-cert fix round is pending.')
-  finish(2, null, `close the loop (record \`closed:\` in the ledger frontmatter + index row, README note ²) — owner decision`, 'loop-close')
+const state = {
+  dir: t.dir, N, RN, rStatus, rCommit, lines, L, serious,
+  led, openHigh, openMedium, armed, closing, queued: [], openSerious, cleanBasis,
+  owed, lastFixIdx, measured,
+  standsDown: standsDown(t.dir),
+  cleanDiscovery: (L.type === 'discovery' || L.type === 'delta-discovery') && openSerious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes',
+}
+const api = { say, finish, routeFixRound, count }
+
+for (const row of ROWS) {
+  if (row.impl !== 'row' || !row.when(state)) continue
+  row.answer(state, api)
 }
 
-// Latest pass is a verification: its results decide. This branch must run before the
-// resolved-resolution branch — verifications write no review file, so N stays at the
-// discovery version and RN === N would otherwise re-route to verification forever.
-if (L.type === 'verification') {
-  if ((L.reopened || 0) > 0) routeFixRound('ROUTER: reopened fixes re-arm the loop (last row).')
-  if (openSerious > 0) routeFixRound('ROUTER: verification surfaced new serious findings (last row).')
-  say(`ROUTER: verification clean (0 reopened, ${cleanBasis}).`)
-  say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
-  if (owed.length) say(`NOTE: lens-coverage debt — never run on this target: ${owed.join(', ')}; certification is refused until each has run (a lean lens-coverage discovery clears one, ${COST['lens-coverage discovery']}).`)
-  if (!measured) say(`NOTE: round r${lines[lastFixIdx].round}'s seed rate is unmeasured — no blind pass has run since it, so "quiet" is unmeasured and certification is refused until a delta discovery measures it (convergence rule, 2026-08-28).`)
-  finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ² — but certification stays refused while a NOTE above names owed lenses or an unmeasured seed rate`, 'delta-worthiness')
-}
-// A fix round exists for the latest review and is resolved → verification. RN can exceed N:
-// a fix round answering a verification pass raises no review file, so its resolution takes the
-// next free number while N stays at the last discovery.
-if (RN >= N && rStatus === 'resolved') {
-  say(`ROUTER: resolution-v${RN} resolved, not yet re-reviewed (row 3).`)
-  finish(0, 'verification (reviewed unit — render records once, after it)', null)
-}
-if (RN >= N && rStatus && rStatus !== 'resolved') {
-  routeFixRound(`ROUTER: resolution-v${RN} is ${rStatus} (row 2).`)
-}
-
-if (L.verdict === 'request-changes' || openSerious > 0) {
-  routeFixRound(`ROUTER: open serious findings with no resolution answering review-v${N} (row 2).`)
-}
-if ((L.type === 'discovery' || L.type === 'delta-discovery') && openSerious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes') {
-  if (queued.length) {
-    routeFixRound(`ROUTER: sweep before certification — ${count(queued.length, 'open medium')} must drain (${queued.join(', ')}) before the loop quiets.`)
-  }
-  if (owed.length) {
-    say(`ROUTER: loop quiet, but these manifest lenses have never run on this target: ${owed.join(', ')} — certification refused on lens-coverage debt (audit R5); the owed lens runs first as a lean pass.`)
-    finish(0, `lens-coverage discovery (${owed[0]})`, null)
-  }
-  say(`ROUTER: discovery-type pass clean (${cleanBasis}, 0 reopened) and every manifest lens has run — loop quiet (row 6).`)
-  finish(2, null, `certification — ALWAYS needs the owner's explicit go-ahead outside an unattended run: first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'certification-go-ahead')
-}
 say('ROUTER: no row matched mechanically — decide from the README router with the facts above.')
-finish(3, null, null, 'no-row-matched')
+finish(3, null, null, GATES.noRowMatched)
