@@ -18,7 +18,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { newest, resolveDir } from './model/target.mjs'
 import { standsDown } from './model/open-work.mjs'
-import { certificationBlocker } from './model/convergence.mjs'
+import { certificationBlocker, convergenceCheck } from './model/convergence.mjs'
 import { openLedger } from './model/queue.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { parse } from './records/frontmatter.mjs'
@@ -80,9 +80,16 @@ function openWork() {
   if (led.medium.length) return `sweep before certification — ${led.medium.length} open medium${led.medium.length === 1 ? '' : 's'} must drain (${led.medium.join(', ')})`
   return null
 }
+// Every fix-round answer consults the convergence brake first, the router's rows included: a
+// component two rounds failed to converge on needs a design pass, and a design pass has no written
+// delegation, so the run fails closed and stops. Its one pass per component per loop already
+// having run lifts the brake, exactly as it does for the router.
 function sweepFirst() {
   const reason = openWork()
   if (!reason) return
+  const c = convergenceCheck(metricsLines(dir))
+  if (c?.nonConvergent && !c.capped)
+    stop(`rounds r${c.r1.round} and r${c.r2.round} both seeded serious findings in "${c.area}" at s ≥ 0.3 (s=${c.s1.toFixed(2)}, ${c.s2.toFixed(2)}) — patching is non-convergent there and the answer is a design pass, which reimplements a component against a new protocol spec: an owner decision with no written delegation`)
   say('ACTION', 'auto')
   say('NEXT', 'fix round')
   say('REASON', reason)

@@ -54,6 +54,27 @@ import { check, run, GOOD_ROOT } from './lib.mjs'
   check('policy stops on a design-pass gate', r.out.includes('ACTION: stop'), r.out.trim())
 }
 
+// The policy answers a fix round of its own at both certification-bound gates, so the brake has to
+// guard those answers too (owner ruling 1, 2026-08-28) — and a design pass has no written
+// delegation, so the policy fails closed and stops.
+for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '931-sweep-non-convergent', 'decide', gate])
+  check(`policy stops instead of sweeping a non-convergent component at the ${gate} gate`,
+    r.out.includes('ACTION: stop') && !r.out.includes('NEXT: fix round'), r.out.trim())
+  check(`the ${gate} stop names the component and the two rounds`,
+    r.out.includes('"payments"') && r.out.includes('rounds r1 and r2'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '929-armed-non-convergent', 'decide', 'certification-go-ahead'])
+  check('policy stops rather than arming a fix round on a non-convergent component',
+    r.out.includes('ACTION: stop') && r.out.includes('"payments"'), r.out.trim())
+}
+{
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '918-open-blocker', 'decide', 'certification-go-ahead'])
+  check('a convergent armed ledger still gets the policy fix round, not a stop',
+    r.out.includes('ACTION: auto') && r.out.includes('NEXT: fix round'), r.out.trim())
+}
+
 {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-stop', 'decide', 'loop-close'])
   check('policy stops when a gate override was logged after the run started', r.out.includes('ACTION: stop') && r.out.includes('COMMENTS_OK'), r.out.trim())

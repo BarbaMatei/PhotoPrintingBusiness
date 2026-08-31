@@ -117,6 +117,8 @@ for (const c of corrections.filter(l => (
 const owed = owedLenses(lines)
 const lastFixIdx = lastSubstantive(lines)
 const measured = seedMeasured(lines, lastFixIdx)
+// EVERY fix-round answer goes through here, so the convergence brake guards them all: a component
+// two rounds have failed to converge on is not patched a third time by whichever row answered first.
 function routeFixRound(reason) {
   say(reason)
   const c = convergenceCheck(lines)
@@ -168,13 +170,9 @@ if (led) {
   if (openHigh.length) armed.push(`${openHigh.length} open 🔴 in the ledger (${openHigh.join(', ')})`)
   if ((L.reopened || 0) > 0) armed.push(`${count(L.reopened, 'reopened fix', 'reopened fixes')} on the latest line`)
   if (regression) armed.push(`a fix-caused 🟠 regression (${regression.d}, from the fix for ${regression.fix_generated})`)
-  if (armed.length) {
-    say(`ROUTER: the loop is armed — ${armed.join(' · ')}.`)
-    finish(0, 'fix round', null)
-  }
+  if (armed.length) routeFixRound(`ROUTER: the loop is armed — ${armed.join(' · ')}.`)
   if (isBatch(openMedium) && !closing) {
-    say(`ROUTER: batch of ${count(openMedium.length, 'open medium')} at or over the queue threshold of ${QUEUE_THRESHOLD} (${openMedium.join(', ')}).`)
-    finish(0, 'fix round', null)
+    routeFixRound(`ROUTER: batch of ${count(openMedium.length, 'open medium')} at or over the queue threshold of ${QUEUE_THRESHOLD} (${openMedium.join(', ')}).`)
   }
   if (openMedium.length && !closing) {
     say(`QUEUED: ${openMedium.join(', ')} (${openMedium.length} below the threshold of ${QUEUE_THRESHOLD})`)
@@ -221,8 +219,7 @@ if (L.verdict === 'request-changes' || openSerious > 0) {
 }
 if ((L.type === 'discovery' || L.type === 'delta-discovery') && openSerious === 0 && (L.reopened || 0) === 0 && L.verdict !== 'request-changes') {
   if (queued.length) {
-    say(`ROUTER: sweep before certification — ${count(queued.length, 'open medium')} must drain (${queued.join(', ')}) before the loop quiets.`)
-    finish(0, 'fix round', null)
+    routeFixRound(`ROUTER: sweep before certification — ${count(queued.length, 'open medium')} must drain (${queued.join(', ')}) before the loop quiets.`)
   }
   if (owed.length) {
     say(`ROUTER: loop quiet, but these manifest lenses have never run on this target: ${owed.join(', ')} — certification refused on lens-coverage debt (audit R5); the owed lens runs first as a lean pass.`)

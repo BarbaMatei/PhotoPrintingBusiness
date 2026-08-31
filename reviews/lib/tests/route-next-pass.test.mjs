@@ -109,3 +109,25 @@ updated: 2026-08-22
   const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '928-design-capped'])
   check('router routes a fix round once the component used its one design pass', r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('design pass per loop already ran'), `exit ${r.code}: ${r.out.trim()}`)
 }
+
+// ---------- the brake guards EVERY fix-round answer (owner ruling 1, 2026-08-28) ----------
+// The brake used to live inside the router's fix-round helper, which the armed row, the batch row
+// and the pre-certification sweep row never went through: a non-convergent component kept being
+// patched by whichever row answered first. All three now consult it, and a convergent state on the
+// same three rows must still route its fix round.
+for (const [target, row, reason] of [
+  ['929-armed-non-convergent', 'armed', 'the loop is armed — 1 open 🔴 in the ledger (PPW-9291)'],
+  ['930-batch-non-convergent', 'batch', 'batch of 3 open mediums'],
+  ['931-sweep-non-convergent', 'sweep', 'sweep before certification — 1 open medium must drain'],
+]) {
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, target])
+  check(`the ${row} row brakes on a non-convergent component instead of routing a fix round`,
+    r.code === 2 && r.out.includes('GATE_KIND: design-pass') && !r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
+  check(`the braked ${row} row still states the row it matched and names the component and both rounds`,
+    r.out.includes(reason) && r.out.includes('"payments"') && r.out.includes('rounds r1 and r2'), r.out.trim())
+}
+for (const [target, row] of [['918-open-blocker', 'armed'], ['916-medium-batch', 'batch'], ['917-sweep-before-cert', 'sweep']]) {
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, target])
+  check(`a convergent ${row} row still routes its fix round`,
+    r.code === 0 && r.out.includes('NEXT: fix round') && !r.out.includes('GATE_KIND: design-pass'), `exit ${r.code}: ${r.out.trim()}`)
+}
