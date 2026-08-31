@@ -1,10 +1,14 @@
-// Tests for records-auditor.mjs: real-repo smoke checks and the reviewed-unit window.
+// Tests for records-auditor.mjs: real-repo smoke checks, the reviewed-unit window, and the two
+// seams the CLI now composes — records/validate.mjs and fix/handback-gates.mjs, called in-process.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only records-auditor
 import { check, run, firstLine, GOOD_ROOT } from './lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { auditIds, auditTarget, citationScan, listTargets } from '../records/validate.mjs'
+import { auditHandBackGates } from '../fix/handback-gates.mjs'
+import { versions } from '../model/target.mjs'
 
 // ---------- records auditor: smoke run against the real repo ----------
 {
@@ -20,6 +24,83 @@ import { tmpdir } from 'node:os'
   check('auditor reports a cross-target duplicate id', r.out.includes('duplicate id PPW-9001'), 'no duplicate-id error in the output')
   check('auditor accepts a well-formed verification findings[] with lineage', !r.out.includes('908-verification-lineage metrics line 2 findings['), r.out.split('\n').find(l => l.includes('line 2 findings[')) ?? '')
   check('auditor rejects a malformed verification findings[] entry', r.out.includes('908-verification-lineage metrics line 3 findings[') && r.out.includes('d must be') && r.out.includes('sev_delta malformed'), 'no shape error for the malformed lineage entry')
+}
+
+// ---------- validate.mjs: the seams the CLI composes ----------
+{
+  const REVIEWS = join(GOOD_ROOT, 'reviews')
+  const all = listTargets(REVIEWS)
+  check('listTargets skips the folders under reviews/ that are not targets',
+    !all.some(t => ['state', 'lib', 'archive', 'system'].includes(t.name)) && all.length > 30,
+    JSON.stringify(all.map(t => t.name).slice(0, 5)))
+  check('a positional filter matches target names by substring',
+    listTargets(REVIEWS, { only: ['921'] }).map(t => t.name).join(',') === '921-gates-bad',
+    JSON.stringify(listTargets(REVIEWS, { only: ['921'] }).map(t => t.name)))
+  check('the cross-target scans ignore the filter, so a duplicate id is found whatever was asked for',
+    listTargets(REVIEWS, { only: ['921'], all: true }).length === all.length,
+    `${listTargets(REVIEWS, { only: ['921'], all: true }).length} vs ${all.length}`)
+
+  // The validator reports through the tiers the CLI passes in and never prints or exits itself:
+  // an archived target's shape errors must land as warnings, a live target's as errors.
+  const collect = () => { const o = { errors: [], warnings: [], infos: [] }; return { ...o, err: m => o.errors.push(m), warn: m => o.warnings.push(m), info: m => o.infos.push(m) } }
+  const ctxFor = (c, gates) => ({ err: c.err, warn: c.warn, info: c.info, checkSha: () => ({ resolves: true, pushed: true }), versions, gates, index: null, track: null })
+
+  let sawEvents = null
+  const c1 = collect()
+  auditTarget({ name: '954-voided-misstamp', dir: join(REVIEWS, '954-voided-misstamp'), archived: false },
+    ctxFor(c1, (t, tag, roundDates, events) => { sawEvents = events }))
+  check('auditTarget hands the hand-back gates the void-filtered events, not the raw log',
+    sawEvents !== null && !sawEvents.some(e => e.ev === 'void'), JSON.stringify(sawEvents?.map(e => e.ev)))
+
+  const T = mkdtempSync(join(tmpdir(), 'records-validate-tier-'))
+  mkdirSync(T, { recursive: true })
+  writeFileSync(join(T, 'metrics.jsonl'), '')
+  writeFileSync(join(T, 'review-v1.md'), '---\npass-type: discovery\n---\n\n# Review v1\n')
+  const c2 = collect()
+  auditTarget({ name: '990-tier', dir: T, archived: true }, ctxFor(c2, () => { }))
+  const c3 = collect()
+  auditTarget({ name: '990-tier', dir: T, archived: false }, ctxFor(c3, () => { }))
+  const PAIRING = 'review-v1.md has no metrics line'
+  check('an archived target\'s record-shape problem is a warning, the same records live an error',
+    c2.warnings.some(m => m.includes(PAIRING)) && !c2.errors.length && c3.errors.some(m => m.includes(PAIRING)) && !c3.warnings.length,
+    `archived ${JSON.stringify(c2)} · live ${JSON.stringify(c3.errors)}`)
+  rmSync(T, { recursive: true, force: true })
+
+  const c4 = collect()
+  auditIds(listTargets(REVIEWS, { all: true }), { err: c4.err, counterPath: join(REVIEWS, 'state', 'id-counter') })
+  check('auditIds reports an id whose rows live in two ledgers',
+    c4.errors.some(m => /duplicate id PPW-9001/.test(m)), JSON.stringify(c4.errors))
+
+  // The scan counts comment text only: a finding id inside a string or a test name is the
+  // review system's accepted leak channel and must not be reported.
+  const c5 = collect()
+  const fakeGrep = () => ['src/A.cs:3:    // PPW-1 fixed here', 'src/B.cs:9:    var s = "PPW-2";', 'src/C.ts:4:  const url = "http://x/PPW-3"'].join('\n')
+  const hits = citationScan({ git: fakeGrep, info: c5.info, warn: c5.warn })
+  check('the citation scan counts a comment and skips a string and a URL',
+    hits.length === 1 && /A\.cs:3/.test(hits[0]), JSON.stringify(hits))
+  check('the scan reports its count as a note, never as an error',
+    c5.infos.length === 1 && /1 occurrence\(s\) in 1 file\(s\)/.test(c5.infos[0]) && !c5.warnings.length, JSON.stringify(c5.infos))
+  // git grep exits 1 when nothing matched, so a throwing git reads as a clean repo, not a failure.
+  const c6 = collect()
+  check('a git grep that exits non-zero reads as no matches, and the note still lands',
+    citationScan({ git: () => { throw new Error('exit 1') }, info: c6.info, warn: c6.warn }).length === 0 &&
+    /0 occurrence\(s\)/.test(c6.infos[0]) && !c6.warnings.length, JSON.stringify([c6.infos, c6.warnings]))
+}
+
+// ---------- handback-gates.mjs: called directly ----------
+{
+  const REVIEWS = join(GOOD_ROOT, 'reviews')
+  const t = { name: '921-gates-bad', dir: join(REVIEWS, '921-gates-bad'), archived: false }
+  const said = []
+  auditHandBackGates(t, t.name, new Map(), [], m => said.push(m))
+  check('with no events at all the gates refuse for want of a round-start, and say so once',
+    said.length === 1 && /no round-start worklog event for round 1/.test(said[0]), JSON.stringify(said))
+
+  const good = { name: '922-gates-good', dir: join(REVIEWS, '922-gates-good'), archived: false }
+  const quiet = []
+  auditHandBackGates(good, good.name, new Map(), JSON.parse('[]'), m => quiet.push(m))
+  check('the gates report through the tier they are given and nowhere else',
+    quiet.length === 1 && /922-gates-good resolution-v1\.md/.test(quiet[0]), JSON.stringify(quiet))
 }
 
 // ---------- records auditor: the reviewed-unit window ----------

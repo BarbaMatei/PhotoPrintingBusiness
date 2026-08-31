@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os'
 import { dateValue, parse, section, value, word } from '../records/frontmatter.mjs'
 import { deepEqual, live, matchesVoid, readEvents, readLines as readWorklogLines, voidsOf } from '../records/worklog.mjs'
 import { appendLine, readMetrics, readLines as readMetricsLines } from '../records/metrics.mjs'
+import { blocks as ledgerBlocks, ids as ledgerIds, severityOf } from '../records/ledger.mjs'
+import { fixedRows, meta as resolutionMeta, rows as resolutionRows, tallies } from '../records/resolution.mjs'
 
 // ---------- frontmatter: the block ----------
 {
@@ -83,6 +85,94 @@ import { appendLine, readMetrics, readLines as readMetricsLines } from '../recor
   check('a missing section is the empty string, never undefined', section(body, 'Refuted') === '', JSON.stringify(section(body, 'Refuted')))
   check('a "## " inside a table cell does not open a section',
     section('## Findings\n| a | not ## Scope |\n', 'Scope') === '', JSON.stringify(section('## Findings\n| a | not ## Scope |\n', 'Scope')))
+}
+
+// ---------- resolution: the Findings table, the tallies, the fixed rows ----------
+{
+  const res = `---
+type: resolution
+status: resolved
+closed: 2026-08-30
+---
+
+# Resolution v1 — 970-resolution-reader
+
+## Findings
+
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| PPW-1 | fixed | \`aaaaaaa\`, \`bbbbbbb\` | two commits |
+| PPW-2 | backlog |  | queued |
+| PPW-3 | Fixed | \`ccccccc\` | capitalised, so no status word |
+| D5 | fixed | \`ddddddd\` | a pre-PPW id shape |
+| PPW-4 | fixed
+
+## Decisions
+
+### PPW-2
+
+Queued.
+`
+  check('rows() reads every Findings row in file order, with its status and commit cell',
+    resolutionRows(res).map(r => `${r.id}=${r.status}`).join(' ') === 'PPW-1=fixed PPW-2=backlog PPW-3=Fixed PPW-4=fixed',
+    JSON.stringify(resolutionRows(res)))
+  // The pre-PPW "D<n>" row shape is gone from the record set, so the reader no longer accepts it.
+  check('a "D<n>" row is not a Findings row any more',
+    !resolutionRows(res).some(r => r.id === 'D5') && tallies(res).fixed === 1,
+    JSON.stringify(resolutionRows(res).map(r => r.id)))
+  check('a row truncated before the commit cell has a null commit',
+    resolutionRows(res).find(r => r.id === 'PPW-4').commit === null, JSON.stringify(resolutionRows(res)))
+
+  const t = tallies(res)
+  check('backlog counts into the deferred bucket, as the metrics tallies read it',
+    t.deferred === 1 && t.fixed === 1, JSON.stringify(t))
+  check('a status cell that is not one lowercase word, or a truncated row, states no status to count',
+    t.fixed + t.deferred + t.wont_fix + t.disputed + t.false_positive + t.open === 2, JSON.stringify(t))
+  check('a table with no countable row tallies null, so a cross-check is skipped not zeroed',
+    tallies('## Findings\n| ID | Status |\n') === null, String(tallies('## Findings\n| ID | Status |\n')))
+
+  check('fixedRows() takes every sha in a multi-commit cell, in cell order',
+    fixedRows(res).find(r => r.id === 'PPW-1').commits.join(', ') === 'aaaaaaa, bbbbbbb',
+    JSON.stringify(fixedRows(res)))
+  check('a fixed row whose cell holds no sha is returned with an empty commit list, never dropped',
+    fixedRows('| PPW-9 | fixed | pending |').length === 1 && fixedRows('| PPW-9 | fixed | pending |')[0].commits.length === 0,
+    JSON.stringify(fixedRows('| PPW-9 | fixed | pending |')))
+
+  check('meta() reads the status and closed scalars', resolutionMeta(res).status === 'resolved' && resolutionMeta(res).closed === '2026-08-30', JSON.stringify(resolutionMeta(res)))
+  check('meta() of a resolution with no status key reads open, never null',
+    resolutionMeta('---\ntype: resolution\n---\n').status === 'open', JSON.stringify(resolutionMeta('---\ntype: resolution\n---\n')))
+}
+
+// ---------- ledger: ids, severities, detail blocks ----------
+{
+  const led = `# Ledger — 970-ledger-reader
+
+| ID | Sev | First seen | Title | File | Status | Affirmed |
+|---|---|---|---|---|---|---|
+| PPW-1 | 🔴 | v1 | a | x.cs | fixed | \`aaaaaaa\` |
+| PPW-2 | 🟡 | v1 | b | y.cs | open |  |
+| PPW-1 | 🔴 | v1 | a | x.cs | fixed | \`aaaaaaa\` |
+
+### PPW-1
+
+- **Fix brief:** Trigger-list-shaped: yes
+- **History:**
+  - v1: fixed
+
+### PPW-2
+
+- **History:**
+  - v1: found
+`
+  check('ids() lists every table row in file order, repeats included',
+    ledgerIds(led).join(' ') === 'PPW-1 PPW-2 PPW-1', JSON.stringify(ledgerIds(led)))
+  check('severityOf() maps each id to its severity emoji',
+    severityOf(led).get('PPW-1') === '🔴' && severityOf(led).get('PPW-2') === '🟡', JSON.stringify([...severityOf(led)]))
+  const b = ledgerBlocks(led)
+  check('blocks() splits each detail block at the next id heading',
+    b.size === 2 && /Trigger-list-shaped/.test(b.get('PPW-1')) && !/Trigger-list-shaped/.test(b.get('PPW-2')),
+    JSON.stringify([...b.keys()]))
+  check('the last block runs to the end of the file', /v1: found/.test(b.get('PPW-2')), JSON.stringify(b.get('PPW-2')))
 }
 
 // ---------- worklog: lines, parse errors, void filtering ----------
