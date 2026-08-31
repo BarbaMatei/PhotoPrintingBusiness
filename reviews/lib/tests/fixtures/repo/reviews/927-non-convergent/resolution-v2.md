@@ -1,13 +1,13 @@
 ---
 type: resolution
-target: 917-non-convergent
+target: 927-non-convergent
 version: 2
 answers: review-v2.md
 status: resolved
 fixed_commit: ccccc19
 ---
 
-# Resolution v2 — 917-non-convergent
+# Resolution v2 — 927-non-convergent
 
 ## Findings
 

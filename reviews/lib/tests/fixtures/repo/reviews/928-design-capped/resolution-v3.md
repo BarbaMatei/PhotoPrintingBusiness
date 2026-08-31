@@ -1,13 +1,13 @@
 ---
 type: resolution
-target: 918-design-capped
+target: 928-design-capped
 version: 3
 answers: review-v3.md
 status: resolved
 fixed_commit: ddddd20
 ---
 
-# Resolution v3 — 918-design-capped
+# Resolution v3 — 928-design-capped
 
 ## Findings
 

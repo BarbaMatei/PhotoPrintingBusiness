@@ -40,17 +40,17 @@ import { check, run, GOOD_ROOT } from './lib.mjs'
 }
 
 {
-  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '915-lens-debt', 'decide', 'certification-go-ahead'])
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '925-lens-debt', 'decide', 'certification-go-ahead'])
   check('policy refuses auto-certification on lens debt and routes the owed lens', r.out.includes('ACTION: auto') && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), r.out.trim())
 }
 
 {
-  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '916-unmeasured-seed', 'decide', 'delta-worthiness'])
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '926-unmeasured-seed', 'decide', 'delta-worthiness'])
   check('policy routes an unmeasured final round to a measuring delta discovery', r.out.includes('ACTION: auto') && r.out.includes('NEXT: delta discovery') && r.out.includes('unmeasured'), r.out.trim())
 }
 
 {
-  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '917-non-convergent', 'decide', 'design-pass'])
+  const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '927-non-convergent', 'decide', 'design-pass'])
   check('policy stops on a design-pass gate', r.out.includes('ACTION: stop'), r.out.trim())
 }
 

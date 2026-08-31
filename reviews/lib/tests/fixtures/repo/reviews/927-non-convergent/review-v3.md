@@ -1,21 +1,21 @@
 ---
 type: review
-target: 915-lens-debt
-version: 1
+target: 927-non-convergent
+version: 3
 supersedes: null
-commit: eeeee15
+commit: ccccc19
 branch: fixture/gate-tests
-pass-type: discovery
-date: 2026-08-20
+pass-type: delta-discovery
+date: 2026-07-05
 lenses: [security]
 lenses-not-run: []
-verdict: approve-with-followups
+verdict: request-changes
 blockers: []
 findings: { high: 0, medium: 0, low: 0, cleanup: 0, refuted: 0 }
 tests: { dotnet: "12/12", frontend: "4/4" }
 ---
 
-# Review v1 — 915-lens-debt
+# Review v3 — 927-non-convergent
 
 ## Findings
 

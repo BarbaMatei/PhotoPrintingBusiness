@@ -1,6 +1,6 @@
 ---
 type: review
-target: 918-design-capped
+target: 928-design-capped
 version: 1
 supersedes: null
 commit: ddddd17
@@ -15,7 +15,7 @@ findings: { high: 0, medium: 0, low: 0, cleanup: 0, refuted: 0 }
 tests: { dotnet: "12/12", frontend: "4/4" }
 ---
 
-# Review v1 — 918-design-capped
+# Review v1 — 928-design-capped
 
 ## Findings
 

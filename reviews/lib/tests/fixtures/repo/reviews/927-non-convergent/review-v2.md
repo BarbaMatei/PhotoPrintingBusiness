@@ -1,12 +1,12 @@
 ---
 type: review
-target: 917-non-convergent
-version: 3
+target: 927-non-convergent
+version: 2
 supersedes: null
-commit: ccccc19
+commit: ccccc18
 branch: fixture/gate-tests
 pass-type: delta-discovery
-date: 2026-07-05
+date: 2026-07-03
 lenses: [security]
 lenses-not-run: []
 verdict: request-changes
@@ -15,7 +15,7 @@ findings: { high: 0, medium: 0, low: 0, cleanup: 0, refuted: 0 }
 tests: { dotnet: "12/12", frontend: "4/4" }
 ---
 
-# Review v3 — 917-non-convergent
+# Review v2 — 927-non-convergent
 
 ## Findings
 

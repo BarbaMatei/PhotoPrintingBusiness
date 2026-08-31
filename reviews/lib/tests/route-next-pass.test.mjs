@@ -91,21 +91,21 @@ updated: 2026-08-22
 
 // ---------- convergence rule + lens-coverage debt (audit R5, 2026-08-28) ----------
 {
-  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '915-lens-debt'])
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '925-lens-debt'])
   check('router refuses row 6 on lens-coverage debt and routes the owed lens', r.code === 0 && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
 {
-  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '916-unmeasured-seed'])
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '926-unmeasured-seed'])
   check('router flags an unmeasured seed rate at the delta-worthiness gate', r.code === 3 && r.out.includes('seed rate is unmeasured'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
 {
-  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '917-non-convergent'])
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '927-non-convergent'])
   check('router declares a component non-convergent at s >= 0.3 on two consecutive rounds', r.code === 2 && r.out.includes('GATE_KIND: design-pass') && r.out.includes('"payments"'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
 {
-  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '918-design-capped'])
+  const r = run('route-next-pass.mjs', ['--root', GOOD_ROOT, '928-design-capped'])
   check('router routes a fix round once the component used its one design pass', r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('design pass per loop already ran'), `exit ${r.code}: ${r.out.trim()}`)
 }

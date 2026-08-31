@@ -1,21 +1,21 @@
 ---
 type: review
-target: 918-design-capped
-version: 2
+target: 925-lens-debt
+version: 1
 supersedes: null
-commit: ddddd18
+commit: eeeee15
 branch: fixture/gate-tests
-pass-type: delta-discovery
-date: 2026-07-03
+pass-type: discovery
+date: 2026-08-20
 lenses: [security]
 lenses-not-run: []
-verdict: request-changes
+verdict: approve-with-followups
 blockers: []
 findings: { high: 0, medium: 0, low: 0, cleanup: 0, refuted: 0 }
 tests: { dotnet: "12/12", frontend: "4/4" }
 ---
 
-# Review v2 — 918-design-capped
+# Review v1 — 925-lens-debt
 
 ## Findings
 

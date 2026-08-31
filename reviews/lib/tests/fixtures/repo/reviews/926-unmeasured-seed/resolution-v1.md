@@ -1,13 +1,13 @@
 ---
 type: resolution
-target: 916-unmeasured-seed
+target: 926-unmeasured-seed
 version: 1
 answers: review-v1.md
 status: resolved
 fixed_commit: eeeee17
 ---
 
-# Resolution v1 — 916-unmeasured-seed
+# Resolution v1 — 926-unmeasured-seed
 
 ## Findings
 
