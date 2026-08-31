@@ -84,7 +84,7 @@ The state of `reviews/<target>/` decides the next pass — first matching row wi
 | An open 🔴 in the ledger · a reopened fix on the latest line · a still-open fix-caused 🟠 regression (its lineage on a verification line's `findings[]`) | **Fix round now** (quiet counter resets) |
 | ≥ 3 open non-regression 🟠 in the ledger | **Fix round** (the batch) |
 | 1–2 open non-regression 🟠 | **Queued** — proceed as if quiet; the sweep row fires before certification |
-| Two consecutive fix rounds seeded the same component at s ≥ 0.3³ | **Design pass**³ (owner gate) — further fix rounds there are refused; it intercepts four of the fix-round rows only, listed below |
+| Two consecutive fix rounds seeded the same component at s ≥ 0.3³ | **Design pass**³ (owner gate) — further fix rounds there are refused; it intercepts **every** fix-round answer, in the router and in the unattended policy alike (below) |
 | Certification passed on the latest pass, no post-cert fix round pending | **Close the loop** (owner gate) — open 🟠 stand down here and roll into the backlog² |
 | Latest line is a verification with reopened fixes, or with serious findings still open | **Fix round** |
 | Latest line is a clean verification | **Judgment call**: delta-worthy¹ → **delta discovery**; patch-grade → loop **quiet** |
@@ -109,12 +109,15 @@ stays that verification and would otherwise re-route the loop onto findings the 
 The mechanical test for the wait is the newest resolution reading `resolved` with no fix-round line
 for its round — the same window `records-auditor.mjs` reports as "unit records pending".
 
-**Where the convergence rule bites.** The design-pass gate sits inside the router's fix-round
-helper. It can therefore intercept only the four fix-round rows that go through that helper: the
-two routed from a verification's results (reopened fixes, new serious findings), the row for a
-resolution that is `open` or `in-progress`, and the row for open serious findings with no
-resolution answering the latest review. The armed row, the ≥ 3 batch row and the loop-quiet sweep
-row answer `fix round` directly, and the gate never sees them.
+**Where the convergence rule bites.** The design-pass gate guards **every** answer of "fix round"
+(owner ruling, 2026-08-28) — the armed row, the ≥ 3 batch row and the loop-quiet sweep row included,
+which used to answer `fix round` directly and skip it. The single implementation is
+[lib/model/convergence.mjs](lib/model/convergence.mjs); the router routes every fix-round answer
+through the helper that consults it, and [lib/autonomy-policy.mjs](lib/autonomy-policy.mjs) consults
+the same check before its own fix-round answers at the delta-worthiness and certification gates —
+where a non-convergent component stops the run, because a design pass has no written delegation.
+The one exception on both sides is the cap: once that component's one design pass per loop has run,
+the fix round proceeds with a note.
 
 Lens-coverage debt is refused by the router itself, on its loop-quiet row. An unmeasured seed rate
 is not a routed row at all. The router prints it as a note on the clean-verification row, and the
