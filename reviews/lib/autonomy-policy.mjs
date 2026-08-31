@@ -23,6 +23,7 @@ import { openLedger } from './model/queue.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { parse } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
+import { fixedRows } from './records/resolution.mjs'
 import { readEvents } from './records/worklog.mjs'
 
 const { root, rest } = takeRoot(process.argv.slice(2))
@@ -121,7 +122,7 @@ if (gateKind === 'delta-worthiness') {
     blockers.push(...(lines[bi].match(/PPW-\d+/g) ?? []))
     for (let i = bi + 1; i < lines.length && /^\s/.test(lines[i]); i++) blockers.push(...(lines[i].match(/PPW-\d+/g) ?? []))
   }
-  const fixed = new Set([...readFileSync(resPath, 'utf8').matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|/gm)].map(m => m[1]))
+  const fixed = new Set(fixedRows(readFileSync(resPath, 'utf8')).map(r => r.id))
   const hit = blockers.filter(b => fixed.has(b))
   if (hit.length) {
     say('ACTION', 'auto')

@@ -2,6 +2,10 @@
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only autonomy-policy
 import { check, run, GOOD_ROOT } from './lib.mjs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { fixedRows } from '../records/resolution.mjs'
 
 // ---------- autonomy-policy: decide ----------
 {
@@ -87,6 +91,51 @@ for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
 {
   const r = run('autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-clean', 'decide', 'loop-close'])
   check('policy ignores overrides logged before the run started', r.out.includes('ACTION: auto'), r.out.trim())
+}
+
+// The policy reads the resolution's `fixed` rows through the same reader as the verifier and the
+// hand-back gates, so a row whose Commit cell is never closed states no fix for either of them: a
+// half-written row must not be the thing that decides a delta discovery.
+{
+  const T = mkdtempSync(join(tmpdir(), 'policy-truncated-row-'))
+  const target = '957-truncated-fixed-row'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'review-v1.md'), `---
+type: review
+target: ${target}
+version: 1
+pass-type: discovery
+date: 2026-08-30
+verdict: request-changes
+blockers: [PPW-9570]
+---
+
+# Review v1 — ${target}
+`)
+  const resolution = `---
+type: resolution
+target: ${target}
+version: 1
+answers: review-v1.md
+status: resolved
+fixed_commit: ffffff1
+---
+
+# Resolution v1 — ${target}
+
+## Findings
+
+| ID | Status | Commit | Note |
+|---|---|---|---|
+| PPW-9570 | fixed | \`ffffff1\`
+`
+  writeFileSync(join(dir, 'resolution-v1.md'), resolution)
+  const r = run('autonomy-policy.mjs', ['--root', T, target, 'decide', 'delta-worthiness'])
+  check('the policy and the shared reader agree that a truncated row states no fix',
+    fixedRows(resolution).length === 0 && !r.out.includes('NEXT: delta discovery') && !r.out.includes('PPW-9570'),
+    `${JSON.stringify(fixedRows(resolution))} · ${r.out.trim()}`)
+  rmSync(T, { recursive: true, force: true })
 }
 
 // A mis-stamped run-start would push the override cut-off past a real override and hide it.
