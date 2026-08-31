@@ -27,7 +27,8 @@ import { sliceSpans, strictSpans } from './model/spans.mjs'
 import { newest } from './model/target.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { INDEX, REVIEWS as REVIEWS_HOME } from './records/schema.mjs'
-import { parse, section, word } from './records/frontmatter.mjs'
+import { parse, word } from './records/frontmatter.mjs'
+import { TALLY, rows as resolutionRows, zeroTally } from './records/resolution.mjs'
 import { appendLine, readMetrics } from './records/metrics.mjs'
 import { live, matchesVoid, readLines, voidsOf } from './records/worklog.mjs'
 
@@ -199,31 +200,18 @@ function renderFixRound() {
   if (!existsSync(resPath)) fail(`no resolution-v${round}.md`)
   const resText = readFileSync(resPath, 'utf8')
 
-  // ---------- resolution frontmatter: findings map + status + fixed_commit ----------
+  // ---------- resolution: the Findings table, status and fixed_commit ----------
   const parsed = parse(resText, { lenient: true })
   if (parsed.fm === null) fail('resolution has no frontmatter')
   const fm = parsed.fm
-  const findings = new Map() // id -> {status, commit, note}
-  // New shape: "## Findings" body table. Old shape (grandfathered): frontmatter map.
-  const fSection = section(parsed.body, 'Findings')
-  for (const r of fSection.split('\n').filter(l => /^\|\s*(?:D\d+|[A-Za-z]+-\d+)\s*\|/.test(l))) {
-    const c = r.split('|').map(x => x.trim())
-    findings.set(c[1], { status: c[2], commit: c[3] ?? null })
-  }
-  if (!findings.size) for (const m of fm.matchAll(/^ {2}([A-Za-z]+-?\d+(?:–[A-Za-z]*\d+)?):\s*\{\s*status:\s*([a-z-]+)([^\n]*)/gm) ?? []) {
-    const restLine = m[3]
-    const c = (/commit:\s*"([^"]+)"/.exec(restLine) || /commit:\s*([0-9a-f]{7,40})/.exec(restLine))?.[1] ?? null
-    const noteTxt = /note:\s*"((?:[^"\\]|\\.)*)"/.exec(restLine)?.[1] ?? null
-    findings.set(m[1], { status: m[2], commit: c, note: noteTxt })
-  }
-  if (!findings.size) fail('no "## Findings" table rows and no frontmatter findings map')
+  const findings = new Map(resolutionRows(parsed.body).map(r => [r.id, { status: r.status, commit: r.commit }]))
+  if (!findings.size) fail('no "## Findings" table rows')
   const resStatus = word(fm, 'status') ?? 'open'
   // word() stays on the key's own line, so an empty value never reads the NEXT key's name.
   const fixedCommitRaw = word(fm, 'fixed_commit') || 'null'
   const fixedCommit = fixedCommitRaw === 'null' ? null : fixedCommitRaw.replace(/"/g, '')
 
-  const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', backlog: 'deferred', disputed: 'disputed', 'false-positive': 'false_positive' }
-  const tallies = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
+  const tallies = zeroTally()
   for (const { status } of findings.values()) tallies[TALLY[status] ?? 'open']++
 
   const events = loadEvents()

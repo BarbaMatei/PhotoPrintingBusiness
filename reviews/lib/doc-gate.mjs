@@ -14,6 +14,7 @@ import { join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { AREAS, BACKLOG, CAPS, INDEX, REVIEWS as REVIEWS_HOME, SEVERITIES as SEV, SHA_SCAN_RE, STATUSES as STATUS_WORDS, TARGETLESS, V4_CUTOFF } from './records/schema.mjs'
 import { parse, section as bodySection, value as fmVal } from './records/frontmatter.mjs'
+import { blocks as ledgerBlocks } from './records/ledger.mjs'
 import { resolveDir } from './model/target.mjs'
 import { takeRoot } from './cli/args.mjs'
 
@@ -263,11 +264,6 @@ if (existsSync(join(dir, resolutionFile))) {
 
 // ---------- ledger.md: block caps, status vocabulary, append-only vs git HEAD ----------
 const STATUSES = new Set(STATUS_WORDS)
-const blocksOf = raw => {
-  const map = new Map()
-  for (const m of raw.matchAll(/^### (PPW-\d+)[^\n]*\n([\s\S]*?)(?=^### PPW-\d+|(?![\s\S]))/gm)) map.set(m[1], m[2])
-  return map
-}
 if (existsSync(join(dir, 'ledger.md'))) {
   const raw = read('ledger.md')
   for (const m of raw.matchAll(/^\|\s*(PPW-\d+)\s*\|(.*)\|\s*$/gm)) {
@@ -276,14 +272,14 @@ if (existsSync(join(dir, 'ledger.md'))) {
     if (status !== undefined && status !== '' && !STATUSES.has(status.replace(/\*/g, '')))
       bad('ledger.md', `${m[1]} Status cell is "${status}" — the status word only; narration goes in the History lines`)
   }
-  const blocks = blocksOf(raw)
+  const blocks = ledgerBlocks(raw)
   for (const [id, text] of blocks) {
     const n = text.split('\n').filter(l => l.trim() !== '').length
     if (n > CAPS.ledgerBlockLines) bad('ledger.md', `detail block ${id} is ${n} lines — cap is ${CAPS.ledgerBlockLines}`)
   }
   try {
     const head = execFileSync('git', ['show', `HEAD:${gitPath}/ledger.md`], { cwd: join(REVIEWS, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).replace(/\r\n/g, '\n')
-    const old = blocksOf(head)
+    const old = ledgerBlocks(head)
     for (const [id, oldText] of old) {
       const now = blocks.get(id)
       if (now === undefined) { bad('ledger.md', `detail block ${id} exists in HEAD but was deleted — blocks are append-only`); continue }

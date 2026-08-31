@@ -29,6 +29,7 @@ import { newest, resolveDir } from './model/target.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { appendEvent } from './wl.mjs'
 import { parse, value } from './records/frontmatter.mjs'
+import { fixedRows } from './records/resolution.mjs'
 
 const { root, rest: argv } = takeRoot(process.argv.slice(2))
 let only = null, dryRun = false, noEvents = false
@@ -63,12 +64,10 @@ const runCmd = c => spawnSync(c, { cwd: REPO, encoding: 'utf8', shell: true, tim
 const N = newest(dir, 'resolution')
 if (!N) { console.error(`no resolution file in ${dir}`); process.exit(2) }
 const resolutionText = readFileSync(join(dir, `resolution-v${N}.md`), 'utf8')
-// A fix may span several commits (the micro-review follow-up is the common case), so the Commit
-// cell can list more than one. Take every sha in the cell and never skip a `fixed` row silently:
-// a row whose cell holds no sha is reported, because under-coverage in a verifier reads as a pass.
-const rows = [...resolutionText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|([^|]*)\|/gm)]
-  .map(m => ({ id: m[1], commits: m[2].match(/[0-9a-f]{7,40}/g) ?? [] }))
-  .map(r => ({ ...r, commit: r.commits.join(', ') }))
+// Never skip a `fixed` row silently: a row whose Commit cell holds no sha is reported, because
+// under-coverage in a verifier reads as a pass.
+const rows = fixedRows(resolutionText)
+  .map(r => ({ id: r.id, commits: r.commits, commit: r.commits.join(', ') }))
   .filter(r => !only || only.has(r.id))
 if (!rows.length) { console.error(`resolution-v${N}.md has no matching fixed rows`); process.exit(2) }
 
