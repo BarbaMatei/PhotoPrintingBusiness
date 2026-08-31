@@ -6,15 +6,28 @@
 // A generated block is the text between `<!-- generated:<name> -->` and its closing marker; the
 // prose around the markers is the owner's and is never touched. The block list below names the
 // one machine home of each table, so a rule with two homes cannot drift apart silently.
+// Drift and broken links are separate signals: the drift half is fast and mechanical, the link
+// half reads records nobody may edit to make a hook green, so only the drift half is hook-grade.
 //
-// Usage: node reviews/lib/cli/docs-sync.mjs [--check | --write]
-// Exit: 0 in step (or written) · 1 a block is stale or a link is broken.
+// Usage: node reviews/lib/cli/docs-sync.mjs [--root <repoRoot>] [--check | --write] [--no-links] [--links]
+// Exit: 0 in step (or written) · 1 a block is stale, a marker is missing, or --check found a
+//       broken link. `--no-links` skips the link scan (drift only, what the pre-commit hook runs);
+//       `--write` never counts links in its exit unless `--links` asks for it.
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
-import { REVIEWS, REPO, AREAS, AREA_COVERS, CAP_ROWS, CORE_LENSES, ADDED_LENSES, EVENTS, FIXER_EVENTS, HANDBACK_EVENT_DOCS, MANIFEST_LENSES } from '../records/schema.mjs'
+import { fileURLToPath } from 'node:url'
+import { AREAS, AREA_COVERS, CAP_ROWS, CORE_LENSES, ADDED_LENSES, EVENTS, FIXER_EVENTS, HANDBACK_EVENT_DOCS, MANIFEST_LENSES } from '../records/schema.mjs'
 import { V2_FIELDS, V3_FIX_FIELDS } from '../records/validate.mjs'
 import { ROWS } from '../drive/rows.mjs'
 import { GATE_DOCS, POLICY_NEXT } from '../drive/gates.mjs'
+import { takeRoot } from './args.mjs'
+
+const { root, rest } = takeRoot(process.argv.slice(2))
+// This CLI sits one folder deeper than the scripts cli/args.mjs derives roots for.
+const REPO = root || join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+const REVIEWS = join(REPO, 'reviews')
+const SKILLS = join(REPO, '.claude', 'skills')
+const flag = name => rest.includes(name)
 
 const table = (head, rows) => [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...rows.map(r => `| ${r.join(' | ')} |`)].join('\n')
 const fields = ev => (EVENTS[ev]?.required ?? []).map(f => `\`${f}\``).join(', ')
@@ -73,12 +86,12 @@ const BLOCKS = [
   },
   {
     name: 'fixer-events',
-    file: join(REPO, '.claude', 'skills', 'fix-review', 'SKILL.md'),
+    file: join(SKILLS, 'fix-review', 'SKILL.md'),
     render: () => table(['Event', 'When', 'Extra fields'], FIXER_EVENTS.map(e => [e.events.map(x => `\`${x}\``).join(' / '), e.when, e.extra])),
   },
   {
     name: 'gate-kinds',
-    file: join(REPO, '.claude', 'skills', 'loop-driver', 'SKILL.md'),
+    file: join(SKILLS, 'loop-driver', 'SKILL.md'),
     render: () => table(['Gate kind', 'Router exit', 'The router means', 'The written policy answers'],
       GATE_DOCS.map(g => [`\`${g.kind}\``, String(g.exit), g.router, g.policy])),
   },
@@ -106,7 +119,7 @@ function splice(text, name, body) {
   return { text: `${head}\n${body}\n${text.slice(close)}`, current: text.slice(open + OPEN(name).length, close).replace(/^\n|\n$/g, '') }
 }
 
-const write = process.argv.includes('--write')
+const write = flag('--write')
 const problems = []
 const stale = []
 const files = new Map()
@@ -136,9 +149,9 @@ for (const s of stale) {
 }
 problems.push(...lensCoverage())
 
-// The link check (formerly fix-links.mjs): every markdown link under reviews/ resolves.
+// Every markdown link under reviews/ must resolve to a file.
 const mdFiles = []
-;(function walk(d) {
+if (!flag('--no-links')) (function walk(d) {
   for (const e of readdirSync(d, { withFileTypes: true })) {
     const p = join(d, e.name)
     if (e.isDirectory()) walk(p)
@@ -153,7 +166,10 @@ for (const p of mdFiles) {
     if (!existsSync(join(dirname(p), t.split('#')[0]))) { console.log(`BROKEN ${relative(REPO, p)}: ${t}`); broken++ }
   }
 }
-console.log(broken ? `${broken} broken link(s)` : 'all reviews/ links resolve')
+if (!flag('--no-links')) console.log(broken ? `${broken} broken link(s)` : 'all reviews/ links resolve')
 for (const p of problems) console.log(`PROBLEM ${p}`)
-if (!write && !stale.length && !problems.length && !broken) console.log(`docs-sync --check: ${BLOCKS.length} generated blocks in step`)
-process.exit((write ? 0 : stale.length) + problems.length + broken ? 1 : 0)
+// The drift verdict is printed on its own, so a broken link somewhere in the records never hides
+// the answer the hook and the suite ask for.
+if (!write && !stale.length && !problems.length) console.log(`docs-sync --check: ${BLOCKS.length} generated blocks in step`)
+const linksCount = write ? flag('--links') : true
+process.exit((write ? 0 : stale.length) + problems.length + (linksCount ? broken : 0) ? 1 : 0)

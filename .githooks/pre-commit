@@ -62,6 +62,19 @@ if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')"
   fi
 fi
 
+# Tables inside <!-- generated:... --> markers are rendered from the code, so a hand edit there is
+# drift. Drift only (--no-links): the link scan reads records this hook cannot ask anyone to fix.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- reviews/README.md 'reviews/rules/*.md' 'reviews/runbooks/*.md' .claude/skills/loop-driver/SKILL.md .claude/skills/fix-review/SKILL.md)" ]; then
+  if ! node reviews/lib/cli/docs-sync.mjs --check --no-links >&2; then
+    echo "" >&2
+    echo "A generated block no longer matches the code that renders it. Edit the data behind it" >&2
+    echo "(reviews/lib/drive/rows.mjs, reviews/lib/drive/gates.mjs, reviews/lib/records/schema.mjs," >&2
+    echo "reviews/lib/records/validate.mjs), then run:" >&2
+    echo "  node reviews/lib/cli/docs-sync.mjs --write" >&2
+    exit 1
+  fi
+fi
+
 if [ -z "$hits" ]; then exit 0; fi
 if [ -n "$COMMENTS_OK" ]; then
   log_override COMMENTS_OK "$(printf '%s\n' "$hits" | cut -d: -f1 | sort -u)"
