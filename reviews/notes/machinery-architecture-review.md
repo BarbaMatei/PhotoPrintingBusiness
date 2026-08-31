@@ -1,6 +1,6 @@
 ---
 type: design-note
-status: draft for owner approval — phase 7a output, 2026-08-28
+status: owner answered all six questions 2026-08-28 (see "Owner decisions"); inventory stands as written — 7b may start on the owner's word
 created: 2026-08-28
 owner: Matei Barba
 charter: machinery-restructure-plan.md
@@ -397,3 +397,28 @@ so the count drops to 555 there and stays).
 6. Skill eval folders: delete after archiving their status lines, or keep as history?
 
 Everything else in this note is decided as written and needs no answer.
+
+## Owner decisions (2026-08-28)
+
+The owner chose from options prepared by an independent analysis (no prior recommendations
+in its input); each ruling below changes the migration order where named.
+
+1. **The redesign brake applies on every path into a fix round** — the armed, batch and
+   sweep rows go through it too. Migration step 6 implements it (route every fix-round
+   answer through the convergence check) with a fixture per newly braked row; the README
+   row and its precedence paragraph change in the same step.
+2. **Archives: duplicate-id scan only.** Step 11 deletes the V2/V3 tolerance tiers,
+   `LEGACY_TOP`, the `D<n>` id allowance and the archive metrics/resolution validation;
+   the cross-target id-uniqueness scan keeps reading archive ledgers.
+3. **`ledger-miner.mjs`: delete now** (step 9, firm). The prevention-sweep spec survives in
+   git history and the design notes; rebuild against real classified rows if the backfill
+   is ever scheduled.
+4. **The wording judge covers owner-facing prose only** (summaries, index glance cells).
+   Decisions blocks fall to the lint plus the lint-mining habit. doc-contracts' judge-scope
+   sentence and the loop-driver's judge step change together in 7b.
+5. **The citation-leak scan stays in the auditor** — overrides this note's section 7
+   recommendation; step 7 keeps it inside `records/validate.mjs` (one grep per run, the
+   whole-repo backstop the hook cannot be).
+6. **Skill eval folders: rebuild their fixtures in 7b**, in the step that rewrites the two
+   skills; retire only what 7b makes obsolete, and correct `evals.json`'s stale operating
+   restriction (overtaken by the 2026-08-20 unattended policy) as part of it.
