@@ -93,7 +93,6 @@ export const BACKLOG = join(REVIEWS, 'state', 'backlog.md')
 export const INDEX = join(REVIEWS, 'state', 'index.md')
 export const TRACK_RECORD = join(REVIEWS, 'state', 'track-record.md')
 export const ID_COUNTER = join(REVIEWS, 'state', 'id-counter')
-export const DEFECT_CLASSES = join(REVIEWS, 'state', 'defect-classes.jsonl')
 export const TEMPLATES = join(REVIEWS, 'templates')
 
 // ---------------------------------------------------------------------------

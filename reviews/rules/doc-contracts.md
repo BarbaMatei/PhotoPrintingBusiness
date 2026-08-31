@@ -178,8 +178,6 @@ Allowed system terms. Anything else must be everyday English.
 - **override log** — `reviews/state/overrides.jsonl`, untracked: the pre-commit hook's record of every `COMMENTS_OK`/`DOCGATE_OK` use. An entry newer than an unattended run's start stops the run.
 - **reconciliation** — after the blinded pass, matching its finds to ledger rows and
   minting a `PPW-<n>` for each one that is new.
-- **class sidecar** — `reviews/state/defect-classes.jsonl`, one line per classified
-  ledger row, written by the prevention-sweep backfill, read by the ledger miner.
 
 ## Per-file contracts
 

@@ -205,7 +205,6 @@ Built and operating:
 | Records auditor (schema, tallies, pairing, commit reachability, citation-leak count with target 0) | [lib/records-auditor.mjs](../lib/records-auditor.mjs) |
 | Doc gate (deterministic lint, target + `state` modes, + Sonnet judge; pre-commit backstop; 36-assertion fixture suite) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
 | Path constants + link keeper (every move: `git mv`, constant, then the link check) | [lib/paths.mjs](../lib/paths.mjs) + [lib/cli/docs-sync.mjs](../lib/cli/docs-sync.mjs) |
-| Ledger miner (ranks defect classes by measured cost into definition-of-done) — **built, unfed**: the class sidecar backfill has not run | [lib/ledger-miner.mjs](../lib/ledger-miner.mjs) + [spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md) |
 | Ledgers + worklogs (template-bound; append-only enforced against git HEAD by the gate) | per-target files, shapes in [doc-contracts.md](../rules/doc-contracts.md) |
 
 To build — re-audited item by item against today's system:
@@ -220,8 +219,10 @@ To build — re-audited item by item against today's system:
 | 6 | ~~compress-review + plain-language skills~~ | — | — | Closed, done differently: templates + caps + automated close sequence + compressed index + judge-enforced language (section above) |
 
 Approved and waiting to run (not a build): the prevention-sweep backfill — ~290 ledger rows
-classified into the sidecar, ~150–250k tokens, then the miner's first real ranking
-([spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md)).
+classified into the spec's class sidecar, ~150–250k tokens, then the ranking's first real run
+([spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md)). The first cut of
+the ranking script was deleted unfed on 2026-08-31; when the backfill is scheduled, rebuild it
+against `records/` from the spec and the deleted version in git history.
 
 System backlog (from live runs): auto-append findings as inline PR comments once `gh` is
 in play · a reusable cross-repo lens pack is now a direction option (D below), not a side
@@ -387,5 +388,5 @@ renderer and the stamper already made.
   reconciler.
 
 None of these is queued. Each stays unbuilt until the lint-miner habit surfaces it as a
-measured cost — the same way the ledger miner is meant to rank defect classes — or the owner
+measured cost — the same way the prevention sweep is meant to rank defect classes — or the owner
 asks for it outright.
