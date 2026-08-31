@@ -1,14 +1,13 @@
 // Reader for a target's ledger Findings table — the record of which findings are still open.
-// The router and the autonomy policy both route on it, so the row shape, the status vocabulary
-// and the definition of "open" live here once.
+// The router and the autonomy policy both route on it, so the row shape and the definition of
+// "open" live here once; the status and severity words come from records/schema.mjs.
 // Row shape (doc-contracts.md): | PPW-<n> | 🔴|🟠|🟡|⚪ | first seen | title | file | status | affirmed |
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { V3_CUTOFF } from './vocab.mjs'
+import { OPEN_STATUSES, SEVERITIES, STATUSES, V3_CUTOFF } from './records/schema.mjs'
 
-export const OPEN_STATUSES = ['open', 'in-progress']
-const STATUSES = [...OPEN_STATUSES, 'fixed', 'verified', 'wont-fix', 'deferred', 'disputed', 'false-positive', 'backlog']
-const ROW = /^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|[^|\n]*\|[^|\n]*\|[^|\n]*\|\s*([a-z-]+)\s*\|/gm
+export { OPEN_STATUSES }
+const ROW = new RegExp(`^\\|\\s*(PPW-\\d+)\\s*\\|\\s*(${SEVERITIES.join('|')})\\s*\\|[^|\\n]*\\|[^|\\n]*\\|[^|\\n]*\\|\\s*([a-z-]+)\\s*\\|`, 'gm')
 const ID_ROW = /^\|\s*PPW-\d+\s*\|/gm
 
 // null when the target has no ledger at all: callers fall back to their pre-ledger behaviour.

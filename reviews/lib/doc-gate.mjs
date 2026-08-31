@@ -12,7 +12,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { V4_CUTOFF } from './vocab.mjs'
+import { AREAS, CAPS, SEVERITIES as SEV, SHA_SCAN_RE, STATUSES as STATUS_WORDS, TARGETLESS, V4_CUTOFF } from './records/schema.mjs'
 import { BACKLOG, INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
 
 const argv = process.argv.slice(2)
@@ -25,11 +25,7 @@ for (let i = 0; i < argv.length; i++) {
 
 const problems = []
 const bad = (file, msg) => problems.push(`${file}: ${msg}`)
-const SEV = ['🔴', '🟠', '🟡', '⚪']
 const BANNED = /\b(critical|severe|blocker)s?\b/i
-// doc-contracts.md stays the prose authority for what each area covers.
-const AREAS = ['payments', 'orders', 'shipping', 'uploads', 'gallery', 'auth', 'edge', 'observability', 'jobs', 'data', 'tests', 'records']
-const TARGETLESS = new Set(['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'])
 
 function report(label) {
   if (problems.length) {
@@ -98,7 +94,7 @@ function lintStateFiles() {
     else for (const r of rows(glance)) {
       const state = r.cells[2] ?? ''
       const breaks = (state.match(/<br\s*\/?>/gi) ?? []).length
-      if (breaks > 4) bad(f, `glance row "${r.cells[1]}": State cell is ${breaks + 1} lines — cap is 5 (doc-contracts.md)`)
+      if (breaks + 1 > CAPS.glanceStateLines) bad(f, `glance row "${r.cells[1]}": State cell is ${breaks + 1} lines — cap is ${CAPS.glanceStateLines} (doc-contracts.md)`)
     }
     const passes = section('Passes')
     if (passes === null) bad(f, 'missing heading "## Passes"')
@@ -112,7 +108,7 @@ function lintStateFiles() {
         if (!/^\d+\/\d+\/\d+\/\d+/.test((counts ?? '').trim())) bad(f, `${where}: New H/M/L/C cell is "${counts ?? ''}" — must open with <h>/<m>/<l>/<c>`)
         if (!/system/i.test(tgt ?? '') && !keys.has((tgt ?? '').trim())) bad(f, `${where}: target "${tgt}" is not a target folder key (${[...keys].filter(k => /^\d/.test(k)).sort().join(' · ')}); only meta rows are exempt`)
         const w = description ? words(description) : 0
-        if (w > 50) bad(f, `${where}: description is ${w} words — cap is 50`)
+        if (w > CAPS.passDescriptionWords) bad(f, `${where}: description is ${w} words — cap is ${CAPS.passDescriptionWords}`)
       }
     }
   }
@@ -175,7 +171,7 @@ if (existsSync(join(dir, reviewFile))) {
       new RegExp(`^# Review v${pass} — ${name}$`),
       /^## Findings$/, /^## Refuted$/, /^## Notes for the fixer$/,
     ])
-    if (bodyLines(p.body) > 120) bad(reviewFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 120`)
+    if (bodyLines(p.body) > CAPS.reviewBodyLines) bad(reviewFile, `body is ${bodyLines(p.body)} non-empty lines — cap is ${CAPS.reviewBodyLines}`)
     const findingsOnly = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
     const rows = findingsOnly.split('\n').filter(l => /^\|\s*(?:PPW-|—|F\d|[A-Z]{2,7}-\d)/.test(l))
     for (const r of rows) {
@@ -198,7 +194,7 @@ if (existsSync(join(dir, summaryFile))) {
       new RegExp(`^# Owner summary — ${name} v${pass}$`),
       /^## Needs your decision$/, /^## Reasons to doubt$/, /^## Filed automatically$/, /^## State$/,
     ])
-    if (bodyLines(p.body) > 60) bad(summaryFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 60`)
+    if (bodyLines(p.body) > CAPS.summaryBodyLines) bad(summaryFile, `body is ${bodyLines(p.body)} non-empty lines — cap is ${CAPS.summaryBodyLines}`)
     const banned = p.body.match(BANNED)
     if (banned) bad(summaryFile, `banned severity synonym "${banned[0]}" — use the four severity words (doc-contracts.md)`)
     if (reviewFm) {
@@ -226,19 +222,19 @@ if (existsSync(join(dir, resolutionFile))) {
       resolutionKeys.push(cells[1])
       resolutionRows.push({ id: cells[1], status: cells[2] ?? '' })
       if (!RSTAT.test(cells[2] ?? '')) bad(resolutionFile, `${cells[1]} status "${cells[2]}" — one status word, never "verified" (that belongs to a re-review)`)
-      if ((cells[4] ?? '').length > 240) bad(resolutionFile, `${cells[1]} note is ${cells[4].length} chars — cap is 240; the story goes in Decisions`)
+      if ((cells[4] ?? '').length > CAPS.resolutionNoteChars) bad(resolutionFile, `${cells[1]} note is ${cells[4].length} chars — cap is ${CAPS.resolutionNoteChars}; the story goes in Decisions`)
     }
     if (!resolutionKeys.length) bad(resolutionFile, 'the "## Findings" table has no rows')
     const got = headings(p.body)
     if (!got[0] || !new RegExp(`^# Resolution v${pass} — ${name}$`).test(got[0]))
       bad(resolutionFile, `title is "${got[0] ?? '(none)'}" — template requires "# Resolution v${pass} — ${name}"`)
     for (const h of ['## Findings', '## Scope', '## Decisions']) if (!got.includes(h)) bad(resolutionFile, `missing heading "${h}"`)
-    if (bodyLines(p.body) > 200) bad(resolutionFile, `body is ${bodyLines(p.body)} non-empty lines — cap is 200`)
+    if (bodyLines(p.body) > CAPS.resolutionBodyLines) bad(resolutionFile, `body is ${bodyLines(p.body)} non-empty lines — cap is ${CAPS.resolutionBodyLines}`)
     const decisionsSection = p.body.split(/^## /m).find(s => s.startsWith('Decisions')) ?? ''
     const decisions = decisionsSection.split(/^### /m).slice(1)
     for (const d of decisions) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1
-      if (n > 15) bad(resolutionFile, `decision "${d.split('\n')[0]}" is ${n} lines — cap is 15`)
+      if (n > CAPS.decisionLines) bad(resolutionFile, `decision "${d.split('\n')[0]}" is ${n} lines — cap is ${CAPS.decisionLines}`)
     }
     // From the V4 cut-off a scope table names its cluster's protocol block, and a protocol states an invariant.
     const closed = fmVal(p.fm, 'closed')
@@ -271,7 +267,7 @@ if (existsSync(join(dir, resolutionFile))) {
 }
 
 // ---------- ledger.md: block caps, status vocabulary, append-only vs git HEAD ----------
-const STATUSES = new Set(['open', 'in-progress', 'fixed', 'verified', 'wont-fix', 'deferred', 'disputed', 'false-positive', 'backlog'])
+const STATUSES = new Set(STATUS_WORDS)
 const blocksOf = raw => {
   const map = new Map()
   for (const m of raw.matchAll(/^### (PPW-\d+)[^\n]*\n([\s\S]*?)(?=^### PPW-\d+|(?![\s\S]))/gm)) map.set(m[1], m[2])
@@ -288,7 +284,7 @@ if (existsSync(join(dir, 'ledger.md'))) {
   const blocks = blocksOf(raw)
   for (const [id, text] of blocks) {
     const n = text.split('\n').filter(l => l.trim() !== '').length
-    if (n > 20) bad('ledger.md', `detail block ${id} is ${n} lines — cap is 20`)
+    if (n > CAPS.ledgerBlockLines) bad('ledger.md', `detail block ${id} is ${n} lines — cap is ${CAPS.ledgerBlockLines}`)
   }
   try {
     const head = execFileSync('git', ['show', `HEAD:${gitPath}/ledger.md`], { cwd: join(REVIEWS, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).replace(/\r\n/g, '\n')
@@ -341,7 +337,7 @@ function checkTargetStateSanity() {
   const scan = (where, text) => {
     if (hasLedger) for (const m of text.matchAll(/PPW-\d+/g)) if (!ledgerIds.has(m[0])) bad(f, `${where}: ${m[0]} is not in ${name}'s ledger`)
     if (!gitAvailable) return
-    for (const m of text.matchAll(/\b[0-9a-f]{7,40}\b/g)) {
+    for (const m of text.matchAll(SHA_SCAN_RE)) {
       const tok = m[0]
       if (!/\d/.test(tok) || /^\d+$/.test(tok)) continue
       if (!shaResolves(tok)) bad(f, `${where}: sha \`${tok}\` does not resolve (git cat-file -e)`)

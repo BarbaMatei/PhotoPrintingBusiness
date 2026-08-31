@@ -17,42 +17,13 @@
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { EVENTS } from './records/schema.mjs'
 
-const VOCAB = new Set([
-  'round-start', 'round-end', 'triage-done', 'gate-open', 'gate-closed', 'gate-parked',
-  'protocol-written', 'check-dispatched', 'check-returned', 'test-run', 'finding',
-  'micro-review-dispatched', 'micro-review-returned', 'round-review-dispatched',
-  'round-review-returned', 'test-audit-dispatched', 'test-audit-returned', 'doc-gate',
-  'pass-launch', 'pass-records-done', 'run-start', 'run-end', 'note', 'void', 'verify-result',
-])
-
-const REQUIRED = {
-  'round-start': ['round'],
-  'round-end': ['round'],
-  'triage-done': ['round', 'clusters'],
-  'gate-open': ['reason'],
-  'gate-closed': ['reason'],
-  'gate-parked': ['kind', 'default', 'reason'],
-  'protocol-written': ['round', 'cluster', 'ids'],
-  'check-dispatched': ['round', 'cluster', 'ids'],
-  'check-returned': ['round', 'cluster', 'verdict'],
-  'test-run': ['kind'],
-  'finding': ['id', 'status'],
-  'micro-review-dispatched': ['cluster'],
-  'micro-review-returned': ['cluster'],
-  'round-review-dispatched': ['round'],
-  'round-review-returned': ['round', 'found'],
-  'test-audit-dispatched': ['round'],
-  'test-audit-returned': ['round', 'verdict'],
-  'pass-launch': ['pass', 'type'],
-  'pass-records-done': ['pass'],
-  'verify-result': ['id', 'verdict'],
-  'void': ['of'],
-}
+const VOCAB = new Set(Object.keys(EVENTS))
+const IDS_EVENTS = new Set(Object.keys(EVENTS).filter(ev => EVENTS[ev].ids))
 
 const TEST_KINDS = new Set(['red', 'green', 'final', 'baseline', 'revert-and-rerun'])
 const PPW = /^PPW-\d+$/
-const IDS_EVENTS = new Set(['protocol-written', 'check-dispatched'])
 
 function readEvents(wlPath) {
   if (!existsSync(wlPath)) return []
@@ -92,7 +63,7 @@ function closestTimestamps(events, tIso) {
 
 function validateShape(event) {
   const { ev } = event
-  for (const key of REQUIRED[ev] ?? []) {
+  for (const key of EVENTS[ev]?.required ?? []) {
     if (event[key] === undefined) throw new Error(`"${ev}" requires "${key}"`)
   }
   if (['round-start', 'round-end', 'triage-done', 'protocol-written', 'round-review-dispatched', 'round-review-returned', 'test-audit-dispatched', 'test-audit-returned'].includes(ev) && typeof event.round !== 'number') {

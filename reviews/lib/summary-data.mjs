@@ -2,7 +2,7 @@
 // Computed half of the owner-summary skill's "Reasons to doubt" section
 // (.claude/skills/owner-summary/SKILL.md): reads one pass's metrics.jsonl line and prints
 // markdown-ready bullet fragments for the skill to assemble into prose. Never writes anything.
-// Lens list: reviews/lib/vocab.mjs's MANIFEST_LENSES (the 11-lens manifest) is the authority
+// Lens list: reviews/lib/records/schema.mjs's MANIFEST_LENSES (the 11-lens manifest) is the authority
 // here — not a hardcoded core list — so a manifest change there is picked up for free.
 //
 // Usage: node reviews/lib/summary-data.mjs [--root <repoRoot>] <target> <pass>
@@ -10,7 +10,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MANIFEST_LENSES } from './vocab.mjs'
+import { MANIFEST_LENSES } from './records/schema.mjs'
 
 const USAGE = 'usage: node reviews/lib/summary-data.mjs [--root <repoRoot>] <target> <pass>'
 const plural = (n, word, pluralWord = `${word}s`) => `${n} ${n === 1 ? word : pluralWord}`

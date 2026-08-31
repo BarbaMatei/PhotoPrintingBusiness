@@ -203,7 +203,7 @@ corrections.
 ## v4 (2026-08-28): seed lineage and the round review
 
 Additions from the accepted fix-round audit; they apply only from the cut-off
-(`V4_CUTOFF` in `reviews/lib/vocab.mjs`) — earlier lines are grandfathered and never
+(`V4_CUTOFF` in `reviews/lib/records/schema.mjs`) — earlier lines are grandfathered and never
 backfilled with estimates.
 
 - **`findings[]` entries gain two optional keys** (discovery, delta *and* verification

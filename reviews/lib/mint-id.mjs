@@ -21,8 +21,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { REVIEWS as REVIEWS_HOME, ID_COUNTER, TEMPLATES } from './paths.mjs'
+import { SEVERITIES as SEV } from './records/schema.mjs'
 
-const SEV = ['🔴', '🟠', '🟡', '⚪']
 const todayIso = () => new Date().toISOString().slice(0, 10)
 const fail = msg => { console.error(`ERROR ${msg}`); process.exit(2) }
 const strip = l => l.replace(/\r$/, '')

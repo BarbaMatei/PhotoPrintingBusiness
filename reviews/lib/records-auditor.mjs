@@ -16,7 +16,7 @@ import { execSync } from 'node:child_process'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
-import { AREAS, V3_CUTOFF, V4_CUTOFF } from './vocab.mjs'
+import { AREAS, SEVERITIES, SHA_RE, TARGETLESS, V2_CUTOFF, V3_CUTOFF, V4_CUTOFF } from './records/schema.mjs'
 import { live } from './wl.mjs'
 
 const argv = process.argv.slice(2)
@@ -29,7 +29,6 @@ for (let i = 0; i < argv.length; i++) {
 if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const REVIEWS = join(ROOT, 'reviews')
 
-const V2_CUTOFF = '2026-07-30'
 const TYPES = new Set(['discovery', 'delta-discovery', 'verification'])
 const SUBTYPES = new Set(['certification-pair-A', 'certification-pair-B', 'certification-single'])
 const SEVS = new Set(['high', 'medium', 'low', 'cleanup'])
@@ -61,12 +60,10 @@ function checkSha(sha) {
   shaCache.set(sha, r)
   return r
 }
-const SHA_RE = /^[0-9a-f]{7,40}$/
-
 function listTargets(all = false) {
   const out = []
   for (const e of readdirSync(REVIEWS, { withFileTypes: true })) {
-    if (!e.isDirectory() || ['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'].includes(e.name)) continue
+    if (!e.isDirectory() || TARGETLESS.has(e.name)) continue
     out.push({ name: e.name, dir: join(REVIEWS, e.name), archived: false })
   }
   const arch = join(REVIEWS, 'archive')
@@ -440,7 +437,7 @@ function auditHandBackGates(t, tag, roundDates, events, strictTier) {
     const blocks = new Map()
     for (const b of ledgerText.matchAll(/^### (PPW-\d+)[^\n]*\n([\s\S]*?)(?=^### PPW-\d+|(?![\s\S]))/gm)) blocks.set(b[1], b[2])
     const sevOf = new Map()
-    for (const r of ledgerText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*(🔴|🟠|🟡|⚪)\s*\|/gm)) sevOf.set(r[1], r[2])
+    for (const r of ledgerText.matchAll(new RegExp(`^\\|\\s*(PPW-\\d+)\\s*\\|\\s*(${SEVERITIES.join('|')})\\s*\\|`, 'gm'))) sevOf.set(r[1], r[2])
 
     const dispatched = by('check-dispatched')
     for (const row of fixedRows) {

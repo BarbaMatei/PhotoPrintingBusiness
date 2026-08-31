@@ -78,7 +78,7 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
 5. **Append-only detail.** A ledger detail block never changes after creation,
    except new History lines. Status fields in the table may change.
 6. **Grandfathering cut-offs.** A new gate rule carries a dated cut-off, kept as
-   a constant in the checker — `V4_CUTOFF` in `lib/vocab.mjs` (2026-08-28, the
+   a constant in the checker — `V4_CUTOFF` in `lib/records/schema.mjs` (2026-08-28, the
    accepted fix-round audit) is the current one. A rule applies to a round only
    when the resolution's `closed:` date or its fix-round metrics line's date is
    on/after the cut-off; every earlier record (the sixteen passes of history,

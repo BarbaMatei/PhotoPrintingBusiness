@@ -15,8 +15,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { live } from './wl.mjs'
-
-const TARGETLESS = new Set(['lib', 'experiments', 'archive', 'state', 'rules', 'runbooks', 'notes', 'system', 'templates'])
+import { TARGETLESS } from './records/schema.mjs'
 // The field that trips the match isn't necessarily the one worth printing — priority differs.
 const MATCH_FIELDS = ['verdict', 'judge', 'reason', 'note']
 const TEXT_FIELDS = ['reason', 'judge', 'note', 'verdict']

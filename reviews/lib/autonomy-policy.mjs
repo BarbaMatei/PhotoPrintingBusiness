@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readLedger, openIds, standsDown } from './ledger.mjs'
 import { live } from './wl.mjs'
-import { MANIFEST_LENSES } from './vocab.mjs'
+import { MANIFEST_LENSES } from './records/schema.mjs'
 
 const argv = process.argv.slice(2)
 let root = null
