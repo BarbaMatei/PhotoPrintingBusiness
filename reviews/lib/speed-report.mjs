@@ -25,12 +25,12 @@
 //       worklog has no events on.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { at as atOf, covers, lenientSpans, REFUSED, short, spanOf, stamp as stampOf } from './model/spans.mjs'
 import { repoRoot } from './cli/args.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { live, readLines } from './records/worklog.mjs'
 
 const CAP_MIN = 30
-const REFUSED = Symbol('refused')
 const RECORDS_ANCHOR = new Set(['round-end', 'pass-records-done', 'doc-gate'])
 const STOPS_RECORDS = new Set(['run-end', 'gate-parked', 'gate-open'])
 const DISAPPROVAL_FIELDS = ['verdict', 'judge', 'reason', 'note']
@@ -84,40 +84,11 @@ const events = (DAY ? all.filter(e => dayOf(e) === DAY) : all)
   .map(x => x.e)
 if (!events.length) fail(DAY ? `worklog has no events on ${DAY}` : `reviews/${target}/worklog.jsonl is empty`)
 
-const at = i => events[i].t
-const stamp = (ev, i) => `${ev} at ${at(i)}`
-// A gate span is keyed by its reason, which is a sentence — a NOTE quotes only its head.
-const short = v => { const t = String(v); return t.length > 60 ? `${t.slice(0, 57)}…` : t }
+const at = i => atOf(events, i)
+const stamp = (ev, i) => stampOf(events, ev, i)
 
-// ---------- spans: rounds, passes, owner gates (index ranges, so duplicate stamps stay apart) ----------
-function pairSpans(startEv, endEv, key, resume) {
-  const spans = []
-  let open = null
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i]
-    if (e.ev === startEv) {
-      // Two starts on the same instant are one stamp restamped: the later one is the correction.
-      if (open && epochOf(e) === epochOf(events[open.from])) {
-        note(`${stamp(startEv, i)} (${key} ${short(e[key])}) restamps the ${key} ${short(open.key)} opened at the same instant — the span reads as ${key} ${short(e[key])}`)
-        open = { key: e[key], from: i }
-      } else if (open) note(`${stamp(startEv, i)} (${key} ${short(e[key])}) opens while ${key} ${short(open.key)} from ${at(open.from)} is still open — the duplicate is ignored`)
-      else open = { key: e[key], from: i }
-    } else if (e.ev === endEv) {
-      if (open) {
-        if (open.key !== e[key] && e[key] != null) note(`${stamp(endEv, i)} carries ${key} ${short(e[key])} but closes the span opened at ${at(open.from)} with ${key} ${short(open.key)} — read it as ${short(open.key)}'s end`)
-        spans.push({ key: open.key, from: open.from, to: i })
-        open = null
-      } else {
-        const from = resume ? resume(e, i, spans) : null
-        if (from === REFUSED) continue
-        if (from == null) note(`${stamp(endEv, i)} (${key} ${short(e[key])}) closes nothing and no resumption stamp precedes it — ignored`)
-        else { spans.push({ key: e[key], from, to: i }); note(`${stamp(endEv, i)} closes a resumed ${key} ${e[key]} whose ${startEv} went unstamped — opened at ${at(from)}`) }
-      }
-    }
-  }
-  if (open) { spans.push({ key: open.key, from: open.from, to: events.length - 1 }); note(`${stamp(startEv, open.from)} has no ${endEv} — measured to the last event`) }
-  return spans
-}
+// ---------- spans: rounds, passes, owner gates (the lenient strategy — see model/spans.mjs) ----------
+const pairSpans = (startEv, endEv, key, resume) => lenientSpans(events, { startEv, endEv, key, resume, note })
 
 const passSpans = pairSpans('pass-launch', 'pass-records-done', 'pass', null)
 
@@ -137,9 +108,6 @@ const resumeRound = (e, i, spans) => {
 
 const roundSpans = pairSpans('round-start', 'round-end', 'round', resumeRound)
 const gateSpans = pairSpans('gate-open', 'gate-closed', 'reason', null)
-
-const covers = (spans, i) => spans.some(s => i >= s.from && i < s.to)
-const spanOf = (spans, i) => spans.find(s => i >= s.from && i <= s.to)
 
 // ---------- buckets ----------
 const buckets = { 'owner wait': 0, 'fix-round work': 0, 'pass work': 0, 'records+gates': 0, 'idle/other': 0 }

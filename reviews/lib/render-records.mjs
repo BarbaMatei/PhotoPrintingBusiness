@@ -23,6 +23,7 @@
 // pass-records-done without --in-progress.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { sliceSpans, strictSpans } from './model/spans.mjs'
 import { newest } from './model/target.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { INDEX, REVIEWS as REVIEWS_HOME } from './records/schema.mjs'
@@ -95,36 +96,6 @@ function loadEvents() {
 }
 
 const voidHint = (ev, t, key, val) => `void the wrong stamp: node reviews/lib/wl.mjs ${target} void --json '{"of":{"ev":"${ev}","t":"${t}","${key}":${JSON.stringify(val)}}}'`
-
-function pairSpans(events, { startEv, endEv, belongs, onSecondStart, onForeign, onStrayEnd }) {
-  const spans = []
-  let open = null
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i]
-    if (e.ev !== startEv && e.ev !== endEv) continue
-    if (!belongs(e)) {
-      // An unclosed start followed by another unit's stamp is a missing end, not a live unit.
-      if (open) fail(onForeign(open.e, e))
-      continue
-    }
-    if (e.ev === startEv) {
-      if (open) fail(onSecondStart(open.e, e))
-      open = { e, i }
-    } else {
-      if (!open) fail(onStrayEnd(e, spans))
-      spans.push({ from: open.i, to: i })
-      open = null
-    }
-  }
-  return { spans, open }
-}
-
-function sliceSpans(events, spans) {
-  const seqs = spans.map(s => events.slice(s.from, s.to + 1))
-  const flat = seqs.flat()
-  for (const e of flat) if (!Number.isFinite(ts(e))) fail(`worklog event with unparseable timestamp: ${JSON.stringify(e)}`)
-  return { seqs, flat }
-}
 
 // ---------- index row: built here, inserted as the newest row of the Passes table ----------
 const indexPath = join(ROOT, 'reviews', relative(REVIEWS_HOME, INDEX))
@@ -257,8 +228,8 @@ function renderFixRound() {
 
   const events = loadEvents()
   const hint = (ev, t) => voidHint(ev, t, 'round', round)
-  const { spans, open: openStart } = pairSpans(events, {
-    startEv: 'round-start', endEv: 'round-end', belongs: e => e.round === round,
+  const { spans, open: openStart } = strictSpans(events, {
+    startEv: 'round-start', endEv: 'round-end', belongs: e => e.round === round, fail,
     onSecondStart: (o, e) => `worklog: round-start ${round} at ${e.t} while the round-start at ${o.t} is still open — one of the two is a mislabel; ${hint('round-start', o.t)}`,
     onForeign: (o, e) => `worklog: round-start ${round} at ${o.t} has no round-end — ${e.ev} ${e.round} at ${e.t} follows it, so this round's end went unstamped; stamp it (node reviews/lib/wl.mjs ${target} round-end --round ${round}) or, if the start itself was the mislabel, ${hint('round-start', o.t)}`,
     onStrayEnd: (e, done) => {
@@ -271,7 +242,7 @@ function renderFixRound() {
     note('no round-end yet — treating the last event as the current end (in-progress render)')
   }
   if (!spans.length) fail(`worklog has no round-start for round ${round}`)
-  const { seqs: spanEvents, flat: inSpans } = sliceSpans(events, spans)
+  const { seqs: spanEvents, flat: inSpans } = sliceSpans(events, spans, { fail })
 
   // ---------- runtime: blocked (gates) / active (gaps <= 30 min) / idle, per span ----------
   const CAP_S = 30 * 60 // schema v3: gaps above this with no open gate = nobody at the wheel
@@ -361,8 +332,8 @@ function renderVerification() {
 
   const events = loadEvents()
   const hint = (ev, e) => voidHint(ev, e.t, 'pass', e.pass)
-  const { spans, open: openPass } = pairSpans(events, {
-    startEv: 'pass-launch', endEv: 'pass-records-done', belongs: e => passNum(e.pass) === pass,
+  const { spans, open: openPass } = strictSpans(events, {
+    startEv: 'pass-launch', endEv: 'pass-records-done', belongs: e => passNum(e.pass) === pass, fail,
     onSecondStart: (o, e) => `worklog: pass-launch ${PASS} at ${e.t} while the pass-launch at ${o.t} is still open — one of the two is a mislabel; ${hint('pass-launch', o)}`,
     onForeign: (o, e) => `worklog: pass-launch ${PASS} at ${o.t} has no pass-records-done — ${e.ev} ${e.pass} at ${e.t} follows it, so this pass's records-done went unstamped; stamp it (node reviews/lib/wl.mjs ${target} pass-records-done --pass v${pass}) or, if the launch itself was the mislabel, ${hint('pass-launch', o)}`,
     onStrayEnd: (e, done) => {
@@ -375,7 +346,7 @@ function renderVerification() {
     note('no pass-records-done yet — treating the last event as the current end (in-progress render)')
   }
   if (!spans.length) fail(`worklog has no pass-launch for pass v${pass}`)
-  const { seqs: spanEvents, flat: inSpans } = sliceSpans(events, spans)
+  const { seqs: spanEvents, flat: inSpans } = sliceSpans(events, spans, { fail })
   const lastSpan = spanEvents[spanEvents.length - 1]
   const firstEvent = spanEvents[0][0], lastEvent = lastSpan[lastSpan.length - 1]
 

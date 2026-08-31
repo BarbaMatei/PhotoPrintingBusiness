@@ -1,8 +1,10 @@
 // Unit tests for the derived-fact modules, imported in-process (no child process): the one
-// target-folder lookup and version listing, and the CLI root/--root handling. Their own file
-// rather than records.test.mjs, because model/ answers questions ABOUT records (which folder,
-// which version) where records/ only reads files — and the runner then reports the two layers
-// separately. The consumers' test files still pin each command's behaviour end to end.
+// target-folder lookup and version listing, the two span-pairing strategies, and the CLI
+// root/--root handling. Their own file rather than records.test.mjs, because model/ answers
+// questions ABOUT records (which folder, which version, which span) where records/ only reads
+// files — and the runner then reports the two layers separately. The consumers' test files still
+// pin each command's behaviour end to end: render-records' 35 and speed-report's 82 are the
+// contract these strategies must keep, and the shapes below are the seams they share.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only model
 import { check } from './lib.mjs'
@@ -11,6 +13,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { newest, resolveDir, targetDirs, versions } from '../model/target.mjs'
+import { covers, lenientSpans, REFUSED, short, sliceSpans, spanOf, strictSpans } from '../model/spans.mjs'
 import { repoRoot, takeRoot } from '../cli/args.mjs'
 import { REPO, REVIEWS } from '../records/schema.mjs'
 
@@ -57,6 +60,105 @@ import { REPO, REVIEWS } from '../records/schema.mjs'
   check('an unknown record kind throws instead of quietly listing nothing',
     threw !== null && /resolution\|review/.test(threw.message), String(threw?.message))
   rmSync(T, { recursive: true, force: true })
+}
+
+// ---------- model/spans.mjs: the strict strategy (the renderer's) ----------
+{
+  const ev = (t, ev, round) => ({ t: `2019-05-01T${t}:00+03:00`, ev, round })
+  // fail must not return, so the test's version throws and the assertion reads the message.
+  const boom = m => { throw new Error(m) }
+  const opts = (round, extra = {}) => ({
+    startEv: 'round-start', endEv: 'round-end', belongs: e => e.round === round, fail: boom,
+    onSecondStart: (o, e) => `second start: ${o.t} then ${e.t}`,
+    onForeign: (o, e) => `foreign: open ${o.t}, ${e.ev} ${e.round} at ${e.t}`,
+    onStrayEnd: (e, done) => `stray end at ${e.t} after ${done.length} span(s)`,
+    ...extra,
+  })
+  const caught = fn => { try { fn(); return null } catch (e) { return e.message } }
+
+  const two = [ev('09:00', 'round-start', 1), ev('09:30', 'note', 1), ev('10:00', 'round-end', 1),
+    ev('11:00', 'round-start', 1), ev('11:30', 'round-end', 1)]
+  const paired = strictSpans(two, opts(1))
+  check('a resumed round pairs into one span per start/end couple, as index ranges',
+    JSON.stringify(paired.spans) === '[{"from":0,"to":2},{"from":3,"to":4}]', JSON.stringify(paired.spans))
+  check('a fully paired walk leaves nothing open', paired.open === null, JSON.stringify(paired.open))
+
+  const other = strictSpans(two, opts(2))
+  check("another unit's stamps pair no spans and raise nothing while nothing is open",
+    other.spans.length === 0 && other.open === null, JSON.stringify(other))
+
+  const open = strictSpans([ev('09:00', 'round-start', 1), ev('09:30', 'note', 1)], opts(1))
+  check('a start with no end comes back as the open span, with its index',
+    open.spans.length === 0 && open.open.i === 0, JSON.stringify(open.open?.i))
+
+  check('a second start while one is open aborts, naming both stamps',
+    caught(() => strictSpans([ev('09:00', 'round-start', 1), ev('10:00', 'round-start', 1)], opts(1)))
+      === 'second start: 2019-05-01T09:00:00+03:00 then 2019-05-01T10:00:00+03:00',
+    String(caught(() => strictSpans([ev('09:00', 'round-start', 1), ev('10:00', 'round-start', 1)], opts(1)))))
+  check("another unit's stamp arriving while a start is open aborts as a missing end",
+    caught(() => strictSpans([ev('09:00', 'round-start', 1), ev('10:00', 'round-start', 2)], opts(1)))
+      === 'foreign: open 2019-05-01T09:00:00+03:00, round-start 2 at 2019-05-01T10:00:00+03:00',
+    String(caught(() => strictSpans([ev('09:00', 'round-start', 1), ev('10:00', 'round-start', 2)], opts(1)))))
+  check('an end that closes nothing aborts, and is told how many spans already closed',
+    caught(() => strictSpans([ev('09:00', 'round-start', 1), ev('09:30', 'round-end', 1), ev('10:00', 'round-end', 1)], opts(1)))
+      === 'stray end at 2019-05-01T10:00:00+03:00 after 1 span(s)',
+    String(caught(() => strictSpans([ev('09:00', 'round-start', 1), ev('09:30', 'round-end', 1), ev('10:00', 'round-end', 1)], opts(1)))))
+
+  const sliced = sliceSpans(two, paired.spans, { fail: boom })
+  check('sliceSpans hands back one sequence per span plus the flat list',
+    sliced.seqs.length === 2 && sliced.seqs[0].length === 3 && sliced.flat.length === 5, JSON.stringify(sliced.seqs.map(s => s.length)))
+  check('a stamp whose timestamp will not parse stops the measurement',
+    /unparseable timestamp/.test(String(caught(() => sliceSpans([{ t: 'the other day', ev: 'round-start', round: 1 }], [{ from: 0, to: 0 }], { fail: boom })))),
+    String(caught(() => sliceSpans([{ t: 'the other day', ev: 'round-start', round: 1 }], [{ from: 0, to: 0 }], { fail: boom }))))
+}
+
+// ---------- model/spans.mjs: the lenient strategy (the speed report's) ----------
+{
+  const ev = (t, ev, round) => ({ t: `2019-06-01T${t}:00+03:00`, ev, round })
+  const walk = (events, resume) => {
+    const notes = []
+    const spans = lenientSpans(events, { startEv: 'round-start', endEv: 'round-end', key: 'round', resume, note: m => notes.push(m) })
+    return { spans, notes }
+  }
+
+  const restamp = walk([ev('09:00', 'round-start', 5), ev('09:00', 'round-start', 6), ev('10:00', 'round-end', 6)])
+  check('two starts on one instant are one restamp: the later key wins and the earlier costs no time',
+    JSON.stringify(restamp.spans) === '[{"key":6,"from":1,"to":2}]', JSON.stringify(restamp.spans))
+  check('the restamp is reported', /restamps the round 5 opened at the same instant/.test(restamp.notes.join('\n')), JSON.stringify(restamp.notes))
+
+  const dup = walk([ev('09:00', 'round-start', 1), ev('09:30', 'round-start', 2), ev('10:00', 'round-end', 2)])
+  check('a later second start is a duplicate: the first span stands and takes the end',
+    JSON.stringify(dup.spans) === '[{"key":1,"from":0,"to":2}]', JSON.stringify(dup.spans))
+  check('the ignored duplicate and the mislabelled end are both reported',
+    /the duplicate is ignored/.test(dup.notes.join('\n')) && /carries round 2 but closes the span opened at/.test(dup.notes.join('\n')),
+    JSON.stringify(dup.notes))
+
+  const stray = walk([ev('09:00', 'round-end', 1)])
+  check('an end that closes nothing is dropped, never aborted', stray.spans.length === 0, JSON.stringify(stray.spans))
+  check('the dropped end is reported', /closes nothing and no resumption stamp precedes it — ignored/.test(stray.notes.join('\n')), JSON.stringify(stray.notes))
+
+  const resumed = walk([ev('09:00', 'triage-done', 1), ev('10:00', 'round-end', 1)], () => 0)
+  check('a resumption opens the span where the caller\'s rule points',
+    JSON.stringify(resumed.spans) === '[{"key":1,"from":0,"to":1}]', JSON.stringify(resumed.spans))
+  check('the resumption is reported with the stamp it opened at',
+    /closes a resumed round 1 whose round-start went unstamped — opened at 2019-06-01T09:00:00\+03:00/.test(resumed.notes.join('\n')),
+    JSON.stringify(resumed.notes))
+  const refused = walk([ev('09:00', 'triage-done', 1), ev('10:00', 'round-end', 1)], () => REFUSED)
+  check('a refused resumption charges nothing and says nothing here — the rule reports it itself',
+    refused.spans.length === 0 && refused.notes.length === 0, JSON.stringify(refused))
+
+  const unclosed = walk([ev('09:00', 'round-start', 1), ev('09:30', 'note', 1), ev('11:00', 'note', 1)])
+  check('a start with no end is measured to the last event',
+    JSON.stringify(unclosed.spans) === '[{"key":1,"from":0,"to":2}]', JSON.stringify(unclosed.spans))
+  check('measuring to the last event is reported', /has no round-end — measured to the last event/.test(unclosed.notes.join('\n')), JSON.stringify(unclosed.notes))
+
+  const spans = [{ key: 1, from: 2, to: 5 }]
+  check('covers is about the gap starting at an index, so the span\'s own end index is not covered',
+    covers(spans, 2) && covers(spans, 4) && !covers(spans, 5) && !covers(spans, 1), 'covers')
+  check('spanOf is about the event at an index, so the end index belongs to its span',
+    spanOf(spans, 5) === spans[0] && spanOf(spans, 6) === undefined, 'spanOf')
+  check('a gate reason longer than 60 chars is quoted by its head only',
+    short('x'.repeat(61)) === `${'x'.repeat(57)}…` && short('short one') === 'short one', short('x'.repeat(61)))
 }
 
 // ---------- cli/args.mjs ----------
