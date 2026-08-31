@@ -111,7 +111,9 @@ for its round — the same window `records-auditor.mjs` reports as "unit records
 
 **Where the convergence rule bites.** The design-pass gate guards **every** answer of "fix round"
 (owner ruling, 2026-08-28) — the armed row, the ≥ 3 batch row and the loop-quiet sweep row included,
-which used to answer `fix round` directly and skip it. The single implementation is
+which used to answer `fix round` directly and skip it. That includes a reopened fix's re-fix round:
+even a broken fix's redo waits on the design-pass decision, because a component that will not
+converge is exactly where a redo lands next. The single implementation is
 [lib/model/convergence.mjs](lib/model/convergence.mjs); the router routes every fix-round answer
 through the helper that consults it, and [lib/autonomy-policy.mjs](lib/autonomy-policy.mjs) consults
 the same check before its own fix-round answers at the delta-worthiness and certification gates —
