@@ -204,7 +204,7 @@ Built and operating:
 | Metrics **v3** (per-finding lens/severity/verdict/fix-lineage; fix-round lines; runtime from the worklog) | [metrics-schema.md](../rules/metrics-schema.md) + [lib/render-records.mjs](../lib/render-records.mjs) |
 | Records auditor (schema, tallies, pairing, commit reachability, citation-leak count with target 0) | [lib/records-auditor.mjs](../lib/records-auditor.mjs) |
 | Doc gate (deterministic lint, target + `state` modes, + Sonnet judge; pre-commit backstop; 36-assertion fixture suite) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
-| Path constants + link keeper (every move: `git mv`, constant, `--apply`, check) | [lib/paths.mjs](../lib/paths.mjs) + [lib/fix-links.mjs](../lib/fix-links.mjs) |
+| Path constants + link keeper (every move: `git mv`, constant, then the link check) | [lib/paths.mjs](../lib/paths.mjs) + [lib/cli/docs-sync.mjs](../lib/cli/docs-sync.mjs) |
 | Ledger miner (ranks defect classes by measured cost into definition-of-done) — **built, unfed**: the class sidecar backfill has not run | [lib/ledger-miner.mjs](../lib/ledger-miner.mjs) + [spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md) |
 | Ledgers + worklogs (template-bound; append-only enforced against git HEAD by the gate) | per-target files, shapes in [doc-contracts.md](../rules/doc-contracts.md) |
 
