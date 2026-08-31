@@ -18,6 +18,7 @@ import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { EVENTS } from './records/schema.mjs'
+import { deepEqual, live, readLines } from './records/worklog.mjs'
 
 const VOCAB = new Set(Object.keys(EVENTS))
 const IDS_EVENTS = new Set(Object.keys(EVENTS).filter(ev => EVENTS[ev].ids))
@@ -25,9 +26,12 @@ const IDS_EVENTS = new Set(Object.keys(EVENTS).filter(ev => EVENTS[ev].ids))
 const TEST_KINDS = new Set(['red', 'green', 'final', 'baseline', 'revert-and-rerun'])
 const PPW = /^PPW-\d+$/
 
-function readEvents(wlPath) {
-  if (!existsSync(wlPath)) return []
-  return readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
+// The stamper refuses to append against a log it cannot read whole: a line that is not JSON
+// stops it, where a measuring reader would skip that line.
+function readEvents(dir) {
+  const lines = readLines(dir) ?? []
+  for (const l of lines) if (l.error) throw l.error
+  return lines.map(l => l.event)
 }
 
 function openRound(events) {
@@ -37,20 +41,6 @@ function openRound(events) {
     else if (e.ev === 'round-end' && e.round === open) open = null
   }
   return open
-}
-
-function deepEqual(a, b) {
-  if (a === b) return true
-  if (typeof a !== typeof b || a === null || b === null) return false
-  if (typeof a !== 'object') return false
-  const ak = Object.keys(a), bk = Object.keys(b)
-  return ak.length === bk.length && ak.every(k => deepEqual(a[k], b[k]))
-}
-
-// Every reader of the log drops what a void erased, or two readers disagree after a repair.
-export function live(events) {
-  const voids = events.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
-  return events.filter(e => e.ev !== 'void' && !voids.some(v => Object.keys(v.of).every(k => deepEqual(e[k], v.of[k]))))
 }
 
 function closestTimestamps(events, tIso) {
@@ -109,7 +99,7 @@ export function appendEvent(root, target, event) {
   const candidateDirs = [join(root, 'reviews', target), join(root, 'reviews', 'archive', target)]
   const dir = candidateDirs.find(existsSync) ?? candidateDirs[0]
   const wlPath = join(dir, 'worklog.jsonl')
-  const existing = readEvents(wlPath)
+  const existing = readEvents(dir)
 
   if (ev === 'round-start') {
     if (!existsSync(join(dir, `resolution-v${event.round}.md`))) {

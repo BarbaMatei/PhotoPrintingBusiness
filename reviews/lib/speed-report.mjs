@@ -23,9 +23,11 @@
 // Exit: 0 = printed · 1 = no such target, no worklog, a worklog line that is unparseable JSON or
 //       carries an unparseable timestamp, a flag given no value, a malformed --day, or a --day the
 //       worklog has no events on.
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readMetrics } from './records/metrics.mjs'
+import { live, readLines } from './records/worklog.mjs'
 
 const CAP_MIN = 30
 const REFUSED = Symbol('refused')
@@ -64,15 +66,10 @@ const round3 = n => Math.round(n * 1000) / 1000
 
 // ---------- worklog: void filtering, day filtering, stable order by instant ----------
 function loadEvents() {
-  const wlPath = join(dir, 'worklog.jsonl')
-  if (!existsSync(wlPath)) fail(`no reviews/${target}/worklog.jsonl — nothing to measure`)
-  const logged = readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map((l, i) => {
-    try { return JSON.parse(l) } catch (e) { fail(`worklog line ${i + 1}: unparseable JSON (${e.message})`) }
-  })
-  const sameVal = (a, b) => a === b || (!!a && !!b && typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b))
-  const voids = logged.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
-  const matchesVoid = (e, v) => Object.keys(v.of).every(k => sameVal(e[k], v.of[k]))
-  return logged.filter(e => e.ev !== 'void' && !voids.some(v => matchesVoid(e, v)))
+  const lines = readLines(dir)
+  if (lines === null) fail(`no reviews/${target}/worklog.jsonl — nothing to measure`)
+  for (const l of lines) if (l.error) fail(`worklog line ${l.n}: unparseable JSON (${l.error.message})`)
+  return live(lines.map(l => l.event))
 }
 
 // Real worklogs mix `Z` and offset stamps, so the day comes from the parsed instant.
@@ -215,12 +212,10 @@ const median = !ratios.length ? null
     : round1((ratios[ratios.length / 2 - 1] + ratios[ratios.length / 2]) / 2)
 
 // ---------- correction lines ----------
-const metricsPath = join(dir, 'metrics.jsonl')
+const metrics = readMetrics(dir)
 let corrections = 0, undated = 0
-if (!existsSync(metricsPath)) note(`no reviews/${target}/metrics.jsonl — correction lines counted as 0`)
-else for (const l of readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())) {
-  let o; try { o = JSON.parse(l) } catch { continue }
-  if (!o.correction_for) continue
+if (!metrics) note(`no reviews/${target}/metrics.jsonl — correction lines counted as 0`)
+else for (const o of metrics.corrections) {
   if (!o.date) { undated++; continue }
   if (!DAY || o.date <= DAY) corrections++
 }

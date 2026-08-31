@@ -4,6 +4,8 @@
 // Row shape (doc-contracts.md): | PPW-<n> | 🔴|🟠|🟡|⚪ | first seen | title | file | status | affirmed |
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { dateValue, parse, value } from './records/frontmatter.mjs'
+import { readMetrics } from './records/metrics.mjs'
 import { OPEN_STATUSES, SEVERITIES, STATUSES, V3_CUTOFF } from './records/schema.mjs'
 
 export { OPEN_STATUSES }
@@ -30,14 +32,11 @@ export function standsDown(dir) {
   }
   const RN = newest(/^resolution-v(\d+)\.md$/)
   if (!RN || RN < newest(/^review-v(\d+)\.md$/)) return false
-  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(join(dir, `resolution-v${RN}.md`), 'utf8'))
-  const fm = block ? block[1] : ''
-  if ((/^status:\s*(.+?)\s*$/m.exec(fm)?.[1] ?? null) !== 'resolved') return false
-  const closed = /^closed:\s*(\d{4}-\d{2}-\d{2})/m.exec(fm)?.[1] ?? null
+  const fm = parse(readFileSync(join(dir, `resolution-v${RN}.md`), 'utf8')).fm ?? ''
+  if (value(fm, 'status') !== 'resolved') return false
+  const closed = dateValue(fm, 'closed', { acrossLines: true })
   if (closed && closed < V3_CUTOFF) return false
-  const metrics = join(dir, 'metrics.jsonl')
-  if (!existsSync(metrics)) return true
-  return !readFileSync(metrics, 'utf8').split(/\r?\n/).filter(l => l.trim())
-    .map(l => { try { return JSON.parse(l) } catch { return null } })
-    .some(l => l && !l.correction_for && l.type === 'fix-round' && l.round === RN)
+  const metrics = readMetrics(dir)
+  if (!metrics) return true
+  return !metrics.lines.some(l => l.type === 'fix-round' && l.round === RN)
 }

@@ -22,6 +22,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { REVIEWS as REVIEWS_HOME, ID_COUNTER, TEMPLATES } from './paths.mjs'
 import { SEVERITIES as SEV } from './records/schema.mjs'
+import { section } from './records/frontmatter.mjs'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 const fail = msg => { console.error(`ERROR ${msg}`); process.exit(2) }
@@ -158,8 +159,7 @@ function scaffoldResolution(reviewsDir, target, opts, templatesDir) {
   const resolutionPath = join(dir, `resolution-v${N}.md`)
   if (existsSync(resolutionPath)) fail(`${resolutionPath} already exists — refusing to overwrite`)
 
-  const reviewBody = readFileSync(reviewPath, 'utf8')
-  const findingsSection = reviewBody.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+  const findingsSection = section(readFileSync(reviewPath, 'utf8'), 'Findings')
   const ids = [...findingsSection.matchAll(/^\|\s*(PPW-\d+)\s*\|/gm)].map(m => m[1])
   if (!ids.length) fail(`review-v${N}.md has no PPW-<n> findings rows`)
 

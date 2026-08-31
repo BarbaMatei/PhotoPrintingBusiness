@@ -7,9 +7,10 @@
 //
 // Usage: node reviews/lib/summary-data.mjs [--root <repoRoot>] <target> <pass>
 // Exit: 0 = fragments printed · 2 = usage error or no metrics line for that pass.
-import { readFileSync, existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readMetrics } from './records/metrics.mjs'
 import { MANIFEST_LENSES } from './records/schema.mjs'
 
 const USAGE = 'usage: node reviews/lib/summary-data.mjs [--root <repoRoot>] <target> <pass>'
@@ -28,11 +29,9 @@ if (!target || !Number.isFinite(pass)) { console.error(USAGE); process.exit(2) }
 
 const REVIEWS = root ? join(root, 'reviews') : join(dirname(fileURLToPath(import.meta.url)), '..')
 const targetDir = name => existsSync(join(REVIEWS, name)) ? join(REVIEWS, name) : join(REVIEWS, 'archive', name)
-const metricsPath = join(targetDir(target), 'metrics.jsonl')
-if (!existsSync(metricsPath)) { console.error(USAGE); process.exit(2) }
-
-const allLines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
-const lines = allLines.filter(l => !l.correction_for)
+const metrics = readMetrics(targetDir(target), { strict: true })
+if (!metrics) { console.error(USAGE); process.exit(2) }
+const { lines } = metrics
 
 // A certification pair writes two lines at one `pass`, so discovery-type lines merge per pass.
 const isDiscoveryType = l => l.type === 'discovery' || l.type === 'delta-discovery'

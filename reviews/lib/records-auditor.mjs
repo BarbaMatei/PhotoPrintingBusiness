@@ -17,7 +17,9 @@ import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
 import { AREAS, SEVERITIES, SHA_RE, TARGETLESS, V2_CUTOFF, V3_CUTOFF, V4_CUTOFF } from './records/schema.mjs'
-import { live } from './wl.mjs'
+import { dateValue, parse, section, word } from './records/frontmatter.mjs'
+import { readLines as readMetricsLines } from './records/metrics.mjs'
+import { live, readLines as readWorklogLines } from './records/worklog.mjs'
 
 const argv = process.argv.slice(2)
 let ROOT = null
@@ -83,25 +85,23 @@ function checkSeedKeys(f, fat) {
 }
 
 function resolutionMeta(text) {
-  const end = text.indexOf('\n---', 3)
-  const fm = text.startsWith('---') && end !== -1 ? text.slice(3, end) : ''
+  const fm = parse(text, { lenient: true }).fm ?? ''
   return {
-    status: /^status:[ \t]*(\S+)/m.exec(fm)?.[1] ?? 'open',
-    closed: /^closed:[ \t]*(\d{4}-\d{2}-\d{2})/m.exec(fm)?.[1] ?? null,
+    status: word(fm, 'status') ?? 'open',
+    closed: dateValue(fm, 'closed'),
   }
 }
 
 // Counts statuses from a resolution's "## Findings" body table (frontmatter map on old rounds).
 function resolutionTallies(text) {
   const t = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
-  const end = text.indexOf('\n---', 3)
-  const fm = text.startsWith('---') && end !== -1 ? text.slice(3, end) : ''
+  const fm = parse(text, { lenient: true }).fm ?? ''
   let found = false
   // New shape: "## Findings" body table. Old shape (grandfathered targets): frontmatter map.
-  const section = text.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+  const rows = section(text, 'Findings')
   const rowRe = /^\|\s*(?:D\d+|[A-Za-z]+-\d+)\s*\|\s*([a-z-]+)\s*\|/gm
   const mapRe = /^ {2}[A-Za-z]+-?\d+:\s*\{\s*status:\s*([a-z-]+)/gm
-  const matches = [...section.matchAll(rowRe)]
+  const matches = [...rows.matchAll(rowRe)]
   for (const m of matches.length ? matches : fm.matchAll(mapRe)) {
     found = true
     const s = m[1]
@@ -119,14 +119,13 @@ function auditTarget(t) {
   const tag = t.name + (t.archived ? ' (archive)' : '')
   const strictTier = t.archived ? warn : err // archives never hard-fail on record shape
   const reviewVersions = readdirSync(t.dir).map(f => /^review-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-  const metricsPath = join(t.dir, 'metrics.jsonl')
-  if (!existsSync(metricsPath)) {
+  const metricsLines = readMetricsLines(t.dir)
+  if (metricsLines === null) {
     info(`${tag}: no metrics.jsonl (${reviewVersions.length} review file(s)) — skipped as a non-code target`)
     return
   }
   const legacyDrift = new Map() // key -> count, aggregated per target
   const drift = k => legacyDrift.set(k, (legacyDrift.get(k) || 0) + 1)
-  const lines = readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim())
   const passes = new Map() // pass -> [line objects]
   const fixRounds = new Set() // round numbers with a fix-round line
   const roundDates = new Map() // round -> the fix-round line's date (hand-back gate cut-off)
@@ -136,18 +135,15 @@ function auditTarget(t) {
   // A fix-round disposition can change after the line was rendered (an owner parks a finding at
   // hand-back). The line is never edited, so a later correction supersedes the cross-check.
   const correctedRoundFields = new Map()
-  for (const raw of lines) {
-    let c
-    try { c = JSON.parse(raw) } catch { continue }
+  for (const { line: c } of metricsLines) {
     if (!c?.correction_for || !num(c.correction_for.round)) continue
     if (!correctedRoundFields.has(c.correction_for.round)) correctedRoundFields.set(c.correction_for.round, new Set())
     correctedRoundFields.get(c.correction_for.round).add(c.correction_for.field)
   }
 
-  lines.forEach((raw, idx) => {
-    const at = `${tag} metrics line ${idx + 1}`
-    let o
-    try { o = JSON.parse(raw) } catch (e) { err(`${at}: unparseable JSON (${e.message})`); return }
+  metricsLines.forEach(({ n, line: o, error }) => {
+    const at = `${tag} metrics line ${n}`
+    if (error) { err(`${at}: unparseable JSON (${error.message})`); return }
 
     if (o.correction_for) {
       if (!o.target || !o.date || !o.note) err(`${at}: correction line missing target/date/note`)
@@ -352,17 +348,16 @@ function auditTarget(t) {
       warn(`${tag}: resolution-v${m[1]} resolved, no fix-round line yet — unit records pending`)
   }
 
-  // worklog: every event line must parse and carry t + ev; fix-round lines want event backing
-  const worklogPath = join(t.dir, 'worklog.jsonl')
+  // worklog: every event line must parse and carry t + ev; fix-round lines want event backing.
+  // The shape check runs over the raw lines — a void erases an event, never its malformed shape.
+  const worklogLines = readWorklogLines(t.dir)
   const worklogEvents = []
-  if (existsSync(worklogPath)) {
-    readFileSync(worklogPath, 'utf8').split('\n').filter(l => l.trim()).forEach((raw, i) => {
-      try {
-        const e = JSON.parse(raw)
-        if (typeof e.t !== 'string' || typeof e.ev !== 'string') err(`${tag} worklog line ${i + 1}: every event needs string "t" and "ev"`)
-        else worklogEvents.push(e)
-      } catch (e) { err(`${tag} worklog line ${i + 1}: unparseable JSON (${e.message})`) }
-    })
+  if (worklogLines !== null) {
+    for (const { n, event: e, error } of worklogLines) {
+      if (error) err(`${tag} worklog line ${n}: unparseable JSON (${error.message})`)
+      else if (typeof e.t !== 'string' || typeof e.ev !== 'string') err(`${tag} worklog line ${n}: every event needs string "t" and "ev"`)
+      else worklogEvents.push(e)
+    }
   } else if (fixRounds.size) {
     warn(`${tag}: ${fixRounds.size} fix-round metrics line(s) but no worklog.jsonl — runtime is not backed by events`)
   }
@@ -408,10 +403,9 @@ function auditHandBackGates(t, tag, roundDates, events, strictTier) {
     if (!m) continue
     const round = Number(m[1])
     const text = readFileSync(join(t.dir, f), 'utf8')
-    const fmEnd = text.indexOf('\n---', 3)
-    const fm = text.startsWith('---') && fmEnd !== -1 ? text.slice(3, fmEnd) : ''
-    if ((/^status:\s*(\S+)/m.exec(fm)?.[1]) !== 'resolved') continue
-    const closed = /^closed:\s*(\d{4}-\d{2}-\d{2})/m.exec(fm)?.[1] ?? null
+    const fm = parse(text, { lenient: true }).fm ?? ''
+    if (word(fm, 'status', { acrossLines: true }) !== 'resolved') continue
+    const closed = dateValue(fm, 'closed', { acrossLines: true })
     const lineDate = roundDates.get(round) ?? null
     if (!((closed && closed >= V4_CUTOFF) || (lineDate && lineDate >= V4_CUTOFF))) continue
     const at = `${tag} resolution-v${round}.md`

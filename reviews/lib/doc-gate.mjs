@@ -13,6 +13,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { AREAS, CAPS, SEVERITIES as SEV, SHA_SCAN_RE, STATUSES as STATUS_WORDS, TARGETLESS, V4_CUTOFF } from './records/schema.mjs'
+import { parse, section as bodySection, value as fmVal } from './records/frontmatter.mjs'
 import { BACKLOG, INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
 
 const argv = process.argv.slice(2)
@@ -133,12 +134,12 @@ const name = target.replace(/^archive\//, '')
 const gitPath = dir.slice(join(REVIEWS, '..').length + 1).replace(/\\/g, '/')
 
 const read = f => readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n')
+// read() has already normalized CRLF, so the shared parser sees an LF-only block here.
 const split = raw => {
-  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(raw)
-  return m ? { fm: m[1], body: m[2] } : null
+  const p = parse(raw)
+  return p.fm === null ? null : p
 }
 const fmKeys = fm => fm.split('\n').filter(l => /^[a-zA-Z_-]+:/.test(l)).map(l => l.split(':')[0])
-const fmVal = (fm, key) => new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm').exec(fm)?.[1] ?? null
 const headings = body => body.split('\n').filter(l => /^#{1,3} /.test(l))
 const bodyLines = body => body.split('\n').filter(l => l.trim() !== '').length
 
@@ -172,7 +173,7 @@ if (existsSync(join(dir, reviewFile))) {
       /^## Findings$/, /^## Refuted$/, /^## Notes for the fixer$/,
     ])
     if (bodyLines(p.body) > CAPS.reviewBodyLines) bad(reviewFile, `body is ${bodyLines(p.body)} non-empty lines — cap is ${CAPS.reviewBodyLines}`)
-    const findingsOnly = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+    const findingsOnly = bodySection(p.body, 'Findings')
     const rows = findingsOnly.split('\n').filter(l => /^\|\s*(?:PPW-|—|F\d|[A-Z]{2,7}-\d)/.test(l))
     for (const r of rows) {
       const cells = r.split('|').map(c => c.trim())
@@ -214,7 +215,7 @@ if (existsSync(join(dir, resolutionFile))) {
     checkFrontmatter(resolutionFile, p.fm, ['type', 'target', 'version', 'answers', 'status', 'fixed_commit'])
     if (/^findings:/m.test(p.fm)) bad(resolutionFile, 'frontmatter carries a findings map — per-finding state lives in the "## Findings" body table (doc-contracts.md)')
     const RSTAT = /^(fixed|wont-fix|deferred|disputed|false-positive|backlog)$/
-    const findingsSection = p.body.split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+    const findingsSection = bodySection(p.body, 'Findings')
     const resolutionRows = []
     for (const r of findingsSection.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*(ID|D#|-)/.test(l))) {
       const cells = r.split('|').map(c => c.trim())
@@ -230,7 +231,7 @@ if (existsSync(join(dir, resolutionFile))) {
       bad(resolutionFile, `title is "${got[0] ?? '(none)'}" — template requires "# Resolution v${pass} — ${name}"`)
     for (const h of ['## Findings', '## Scope', '## Decisions']) if (!got.includes(h)) bad(resolutionFile, `missing heading "${h}"`)
     if (bodyLines(p.body) > CAPS.resolutionBodyLines) bad(resolutionFile, `body is ${bodyLines(p.body)} non-empty lines — cap is ${CAPS.resolutionBodyLines}`)
-    const decisionsSection = p.body.split(/^## /m).find(s => s.startsWith('Decisions')) ?? ''
+    const decisionsSection = bodySection(p.body, 'Decisions')
     const decisions = decisionsSection.split(/^### /m).slice(1)
     for (const d of decisions) {
       const n = d.split('\n').filter(l => l.trim() !== '').length - 1
@@ -239,7 +240,7 @@ if (existsSync(join(dir, resolutionFile))) {
     // From the V4 cut-off a scope table names its cluster's protocol block, and a protocol states an invariant.
     const closed = fmVal(p.fm, 'closed')
     if (closed && closed >= V4_CUTOFF) {
-      const scope = p.body.split(/^## /m).find(s => s.startsWith('Scope')) ?? ''
+      const scope = bodySection(p.body, 'Scope')
       const scopeRows = scope.split('\n').filter(l => /^\|/.test(l))
       const header = scopeRows[0] ?? ''
       if (/Approach-check/i.test(header)) bad(resolutionFile, 'the scope table carries an Approach-check column — retired 2026-08-28: the check is a machine-read worklog event, and "not needed" is not a writable value (doc-contracts.md)')

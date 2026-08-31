@@ -21,10 +21,13 @@
 // a bad worklog, unpaired stamps, an --outcome that is missing, over 50 words or carries a "|" or a
 // line break, no Passes table to insert into, or an unresolved resolution / unstamped
 // pass-records-done without --in-progress.
-import { readFileSync, writeFileSync, appendFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
+import { parse, section, word } from './records/frontmatter.mjs'
+import { appendLine, readMetrics } from './records/metrics.mjs'
+import { live, matchesVoid, readLines, voidsOf } from './records/worklog.mjs'
 
 const argv = process.argv.slice(2)
 let ROOT = null, ROUND = null, DRY = false, ALLOW_UNRESOLVED = false
@@ -79,21 +82,16 @@ if (OUTCOME != null) {
 
 // ---------- worklog: void filtering, then paired spans ----------
 function loadEvents() {
-  const wlPath = join(dir, 'worklog.jsonl')
-  if (!existsSync(wlPath)) fail('no worklog.jsonl — the loop stamps it as work happens; nothing to compute runtime from')
-  const logged = readFileSync(wlPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map((l, i) => {
-    try { return JSON.parse(l) } catch (e) { fail(`worklog line ${i + 1}: unparseable JSON (${e.message})`) }
-  })
+  const lines = readLines(dir)
+  if (lines === null) fail('no worklog.jsonl — the loop stamps it as work happens; nothing to compute runtime from')
+  for (const l of lines) if (l.error) fail(`worklog line ${l.n}: unparseable JSON (${l.error.message})`)
+  const logged = lines.map(l => l.event)
   // A void's "of" matches on a key subset, so one carrying "round" must not hit a same-timestamp stamp for another round.
-  const sameVal = (a, b) => a === b || (!!a && !!b && typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b))
-  const voids = logged.filter(e => e.ev === 'void' && e.of && typeof e.of === 'object' && Object.keys(e.of).length)
-  const matchesVoid = (e, v) => Object.keys(v.of).every(k => sameVal(e[k], v.of[k]))
-  const live = logged.filter(e => e.ev !== 'void' && !voids.some(v => matchesVoid(e, v)))
-  for (const v of voids) {
+  for (const v of voidsOf(logged)) {
     const hits = logged.filter(e => e.ev !== 'void' && matchesVoid(e, v)).length
     if (hits > 1) note(`the void at ${v.t} matches ${hits} events — every one of them is dropped; narrow its "of" if only one was meant`)
   }
-  return live
+  return live(logged)
 }
 
 const voidHint = (ev, t, key, val) => `void the wrong stamp: node reviews/lib/wl.mjs ${target} void --json '{"of":{"ev":"${ev}","t":"${t}","${key}":${JSON.stringify(val)}}}'`
@@ -192,17 +190,11 @@ function planLedger(flips) {
 }
 
 // ---------- duplicate guard ----------
-const metricsPath = join(dir, 'metrics.jsonl')
-function alreadyHas(match) {
-  if (!existsSync(metricsPath)) return false
-  return readFileSync(metricsPath, 'utf8').split('\n').filter(l => l.trim()).some(l => {
-    try { const o = JSON.parse(l); return !o.correction_for && match(o) } catch { return false }
-  })
-}
+// A correction line supersedes a field of an earlier line, so it is never the duplicate.
+const alreadyHas = match => (readMetrics(dir)?.lines ?? []).some(match)
 
 function writeRecords(line, indexPlan, ledgerPlan, appended) {
-  const prev = existsSync(metricsPath) ? readFileSync(metricsPath, 'utf8') : ''
-  appendFileSync(metricsPath, (prev && !prev.endsWith('\n') ? '\n' : '') + JSON.stringify(line) + '\n')
+  appendLine(dir, line)
   note(`${appended} — now run: node reviews/lib/records-auditor.mjs ${target}`)
   if (indexPlan) {
     const lines = [...indexPlan.lines]
@@ -237,11 +229,12 @@ function renderFixRound() {
   const resText = readFileSync(resPath, 'utf8')
 
   // ---------- resolution frontmatter: findings map + status + fixed_commit ----------
-  const fmEnd = resText.indexOf('\n---', 3)
-  const fm = resText.startsWith('---') && fmEnd !== -1 ? resText.slice(3, fmEnd) : fail('resolution has no frontmatter')
+  const parsed = parse(resText, { lenient: true })
+  if (parsed.fm === null) fail('resolution has no frontmatter')
+  const fm = parsed.fm
   const findings = new Map() // id -> {status, commit, note}
   // New shape: "## Findings" body table. Old shape (grandfathered): frontmatter map.
-  const fSection = resText.slice(fmEnd).split(/^## /m).find(s => s.startsWith('Findings')) ?? ''
+  const fSection = section(parsed.body, 'Findings')
   for (const r of fSection.split('\n').filter(l => /^\|\s*(?:D\d+|[A-Za-z]+-\d+)\s*\|/.test(l))) {
     const c = r.split('|').map(x => x.trim())
     findings.set(c[1], { status: c[2], commit: c[3] ?? null })
@@ -253,9 +246,9 @@ function renderFixRound() {
     findings.set(m[1], { status: m[2], commit: c, note: noteTxt })
   }
   if (!findings.size) fail('no "## Findings" table rows and no frontmatter findings map')
-  const resStatus = /^status:[ \t]*(\S+)/m.exec(fm)?.[1] ?? 'open'
-  // \s would cross the newline and read the NEXT key's name as the value of an empty one.
-  const fixedCommitRaw = /^fixed_commit:[ \t]*(\S*)/m.exec(fm)?.[1] || 'null'
+  const resStatus = word(fm, 'status') ?? 'open'
+  // word() stays on the key's own line, so an empty value never reads the NEXT key's name.
+  const fixedCommitRaw = word(fm, 'fixed_commit') || 'null'
   const fixedCommit = fixedCommitRaw === 'null' ? null : fixedCommitRaw.replace(/"/g, '')
 
   const TALLY = { fixed: 'fixed', 'wont-fix': 'wont_fix', deferred: 'deferred', backlog: 'deferred', disputed: 'disputed', 'false-positive': 'false_positive' }
@@ -429,7 +422,7 @@ function anchorCommit() {
   const vs = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
   if (vs.length) {
     const newest = Math.max(...vs)
-    const raw = /^fixed_commit:[ \t]*(\S*)/m.exec(readFileSync(join(dir, `resolution-v${newest}.md`), 'utf8'))?.[1] ?? ''
+    const raw = word(readFileSync(join(dir, `resolution-v${newest}.md`), 'utf8'), 'fixed_commit') ?? ''
     const sha = raw.replace(/["`]/g, '')
     if (sha && sha !== 'null') { note(`no --commit given — reading resolution-v${newest}.md's fixed_commit ${sha} as the reviewed commit`); return sha }
   }

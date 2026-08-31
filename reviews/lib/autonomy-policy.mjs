@@ -18,7 +18,9 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readLedger, openIds, standsDown } from './ledger.mjs'
-import { live } from './wl.mjs'
+import { parse } from './records/frontmatter.mjs'
+import { readMetrics } from './records/metrics.mjs'
+import { readEvents } from './records/worklog.mjs'
 import { MANIFEST_LENSES } from './records/schema.mjs'
 
 const argv = process.argv.slice(2)
@@ -37,13 +39,7 @@ if (!dir) { console.error(`no reviews folder for "${target}"`); process.exit(1) 
 const say = (k, v) => console.log(`${k}: ${v}`)
 const stop = reason => { say('ACTION', 'stop'); say('REASON', reason); process.exit(0) }
 
-function metricsLines(targetDir) {
-  const metricsPath = join(targetDir, 'metrics.jsonl')
-  if (!existsSync(metricsPath)) return []
-  return readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim())
-    .map(l => { try { return JSON.parse(l) } catch { return null } })
-    .filter(l => l && !l.correction_for)
-}
+const metricsLines = targetDir => readMetrics(targetDir)?.lines ?? []
 function hasCertification(targetDir) {
   return metricsLines(targetDir).some(e => e.outcome === 'certified' || /^certification/.test(e.subtype ?? ''))
 }
@@ -68,12 +64,10 @@ function certificationBlocker(targetDir) {
 // during an unattended run: any override newer than the run's start ends the delegation.
 {
   const overridesPath = join(REVIEWS, 'state', 'overrides.jsonl')
-  const wl = join(dir, 'worklog.jsonl')
-  if (existsSync(overridesPath) && existsSync(wl)) {
+  // Voided events are dropped here too: a mis-stamped run-start must not move the cut-off.
+  const events = readEvents(dir)
+  if (existsSync(overridesPath) && events) {
     let runStart = null
-    // Voided events are dropped here too: a mis-stamped run-start must not move the cut-off.
-    const events = live(readFileSync(wl, 'utf8').split(/\r?\n/).filter(x => x.trim())
-      .map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean))
     for (const e of events) {
       if (e.ev === 'run-start' && Number.isFinite(Date.parse(e.t)) && (runStart === null || Date.parse(e.t) > runStart)) runStart = Date.parse(e.t)
     }
@@ -127,7 +121,7 @@ if (gateKind === 'delta-worthiness') {
   const resPath = join(dir, `resolution-v${RN}.md`)
   const reviewPath = join(dir, `review-v${RN}.md`)
   const fmBlock = existsSync(reviewPath)
-    ? /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(reviewPath, 'utf8'))?.[1] ?? ''
+    ? parse(readFileSync(reviewPath, 'utf8')).fm ?? ''
     : ''
   const lines = fmBlock.split(/\r?\n/)
   const bi = lines.findIndex(l => /^blockers:/.test(l))

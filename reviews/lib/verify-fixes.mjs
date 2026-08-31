@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process'
 import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { appendEvent } from './wl.mjs'
+import { parse, value } from './records/frontmatter.mjs'
 
 const argv = process.argv.slice(2)
 let root = null, only = null, dryRun = false, noEvents = false
@@ -72,8 +73,8 @@ const rows = [...resolutionText.matchAll(/^\|\s*(PPW-\d+)\s*\|\s*fixed\s*\|([^|]
   .filter(r => !only || only.has(r.id))
 if (!rows.length) { console.error(`resolution-v${N}.md has no matching fixed rows`); process.exit(2) }
 
-const resolutionFm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(resolutionText)?.[1] ?? ''
-const fixedCommit = /^fixed_commit:\s*(.+?)\s*$/m.exec(resolutionFm)?.[1]
+const resolutionFm = parse(resolutionText).fm ?? ''
+const fixedCommit = value(resolutionFm, 'fixed_commit')
 if (fixedCommit) {
   const fc = git('rev-parse', fixedCommit)
   const head = git('rev-parse', 'HEAD')

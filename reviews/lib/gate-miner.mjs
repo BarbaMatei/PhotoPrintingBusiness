@@ -11,10 +11,10 @@
 // prefix — real worklogs mix `Z` and offset (`+03:00`) stamps, and a naive string compare
 // mis-buckets and mis-orders across that mix.
 // Exit: 0 always, even with zero matches · 1 on an IO error while reading worklogs.
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { live } from './wl.mjs'
+import { readEvents } from './records/worklog.mjs'
 import { TARGETLESS } from './records/schema.mjs'
 // The field that trips the match isn't necessarily the one worth printing — priority differs.
 const MATCH_FIELDS = ['verdict', 'judge', 'reason', 'note']
@@ -31,15 +31,6 @@ function listTargets(reviewsDir, filters) {
     }
   }
   return filters.length ? out.filter(t => filters.some(f => t.name.includes(f))) : out
-}
-
-// live() drops what a void erased: a voided mis-stamp is not a disapproval anyone must triage.
-function readWorklog(dir) {
-  const p = join(dir, 'worklog.jsonl')
-  if (!existsSync(p)) return []
-  return live(readFileSync(p, 'utf8').split(/\r?\n/).filter(l => l.trim())
-    .map(l => { try { return JSON.parse(l) } catch { return null } })
-    .filter(Boolean))
 }
 
 const isDisapproval = e => MATCH_FIELDS.some(k => typeof e[k] === 'string' && /disapprove/i.test(e[k]))
@@ -62,7 +53,8 @@ function main() {
 
   const targets = listTargets(reviewsDir, filters)
   const events = []
-  for (const t of targets) for (const event of readWorklog(t.dir)) events.push({ target: t.name, event })
+  // A voided mis-stamp is not a disapproval anyone must triage, so the filtered view is read.
+  for (const t of targets) for (const event of readEvents(t.dir) ?? []) events.push({ target: t.name, event })
 
   let newest = null
   for (const { event } of events) {

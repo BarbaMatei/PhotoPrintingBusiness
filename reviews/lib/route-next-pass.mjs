@@ -17,6 +17,8 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readLedger, openIds, standsDown } from './ledger.mjs'
+import { parse, value } from './records/frontmatter.mjs'
+import { readMetrics } from './records/metrics.mjs'
 import { MANIFEST_LENSES, TARGETLESS } from './records/schema.mjs'
 
 const argv = process.argv.slice(2)
@@ -61,10 +63,8 @@ function findDir(name) {
 }
 // Frontmatter-only lookup: a key in the document body never counts.
 const fm = (file, key) => {
-  const block = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(file, 'utf8'))
-  if (!block) return null
-  const m = new RegExp(`^${key}:\\s*(.+?)\\s*$`, 'm').exec(block[1])
-  return m ? m[1] : null
+  const block = parse(readFileSync(file, 'utf8')).fm
+  return block === null ? null : value(block, key)
 }
 const count = (n, word, plural = `${word}s`) => `${n} ${n === 1 ? word : plural}`
 
@@ -100,15 +100,14 @@ const reviews = readdirSync(t.dir).map(f => /^review-v(\d+)\.md$/.exec(f)).filte
 if (!reviews.length) { say('STATE: folder exists, no review-v1.md'); say('ROUTER: row 1'); finish(0, 'full discovery', null) }
 const N = Math.max(...reviews)
 
-const metricsPath = join(t.dir, 'metrics.jsonl')
-if (!existsSync(metricsPath)) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null, 'no-metrics') }
-const allLines = readFileSync(metricsPath, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
-const lines = allLines.filter(l => !l.correction_for)
+const metrics = readMetrics(t.dir, { strict: true })
+if (!metrics) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null, 'no-metrics') }
+const { lines, corrections } = metrics
 if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null, 'records-broken') }
 const L = lines[lines.length - 1]
 // Corrections are authoritative but not machine-applied here — surface the ones that
 // correct the latest line: round-keyed for a fix-round line, pass-keyed for a pass line.
-for (const c of allLines.filter(l => l.correction_for && (
+for (const c of corrections.filter(l => (
   L.type === 'fix-round'
     ? Number.isFinite(l.correction_for.round) && l.correction_for.round === L.round
     : Number.isFinite(l.correction_for.pass) && l.correction_for.pass === L.pass
