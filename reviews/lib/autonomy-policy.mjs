@@ -16,13 +16,14 @@
 // Exit: 0 answered · 1 usage error or unknown target.
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { readLedger, openIds, standsDown } from './ledger.mjs'
 import { newest, resolveDir } from './model/target.mjs'
+import { standsDown } from './model/open-work.mjs'
+import { certificationBlocker } from './model/convergence.mjs'
+import { openLedger } from './model/queue.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
 import { parse } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { readEvents } from './records/worklog.mjs'
-import { MANIFEST_LENSES } from './records/schema.mjs'
 
 const { root, rest } = takeRoot(process.argv.slice(2))
 const [target, cmd, gateKind] = rest
@@ -43,21 +44,8 @@ function hasCertification(targetDir) {
 }
 // Convergence rule (2026-08-28): certification is never auto-approved while a manifest lens
 // has not run on the target, or while no blind pass has run since the last substantive fix
-// round (its seed rate would be unmeasured). Mirrors the router's row-6 refusal.
-function certificationBlocker(targetDir) {
-  const lines = metricsLines(targetDir)
-  const lensUnion = new Set()
-  for (const l of lines) if (Array.isArray(l.lenses)) for (const k of l.lenses) lensUnion.add(k)
-  const owed = MANIFEST_LENSES.filter(k => !lensUnion.has(k))
-  if (owed.length) return { next: `lens-coverage discovery (${owed[0]})`, reason: `certification refused on lens-coverage debt — never run on this target: ${owed.join(', ')} (audit R5)` }
-  const isBlind = l => l.type === 'discovery' || l.type === 'delta-discovery'
-  const substantive = l => l.type === 'fix-round' && (l.findings?.fixed ?? 0) > 0 && (l.tests?.invocations ?? 0) > 0
-  let lastFixIdx = -1
-  for (let i = lines.length - 1; i >= 0; i--) if (substantive(lines[i])) { lastFixIdx = i; break }
-  if (lastFixIdx !== -1 && !lines.some((l, i) => i > lastFixIdx && isBlind(l)))
-    return { next: 'delta discovery', reason: `round r${lines[lastFixIdx].round}'s seed rate is unmeasured — no blind pass has run since it; a delta discovery measures it before certification (convergence rule, 2026-08-28)` }
-  return null
-}
+// round (its seed rate would be unmeasured). Mirrors the router's row-6 refusal — same module.
+const certBlocker = targetDir => certificationBlocker(metricsLines(targetDir))
 // Gate overrides (COMMENTS_OK / DOCGATE_OK, logged by the pre-commit hook) are a hard stop
 // during an unattended run: any override newer than the run's start ends the delegation.
 {
@@ -86,12 +74,10 @@ function certificationBlocker(targetDir) {
 // target with no ledger, on a round awaiting its verification, and at the loop-close gate:
 // 🟠 open at close roll into the backlog by design.
 function openWork() {
-  const led = readLedger(join(dir, 'ledger.md'))
+  const led = openLedger(dir)
   if (!led || standsDown(dir)) return null
-  const high = openIds(led.rows, '🔴')
-  if (high.length) return `the loop is armed — ${high.length} open 🔴 (${high.join(', ')})`
-  const medium = openIds(led.rows, '🟠')
-  if (medium.length) return `sweep before certification — ${medium.length} open medium${medium.length === 1 ? '' : 's'} must drain (${medium.join(', ')})`
+  if (led.high.length) return `the loop is armed — ${led.high.length} open 🔴 (${led.high.join(', ')})`
+  if (led.medium.length) return `sweep before certification — ${led.medium.length} open medium${led.medium.length === 1 ? '' : 's'} must drain (${led.medium.join(', ')})`
   return null
 }
 function sweepFirst() {
@@ -136,7 +122,7 @@ if (gateKind === 'delta-worthiness') {
     process.exit(0)
   }
   sweepFirst()
-  const blocker = certificationBlocker(dir)
+  const blocker = certBlocker(dir)
   if (blocker) {
     say('ACTION', 'auto')
     say('NEXT', blocker.next)
@@ -151,7 +137,7 @@ if (gateKind === 'delta-worthiness') {
 }
 if (gateKind === 'certification-go-ahead') {
   sweepFirst()
-  const blocker = certificationBlocker(dir)
+  const blocker = certBlocker(dir)
   if (blocker) {
     say('ACTION', 'auto')
     say('NEXT', blocker.next)

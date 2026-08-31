@@ -16,11 +16,13 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { newest, versions } from './model/target.mjs'
+import { atLoopClose, standsDown } from './model/open-work.mjs'
+import { convergenceCheck, lastSubstantive, owedLenses, seedMeasured } from './model/convergence.mjs'
+import { QUEUE_THRESHOLD, isBatch, openLedger, seriousCount } from './model/queue.mjs'
 import { repoRoot, takeRoot } from './cli/args.mjs'
-import { readLedger, openIds, standsDown } from './ledger.mjs'
 import { parse, value } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
-import { MANIFEST_LENSES, TARGETLESS } from './records/schema.mjs'
+import { TARGETLESS } from './records/schema.mjs'
 
 const { root, rest } = takeRoot(process.argv.slice(2))
 const arg = rest.at(-1) ?? null
@@ -37,8 +39,6 @@ const COST = {
   'certification (pair)': '~4.0–4.6M tokens (two blinded full passes)',
   'certification (single)': '~2.9M tokens (re-certification after a small verified fix round)',
 }
-// Open 🟠 below this count wait in the queue; at it or over, they are a fix round of their own.
-const QUEUE_THRESHOLD = 3
 
 function findDir(name) {
   const hits = []
@@ -114,47 +114,21 @@ for (const c of corrections.filter(l => (
 }
 
 // Convergence-rule state (2026-08-28): lens-coverage union, seed-rate lineage, round sizes.
-const lensUnion = new Set()
-for (const l of lines) if (Array.isArray(l.lenses)) for (const k of l.lenses) lensUnion.add(k)
-const owedLenses = MANIFEST_LENSES.filter(k => !lensUnion.has(k))
-const isBlind = l => l.type === 'discovery' || l.type === 'delta-discovery'
-const substantive = l => l.type === 'fix-round' && (l.findings?.fixed ?? 0) > 0 && (l.tests?.invocations ?? 0) > 0
-let lastFixIdx = -1
-for (let i = lines.length - 1; i >= 0; i--) if (substantive(lines[i])) { lastFixIdx = i; break }
-const seedMeasured = lastFixIdx === -1 || lines.some((l, i) => i > lastFixIdx && isBlind(l))
-const seeds = new Map()
-for (const l of lines) if (isBlind(l) && Array.isArray(l.findings)) for (const f of l.findings) {
-  if (f.new !== true || (f.sev !== 'high' && f.sev !== 'medium') || !Number.isFinite(f.seed_round)) continue
-  if (!seeds.has(f.seed_round)) seeds.set(f.seed_round, new Map())
-  const m = seeds.get(f.seed_round)
-  const a = typeof f.area === 'string' ? f.area : '(unstated)'
-  m.set(a, (m.get(a) || 0) + 1)
-}
+const owed = owedLenses(lines)
+const lastFixIdx = lastSubstantive(lines)
+const measured = seedMeasured(lines, lastFixIdx)
 function routeFixRound(reason) {
   say(reason)
-  const subs = lines.filter(substantive)
-  if (subs.length >= 2) {
-    const [r1, r2] = subs.slice(-2)
-    if (r2.findings.fixed >= r1.findings.fixed)
-      say(`NOTE: fix rounds are not shrinking (r${r1.round}: ${r1.findings.fixed} fixed → r${r2.round}: ${r2.findings.fixed}) — the convergence rule expects each round strictly smaller than the one before.`)
-    const rate = r => {
-      const m = seeds.get(r.round)
-      let n = 0
-      if (m) for (const c of m.values()) n += c
-      return { s: n / r.findings.fixed, areas: new Set(m ? m.keys() : []) }
-    }
-    const a1 = rate(r1), a2 = rate(r2)
-    if (a1.s >= 0.3 && a2.s >= 0.3) {
-      const common = [...a2.areas].filter(a => a !== '(unstated)' && a1.areas.has(a))
-      if (common.length) {
-        const area = common[0]
-        const capped = lines.some(l => l.type === 'fix-round' && typeof l.notes === 'string' && l.notes.includes(`design-pass:${area}`))
-        if (!capped) {
-          say(`ROUTER: rounds r${r1.round} and r${r2.round} both seeded serious findings in "${area}" at s ≥ 0.3 (s=${a1.s.toFixed(2)}, ${a2.s.toFixed(2)}) — patching declared non-convergent for that component; further fix rounds there are refused (convergence rule, 2026-08-28).`)
-          finish(2, null, `design pass for "${area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${area}; at most one per component per loop — owner decision`, 'design-pass')
-        }
-        say(`NOTE: rounds r${r1.round}/r${r2.round} still seed "${area}" at s ≥ 0.3, but its one design pass per loop already ran — the fix round proceeds; raise it with the owner if it seeds again.`)
+  const c = convergenceCheck(lines)
+  if (c) {
+    if (c.notShrinking)
+      say(`NOTE: fix rounds are not shrinking (r${c.r1.round}: ${c.r1.findings.fixed} fixed → r${c.r2.round}: ${c.r2.findings.fixed}) — the convergence rule expects each round strictly smaller than the one before.`)
+    if (c.nonConvergent) {
+      if (!c.capped) {
+        say(`ROUTER: rounds r${c.r1.round} and r${c.r2.round} both seeded serious findings in "${c.area}" at s ≥ 0.3 (s=${c.s1.toFixed(2)}, ${c.s2.toFixed(2)}) — patching declared non-convergent for that component; further fix rounds there are refused (convergence rule, 2026-08-28).`)
+        finish(2, null, `design pass for "${c.area}" — an R1 protocol spec at component level, reimplementation against it, then discovery; recorded as a fix round whose metrics notes carry design-pass:${c.area}; at most one per component per loop — owner decision`, 'design-pass')
       }
+      say(`NOTE: rounds r${c.r1.round}/r${c.r2.round} still seed "${c.area}" at s ≥ 0.3, but its one design pass per loop already ran — the fix round proceeds; raise it with the owner if it seeds again.`)
     }
   }
   finish(0, 'fix round', null)
@@ -168,12 +142,12 @@ const serious = L.new_findings ? (L.new_findings.high || 0) + (L.new_findings.me
 say(`STATE: latest review v${N} · last ${L.type === 'fix-round' ? `fix round r${L.round}` : `pass v${L.pass} ${L.type}`}${L.subtype ? ` (${L.subtype})` : ''} → ${L.verdict ?? '—'}${L.outcome ? ` · outcome ${L.outcome}` : ''} · new serious ${serious} · reopened ${L.reopened || 0}`)
 say(`STATE: latest resolution v${RN || '—'}${rStatus ? ` (${rStatus}${rCommit ? ` @${rCommit}` : ''})` : ''}`)
 
-const led = readLedger(ledger)
-const openHigh = led ? openIds(led.rows, '🔴') : []
-const openMedium = led ? openIds(led.rows, '🟠') : []
+const led = openLedger(t.dir)
+const openHigh = led ? led.high : []
+const openMedium = led ? led.medium : []
 if (led) {
   say(`STATE: ledger open 🔴 ${openHigh.length} · open 🟠 ${openMedium.length} (queue threshold ${QUEUE_THRESHOLD})`)
-  const unread = led.idRows - led.rows.length
+  const unread = led.idRows - led.rows
   if (unread > 0) say(`NOTE: ${unread} of ${count(led.idRows, 'ledger row')} did not parse (severity or status cell off-format) — a row the router cannot read can only make the loop quieter, so read the ledger yourself before acting on this state.`)
 }
 
@@ -183,7 +157,7 @@ if (standsDown(t.dir)) {
   finish(0, 'verification (reviewed unit — render records once, after it)', null)
 }
 // 🟠 open at a passing certification roll into the backlog, so they never pre-empt the owner's close.
-const atLoopClose = L.outcome === 'certified' && L.pass === N && (!RN || RN < N)
+const closing = atLoopClose(L, N, RN)
 let queued = []
 if (led) {
   // A fix-caused 🟠 re-arms the loop where a plain 🟠 would queue — for as long as it stays open.
@@ -198,25 +172,23 @@ if (led) {
     say(`ROUTER: the loop is armed — ${armed.join(' · ')}.`)
     finish(0, 'fix round', null)
   }
-  if (openMedium.length >= QUEUE_THRESHOLD && !atLoopClose) {
+  if (isBatch(openMedium) && !closing) {
     say(`ROUTER: batch of ${count(openMedium.length, 'open medium')} at or over the queue threshold of ${QUEUE_THRESHOLD} (${openMedium.join(', ')}).`)
     finish(0, 'fix round', null)
   }
-  if (openMedium.length && !atLoopClose) {
+  if (openMedium.length && !closing) {
     say(`QUEUED: ${openMedium.join(', ')} (${openMedium.length} below the threshold of ${QUEUE_THRESHOLD})`)
     queued = openMedium
   }
 }
 // Still-open serious work for the later rows: a ledger'd target counts 🔴 always, 🟠 only as a batch.
-const openSerious = led
-  ? openHigh.length + (openMedium.length >= QUEUE_THRESHOLD ? openMedium.length : 0)
-  : serious
+const openSerious = led ? seriousCount(led) : serious
 const cleanBasis = led ? 'nothing open in the ledger' : '0 new serious'
 
 // Certified with NO post-cert fix round pending → close decision belongs to the owner.
 // A resolved post-cert fix round must fall through to the verification branch below (row 3):
 // 015's post-cert round is the precedent — its verification reopened 4 fixes.
-if (atLoopClose) {
+if (closing) {
   say('ROUTER: certification passed on the latest pass; no post-cert fix round is pending.')
   finish(2, null, `close the loop (record \`closed:\` in the ledger frontmatter + index row, README note ²) — owner decision`, 'loop-close')
 }
@@ -229,8 +201,8 @@ if (L.type === 'verification') {
   if (openSerious > 0) routeFixRound('ROUTER: verification surfaced new serious findings (last row).')
   say(`ROUTER: verification clean (0 reopened, ${cleanBasis}).`)
   say('FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.')
-  if (owedLenses.length) say(`NOTE: lens-coverage debt — never run on this target: ${owedLenses.join(', ')}; certification is refused until each has run (a lean lens-coverage discovery clears one, ${COST['lens-coverage discovery']}).`)
-  if (!seedMeasured) say(`NOTE: round r${lines[lastFixIdx].round}'s seed rate is unmeasured — no blind pass has run since it, so "quiet" is unmeasured and certification is refused until a delta discovery measures it (convergence rule, 2026-08-28).`)
+  if (owed.length) say(`NOTE: lens-coverage debt — never run on this target: ${owed.join(', ')}; certification is refused until each has run (a lean lens-coverage discovery clears one, ${COST['lens-coverage discovery']}).`)
+  if (!measured) say(`NOTE: round r${lines[lastFixIdx].round}'s seed rate is unmeasured — no blind pass has run since it, so "quiet" is unmeasured and certification is refused until a delta discovery measures it (convergence rule, 2026-08-28).`)
   finish(3, null, `if delta-worthy → delta discovery (${COST['delta discovery']}); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ² — but certification stays refused while a NOTE above names owed lenses or an unmeasured seed rate`, 'delta-worthiness')
 }
 // A fix round exists for the latest review and is resolved → verification. RN can exceed N:
@@ -252,9 +224,9 @@ if ((L.type === 'discovery' || L.type === 'delta-discovery') && openSerious === 
     say(`ROUTER: sweep before certification — ${count(queued.length, 'open medium')} must drain (${queued.join(', ')}) before the loop quiets.`)
     finish(0, 'fix round', null)
   }
-  if (owedLenses.length) {
-    say(`ROUTER: loop quiet, but these manifest lenses have never run on this target: ${owedLenses.join(', ')} — certification refused on lens-coverage debt (audit R5); the owed lens runs first as a lean pass.`)
-    finish(0, `lens-coverage discovery (${owedLenses[0]})`, null)
+  if (owed.length) {
+    say(`ROUTER: loop quiet, but these manifest lenses have never run on this target: ${owed.join(', ')} — certification refused on lens-coverage debt (audit R5); the owed lens runs first as a lean pass.`)
+    finish(0, `lens-coverage discovery (${owed[0]})`, null)
   }
   say(`ROUTER: discovery-type pass clean (${cleanBasis}, 0 reopened) and every manifest lens has run — loop quiet (row 6).`)
   finish(2, null, `certification — ALWAYS needs the owner's explicit go-ahead outside an unattended run: first attempt = pair (${COST['certification (pair)']}), re-certification after a small verified fix round = single pass (${COST['certification (single)']}), README note ²`, 'certification-go-ahead')
