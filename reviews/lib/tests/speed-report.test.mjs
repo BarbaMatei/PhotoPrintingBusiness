@@ -1,5 +1,7 @@
 // Tests for speed-report.mjs: the bucket state machine, the acceptance metrics, --json
-// round-tripping, and the mislabelled/duplicate/stray round stamps a live worklog carries.
+// round-tripping, the mislabelled/duplicate/stray round stamps a live worklog carries, and the
+// `--disapprovals` lint miner — its disapproval mining, since-filtering and mixed-offset
+// timestamp bucketing (measure/gates.mjs).
 //
 // The fixtures are verbatim copies of 038-039-invoicing's worklog.jsonl and metrics.jsonl.
 // They carry five worklog events and three correction lines appended after the owner's
@@ -285,6 +287,150 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
   roots.push(noLog)
   const r2 = run('speed-report.mjs', ['--root', noLog, TARGET])
   check('a target with no worklog exits 1', r2.code === 1 && /worklog\.jsonl/.test(r2.out), `exit ${r2.code}: ${r2.out.trim()}`)
+
+  const sinceNoValue = run('speed-report.mjs', ['--disapprovals', '--root', T, '--since'])
+  check('--since with no value exits 1', sinceNoValue.code === 1 && /--since needs a value/.test(sinceNoValue.out), `exit ${sinceNoValue.code}: ${sinceNoValue.out.trim()}`)
+  const sinceAlone = run('speed-report.mjs', ['--root', T, TARGET, '--since', '2019-05-01'])
+  check('--since without --disapprovals exits 1', sinceAlone.code === 1 && /--since applies to --disapprovals only/.test(sinceAlone.out), `exit ${sinceAlone.code}: ${sinceAlone.out.trim()}`)
+  const minedJson = run('speed-report.mjs', ['--disapprovals', '--root', T, '--json'])
+  check('--disapprovals refuses the measurement flags instead of ignoring them', minedJson.code === 1 && /--day and --json do not apply/.test(minedJson.out), `exit ${minedJson.code}: ${minedJson.out.trim()}`)
+}
+
+// ---------- --disapprovals (the lint miner): detection, since-filtering, summary ----------
+// Fixture dates sit in 2019, far from the real wall-clock date, so a --since default that
+// wrongly used "now" instead of "the newest event seen" would drop everything and fail these.
+const mined = (T, ...args) => run('speed-report.mjs', ['--disapprovals', '--root', T, ...args])
+const minerRoot = tag => {
+  const T = mkdtempSync(join(tmpdir(), `speed-report-${tag}-`))
+  roots.push(T)
+  return T
+}
+const minerWorklog = (T, target, events, archived) => {
+  const dir = join(T, 'reviews', ...(archived ? ['archive', target] : [target]))
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'worklog.jsonl'), events.map(e => JSON.stringify(e)).join('\n') + '\n')
+}
+
+{
+  const T = minerRoot('miner-core')
+  const target = '960-gate-miner-core'
+  const REASON_A = 'heading order mismatch in review-v1.md'
+  const JUDGE_C = 'disapprove-then-fixed: fixed_commit rendered as the closing sentence text'
+  const NOTE_B = 'nothing unusual, quick approve'
+  const REASON_VOIDED = 'disapprove stamped against the wrong round, repaired with a void'
+  const STUB = '[ ] lintable? -> add a check to doc-gate.mjs + a fixture to run-tests.mjs'
+  minerWorklog(T, target, [
+    { t: '2019-01-01T10:00:00+03:00', ev: 'doc-gate', verdict: 'disapprove', round: 1, reason: REASON_A },
+    { t: '2019-01-05T10:00:00+03:00', ev: 'doc-gate', verdict: 'disapprove', round: 4, reason: REASON_VOIDED },
+    { t: '2019-01-15T09:00:00+03:00', ev: 'doc-gate', verdict: 'approve', round: 2, note: NOTE_B },
+    { t: '2019-01-20T11:00:00+03:00', ev: 'doc-gate', round: 9, lint: 'clean', judge: JUDGE_C, auditor: '0 errors' },
+    { t: '2019-01-21T12:00:00+03:00', ev: 'void', of: { ev: 'doc-gate', t: '2019-01-05T10:00:00+03:00', reason: REASON_VOIDED } },
+  ])
+
+  {
+    const r = mined(T)
+    check('--disapprovals exits 0 with no --since', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+    check('both disapprovals print their full reason/judge text', r.out.includes(REASON_A) && r.out.includes(JUDGE_C), r.out.trim())
+    check('the approve event does not print', !r.out.includes(NOTE_B), r.out.trim())
+    check('a voided disapproval is neither printed nor counted', !r.out.includes(REASON_VOIDED), r.out.trim())
+    check('default --since (30 days before the newest event seen) counts both', r.out.includes('total disapprovals: 2'), r.out.trim())
+    check('the summary breaks the count down per target', r.out.includes(`${target}: 2`), r.out.trim())
+    const stubCount = r.out.split(STUB).length - 1
+    check('two distinct reasons each get their own stub checklist line', stubCount === 2, `stub appeared ${stubCount} time(s)`)
+  }
+  {
+    const r = mined(T, '--since', '2019-01-10')
+    check('--since excludes the earlier disapproval', r.code === 0 && !r.out.includes(REASON_A), r.out.trim())
+    check('--since keeps the later disapproval', r.out.includes(JUDGE_C), r.out.trim())
+    check('the filtered summary counts 1', r.out.includes('total disapprovals: 1'), r.out.trim())
+  }
+  {
+    const r = mined(T, '--since', '2019-02-01')
+    check('a --since after every event yields zero, not an error', r.code === 0 && r.out.includes('total disapprovals: 0'), `exit ${r.code}: ${r.out.trim()}`)
+    check('no reason text leaks into a zero-match run', !r.out.includes(REASON_A) && !r.out.includes(JUDGE_C), r.out.trim())
+  }
+}
+
+// ---------- --disapprovals: per-target summary, archive scan by default, target filtering, dedup ----------
+{
+  const T = minerRoot('miner-multi')
+  const SHARED_REASON = 'filename used as link text'
+  minerWorklog(T, '962-gate-miner-multi-a', [
+    { t: '2019-02-01T08:00:00Z', ev: 'doc-gate', verdict: 'disapprove', round: 4, reason: SHARED_REASON },
+    { t: '2019-02-02T08:00:00Z', ev: 'doc-gate', verdict: 'disapprove', round: 5, reason: 'dense multi-id sentence in Decisions' },
+  ])
+  minerWorklog(T, '963-gate-miner-multi-b', [
+    { t: '2019-02-03T08:00:00Z', ev: 'doc-gate', pass: 3, verdict: 'disapprove', reason: SHARED_REASON },
+  ])
+  minerWorklog(T, '964-gate-miner-archived', [
+    { t: '2019-02-04T08:00:00Z', ev: 'doc-gate', verdict: 'disapprove', round: 1, reason: 'unauthorized metrics-schema vocabulary in prose' },
+  ], true)
+
+  {
+    const r = mined(T)
+    check('--disapprovals scans archived targets by default', r.code === 0 && r.out.includes('964-gate-miner-archived: 1'), r.out.trim())
+    check('per-target counts are correct across live targets', r.out.includes('962-gate-miner-multi-a: 2') && r.out.includes('963-gate-miner-multi-b: 1'), r.out.trim())
+    check('the total sums every target, live and archived', r.out.includes('total disapprovals: 4'), r.out.trim())
+    check('round/pass prints whichever field is present', r.out.includes('round 4') && r.out.includes('pass 3'), r.out.trim())
+    const stubCount = r.out.split('[ ] lintable?').length - 1
+    check('a reason repeated across targets gets one stub line, not two', stubCount === 3, `stub appeared ${stubCount} time(s)`)
+  }
+  {
+    const r = mined(T, '964-gate-miner-archived')
+    check('a positional target argument narrows the scan', r.code === 0 && r.out.includes('total disapprovals: 1'), r.out.trim())
+    check('the narrowed scan excludes the other targets', !r.out.includes('962-gate-miner-multi-a') && !r.out.includes('963-gate-miner-multi-b'), r.out.trim())
+  }
+}
+
+// ---------- --disapprovals: mixed Z/offset timestamps — bucketing and print order by instant ----------
+// The real 038-039 worklog mixes `Z` and `+03:00` stamps. A raw ISO-string compare mis-orders
+// and mis-buckets across that mix: "...T23:30:00Z" sorts before "...T01:00:00+03:00" the next
+// calendar day even though the +03:00 stamp is the earlier instant (it's 3h behind its own
+// written day). Per measure/gates.mjs's bucketing contract, both are judged by parsed instant.
+{
+  const T = minerRoot('miner-tz')
+  const REASON_Z = 'Z stamp reading the earlier day by string alone'
+  const REASON_OFFSET = 'offset stamp reading the next local day but the earlier instant'
+  minerWorklog(T, '966-gate-miner-mixed-tz', [
+    { t: '2026-08-21T23:30:00Z', ev: 'doc-gate', verdict: 'disapprove', round: 1, reason: REASON_Z },
+    { t: '2026-08-22T01:00:00+03:00', ev: 'doc-gate', verdict: 'disapprove', round: 2, reason: REASON_OFFSET },
+  ])
+
+  {
+    const r = mined(T)
+    check('both mixed-offset disapprovals are counted', r.code === 0 && r.out.includes('total disapprovals: 2'), r.out.trim())
+    check('both bucket to the same true UTC day (2026-08-21), not two different days',
+      (r.out.match(/2026-08-21 ·/g) || []).length === 2 && !r.out.includes('2026-08-22 ·'), r.out.trim())
+    check('the earlier instant (the +03:00 stamp) prints before the later one (the Z stamp)',
+      r.out.indexOf(REASON_OFFSET) > -1 && r.out.indexOf(REASON_OFFSET) < r.out.indexOf(REASON_Z), r.out.trim())
+  }
+  {
+    const r = mined(T, '--since', '2026-08-22')
+    check('--since buckets by the true UTC day: both real instants are 2026-08-21, so both are excluded (the +03:00 stamp\'s raw string alone would have wrongly survived)',
+      r.code === 0 && r.out.includes('total disapprovals: 0'), r.out.trim())
+    check('neither reason text leaks through the boundary', !r.out.includes(REASON_OFFSET) && !r.out.includes(REASON_Z), r.out.trim())
+  }
+  {
+    const r = mined(T, '--since', '2026-08-21')
+    check('--since on the true UTC day itself keeps both', r.code === 0 && r.out.includes('total disapprovals: 2'), r.out.trim())
+  }
+}
+
+// ---------- --disapprovals: an approved round's note mentioning "disapprove" still matches ----------
+// Real shape, 038-039-invoicing worklog line 8: an overall-approved pass whose note narrates
+// per-round disapprovals inline. The pinned match rule (verdict/judge/reason/note, case
+// insensitive) doesn't care about the top-level verdict — this locks that in.
+{
+  const T = minerRoot('miner-approve-note')
+  const NOTE = 'lint clean throughout; Sonnet judge disapproved rounds 1-4 (heading/title mismatches, unauthorized metrics-schema vocabulary in prose) — approved round 5'
+  minerWorklog(T, '967-gate-miner-approve-note', [
+    { t: '2026-08-13T08:45:00Z', ev: 'doc-gate', pass: 'v1', verdict: 'approve', rounds: 5, note: NOTE },
+  ])
+
+  const r = mined(T)
+  check('an approve-verdict event whose note mentions "disapprove" still matches', r.code === 0 && r.out.includes(NOTE), r.out.trim())
+  check('the summary counts it despite the overall verdict being approve', r.out.includes('total disapprovals: 1'), r.out.trim())
+  check('round/pass falls back to the pass field when there is no round', r.out.includes('pass v1'), r.out.trim())
 }
 
 for (const T of roots) rmSync(T, { recursive: true, force: true })

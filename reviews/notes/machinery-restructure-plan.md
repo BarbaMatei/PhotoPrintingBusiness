@@ -27,7 +27,7 @@ and the same logic is written several times.
 | **Fix** | `fix-review` skill (triage, clusters, protocol blocks, approach-checks, round review, test audit), `run-scoped-tests.mjs` | no — an engineering workflow |
 | **Drive** | `route-next-pass.mjs`, `autonomy-policy.mjs`, `loop-driver` skill, convergence and re-arm rules, unattended runs | no — a workflow state machine |
 | **Records** | worklog, metrics, ledger, resolutions, index, backlog, id-counter; `wl.mjs`, `render-records.mjs`, `records-auditor.mjs`, `doc-gate.mjs` + judge, `mint-id.mjs`, `doc-contracts.md`, `metrics-schema.md`, templates | no — a defect tracker plus telemetry store on markdown/JSONL |
-| **Measure** | `speed-report.mjs`, `gate-miner.mjs`, the overrides log, the `system` meta-review target, `track-record.md`, `rationale.md` | no — process measurement and improvement |
+| **Measure** | `speed-report.mjs` (the loop measurement and its `--disapprovals` lint miner), `measure/gates.mjs`, the overrides log, the `system` meta-review target, `track-record.md`, `rationale.md` | no — process measurement and improvement |
 | **Enforce** | `.githooks/pre-commit` (comment gate, doc-gate backstop, suite run, override log) | no — repo policy |
 
 Concrete symptoms this phase removes:

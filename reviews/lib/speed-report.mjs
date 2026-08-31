@@ -19,12 +19,21 @@
 // sittings per fixed finding` = sittings ÷ fixed findings; `correction lines` = metrics.jsonl
 // lines carrying correction_for, counted cumulatively up to --day, an undated one left out.
 //
+// Second mode, the lint miner: `--disapprovals` lists the doc gate's judge disapprovals across
+// every target, live and archived, each with a stub checklist line, so a person decides which
+// become deterministic doc-gate checks (the scan and its date rule live in measure/gates.mjs).
+// Positional arguments narrow it by substring of the target name; --day and --json are the
+// measurement's flags and do not apply to it.
+//
 // Usage: node reviews/lib/speed-report.mjs [--root <repoRoot>] <target> [--day YYYY-MM-DD] [--json]
+//        node reviews/lib/speed-report.mjs [--root <repoRoot>] --disapprovals [--since YYYY-MM-DD] [target ...]
 // Exit: 0 = printed · 1 = no such target, no worklog, a worklog line that is unparseable JSON or
-//       carries an unparseable timestamp, a flag given no value, a malformed --day, or a --day the
-//       worklog has no events on.
+//       carries an unparseable timestamp, a flag given no value, a malformed --day, a --day the
+//       worklog has no events on, or a flag used outside its own mode. A --disapprovals scan that
+//       matches nothing still exits 0.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { dayOf, disapprovalLines, epochOf, isApprove, isDisapproval } from './measure/gates.mjs'
 import { at as atOf, covers, lenientSpans, REFUSED, short, spanOf, stamp as stampOf } from './model/spans.mjs'
 import { repoRoot } from './cli/args.mjs'
 import { readMetrics } from './records/metrics.mjs'
@@ -33,24 +42,34 @@ import { live, readLines } from './records/worklog.mjs'
 const CAP_MIN = 30
 const RECORDS_ANCHOR = new Set(['round-end', 'pass-records-done', 'doc-gate'])
 const STOPS_RECORDS = new Set(['run-end', 'gate-parked', 'gate-open'])
-const DISAPPROVAL_FIELDS = ['verdict', 'judge', 'reason', 'note']
 
-const USAGE = 'usage: speed-report.mjs [--root <repoRoot>] <target> [--day YYYY-MM-DD] [--json]'
+const USAGE = 'usage: speed-report.mjs [--root <repoRoot>] <target> [--day YYYY-MM-DD] [--json] · speed-report.mjs [--root <repoRoot>] --disapprovals [--since YYYY-MM-DD] [target ...]'
 function fail(m) { console.error(`ERROR   ${m}`); process.exit(1) }
 
 const argv = process.argv.slice(2)
-let ROOT = null, DAY = null, JSON_OUT = false
+let ROOT = null, DAY = null, SINCE = null, JSON_OUT = false, DISAPPROVALS = false
 const rest = []
 for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root' || argv[i] === '--day') {
+  if (argv[i] === '--root' || argv[i] === '--day' || argv[i] === '--since') {
     const flag = argv[i], value = argv[++i]
     if (value == null || /^--/.test(value)) fail(`${flag} needs a value; ${USAGE}`)
     if (flag === '--root') ROOT = value
-    else DAY = value
+    else if (flag === '--day') DAY = value
+    else SINCE = value
   } else if (argv[i] === '--json') JSON_OUT = true
+  else if (argv[i] === '--disapprovals') DISAPPROVALS = true
   else rest.push(argv[i])
 }
 ROOT = repoRoot(import.meta.url, ROOT)
+
+// ---------- the lint miner: every target's gate disapprovals, no target argument needed ----------
+if (DISAPPROVALS) {
+  if (DAY || JSON_OUT) fail(`--disapprovals reports the gate disapprovals, so --day and --json do not apply; ${USAGE}`)
+  try { console.log(disapprovalLines(join(ROOT, 'reviews'), { since: SINCE, filters: rest }).join('\n')) }
+  catch (e) { fail(`reading the worklogs: ${e.message}`) }
+  process.exit(0)
+}
+if (SINCE) fail(`--since applies to --disapprovals only; ${USAGE}`)
 
 const target = rest[0]
 if (!target) fail(USAGE)
@@ -71,10 +90,6 @@ function loadEvents() {
   for (const l of lines) if (l.error) fail(`worklog line ${l.n}: unparseable JSON (${l.error.message})`)
   return live(lines.map(l => l.event))
 }
-
-// Real worklogs mix `Z` and offset stamps, so the day comes from the parsed instant.
-const epochOf = e => Date.parse(e.t)
-const dayOf = e => new Date(epochOf(e)).toISOString().slice(0, 10)
 
 const all = loadEvents()
 for (const e of all) if (!Number.isFinite(epochOf(e))) fail(`worklog event with unparseable timestamp: ${JSON.stringify(e)}`)
@@ -130,8 +145,6 @@ const spanMin = min(epochOf(events[events.length - 1]) - epochOf(events[0]))
 
 // ---------- doc-gate sittings ----------
 const gateKey = e => (e.round != null ? `round ${e.round}` : e.pass != null ? `pass ${e.pass}` : 'unkeyed')
-const isDisapproval = e => DISAPPROVAL_FIELDS.some(k => typeof e[k] === 'string' && /disapprove/i.test(e[k]))
-const isApprove = e => !isDisapproval(e) && DISAPPROVAL_FIELDS.some(k => typeof e[k] === 'string' && /^approve/i.test(e[k]))
 
 const sittings = []
 for (let i = 0; i < events.length; i++) {

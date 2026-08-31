@@ -122,9 +122,9 @@ evidence events of the 2026-08-28 audit (`protocol-written`,
 
 - `void` — `{"ev":"void","of":{...}}`. This is how a mis-stamped event is repaired; the log
   stays append-only. **Every reader drops the events `of` matches** — the stamper, the renderer,
-  the speed report, the auditor (`records-auditor.mjs`, its hand-back gates included), the
-  unattended policy and the lint miner (`gate-miner.mjs`) — so one void repairs what all of them
-  see. Several of them carry their own copy of the matching rule, so a change to it changes each.
+  the speed report (`speed-report.mjs`, its `--disapprovals` lint-miner mode included), the
+  auditor (`records-auditor.mjs`, its hand-back gates included) and the unattended policy — so one
+  void repairs what all of them see. Several of them carry their own copy of the matching rule, so a change to it changes each.
 - `verify-result` — `{"ev":"verify-result","id":"PPW-<n>","verdict":"held|...","commit":"..."}`,
   appended by `reviews/lib/verify-fixes.mjs`, which buffers them and flushes them once after the
   last row (never row by row, so an aborted run leaves no half-written verdicts). `commit` is the commit the

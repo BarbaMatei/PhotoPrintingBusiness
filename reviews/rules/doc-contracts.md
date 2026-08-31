@@ -142,13 +142,13 @@ Allowed system terms. Anything else must be everyday English.
   allowed; the list and the tiebreak rule sit under `backlog.md` below.
 - **worklog** — `worklog.jsonl`, the per-target append-only event trail.
 - **stamper** — `lib/wl.mjs`, the only sanctioned way to append a worklog event; it owns the timestamp and enforces the event vocabulary and each event's required fields.
-- **void** — an appended worklog event that repairs a mis-stamped one. Every reader of the worklog — stamper, renderer, speed report, auditor (hand-back gates included), unattended policy and lint miner — drops the events it matches.
+- **void** — an appended worklog event that repairs a mis-stamped one. Every reader of the worklog — stamper, renderer, speed report (its lint-miner mode included), auditor (hand-back gates included) and unattended policy — drops the events it matches.
 - **sitting** — one visit to the doc gate: a run of adjacent `doc-gate` events sharing a round or pass key.
 - **`verify-result`** — the worklog event a verification appends per checked row: its id, its verdict, and the commit the row was proved at.
 - **renderer** — `lib/render-records.mjs`, which turns a unit's worklog into its metrics line, its index rows and its ledger flips.
 - **test wrapper** — `lib/run-scoped-tests.mjs`, which runs one scoped suite under a machine-global lock and stamps its `test-run` event.
 - **speed report** — `lib/speed-report.mjs`, the read-only acceptance measurement of where a loop's wall-clock time went (definitions in `metrics-schema.md`).
-- **lint miner** — `lib/gate-miner.mjs`, which lists the doc gate's judge disapprovals so a person can decide which become deterministic lint checks.
+- **lint miner** — `lib/speed-report.mjs --disapprovals`, which lists the doc gate's judge disapprovals so a person can decide which become deterministic lint checks.
 - **index** — `reviews/state/index.md`, one row per pass, repo-wide.
 - **severity** — 🔴 High · 🟠 Medium · 🟡 Low · ⚪ Cleanup.
 - **verdict** — `request-changes` · `approve-with-followups` · `approved`.
@@ -263,8 +263,8 @@ never estimated.
 Every event goes in through the stamper, which owns the timestamp and rejects an
 event outside the vocabulary or missing a required field. Two events serve the
 records. `void` repairs a mis-stamped event by naming it in `of`; every reader —
-the stamper, the renderer, the speed report, the auditor including its hand-back
-gates, the unattended policy and the lint miner — then drops what it matches, so one void is the whole
+the stamper, the renderer, the speed report including its lint-miner mode, the
+auditor including its hand-back gates and the unattended policy — then drops what it matches, so one void is the whole
 repair and no reader keeps counting the mis-stamp. `verify-result`
 carries a checked row's id, verdict and proved-at commit for the verification to
 render from.
