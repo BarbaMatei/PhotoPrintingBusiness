@@ -2,8 +2,9 @@
 // The router and the autonomy policy both route on it, so the row shape and the definition of
 // "open" live here once; the status and severity words come from records/schema.mjs.
 // Row shape (doc-contracts.md): | PPW-<n> | 🔴|🟠|🟡|⚪ | first seen | title | file | status | affirmed |
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { newest } from './model/target.mjs'
 import { dateValue, parse, value } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { OPEN_STATUSES, SEVERITIES, STATUSES, V3_CUTOFF } from './records/schema.mjs'
@@ -25,13 +26,8 @@ export const openIds = (rows, sev) => rows.filter(r => r.sev === sev && OPEN_STA
 // The ledger is not the authority while a resolved round's records are unrendered — unless the round
 // closed before V3_CUTOFF, when fix-round lines did not exist yet and its records will never come.
 export function standsDown(dir) {
-  const files = readdirSync(dir)
-  const newest = re => {
-    const ns = files.map(f => re.exec(f)).filter(Boolean).map(m => Number(m[1]))
-    return ns.length ? Math.max(...ns) : 0
-  }
-  const RN = newest(/^resolution-v(\d+)\.md$/)
-  if (!RN || RN < newest(/^review-v(\d+)\.md$/)) return false
+  const RN = newest(dir, 'resolution')
+  if (!RN || RN < newest(dir, 'review')) return false
   const fm = parse(readFileSync(join(dir, `resolution-v${RN}.md`), 'utf8')).fm ?? ''
   if (value(fm, 'status') !== 'resolved') return false
   const closed = dateValue(fm, 'closed', { acrossLines: true })

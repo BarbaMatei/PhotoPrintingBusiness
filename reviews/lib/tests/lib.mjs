@@ -7,7 +7,7 @@
 import { spawnSync } from 'node:child_process'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { REVIEWS, REPO } from '../paths.mjs'
+import { REVIEWS, REPO } from '../records/schema.mjs'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 export const GOOD_ROOT = join(FIXTURES, 'repo')

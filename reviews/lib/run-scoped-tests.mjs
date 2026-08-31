@@ -31,9 +31,9 @@
 // 3 another test process already holds the lock.
 import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { appendEvent } from './wl.mjs'
 
 const DEFAULT_API_CMD = 'dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"'
@@ -47,13 +47,13 @@ function usageError(message) {
   process.exit(2)
 }
 
-function parseArgs(argv) {
-  const args = { cluster: null, round: null, note: null, cmd: null, dryRun: false, noEvents: false, ui: false }
+function parseArgs(rawArgv) {
+  const { root, rest: argv } = takeRoot(rawArgv)
+  const args = { cluster: null, round: null, note: null, cmd: null, dryRun: false, noEvents: false, ui: false, root }
   const positional = []
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--root') args.root = argv[++i]
-    else if (a === '--kind') args.kind = argv[++i]
+    if (a === '--kind') args.kind = argv[++i]
     else if (a === '--filter') args.filter = argv[++i]
     else if (a === '--include') args.include = argv[++i]
     else if (a === '--ui') args.ui = true
@@ -111,7 +111,7 @@ function parseOutput(mode, text) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2))
-  const REPO = args.root ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+  const REPO = repoRoot(import.meta.url, args.root)
   if (!args.target) usageError('missing <target>')
   if (!args.kind) usageError('missing --kind')
   if (args.ui ? !args.include : !args.filter) {

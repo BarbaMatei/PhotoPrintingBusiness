@@ -14,20 +14,17 @@
 // Exit codes: 0 = next pass determined (or target closed) · 2 = OWNER GATE required first ·
 //             3 = judgment call needed (facts printed; README router row cited) · 1 = error.
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { newest, versions } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { readLedger, openIds, standsDown } from './ledger.mjs'
 import { parse, value } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { MANIFEST_LENSES, TARGETLESS } from './records/schema.mjs'
 
-const argv = process.argv.slice(2)
-let root = null, arg = null
-for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') root = argv[++i]
-  else arg = argv[i]
-}
-const REVIEWS = root ? join(root, 'reviews') : join(dirname(fileURLToPath(import.meta.url)), '..')
+const { root, rest } = takeRoot(process.argv.slice(2))
+const arg = rest.at(-1) ?? null
+const REVIEWS = join(repoRoot(import.meta.url, root), 'reviews')
 if (!arg) { console.error('usage: node reviews/lib/route-next-pass.mjs [--root <repoRoot>] <target>'); process.exit(1) }
 
 // Pass-cost estimates from the recorded history (metrics.jsonl roll-ups, 2026-07-30).
@@ -96,7 +93,7 @@ if (closed) {
   finish(0, null, null)
 }
 
-const reviews = readdirSync(t.dir).map(f => /^review-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
+const reviews = versions(t.dir, 'review')
 if (!reviews.length) { say('STATE: folder exists, no review-v1.md'); say('ROUTER: row 1'); finish(0, 'full discovery', null) }
 const N = Math.max(...reviews)
 
@@ -163,8 +160,7 @@ function routeFixRound(reason) {
   finish(0, 'fix round', null)
 }
 
-const resolutions = readdirSync(t.dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-const RN = resolutions.length ? Math.max(...resolutions) : 0
+const RN = newest(t.dir, 'resolution')
 const rStatus = RN ? fm(join(t.dir, `resolution-v${RN}.md`), 'status') : null
 const rCommit = RN ? fm(join(t.dir, `resolution-v${RN}.md`), 'fixed_commit') : null
 

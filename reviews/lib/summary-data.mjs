@@ -7,28 +7,23 @@
 //
 // Usage: node reviews/lib/summary-data.mjs [--root <repoRoot>] <target> <pass>
 // Exit: 0 = fragments printed · 2 = usage error or no metrics line for that pass.
-import { existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { resolveDir, targetDirs } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { MANIFEST_LENSES } from './records/schema.mjs'
 
 const USAGE = 'usage: node reviews/lib/summary-data.mjs [--root <repoRoot>] <target> <pass>'
 const plural = (n, word, pluralWord = `${word}s`) => `${n} ${n === 1 ? word : pluralWord}`
 
-const argv = process.argv.slice(2)
-let root = null
-const positional = []
-for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') root = argv[++i]
-  else positional.push(argv[i])
-}
+const { root, rest: positional } = takeRoot(process.argv.slice(2))
 const [target, passArg] = positional
 const pass = Number(passArg)
 if (!target || !Number.isFinite(pass)) { console.error(USAGE); process.exit(2) }
 
-const REVIEWS = root ? join(root, 'reviews') : join(dirname(fileURLToPath(import.meta.url)), '..')
-const targetDir = name => existsSync(join(REVIEWS, name)) ? join(REVIEWS, name) : join(REVIEWS, 'archive', name)
+const REVIEWS = join(repoRoot(import.meta.url, root), 'reviews')
+// A target that exists nowhere reads as the archive path, whose missing metrics file ends the run below.
+const targetDir = name => resolveDir(REVIEWS, name) ?? targetDirs(REVIEWS, name)[1]
 const metrics = readMetrics(targetDir(target), { strict: true })
 if (!metrics) { console.error(USAGE); process.exit(2) }
 const { lines } = metrics

@@ -12,17 +12,12 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { AREAS, CAPS, SEVERITIES as SEV, SHA_SCAN_RE, STATUSES as STATUS_WORDS, TARGETLESS, V4_CUTOFF } from './records/schema.mjs'
+import { AREAS, BACKLOG, CAPS, INDEX, REVIEWS as REVIEWS_HOME, SEVERITIES as SEV, SHA_SCAN_RE, STATUSES as STATUS_WORDS, TARGETLESS, V4_CUTOFF } from './records/schema.mjs'
 import { parse, section as bodySection, value as fmVal } from './records/frontmatter.mjs'
-import { BACKLOG, INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
+import { resolveDir } from './model/target.mjs'
+import { takeRoot } from './cli/args.mjs'
 
-const argv = process.argv.slice(2)
-let root = null
-const rest = []
-for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') root = argv[++i]
-  else rest.push(argv[i])
-}
+const { root, rest } = takeRoot(process.argv.slice(2))
 
 const problems = []
 const bad = (file, msg) => problems.push(`${file}: ${msg}`)
@@ -127,9 +122,8 @@ if (!target || !Number.isFinite(pass)) {
   process.exit(2)
 }
 const REVIEWS = root ? join(root, 'reviews') : REVIEWS_HOME
-let dir = join(REVIEWS, target)
-if (!existsSync(dir)) dir = join(REVIEWS, 'archive', target)
-if (!existsSync(dir)) { console.error(`no such target folder: ${join(REVIEWS, target)} (also tried archive/)`); process.exit(2) }
+const dir = resolveDir(REVIEWS, target)
+if (!dir) { console.error(`no such target folder: ${join(REVIEWS, target)} (also tried archive/)`); process.exit(2) }
 const name = target.replace(/^archive\//, '')
 const gitPath = dir.slice(join(REVIEWS, '..').length + 1).replace(/\\/g, '/')
 

@@ -73,7 +73,8 @@ A target folder contains at most: `review-v<n>.md`, `resolution-v<n>.md`,
    File-to-file links are allowed only between files of the same round.
    Prose never spells out a system file's path — it uses the file's vocabulary
    name ("the backlog", "the ledger"); the vocabulary entry owns the path, and
-   `lib/paths.mjs` owns it for scripts. Literal paths appear only in markdown
+   `lib/records/schema.mjs` owns it for scripts (a per-target folder comes from
+   `lib/model/target.mjs`, never from a constant). Literal paths appear only in markdown
    links (kept true by `lib/fix-links.mjs`), definitions, and commands.
 5. **Append-only detail.** A ledger detail block never changes after creation,
    except new History lines. Status fields in the table may change.

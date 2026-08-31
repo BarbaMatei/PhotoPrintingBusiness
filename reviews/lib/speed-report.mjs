@@ -24,8 +24,8 @@
 //       carries an unparseable timestamp, a flag given no value, a malformed --day, or a --day the
 //       worklog has no events on.
 import { existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { repoRoot } from './cli/args.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { live, readLines } from './records/worklog.mjs'
 
@@ -50,7 +50,7 @@ for (let i = 0; i < argv.length; i++) {
   } else if (argv[i] === '--json') JSON_OUT = true
   else rest.push(argv[i])
 }
-if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+ROOT = repoRoot(import.meta.url, ROOT)
 
 const target = rest[0]
 if (!target) fail(USAGE)

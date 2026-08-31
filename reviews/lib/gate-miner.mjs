@@ -12,8 +12,8 @@
 // mis-buckets and mis-orders across that mix.
 // Exit: 0 always, even with zero matches · 1 on an IO error while reading worklogs.
 import { readdirSync, existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { readEvents } from './records/worklog.mjs'
 import { TARGETLESS } from './records/schema.mjs'
 // The field that trips the match isn't necessarily the one worth printing — priority differs.
@@ -40,16 +40,14 @@ const epochOf = e => typeof e.t === 'string' ? Date.parse(e.t) : NaN
 const dateOf = e => { const ms = epochOf(e); return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null }
 
 function main() {
-  const argv = process.argv.slice(2)
-  let root = null, sinceArg = null
+  const { root, rest } = takeRoot(process.argv.slice(2))
+  let sinceArg = null
   const filters = []
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--root') root = argv[++i]
-    else if (argv[i] === '--since') sinceArg = argv[++i]
-    else filters.push(argv[i])
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === '--since') sinceArg = rest[++i]
+    else filters.push(rest[i])
   }
-  if (!root) root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-  const reviewsDir = join(root, 'reviews')
+  const reviewsDir = join(repoRoot(import.meta.url, root), 'reviews')
 
   const targets = listTargets(reviewsDir, filters)
   const events = []

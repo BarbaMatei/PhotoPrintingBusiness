@@ -15,8 +15,10 @@
 // Exit: 0 appended (prints the appended line) · 1 usage or validation error (prints
 // "ERROR <reason>", appends nothing).
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { resolveDir, targetDirs } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { EVENTS } from './records/schema.mjs'
 import { deepEqual, live, readLines } from './records/worklog.mjs'
 
@@ -96,8 +98,9 @@ export function appendEvent(root, target, event) {
   if (typeof event.pass === 'string' && /^v\d+$/.test(event.pass)) event = { ...event, pass: Number(event.pass.slice(1)) }
   validateShape(event)
 
-  const candidateDirs = [join(root, 'reviews', target), join(root, 'reviews', 'archive', target)]
-  const dir = candidateDirs.find(existsSync) ?? candidateDirs[0]
+  const reviewsDir = join(root, 'reviews')
+  const candidateDirs = targetDirs(reviewsDir, target)
+  const dir = resolveDir(reviewsDir, target) ?? candidateDirs[0]
   const wlPath = join(dir, 'worklog.jsonl')
   const existing = readEvents(dir)
 
@@ -141,19 +144,17 @@ function isMain() {
 
 if (isMain()) {
   try {
-    const argv = process.argv.slice(2)
-    let root = null
+    const { root: rootFlag, rest: argv } = takeRoot(process.argv.slice(2))
     const rest = []
     const event = {}
     for (let i = 0; i < argv.length; i++) {
       const a = argv[i]
-      if (a === '--root') root = argv[++i]
-      else if (a === '--json') Object.assign(event, JSON.parse(argv[++i]))
+      if (a === '--json') Object.assign(event, JSON.parse(argv[++i]))
       else if (a === '--ids') event.ids = argv[++i].split(',').map(s => s.trim()).filter(Boolean)
       else if (a.startsWith('--')) event[a.slice(2)] = coerce(argv[++i])
       else rest.push(a)
     }
-    if (!root) root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+    const root = repoRoot(import.meta.url, rootFlag)
     const [target, ev] = rest
     if (!target || !ev) {
       throw new Error("usage: wl.mjs [--root <repoRoot>] <target> <ev> [--<key> <value>]... [--json '<obj>']")

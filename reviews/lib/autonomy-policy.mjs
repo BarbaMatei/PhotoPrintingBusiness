@@ -14,26 +14,24 @@
 // close the loop) and REASON.
 // A design-pass gate and any gate override logged after the run's start always stop.
 // Exit: 0 answered · 1 usage error or unknown target.
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { readLedger, openIds, standsDown } from './ledger.mjs'
+import { newest, resolveDir } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { parse } from './records/frontmatter.mjs'
 import { readMetrics } from './records/metrics.mjs'
 import { readEvents } from './records/worklog.mjs'
 import { MANIFEST_LENSES } from './records/schema.mjs'
 
-const argv = process.argv.slice(2)
-let root = null
-const rest = []
-for (let i = 0; i < argv.length; i++) argv[i] === '--root' ? (root = argv[++i]) : rest.push(argv[i])
+const { root, rest } = takeRoot(process.argv.slice(2))
 const [target, cmd, gateKind] = rest
-const REVIEWS = root ? join(root, 'reviews') : join(dirname(fileURLToPath(import.meta.url)), '..')
+const REVIEWS = join(repoRoot(import.meta.url, root), 'reviews')
 if (!target || cmd !== 'decide' || !gateKind) {
   console.error('usage: node reviews/lib/autonomy-policy.mjs [--root <repoRoot>] <target> decide <gate-kind>')
   process.exit(1)
 }
-const dir = [join(REVIEWS, target), join(REVIEWS, 'archive', target)].find(existsSync)
+const dir = resolveDir(REVIEWS, target)
 if (!dir) { console.error(`no reviews folder for "${target}"`); process.exit(1) }
 
 const say = (k, v) => console.log(`${k}: ${v}`)
@@ -115,9 +113,8 @@ if (gateKind === 'delta-worthiness') {
   // Judge the round that just ran, which is the newest resolution. A round answering a
   // verification pass raises no review file, so it has no blocker list and is patch-grade
   // unless its own review file says otherwise.
-  const resolutions = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-  if (!resolutions.length) stop('no resolution file — delta-worthiness cannot be judged mechanically')
-  const RN = Math.max(...resolutions)
+  const RN = newest(dir, 'resolution')
+  if (!RN) stop('no resolution file — delta-worthiness cannot be judged mechanically')
   const resPath = join(dir, `resolution-v${RN}.md`)
   const reviewPath = join(dir, `review-v${RN}.md`)
   const fmBlock = existsSync(reviewPath)

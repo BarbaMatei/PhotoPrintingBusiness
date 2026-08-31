@@ -13,22 +13,17 @@
 // Exit 0 = no errors (warnings allowed) · 1 = errors.
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { join, dirname, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { REVIEWS as LIVE_REVIEWS, INDEX as INDEX_FILE, TRACK_RECORD, ID_COUNTER } from './paths.mjs'
-import { AREAS, SEVERITIES, SHA_RE, TARGETLESS, V2_CUTOFF, V3_CUTOFF, V4_CUTOFF } from './records/schema.mjs'
+import { join, relative } from 'node:path'
+import { AREAS, ID_COUNTER, INDEX as INDEX_FILE, REVIEWS as LIVE_REVIEWS, SEVERITIES, SHA_RE, TARGETLESS, TRACK_RECORD, V2_CUTOFF, V3_CUTOFF, V4_CUTOFF } from './records/schema.mjs'
+import { versions } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { dateValue, parse, section, word } from './records/frontmatter.mjs'
 import { readLines as readMetricsLines } from './records/metrics.mjs'
 import { live, readLines as readWorklogLines } from './records/worklog.mjs'
 
 const argv = process.argv.slice(2)
-let ROOT = null
-const only = []
-for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') ROOT = argv[++i]
-  else only.push(argv[i])
-}
-if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const { root, rest: only } = takeRoot(argv)
+const ROOT = repoRoot(import.meta.url, root)
 const REVIEWS = join(ROOT, 'reviews')
 
 const TYPES = new Set(['discovery', 'delta-discovery', 'verification'])
@@ -118,7 +113,7 @@ function resolutionTallies(text) {
 function auditTarget(t) {
   const tag = t.name + (t.archived ? ' (archive)' : '')
   const strictTier = t.archived ? warn : err // archives never hard-fail on record shape
-  const reviewVersions = readdirSync(t.dir).map(f => /^review-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
+  const reviewVersions = versions(t.dir, 'review')
   const metricsLines = readMetricsLines(t.dir)
   if (metricsLines === null) {
     info(`${tag}: no metrics.jsonl (${reviewVersions.length} review file(s)) — skipped as a non-code target`)
@@ -324,7 +319,7 @@ function auditTarget(t) {
 
   // review-v<n>.md <-> metrics pairing (+ frontmatter commit collection)
   let missingFm = 0
-  for (const v of reviewVersions.sort((a, b) => a - b)) {
+  for (const v of reviewVersions) {
     if (!passes.has(v)) strictTier(`${tag}: review-v${v}.md has no metrics line`)
     const head = readFileSync(join(t.dir, `review-v${v}.md`), 'utf8').slice(0, 800)
     const cm = /^commit:\s*([0-9a-f]{7,40})\b/m.exec(head)

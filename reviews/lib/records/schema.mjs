@@ -1,9 +1,12 @@
 // The one machine home for the vocabulary and the numbers every gate shares: worklog events,
 // finding statuses, severities, areas, lenses, size caps, grandfathering cut-offs, the folders
-// under reviews/ that are not targets, and the sha shapes. No I/O, no dependencies.
+// under reviews/ that are not targets, the sha shapes, and the paths of the cross-target files.
+// Reads nothing; the path constants are the only reason it touches node:path/node:url.
 // Prose authorities that must change in the same commit as a change here (the
 // descriptive-standards rule): the lens manifest table in runbooks/runbook-discovery.md, the
 // area table, status vocabulary, event list and cap table in rules/doc-contracts.md.
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const MANIFEST_LENSES = [
   'correctness', 'security', 'requirements', 'quality', 'tests-coverage',
@@ -80,3 +83,15 @@ export const V3_CUTOFF = '2026-08-03'
 // Rules from the accepted fix-round audit apply to rounds closed on/after this date;
 // every earlier record is grandfathered (doc-contracts.md, "Grandfathering cut-offs").
 export const V4_CUTOFF = '2026-08-28'
+
+// The live repo's paths: absolute, so a script running against a fixture repo rebases them onto
+// its own --root (cli/args.mjs owns that root). Per-target files are never constants — they are
+// derived from the target folder model/target.mjs resolves.
+export const REVIEWS = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+export const REPO = join(REVIEWS, '..')
+export const BACKLOG = join(REVIEWS, 'state', 'backlog.md')
+export const INDEX = join(REVIEWS, 'state', 'index.md')
+export const TRACK_RECORD = join(REVIEWS, 'state', 'track-record.md')
+export const ID_COUNTER = join(REVIEWS, 'state', 'id-counter')
+export const DEFECT_CLASSES = join(REVIEWS, 'state', 'defect-classes.jsonl')
+export const TEMPLATES = join(REVIEWS, 'templates')

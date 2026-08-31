@@ -22,21 +22,21 @@
 // memory and flushed once after the last row (a killed run leaves no partial trail; re-run
 // instead — the run is idempotent), unless --dry-run or --no-events.
 // Exit: 0 all held · 1 any other verdict · 2 dirty tree or usage error.
-import { readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
+import { readFileSync, existsSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { join, dirname, basename } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join, basename } from 'node:path'
+import { newest, resolveDir } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 import { appendEvent } from './wl.mjs'
 import { parse, value } from './records/frontmatter.mjs'
 
-const argv = process.argv.slice(2)
-let root = null, only = null, dryRun = false, noEvents = false
+const { root, rest: argv } = takeRoot(process.argv.slice(2))
+let only = null, dryRun = false, noEvents = false
 let tplApi = 'dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"'
 let tplUi = 'npm --prefix src/PhotoPrint.UI test -- --watch=false --include=**/{name}*.spec.ts'
 const rest = []
 for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') root = argv[++i]
-  else if (argv[i] === '--only') only = new Set(argv[++i].split(','))
+  if (argv[i] === '--only') only = new Set(argv[++i].split(','))
   else if (argv[i] === '--dry-run') dryRun = true
   else if (argv[i] === '--no-events') noEvents = true
   else if (argv[i] === '--test-cmd-api') tplApi = argv[++i]
@@ -44,9 +44,9 @@ for (let i = 0; i < argv.length; i++) {
   else rest.push(argv[i])
 }
 const target = rest[0]
-const REPO = root ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const REPO = repoRoot(import.meta.url, root)
 if (!target) { console.error('usage: node reviews/lib/verify-fixes.mjs [--root <repoRoot>] <target> [--only ids] [--dry-run] [--no-events] [--test-cmd-api tpl] [--test-cmd-ui tpl]'); process.exit(2) }
-const dir = [join(REPO, 'reviews', target), join(REPO, 'reviews', 'archive', target)].find(existsSync)
+const dir = resolveDir(join(REPO, 'reviews'), target)
 if (!dir) { console.error(`no reviews folder for "${target}"`); process.exit(2) }
 
 // A git hook's own GIT_DIR/GIT_WORK_TREE/GIT_COMMON_DIR (etc.) would otherwise leak in here
@@ -60,9 +60,8 @@ for (const k of gitEnvVars) delete gitEnv[k]
 const git = (...a) => spawnSync('git', a, { cwd: REPO, encoding: 'utf8', env: gitEnv })
 const runCmd = c => spawnSync(c, { cwd: REPO, encoding: 'utf8', shell: true, timeout: 600000 })
 
-const versions = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-if (!versions.length) { console.error(`no resolution file in ${dir}`); process.exit(2) }
-const N = Math.max(...versions)
+const N = newest(dir, 'resolution')
+if (!N) { console.error(`no resolution file in ${dir}`); process.exit(2) }
 const resolutionText = readFileSync(join(dir, `resolution-v${N}.md`), 'utf8')
 // A fix may span several commits (the micro-review follow-up is the common case), so the Commit
 // cell can list more than one. Take every sha in the cell and never skip a `fixed` row silently:

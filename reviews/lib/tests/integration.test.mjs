@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { REVIEWS, REPO } from '../paths.mjs'
+import { REVIEWS, REPO } from '../records/schema.mjs'
 
 // ---------- route-next-pass: the ledger-derived rows — threshold, queue, sweep, reviewed unit ----------
 // A fix round and its verification are one reviewed unit, so the ledger — not the metrics tally —

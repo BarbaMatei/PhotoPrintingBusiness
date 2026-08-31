@@ -8,7 +8,7 @@ import { check, run } from './lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { TEMPLATES } from '../paths.mjs'
+import { TEMPLATES } from '../records/schema.mjs'
 
 function seedTemplates(T) {
   const dst = join(T, 'reviews', 'templates')

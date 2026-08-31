@@ -21,21 +21,21 @@
 // a bad worklog, unpaired stamps, an --outcome that is missing, over 50 words or carries a "|" or a
 // line break, no Passes table to insert into, or an unresolved resolution / unstamped
 // pass-records-done without --in-progress.
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
-import { join, dirname, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { INDEX, REVIEWS as REVIEWS_HOME } from './paths.mjs'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { join, relative } from 'node:path'
+import { newest } from './model/target.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
+import { INDEX, REVIEWS as REVIEWS_HOME } from './records/schema.mjs'
 import { parse, section, word } from './records/frontmatter.mjs'
 import { appendLine, readMetrics } from './records/metrics.mjs'
 import { live, matchesVoid, readLines, voidsOf } from './records/worklog.mjs'
 
-const argv = process.argv.slice(2)
-let ROOT = null, ROUND = null, DRY = false, ALLOW_UNRESOLVED = false
+const { root, rest: argv } = takeRoot(process.argv.slice(2))
+let ROUND = null, DRY = false, ALLOW_UNRESOLVED = false
 let PASS = null, OUTCOME = null, NEW_FINDINGS = '0,0,0,0', COMMIT = null, NO_INDEX = false
 const rest = []
 for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') ROOT = argv[++i]
-  else if (argv[i] === '--round') ROUND = Number(argv[++i])
+  if (argv[i] === '--round') ROUND = Number(argv[++i])
   else if (argv[i] === '--verification') PASS = String(argv[++i])
   else if (argv[i] === '--outcome') OUTCOME = argv[++i]
   else if (argv[i] === '--new-findings') NEW_FINDINGS = argv[++i]
@@ -45,7 +45,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (argv[i] === '--in-progress') ALLOW_UNRESOLVED = true
   else rest.push(argv[i])
 }
-if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const ROOT = repoRoot(import.meta.url, root)
 const USAGE = 'usage: render-records.mjs <target> [--round <n> | --verification <pass>] --outcome "<text>" [--new-findings h,m,l,c] [--commit <sha>] [--no-index] [--dry-run] [--in-progress]'
 const target = rest[0]
 if (!target) fail(USAGE)
@@ -221,9 +221,9 @@ else renderFixRound()
 
 // ---------- fix round ----------
 function renderFixRound() {
-  const resVersions = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-  if (!resVersions.length) fail(`no resolution-v<n>.md in reviews/${target}/`)
-  const round = ROUND ?? Math.max(...resVersions)
+  const newestRes = newest(dir, 'resolution')
+  if (!newestRes) fail(`no resolution-v<n>.md in reviews/${target}/`)
+  const round = ROUND ?? newestRes
   const resPath = join(dir, `resolution-v${round}.md`)
   if (!existsSync(resPath)) fail(`no resolution-v${round}.md`)
   const resText = readFileSync(resPath, 'utf8')
@@ -419,12 +419,11 @@ function renderVerification() {
 
 // A verification is anchored at the commit whose fixes it checks: the newest resolution's.
 function anchorCommit() {
-  const vs = readdirSync(dir).map(f => /^resolution-v(\d+)\.md$/.exec(f)).filter(Boolean).map(m => Number(m[1]))
-  if (vs.length) {
-    const newest = Math.max(...vs)
-    const raw = word(readFileSync(join(dir, `resolution-v${newest}.md`), 'utf8'), 'fixed_commit') ?? ''
+  const N = newest(dir, 'resolution')
+  if (N) {
+    const raw = word(readFileSync(join(dir, `resolution-v${N}.md`), 'utf8'), 'fixed_commit') ?? ''
     const sha = raw.replace(/["`]/g, '')
-    if (sha && sha !== 'null') { note(`no --commit given — reading resolution-v${newest}.md's fixed_commit ${sha} as the reviewed commit`); return sha }
+    if (sha && sha !== 'null') { note(`no --commit given — reading resolution-v${N}.md's fixed_commit ${sha} as the reviewed commit`); return sha }
   }
   note('no --commit given and no resolution names a fixed_commit — commit will be null')
   return null

@@ -8,18 +8,17 @@
 //
 // Usage: node reviews/lib/ledger-miner.mjs [--area <slug>] [--dry-run] [--root <repoRoot>]
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
-import { join, dirname, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { REPO as LIVE_REPO, DEFECT_CLASSES } from './paths.mjs'
+import { join, relative } from 'node:path'
+import { REPO as LIVE_REPO, DEFECT_CLASSES } from './records/schema.mjs'
+import { repoRoot, takeRoot } from './cli/args.mjs'
 
-const argv = process.argv.slice(2)
-let ROOT = null, AREA = null, DRY = false
+const { root, rest: argv } = takeRoot(process.argv.slice(2))
+let AREA = null, DRY = false
 for (let i = 0; i < argv.length; i++) {
-  if (argv[i] === '--root') ROOT = argv[++i]
-  else if (argv[i] === '--area') AREA = argv[++i]
+  if (argv[i] === '--area') AREA = argv[++i]
   else if (argv[i] === '--dry-run') DRY = true
 }
-if (!ROOT) ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const ROOT = repoRoot(import.meta.url, root)
 
 const WEIGHT = { high: 5, medium: 3, low: 1, cleanup: 0.5 }
 const sidecarPath = join(ROOT, relative(LIVE_REPO, DEFECT_CLASSES))

@@ -20,22 +20,21 @@
 // unrecognized template shape).
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { REVIEWS as REVIEWS_HOME, ID_COUNTER, TEMPLATES } from './paths.mjs'
-import { SEVERITIES as SEV } from './records/schema.mjs'
+import { ID_COUNTER, REVIEWS as REVIEWS_HOME, SEVERITIES as SEV, TEMPLATES } from './records/schema.mjs'
+import { takeRoot } from './cli/args.mjs'
 import { section } from './records/frontmatter.mjs'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 const fail = msg => { console.error(`ERROR ${msg}`); process.exit(2) }
 const strip = l => l.replace(/\r$/, '')
 
-function parseArgs(argv) {
-  let root = null
+function parseArgs(rawArgv) {
+  const { root, rest: argv } = takeRoot(rawArgv)
   const rest = []
   const opts = {}
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
-    if (a === '--root') root = argv[++i]
-    else if (a === '--dry-run') opts.dryRun = true
+    if (a === '--dry-run') opts.dryRun = true
     else if (a.startsWith('--')) opts[a.slice(2)] = argv[++i]
     else rest.push(a)
   }

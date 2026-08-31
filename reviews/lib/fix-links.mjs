@@ -5,7 +5,7 @@
 // Moving a file = git mv + update lib/paths.mjs + MOVES here + run --apply, then check.
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname, relative, sep } from 'node:path'
-import { REVIEWS, REPO } from './paths.mjs'
+import { REVIEWS, REPO } from './records/schema.mjs'
 
 const MOVES = {
   'system/review-v1.md': 'system/review-v1/review-v1.md',
