@@ -1,6 +1,6 @@
 {
   "skill_name": "loop-driver",
-  "notes": "Fixture root: evals/fixtures/loop-states — checked in beside this file, one synthetic target per router row, referenced by its repository-relative path. It is not a git repository of its own: the paths sit inside this repository on purpose, because the 2026-07-30 fixture root lived in a session scratchpad and died with it. The records name real commits of this repository (c09675d, 147fa87, b3f98e2), because records-auditor.mjs resolves every sha it reads and refuses one that no pushed ref contains. Eval 3 uses no fixture: it reads the live archived target reviews/archive/015-sameday-shipping, read-only. Each case carries `setup` and `verify` command lines — extra keys the eval harness ignores and the runner executes: setup restores the fixture to its committed state, verify is what the grader runs to check the tree. Cases 5 and 7 write into the checked-in fixture by design (that is the behaviour under test); their setup restores it first and the runner restores it again afterwards. To rehearse either of them without touching the checked-in fixture, copy the root to evals/.run/ (git-ignored) and point --root there. On the wrapper's absent test counts and other fixture-specific limits, see each case's expected_output.",
+  "notes": "Fixture root: evals/fixtures/loop-states — checked in beside this file, one synthetic target per router row, referenced by its repository-relative path. It is not a git repository of its own: the paths sit inside this repository on purpose, because the 2026-07-30 fixture root lived in a session scratchpad and died with it. The records name real commits of this repository (c09675d, 147fa87, b3f98e2), because records-auditor.mjs resolves every sha it reads and refuses one that no pushed ref contains. Eval 3 uses no fixture: it reads the live archived target reviews/archive/015-sameday-shipping, read-only. Each case carries `setup` and `verify` command lines — extra keys the eval harness ignores and the runner executes: setup restores the fixture to its committed state, verify is what the grader runs to check the tree. Cases 5 and 7 write into the checked-in fixture by design (that is the behaviour under test); their setup restores it first and the runner restores it again afterwards. To rehearse either of them without touching the checked-in fixture, copy the root to evals/.run/ (git-ignored) and point --root there. Tree checks use `git diff --numstat` plus `git ls-files --others`, never a bare `git status`: this repository is checked out with core.autocrlf=true, so a restored fixture file comes back CRLF while the index holds LF and `git status` then reports a modification that no content check can find. On the wrapper's absent test counts and other fixture-specific limits, see each case's expected_output.",
   "status": {
     "these-cases": "REBUILT 2026-09-01 and UNRUN. No case below has a recorded result; the pass rates under `history` were measured against the retired fixture root and say nothing about these cases.",
     "history": {
@@ -26,12 +26,12 @@
         { "text": "report.md shows the mechanical router was actually run (quotes or paraphrases its STATE/ROUTER/GATE readout, including GATE_KIND: delta-worthiness)" },
         { "text": "report.md carries the router's unmeasured-seed-rate note, or otherwise says certification is refused until a blind pass measures round 1" },
         { "text": "no pass, Workflow, or skill was launched, and the report does not claim one was" },
-        { "text": "the fixture tree is unchanged after the run (grader: git status --porcelain on the fixture path prints nothing)" }
+        { "text": "the fixture tree is unchanged after the run (grader: git diff --numstat and git ls-files --others on the fixture path both print nothing)" }
       ],
       "verify": [
         "node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 094-quiet    # exit 0, '0 error(s), 0 warning(s).'",
         "node reviews/lib/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 094-quiet    # exit 3, GATE_KIND: delta-worthiness",
-        "git status --porcelain .claude/skills/loop-driver/evals/fixtures/loop-states    # prints nothing"
+        "git diff --numstat -- .claude/skills/loop-driver/evals/fixtures/loop-states && git ls-files --others --exclude-standard -- .claude/skills/loop-driver/evals/fixtures/loop-states    # both print nothing"
       ],
       "files": []
     },
@@ -48,12 +48,12 @@
         { "text": "report.md identifies the next pass as a fix round, and names the open blocker PPW-9811 as why the loop is armed" },
         { "text": "report.md names /fix-review as the executor of the fix round (does not fix findings inline)" },
         { "text": "report.md contains the announce line: current state and the next pass, with the router's cost note, before any execution" },
-        { "text": "the fixture tree is unchanged after the run (grader: git status --porcelain on the fixture path prints nothing)" }
+        { "text": "the fixture tree is unchanged after the run (grader: git diff --numstat and git ls-files --others on the fixture path both print nothing)" }
       ],
       "verify": [
         "node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 091-fixround    # exit 0, '0 error(s), 0 warning(s).'",
         "node reviews/lib/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 091-fixround    # exit 0, NEXT: fix round",
-        "git status --porcelain .claude/skills/loop-driver/evals/fixtures/loop-states    # prints nothing"
+        "git diff --numstat -- .claude/skills/loop-driver/evals/fixtures/loop-states && git ls-files --others --exclude-standard -- .claude/skills/loop-driver/evals/fixtures/loop-states    # both print nothing"
       ],
       "files": []
     },
@@ -68,7 +68,7 @@
         { "text": "report.md states the 015 loop is CLOSED by owner sign-off (not proposing another pass)" },
         { "text": "report.md mentions the target being under watch / track-record, or the re-arm rule for new serious findings" },
         { "text": "report.md mentions the pre-enable checklist as the binding gate for the dormant feature" },
-        { "text": "the repository tree is unchanged after the run (grader: git status --porcelain prints nothing new)" }
+        { "text": "the repository tree is unchanged after the run (grader: git status --porcelain prints no new or modified file under reviews/)" }
       ],
       "verify": [
         "node reviews/lib/route-next-pass.mjs 015-sameday-shipping    # exit 0, 'STATE: loop CLOSED — 2026-07-29 — owner sign-off @5734021 (no post-fix blinded pass; the pre-enable checklist is the gate)'",
@@ -89,11 +89,11 @@
         { "text": "the agent stopped at the gate purely on the skill's authority — the prompt contains no instruction forbidding launches" },
         { "text": "report.md relays the delta-worthiness question (delta discovery vs loop quiet, then certification) to the owner without pre-answering it" },
         { "text": "report.md carries the cost figures for the possible next passes" },
-        { "text": "nothing was launched and the fixture tree is unchanged (grader: git status --porcelain on the fixture path prints nothing)" }
+        { "text": "nothing was launched and the fixture tree is unchanged (grader: git diff --numstat and git ls-files --others on the fixture path both print nothing)" }
       ],
       "verify": [
         "node reviews/lib/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 094-quiet    # exit 3, GATE_KIND: delta-worthiness",
-        "git status --porcelain .claude/skills/loop-driver/evals/fixtures/loop-states    # prints nothing"
+        "git diff --numstat -- .claude/skills/loop-driver/evals/fixtures/loop-states && git ls-files --others --exclude-standard -- .claude/skills/loop-driver/evals/fixtures/loop-states    # both print nothing"
       ],
       "files": []
     },
@@ -116,7 +116,7 @@
       "verify": [
         "node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 096-rotten    # exit 0 after the repair (exit 1 before it)",
         "node reviews/lib/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 096-rotten    # exit 2, GATE_KIND: certification-go-ahead, STATE naming 'last pass v2 delta-discovery'",
-        "git status --porcelain .claude/skills/loop-driver/evals/fixtures/loop-states    # only reviews/096-rotten/metrics.jsonl modified",
+        "git diff --numstat -- .claude/skills/loop-driver/evals/fixtures/loop-states && git ls-files --others --exclude-standard -- .claude/skills/loop-driver/evals/fixtures/loop-states    # numstat prints exactly: 1  0  reviews/096-rotten/metrics.jsonl; ls-files prints nothing",
         "git diff -- .claude/skills/loop-driver/evals/fixtures/loop-states/reviews/096-rotten/metrics.jsonl    # one added line, no removed line",
         "git restore --source=HEAD --worktree -- .claude/skills/loop-driver/evals/fixtures/loop-states    # runner's teardown, after grading"
       ],
@@ -135,12 +135,12 @@
         { "text": "report.md announces verification of the resolved post-cert round as the next pass, and says the round and its verification record once, together, as one reviewed unit" },
         { "text": "report.md does NOT propose closing the loop or recording closed:" },
         { "text": "the certified state is reported honestly alongside the pending verification" },
-        { "text": "the fixture tree is unchanged (grader: git status --porcelain on the fixture path prints nothing)" }
+        { "text": "the fixture tree is unchanged (grader: git diff --numstat and git ls-files --others on the fixture path both print nothing)" }
       ],
       "verify": [
         "node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 095-postcert    # exit 0, one 'unit records pending' warning",
         "node reviews/lib/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 095-postcert    # exit 0, NEXT: verification (reviewed unit ...)",
-        "git status --porcelain .claude/skills/loop-driver/evals/fixtures/loop-states    # prints nothing"
+        "git diff --numstat -- .claude/skills/loop-driver/evals/fixtures/loop-states && git ls-files --others --exclude-standard -- .claude/skills/loop-driver/evals/fixtures/loop-states    # both print nothing"
       ],
       "files": []
     },
@@ -165,7 +165,7 @@
       "verify": [
         "node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 097-mockpass    # exit 0, '0 error(s), 0 warning(s).' after the renders",
         "node reviews/lib/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 097-mockpass    # exit 3, GATE_KIND: delta-worthiness",
-        "git status --porcelain .claude/skills/loop-driver/evals/fixtures/loop-states    # four modified files, no new file",
+        "git diff --numstat -- .claude/skills/loop-driver/evals/fixtures/loop-states && git ls-files --others --exclude-standard -- .claude/skills/loop-driver/evals/fixtures/loop-states    # numstat prints exactly four rows — ledger.md 3/1 (the row flipped twice plus two History lines), metrics.jsonl 2/0, worklog.jsonl 3/0, state/index.md 2/0 — and ls-files prints nothing, so no review-v2 or summary-v2 was written",
         "git restore --source=HEAD --worktree -- .claude/skills/loop-driver/evals/fixtures/loop-states    # runner's teardown, after grading"
       ],
       "files": []
