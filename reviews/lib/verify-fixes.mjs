@@ -1,2 +1,2 @@
-// Compatibility entry point: verify/verify-fixes.mjs is the home; this command path stays until every caller moves.
+// Permanent command path: verify/verify-fixes.mjs is the home — the implementation moves, this name never does.
 import './verify/verify-fixes.mjs'

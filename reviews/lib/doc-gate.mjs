@@ -1,2 +1,2 @@
-// Compatibility entry point: records/doc-gate.mjs is the home; this command path stays until every caller moves.
+// Permanent command path: records/doc-gate.mjs is the home — the implementation moves, this name never does.
 import './records/doc-gate.mjs'

@@ -198,12 +198,12 @@ Built and operating:
 | Discovery fan-out script (lenses → dedup + `hinted` → trace-first skeptics tiered by severity and convergence, delta budget guard, decided-re-raise skip) | [lib/discovery-review.wf.js](../lib/discovery-review.wf.js) |
 | Mechanical router (state → next pass → cost → gates, exit codes for owner gates) | [lib/route-next-pass.mjs](../lib/route-next-pass.mjs) |
 | Loop driver (audit → route → announce → gate → execute → record; session-model guard; archive-on-close; runs the doc gate) | `.claude/skills/loop-driver/SKILL.md` |
-| Fixer contract, descheduled 2026-08-03 (triage → one batched owner gate → background approach-checks, test runs, micro-reviews while fixing) | `/fix-review` skill |
+| Fixer contract, descheduled 2026-08-03 (triage → one batched owner gate → background approach-checks and test runs while fixing → one round review before hand-back) | `/fix-review` skill |
 | Reconciler (mints `PPW-<n>` from the id counter; scored 2026-07-27: 0 over-merges) | `.claude/skills/reconcile-findings/SKILL.md` |
 | Owner summary (contract-bound page per decision pass) | `.claude/skills/owner-summary/SKILL.md` |
 | Metrics **v3** (per-finding lens/severity/verdict/fix-lineage; fix-round lines; runtime from the worklog) | [metrics-schema.md](../rules/metrics-schema.md) + [lib/render-records.mjs](../lib/render-records.mjs) |
 | Records auditor (schema, tallies, pairing, commit reachability, citation-leak count with target 0) | [lib/records-auditor.mjs](../lib/records-auditor.mjs) |
-| Doc gate (deterministic lint, target + `state` modes, + Sonnet judge; pre-commit backstop; 36-assertion fixture suite) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
+| Doc gate (deterministic lint, target + `state` modes, + Sonnet judge on owner-facing prose; pre-commit backstop; its own fixture suite — 45 assertions on 2026-09-01) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
 | Path constants + link keeper (every move: `git mv`, constant, then the link check) | [lib/paths.mjs](../lib/paths.mjs) + [lib/cli/docs-sync.mjs](../lib/cli/docs-sync.mjs) |
 | Ledgers + worklogs (template-bound; append-only enforced against git HEAD by the gate) | per-target files, shapes in [doc-contracts.md](../rules/doc-contracts.md) |
 
@@ -255,7 +255,7 @@ with a manual or unproven half; missing = does not exist.
 | Judge severity | partial | single synthesis judgment; measured once (run 1: erred high ~4 of 10, never low); `sev_delta` recorded, unread |
 | Fix | built | fixer contract descheduled; 234 fixes verified, 6 reopened (2.6%) |
 | Verify fixes | built | verify-fixes.mjs + one subagent per pass |
-| Record | built | contracts + templates + doc gate (lint + judge) + auditor + pre-commit backstop + 36-assertion fixture suite |
+| Record | built | contracts + templates + doc gate (lint + judge) + auditor + pre-commit backstop + the gate's own fixture suite |
 | Self-route | built | mechanical router + loop driver; hand-routing only when it abstains |
 | Self-check its own records | built | auditor on every append; gate on every round; but the pair has never processed a genuinely new target end to end — all five targets were retrofitted |
 | Prove its own recall | missing | run 1 could not test it (0 misses); run 2 deferred; interim track record: 2 certifications, 0 escapes, low power |

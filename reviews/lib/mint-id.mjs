@@ -1,2 +1,2 @@
-// Compatibility entry point: review/mint-id.mjs is the home; this command path stays until every caller moves.
+// Permanent command path: review/mint-id.mjs is the home — the implementation moves, this name never does.
 import './review/mint-id.mjs'

@@ -1,2 +1,2 @@
-// Compatibility entry point: records/records-auditor.mjs is the home; this command path stays until every caller moves.
+// Permanent command path: records/records-auditor.mjs is the home — the implementation moves, this name never does.
 import './records/records-auditor.mjs'

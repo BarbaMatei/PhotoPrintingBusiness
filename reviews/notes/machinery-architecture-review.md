@@ -224,7 +224,11 @@ Totals: 71 pieces · keep 52 · merge/split 14 · delete 5 (2 firm: `ledger-mine
 
 ## 3. Duplication ledger
 
-| Logic | Copies (file:line) | Proposed home |
+Every file:line below is the 7a snapshot (branch tip `ee828e6`) and the row names what was true
+then; 7b moved each logic into the proposed home, so the copies are gone and the line numbers no
+longer point at anything. Read the rows as the finding, not as a map of today's tree.
+
+| Logic | Copies (file:line, as of 7a) | Proposed home |
 |---|---|---|
 | Read `metrics.jsonl`, drop corrections | `route-next-pass.mjs:105-106` · `autonomy-policy.mjs:39-45` and again `91-98` · `summary-data.mjs:34-35` · `render-records.mjs:198-202` · `speed-report.mjs:223-227` · `records-auditor.mjs:132-165` | `records/metrics.mjs` `readMetrics(dir) → {lines, corrections}` |
 | Load worklog + void filter | `wl.mjs:57-84` (deepEqual) · `render-records.mjs:82-97` (JSON.stringify) · `speed-report.mjs:66-76` (copy) · no void filter at all in `records-auditor.mjs:363`, `gate-miner.mjs:37-42`, `autonomy-policy.mjs:73-78` | `records/worklog.mjs` `readEvents(dir) → live events`; one equality rule |
@@ -305,6 +309,14 @@ event table, loop-driver gate-kind table.
 | `discovery-review.wf.js:35` "README Cost discipline" reference; `self-driving:206` "36-assertion" | old prose | nobody | fix in 7c |
 
 13 legacy paths: 5 firm deletes, 6 tied to ruling 3, 2 keep.
+
+**Landed 2026-09-01 (step 11).** The archive ruling deleted the V2 tier and its constant, the
+`LEGACY_TOP` fields, the `certification` type / prose-lens / `frontend_*` / `subagent_tokens`
+drift reports, the pre-V3 fix-round window and the `D<n>` id allowance; the archive `warn` tier
+went with them, because an archived target is now skipped after one note. What stayed: `V3_CUTOFF`
+(the `runtime` refusal and the reviewed-unit window, both live), `V4_CUTOFF`, `id-map.md`, and the
+reader half of `micro-review-*` — the stamper refuses those two events by name, every reader still
+counts them in a log written before 2026-08-28.
 
 ## 6. Target architecture
 
@@ -394,7 +406,7 @@ so the count drops to 555 there and stays).
 
 1. Delete the duplicate test blocks (`render-records.test.mjs:15-85`, `records-auditor.test.mjs:116-120`); rename the colliding fixture numbers. No code change.
 2. `records/schema.mjs` from `vocab.mjs`: add events + required fields, statuses, severities, areas, caps, cut-offs, targetless list, sha regex. Point `doc-gate.mjs:31`, `mint-id.mjs:23`, the four `TARGETLESS` lists and `wl.mjs:21-51` at it. Removes duplicates: targetless, areas, severity set, status vocabulary, sha regex.
-3. `records/frontmatter.mjs` + `records/worklog.mjs` + `records/metrics.mjs`: replace the 9 frontmatter sites, 6 worklog loaders, 7 metrics readers. Removes: frontmatter, metrics-with-corrections, worklog-with-void. The auditor and gate-miner gain void filtering here (behaviour change, pinned by a new assertion each).
+3. `records/frontmatter.mjs` + `records/worklog.mjs` + `records/metrics.mjs`: replace the 9 frontmatter sites, 6 worklog loaders and every metrics reader. Removes: frontmatter, metrics-with-corrections, worklog-with-void. The auditor and the disapproval scan (then `gate-miner.mjs`, since merged into `speed-report --disapprovals`) gain void filtering here (behaviour change, pinned by a new assertion each).
 4. `model/target.mjs` + `cli/args.mjs`: the 11 root derivations, 10 `--root` parsers, 7 folder lookups, 11 version listings. Delete the unused `paths.mjs` exports and `targetDir`.
 5. `model/spans.mjs`: lift `render-records.mjs:102-129` and `speed-report.mjs:96-147` into one module with a strictness flag; both test files pin the two behaviours unchanged.
 6. `model/open-work.mjs` + `model/convergence.mjs` + `model/queue.mjs`: route and policy import them; delete `ledger.mjs`. Fix the README row-86 disagreement here by ruling: either route every fix-round answer through the design-pass check or reword the README row (owner question 1).
@@ -402,7 +414,7 @@ so the count drops to 555 there and stays).
 8. `drive/rows.mjs` + `drive/gates.mjs` as data; `route.mjs` iterates rows. Then `cli/docs-sync.mjs` generates the README router table and the 7 other tables, with the check test. `fix-links --apply` and `MOVES` deleted; the check moves in.
 9. Merge `gate-miner` into `speed-report`; delete `ledger-miner.mjs` and its constant/vocabulary entry (per ruling). Wire `summary-data.mjs` into `owner-summary` and `mint-id.mjs` into `reconcile-findings` (skill text only).
 10. **DONE (2026-09-01).** Files moved into the folders; the flat `reviews/lib/<name>.mjs` entry points keep today's command names **permanently** (see "Command surface"), pinned by `unit/shims.test.mjs`; `docs-sync --check` confirms every prose path. `integration.test.mjs` re-cut into five flow files under `tests/flows/` — named for what they drive, not for the loop stages this note first sketched, because the assertions cut across the stages. The `drive-states` fixture root landed (7 targets: 903, 904, 909, 913, 914, both 919-override-*). **The `drive-ledger` merge is refused as unimplementable:** each of those 14 targets is a full four-file target whose *ledger differs* (918 needs an open 🔴, 943 needs that same lineage settled), so no shared ledger with per-case metrics tails can serve them, and the CLIs take the target as a positional with no variant selector. Reducing that dir count needs a run-time fixture builder — a separate decision about checked-in vs generated fixtures.
-11. 7c: archive-validation scope per ruling 3 (delete V2/V3 tiers, `LEGACY_TOP`, `D<n>` id allowance); stale prose (`doc-contracts.md:22-30, 175`, `self-driving:206, 208`, `discovery-review.wf.js:35`); drop `micro-review-*` from the stamper vocabulary; comment rule and commit style move to `coding-standards.md`.
+11. **DONE (2026-09-01).** Archive-validation scope per the archive ruling (see section 5's "Landed" note for the exact tolerance deleted); the wording judge narrowed to owner-facing prose per ruling 4; `micro-review-*` out of the stamper's vocabulary; the stale prose swept (`doc-contracts` archive sentences, `self-driving`'s assertion count and fixer-contract line, `discovery-review.wf.js`'s dead README citation, this section's own step 3 and section 3's snapshot caveat); the comment rule and commit style copied into `coding-standards.md` as their durable home, with `CLAUDE.md` left as it stands by controller ruling. The `class sidecar` doc-contracts entry and `paths.mjs DEFECT_CLASSES` went with the miner in step 9.
 
 ## 9. Open questions for the owner
 

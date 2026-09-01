@@ -32,7 +32,7 @@ export const meta = {
 //   guardEvidence, traceEvidence. The '_canonical' overall line reports skeptic-run counts for
 //   the metrics entry (cost.agents_by_stage). The main agent then synthesizes.
 //
-// TOKEN-EFFICIENCY MEASURES BAKED IN (see reviews/README.md "Cost discipline"):
+// TOKEN-EFFICIENCY MEASURES BAKED IN (the per-pass costs they buy: reviews/lib/drive/rows.mjs):
 //   #1 Dedup-before-verify: all lenses run, then ONE dedup agent clusters duplicates; each real
 //      defect is verified once, not once-per-lens-that-found-it. (Distinct from the cross-pass
 //      "ledger reconciler" of the self-driving loop, which does not exist yet.)
