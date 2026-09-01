@@ -152,7 +152,7 @@ applies the ledger status flips (doc-contracts.md names these as its two mechani
 | `findings` | `{fixed, wont_fix, deferred, disputed, false_positive, open}` | counts from the resolution's `## Findings` body table (`in-progress` counts as `open`; `backlog` counts as `deferred`) |
 | `tests` | `{invocations, red_runs, green_runs, final: {passed, failed}}` | from `test-run` events; `final` from the last `kind:final` event, null if none |
 | `approach_checks` | `{pre_cleared_consumed, run, tokens}` | review-time verdicts used vs checks this round ran (`check-*` events); `tokens` null if unreported |
-| `micro_reviews` | `{count, follow_up_fixes}` | per-cluster micro-reviews and the extra fixes they caused |
+| `micro_reviews` | `{count, follow_up_fixes}` | composition reviews the round dispatched and the extra fixes they caused — round reviews from the v4 cut-off, per-cluster micro-reviews before it (the field keeps its first name) |
 | `cost` | `{agents, tokens}` | subagents this round dispatched; tokens null unless known |
 | `runtime` | `{started, ended, active_s, blocked_s, idle_s, blocked: [{reason, s}]}` | see derivation below |
 | `notes` | string | e.g. `pilot`, deviations, what broke |

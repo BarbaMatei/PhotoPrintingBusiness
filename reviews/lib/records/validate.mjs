@@ -61,7 +61,7 @@ export const V3_FIX_FIELDS = [
   { cell: '`findings`', type: '`{fixed, wont_fix, deferred, disputed, false_positive, open}`', meaning: 'counts from the resolution\'s `## Findings` body table (`in-progress` counts as `open`; `backlog` counts as `deferred`)' },
   { cell: '`tests`', type: '`{invocations, red_runs, green_runs, final: {passed, failed}}`', meaning: 'from `test-run` events; `final` from the last `kind:final` event, null if none' },
   { cell: '`approach_checks`', type: '`{pre_cleared_consumed, run, tokens}`', meaning: 'review-time verdicts used vs checks this round ran (`check-*` events); `tokens` null if unreported' },
-  { cell: '`micro_reviews`', type: '`{count, follow_up_fixes}`', meaning: 'per-cluster micro-reviews and the extra fixes they caused' },
+  { cell: '`micro_reviews`', type: '`{count, follow_up_fixes}`', meaning: 'composition reviews the round dispatched and the extra fixes they caused — round reviews from the v4 cut-off, per-cluster micro-reviews before it (the field keeps its first name)' },
   { cell: '`cost`', type: '`{agents, tokens}`', meaning: 'subagents this round dispatched; tokens null unless known' },
   { cell: '`runtime`', type: '`{started, ended, active_s, blocked_s, idle_s, blocked: [{reason, s}]}`', meaning: 'see derivation below' },
   { cell: '`notes`', type: 'string', meaning: 'e.g. `pilot`, deviations, what broke' },
