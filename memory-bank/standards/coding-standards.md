@@ -160,4 +160,7 @@ ids in the subject where they apply, e.g.
 `fix(orders): guard duplicate AWB creation (PPW-284, review 015-v3)`.
 
 Both rules above hold at every entry point, so `CLAUDE.md` states them for each session too;
-this file is their home as a standard, and the two are edited together.
+this file is their home as a standard, and the two are edited together. `CLAUDE.md` states the
+comment gate unqualified — "any commit adding comment lines", without the `.cs`/`.ts` scope named
+above — by the owner's choice: it is the stricter reading, it holds for every file type, and it is
+not to be "corrected" here or there.
