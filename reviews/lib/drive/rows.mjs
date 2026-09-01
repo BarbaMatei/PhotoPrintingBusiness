@@ -103,10 +103,10 @@ export const ROWS = [
     state: 'Latest line is a verification with reopened fixes, or with serious findings still open',
     next: '**Fix round**',
     when: s => s.L.type === 'verification' && ((s.L.reopened || 0) > 0 || s.openSerious > 0),
-    answer: (s, a) => {
-      if ((s.L.reopened || 0) > 0) a.routeFixRound('ROUTER: reopened fixes re-arm the loop (last row).')
-      a.routeFixRound('ROUTER: verification surfaced new serious findings (last row).')
-    },
+    // routeFixRound never returns (it finishes the run), so the row states its reason once.
+    answer: (s, a) => a.routeFixRound((s.L.reopened || 0) > 0
+      ? 'ROUTER: reopened fixes re-arm the loop (last row).'
+      : 'ROUTER: verification surfaced new serious findings (last row).'),
   },
   {
     name: 'verification-clean',

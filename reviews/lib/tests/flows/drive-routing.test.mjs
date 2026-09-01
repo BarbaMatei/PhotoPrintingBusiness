@@ -31,6 +31,12 @@ const REVIEWED_UNIT = 'NEXT: verification (reviewed unit — render records once
     r.out.includes('QUEUED: PPW-9172 (1 below the threshold of 3)'), r.out.trim())
   check('the certification gate does not print while the queue is unswept',
     !r.out.includes('GATE_KIND: certification-go-ahead'), r.out.trim())
+  // The seam between the two rows: the queued row answers nothing and writes the ids into the
+  // walk's state; the sweep row further down drains that list, not a freshly counted one.
+  const queuedIds = (/QUEUED: ([^(]+)/.exec(r.out) ?? [])[1]?.trim()
+  const sweptIds = (/must drain \(([^)]+)\)/.exec(r.out) ?? [])[1]?.trim()
+  check('the sweep drains exactly the ids the queued row recorded',
+    Boolean(queuedIds) && queuedIds === sweptIds, `queued "${queuedIds}" vs swept "${sweptIds}"`)
 }
 {
   const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '918-open-blocker'])

@@ -63,6 +63,14 @@ import { fixedRows, meta as resolutionMeta, rows as resolutionRows, tallies } fr
   check('value() takes the rest of the key\'s line, trimmed',
     value(fm, 'title') === 'a long value with spaces', JSON.stringify(value(fm, 'title')))
   check('value() of a missing key is null', value(fm, 'answers') === null, String(value(fm, 'answers')))
+  // value()'s gap after the colon crosses newlines, so an empty key reads the NEXT line whole —
+  // the shape every caller of value() relies on, and the reason word() exists beside it.
+  check('value() of an empty key reads the next line, where word() stays on its own',
+    value(fm, 'fixed_commit') === 'closed: not-a-date' && word(fm, 'fixed_commit') === null,
+    JSON.stringify([value(fm, 'fixed_commit'), word(fm, 'fixed_commit')]))
+  check('value() of the last key with an empty value is null, having no next line to reach',
+    value('version: 3\nfixed_commit:', 'fixed_commit') === null,
+    String(value('version: 3\nfixed_commit:', 'fixed_commit')))
   check('word() takes the first token only',
     word(fm, 'title') === 'a', String(word(fm, 'title')))
   check('word() stays on the key\'s own line, so an empty value reads as absent',
@@ -217,6 +225,12 @@ Queued.
   const emptyVoid = { t: '2019-03-01T12:00:00Z', ev: 'void', of: {} }
   check('a void with an empty "of" erases nothing',
     voidsOf([emptyVoid]).length === 0 && live([two[0], emptyVoid]).length === 1, JSON.stringify(live([two[0], emptyVoid])))
+  // An `of` that is not an object has no keys to match on, so every event would match it: such a
+  // void is dropped by the filter rather than erasing the whole log.
+  const stringVoid = { t: '2019-03-01T12:30:00Z', ev: 'void', of: 'doc-gate' }
+  check('a void whose "of" is a string erases nothing either',
+    voidsOf([stringVoid]).length === 0 && live([two[0], two[1], stringVoid]).length === 2,
+    JSON.stringify(live([two[0], two[1], stringVoid])))
 
   // The one equality rule is deep and key-order-blind — a JSON.stringify comparison would call
   // these two different and leave the event standing.

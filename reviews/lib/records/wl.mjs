@@ -20,7 +20,7 @@ import { pathToFileURL } from 'node:url'
 import { resolveDir, targetDirs } from '../model/target.mjs'
 import { repoRoot, takeRoot } from '../cli/args.mjs'
 import { EVENTS } from './schema.mjs'
-import { deepEqual, live, readLines } from './worklog.mjs'
+import { live, matchesVoid, readLines } from './worklog.mjs'
 
 const VOCAB = new Set(Object.keys(EVENTS))
 const IDS_EVENTS = new Set(Object.keys(EVENTS).filter(ev => EVENTS[ev].ids))
@@ -130,7 +130,7 @@ export function appendEvent(root, target, event) {
     if (open !== event.round) throw new Error(`round-end ${event.round}: no open round-start for ${event.round}`)
   }
   if (ev === 'void') {
-    const match = existing.find(e => Object.keys(event.of).every(k => deepEqual(e[k], event.of[k])))
+    const match = existing.find(e => matchesVoid(e, event))
     if (!match) {
       const closest = closestTimestamps(existing, event.of.t)
       throw new Error(`void: no worklog event matches ${JSON.stringify(event.of)} — closest timestamps: ${closest.length ? closest.join(', ') : '(worklog is empty)'}`)
