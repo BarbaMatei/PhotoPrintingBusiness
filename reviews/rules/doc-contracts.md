@@ -34,8 +34,9 @@ here — but the system target keeps its own lightweight records: `SF<n>` ids (o
 the `PPW-<n>` sequence), a ledger-style status registry, a worklog, and a metrics
 line per meta-pass, grouped per pass under `reviews/system/review-v<n>/`. Archived targets were
 retrofitted to this shape on 2026-08-11 and are now closed books: the auditor reads an archived
-ledger for the cross-target id scan and validates nothing else there (owner ruling,
-2026-08-28).
+ledger for the cross-target id scan and, for archived certification holders, the track-record
+listing check (a lenient certification-detection scan, no validation) — nothing else there is
+validated (owner ruling, 2026-08-28).
 
 ## The artifact set
 

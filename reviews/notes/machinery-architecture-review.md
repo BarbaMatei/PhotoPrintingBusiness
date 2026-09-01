@@ -169,10 +169,10 @@ Confidence: H = evidence in this file, M = evidence but a live run could change 
 |---|---|---|---|---|
 | `901-good-target`, `902-broken-target`, `bad-state/*` | doc-gate clean/violations, state lint | keep as `records-good` / `records-broken` | 902 still carries a retired `findings-v1.md` on purpose (`doc-gate.mjs:186`) | H |
 | `903-closed`, `904-clean-verification`, `909-certified`, `913-loop-quiet`, `914-resolution-above-review` | router rows 1-6 | **DONE** — moved into the `fixtures/drive-states` root (a family, not one folder: each target's `target:` frontmatter must match its own dir, and 909 vs 913 differ in `pass-type` and `verdict`, not just a metrics tail) | each is 1-3 files differing in one line | H |
-| `910-delta-worthy`, `911-patch-grade`, `912-recert`, `952-*` | policy delta-worthiness | merge into `drive-states` | same shape | M |
+| `910-delta-worthy`, `911-patch-grade`, `912-recert`, `952-*` | policy delta-worthiness | **NOT DONE** — the merge was never executed | still standalone directly under `fixtures/repo/reviews`, same shape as when this row was written | M |
 | `915-queued-mediums`, `916-medium-batch`, `917-sweep-before-cert`, `918-open-blocker`, `919-reopened-latest`, `941-949` (9 dirs) | ledger-driven rows, queue, regression lineage, loop-close | **REFUSED as specced** — one shared ledger cannot serve them: 918 needs an open 🔴 where 943 needs that lineage settled, so every case would read the 🔴 and route to a fix round. Reducing the count needs a run-time fixture builder, not a move | 14 dirs for one rule family, each with its own ledger | H |
-| `915-lens-debt`, `916-unmeasured-seed`, `917-non-convergent`, `918-design-capped` | convergence rule | keep as `drive-convergence` | numbers collide with the queue fixtures (two 915s, 916s, 917s, 918s, 919s, 952s) — rename | H |
-| `905-dup-ledger`, `907-correction`, `908-verification-lineage` | auditor id uniqueness, corrections, lineage shape | fold into `records-good`/`records-broken` | 905 is never named by a test; it exists only to trip `duplicate id PPW-9001` | H |
+| `925-lens-debt`, `926-unmeasured-seed`, `927-non-convergent`, `928-design-capped` (renumbered from `915-918`, D1) | convergence rule | **DONE as a renumber, not a root** — the collision with the queue fixtures is resolved by the rename alone; no separate `drive-convergence` folder was created, they sit at their new numbers directly under `fixtures/repo/reviews` | numbers no longer collide with the queue fixtures (which kept 915-919, 952) | H |
+| `905-dup-ledger`, `907-correction`, `908-verification-lineage` | auditor id uniqueness, corrections, lineage shape | **NOT DONE** — the fold was never executed | still standalone; 905 is never named by a test — it exists only to trip `duplicate id PPW-9001` | H |
 | `921-gates-bad`, `922-gates-good`, `923-newshape`, `924-oldshape` | V4 hand-back gates and resolution shape | keep as `fix-handback` | the only fixtures for the audit R1-R4 rules | H |
 | `919-override-clean`, `919-override-stop` | policy override stop | **DONE** — in `fixtures/drive-states`, which carries its own copy of `state/overrides.jsonl` (the two one-line worklogs straddle its timestamps) | two one-line worklogs | H |
 | `fixtures/speed-report/*` | acceptance baseline | keep, frozen | verbatim copy of the live 038 records (483 + 57 lines, identical to `reviews/038-039-invoicing/*`) | H |
@@ -346,7 +346,9 @@ reviews/lib/
             spans.mjs       pairSpans(strict|lenient), sliceSpans, runtime split
             open-work.mjs   readLedger + openIds + standsDown + atLoopClose
             convergence.mjs lens union, owed lenses, seed rates, substantive rounds, design-pass cap
-            unit.mjs        the reviewed unit: round + its verification, findings tallies
+            unit.mjs        NOT BUILT — skipped twice by ruling (D5, D8): no consumer ever
+                            appeared for "the reviewed unit: round + its verification, findings
+                            tallies"; it gets built if one does
             queue.mjs       queued mediums vs batch vs sweep
   review/   summary-data.mjs · mint-id.mjs (scaffolds)
             discovery-review.wf.js STAYS at reviews/lib/ — the Workflow harness wraps the script's
@@ -359,7 +361,7 @@ reviews/lib/
             cost.mjs NOT BUILT, by design — the cost lines live with the rows that print them
   measure/  speed-report.mjs (+ disapproval listing)
             track-record reader NOT BUILT, by design — one caller reads the file directly
-  cli/      args.mjs (--root, --dry-run) · docs-blocks.mjs · docs-sync.mjs · text.mjs (pluralize)
+  cli/      args.mjs (--root only) · docs-blocks.mjs · docs-sync.mjs
             NOT one file per command name — see "Command surface" below
   tests/    unit/<module-or-command>.test.mjs · unit/shims.test.mjs (the command surface)
             flows/{drive-routing,drive-policy,render-records,verify-fixes,verify-fixes-red-leg,hook-override}.test.mjs
@@ -369,8 +371,9 @@ reviews/lib/
 
 What `model/` computes once and who consumes it: `target` (every CLI) · `spans` (render,
 speed-report) · `open-work` (route, policy, close step) · `convergence` (route, policy,
-summary-data) · `unit` (render, auditor gates, speed-report per-round) · `queue` (route, policy,
-loop-driver's sweep stall detector). Every consumer today recomputes at least one of these.
+summary-data) · `queue` (route, policy, loop-driver's sweep stall detector). `unit` was never
+built — no consumer ever needed it (see the model/ tree above). Every consumer today recomputes
+at least one of the four that exist.
 
 **Command surface (controller ruling, 2026-09-01 — supersedes the earlier "shims for one
 release" plan).** The eleven flat `reviews/lib/<name>.mjs` files are the **permanent** command

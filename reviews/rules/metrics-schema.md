@@ -29,7 +29,8 @@ work, waiting on the owner, or nobody at the wheel.
 **After appending, run the auditor** — it validates the new line against this schema and
 cross-checks the target's records; it must exit clean. It validates **live targets only**: an
 archived target's books never change again, so the auditor reads its ledger for the cross-target
-id scan and nothing else (owner ruling, 2026-08-28):
+id scan and, for archived certification holders, the track-record listing check (a lenient
+certification-detection scan, no validation) — nothing else (owner ruling, 2026-08-28):
 
 ```
 node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
@@ -127,7 +128,8 @@ lists them, generated from the same vocabulary) and two events the renderer read
   stays append-only. **Every reader drops the events `of` matches** — the stamper, the renderer,
   the speed report (`speed-report.mjs`, its `--disapprovals` lint-miner mode included), the
   auditor (`records-auditor.mjs`, its hand-back gates included) and the unattended policy — so one
-  void repairs what all of them see. Several of them carry their own copy of the matching rule, so a change to it changes each.
+  void repairs what all of them see. One rule exists — `records/worklog.mjs`'s `matchesVoid` /
+  `deepEqual` — and every reader imports it, so a change to it changes each of them at once.
 - `verify-result` — `{"ev":"verify-result","id":"PPW-<n>","verdict":"held|...","commit":"..."}`,
   appended by `reviews/lib/verify-fixes.mjs`, which buffers them and flushes them once after the
   last row (never row by row, so an aborted run leaves no half-written verdicts). `commit` is the commit the
