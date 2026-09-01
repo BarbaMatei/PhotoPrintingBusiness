@@ -169,8 +169,8 @@ node reviews/lib/render-records.mjs <target> --verification v<pass> --outcome "<
    auditor cannot pass before the push.
 5. `node reviews/lib/records-auditor.mjs <target>` — must exit clean.
 6. **One doc-gate sitting for the whole unit** (below): `node reviews/lib/doc-gate.mjs
-   <target> <round>` plus one judge dispatch over the unit's owner-facing prose — the round's
-   and the verification's together, never one per half.
+   <target> <round>`, plus one judge dispatch over the unit's owner-facing prose — the round's
+   and the verification's together, never one per half, and none when the unit changed none.
 
 **Resuming a round you did not run.** A fix round handed back in an earlier invocation is the
 same unit: the router answers `verification (reviewed unit — render records once, after it)`,
@@ -206,14 +206,17 @@ plus the round's new/changed **owner-facing prose** — the summary page and the
 at a glance` State cell, and nothing else. That is its whole scope (owner ruling, 2026-08-28):
 language against the vocabulary, evidence links that support the claims they hang on, real
 reasons in "Reasons to doubt". Resolution `Decisions` blocks, review bodies and rendered cells
-are the lint's; when the same wording fault keeps appearing there, mine it into a lint check
-(`speed-report.mjs --disapprovals`) instead of widening the judge. Its output is approve, or disapprove
+are the lint's alone. Nothing surfaces a wording fault in them for you — the lint miner reads
+judge disapprovals, and the judge no longer sits on those blocks — so when a re-reviewer or the
+owner observes one recurring, add the check to the lint **by hand**. Its output is approve, or disapprove
 with, per violation, the **exact replacement text** to use; a correction it cannot make
 without changing a recorded fact (a number, an id, a sha, a verdict) comes back as a
 **question** instead of text. Append a `doc-gate` worklog event with the verdict.
 
-**The judge is dispatched once per reviewed unit** — one sitting over the round's and the
-verification's files together. On disapprove, apply its returned replacement text **verbatim**
+**The judge is dispatched at most once per reviewed unit** — one sitting over the round's and the
+verification's owner-facing prose together, and **none at all** when the unit changed none of it
+(a fix round plus its verification writes no summary; if its index State cell is untouched too,
+run the lint and stop there). On disapprove, apply its returned replacement text **verbatim**
 and re-run the lint; re-judge only the items it returned as questions, once you have answered
 them. Re-judging text it wrote itself is a second dispatch that decides nothing. Neither half
 of the gate edits anything — the lint reports, the judge writes the text, you apply it; don't

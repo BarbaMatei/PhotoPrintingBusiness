@@ -11,13 +11,16 @@ Every review artifact follows a fixed template, a size cap, and the language rul
 below. The round-end gate (lint + Sonnet judge) enforces this file. The deterministic lint
 never edits and covers the target's files and the state files in one run. The judge returns,
 per violation, the exact replacement text; the driver applies it verbatim and re-runs the
-lint — one judge sitting per reviewed unit. A correction that would change a recorded fact (a
-count, a commit, a status) is returned as a question, never as text. Judge scope: **owner-facing
-prose only** — the summary pages and the index's `Targets at a glance` State cells (owner ruling,
-2026-08-28). Everything else is the lint's, resolution `Decisions` blocks included: the lint keeps
-checking that each has its block, its heading and its cap, and a wording fault that keeps
-recurring there becomes a new deterministic check through the lint miner rather than a judge
-sitting.
+lint — at most one judge sitting per reviewed unit. A correction that would change a recorded fact
+(a count, a commit, a status) is returned as a question, never as text. Judge scope:
+**owner-facing prose only** — the summary pages and the index's `Targets at a glance` State cells
+(owner ruling, 2026-08-28). Everything else is the lint's alone, resolution `Decisions` blocks
+included: the lint keeps checking that each has its block, its heading and its cap. Nothing
+surfaces a *wording* fault in those blocks any more — the lint miner reads judge disapprovals, and
+the judge no longer sits on them — so a recurring one is added to the lint **by hand**, when a
+re-reviewer or the owner observes it. When a unit changed no owner-facing prose at all — a fix
+round plus its verification writes no summary — there is no judge dispatch: the lint is the whole
+gate.
 `doc-gate.mjs <target> <pass>` lints a round's files plus the
 cross-target files keyed to that target, `doc-gate.mjs state` the cross-target files
 alone, and `lib/tests/run-tests.mjs` lints the gate itself against fixtures. The lint also
