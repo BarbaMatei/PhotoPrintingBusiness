@@ -113,6 +113,22 @@ import { versions } from '../../model/target.mjs'
   check('auditIds reports an id whose rows live in two ledgers',
     c4.errors.some(m => /duplicate id PPW-9001/.test(m)), JSON.stringify(c4.errors))
 
+  // The one check the archive ruling keeps: the id scan still reads a closed target's ledger, so
+  // a mint that collides with an archived row is caught even though nothing else there is read.
+  const A = mkdtempSync(join(tmpdir(), 'records-validate-archive-ids-'))
+  const liveDir = join(A, '993-live'), archDir = join(A, 'archive', '994-archived')
+  mkdirSync(liveDir, { recursive: true })
+  mkdirSync(archDir, { recursive: true })
+  const oneRow = id => `| ID | Sev | First seen | Title | File | Status | Affirmed |\n|---|---|---|---|---|---|---|\n| ${id} | 🔴 | v1 | a row | \`x.cs\` | open |  |\n`
+  writeFileSync(join(liveDir, 'ledger.md'), oneRow('PPW-9931'))
+  writeFileSync(join(archDir, 'ledger.md'), oneRow('PPW-9931'))
+  const cIds = collect()
+  auditIds(listTargets(A, { all: true }), { err: cIds.err, counterPath: join(A, 'no-such-counter') })
+  check('the id scan still reads an archived ledger after the archive skip',
+    cIds.errors.some(m => /duplicate id PPW-9931/.test(m) && /993-live/.test(m) && /994-archived/.test(m)),
+    JSON.stringify(cIds.errors))
+  rmSync(A, { recursive: true, force: true })
+
   // The scan counts comment text only: a finding id inside a string or a test name is the
   // review system's accepted leak channel and must not be reported.
   const c5 = collect()
