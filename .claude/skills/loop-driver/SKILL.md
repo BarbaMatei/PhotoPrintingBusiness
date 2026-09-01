@@ -169,8 +169,8 @@ node reviews/lib/render-records.mjs <target> --verification v<pass> --outcome "<
    auditor cannot pass before the push.
 5. `node reviews/lib/records-auditor.mjs <target>` — must exit clean.
 6. **One doc-gate sitting for the whole unit** (below): `node reviews/lib/doc-gate.mjs
-   <target> <round>` plus one judge dispatch over the round's and the verification's changed
-   files together, never one per half.
+   <target> <round>` plus one judge dispatch over the unit's owner-facing prose — the round's
+   and the verification's together, never one per half.
 
 **Resuming a round you did not run.** A fix round handed back in an earlier invocation is the
 same unit: the router answers `verification (reviewed unit — render records once, after it)`,
@@ -202,9 +202,12 @@ node reviews/lib/doc-gate.mjs <target> <pass>     # structure lint — must exit
 ```
 
 then spawn the **Sonnet judge** (Agent, `model: sonnet`): input = `reviews/rules/doc-contracts.md`
-plus the round's new/changed `reviews/` files. Its scope is the **hand-written prose** —
+plus the round's new/changed **owner-facing prose** — the summary page and the index's `Targets
+at a glance` State cell, and nothing else. That is its whole scope (owner ruling, 2026-08-28):
 language against the vocabulary, evidence links that support the claims they hang on, real
-reasons in "Reasons to doubt" — not the rendered cells. Its output is approve, or disapprove
+reasons in "Reasons to doubt". Resolution `Decisions` blocks, review bodies and rendered cells
+are the lint's; when the same wording fault keeps appearing there, mine it into a lint check
+(`speed-report.mjs --disapprovals`) instead of widening the judge. Its output is approve, or disapprove
 with, per violation, the **exact replacement text** to use; a correction it cannot make
 without changing a recorded fact (a number, an id, a sha, a verdict) comes back as a
 **question** instead of text. Append a `doc-gate` worklog event with the verdict.
