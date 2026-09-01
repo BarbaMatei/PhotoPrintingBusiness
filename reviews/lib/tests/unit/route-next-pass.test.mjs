@@ -83,6 +83,28 @@ updated: 2026-08-22
   rmSync(T, { recursive: true, force: true })
 }
 
+// ---------- route-next-pass: a metrics line that is not a record ----------
+// It is skipped, so it has to be named: a state assembled without a line nobody mentioned is a
+// router answer that stops matching the file it was read from.
+{
+  const T = mkdtempSync(join(tmpdir(), 'router-non-record-line-'))
+  const target = '957-non-record-metrics-line'
+  const dir = join(T, 'reviews', target)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'review-v1.md'), `---\ntype: review\ntarget: ${target}\nversion: 1\ncommit: ddddde1\n---\n\n# Review v1\n`)
+  writeFileSync(join(dir, 'metrics.jsonl'), `null\n${JSON.stringify({
+    target, pass: 1, type: 'discovery', date: '2026-08-22', commit: 'ddddde1', verdict: 'approve-with-followups',
+    lenses: ['correctness', 'security', 'requirements', 'quality', 'tests-coverage', 'completeness-critic', 'db-parity', 'input-validation', 'observability', 'race', 'frontend-ux'],
+    new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0,
+  })}\n`)
+  const r = run('drive/route-next-pass.mjs', ['--root', T, target])
+  check('router names a metrics line that is not a record, with its line number',
+    r.out.includes('NOTE: metrics.jsonl line 1 is not a record (not a JSON object (null))'), r.out.trim())
+  check('the router still routes on the lines that are records',
+    r.code === 2 && r.out.includes('GATE_KIND: certification-go-ahead'), `exit ${r.code}: ${r.out.trim()}`)
+  rmSync(T, { recursive: true, force: true })
+}
+
 {
   const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '907-correction-target'])
   check("router surfaces the latest round's correction", r.out.includes('for fix round 1'), r.out.trim())

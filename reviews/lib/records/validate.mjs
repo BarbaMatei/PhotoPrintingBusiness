@@ -20,7 +20,7 @@ import { AREAS, SHA_RE, TARGETLESS, V3_CUTOFF } from './schema.mjs'
 import { ids as ledgerIds } from './ledger.mjs'
 import { meta as resolutionMeta, tallies as resolutionTallies } from './resolution.mjs'
 import { live, readLines as readWorklogLines } from './worklog.mjs'
-import { readLines as readMetricsLines } from './metrics.mjs'
+import { readLines as readMetricsLines, skipReason } from './metrics.mjs'
 
 // The metrics line's field lists, in the order rules/metrics-schema.md prints them: the key sets
 // below are derived from them, so a field this validator accepts and a row in the schema table are
@@ -135,7 +135,10 @@ export function auditTarget(t, ctx) {
 
   metricsLines.forEach(({ n, line: o, error }) => {
     const at = `${tag} metrics line ${n}`
-    if (error) { err(`${at}: unparseable JSON (${error.message})`); return }
+    // A line that is not a record object is named here; walking into one would throw a
+    // TypeError that says nothing about which line is wrong.
+    const skip = skipReason({ line: o, error })
+    if (skip) { err(`${at}: ${skip}`); return }
 
     if (o.correction_for) {
       if (!o.target || !o.date || !o.note) err(`${at}: correction line missing target/date/note`)
@@ -395,22 +398,26 @@ function commentStart(line) {
 }
 
 export function citationScan({ git, info, warn }) {
+  let rows = []
   try {
-    let rows = []
-    try { rows = git(`grep -P -n "${PATTERN}" -- "src/**/*.cs" "src/**/*.ts"`).split(/\r?\n/) } catch { /* exit 1 = no matches */ }
-    const re = new RegExp(PATTERN)
-    const hits = []
-    for (const row of rows) {
-      const m = /^(.+?:\d+):(.*)$/.exec(row)
-      if (!m) continue
-      const cs = commentStart(m[2])
-      if (cs !== -1 && re.test(m[2].slice(cs))) hits.push(`${m[1]}: ${m[2].trim()}`)
+    rows = git(`grep -P -n "${PATTERN}" -- "src/**/*.cs" "src/**/*.ts"`).split(/\r?\n/)
+  } catch (e) {
+    // git grep exits 1 for "no matches" and 128 for a scan it could not run (no PCRE support,
+    // no repository). Only the first is a clean answer; the second must not read as one.
+    if (e?.status !== 1) {
+      warn(`citation scan skipped — git grep -P could not run (exit ${e?.status ?? '?'}): ${String(e?.message ?? e).split('\n')[0]}`)
+      return null
     }
-    const files = new Set(hits.map(h => h.slice(0, h.indexOf(':')))).size
-    info(`citation-leak scan (comments only): ${hits.length} occurrence(s) in ${files} file(s) — target is 0 (CLAUDE.md comment rule)`)
-    return hits
-  } catch {
-    warn('citation scan skipped (git grep -P unavailable)')
-    return null
   }
+  const re = new RegExp(PATTERN)
+  const hits = []
+  for (const row of rows) {
+    const m = /^(.+?:\d+):(.*)$/.exec(row)
+    if (!m) continue
+    const cs = commentStart(m[2])
+    if (cs !== -1 && re.test(m[2].slice(cs))) hits.push(`${m[1]}: ${m[2].trim()}`)
+  }
+  const files = new Set(hits.map(h => h.slice(0, h.indexOf(':')))).size
+  info(`citation-leak scan (comments only): ${hits.length} occurrence(s) in ${files} file(s) — target is 0 (CLAUDE.md comment rule)`)
+  return hits
 }

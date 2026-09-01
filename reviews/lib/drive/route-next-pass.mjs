@@ -94,7 +94,8 @@ const N = Math.max(...reviews)
 
 const metrics = readMetrics(t.dir, { strict: true })
 if (!metrics) { say(`STATE: ${reviews.length} review file(s), no metrics.jsonl — non-code target?`); finish(3, null, null, GATES.noMetrics) }
-const { lines, corrections } = metrics
+const { lines, corrections, skipped } = metrics
+for (const s of skipped) say(`NOTE: metrics.jsonl line ${s.n} is not a record (${s.reason}) — it is skipped, so the state below is read without it.`)
 if (!lines.length) { say('STATE: metrics.jsonl has no usable pass lines (empty or corrections-only) — repair the records first (append-only, per metrics-schema.md)'); finish(3, null, null, GATES.recordsBroken) }
 const L = lines[lines.length - 1]
 // Corrections are authoritative but not machine-applied here — surface the ones that

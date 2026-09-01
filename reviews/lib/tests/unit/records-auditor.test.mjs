@@ -96,6 +96,18 @@ import { versions } from '../../model/target.mjs'
     `no track ${JSON.stringify(cNoTrack.errors)} · listed ${JSON.stringify(cTracked.errors)}`)
   rmSync(C, { recursive: true, force: true })
 
+  // A line that is not a record object used to walk into a TypeError, which named no line at all.
+  const N = mkdtempSync(join(tmpdir(), 'records-validate-non-record-'))
+  mkdirSync(N, { recursive: true })
+  writeFileSync(join(N, 'metrics.jsonl'), 'null\n{oops\n')
+  const cBad = collect()
+  auditTarget({ name: '992-non-record', dir: N, archived: false }, ctxFor(cBad, () => { }))
+  check('a metrics line that is not a record is an error naming the line and the fault',
+    cBad.errors.some(m => /992-non-record metrics line 1: not a JSON object \(null\)/.test(m)) &&
+    cBad.errors.some(m => /992-non-record metrics line 2: unparseable JSON/.test(m)),
+    JSON.stringify(cBad.errors))
+  rmSync(N, { recursive: true, force: true })
+
   const c4 = collect()
   auditIds(listTargets(REVIEWS, { all: true }), { err: c4.err, counterPath: join(REVIEWS, 'state', 'id-counter') })
   check('auditIds reports an id whose rows live in two ledgers',
@@ -110,11 +122,19 @@ import { versions } from '../../model/target.mjs'
     hits.length === 1 && /A\.cs:3/.test(hits[0]), JSON.stringify(hits))
   check('the scan reports its count as a note, never as an error',
     c5.infos.length === 1 && /1 occurrence\(s\) in 1 file\(s\)/.test(c5.infos[0]) && !c5.warnings.length, JSON.stringify(c5.infos))
-  // git grep exits 1 when nothing matched, so a throwing git reads as a clean repo, not a failure.
+  // git grep exits 1 for "nothing matched" — a clean answer — and 128 for a scan it could not
+  // run at all. Reading the second as zero occurrences would report a whole-repo backstop as
+  // clean when it never ran, so the two are pinned apart.
+  const exiting = status => () => { throw Object.assign(new Error(`git grep failed (${status})`), { status }) }
   const c6 = collect()
-  check('a git grep that exits non-zero reads as no matches, and the note still lands',
-    citationScan({ git: () => { throw new Error('exit 1') }, info: c6.info, warn: c6.warn }).length === 0 &&
+  check('a git grep exiting 1 reads as no matches, and the note still lands',
+    citationScan({ git: exiting(1), info: c6.info, warn: c6.warn }).length === 0 &&
     /0 occurrence\(s\)/.test(c6.infos[0]) && !c6.warnings.length, JSON.stringify([c6.infos, c6.warnings]))
+  const c7 = collect()
+  check('a git grep that could not run warns and returns nothing, never a clean zero',
+    citationScan({ git: exiting(128), info: c7.info, warn: c7.warn }) === null &&
+    !c7.infos.length && c7.warnings.length === 1 && /could not run \(exit 128\)/.test(c7.warnings[0]),
+    JSON.stringify([c7.infos, c7.warnings]))
 }
 
 // ---------- handback-gates.mjs: called directly ----------

@@ -253,6 +253,13 @@ Queued.
     m.corrections.length === 1 && m.corrections[0].correction_for.field === 'new_findings', JSON.stringify(m.corrections))
   check('a line that is not JSON, and one that parses to a non-object, are not records',
     m.lines.length === 2 && m.corrections.length === 1, JSON.stringify(m))
+  // Every consumer reports these lines rather than dropping them silently, so the reader hands
+  // back which line and why — the auditor errors on them, the router and speed report note them.
+  check('a skipped line comes back with its number, its raw text and the reason',
+    m.skipped.length === 2 &&
+    m.skipped[0].n === 4 && m.skipped[0].raw === 'null' && m.skipped[0].reason === 'not a JSON object (null)' &&
+    m.skipped[1].n === 5 && /^unparseable JSON \(/.test(m.skipped[1].reason),
+    JSON.stringify(m.skipped))
 
   let threw = null
   try { readMetrics(dir, { strict: true }) } catch (e) { threw = e }

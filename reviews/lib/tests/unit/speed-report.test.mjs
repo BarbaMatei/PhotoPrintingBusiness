@@ -257,6 +257,24 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
   check('without --day the undated line is still left out', all != null && all.metrics.correction_lines_cumulative === 2, String(all?.metrics.correction_lines_cumulative))
 }
 
+// ---------- a metrics line that is not a record is named, never silently dropped ----------
+// The correction count is read off these lines, so a line left out without a word makes the
+// measurement quietly disagree with the file.
+{
+  const T = rootWith([{ t: '2019-09-01T09:00:00+03:00', ev: 'note', text: 'x' }], [
+    'null',
+    '{"target":"t","date":"2019-09-02","correction_for":{"round":1,"field":"findings"},"note":"a"}',
+    '{oops',
+  ])
+  const j = reportOf(T)
+  check('each skipped metrics line is reported with its line number and why',
+    j != null && j.notes.some(n => /metrics\.jsonl line 1 is not a record \(not a JSON object \(null\)\)/.test(n)) &&
+    j.notes.some(n => /metrics\.jsonl line 3 is not a record \(unparseable JSON/.test(n)),
+    JSON.stringify(j?.notes))
+  check('the records around a skipped line still count',
+    j != null && j.metrics.correction_lines_cumulative === 1, String(j?.metrics.correction_lines_cumulative))
+}
+
 // ---------- refusals ----------
 {
   const T = rootWith([{ t: '2019-05-01T09:00:00+03:00', ev: 'note', text: 'x' }], null)

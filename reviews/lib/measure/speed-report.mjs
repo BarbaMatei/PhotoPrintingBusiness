@@ -196,9 +196,12 @@ const median = !ratios.length ? null
 const metrics = readMetrics(dir)
 let corrections = 0, undated = 0
 if (!metrics) note(`no reviews/${target}/metrics.jsonl — correction lines counted as 0`)
-else for (const o of metrics.corrections) {
-  if (!o.date) { undated++; continue }
-  if (!DAY || o.date <= DAY) corrections++
+else {
+  for (const s of metrics.skipped) note(`metrics.jsonl line ${s.n} is not a record (${s.reason}) — left out of the correction count`)
+  for (const o of metrics.corrections) {
+    if (!o.date) { undated++; continue }
+    if (!DAY || o.date <= DAY) corrections++
+  }
 }
 if (undated) note(`${undated} correction line(s) carry no date — left out of the count rather than dated by guess`)
 
