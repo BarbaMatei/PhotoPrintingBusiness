@@ -74,9 +74,6 @@ export const CAPS = {
 export const SHA_RE = /^[0-9a-f]{7,40}$/
 export const SHA_SCAN_RE = /\b[0-9a-f]{7,40}\b/g
 
-// Strict metrics validation applies to lines dated on/after this; earlier lines are lenient.
-export const V2_CUTOFF = '2026-07-30'
-
 // Fix-round lines and the runtime split exist only from this date; earlier rounds never get one.
 export const V3_CUTOFF = '2026-08-03'
 

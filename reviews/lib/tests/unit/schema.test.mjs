@@ -6,8 +6,9 @@
 import { check } from '../lib.mjs'
 import {
   AREAS, CAPS, EVENTS, MANIFEST_LENSES, OPEN_STATUSES, SEVERITIES, SHA_RE, SHA_SCAN_RE,
-  STATUSES, TARGETLESS, V2_CUTOFF, V3_CUTOFF, V4_CUTOFF,
+  STATUSES, TARGETLESS, V3_CUTOFF, V4_CUTOFF,
 } from '../../records/schema.mjs'
+import * as schema from '../../records/schema.mjs'
 import * as shim from '../../vocab.mjs'
 
 {
@@ -63,9 +64,11 @@ import * as shim from '../../vocab.mjs'
   check('SHA_SCAN_RE finds shas inside prose and is global',
     SHA_SCAN_RE.global && [...'at eeeee15 and ddddd17.'.matchAll(SHA_SCAN_RE)].length === 2, SHA_SCAN_RE.source)
 
-  check('the cut-offs are V2 2026-07-30, V3 2026-08-03, V4 2026-08-28',
-    V2_CUTOFF === '2026-07-30' && V3_CUTOFF === '2026-08-03' && V4_CUTOFF === '2026-08-28',
-    [V2_CUTOFF, V3_CUTOFF, V4_CUTOFF].join(' '))
+  // The V2 cut-off went with the archive tolerance it gated: only lines no live target can hold
+  // were ever read leniently, so a live record has one tier and the constant has no reader.
+  check('the cut-offs are V3 2026-08-03 and V4 2026-08-28, with no V2 tier left',
+    V3_CUTOFF === '2026-08-03' && V4_CUTOFF === '2026-08-28' && schema.V2_CUTOFF === undefined,
+    [V3_CUTOFF, V4_CUTOFF, String(schema.V2_CUTOFF)].join(' '))
 
   check('the old vocab.mjs path still serves the same objects',
     shim.AREAS === AREAS && shim.MANIFEST_LENSES === MANIFEST_LENSES && shim.V4_CUTOFF === V4_CUTOFF,

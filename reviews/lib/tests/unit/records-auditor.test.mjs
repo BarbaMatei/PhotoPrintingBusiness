@@ -2,7 +2,7 @@
 // seams the CLI now composes — records/validate.mjs and fix/handback-gates.mjs, called in-process.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only records-auditor
-import { check, run, firstLine, GOOD_ROOT } from '../lib.mjs'
+import { check, run, GOOD_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -12,12 +12,17 @@ import { versions } from '../../model/target.mjs'
 
 // ---------- records auditor: smoke run against the real repo ----------
 {
-  const r = run('records/records-auditor.mjs', ['044-045-observability'])
-  check('auditor exits 0 on 044-045-observability', r.code === 0, `exit ${r.code}: ${r.out.trim().split('\n').slice(-3).join(' | ')}`)
+  const r = run('records/records-auditor.mjs', ['038-039-invoicing'])
+  check('auditor exits 0 on the live target', r.code === 0, `exit ${r.code}: ${r.out.trim().split('\n').slice(-3).join(' | ')}`)
 }
 {
-  const r = run('records/records-auditor.mjs', ['043-cloud-storage-provider'])
-  check('auditor finds the track record for a certified target', !r.out.includes('track-record.md is missing'), r.out.split('\n').find(l => l.includes('track-record')) ?? firstLine(r.out))
+  // Archives are closed books (owner ruling, 2026-08-28): one note, and none of the per-line,
+  // per-resolution or per-commit checks the live pass runs.
+  const r = run('records/records-auditor.mjs', ['044-045-observability'])
+  const lines = r.out.trim().split('\n').filter(l => l.trim())
+  check('an archived target reports one skip note and nothing else',
+    r.code === 0 && lines.length === 2 && /^note\s+044-045-observability \(archive\): closed books/.test(lines[0]) && /^0 error\(s\), 0 warning\(s\)/.test(lines[1]),
+    `exit ${r.code}: ${r.out.trim()}`)
 }
 {
   const r = run('records/records-auditor.mjs', ['--root', GOOD_ROOT])
@@ -40,8 +45,8 @@ import { versions } from '../../model/target.mjs'
     listTargets(REVIEWS, { only: ['921'], all: true }).length === all.length,
     `${listTargets(REVIEWS, { only: ['921'], all: true }).length} vs ${all.length}`)
 
-  // The validator reports through the tiers the CLI passes in and never prints or exits itself:
-  // an archived target's shape errors must land as warnings, a live target's as errors.
+  // The validator reports through the reporters the CLI passes in and never prints or exits
+  // itself; an archived target is not validated at all.
   const collect = () => { const o = { errors: [], warnings: [], infos: [] }; return { ...o, err: m => o.errors.push(m), warn: m => o.warnings.push(m), info: m => o.infos.push(m) } }
   const ctxFor = (c, gates) => ({ err: c.err, warn: c.warn, info: c.info, checkSha: () => ({ resolves: true, pushed: true }), versions, gates, index: null, track: null })
 
@@ -57,14 +62,39 @@ import { versions } from '../../model/target.mjs'
   writeFileSync(join(T, 'metrics.jsonl'), '')
   writeFileSync(join(T, 'review-v1.md'), '---\npass-type: discovery\n---\n\n# Review v1\n')
   const c2 = collect()
-  auditTarget({ name: '990-tier', dir: T, archived: true }, ctxFor(c2, () => { }))
+  let archivedGateCalls = 0
+  auditTarget({ name: '990-tier', dir: T, archived: true }, ctxFor(c2, () => { archivedGateCalls++ }))
   const c3 = collect()
   auditTarget({ name: '990-tier', dir: T, archived: false }, ctxFor(c3, () => { }))
   const PAIRING = 'review-v1.md has no metrics line'
-  check('an archived target\'s record-shape problem is a warning, the same records live an error',
-    c2.warnings.some(m => m.includes(PAIRING)) && !c2.errors.length && c3.errors.some(m => m.includes(PAIRING)) && !c3.warnings.length,
-    `archived ${JSON.stringify(c2)} · live ${JSON.stringify(c3.errors)}`)
+  check('an archived target is skipped after one note, hand-back gates included',
+    c2.infos.length === 1 && /closed books/.test(c2.infos[0]) && !c2.errors.length && !c2.warnings.length && archivedGateCalls === 0,
+    `${JSON.stringify(c2)} · ${archivedGateCalls} gate call(s)`)
+  check('the same records on a live target are an error — one severity, no lenient tier',
+    c3.errors.some(m => m.includes(PAIRING)) && !c3.warnings.length,
+    `live ${JSON.stringify(c3.errors)}`)
   rmSync(T, { recursive: true, force: true })
+
+  // A certified live target is "under watch": the track-record check used to be exercised only
+  // through an archived target, which is no longer validated at all.
+  const C = mkdtempSync(join(tmpdir(), 'records-validate-certified-'))
+  mkdirSync(C, { recursive: true })
+  writeFileSync(join(C, 'metrics.jsonl'), `${JSON.stringify({
+    target: '991-certified', pass: 1, type: 'discovery', subtype: 'certification-single',
+    date: '2026-08-30', commit: 'abc1234', outcome: 'certified', mediums_open_at_close: 0,
+    new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, findings: [],
+  })}\n`)
+  writeFileSync(join(C, 'review-v1.md'), '---\npass-type: certification\ncommit: abc1234\n---\n\n# Review v1\n')
+  const cNoTrack = collect()
+  auditTarget({ name: '991-certified', dir: C, archived: false }, ctxFor(cNoTrack, () => { }))
+  const cTracked = collect()
+  auditTarget({ name: '991-certified', dir: C, archived: false },
+    { ...ctxFor(cTracked, () => { }), track: '| 991-certified | v1 |' })
+  check('a live target holding a certification must be listed in the track record',
+    cNoTrack.errors.some(m => /holds a certification but reviews\/state\/track-record\.md is missing/.test(m)) &&
+    !cTracked.errors.length,
+    `no track ${JSON.stringify(cNoTrack.errors)} · listed ${JSON.stringify(cTracked.errors)}`)
+  rmSync(C, { recursive: true, force: true })
 
   const c4 = collect()
   auditIds(listTargets(REVIEWS, { all: true }), { err: c4.err, counterPath: join(REVIEWS, 'state', 'id-counter') })

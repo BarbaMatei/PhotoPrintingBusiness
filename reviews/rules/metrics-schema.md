@@ -27,13 +27,15 @@ question the v2 scope could not answer: where does the wall-clock time go, and i
 work, waiting on the owner, or nobody at the wheel.
 
 **After appending, run the auditor** — it validates the new line against this schema and
-cross-checks the target's records; it must exit clean (legacy drift reports as warnings):
+cross-checks the target's records; it must exit clean. It validates **live targets only**: an
+archived target's books never change again, so the auditor reads its ledger for the cross-target
+id scan and nothing else (owner ruling, 2026-08-28):
 
 ```
 node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 ```
 
-## v2 fields (one JSON object per line; lines dated ≥ 2026-07-30 are validated strictly)
+## v2 fields (one JSON object per line; every line of a live target is validated strictly)
 
 <!-- generated:metrics-v2-fields -->
 | Field | Type | Meaning |
@@ -51,7 +53,7 @@ node reviews/lib/records-auditor.mjs <target>     # or no args = all targets
 | `outcome` | `"certified"` \| `"not-certified"` \| absent | certification lines only |
 | `mediums_open_at_close` | int | **required when `outcome: "certified"`** — 🟠 count not `fixed`/`verified` at close (mirrors the index-row rule, calibration 2026-07-29) |
 | `new_findings` | `{high, medium, low, cleanup}` | **new** problems this pass named (info items count as `cleanup`, note it) |
-| `findings` | array | **required on strict discovery/delta lines** — one entry per canonical finding, see below. **Optional on verification lines** that name new defects: one entry per new defect, carrying only `{d, new, sev, fix_generated, sev_delta?}` — this is where fix lineage gets counted, since fix-caused defects surface mainly in verifications |
+| `findings` | array | **required on discovery/delta lines** — one entry per canonical finding, see below. **Optional on verification lines** that name new defects: one entry per new defect, carrying only `{d, new, sev, fix_generated, sev_delta?}` — this is where fix lineage gets counted, since fix-caused defects surface mainly in verifications |
 | `refinds_identity` | int | same problem as an earlier finding (reconciler judgment) |
 | `reraises_of_decided` | int | findings re-raising an accepted wont-fix / deferral / dismissal |
 | `refuted` | int | candidate findings recorded as false positives this pass |
@@ -87,10 +89,11 @@ fields and the auditor rejects them there.
 | `fix_generated` | `"PPW-<n>"` \| null | the earlier finding whose **fix** caused this one (reconciler `residual-of` lineage) |
 | `sev_delta` | `"<lens-max>-><final>"` \| null | only when synthesis changed the severity vs the lens maximum |
 
-Lines appended before 2026-08-11 carry the old per-target names in `d` and `fix_generated`
-(this file is append-only, so they stay); `reviews/archive/id-map.md` translates them.
-The auditor accepts both id shapes on old lines; `f` is now the only place a finder's own
-number is ever recorded.
+Lines appended before 2026-08-11 carry the old per-target `D<n>` names in `d` and
+`fix_generated` (this file is append-only, so they stay); `reviews/archive/id-map.md` translates
+them. They survive only in archived targets, which the auditor no longer validates, so
+`PPW-<n>` is the only id shape it accepts. `f` is the only place a finder's own number is ever
+recorded.
 
 What this buys, after 2–3 more targets: per-lens yield ("which lenses earn their keep") by
 grouping on `lenses`; the fix-generativity rate (`fix_generated` non-null / `new`) that tells
@@ -264,8 +267,9 @@ supersession stays visible rather than silent.
 
 ## Legacy lines (dated before 2026-07-30)
 
-Validated leniently; the auditor reports known v1 drift as aggregated warnings, never errors.
-Readers of old lines need this table:
+They exist only in archived targets, which the auditor no longer validates, so the tolerance
+that used to read them is gone: on a live target every form below is an error. The table stays
+for the person reading an old line:
 
 | Legacy form | Where | Read as |
 |---|---|---|

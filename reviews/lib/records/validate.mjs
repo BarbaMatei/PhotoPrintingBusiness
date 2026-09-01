@@ -1,10 +1,14 @@
 // The schema half of the records auditor: the mechanical checks over one target's structured
-// records, per rules/metrics-schema.md v3. Checks metrics.jsonl parses and validates (strict for
-// lines dated on/after V2_CUTOFF, v3 fix-round lines strict from V3_CUTOFF, lenient with
-// grandfathered drift before), new_findings tallies against findings[], fix-round tallies against
-// the resolution's Findings rows, review-v<n>.md <-> metrics pairing, worklog event shape, index
-// and track-record mentions, cross-target id uniqueness against the id-counter, and the
-// citation-leak scan over source comments.
+// records, per rules/metrics-schema.md v3. Checks metrics.jsonl parses and validates,
+// new_findings tallies against findings[], fix-round tallies against the resolution's Findings
+// rows, review-v<n>.md <-> metrics pairing, worklog event shape, index and track-record mentions,
+// cross-target id uniqueness against the id-counter, and the citation-leak scan over source
+// comments.
+//
+// An archived target is validated no further than the cross-target id scan (owner ruling,
+// 2026-08-28): its books never change again, so re-reading their shape only kept tolerance code
+// alive for records nobody can repair. Every check below therefore runs on live records only, and
+// reports at one severity.
 //
 // Nothing here prints or exits: every check reports through the err/warn/info functions the CLI
 // passes in, so the CLI owns the output format and the exit code. Three collaborators are injected
@@ -12,7 +16,7 @@
 // (git), `versions` (model/target.mjs) and `gates` (fix/handback-gates.mjs).
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { AREAS, SHA_RE, TARGETLESS, V2_CUTOFF, V3_CUTOFF } from './schema.mjs'
+import { AREAS, SHA_RE, TARGETLESS, V3_CUTOFF } from './schema.mjs'
 import { ids as ledgerIds } from './ledger.mjs'
 import { meta as resolutionMeta, tallies as resolutionTallies } from './resolution.mjs'
 import { live, readLines as readWorklogLines } from './worklog.mjs'
@@ -35,7 +39,7 @@ export const V2_FIELDS = [
   { cell: '`outcome`', type: '`"certified"` \\| `"not-certified"` \\| absent', meaning: 'certification lines only' },
   { cell: '`mediums_open_at_close`', type: 'int', meaning: '**required when `outcome: "certified"`** — 🟠 count not `fixed`/`verified` at close (mirrors the index-row rule, calibration 2026-07-29)' },
   { cell: '`new_findings`', type: '`{high, medium, low, cleanup}`', meaning: '**new** problems this pass named (info items count as `cleanup`, note it)' },
-  { cell: '`findings`', type: 'array', meaning: '**required on strict discovery/delta lines** — one entry per canonical finding, see below. **Optional on verification lines** that name new defects: one entry per new defect, carrying only `{d, new, sev, fix_generated, sev_delta?}` — this is where fix lineage gets counted, since fix-caused defects surface mainly in verifications' },
+  { cell: '`findings`', type: 'array', meaning: '**required on discovery/delta lines** — one entry per canonical finding, see below. **Optional on verification lines** that name new defects: one entry per new defect, carrying only `{d, new, sev, fix_generated, sev_delta?}` — this is where fix lineage gets counted, since fix-caused defects surface mainly in verifications' },
   { cell: '`refinds_identity`', type: 'int', meaning: 'same problem as an earlier finding (reconciler judgment)' },
   { cell: '`reraises_of_decided`', type: 'int', meaning: 'findings re-raising an accepted wont-fix / deferral / dismissal' },
   { cell: '`refuted`', type: 'int', meaning: 'candidate findings recorded as false positives this pass' },
@@ -72,7 +76,6 @@ const SEVS = new Set(['high', 'medium', 'low', 'cleanup'])
 const VERDICTS = new Set(['confirmed', 'plausible', 'refuted', 're-raise', 'unverified-cleanup', 'unverified-low', 'unverified-over-budget'])
 const TOP_KEYS = keysOf(V2_FIELDS)
 const STAGE_KEYS = new Set(['lenses', 'dedup', 'skeptics_guard', 'skeptics_trace', 'reraise_skipped', 'budget_skipped', 'approach_checks'])
-const LEGACY_TOP = new Set(['base', 'certified', 'deferred_reaffirmed', 'disputed_upheld'])
 const FIX_KEYS = keysOf(V3_FIX_FIELDS)
 const FIX_TALLY_KEYS = ['fixed', 'wont_fix', 'deferred', 'disputed', 'false_positive', 'open']
 const RUNTIME_KEYS = new Set(['started', 'ended', 'active_s', 'blocked_s', 'idle_s', 'blocked'])
@@ -97,6 +100,10 @@ export function listTargets(reviews, { only = [], all = false } = {}) {
 
 export function auditTarget(t, ctx) {
   const { err, warn, info, checkSha, versions, gates, index, track } = ctx
+  if (t.archived) {
+    info(`${t.name} (archive): closed books — metrics and resolutions are not validated; only the cross-target id scan reads its ledger`)
+    return
+  }
   // Seed lineage (convergence rule, 2026-08-28): which fix round a fix-caused finding is
   // attributed to, plus the component word for per-area convergence accounting.
   const checkSeedKeys = (f, fat) => {
@@ -104,16 +111,13 @@ export function auditTarget(t, ctx) {
     if (f.area !== undefined && !AREAS.includes(f.area)) err(`${fat}: area "${f.area}" — one of the twelve backlog area words only`)
   }
 
-  const tag = t.name + (t.archived ? ' (archive)' : '')
-  const strictTier = t.archived ? warn : err // archives never hard-fail on record shape
+  const tag = t.name
   const reviewVersions = versions(t.dir, 'review')
   const metricsLines = readMetricsLines(t.dir)
   if (metricsLines === null) {
     info(`${tag}: no metrics.jsonl (${reviewVersions.length} review file(s)) — skipped as a non-code target`)
     return
   }
-  const legacyDrift = new Map() // key -> count, aggregated per target
-  const drift = k => legacyDrift.set(k, (legacyDrift.get(k) || 0) + 1)
   const passes = new Map() // pass -> [line objects]
   const fixRounds = new Set() // round numbers with a fix-round line
   const roundDates = new Map() // round -> the fix-round line's date (hand-back gate cut-off)
@@ -145,38 +149,37 @@ export function auditTarget(t, ctx) {
     }
 
     if (o.type === 'fix-round') {
-      const badFr = (typeof o.date === 'string' && o.date >= V3_CUTOFF) ? err : strictTier
-      for (const k of ['target', 'round', 'type', 'date', 'base_commit', 'findings', 'runtime']) if (o[k] === undefined) badFr(`${at}: fix-round line missing required field "${k}"`)
+      for (const k of ['target', 'round', 'type', 'date', 'base_commit', 'findings', 'runtime']) if (o[k] === undefined) err(`${at}: fix-round line missing required field "${k}"`)
       if (o.target && o.target !== t.name) err(`${at}: target "${o.target}" does not match folder "${t.name}"`)
-      for (const k of Object.keys(o)) if (!FIX_KEYS.has(k)) badFr(`${at}: unknown fix-round field "${k}"`)
+      for (const k of Object.keys(o)) if (!FIX_KEYS.has(k)) err(`${at}: unknown fix-round field "${k}"`)
       if (o.findings) {
-        for (const k of Object.keys(o.findings)) if (!FIX_TALLY_KEYS.includes(k)) badFr(`${at}: unknown findings key "${k}"`)
-        for (const k of FIX_TALLY_KEYS) if (!num(o.findings[k])) badFr(`${at}: findings.${k} missing or non-numeric`)
+        for (const k of Object.keys(o.findings)) if (!FIX_TALLY_KEYS.includes(k)) err(`${at}: unknown findings key "${k}"`)
+        for (const k of FIX_TALLY_KEYS) if (!num(o.findings[k])) err(`${at}: findings.${k} missing or non-numeric`)
       }
       if (o.tests !== undefined && o.tests !== null) {
-        for (const k of Object.keys(o.tests)) if (!['invocations', 'red_runs', 'green_runs', 'final'].includes(k)) badFr(`${at}: unknown tests key "${k}"`)
-        for (const k of ['invocations', 'red_runs', 'green_runs']) if (o.tests[k] !== undefined && !num(o.tests[k])) badFr(`${at}: tests.${k} must be a number`)
-        if (o.tests.final !== undefined && o.tests.final !== null && (!num(o.tests.final.passed) || !num(o.tests.final.failed))) badFr(`${at}: tests.final must be {passed, failed}|null`)
+        for (const k of Object.keys(o.tests)) if (!['invocations', 'red_runs', 'green_runs', 'final'].includes(k)) err(`${at}: unknown tests key "${k}"`)
+        for (const k of ['invocations', 'red_runs', 'green_runs']) if (o.tests[k] !== undefined && !num(o.tests[k])) err(`${at}: tests.${k} must be a number`)
+        if (o.tests.final !== undefined && o.tests.final !== null && (!num(o.tests.final.passed) || !num(o.tests.final.failed))) err(`${at}: tests.final must be {passed, failed}|null`)
       }
       if (o.runtime) {
-        for (const k of Object.keys(o.runtime)) if (!RUNTIME_KEYS.has(k)) badFr(`${at}: unknown runtime key "${k}"`)
-        for (const k of ['active_s', 'blocked_s', 'idle_s']) if (o.runtime[k] !== undefined && !num(o.runtime[k])) badFr(`${at}: runtime.${k} must be a number`)
-        if (o.runtime.blocked !== undefined && (!Array.isArray(o.runtime.blocked) || o.runtime.blocked.some(b => typeof b?.reason !== 'string' || !num(b?.s)))) badFr(`${at}: runtime.blocked must be [{reason, s}]`)
+        for (const k of Object.keys(o.runtime)) if (!RUNTIME_KEYS.has(k)) err(`${at}: unknown runtime key "${k}"`)
+        for (const k of ['active_s', 'blocked_s', 'idle_s']) if (o.runtime[k] !== undefined && !num(o.runtime[k])) err(`${at}: runtime.${k} must be a number`)
+        if (o.runtime.blocked !== undefined && (!Array.isArray(o.runtime.blocked) || o.runtime.blocked.some(b => typeof b?.reason !== 'string' || !num(b?.s)))) err(`${at}: runtime.blocked must be [{reason, s}]`)
       }
       if (o.approach_checks) for (const k of Object.keys(o.approach_checks)) {
-        if (!['pre_cleared_consumed', 'run', 'tokens'].includes(k)) badFr(`${at}: unknown approach_checks key "${k}"`)
-        else if (k === 'tokens' ? !numOrNull(o.approach_checks[k]) : !num(o.approach_checks[k])) badFr(`${at}: approach_checks.${k} malformed`)
+        if (!['pre_cleared_consumed', 'run', 'tokens'].includes(k)) err(`${at}: unknown approach_checks key "${k}"`)
+        else if (k === 'tokens' ? !numOrNull(o.approach_checks[k]) : !num(o.approach_checks[k])) err(`${at}: approach_checks.${k} malformed`)
       }
-      if (o.micro_reviews) for (const k of Object.keys(o.micro_reviews)) if (!['count', 'follow_up_fixes'].includes(k) || !num(o.micro_reviews[k])) badFr(`${at}: micro_reviews.${k} malformed`)
+      if (o.micro_reviews) for (const k of Object.keys(o.micro_reviews)) if (!['count', 'follow_up_fixes'].includes(k) || !num(o.micro_reviews[k])) err(`${at}: micro_reviews.${k} malformed`)
       if (o.cost) for (const k of Object.keys(o.cost)) {
-        if (!['agents', 'tokens'].includes(k)) badFr(`${at}: unknown fix-round cost key "${k}"`)
-        else if (!numOrNull(o.cost[k])) badFr(`${at}: cost.${k} must be number|null`)
+        if (!['agents', 'tokens'].includes(k)) err(`${at}: unknown fix-round cost key "${k}"`)
+        else if (!numOrNull(o.cost[k])) err(`${at}: cost.${k} must be number|null`)
       }
       if (num(o.round)) {
         fixRounds.add(o.round)
         if (typeof o.date === 'string') roundDates.set(o.round, o.date)
         const resPath = join(t.dir, `resolution-v${o.round}.md`)
-        if (!existsSync(resPath)) badFr(`${at}: fix-round line for round ${o.round} but no resolution-v${o.round}.md`)
+        if (!existsSync(resPath)) err(`${at}: fix-round line for round ${o.round} but no resolution-v${o.round}.md`)
         else if (o.findings && correctedRoundFields.get(o.round)?.has('findings')) {
           warn(`${at}: findings tallies superseded by a later correction line — cross-check skipped`)
         }
@@ -194,82 +197,62 @@ export function auditTarget(t, ctx) {
       return
     }
 
-    const strict = typeof o.date === 'string' && o.date >= V2_CUTOFF
-    const bad = strict ? err : strictTier
-
-    for (const k of ['target', 'pass', 'type', 'date', 'commit']) if (o[k] === undefined) bad(`${at}: missing required field "${k}"`)
+    for (const k of ['target', 'pass', 'type', 'date', 'commit']) if (o[k] === undefined) err(`${at}: missing required field "${k}"`)
     if (o.target && o.target !== t.name) err(`${at}: target "${o.target}" does not match folder "${t.name}"`)
     if (num(o.pass)) passes.set(o.pass, [...(passes.get(o.pass) || []), o])
 
-    if (o.type && !TYPES.has(o.type)) {
-      if (!strict && o.type === 'certification') drift('type:"certification" (read as discovery + certification-single)')
-      else bad(`${at}: type "${o.type}" not in ${[...TYPES].join('|')}`)
-    }
-    if (o.subtype !== undefined && !SUBTYPES.has(o.subtype)) bad(`${at}: unknown subtype "${o.subtype}"`)
+    if (o.type && !TYPES.has(o.type)) err(`${at}: type "${o.type}" not in ${[...TYPES].join('|')}`)
+    if (o.subtype !== undefined && !SUBTYPES.has(o.subtype)) err(`${at}: unknown subtype "${o.subtype}"`)
 
-    for (const k of Object.keys(o)) {
-      if (TOP_KEYS.has(k)) continue
-      if (!strict && LEGACY_TOP.has(k)) { drift(`field "${k}"`); continue }
-      bad(`${at}: unknown field "${k}"`)
-    }
+    for (const k of Object.keys(o)) if (!TOP_KEYS.has(k)) err(`${at}: unknown field "${k}"`)
 
     if (o.lenses !== undefined && o.lenses !== null) {
-      if (!Array.isArray(o.lenses)) bad(`${at}: lenses must be an array or null`)
-      else if (o.lenses.some(l => typeof l !== 'string' || /\s/.test(l))) {
-        if (strict) err(`${at}: lenses must be bare lens keys, not prose`)
-        else drift('prose in lenses[]')
-      }
+      if (!Array.isArray(o.lenses)) err(`${at}: lenses must be an array or null`)
+      else if (o.lenses.some(l => typeof l !== 'string' || /\s/.test(l))) err(`${at}: lenses must be bare lens keys, not prose`)
     }
 
-    if (o.new_findings) for (const s of SEVS) if (!num(o.new_findings[s])) bad(`${at}: new_findings.${s} missing or non-numeric`)
-    for (const k of ['refinds_identity', 'reraises_of_decided', 'refuted', 'verified', 'reopened']) if (o[k] !== undefined && !num(o[k])) bad(`${at}: ${k} must be a number`)
+    if (o.new_findings) for (const s of SEVS) if (!num(o.new_findings[s])) err(`${at}: new_findings.${s} missing or non-numeric`)
+    for (const k of ['refinds_identity', 'reraises_of_decided', 'refuted', 'verified', 'reopened']) if (o[k] !== undefined && !num(o[k])) err(`${at}: ${k} must be a number`)
 
     if (o.tests !== undefined && o.tests !== null) {
-      if (!num(o.tests.passed) || !num(o.tests.failed)) bad(`${at}: tests must be {passed, failed}`)
-      for (const k of Object.keys(o.tests)) if (!['passed', 'failed'].includes(k)) {
-        if (!strict && k.startsWith('frontend_')) drift('tests.frontend_* (v2 combines suites)')
-        else bad(`${at}: unknown tests key "${k}"`)
-      }
+      if (!num(o.tests.passed) || !num(o.tests.failed)) err(`${at}: tests must be {passed, failed}`)
+      for (const k of Object.keys(o.tests)) if (!['passed', 'failed'].includes(k)) err(`${at}: unknown tests key "${k}"`)
     }
 
     if (o.cost !== undefined && o.cost !== null) {
-      for (const k of Object.keys(o.cost)) {
-        if (['agents', 'tokens', 'agents_by_stage'].includes(k)) continue
-        if (!strict && k === 'subagent_tokens') { drift('cost.subagent_tokens (read as cost.tokens)'); continue }
-        bad(`${at}: unknown cost key "${k}"`)
-      }
-      if (o.cost.tokens !== undefined && !numOrNull(o.cost.tokens)) bad(`${at}: cost.tokens must be number|null`)
-      if (o.cost.agents !== undefined && !numOrNull(o.cost.agents)) bad(`${at}: cost.agents must be number|null`)
-      if (strict && o.cost.agents_by_stage) for (const k of Object.keys(o.cost.agents_by_stage))
+      for (const k of Object.keys(o.cost)) if (!['agents', 'tokens', 'agents_by_stage'].includes(k)) err(`${at}: unknown cost key "${k}"`)
+      if (o.cost.tokens !== undefined && !numOrNull(o.cost.tokens)) err(`${at}: cost.tokens must be number|null`)
+      if (o.cost.agents !== undefined && !numOrNull(o.cost.agents)) err(`${at}: cost.agents must be number|null`)
+      if (o.cost.agents_by_stage) for (const k of Object.keys(o.cost.agents_by_stage))
         if (!STAGE_KEYS.has(k)) err(`${at}: unknown agents_by_stage key "${k}"`)
     }
 
     if (o.runtime !== undefined && o.runtime !== null) {
-      if (typeof o.date === 'string' && o.date < V3_CUTOFF) bad(`${at}: runtime predates v3 (${V3_CUTOFF})`)
+      if (typeof o.date === 'string' && o.date < V3_CUTOFF) err(`${at}: runtime predates v3 (${V3_CUTOFF})`)
       for (const k of Object.keys(o.runtime)) if (!['started', 'ended'].includes(k))
-        bad(`${at}: pass runtime allows only {started, ended} — the full split belongs to fix-round lines`)
+        err(`${at}: pass runtime allows only {started, ended} — the full split belongs to fix-round lines`)
     }
 
-    if (o.outcome === 'certified' || o.certified) holdsCertification = true
+    if (o.outcome === 'certified') holdsCertification = true
     if (o.outcome !== undefined) {
-      if (!['certified', 'not-certified'].includes(o.outcome)) bad(`${at}: outcome must be certified|not-certified`)
-      if (strict && !o.subtype) err(`${at}: certification line (outcome set) requires subtype`)
-      if (o.outcome === 'certified' && strict && !num(o.mediums_open_at_close)) err(`${at}: outcome certified requires mediums_open_at_close (calibration 2026-07-29)`)
+      if (!['certified', 'not-certified'].includes(o.outcome)) err(`${at}: outcome must be certified|not-certified`)
+      if (!o.subtype) err(`${at}: certification line (outcome set) requires subtype`)
+      if (o.outcome === 'certified' && !num(o.mediums_open_at_close)) err(`${at}: outcome certified requires mediums_open_at_close (calibration 2026-07-29)`)
     }
 
     // Verification lines may carry findings[] for fix lineage (schema, SF-era 2026-08-12):
     // per entry only {d, new, sev, fix_generated, sev_delta} — the lens-stage keys belong
     // to discovery entries.
-    if (strict && o.type === 'verification' && o.findings !== undefined) {
+    if (o.type === 'verification' && o.findings !== undefined) {
       if (!Array.isArray(o.findings)) err(`${at}: findings must be an array`)
       else {
         const tally = { high: 0, medium: 0, low: 0, cleanup: 0 }
         o.findings.forEach((f, i) => {
           const fat = `${at} findings[${i}]`
-          if (!/^(PPW-\d+|D\d+)$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>" (pre-2026-08-11 lines carry "D<n>")`)
+          if (!/^PPW-\d+$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>"`)
           if (typeof f.new !== 'boolean') err(`${fat}: new must be boolean`)
           if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
-          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^(PPW-\d+|D\d+)$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null (pre-2026-08-11: D<n>)`)
+          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^PPW-\d+$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null`)
           if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
           checkSeedKeys(f, fat)
           for (const k of Object.keys(f)) if (!['d', 'new', 'sev', 'fix_generated', 'sev_delta', 'seed_round', 'area'].includes(k)) err(`${fat}: unknown key "${k}" on a verification entry`)
@@ -280,21 +263,21 @@ export function auditTarget(t, ctx) {
       }
     }
 
-    if (strict && (o.type === 'discovery' || o.type === 'delta-discovery')) {
-      if (!Array.isArray(o.findings)) err(`${at}: strict ${o.type} line requires findings[]`)
+    if (o.type === 'discovery' || o.type === 'delta-discovery') {
+      if (!Array.isArray(o.findings)) err(`${at}: ${o.type} line requires findings[]`)
       else {
         const tally = { high: 0, medium: 0, low: 0, cleanup: 0 }
         o.findings.forEach((f, i) => {
           const fat = `${at} findings[${i}]`
           if (!/^F\d+$/.test(f.f || '')) err(`${fat}: f must be "F<n>"`)
-          if (!/^(PPW-\d+|D\d+)$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>" (reconcile before appending; pre-2026-08-11 lines carry "D<n>")`)
+          if (!/^PPW-\d+$/.test(f.d || '')) err(`${fat}: d must be "PPW-<n>" (reconcile before appending)`)
           if (typeof f.new !== 'boolean') err(`${fat}: new must be boolean`)
           if (!SEVS.has(f.sev)) err(`${fat}: sev "${f.sev}" invalid`)
           if (!Array.isArray(f.lenses) || !f.lenses.length) err(`${fat}: lenses[] required`)
           if (!num(f.conv) || f.conv < 1) err(`${fat}: conv must be >= 1`)
           if (typeof f.hinted !== 'boolean') err(`${fat}: hinted must be boolean`)
           if (!VERDICTS.has(f.verdict)) err(`${fat}: verdict "${f.verdict}" invalid`)
-          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^(PPW-\d+|D\d+)$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null (pre-2026-08-11: D<n>)`)
+          if (f.fix_generated !== null && f.fix_generated !== undefined && !/^PPW-\d+$/.test(f.fix_generated)) err(`${fat}: fix_generated must be PPW-<n>|null`)
           if (f.sev_delta !== null && f.sev_delta !== undefined && !/^(high|medium|low|cleanup)->(high|medium|low|cleanup)$/.test(f.sev_delta)) err(`${fat}: sev_delta malformed`)
           checkSeedKeys(f, fat)
           if (f.new === true && SEVS.has(f.sev)) tally[f.sev]++
@@ -313,7 +296,7 @@ export function auditTarget(t, ctx) {
   // review-v<n>.md <-> metrics pairing (+ frontmatter commit collection)
   let missingFm = 0
   for (const v of reviewVersions) {
-    if (!passes.has(v)) strictTier(`${tag}: review-v${v}.md has no metrics line`)
+    if (!passes.has(v)) err(`${tag}: review-v${v}.md has no metrics line`)
     const head = readFileSync(join(t.dir, `review-v${v}.md`), 'utf8').slice(0, 800)
     const cm = /^commit:\s*([0-9a-f]{7,40})\b/m.exec(head)
     if (cm) shas.set(cm[1], `${tag} review-v${v}.md frontmatter`)
@@ -323,7 +306,7 @@ export function auditTarget(t, ctx) {
   for (const [p, ls] of passes) {
     // Verification passes write no review file (doc-contracts.md, 2026-08-10).
     if (!reviewVersions.includes(p) && !ls.every(l => l.type === 'verification'))
-      strictTier(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
+      err(`${tag}: metrics line for pass ${p} has no review-v${p}.md`)
     if (ls.length > 1 && !ls.every(l => l.subtype && l.subtype.startsWith('certification-pair'))) warn(`${tag}: ${ls.length} metrics lines share pass ${p} without pair subtypes`)
   }
 
@@ -351,31 +334,26 @@ export function auditTarget(t, ctx) {
   }
 
   // Every reader drops voided events: a mis-stamp repaired with a void must not gate hand-back.
-  gates(t, tag, roundDates, live(worklogEvents), strictTier)
+  gates(t, tag, roundDates, live(worklogEvents), err)
 
   // commit resolvability + reachability from a pushed ref
   for (const [sha, where] of shas) {
     const r = checkSha(sha)
-    if (!r.resolves) strictTier(`${where}: commit ${sha} does not resolve in this repo`)
-    else if (!r.pushed) strictTier(`${where}: commit ${sha} is reachable from NO pushed ref (tag or remote branch) — evidence is single-machine`)
+    if (!r.resolves) err(`${where}: commit ${sha} does not resolve in this repo`)
+    else if (!r.pushed) err(`${where}: commit ${sha} is reachable from NO pushed ref (tag or remote branch) — evidence is single-machine`)
   }
 
   // certified targets are "under watch" and must be listed in the track record
   if (holdsCertification) {
-    if (track === null) strictTier(`${tag}: holds a certification but reviews/state/track-record.md is missing`)
-    else if (!track.includes(t.name)) strictTier(`${tag}: holds a certification but is not listed in reviews/state/track-record.md`)
+    if (track === null) err(`${tag}: holds a certification but reviews/state/track-record.md is missing`)
+    else if (!track.includes(t.name)) err(`${tag}: holds a certification but is not listed in reviews/state/track-record.md`)
   }
 
-  // index.md mention (warn-level; prose matching is fuzzy; archive rows use ranges — skipped)
+  // index.md mention (warn-level; prose matching is fuzzy)
   const short = t.name.split('-')[0]
-  if (index && !t.archived) for (const p of passes.keys()) {
+  if (index) for (const p of passes.keys()) {
     const re = new RegExp(`\\|\\s*${short}\\s*\\|[^\\n]*v${p}\\b`)
     if (!re.test(index)) warn(`${tag}: no index.md row mentions ${short} v${p}`)
-  }
-
-  if (legacyDrift.size) {
-    const parts = [...legacyDrift].map(([k, n]) => `${k} ×${n}`).join(' · ')
-    info(`${tag}: grandfathered v1 drift — ${parts}`)
   }
 }
 

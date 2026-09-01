@@ -25,10 +25,10 @@ per-target artifact, plus the cross-target `index.md` and `backlog.md`. `reviews
 and `track-record.md` have no contract
 here — but the system target keeps its own lightweight records: `SF<n>` ids (outside
 the `PPW-<n>` sequence), a ledger-style status registry, a worklog, and a metrics
-line per meta-pass, grouped per pass under `reviews/system/review-v<n>/`. Archived targets are being
-retrofitted to this shape by owner order (2026-08-10, newest to oldest; the owner
-explicitly lifted review-file immutability for the retrofit — originals live in git
-history).
+line per meta-pass, grouped per pass under `reviews/system/review-v<n>/`. Archived targets were
+retrofitted to this shape on 2026-08-11 and are now closed books: the auditor reads an archived
+ledger for the cross-target id scan and validates nothing else there (owner ruling,
+2026-08-28).
 
 ## The artifact set
 

@@ -14,7 +14,7 @@ import { V4_CUTOFF } from '../records/schema.mjs'
 import { blocks as ledgerBlocks, severityOf } from '../records/ledger.mjs'
 import { meta, fixedRows } from '../records/resolution.mjs'
 
-export function auditHandBackGates(t, tag, roundDates, events, strictTier) {
+export function auditHandBackGates(t, tag, roundDates, events, err) {
   for (const f of readdirSync(t.dir)) {
     const m = /^resolution-v(\d+)\.md$/.exec(f)
     if (!m) continue
@@ -25,10 +25,10 @@ export function auditHandBackGates(t, tag, roundDates, events, strictTier) {
     const lineDate = roundDates.get(round) ?? null
     if (!((closed && closed >= V4_CUTOFF) || (lineDate && lineDate >= V4_CUTOFF))) continue
     const at = `${tag} resolution-v${round}.md`
-    if (!closed) strictTier(`${at}: resolved without a closed: date — required since 2026-08-28; the hand-back gates key on it`)
+    if (!closed) err(`${at}: resolved without a closed: date — required since 2026-08-28; the hand-back gates key on it`)
 
     const startIdx = events.findIndex(e => e.ev === 'round-start' && e.round === round)
-    if (startIdx === -1) { strictTier(`${at}: no round-start worklog event for round ${round} — the hand-back gates have nothing to check against`); continue }
+    if (startIdx === -1) { err(`${at}: no round-start worklog event for round ${round} — the hand-back gates have nothing to check against`); continue }
     let endIdx = -1
     for (let i = events.length - 1; i >= 0; i--) if (events[i].ev === 'round-end' && events[i].round === round) { endIdx = i; break }
     const slice = events.slice(startIdx, endIdx === -1 ? undefined : endIdx + 1)
@@ -37,9 +37,9 @@ export function auditHandBackGates(t, tag, roundDates, events, strictTier) {
 
     const fixed = fixedRows(text).map(r => ({ id: r.id, code: r.commits.length > 0 }))
     if (fixed.some(r => r.code) && (!by('round-review-dispatched').length || !by('round-review-returned').length))
-      strictTier(`${at}: code was fixed but the round has no round-review-dispatched/returned pair — one composition review over the whole round's diff gates hand-back (audit R3)`)
+      err(`${at}: code was fixed but the round has no round-review-dispatched/returned pair — one composition review over the whole round's diff gates hand-back (audit R3)`)
     if (slice.some(e => e.ev === 'test-run' && e.kind === 'red') && !by('test-audit-returned').length)
-      strictTier(`${at}: regression tests ran red but no test-audit-returned event exists — the test-meaning check gates hand-back (audit R4)`)
+      err(`${at}: regression tests ran red but no test-audit-returned event exists — the test-meaning check gates hand-back (audit R4)`)
 
     const ledgerPath = join(t.dir, 'ledger.md')
     const ledgerText = existsSync(ledgerPath) ? readFileSync(ledgerPath, 'utf8') : ''
@@ -53,7 +53,7 @@ export function auditHandBackGates(t, tag, roundDates, events, strictTier) {
       const preChecked = /Approach pre-check:\s*(cleared|revised)/i.test(block)
       const named = dispatched.some(e => idsOf(e).includes(row.id))
       if (!preChecked && !named)
-        strictTier(`${at}: ${row.id} is trigger-classified by its fix brief but no pre-check verdict was consumed and no check-dispatched event names it — "not needed" is not a writable value (audit R2)`)
+        err(`${at}: ${row.id} is trigger-classified by its fix brief but no pre-check verdict was consumed and no check-dispatched event names it — "not needed" is not a writable value (audit R2)`)
     }
 
     const briefFiles = id => {
@@ -81,9 +81,9 @@ export function auditHandBackGates(t, tag, roundDates, events, strictTier) {
       const proto = protoEvents.find(e => idsOf(e).some(id => g.ids.includes(id)))
       const firstFix = findingEvents.find(e => g.ids.includes(e.id))
       if (!proto)
-        strictTier(`${at}: ${g.ids.join(', ')} share a stateful surface (fix briefs overlap on ${[...g.files][0]}) but no protocol-written event covers them — the protocol block is the cluster's first artifact (audit R1)`)
+        err(`${at}: ${g.ids.join(', ')} share a stateful surface (fix briefs overlap on ${[...g.files][0]}) but no protocol-written event covers them — the protocol block is the cluster's first artifact (audit R1)`)
       else if (firstFix && Date.parse(proto.t) > Date.parse(firstFix.t))
-        strictTier(`${at}: the protocol-written event for ${g.ids.join(', ')} is timestamped after the cluster's first finding event — a protocol paraphrasing the diff is spec-theatre (audit R1)`)
+        err(`${at}: the protocol-written event for ${g.ids.join(', ')} is timestamped after the cluster's first finding event — a protocol paraphrasing the diff is spec-theatre (audit R1)`)
     }
   }
 }
