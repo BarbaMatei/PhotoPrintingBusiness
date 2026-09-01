@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// Builds a throwaway git repository from an eval fixture, because a fix round commits: the
-// fixer needs a tree of its own, and the checked-in fixture may not gain the round's commits.
-// The copy lands under evals/.run/ (git-ignored, inside the repository on purpose — a scratchpad
-// root is what the 2026-07-30 evals lost) and starts at one commit holding the whole fixture, so
-// a grader can diff any file against that base and read the round's commits as its own history.
+// Copies an eval fixture to evals/.run/<name> and makes it a git repository holding the whole
+// fixture in one commit, so a fix round can commit into a tree of its own and a grader can diff
+// any file against that base. The copy stays inside this repository because the records auditor
+// resolves record shas against the enclosing one.
 //
 // Usage: node .claude/skills/fix-review/evals/init-run.mjs [<fixture name>]
 // Prints the run root and the base commit. Exit 0 built · 1 the fixture or a git step failed.
@@ -22,8 +21,7 @@ if (!existsSync(from)) {
   process.exit(1)
 }
 
-// A git variable inherited from the caller would point the fixture's commits at another
-// repository's index or object store.
+// An inherited GIT_* variable would point these commits at another repository's index.
 const env = { ...process.env }
 for (const k of Object.keys(env)) if (k.startsWith('GIT_')) delete env[k]
 
@@ -42,8 +40,7 @@ cpSync(from, to, { recursive: true })
 
 git('init', '--quiet', '--initial-branch=fixture')
 git('add', '-A')
-// core.hooksPath is emptied rather than the commit skipping verification: this repository's
-// hooks belong to this repository, and a fixture commit must not run them.
+// hooksPath is emptied rather than the commit skipping verification: these hooks are this repository's.
 git('-c', 'user.name=eval fixture', '-c', 'user.email=eval@fixture.local', '-c', 'core.hooksPath=',
   'commit', '--quiet', '-m', `fixture base: ${name}`)
 

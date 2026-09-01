@@ -10,7 +10,7 @@ updated: 2026-08-31
 
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
-| PPW-9852 | 🟠 | v2 | The retry counter is read before the row is refreshed | `Services/Fixture.cs:73` | fixed | `b3f98e2` |
+| PPW-9852 | 🟠 | v2 | The retry counter is read before the row is refreshed | `Services/Fixture.cs:73` | open |  |
 
 ## Details
 
@@ -25,4 +25,3 @@ updated: 2026-08-31
   **Trigger-list-shaped:** no.
 - **History:**
   - v2: found by the certification pass
-  - v3: fix round — fixed at `b3f98e2`

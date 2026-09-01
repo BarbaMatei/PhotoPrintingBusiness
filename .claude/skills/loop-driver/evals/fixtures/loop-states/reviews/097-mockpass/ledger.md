@@ -10,7 +10,7 @@ updated: 2026-08-30
 
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
-| PPW-9871 | 🔴 | v1 | The invoice total leaves out the shipping line | `Services/Fixture.cs:88` | fixed | `147fa87` |
+| PPW-9871 | 🔴 | v1 | The invoice total leaves out the shipping line | `Services/Fixture.cs:88` | open |  |
 
 ## Details
 
@@ -25,4 +25,3 @@ updated: 2026-08-30
   **Trigger-list-shaped:** no.
 - **History:**
   - v1: found
-  - v1: fix round — fixed at `147fa87`
