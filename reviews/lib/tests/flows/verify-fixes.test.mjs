@@ -4,7 +4,7 @@
 // verify-fixes-red-leg.test.mjs.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only verify-fixes
-import { check, run, scrubbedGitEnv } from '../lib.mjs'
+import { check, run, fixtureGit } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -14,8 +14,7 @@ import { REVIEWS, REPO } from '../../records/schema.mjs'
 // ---------- verify-fixes: revert-and-rerun against a throwaway repo ----------
 {
   const T = mkdtempSync(join(tmpdir(), 'verify-fixes-'))
-  const gitEnv = scrubbedGitEnv()
-  const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8', env: gitEnv })
+  const g = fixtureGit(T)
   g('init', '-q', '-b', 'main')
   g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
   mkdirSync(join(T, 'src', 'app'), { recursive: true })
@@ -62,7 +61,7 @@ import { REVIEWS, REPO } from '../../records/schema.mjs'
 
   {
     const decoyT = mkdtempSync(join(tmpdir(), 'decoy-'))
-    const dg = (...a) => spawnSync('git', ['-C', decoyT, ...a], { encoding: 'utf8', env: gitEnv })
+    const dg = fixtureGit(decoyT)
     dg('init', '-q', '-b', 'main')
     dg('config', 'user.email', 'decoy@test'); dg('config', 'user.name', 'decoy')
     writeFileSync(join(decoyT, 'marker.txt'), 'untouched\n')

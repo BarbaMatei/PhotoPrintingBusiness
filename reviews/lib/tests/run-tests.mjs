@@ -9,7 +9,7 @@
 import { readdirSync } from 'node:fs'
 import { dirname, basename, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { currentTally, resetTally } from './lib.mjs'
+import { check, currentTally, resetTally, gitIdentity, IDENTITY_AT_LOAD } from './lib.mjs'
 
 const TESTS_DIR = dirname(fileURLToPath(import.meta.url))
 
@@ -39,6 +39,19 @@ for (const f of files) {
   console.log(`  ${f}: ${count}`)
   total += count
   failures.push(...fileFailures)
+}
+
+resetTally()
+{
+  const before = IDENTITY_AT_LOAD
+  const after = gitIdentity()
+  check("the suite left the repository's git identity untouched",
+    after.name === before.name && after.email === before.email,
+    `git config now reads "${after.name} <${after.email}>", was "${before.name} <${before.email}>" — a fixture repo's config write leaked into the real repository; restore it before committing`)
+  const { count, failures: guard } = currentTally()
+  console.log(`  (git identity guard): ${count}`)
+  total += count
+  failures.push(...guard)
 }
 
 if (failures.length) {

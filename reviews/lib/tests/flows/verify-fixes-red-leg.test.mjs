@@ -7,17 +7,14 @@
 // These runs pass --no-events so the worklog cannot dirty the fixture between legs.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only verify-fixes-red-leg
-import { check, run, scrubbedGitEnv } from '../lib.mjs'
+import { check, run, fixtureGit } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { spawnSync } from 'node:child_process'
 
 {
   const T = mkdtempSync(join(tmpdir(), 'verify-red-'))
-  // A git hook's own GIT_DIR/GIT_INDEX_FILE would override -C and land these commits on the
-  // real repository, so the throwaway repo gets a scrubbed environment.
-  const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8', env: scrubbedGitEnv() })
+  const g = fixtureGit(T)
   g('init', '-q', '-b', 'main')
   g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
   mkdirSync(join(T, 'src', 'app'), { recursive: true })

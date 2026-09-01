@@ -2,7 +2,7 @@
 // an override leaves a parsable trace in reviews/state/overrides.jsonl.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only hook-override
-import { check, scrubbedGitEnv } from '../lib.mjs'
+import { check, fixtureGit, scrubbedGitEnv } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -18,7 +18,7 @@ import { REVIEWS } from '../../records/schema.mjs'
     const T = mkdtempSync(join(tmpdir(), 'hook-override-'))
     // A git hook's own GIT_DIR/GIT_INDEX_FILE would override -C and land these commits
     // on the real repository, so the throwaway repo gets a scrubbed environment.
-    const g = (...a) => spawnSync('git', ['-C', T, ...a], { encoding: 'utf8', env: scrubbedGitEnv() })
+    const g = fixtureGit(T)
     g('init', '-q', '-b', 'main')
     g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')
     mkdirSync(join(T, 'src'), { recursive: true })
