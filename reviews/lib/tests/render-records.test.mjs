@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 
 // ---------- render-records: dry-run backlog bucketing ----------
 {
-  const r = run('render-records.mjs', ['--root', GOOD_ROOT, '901-good-target', '--dry-run'])
+  const r = run('records/render-records.mjs', ['--root', GOOD_ROOT, '901-good-target', '--dry-run'])
   check('renderer buckets a backlog row as deferred', r.out.includes('"deferred": 1') && r.out.includes('"open": 0'), r.out.split('\n').filter(l => /"(deferred|open)"/.test(l)).join(' ').trim() || r.out.trim().slice(0, 160))
 }
 
@@ -57,14 +57,14 @@ closed:
 
   wl([...mislabel, voidEvent])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
     check('renderer counts only the surviving span of a voided mislabel', r.code === 0 && r.out.includes('"active_s": 1440'),
       `exit ${r.code}: ${line(r.out, 'active_s')}`)
     check('renderer brackets the round by its span, not by the voided stamp',
       r.out.includes(`"started": "${at('11:36')}"`) && r.out.includes(`"ended": "${at('12:00')}"`), `${line(r.out, 'started')} ${line(r.out, 'ended')}`)
   }
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '7', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '7', '--dry-run'])
     check('a void naming round 8 leaves the same-timestamp round-7 stamp countable',
       r.code === 0 && r.out.includes('"active_s": 1740') && r.out.includes(`"started": "${at('10:15')}"`),
       `exit ${r.code}: ${line(r.out, 'active_s')} ${line(r.out, 'started')}`)
@@ -72,7 +72,7 @@ closed:
 
   wl(mislabel.filter(e => !(e.ev === 'round-start' && e.round === 7)))
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
     check('renderer aborts on the unvoided mislabel instead of spanning both parts', r.code === 1, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the abort names the unclosed start, the foreign stamp that follows it, and both repairs',
       r.out.includes(at('10:15')) && r.out.includes(at('10:44')) && r.out.includes('round-end --round 8') && r.out.includes('void'), r.out.trim())
@@ -84,7 +84,7 @@ closed:
     { t: at('12:00'), ev: 'round-end', round: 8 },
   ])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
     check('renderer aborts on a second round-start while the round is open', r.code === 1, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the abort names both round-start timestamps and suggests a void',
       r.out.includes(at('10:15')) && r.out.includes(at('11:36')) && r.out.includes('wl.mjs'), r.out.trim())
@@ -96,7 +96,7 @@ closed:
     { t: at('10:30'), ev: 'round-end', round: 8 },
   ])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '8', '--dry-run'])
     check('renderer aborts on a round-end that closes nothing', r.code === 1 && r.out.includes(at('10:30')) && r.out.includes(at('10:20')), `exit ${r.code}: ${r.out.trim()}`)
     check('that abort also offers the resumed-without-a-start repair, not just the void',
       r.out.includes('resumed') && r.out.includes('round-start'), r.out.trim())
@@ -112,7 +112,7 @@ closed:
     { t: at('11:30'), ev: 'round-end', round: 2 },
   ])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '1', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '1', '--dry-run'])
     check('renderer aborts when a later round runs inside an unclosed round', r.code === 1 && !r.out.includes('"invocations"'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('that abort names the unclosed start and the first foreign round stamp',
       r.out.includes(at('09:00')) && r.out.includes(at('11:00')), r.out.trim())
@@ -123,7 +123,7 @@ closed:
     { t: at('09:10'), ev: 'test-run', kind: 'red' },
   ])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '1', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '1', '--dry-run'])
     check('a round still open at the end of the log renders in progress', r.code === 0 && r.out.includes('no round-end yet'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the in-progress render ends at the last event',
       r.out.includes(`"started": "${at('09:00')}"`) && r.out.includes(`"ended": "${at('09:10')}"`), `${line(r.out, 'started')} ${line(r.out, 'ended')}`)
@@ -142,7 +142,7 @@ closed:
     { t: at('14:20'), ev: 'round-end', round: 6 },
   ])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '6', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '6', '--dry-run'])
     check('renderer sums a three-part round\'s spans and skips the time between them',
       r.code === 0 && r.out.includes('"active_s": 3600') && r.out.includes('"idle_s": 0'), `exit ${r.code}: ${line(r.out, 'active_s')} ${line(r.out, 'idle_s')}`)
     check('a multi-part round is bracketed by its first and last span',
@@ -160,7 +160,7 @@ closed:
     { t: at('09:30'), ev: 'void', of: { ev: 'test-run', t: at('09:10') } },
   ])
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '4', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '4', '--dry-run'])
     check('renderer warns when one void matches more than one event', r.code === 0 && r.out.includes('matches 2 events'), `exit ${r.code}: ${r.out.split('\n').find(l => l.includes('void')) ?? r.out.trim().slice(0, 200)}`)
     check('every event the void matched is dropped', r.out.includes('"invocations": 0'), line(r.out, 'invocations'))
   }
@@ -172,16 +172,16 @@ closed:
   ])
   const metricsPath = join(dir, 'metrics.jsonl')
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '5', '--no-index'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '5', '--no-index'])
     check('renderer refuses to append for a round that is not resolved', r.code === 1 && r.out.includes('--in-progress'), `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the refused append wrote no metrics line', !existsSync(metricsPath), 'metrics.jsonl exists')
   }
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '5', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '5', '--dry-run'])
     check('renderer still dry-runs a round that is not resolved', r.code === 0, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
   }
   {
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '5', '--in-progress', '--no-index'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '5', '--in-progress', '--no-index'])
     const written = existsSync(metricsPath) ? readFileSync(metricsPath, 'utf8').trim().split('\n') : []
     check('--in-progress appends the line anyway', r.code === 0 && written.length === 1, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('the appended line is this round\'s fix-round line', written.length === 1 && JSON.parse(written[0]).type === 'fix-round' && JSON.parse(written[0]).round === 5, written.join(' | '))
@@ -190,14 +190,14 @@ closed:
   wl([...mislabel, voidEvent])
   {
     const before = readFileSync(metricsPath, 'utf8').trim().split('\n').length
-    const r = run('render-records.mjs', ['--root', T, target, '--round', '8', '--no-index'])
+    const r = run('records/render-records.mjs', ['--root', T, target, '--round', '8', '--no-index'])
     const written = readFileSync(metricsPath, 'utf8').trim().split('\n')
     check('renderer appends the line at hand-back for a resolved round with no flag',
       r.code === 0 && written.length === before + 1, `exit ${r.code}: ${written.length} line(s), was ${before}: ${r.out.trim().slice(0, 200)}`)
     const appended = written.length ? JSON.parse(written[written.length - 1]) : {}
     check('the hand-back line carries this round\'s number and span-derived runtime',
       appended.type === 'fix-round' && appended.round === 8 && appended.runtime?.active_s === 1440, JSON.stringify(appended.runtime ?? appended))
-    const again = run('render-records.mjs', ['--root', T, target, '--round', '8', '--no-index'])
+    const again = run('records/render-records.mjs', ['--root', T, target, '--round', '8', '--no-index'])
     check('a second hand-back render refuses rather than duplicating the line',
       again.code === 1 && readFileSync(metricsPath, 'utf8').trim().split('\n').length === written.length, `exit ${again.code}: ${again.out.trim().slice(0, 200)}`)
   }
@@ -256,7 +256,7 @@ commit: abc1234
   write('920-open-round', 'worklog.jsonl', worklog(['PPW-9201', 'PPW-9202', 'PPW-9203']))
   write('920-open-round', 'resolution-v1.md', resolution('in-progress', null))
   {
-    const r = run('render-records.mjs', ['--root', T, '920-open-round', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, '920-open-round', '--dry-run'])
     check('renderer exits 0 on an in-progress round', r.code === 0, `exit ${r.code}: ${r.out.trim().slice(0, 200)}`)
     check('renderer reads an empty fixed_commit as null', r.out.includes('"fixed_commit": null'),
       r.out.split('\n').find(l => l.includes('fixed_commit')) ?? r.out.trim().slice(0, 200))
@@ -273,7 +273,7 @@ commit: abc1234
   write('920-open-round', 'worklog.jsonl', worklog(2))
   write('920-open-round', 'resolution-v1.md', resolution('resolved', 'def5678'))
   {
-    const r = run('render-records.mjs', ['--root', T, '920-open-round', '--dry-run'])
+    const r = run('records/render-records.mjs', ['--root', T, '920-open-round', '--dry-run'])
     check('renderer still reads a filled fixed_commit', r.out.includes('"fixed_commit": "def5678"'),
       r.out.split('\n').find(l => l.includes('fixed_commit')) ?? r.out.trim().slice(0, 200))
     check('renderer still counts pre_cleared given as a number', r.out.includes('"pre_cleared_consumed": 2'),

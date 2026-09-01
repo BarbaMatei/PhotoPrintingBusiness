@@ -27,7 +27,7 @@ const target = '960-run-scoped-target'
 
 {
   const passDotnet = "node -e \"console.log('Passed! - Failed: 0, Passed: 5, Skipped: 1, Total: 6')\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Bar', '--cmd', passDotnet])
   check('a passing dotnet-style command exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   const ev = lastEvent(T, target)
@@ -39,7 +39,7 @@ const target = '960-run-scoped-target'
 }
 {
   const failDotnet = "node -e \"console.log('Failed! - Failed: 2, Passed: 3, Skipped: 0, Total: 5'); process.exit(1)\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'red', '--filter', 'Foo.Baz', '--cmd', failDotnet])
   check('a failing command exits non-zero (the runner\'s own code)', r.code === 1, `exit ${r.code}: ${r.out.trim()}`)
   const ev = lastEvent(T, target)
@@ -49,7 +49,7 @@ const target = '960-run-scoped-target'
 }
 {
   const unparsable = "node -e \"console.log('nothing of note here')\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'baseline', '--filter', 'Foo.Qux', '--cmd', unparsable])
   check('unparsable output still exits with the runner\'s own code', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   const ev = lastEvent(T, target)
@@ -58,7 +58,7 @@ const target = '960-run-scoped-target'
 }
 {
   const passVitest = "node -e \"console.log('Test Files  1 passed (1)'); console.log(' Tests  1 failed | 5 passed (6)')\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'final', '--ui', '--include', 'WidgetComponent', '--cmd', passVitest])
   check('a vitest-style summary exits with the runner\'s own code', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   const ev = lastEvent(T, target)
@@ -66,7 +66,7 @@ const target = '960-run-scoped-target'
     !!ev && ev.kind === 'final' && ev.include === 'WidgetComponent' && ev.passed === 5 && ev.failed === 1, JSON.stringify(ev))
 
   const allPassVitest = "node -e \"console.log('Tests  6 passed (6)')\""
-  const r2 = run('run-scoped-tests.mjs',
+  const r2 = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'final', '--ui', '--include', 'WidgetComponent', '--cmd', allPassVitest])
   const ev2 = lastEvent(T, target)
   check('a vitest summary with no failed group defaults failed to 0, not null',
@@ -80,7 +80,7 @@ const target = '960-run-scoped-target'
     const marker = join(T, 'lock-marker.txt')
     try { unlinkSync(marker) } catch { /* not created yet */ }
     const cmd = `node -e "require('fs').writeFileSync(${JSON.stringify(marker)},'ran')"`
-    const r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Locked', '--cmd', cmd])
+    const r = run('fix/run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Locked', '--cmd', cmd])
     check('a live lock holder makes the run exit 3', r.code === 3, `exit ${r.code}: ${r.out.trim()}`)
     check('the exit-3 message names the holder pid and the machine-wide rule',
       r.out.includes(`another test process is running (pid ${process.pid}) — the machine takes one at a time`), r.out.trim())
@@ -107,7 +107,7 @@ const target = '960-run-scoped-target'
     process.env.RST_LOCK_PATH = LOCK_PATH
     process.env.RST_FOREIGN_PAYLOAD = foreignPayload
     const stealMidRun = 'node -e "require(\'fs\').writeFileSync(process.env.RST_LOCK_PATH, process.env.RST_FOREIGN_PAYLOAD); process.exit(0)"'
-    const r = run('run-scoped-tests.mjs',
+    const r = run('fix/run-scoped-tests.mjs',
       ['--root', T, target, '--kind', 'green', '--filter', 'Foo.MidRunSteal', '--cmd', stealMidRun])
     check('the wrapper still exits with its own command\'s code after the lock is swapped mid-run', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
     const afterExists = existsSync(LOCK_PATH)
@@ -125,7 +125,7 @@ const target = '960-run-scoped-target'
   try {
     writeFileSync(LOCK_PATH, JSON.stringify({ pid: 999999, started: new Date().toISOString() }), { flag: 'wx' })
     const passDotnet = "node -e \"console.log('Passed! - Failed: 0, Passed: 1')\""
-    const r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Stolen', '--cmd', passDotnet])
+    const r = run('fix/run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Stolen', '--cmd', passDotnet])
     check('a dead pid\'s stale lock is stolen and the run proceeds', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
     check('the lock is removed after the stolen run completes', !existsSync(LOCK_PATH), 'lock file still present')
   } finally {
@@ -134,13 +134,13 @@ const target = '960-run-scoped-target'
 }
 {
   const passDotnet = "node -e \"console.log('Passed! - Failed: 0, Passed: 1')\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'green', '--filter', 'Foo.DryRun', '--cmd', passDotnet, '--dry-run'])
   check('--dry-run exits 0 and prints the command without running it', r.code === 0 && r.out.trim() === passDotnet, r.out.trim())
   check('--dry-run never touches the lock', !existsSync(LOCK_PATH), 'lock file present after a dry run')
 }
 {
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'green', '--ui', '--include', 'Widget', '--dry-run'])
   check('the default UI command has no single quotes (cmd.exe would not strip them)', r.code === 0 && !r.out.includes("'"), r.out.trim())
   check('the default UI command substitutes the include fragment into the glob', r.out.includes('**/Widget*.spec.ts'), r.out.trim())
@@ -148,29 +148,29 @@ const target = '960-run-scoped-target'
 {
   const before = lastEvent(T, target)
   const passDotnet = "node -e \"console.log('Passed! - Failed: 0, Passed: 9')\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'green', '--filter', 'Foo.NoEvents', '--cmd', passDotnet, '--no-events'])
   check('--no-events still runs and exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('--no-events suppresses the worklog stamp', JSON.stringify(lastEvent(T, target)) === JSON.stringify(before), 'a new event was appended despite --no-events')
 }
 {
   const passDotnet = "node -e \"console.log('Passed! - Failed: 0, Passed: 2')\""
-  const r = run('run-scoped-tests.mjs',
+  const r = run('fix/run-scoped-tests.mjs',
     ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Meta', '--cluster', 'c3', '--round', '2', '--note', 'triage note', '--cmd', passDotnet])
   const ev = lastEvent(T, target)
   check('--cluster, --round and --note pass through to the stamped event',
     r.code === 0 && !!ev && ev.cluster === 'c3' && ev.round === 2 && ev.note === 'triage note', JSON.stringify(ev))
 }
 {
-  let r = run('run-scoped-tests.mjs', ['--root', T, '--kind', 'green', '--filter', 'x'])
+  let r = run('fix/run-scoped-tests.mjs', ['--root', T, '--kind', 'green', '--filter', 'x'])
   check('missing <target> is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
-  r = run('run-scoped-tests.mjs', ['--root', T, target, '--filter', 'x'])
+  r = run('fix/run-scoped-tests.mjs', ['--root', T, target, '--filter', 'x'])
   check('missing --kind is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
-  r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green'])
+  r = run('fix/run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green'])
   check('missing --filter (api mode, no --cmd) is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
-  r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--ui'])
+  r = run('fix/run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--ui'])
   check('missing --include (ui mode, no --cmd) is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
-  r = run('run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--cmd', 'node -e "process.exit(0)"'])
+  r = run('fix/run-scoped-tests.mjs', ['--root', T, target, '--kind', 'green', '--cmd', 'node -e "process.exit(0)"'])
   check('missing --filter is a usage error even when --cmd is given (every stamp must carry the field)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
 }
 

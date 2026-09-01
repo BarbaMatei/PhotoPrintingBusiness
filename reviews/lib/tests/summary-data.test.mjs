@@ -42,7 +42,7 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
   ]))
 
   {
-    const r = run('summary-data.mjs', ['--root', T, target, '2'])
+    const r = run('review/summary-data.mjs', ['--root', T, target, '2'])
     check('exits 0 for a pass with a metrics line', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
     check('reports the 6 lenses this scoped pass did not run, in manifest order',
       r.out.includes('- Owed manifest lenses: security, requirements, quality, input-validation, observability, race'), r.out.trim())
@@ -55,7 +55,7 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
     check('backlog filings sum new low + cleanup (2+1)', r.out.includes('- 3 new low/cleanup findings filed to backlog automatically'), r.out.trim())
   }
   {
-    const r = run('summary-data.mjs', ['--root', T, target, '1'])
+    const r = run('review/summary-data.mjs', ['--root', T, target, '1'])
     check('exits 0 for the earlier pass', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
     check('a full-manifest pass reports no owed lenses', !r.out.includes('Owed manifest lenses'), r.out.trim())
     check('its trend stops at itself', r.out.includes('- v1: 1+2') && !r.out.includes('v2:'), r.out.trim())
@@ -85,13 +85,13 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
   ]))
 
   {
-    const r = run('summary-data.mjs', ['--root', T, target, '5'])
+    const r = run('review/summary-data.mjs', ['--root', T, target, '5'])
     check('a delta-discovery pass gets the cap reminder', r.out.includes('- This pass type (delta-discovery) cannot certify.'), r.out.trim())
     check('a delta-discovery pass still counts toward the trend', r.out.includes('- v5: 0+0'), r.out.trim())
     check('owed lenses are still reported for a scoped pass type', r.out.includes('Owed manifest lenses:') && r.out.includes('race'), r.out.trim())
   }
   {
-    const r = run('summary-data.mjs', ['--root', T, target, '6'])
+    const r = run('review/summary-data.mjs', ['--root', T, target, '6'])
     check('a verification pass gets the cap reminder', r.out.includes('- This pass type (verification) cannot certify.'), r.out.trim())
     check('verification is not a discovery-type line, so it never gets its own trend entry', !r.out.includes('v6:'), r.out.trim())
     check("the earlier delta-discovery pass's trend entry still shows through", r.out.includes('- v5: 0+0'), r.out.trim())
@@ -129,7 +129,7 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
     { target, date: '2026-08-21', correction_for: { pass: 7, field: 'new_findings' }, note: 'test-only correction, must not be picked up as a pass line' },
   ]))
 
-  const r = run('summary-data.mjs', ['--root', T, target, '7'])
+  const r = run('review/summary-data.mjs', ['--root', T, target, '7'])
   check('exits 0 for a paired pass', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('owed lenses are the manifest minus the UNION of A and B — "requirements" (A-only) and "quality" (B-only) both count as run',
     r.out.includes('- Owed manifest lenses: input-validation, observability, race, frontend-ux'), r.out.trim())
@@ -154,7 +154,7 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
       lenses: ['correctness', 'security', 'requirements', 'quality', 'tests-coverage', 'completeness-critic', 'db-parity', 'input-validation', 'observability', 'race', 'frontend-ux'],
       new_findings: { high: 2, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
   ]))
-  const r = run('summary-data.mjs', ['--root', T, target, '1'])
+  const r = run('review/summary-data.mjs', ['--root', T, target, '1'])
   check('an archived target is found via the archive fallback', r.code === 0 && r.out.includes('- v1: 2+0'), `exit ${r.code}: ${r.out.trim()}`)
   rmSync(T, { recursive: true, force: true })
 }
@@ -170,20 +170,20 @@ const jsonl = lines => lines.map(l => JSON.stringify(l)).join('\n') + '\n'
   ]))
 
   {
-    const r = run('summary-data.mjs', ['--root', T, target, '99'])
+    const r = run('review/summary-data.mjs', ['--root', T, target, '99'])
     check('exits 2 when the requested pass has no metrics line', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
     check('prints the usage line', r.out.includes('usage: node reviews/lib/summary-data.mjs'), r.out.trim())
   }
   {
-    const r = run('summary-data.mjs', ['--root', T])
+    const r = run('review/summary-data.mjs', ['--root', T])
     check('exits 2 with no target/pass arguments at all', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
   }
   {
-    const r = run('summary-data.mjs', ['--root', T, target, 'not-a-number'])
+    const r = run('review/summary-data.mjs', ['--root', T, target, 'not-a-number'])
     check('exits 2 when the pass argument is not numeric', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
   }
   {
-    const r = run('summary-data.mjs', ['--root', T, 'no-such-target', '1'])
+    const r = run('review/summary-data.mjs', ['--root', T, 'no-such-target', '1'])
     check('exits 2 when the target has no metrics.jsonl at all', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
   }
   rmSync(T, { recursive: true, force: true })

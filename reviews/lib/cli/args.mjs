@@ -4,13 +4,19 @@
 // given a value, another turns unknown `--<key> <value>` pairs into worklog fields, a third lets
 // the last positional win. A shared flag parser would have to reproduce all three, so it does not
 // exist: takeRoot runs first and each command's own loop reads what is left.
-import { join, dirname } from 'node:path'
+import { join, dirname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// A lib script lives at <repo>/reviews/lib/<name>.mjs, so the repo root is two levels up from it;
-// an explicit --root wins. Pass import.meta.url from the script itself, never from a module.
-export const repoRoot = (importMetaUrl, overrideRoot) =>
-  overrideRoot || join(dirname(fileURLToPath(importMetaUrl)), '..', '..')
+// A script lives somewhere under <repo>/reviews/lib/, at whatever depth its system folder puts it,
+// so the root is the path above that marker rather than a fixed number of levels up; an explicit
+// --root wins. Pass import.meta.url from the script itself, never from a module.
+const MARKER = `${sep}reviews${sep}lib`
+export const repoRoot = (importMetaUrl, overrideRoot) => {
+  if (overrideRoot) return overrideRoot
+  const dir = dirname(fileURLToPath(importMetaUrl))
+  const at = dir.lastIndexOf(MARKER)
+  return at === -1 ? join(dir, '..', '..') : dir.slice(0, at)
+}
 
 // { root, rest }: `--root` and its value removed, every other argument kept in order. A trailing
 // `--root` with no value reads as no root, so the caller falls back to the derived one.

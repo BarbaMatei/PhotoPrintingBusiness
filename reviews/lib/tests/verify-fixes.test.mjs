@@ -33,7 +33,7 @@ import { spawnSync } from 'node:child_process'
     `---\ntype: resolution\ntarget: 950-verify-target\nversion: 1\nanswers: review-v1.md\nstatus: resolved\nfixed_commit: ${sha}\n---\n\n## Findings\n\n| ID | Status | Commit | Note |\n|---|---|---|---|\n| PPW-9501 | fixed | \`${sha}\` | fixture fix |\n`)
   g('add', '.'); g('commit', '-qm', 'resolution')
 
-  const verify = tpl => run('verify-fixes.mjs',
+  const verify = tpl => run('verify/verify-fixes.mjs',
     ['--root', T, '950-verify-target', '--no-events', '--test-cmd-api', tpl])
 
   // A test that names its failure: the only shape that counts as red.

@@ -2,8 +2,8 @@
 // renders today, each marked block must line up with the data behind it, the link scan must fail on
 // a link nobody has tolerated, and a hand edit inside a generated block must be caught.
 //
-// The mutation test runs against a throwaway copy of the marked files under --root: the live tree is
-// never written by a test, because the pre-commit hook runs this suite.
+// The mutation test runs against a throwaway copy of cli/docs-blocks.mjs's marked-file set under
+// --root: the live tree is never written by a test, because the pre-commit hook runs this suite.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only docs-sync
 import { check, run } from './lib.mjs'
@@ -14,16 +14,7 @@ import { REVIEWS, REPO, AREAS, CAP_ROWS, CORE_LENSES, ADDED_LENSES, FIXER_EVENTS
 import { V2_FIELDS, V3_FIX_FIELDS } from '../records/validate.mjs'
 import { ROWS } from '../drive/rows.mjs'
 import { GATE_DOCS } from '../drive/gates.mjs'
-
-// Every file that carries generated blocks, repo-relative.
-const MARKED = [
-  'reviews/README.md',
-  'reviews/rules/doc-contracts.md',
-  'reviews/rules/metrics-schema.md',
-  'reviews/runbooks/runbook-discovery.md',
-  '.claude/skills/fix-review/SKILL.md',
-  '.claude/skills/loop-driver/SKILL.md',
-]
+import { MARKED_FILES } from '../cli/docs-blocks.mjs'
 // Broken links the records carry today, each with an owner outside this dispatch's reach: the two
 // `<target>` paths are deliberate placeholders in a planning note, the two v13 files were never
 // written for the pass their index rows name. A fifth broken link fails this test.
@@ -121,7 +112,7 @@ for (const [file, name, expected] of [
 {
   const root = mkdtempSync(join(tmpdir(), 'docs-sync-'))
   try {
-    for (const rel of MARKED) {
+    for (const rel of MARKED_FILES) {
       const dest = join(root, rel)
       mkdirSync(dirname(dest), { recursive: true })
       writeFileSync(dest, readFileSync(join(REPO, rel), 'utf8'))

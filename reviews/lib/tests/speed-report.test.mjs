@@ -35,13 +35,13 @@ function rootWith(worklog, metrics, target = TARGET) {
   return T
 }
 const jsonOf = r => { try { return JSON.parse(r.out) } catch { return null } }
-const reportOf = (T, ...args) => jsonOf(run('speed-report.mjs', ['--root', T, TARGET, ...args, '--json']))
+const reportOf = (T, ...args) => jsonOf(run('measure/speed-report.mjs', ['--root', T, TARGET, ...args, '--json']))
 const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
 
 // ---------- the frozen baseline: every number the day currently computes to ----------
 {
   const T = rootWith(fixtureLines('worklog.jsonl'), fixtureLines('metrics.jsonl'))
-  const r = run('speed-report.mjs', ['--root', T, TARGET, '--day', DAY, '--json'])
+  const r = run('measure/speed-report.mjs', ['--root', T, TARGET, '--day', DAY, '--json'])
   check('frozen baseline exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   const j = jsonOf(r)
   check('frozen baseline emits parseable JSON', j != null, r.out.slice(0, 400))
@@ -83,7 +83,7 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
   check('the unopened gate-closed is named with its reason truncated', /gate-closed at 2026-08-21T12:35:27\+03:00 \(reason owner ruled the 4 parked items and authorised the push: P…\) closes nothing/.test(notes), notes)
 
   // ---------- --json round-trips: the text report prints the same numbers ----------
-  const txt = run('speed-report.mjs', ['--root', T, TARGET, '--day', DAY])
+  const txt = run('measure/speed-report.mjs', ['--root', T, TARGET, '--day', DAY])
   check('the text report exits 0', txt.code === 0, `exit ${txt.code}: ${txt.out.trim()}`)
   check('the text report prints the span', txt.out.includes('span 763.4 min'), txt.out.split('\n')[1])
   check('the text report prints the buckets', txt.out.includes('fix-round work     262.1 min') && txt.out.includes('records+gates      201.7 min'), txt.out)
@@ -262,44 +262,44 @@ const within = (v, lo, hi) => typeof v === 'number' && v >= lo && v <= hi
 // ---------- refusals ----------
 {
   const T = rootWith([{ t: '2019-05-01T09:00:00+03:00', ev: 'note', text: 'x' }], null)
-  const bad = run('speed-report.mjs', ['--root', T, 'no-such-target'])
+  const bad = run('measure/speed-report.mjs', ['--root', T, 'no-such-target'])
   check('an unknown target exits 1', bad.code === 1 && /no reviews\/no-such-target\//.test(bad.out), `exit ${bad.code}: ${bad.out.trim()}`)
-  const badDay = run('speed-report.mjs', ['--root', T, TARGET, '--day', 'yesterday'])
+  const badDay = run('measure/speed-report.mjs', ['--root', T, TARGET, '--day', 'yesterday'])
   check('a malformed --day exits 1', badDay.code === 1 && /--day "yesterday"/.test(badDay.out), `exit ${badDay.code}: ${badDay.out.trim()}`)
-  const emptyDay = run('speed-report.mjs', ['--root', T, TARGET, '--day', '2019-05-02'])
+  const emptyDay = run('measure/speed-report.mjs', ['--root', T, TARGET, '--day', '2019-05-02'])
   check('a --day with no events exits 1', emptyDay.code === 1 && /no events on 2019-05-02/.test(emptyDay.out), `exit ${emptyDay.code}: ${emptyDay.out.trim()}`)
-  const dayNoValue = run('speed-report.mjs', ['--root', T, TARGET, '--day'])
+  const dayNoValue = run('measure/speed-report.mjs', ['--root', T, TARGET, '--day'])
   check('--day with no value exits 1', dayNoValue.code === 1 && /--day needs a value/.test(dayNoValue.out), `exit ${dayNoValue.code}: ${dayNoValue.out.trim()}`)
-  const rootNoValue = run('speed-report.mjs', [TARGET, '--root', '--json'])
+  const rootNoValue = run('measure/speed-report.mjs', [TARGET, '--root', '--json'])
   check('--root swallowing the next flag exits 1', rootNoValue.code === 1 && /--root needs a value/.test(rootNoValue.out), `exit ${rootNoValue.code}: ${rootNoValue.out.trim()}`)
-  check('no target exits 1 with the usage line', run('speed-report.mjs', ['--root', T]).code === 1)
+  check('no target exits 1 with the usage line', run('measure/speed-report.mjs', ['--root', T]).code === 1)
 
   const broken = rootWith(['{"t":"2019-05-01T09:00:00+03:00","ev":"round-start","round":1}', '{oops'], null)
-  const r = run('speed-report.mjs', ['--root', broken, TARGET])
+  const r = run('measure/speed-report.mjs', ['--root', broken, TARGET])
   check('an unparseable worklog line exits 1 naming the line', r.code === 1 && /worklog line 2/.test(r.out), `exit ${r.code}: ${r.out.trim()}`)
 
   const badTime = rootWith(['{"t":"the other day","ev":"round-start","round":1}'], null)
-  const r3 = run('speed-report.mjs', ['--root', badTime, TARGET])
+  const r3 = run('measure/speed-report.mjs', ['--root', badTime, TARGET])
   check('an unparseable timestamp exits 1', r3.code === 1 && /unparseable timestamp/.test(r3.out), `exit ${r3.code}: ${r3.out.trim()}`)
 
   const noLog = mkdtempSync(join(tmpdir(), 'speed-report-'))
   mkdirSync(join(noLog, 'reviews', TARGET), { recursive: true })
   roots.push(noLog)
-  const r2 = run('speed-report.mjs', ['--root', noLog, TARGET])
+  const r2 = run('measure/speed-report.mjs', ['--root', noLog, TARGET])
   check('a target with no worklog exits 1', r2.code === 1 && /worklog\.jsonl/.test(r2.out), `exit ${r2.code}: ${r2.out.trim()}`)
 
-  const sinceNoValue = run('speed-report.mjs', ['--disapprovals', '--root', T, '--since'])
+  const sinceNoValue = run('measure/speed-report.mjs', ['--disapprovals', '--root', T, '--since'])
   check('--since with no value exits 1', sinceNoValue.code === 1 && /--since needs a value/.test(sinceNoValue.out), `exit ${sinceNoValue.code}: ${sinceNoValue.out.trim()}`)
-  const sinceAlone = run('speed-report.mjs', ['--root', T, TARGET, '--since', '2019-05-01'])
+  const sinceAlone = run('measure/speed-report.mjs', ['--root', T, TARGET, '--since', '2019-05-01'])
   check('--since without --disapprovals exits 1', sinceAlone.code === 1 && /--since applies to --disapprovals only/.test(sinceAlone.out), `exit ${sinceAlone.code}: ${sinceAlone.out.trim()}`)
-  const minedJson = run('speed-report.mjs', ['--disapprovals', '--root', T, '--json'])
+  const minedJson = run('measure/speed-report.mjs', ['--disapprovals', '--root', T, '--json'])
   check('--disapprovals refuses the measurement flags instead of ignoring them', minedJson.code === 1 && /--day and --json do not apply/.test(minedJson.out), `exit ${minedJson.code}: ${minedJson.out.trim()}`)
 }
 
 // ---------- --disapprovals (the lint miner): detection, since-filtering, summary ----------
 // Fixture dates sit in 2019, far from the real wall-clock date, so a --since default that
 // wrongly used "now" instead of "the newest event seen" would drop everything and fail these.
-const mined = (T, ...args) => run('speed-report.mjs', ['--disapprovals', '--root', T, ...args])
+const mined = (T, ...args) => run('measure/speed-report.mjs', ['--disapprovals', '--root', T, ...args])
 const minerRoot = tag => {
   const T = mkdtempSync(join(tmpdir(), `speed-report-${tag}-`))
   roots.push(T)

@@ -12,15 +12,15 @@ import { versions } from '../model/target.mjs'
 
 // ---------- records auditor: smoke run against the real repo ----------
 {
-  const r = run('records-auditor.mjs', ['044-045-observability'])
+  const r = run('records/records-auditor.mjs', ['044-045-observability'])
   check('auditor exits 0 on 044-045-observability', r.code === 0, `exit ${r.code}: ${r.out.trim().split('\n').slice(-3).join(' | ')}`)
 }
 {
-  const r = run('records-auditor.mjs', ['043-cloud-storage-provider'])
+  const r = run('records/records-auditor.mjs', ['043-cloud-storage-provider'])
   check('auditor finds the track record for a certified target', !r.out.includes('track-record.md is missing'), r.out.split('\n').find(l => l.includes('track-record')) ?? firstLine(r.out))
 }
 {
-  const r = run('records-auditor.mjs', ['--root', GOOD_ROOT])
+  const r = run('records/records-auditor.mjs', ['--root', GOOD_ROOT])
   check('auditor reports a cross-target duplicate id', r.out.includes('duplicate id PPW-9001'), 'no duplicate-id error in the output')
   check('auditor accepts a well-formed verification findings[] with lineage', !r.out.includes('908-verification-lineage metrics line 2 findings['), r.out.split('\n').find(l => l.includes('line 2 findings[')) ?? '')
   check('auditor rejects a malformed verification findings[] entry', r.out.includes('908-verification-lineage metrics line 3 findings[') && r.out.includes('d must be') && r.out.includes('sev_delta malformed'), 'no shape error for the malformed lineage entry')
@@ -143,7 +143,7 @@ closed: 2026-08-21
   const WARNING = `${target}: resolution-v1 resolved, no fix-round line yet — unit records pending`
 
   {
-    const r = run('records-auditor.mjs', ['--root', T, target])
+    const r = run('records/records-auditor.mjs', ['--root', T, target])
     check('auditor tolerates a resolved resolution with no fix-round line yet', r.code === 0 && r.out.includes(WARNING), `exit ${r.code}: ${r.out.trim()}`)
     check('void and verify-result worklog events read as valid shapes', !r.out.includes('worklog line'), r.out.split('\n').find(l => l.includes('worklog line')) ?? '')
   }
@@ -158,7 +158,7 @@ closed: 2026-08-21
   }
   writeFileSync(join(dir, 'metrics.jsonl'), JSON.stringify(fixRoundLine) + '\n')
   {
-    const r = run('records-auditor.mjs', ['--root', T, target])
+    const r = run('records/records-auditor.mjs', ['--root', T, target])
     check('once the fix-round line lands the warning is gone and the auditor stays exit 0', r.code === 0 && !r.out.includes('unit records pending'), `exit ${r.code}: ${r.out.trim()}`)
   }
 
@@ -187,7 +187,7 @@ closed: 2026-07-15
 | PPW-9231 | fixed | \`abc1234\` | done |
 `)
   {
-    const r = run('records-auditor.mjs', ['--root', T, legacyTarget])
+    const r = run('records/records-auditor.mjs', ['--root', T, legacyTarget])
     check('a resolution closed before V3_CUTOFF stays silent even with no fix-round line', r.code === 0 && !r.out.includes('unit records pending'), `exit ${r.code}: ${r.out.trim()}`)
   }
 
@@ -195,7 +195,7 @@ closed: 2026-07-15
 }
 
 {
-  const r = run('records-auditor.mjs', ['--root', GOOD_ROOT])
+  const r = run('records/records-auditor.mjs', ['--root', GOOD_ROOT])
   check('auditor accepts seed_round and area lineage keys when well-formed', !r.out.includes('line 2 findings[0]: seed_round') && !r.out.includes('line 2 findings[0]: area'), r.out.split('\n').find(l => l.includes('line 2 findings[0]')) ?? '')
   check('auditor rejects a non-numeric seed_round and an off-vocabulary area', r.out.includes('seed_round must be a round number or null') && r.out.includes('area "checkout" — one of the twelve backlog area words only'), 'no seed-lineage shape errors in the output')
 

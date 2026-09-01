@@ -31,26 +31,26 @@ const today = () => new Date().toISOString().slice(0, 10)
   const counterPath = join(T, 'reviews', 'state', 'id-counter')
   writeFileSync(counterPath, '5\n')
 
-  let r = run('mint-id.mjs', ['--root', T, 'mint', '--count', '3'])
+  let r = run('review/mint-id.mjs', ['--root', T, 'mint', '--count', '3'])
   check('mint exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('mint prints the PPW-<a>..PPW-<b> range', r.out.trim() === 'PPW-5..PPW-7', r.out.trim())
   check('mint writes the incremented counter back', readFileSync(counterPath, 'utf8') === '8\n', readFileSync(counterPath, 'utf8'))
 
-  r = run('mint-id.mjs', ['--root', T, 'mint', '--count', '1', '--dry-run'])
+  r = run('review/mint-id.mjs', ['--root', T, 'mint', '--count', '1', '--dry-run'])
   check('mint --dry-run exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('mint --dry-run prints the next single id as a range', r.out.trim() === 'PPW-8..PPW-8', r.out.trim())
   check('mint --dry-run leaves the counter untouched', readFileSync(counterPath, 'utf8') === '8\n', readFileSync(counterPath, 'utf8'))
 
   writeFileSync(counterPath, 'abc\n')
-  r = run('mint-id.mjs', ['--root', T, 'mint', '--count', '1'])
+  r = run('review/mint-id.mjs', ['--root', T, 'mint', '--count', '1'])
   check('mint refuses a non-numeric counter', r.code === 2 && r.out.includes('ERROR'), r.out.trim())
   check('mint leaves the garbage counter untouched', readFileSync(counterPath, 'utf8') === 'abc\n', readFileSync(counterPath, 'utf8'))
 
-  r = run('mint-id.mjs', ['--root', T, 'mint'])
+  r = run('review/mint-id.mjs', ['--root', T, 'mint'])
   check('mint refuses a missing --count', r.code === 2 && r.out.includes('ERROR'), r.out.trim())
 
   writeFileSync(counterPath, '12\r\n')
-  r = run('mint-id.mjs', ['--root', T, 'mint', '--count', '2'])
+  r = run('review/mint-id.mjs', ['--root', T, 'mint', '--count', '2'])
   check('mint parses a CRLF-terminated counter correctly', r.out.trim() === 'PPW-12..PPW-13', r.out.trim())
   check('mint writes a clean counter back after a CRLF-terminated input', readFileSync(counterPath, 'utf8') === '14\n', JSON.stringify(readFileSync(counterPath, 'utf8')))
 
@@ -64,7 +64,7 @@ const today = () => new Date().toISOString().slice(0, 10)
   const target = '960-fixture-target'
   const ledgerPath = join(T, 'reviews', target, 'ledger.md')
 
-  let r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
+  let r = run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9601', '--sev', '🔴', '--title', 'Fixture defect one', '--file', 'Fixture.cs:10', '--pass', 'v1'])
   check('scaffold-ledger exits 0 creating a fresh ledger', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('scaffold-ledger creates ledger.md', existsSync(ledgerPath), ledgerPath)
@@ -81,7 +81,7 @@ const today = () => new Date().toISOString().slice(0, 10)
   check('exactly one blank line separates "## Details" from the first block',
     afterFirst.includes('## Details\n\n### PPW-9601 —') && !afterFirst.includes('## Details\n\n\n### PPW-9601'), afterFirst)
 
-  r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
+  r = run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9602', '--sev', '🟠', '--title', 'Fixture defect two', '--file', 'Fixture.cs:20', '--pass', 'v1'])
   check('scaffold-ledger exits 0 appending a second row', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   const afterSecond = readFileSync(ledgerPath, 'utf8')
@@ -90,12 +90,12 @@ const today = () => new Date().toISOString().slice(0, 10)
   check('exactly one blank line separates the first block from the second',
     afterSecond.includes('found by <fill in>\n\n### PPW-9602 —') && !afterSecond.includes('found by <fill in>\n\n\n### PPW-9602'), afterSecond)
 
-  r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
+  r = run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9601', '--sev', '🟡', '--title', 'Duplicate attempt', '--file', 'Fixture.cs:30', '--pass', 'v2'])
   check('scaffold-ledger refuses a duplicate id', r.code === 2 && r.out.includes('ERROR') && r.out.includes('PPW-9601'), r.out.trim())
   check('the ledger is unchanged after the refused duplicate', readFileSync(ledgerPath, 'utf8') === afterSecond, 'ledger.md changed on a refused duplicate')
 
-  r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
+  r = run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9603', '--sev', '⚪', '--title', 'Dry-run only', '--file', 'Fixture.cs:40', '--pass', 'v1', '--dry-run'])
   check('scaffold-ledger --dry-run exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('scaffold-ledger --dry-run writes nothing', readFileSync(ledgerPath, 'utf8') === afterSecond, 'ledger.md changed on a dry run')
@@ -127,7 +127,7 @@ const today = () => new Date().toISOString().slice(0, 10)
   const original = originalLF.replace(/\n/g, '\r\n')
   writeFileSync(ledgerPath, original)
 
-  const r = run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
+  const r = run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target,
     '--id', 'PPW-9621', '--sev', '🔴', '--title', 'New CRLF finding', '--file', 'New.cs:9', '--pass', 'v2'])
   check('scaffold-ledger exits 0 against a CRLF-terminated existing ledger', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
 
@@ -188,7 +188,7 @@ Fixture only.
   writeFileSync(join(dir, 'review-v1.md'), review)
   writeFileSync(join(dir, 'review-v2.md'), review.replace(/version: 1/, 'version: 2').replace(/Review v1/, 'Review v2'))
 
-  let r = run('mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '1'])
+  let r = run('review/mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '1'])
   check('scaffold-resolution exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   const resolutionPath = join(dir, 'resolution-v1.md')
   check('scaffold-resolution creates resolution-v1.md', existsSync(resolutionPath), resolutionPath)
@@ -208,20 +208,20 @@ Fixture only.
   check('scaffold-resolution includes the template\'s one-line-decision-title placeholder too, as its own heading line',
     !!decisionTitleHeading && resolutionLines.includes(decisionTitleHeading), decisionTitleHeading)
 
-  r = run('mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '1'])
+  r = run('review/mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '1'])
   check('scaffold-resolution refuses to overwrite an existing file', r.code === 2 && r.out.includes('ERROR'), r.out.trim())
   check('the existing resolution is unchanged after the refused overwrite', readFileSync(resolutionPath, 'utf8') === resolution, 'resolution-v1.md changed on a refused overwrite')
 
-  r = run('mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '2', '--dry-run'])
+  r = run('review/mint-id.mjs', ['--root', T, 'scaffold-resolution', target, '--version', '2', '--dry-run'])
   check('scaffold-resolution --dry-run exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('scaffold-resolution --dry-run writes nothing', !existsSync(join(dir, 'resolution-v2.md')), 'resolution-v2.md should not exist after a dry run')
 
   // doc-gate-clean in shape: a freshly scaffolded target's ledger + resolution carry no
   // heading or frontmatter violation, even though their still-"open" rows are legitimately
   // flagged for missing Decisions blocks until the fixer works through them.
-  run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target, '--id', 'PPW-9601', '--sev', '🔴', '--title', 'Fixture finding one', '--file', 'Fixture.cs:10', '--pass', 'v1'])
-  run('mint-id.mjs', ['--root', T, 'scaffold-ledger', target, '--id', 'PPW-9602', '--sev', '🔴', '--title', 'Fixture finding two', '--file', 'Fixture.cs:20', '--pass', 'v1'])
-  const gate = run('doc-gate.mjs', ['--root', T, target, '1'])
+  run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target, '--id', 'PPW-9601', '--sev', '🔴', '--title', 'Fixture finding one', '--file', 'Fixture.cs:10', '--pass', 'v1'])
+  run('review/mint-id.mjs', ['--root', T, 'scaffold-ledger', target, '--id', 'PPW-9602', '--sev', '🔴', '--title', 'Fixture finding two', '--file', 'Fixture.cs:20', '--pass', 'v1'])
+  const gate = run('records/doc-gate.mjs', ['--root', T, target, '1'])
   const shapeViolation = gate.out.split('\n').some(l => /(missing heading|frontmatter missing|no frontmatter block)/i.test(l) && /(resolution-v1\.md|ledger\.md)/.test(l))
   check('a scaffolded resolution + ledger raise no doc-gate heading or frontmatter violation', !shapeViolation, gate.out)
 

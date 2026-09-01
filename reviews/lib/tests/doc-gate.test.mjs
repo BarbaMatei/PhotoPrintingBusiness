@@ -8,14 +8,14 @@ import { tmpdir } from 'node:os'
 
 // ---------- doc-gate: the conforming target is clean ----------
 {
-  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '901-good-target', '1'])
+  const r = run('records/doc-gate.mjs', ['--root', GOOD_ROOT, '901-good-target', '1'])
   check('doc-gate exits 0 on the conforming target', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('doc-gate reports the conforming target clean, state checks included', r.out.includes('clean for 901-good-target v1 + state'), firstLine(r.out))
 }
 
 // ---------- doc-gate: every planted violation on the broken target ----------
 {
-  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '902-broken-target', '1'])
+  const r = run('records/doc-gate.mjs', ['--root', GOOD_ROOT, '902-broken-target', '1'])
   check('doc-gate exits 1 on the broken target', r.code === 1, `exit ${r.code}`)
   const expected = [
     'frontmatter missing "lenses-not-run:"',
@@ -77,7 +77,7 @@ ${filler}
 ${decisionsBody}
 `
   writeFileSync(join(dir, 'resolution-v1.md'), resolution(1, '### Some unrelated call (PPW-9999)\n\nNothing about PPW-9500 here.'))
-  const bad = run('doc-gate.mjs', ['--root', T, target, '1'])
+  const bad = run('records/doc-gate.mjs', ['--root', T, target, '1'])
   check('doc-gate fires when the only matching heading sits outside Decisions',
     bad.code === 1 && bad.out.includes('PPW-9500 status deferred has no Decisions block — every non-fixed status needs its rationale (doc-contracts.md)'),
     `exit ${bad.code}: ${bad.out.trim()}`)
@@ -85,7 +85,7 @@ ${decisionsBody}
     !bad.out.includes('cap is 15'), bad.out.trim())
 
   writeFileSync(join(dir, 'resolution-v2.md'), resolution(2, '### Queued until the rewrite lands (PPW-9500)\n\nNot a defect this round can close.'))
-  const good = run('doc-gate.mjs', ['--root', T, target, '2'])
+  const good = run('records/doc-gate.mjs', ['--root', T, target, '2'])
   check('doc-gate is clean once the real Decisions section names the id, decoy heading notwithstanding',
     good.code === 0, `exit ${good.code}: ${good.out.trim()}`)
 
@@ -94,7 +94,7 @@ ${decisionsBody}
 
 // ---------- doc-gate target mode: state files lint in the same run, keyed to the target ----------
 {
-  const r = run('doc-gate.mjs', ['--root', BAD_STATE_ROOT, '901-good-target', '1'])
+  const r = run('records/doc-gate.mjs', ['--root', BAD_STATE_ROOT, '901-good-target', '1'])
   check('doc-gate exits 1 when the state files it also lints in target mode are broken', r.code === 1, `exit ${r.code}`)
   check('doc-gate labels the combined run "<target> v<pass> + state"', r.out.includes('violation(s) for 901-good-target v1 + state'), firstLine(r.out))
   const expected = [
@@ -111,7 +111,7 @@ ${decisionsBody}
   mkdirSync(join(T, 'reviews', '999-no-state-dir'), { recursive: true })
   writeFileSync(join(T, 'reviews', '999-no-state-dir', 'ledger.md'),
     '---\ntype: review-ledger\ntarget: 999-no-state-dir\nupdated: 2026-08-22\n---\n\n# Ledger — 999-no-state-dir\n\n## Findings\n\n| ID | Sev | First seen | Title | File | Status | Affirmed |\n|---|---|---|---|---|---|---|\n')
-  const r = run('doc-gate.mjs', ['--root', T, '999-no-state-dir', '1'])
+  const r = run('records/doc-gate.mjs', ['--root', T, '999-no-state-dir', '1'])
   check('doc-gate exits 0 with no reviews/state dir present', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('doc-gate skips the state half silently, no "+ state" suffix and no state/ labels',
     r.out.includes('clean for 999-no-state-dir v1') && !r.out.includes('+ state') && !r.out.includes('state/'), r.out.trim())
@@ -120,12 +120,12 @@ ${decisionsBody}
 
 // ---------- doc-gate state mode ----------
 {
-  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, 'state'])
+  const r = run('records/doc-gate.mjs', ['--root', GOOD_ROOT, 'state'])
   check('doc-gate state exits 0 on the good state fixtures', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
   check('doc-gate state reports the good state fixtures clean', r.out.includes('clean for the state files'), firstLine(r.out))
 }
 {
-  const r = run('doc-gate.mjs', ['--root', BAD_STATE_ROOT, 'state'])
+  const r = run('records/doc-gate.mjs', ['--root', BAD_STATE_ROOT, 'state'])
   check('doc-gate state exits 1 on the bad state fixtures', r.code === 1, `exit ${r.code}`)
   const expected = [
     '4 cells — a row has exactly 5',
@@ -145,12 +145,12 @@ ${decisionsBody}
 
 // ---------- doc-gate: the V4 resolution shape (audit R1/R2, rounds closed >= 2026-08-28) ----------
 {
-  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '923-newshape', '1'])
+  const r = run('records/doc-gate.mjs', ['--root', GOOD_ROOT, '923-newshape', '1'])
   check('doc-gate accepts a post-cutoff resolution with a Protocol column and a quantified protocol block', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
 }
 
 {
-  const r = run('doc-gate.mjs', ['--root', GOOD_ROOT, '924-oldshape', '1'])
+  const r = run('records/doc-gate.mjs', ['--root', GOOD_ROOT, '924-oldshape', '1'])
   check('doc-gate refuses the retired Approach-check column after the cut-off', r.code === 1 && r.out.includes('Approach-check column — retired 2026-08-28'), r.out.trim())
   check('doc-gate requires the Protocol column after the cut-off', r.out.includes('no Protocol column'), r.out.trim())
   check('doc-gate refuses a protocol block with no quantified invariant', r.out.includes('protocol block "vague" states no quantified invariant'), r.out.trim())
