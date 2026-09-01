@@ -102,26 +102,26 @@ whether the 2026-07-22 fixer rules work; and an audit trail on synthesis severit
 
 ## v3 (2026-08-03): the fix-round line and the worklog
 
-Two additions; everything above still holds for pass lines. Lines dated on/after 2026-08-03
-are validated strictly against v3.
+Two additions; everything above still holds for pass lines. A live target's lines are validated
+strictly whatever their date, and `runtime` on a line dated before 2026-08-03 is refused — the
+split did not exist then.
 
 **The worklog** — `reviews/<target>/worklog.jsonl`, append-only, one JSON event per line,
 each with `t` (ISO timestamp) and `ev`. Written **at the moment events happen** by whoever
-drives them: the `/fix-review` skill during fix rounds (`round-start`, `triage-done`,
-`gate-open`/`gate-closed`, `protocol-written`, `check-dispatched`/`check-returned`, `test-run`,
-`finding`, `round-review-dispatched`/`-returned`, `test-audit-dispatched`/`-returned`,
-`round-end` — the per-cluster `micro-review-dispatched`/`-returned` pair was retired on
-2026-08-28 by the round-scope review; the stamper still accepts it so old logs stay
-readable), the loop-driver around passes
-(`pass-launch`, `pass-records-done`) and owner gates. It is the crash-safe evidence trail
-and the input `reviews/lib/render-records.mjs` computes runtime from.
+drives them: the `/fix-review` skill during a fix round (its event table names each one, rendered
+from the stamper's vocabulary — this file lists none of them, so the two can never disagree), the
+loop-driver around passes (`pass-launch`, `pass-records-done`) and owner gates. It is the
+crash-safe evidence trail and the input `reviews/lib/render-records.mjs` computes runtime from.
+
+The per-cluster `micro-review-dispatched`/`-returned` pair was **retired** on 2026-08-28 by the
+round-scope review: the stamper now refuses it, naming `round-review-*` instead, and it survives
+in logs written before that date, which every reader still counts.
 
 The **stamper** (`reviews/lib/wl.mjs`) is the only sanctioned way to append an event. It owns
-the timestamp, refuses an unknown event name, refuses an event missing a required field, and
-refuses a second `round-start` while a round is open. Its vocabulary carries the hand-back
-evidence events of the 2026-08-28 audit (`protocol-written`,
-`check-dispatched`/`check-returned` with `ids`, `round-review-dispatched`/`-returned`,
-`test-audit-dispatched`/`-returned`) and two events the renderer reads:
+the timestamp, refuses an event outside the vocabulary, refuses an event missing a required
+field, and refuses a second `round-start` while a round is open. Its vocabulary carries the
+hand-back evidence events of the 2026-08-28 audit (the worklog contract in doc-contracts.md
+lists them, generated from the same vocabulary) and two events the renderer reads:
 
 - `void` — `{"ev":"void","of":{...}}`. This is how a mis-stamped event is repaired; the log
   stays append-only. **Every reader drops the events `of` matches** — the stamper, the renderer,

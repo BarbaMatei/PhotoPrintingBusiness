@@ -26,6 +26,8 @@ export const STATUSES = [...OPEN_STATUSES, 'fixed', 'verified', 'wont-fix', 'def
 
 // The worklog event vocabulary and each event's required fields. `ids` marks the events whose
 // "ids" field must be a non-empty array of PPW-<n>; the stamper (wl.mjs) enforces both.
+// This list is what may be WRITTEN: a reader still meets retired events in old logs (wl.mjs
+// names them), so no reader validates an event against these keys.
 export const EVENTS = {
   'round-start': { required: ['round'] },
   'round-end': { required: ['round'] },
@@ -38,8 +40,6 @@ export const EVENTS = {
   'check-returned': { required: ['round', 'cluster', 'verdict'] },
   'test-run': { required: ['kind'] },
   finding: { required: ['id', 'status'] },
-  'micro-review-dispatched': { required: ['cluster'] },
-  'micro-review-returned': { required: ['cluster'] },
   'round-review-dispatched': { required: ['round'] },
   'round-review-returned': { required: ['round', 'found'] },
   'test-audit-dispatched': { required: ['round'] },

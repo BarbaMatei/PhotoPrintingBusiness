@@ -29,7 +29,9 @@ import * as shim from '../../vocab.mjs'
     STATUSES[0] === 'open' && STATUSES[1] === 'in-progress' && STATUSES[8] === 'backlog', STATUSES.join(','))
 
   const events = Object.keys(EVENTS)
-  check('the worklog vocabulary is 25 events', events.length === 25, String(events.length))
+  check('the writable worklog vocabulary is 23 events', events.length === 23, String(events.length))
+  check('the retired micro-review pair is out of the writable vocabulary',
+    !events.some(e => e.startsWith('micro-review')), events.join(','))
   check('round-start requires its round number',
     EVENTS['round-start'].required.join(',') === 'round', JSON.stringify(EVENTS['round-start']))
   check('gate-parked requires kind, default and reason',

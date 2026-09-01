@@ -34,7 +34,7 @@ import { tmpdir } from 'node:os'
     ['gate-parked', ['--kind', 'fixer-decision', '--default', 'deferred'], 'reason'],
     ['test-run', [], 'kind'],
     ['finding', ['--id', 'PPW-1'], 'status'],
-    ['micro-review-dispatched', [], 'cluster'],
+    ['round-review-returned', ['--round', '1'], 'found'],
     ['pass-launch', ['--pass', 'v1'], 'type'],
     ['pass-records-done', [], 'pass'],
     ['verify-result', ['--id', 'PPW-1'], 'verdict'],
@@ -45,6 +45,16 @@ import { tmpdir } from 'node:os'
     const rr = run('records/wl.mjs', ['--root', T, target, ev, ...args])
     check(`wl refuses ${ev} missing "${field}"`, rr.code === 1 && rr.out.includes('ERROR'), rr.out.trim())
     check(`wl appends nothing for ${ev} missing "${field}"`, lines().length === before, String(lines().length))
+  }
+
+  // The round-scope review replaced the per-cluster pair on 2026-08-28: the stamper refuses both
+  // by name, while every reader still counts them in a log written before then.
+  {
+    const before = lines().length
+    r = run('records/wl.mjs', ['--root', T, target, 'micro-review-dispatched', '--cluster', 'retry'])
+    check('wl refuses the retired micro-review-dispatched and names its replacement',
+      r.code === 1 && /was retired on 2026-08-28/.test(r.out) && /round-review-dispatched/.test(r.out) && lines().length === before,
+      r.out.trim())
   }
 
   r = run('records/wl.mjs', ['--root', T, target, 'test-run', '--kind', 'bogus'])
