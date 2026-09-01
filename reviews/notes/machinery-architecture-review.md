@@ -198,9 +198,9 @@ Confidence: H = evidence in this file, M = evidence but a live run could change 
 | Piece | System | Verdict | Evidence | Conf |
 |---|---|---|---|---|
 | `loop-driver/SKILL.md` (306) | Drive | keep; strip restated rules to citations | restates the queue rule (46-51), the close sequence (266-281), the unit sequence (124-151) | H |
-| `loop-driver/evals/evals.json` | Drive | provisional delete | references a fixture root `scratchpad/router-fixture` that no longer exists; last status 2026-07-30 | M |
+| `loop-driver/evals/evals.json` | Drive | **DONE** — rebuilt, not deleted (ruling 6) | the seven cases now run against `evals/fixtures/loop-states`, checked in beside the skill (eval 3 reads the live archived 015); the status block says REBUILT and UNRUN, and the "'until a gate' chaining stays off until … PASSED here" restriction is retired in favour of the 2026-08-20 unattended policy | H |
 | `fix-review/SKILL.md` (408) | Fix | keep; event table (102-112) generated from `wl.mjs` | the "sole owner of the fixer contract" — right home | H |
-| `fix-review/evals/*.json` | Fix | provisional delete | same staleness as above | M |
+| `fix-review/evals/*.json` | Fix | **DONE** — rebuilt, not deleted (ruling 6) | both cases run against `evals/fixtures/discount-module`, copied into a throwaway repository by `evals/init-run.mjs` because a fix round commits; the finding ids, the Findings-table shape and the mandatory worklog events are today's contract, and the trigger eval gained two rows | H |
 | `owner-summary/SKILL.md` | Review | keep; cite `summary-data.mjs` | never names the script that computes its section 2 | H |
 | `reconcile-findings/SKILL.md` + `overlap-ground-truth.md` | Review | keep; cite `mint-id.mjs` | the ground truth is the reconciler's trust gate | H |
 
@@ -220,7 +220,9 @@ Confidence: H = evidence in this file, M = evidence but a live run could change 
 | `archive/experiments/*` | Measure | keep | evidence for rationale.md | H |
 | `.githooks/pre-commit` | Enforce | keep; comment gate is repo policy, not machinery | runs doc-gate, the suite, logs overrides | H |
 
-Totals: 71 pieces · keep 52 · merge/split 14 · delete 5 (2 firm: `ledger-miner.mjs`, the `fix-links --apply` half; 3 provisional: two eval folders, the duplicate test blocks counted once).
+Totals: 71 pieces · keep 52 · merge/split 14 · delete 3 (`ledger-miner.mjs`, the `fix-links --apply`
+half, the duplicate test blocks counted once). The two eval folders this section first proposed
+deleting were rebuilt instead (ruling 6), so they count as keeps.
 
 ## 3. Duplication ledger
 
@@ -396,7 +398,7 @@ time has to come from.
 | Validating archives forever (`records-auditor.mjs:123`, V2/V3 tiers, `D<n>` ids, `LEGACY_TOP`) | ~90 lines of tolerance code; every full auditor run re-reads 5 archived targets | nothing live: the citation scan and id uniqueness (`records-auditor.mjs:494-514`) still need the archive ledgers, but not their metrics | stop validating archived `metrics.jsonl` and resolutions; keep the id-uniqueness scan over archive ledgers; then delete the V2/V3 tiers |
 | `ledger-miner.mjs` + prevention-sweep backfill (~150-250k tokens, approved 2026-08-10, never run) | dead script, a `paths.mjs` constant, a doc-contracts vocabulary entry, a table slot in `definition-of-done.md` | the prevention-sweep idea the owner liked | delete the script; keep the spec under `docs/superpowers/specs/`; rebuild from `records/` when the backfill is actually scheduled |
 | Citation-leak scan (`records-auditor.mjs:517-544`) | git grep over `src/` on every no-target auditor run | the count of finding-id citations in source comments (target 0, reached 2026-07-29) | move to the pre-commit hook's comment gate (Enforce), which already scans added comment lines; drop it from the auditor |
-| Skill eval folders (`loop-driver/evals`, `fix-review/evals`) | 156 lines referencing a fixture root that no longer exists | a record of the 2026-07-30 skill evaluation | **provisional** delete; archive the status lines into `self-driving-loop-design.md` first |
+| Skill eval folders (`loop-driver/evals`, `fix-review/evals`) | 156 lines referencing a fixture root that no longer exists | a record of the 2026-07-30 skill evaluation | **overtaken by ruling 6: rebuilt in 7b, not deleted.** The fixtures are checked in beside each skill, every case's setup and verify command line was executed against the current machinery, and the 2026-07-30 results stay in `../loop-driver-workspace/` as history the status blocks cite rather than claim |
 | `fix-links --apply` | 35 lines of one-off move logic | nothing (moves are done) | delete; keep the check inside `docs-sync` |
 
 ## 8. Migration order for 7b
@@ -415,6 +417,17 @@ so the count drops to 555 there and stays).
 9. Merge `gate-miner` into `speed-report`; delete `ledger-miner.mjs` and its constant/vocabulary entry (per ruling). Wire `summary-data.mjs` into `owner-summary` and `mint-id.mjs` into `reconcile-findings` (skill text only).
 10. **DONE (2026-09-01).** Files moved into the folders; the flat `reviews/lib/<name>.mjs` entry points keep today's command names **permanently** (see "Command surface"), pinned by `unit/shims.test.mjs`; `docs-sync --check` confirms every prose path. `integration.test.mjs` re-cut into five flow files under `tests/flows/` — named for what they drive, not for the loop stages this note first sketched, because the assertions cut across the stages. The `drive-states` fixture root landed (7 targets: 903, 904, 909, 913, 914, both 919-override-*). **The `drive-ledger` merge is refused as unimplementable:** each of those 14 targets is a full four-file target whose *ledger differs* (918 needs an open 🔴, 943 needs that same lineage settled), so no shared ledger with per-case metrics tails can serve them, and the CLIs take the target as a positional with no variant selector. Reducing that dir count needs a run-time fixture builder — a separate decision about checked-in vs generated fixtures.
 11. **DONE (2026-09-01).** Archive-validation scope per the archive ruling (see section 5's "Landed" note for the exact tolerance deleted); the wording judge narrowed to owner-facing prose per ruling 4; `micro-review-*` out of the stamper's vocabulary; the stale prose swept (`doc-contracts` archive sentences, `self-driving`'s assertion count and fixer-contract line, `discovery-review.wf.js`'s dead README citation, this section's own step 3 and section 3's snapshot caveat); the comment rule and commit style copied into `coding-standards.md` as their durable home, with `CLAUDE.md` left as it stands by controller ruling. The `class sidecar` doc-contracts entry and `paths.mjs DEFECT_CLASSES` went with the miner in step 9.
+
+12. **DONE (2026-09-01).** The two skills' eval fixtures rebuilt in-tree per ruling 6:
+    `loop-driver/evals/fixtures/loop-states` (five synthetic targets, one per router row the cases
+    exercise, plus the live archived 015 for the terminal case) and
+    `fix-review/evals/fixtures/discount-module` (a node project with a full review target, copied
+    into a throwaway repository by `init-run.mjs`, because a fix round commits). No case was
+    retired — every behaviour the 2026-07-30 cases held still exists, relocated; eval 7's
+    expectation was inverted where the contract changed under it (a verification pass writes no
+    review or summary file, and its metrics line comes from the renderer). Each case carries the
+    `setup` and `verify` command lines, all executed. The evals are UNRUN: `claude plugin eval`
+    needs the plugin harness, which is out of this phase's scope.
 
 ## 9. Open questions for the owner
 
