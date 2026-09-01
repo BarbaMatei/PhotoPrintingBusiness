@@ -4,7 +4,7 @@
 // number, read as one unit), and the missing-pass usage/exit-2 path.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only summary-data
-import { check, run } from './lib.mjs'
+import { check, run } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'

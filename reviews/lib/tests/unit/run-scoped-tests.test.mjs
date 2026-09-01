@@ -3,7 +3,7 @@
 // stand-in — never dotnet or npm.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only run-scoped
-import { check, run } from './lib.mjs'
+import { check, run } from '../lib.mjs'
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'

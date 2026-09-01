@@ -4,11 +4,11 @@
 // templates (the script reads them at runtime), so a template edit is exercised here too.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only mint-id
-import { check, run } from './lib.mjs'
+import { check, run } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { TEMPLATES } from '../records/schema.mjs'
+import { TEMPLATES } from '../../records/schema.mjs'
 
 function seedTemplates(T) {
   const dst = join(T, 'reviews', 'templates')

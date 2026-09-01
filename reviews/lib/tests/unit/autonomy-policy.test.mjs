@@ -1,11 +1,11 @@
 // Tests for autonomy-policy.mjs: the decide subcommand across gate kinds.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only autonomy-policy
-import { check, run, GOOD_ROOT } from './lib.mjs'
+import { check, run, GOOD_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { fixedRows } from '../records/resolution.mjs'
+import { fixedRows } from '../../records/resolution.mjs'
 
 // ---------- autonomy-policy: decide ----------
 {

@@ -7,16 +7,16 @@
 // contract these strategies must keep, and the shapes below are the seams they share.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only model
-import { check } from './lib.mjs'
+import { check } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
-import { newest, resolveDir, targetDirs, versions } from '../model/target.mjs'
-import { covers, lenientSpans, REFUSED, short, sliceSpans, spanOf, strictSpans } from '../model/spans.mjs'
-import { convergenceCheck } from '../model/convergence.mjs'
-import { repoRoot, takeRoot } from '../cli/args.mjs'
-import { REPO, REVIEWS } from '../records/schema.mjs'
+import { newest, resolveDir, targetDirs, versions } from '../../model/target.mjs'
+import { covers, lenientSpans, REFUSED, short, sliceSpans, spanOf, strictSpans } from '../../model/spans.mjs'
+import { convergenceCheck } from '../../model/convergence.mjs'
+import { repoRoot, takeRoot } from '../../cli/args.mjs'
+import { REPO, REVIEWS } from '../../records/schema.mjs'
 
 // ---------- model/target.mjs: the lookup ----------
 {

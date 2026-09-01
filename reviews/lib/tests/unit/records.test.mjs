@@ -5,15 +5,15 @@
 // frontmatter read deliberately disagree, and what a void erases.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only records
-import { check } from './lib.mjs'
+import { check } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { dateValue, parse, section, value, word } from '../records/frontmatter.mjs'
-import { deepEqual, live, matchesVoid, readEvents, readLines as readWorklogLines, voidsOf } from '../records/worklog.mjs'
-import { appendLine, readMetrics, readLines as readMetricsLines } from '../records/metrics.mjs'
-import { blocks as ledgerBlocks, ids as ledgerIds, severityOf } from '../records/ledger.mjs'
-import { fixedRows, meta as resolutionMeta, rows as resolutionRows, tallies } from '../records/resolution.mjs'
+import { dateValue, parse, section, value, word } from '../../records/frontmatter.mjs'
+import { deepEqual, live, matchesVoid, readEvents, readLines as readWorklogLines, voidsOf } from '../../records/worklog.mjs'
+import { appendLine, readMetrics, readLines as readMetricsLines } from '../../records/metrics.mjs'
+import { blocks as ledgerBlocks, ids as ledgerIds, severityOf } from '../../records/ledger.mjs'
+import { fixedRows, meta as resolutionMeta, rows as resolutionRows, tallies } from '../../records/resolution.mjs'
 
 // ---------- frontmatter: the block ----------
 {

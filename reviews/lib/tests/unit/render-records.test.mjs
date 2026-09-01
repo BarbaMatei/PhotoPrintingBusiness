@@ -1,7 +1,7 @@
 // Tests for render-records.mjs: backlog bucketing, frontmatter/worklog edge shapes, and span math.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only render-records
-import { check, run, GOOD_ROOT } from './lib.mjs'
+import { check, run, GOOD_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'

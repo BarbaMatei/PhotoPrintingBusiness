@@ -12,6 +12,7 @@ import { REVIEWS, REPO } from '../records/schema.mjs'
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 export const GOOD_ROOT = join(FIXTURES, 'repo')
 export const BAD_STATE_ROOT = join(FIXTURES, 'bad-state')
+export const SPEED_FIXTURE = join(FIXTURES, 'speed-report')
 
 let count = 0
 const failures = []

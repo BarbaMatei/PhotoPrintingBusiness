@@ -6,15 +6,15 @@
 // --root: the live tree is never written by a test, because the pre-commit hook runs this suite.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only docs-sync
-import { check, run } from './lib.mjs'
+import { check, run } from '../lib.mjs'
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
-import { REVIEWS, REPO, AREAS, CAP_ROWS, CORE_LENSES, ADDED_LENSES, FIXER_EVENTS, HANDBACK_EVENT_DOCS, MANIFEST_LENSES } from '../records/schema.mjs'
-import { V2_FIELDS, V3_FIX_FIELDS } from '../records/validate.mjs'
-import { ROWS } from '../drive/rows.mjs'
-import { GATE_DOCS } from '../drive/gates.mjs'
-import { MARKED_FILES } from '../cli/docs-blocks.mjs'
+import { REVIEWS, REPO, AREAS, CAP_ROWS, CORE_LENSES, ADDED_LENSES, FIXER_EVENTS, HANDBACK_EVENT_DOCS, MANIFEST_LENSES } from '../../records/schema.mjs'
+import { V2_FIELDS, V3_FIX_FIELDS } from '../../records/validate.mjs'
+import { ROWS } from '../../drive/rows.mjs'
+import { GATE_DOCS } from '../../drive/gates.mjs'
+import { MARKED_FILES } from '../../cli/docs-blocks.mjs'
 // Broken links the records carry today, each with an owner outside this dispatch's reach: the two
 // `<target>` paths are deliberate placeholders in a planning note, the two v13 files were never
 // written for the pass their index rows name. A fifth broken link fails this test.

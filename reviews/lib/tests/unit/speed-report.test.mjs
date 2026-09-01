@@ -10,13 +10,11 @@
 // the frozen full day is pinned by its own exact numbers instead.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only speed-report
-import { check, run } from './lib.mjs'
+import { check, run, SPEED_FIXTURE as FIXTURE } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'speed-report')
 const TARGET = '038-039-invoicing'
 const DAY = '2026-08-21'
 // Where the owner's reference measurement stopped: the v12 certification launch.

@@ -2,13 +2,13 @@
 // seams the CLI now composes — records/validate.mjs and fix/handback-gates.mjs, called in-process.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only records-auditor
-import { check, run, firstLine, GOOD_ROOT } from './lib.mjs'
+import { check, run, firstLine, GOOD_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { auditIds, auditTarget, citationScan, listTargets } from '../records/validate.mjs'
-import { auditHandBackGates } from '../fix/handback-gates.mjs'
-import { versions } from '../model/target.mjs'
+import { auditIds, auditTarget, citationScan, listTargets } from '../../records/validate.mjs'
+import { auditHandBackGates } from '../../fix/handback-gates.mjs'
+import { versions } from '../../model/target.mjs'
 
 // ---------- records auditor: smoke run against the real repo ----------
 {

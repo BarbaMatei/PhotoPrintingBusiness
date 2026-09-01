@@ -1,7 +1,7 @@
 // Tests for wl.mjs: the validated worklog-event stamper, its shapes, voids, and in-process appendEvent.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only wl
-import { check, run } from './lib.mjs'
+import { check, run } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -123,7 +123,7 @@ import { tmpdir } from 'node:os'
   const target = '931-wl-inprocess'
   mkdirSync(join(T, 'reviews', target), { recursive: true })
   try {
-    const { appendEvent } = await import('../records/wl.mjs')
+    const { appendEvent } = await import('../../records/wl.mjs')
     const stamped = appendEvent(T, target, { ev: 'note', text: 'in-process call' })
     check('appendEvent returns the stamped event with an offset timestamp',
       stamped.ev === 'note' && /[+-]\d{2}:\d{2}$/.test(stamped.t), JSON.stringify(stamped))

@@ -3,11 +3,11 @@
 // `revert-broke-build` — never proof (audit R6, SF39).
 //
 // Everything else about verify-fixes — the held path, worklog events, --no-events, multi-commit
-// rows, env-missing, dirty-tree refusal, leaked git env — lives in integration.test.mjs.
+// rows, env-missing, dirty-tree refusal, leaked git env — lives in verify-fixes.test.mjs.
 // These runs pass --no-events so the worklog cannot dirty the fixture between legs.
 //
-// Usage: node reviews/lib/tests/run-tests.mjs --only verify-fixes
-import { check, run, scrubbedGitEnv } from './lib.mjs'
+// Usage: node reviews/lib/tests/run-tests.mjs --only verify-fixes-red-leg
+import { check, run, scrubbedGitEnv } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'

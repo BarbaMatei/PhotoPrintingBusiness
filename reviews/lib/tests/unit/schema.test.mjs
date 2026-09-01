@@ -3,12 +3,12 @@
 // Behaviour that uses these values is pinned by each consumer's own test file.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only schema
-import { check } from './lib.mjs'
+import { check } from '../lib.mjs'
 import {
   AREAS, CAPS, EVENTS, MANIFEST_LENSES, OPEN_STATUSES, SEVERITIES, SHA_RE, SHA_SCAN_RE,
   STATUSES, TARGETLESS, V2_CUTOFF, V3_CUTOFF, V4_CUTOFF,
-} from '../records/schema.mjs'
-import * as shim from '../vocab.mjs'
+} from '../../records/schema.mjs'
+import * as shim from '../../vocab.mjs'
 
 {
   check('the lens manifest is the 11 keys', MANIFEST_LENSES.length === 11, String(MANIFEST_LENSES.length))

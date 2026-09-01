@@ -1,7 +1,7 @@
 // Tests for doc-gate.mjs: target-mode doc-contract linting and state-file linting.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only doc-gate
-import { check, run, firstLine, GOOD_ROOT, BAD_STATE_ROOT } from './lib.mjs'
+import { check, run, firstLine, GOOD_ROOT, BAD_STATE_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'

@@ -1,7 +1,7 @@
 // Tests for route-next-pass.mjs: fixture-state routing, gate kinds, and ledger-row parsing.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only route-next-pass
-import { check, run, GOOD_ROOT } from './lib.mjs'
+import { check, run, GOOD_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -138,8 +138,8 @@ for (const [target, row] of [['918-open-blocker', 'armed'], ['916-medium-batch',
 
 // ---------- the rows as data: the walk's seam ----------
 {
-  const { ROWS, COST, walkableRows } = await import('../drive/rows.mjs')
-  const { GATES, GATE_DOCS, POLICY_NEXT, NEXT } = await import('../drive/gates.mjs')
+  const { ROWS, COST, walkableRows } = await import('../../drive/rows.mjs')
+  const { GATES, GATE_DOCS, POLICY_NEXT, NEXT } = await import('../../drive/gates.mjs')
   const kinds = ['row', 'guard', 'note', 'prose']
   check('every row carries the README cells', ROWS.every(r => r.name && r.state && r.next),
     ROWS.filter(r => !(r.name && r.state && r.next)).map(r => r.name).join(', '))
