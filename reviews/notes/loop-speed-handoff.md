@@ -1,8 +1,8 @@
 ---
 type: design-note
-status: phases 1–6 complete 2026-08-28; Phase 7a delivered, waiting on the owner's approval of its inventory
+status: complete — phases 1–6 (2026-08-28) and Phase 7 (2026-09-01) executed; outcome + next-session list in machinery-restructure-plan.md
 created: 2026-08-22
-updated: 2026-08-28
+updated: 2026-09-01
 owner: Matei Barba
 ---
 

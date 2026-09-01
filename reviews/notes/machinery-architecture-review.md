@@ -1,6 +1,6 @@
 ---
 type: design-note
-status: owner answered all six questions 2026-08-28 (see "Owner decisions"); inventory stands as written — 7b may start on the owner's word
+status: executed — owner answered all six questions 2026-08-28; 7b/7c landed 2026-09-01 with the deviations annotated in §2/§6/§8; outcome scorecard in machinery-restructure-plan.md
 created: 2026-08-28
 owner: Matei Barba
 charter: machinery-restructure-plan.md

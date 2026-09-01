@@ -1,6 +1,6 @@
 ---
 type: design-note
-status: approved 2026-08-28 (owner) — runs after loop-speed phases 5 and 6
+status: executed 2026-09-01 — 7a approved 2026-08-28, 7b/7c landed (see Outcome); two acceptance criteria measured NOT MET, next-session list below
 created: 2026-08-28
 owner: Matei Barba
 ---
@@ -103,3 +103,36 @@ Concrete symptoms this phase removes:
 Loop-speed phase 5 (docs/skills) → phase 6 (replay + final review) → one real target run
 (recommended) → 7a → owner approval of the inventory → 7b → 7c. Cost is of the order of
 loop-speed phases 1–4.
+
+## Outcome (2026-09-01)
+
+Executed as ten sequential dispatches (D1–D10) plus a whole-phase review and one closure
+wave, each dispatch independently reviewed with fix rounds; the 7c cleanup ran folded into
+D9. The migration order and every deviation are recorded in
+[machinery-architecture-review.md](machinery-architecture-review.md) §8/§2 as annotated.
+
+**Acceptance, honestly scored** (whole-phase review, 2026-09-01):
+
+| Criterion | Score |
+|---|---|
+| Every piece in one named system | met — records/model/drive/fix/verify/measure/review/cli; 11 flat command shims are the permanent surface (pinned); `discovery-review.wf.js` stays flat by ruling (the Workflow harness wraps its source) |
+| Duplicate parsers one; each rule one home, prose cites it | met — one reader per artifact, one void rule, 11 generated doc blocks with a drift alarm the hook runs on doc-only edits |
+| docs-sync passes | met as wired (`--no-links`); plain `--check` stays red on 4 tolerated broken links until the two index v13 rows are repaired or ruled tolerated |
+| Suite green and smaller | green met (816); **smaller NOT MET** — 565→816 assertions by design (every fix pinned), fixture count ~unchanged (the drive-ledger merge was twice refused on evidence: 14 materially different ledgers) |
+| Full run under one minute | **NOT MET** — 1m18–2m15 measured; three spawn-heavy test files own ~117 s; closing it needs their in-process rewrite (next session) |
+| No legacy tolerance for shapes the repo cannot produce | met — V2 tier, LEGACY_TOP, D-ids, frontmatter-map fallback gone; V3/V4 cut-offs stay (live records behind them) |
+
+**Owner items left open by this phase:** the ruling-4 premise correction (Decisions-block
+wording now has no automatic detector — the judge left it and the miner cannot see it);
+the two NOT MET criteria above; the citation scan now reads 38 — ADR references in
+bolt-038's own `src/` doc comments, pre-dating this branch; `038-039`'s resolution-v15
+carries 7 pre-existing doc-gate violations; the runbook's "Per-provider symmetry" lens row
+has no manifest key; the rebuilt skill evals are UNRUN (first `claude plugin eval` run is
+their shakedown); the recommended one-real-target run has still not happened.
+
+**Next-session list:** suite under one minute (in-process rewrite of unit/records,
+flows/verify-fixes, unit/records-auditor); vocab.mjs/paths.mjs shim deletion decision;
+GATE MINER header rename with a baseline re-freeze; metrics-schema's running-prose event
+list (third copy); run-scoped-tests TAP parsing for `node --test`; the 67 auditor errors
+on the deliberately-broken fixture root (noise, assertion-free); optional runtime fixture
+builder for the drive-ledger family.
