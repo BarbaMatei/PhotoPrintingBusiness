@@ -7,8 +7,9 @@
 //
 // An archived target is validated no further than the cross-target id scan (owner ruling,
 // 2026-08-28): its books never change again, so re-reading their shape only kept tolerance code
-// alive for records nobody can repair. Every check below therefore runs on live records only, and
-// reports at one severity.
+// alive for records nobody can repair. The one fact still read there is whether it holds a
+// certification, because that keeps it under watch and on the track record. Every other check
+// below runs on live records only, and reports at one severity.
 //
 // Nothing here prints or exits: every check reports through the err/warn/info functions the CLI
 // passes in, so the CLI owns the output format and the exit code. Three collaborators are injected
@@ -98,10 +99,26 @@ export function listTargets(reviews, { only = [], all = false } = {}) {
   return only.length && !all ? out.filter(t => only.some(o => t.name.includes(o))) : out
 }
 
+// Certification evidence on an ARCHIVED line, read leniently and validated not at all: a pre-v2
+// line records the fact in the retired `certified` field, or in a certification subtype with no
+// `outcome` beside it. A recorded failure (`outcome: "not-certified"`) is not a holding.
+const archiveHoldsCertification = dir => (readMetricsLines(dir) ?? []).some(({ line: o }) =>
+  o && typeof o === 'object' && o.outcome !== 'not-certified' && (
+    o.outcome === 'certified' || Boolean(o.certified) ||
+    (typeof o.subtype === 'string' && o.subtype.startsWith('certification'))))
+
 export function auditTarget(t, ctx) {
   const { err, warn, info, checkSha, versions, gates, index, track } = ctx
   if (t.archived) {
-    info(`${t.name} (archive): closed books — metrics and resolutions are not validated; only the cross-target id scan reads its ledger`)
+    // Archiving does not end a certification: the target stays under watch, so the track record
+    // must keep listing it. Both certification holders are archived, so this is the one check
+    // that still crosses into a closed target's metrics — for that fact and nothing else.
+    const tag = `${t.name} (archive)`
+    if (archiveHoldsCertification(t.dir)) {
+      if (track === null) err(`${tag}: holds a certification but reviews/state/track-record.md is missing`)
+      else if (!track.includes(t.name)) err(`${tag}: holds a certification but is not listed in reviews/state/track-record.md`)
+    }
+    info(`${tag}: closed books — records are not validated; only the cross-target id scan and, for a certification holder, the track-record listing are checked`)
     return
   }
   // Seed lineage (convergence rule, 2026-08-28): which fix round a fix-caused finding is

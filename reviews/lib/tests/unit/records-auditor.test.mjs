@@ -96,6 +96,38 @@ import { versions } from '../../model/target.mjs'
     `no track ${JSON.stringify(cNoTrack.errors)} · listed ${JSON.stringify(cTracked.errors)}`)
   rmSync(C, { recursive: true, force: true })
 
+  // Archiving does not end a certification, and both holders are archived — so the watch-list
+  // check survives the archive skip. The line it reads is pre-v2 shaped (a retired `certified`
+  // field, prose in lenses[]): the scan must find the fact without validating anything.
+  const K = mkdtempSync(join(tmpdir(), 'records-validate-archive-cert-'))
+  mkdirSync(K, { recursive: true })
+  writeFileSync(join(K, 'metrics.jsonl'), `${JSON.stringify({
+    target: '995-archived-certified', pass: 9, type: 'discovery', subtype: 'certification-single',
+    date: '2026-07-05', commit: 'abc1234', certified: 'serious-clean', lenses: ['prose about lenses'],
+  })}\n`)
+  const cUnlisted = collect()
+  auditTarget({ name: '995-archived-certified', dir: K, archived: true },
+    { ...ctxFor(cUnlisted, () => { }), track: '| 900-someone-else | v1 |' })
+  check('an archived certification holder missing from the track record is still an error',
+    cUnlisted.errors.length === 1 && /995-archived-certified \(archive\): holds a certification but is not listed in reviews\/state\/track-record\.md/.test(cUnlisted.errors[0]),
+    JSON.stringify(cUnlisted.errors))
+  const cListed = collect()
+  auditTarget({ name: '995-archived-certified', dir: K, archived: true },
+    { ...ctxFor(cListed, () => { }), track: '| 995-archived-certified | certified |' })
+  check('a listed archived holder passes, and its pre-v2 fields are validated nowhere',
+    !cListed.errors.length && !cListed.warnings.length && cListed.infos.length === 1,
+    JSON.stringify([cListed.errors, cListed.warnings]))
+  writeFileSync(join(K, 'metrics.jsonl'), `${JSON.stringify({
+    target: '995-archived-certified', pass: 9, type: 'discovery', subtype: 'certification-single',
+    date: '2026-08-30', commit: 'abc1234', outcome: 'not-certified',
+  })}\n`)
+  const cFailed = collect()
+  auditTarget({ name: '995-archived-certified', dir: K, archived: true },
+    { ...ctxFor(cFailed, () => { }), track: '| 900-someone-else | v1 |' })
+  check('a recorded certification failure is not a holding, so the track record is not required',
+    !cFailed.errors.length, JSON.stringify(cFailed.errors))
+  rmSync(K, { recursive: true, force: true })
+
   // A line that is not a record object used to walk into a TypeError, which named no line at all.
   const N = mkdtempSync(join(tmpdir(), 'records-validate-non-record-'))
   mkdirSync(N, { recursive: true })
