@@ -368,8 +368,9 @@ forwards to), so a broken forward fails the suite instead of a live pass.
 
 Tests: unit per `records/` and `model/` module (in-process imports, no child process); flow tests
 spawn the CLIs over the fixtures; `speed-report` keeps its frozen baseline. Target: under one
-minute — **not met: a full run measures 2m01s** (2026-09-01, 795 assertions). Three files own
-117s of it: `unit/records.test.mjs` 42s, `flows/verify-fixes.test.mjs` 40s,
+minute — **not met: a full run measures 2m01s-2m15s** (2026-09-01, 795 assertions; measured twice
+on the same tree, so treat the spread as machine load). Three files own ~117s of it:
+`unit/records.test.mjs` 42s, `flows/verify-fixes.test.mjs` 40s,
 `unit/records-auditor.test.mjs` 35s. Every assertion still goes through `spawnSync`
 (`tests/lib.mjs`) and the git-backed fixtures dominate; the in-process unit layer is where the
 time has to come from.
