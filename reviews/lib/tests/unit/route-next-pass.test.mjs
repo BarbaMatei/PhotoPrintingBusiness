@@ -1,14 +1,14 @@
 // Tests for route-next-pass.mjs: fixture-state routing, gate kinds, and ledger-row parsing.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only route-next-pass
-import { check, run, GOOD_ROOT } from '../lib.mjs'
+import { check, run, GOOD_ROOT, DRIVE_STATES } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 // ---------- route-next-pass: three fixture states ----------
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '903-closed-target'])
+  const r = run('drive/route-next-pass.mjs', ['--root', DRIVE_STATES, '903-closed-target'])
   check('router exits 0 on a closed target', r.code === 0, `exit ${r.code}`)
   check('router reports the closed loop as terminal', r.out.includes('STATE: loop CLOSED') && r.out.includes('ROUTER: terminal.'), r.out.trim())
 }
@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os'
   check('router picks verification after a resolved resolution', r.out.includes('NEXT: verification'), r.out.trim())
 }
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '904-clean-verification'])
+  const r = run('drive/route-next-pass.mjs', ['--root', DRIVE_STATES, '904-clean-verification'])
   check('router exits 3 on a clean verification', r.code === 3, `exit ${r.code}`)
   check('router reports the clean verification and asks for the delta-worthiness call',
     r.out.includes('ROUTER: verification clean (0 reopened, 0 new serious).') && r.out.includes('GATE:'), r.out.trim())
@@ -26,21 +26,21 @@ import { tmpdir } from 'node:os'
 
 // ---------- route-next-pass: gate kinds ----------
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '909-certified-target'])
+  const r = run('drive/route-next-pass.mjs', ['--root', DRIVE_STATES, '909-certified-target'])
   check('router exits 2 on a certified target with no pending fix round', r.code === 2, `exit ${r.code}`)
   check('router names the loop-close gate kind', r.out.includes('GATE_KIND: loop-close'), r.out.trim())
 }
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '904-clean-verification'])
+  const r = run('drive/route-next-pass.mjs', ['--root', DRIVE_STATES, '904-clean-verification'])
   check('router names the delta-worthiness gate kind', r.out.includes('GATE_KIND: delta-worthiness'), r.out.trim())
 }
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '913-loop-quiet'])
+  const r = run('drive/route-next-pass.mjs', ['--root', DRIVE_STATES, '913-loop-quiet'])
   check('router exits 2 on a clean discovery-type pass (row 6)', r.code === 2, `exit ${r.code}`)
   check('router names the certification-go-ahead gate kind', r.out.includes('GATE_KIND: certification-go-ahead'), r.out.trim())
 }
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '914-resolution-above-review'])
+  const r = run('drive/route-next-pass.mjs', ['--root', DRIVE_STATES, '914-resolution-above-review'])
   check('router picks verification when the resolved resolution outnumbers the newest review', r.code === 0 && r.out.includes('NEXT: verification'), `exit ${r.code}: ${r.out.trim()}`)
   check('router names the resolution it routed on', r.out.includes('resolution-v2 resolved'), r.out.trim())
 }

@@ -168,13 +168,13 @@ Confidence: H = evidence in this file, M = evidence but a live run could change 
 | Group | Pins | Verdict | Evidence | Conf |
 |---|---|---|---|---|
 | `901-good-target`, `902-broken-target`, `bad-state/*` | doc-gate clean/violations, state lint | keep as `records-good` / `records-broken` | 902 still carries a retired `findings-v1.md` on purpose (`doc-gate.mjs:186`) | H |
-| `903-closed`, `904-clean-verification`, `909-certified`, `913-loop-quiet`, `914-resolution-above-review` | router rows 1-6 | merge into one `drive-states` fixture with several metrics tails | each is 1-3 files differing in one line | M |
+| `903-closed`, `904-clean-verification`, `909-certified`, `913-loop-quiet`, `914-resolution-above-review` | router rows 1-6 | **DONE** — moved into the `fixtures/drive-states` root (a family, not one folder: each target's `target:` frontmatter must match its own dir, and 909 vs 913 differ in `pass-type` and `verdict`, not just a metrics tail) | each is 1-3 files differing in one line | H |
 | `910-delta-worthy`, `911-patch-grade`, `912-recert`, `952-*` | policy delta-worthiness | merge into `drive-states` | same shape | M |
-| `915-queued-mediums`, `916-medium-batch`, `917-sweep-before-cert`, `918-open-blocker`, `919-reopened-latest`, `941-949` (7 dirs) | ledger-driven rows, queue, regression lineage, loop-close | merge into `drive-ledger` (one ledger, metrics tails per case) | 13 dirs for one rule family | M |
+| `915-queued-mediums`, `916-medium-batch`, `917-sweep-before-cert`, `918-open-blocker`, `919-reopened-latest`, `941-949` (9 dirs) | ledger-driven rows, queue, regression lineage, loop-close | **REFUSED as specced** — one shared ledger cannot serve them: 918 needs an open 🔴 where 943 needs that lineage settled, so every case would read the 🔴 and route to a fix round. Reducing the count needs a run-time fixture builder, not a move | 14 dirs for one rule family, each with its own ledger | H |
 | `915-lens-debt`, `916-unmeasured-seed`, `917-non-convergent`, `918-design-capped` | convergence rule | keep as `drive-convergence` | numbers collide with the queue fixtures (two 915s, 916s, 917s, 918s, 919s, 952s) — rename | H |
 | `905-dup-ledger`, `907-correction`, `908-verification-lineage` | auditor id uniqueness, corrections, lineage shape | fold into `records-good`/`records-broken` | 905 is never named by a test; it exists only to trip `duplicate id PPW-9001` | H |
 | `921-gates-bad`, `922-gates-good`, `923-newshape`, `924-oldshape` | V4 hand-back gates and resolution shape | keep as `fix-handback` | the only fixtures for the audit R1-R4 rules | H |
-| `919-override-clean`, `919-override-stop` | policy override stop | fold into `drive-states` | two one-line worklogs | H |
+| `919-override-clean`, `919-override-stop` | policy override stop | **DONE** — in `fixtures/drive-states`, which carries its own copy of `state/overrides.jsonl` (the two one-line worklogs straddle its timestamps) | two one-line worklogs | H |
 | `fixtures/speed-report/*` | acceptance baseline | keep, frozen | verbatim copy of the live 038 records (483 + 57 lines, identical to `reviews/038-039-invoicing/*`) | H |
 | inline `mkdtemp` fixtures (920, 921-spans, 938, 950, 960-975, 999…) | renderer spans, verify repo, wrapper, summary-data | keep as code | they are the tests' own arrange step | H |
 
@@ -324,23 +324,32 @@ reviews/lib/
             ledger.mjs      rows, blocks, flipRow
             resolution.mjs  frontmatter scalars, Findings rows, tallies
             validate.mjs    the auditor's schema half (v2/v3/v4 key sets, cut-offs)
-            lint.mjs        doc-gate's per-file checks
-            render.mjs      render-records' line builders + index/ledger writes
+            lint.mjs        NOT BUILT, by design — doc-gate's checks stay inside doc-gate.mjs;
+                            it has one caller, so a module would only add a hop
+            render.mjs      NOT BUILT, by design — the line builders stay inside
+                            render-records.mjs for the same reason
   model/    target.mjs      resolve dir (live/archive), versions, newest resolution/review
             spans.mjs       pairSpans(strict|lenient), sliceSpans, runtime split
             open-work.mjs   readLedger + openIds + standsDown + atLoopClose
             convergence.mjs lens union, owed lenses, seed rates, substantive rounds, design-pass cap
             unit.mjs        the reviewed unit: round + its verification, findings tallies
             queue.mjs       queued mediums vs batch vs sweep
-  review/   discovery-review.wf.js · summary-data.mjs · mint-id.mjs (scaffolds)
+  review/   summary-data.mjs · mint-id.mjs (scaffolds)
+            discovery-review.wf.js STAYS at reviews/lib/ — the Workflow harness wraps the script's
+            source (it carries a top-level `return`), so the file is not an importable module and
+            cannot take a re-export entry point. Its scriptPath is the stable name.
   verify/   verify-fixes.mjs · git.mjs (env scrub, shared with tests)
   fix/      run-scoped-tests.mjs · handback-gates.mjs (auditor R1-R4)
   drive/    rows.mjs (router rows as data) · gates.mjs (gate kinds, policy vocabulary) ·
-            route.mjs · policy.mjs · cost.mjs
-  measure/  speed-report.mjs (+ disapproval listing) · track-record reader
-  cli/      one file per command name; args.mjs (--root, --dry-run) · text.mjs (pluralize)
-  tests/    unit/<module>.test.mjs · flows/{handback,verification,certification,close,unattended}.test.mjs
-            fixtures/{records-good,records-broken,drive-states,drive-ledger,drive-convergence,fix-handback}
+            route.mjs · policy.mjs
+            cost.mjs NOT BUILT, by design — the cost lines live with the rows that print them
+  measure/  speed-report.mjs (+ disapproval listing)
+            track-record reader NOT BUILT, by design — one caller reads the file directly
+  cli/      args.mjs (--root, --dry-run) · docs-blocks.mjs · docs-sync.mjs · text.mjs (pluralize)
+            NOT one file per command name — see "Command surface" below
+  tests/    unit/<module-or-command>.test.mjs · unit/shims.test.mjs (the command surface)
+            flows/{drive-routing,drive-policy,render-records,verify-fixes,verify-fixes-red-leg,hook-override}.test.mjs
+            fixtures/{repo (records-good), bad-state (records-broken), drive-states}
             fixtures/speed-report (frozen 038 baseline)
 ```
 
@@ -349,14 +358,21 @@ speed-report) · `open-work` (route, policy, close step) · `convergence` (route
 summary-data) · `unit` (render, auditor gates, speed-report per-round) · `queue` (route, policy,
 loop-driver's sweep stall detector). Every consumer today recomputes at least one of these.
 
-Command names stay stable: `reviews/lib/<name>.mjs` becomes a two-line shim under
-`reviews/lib/cli/` and the old path is kept as a re-export for one release, so every skill,
-runbook and hook line keeps working during 7b; 7c deletes the shims and runs `fix-links`.
+**Command surface (controller ruling, 2026-09-01 — supersedes the earlier "shims for one
+release" plan).** The eleven flat `reviews/lib/<name>.mjs` files are the **permanent** command
+surface. Each is a two-line entry point that forwards to its system folder; the implementation
+moves, the command name never does. There is no `cli/` file per command, nothing deletes the flat
+files in 7c, and no prose is rewritten to point past them — the old paths *are* the stable names.
+`unit/shims.test.mjs` pins all eleven (exit code + first output line equal to the module each
+forwards to), so a broken forward fails the suite instead of a live pass.
 
 Tests: unit per `records/` and `model/` module (in-process imports, no child process); flow tests
-spawn the CLIs over the six fixtures; `speed-report` keeps its frozen baseline. Target: under
-one minute. Today every assertion goes through `spawnSync` (`tests/lib.mjs:25-29`) — roughly
-500 process launches per run; the in-process unit layer is where the time comes from.
+spawn the CLIs over the fixtures; `speed-report` keeps its frozen baseline. Target: under one
+minute — **not met: a full run measures 2m01s** (2026-09-01, 795 assertions). Three files own
+117s of it: `unit/records.test.mjs` 42s, `flows/verify-fixes.test.mjs` 40s,
+`unit/records-auditor.test.mjs` 35s. Every assertion still goes through `spawnSync`
+(`tests/lib.mjs`) and the git-backed fixtures dominate; the in-process unit layer is where the
+time has to come from.
 
 ## 7. Delete candidates that need an owner ruling
 
@@ -384,7 +400,7 @@ so the count drops to 555 there and stays).
 7. Split the auditor: `records/validate.mjs`, `fix/handback-gates.mjs`, citation scan → hook (or deleted per ruling). `records-auditor.mjs` becomes a CLI that calls all three. Legacy items deleted here: frontmatter-map fallback, `D\d+` row alternative.
 8. `drive/rows.mjs` + `drive/gates.mjs` as data; `route.mjs` iterates rows. Then `cli/docs-sync.mjs` generates the README router table and the 7 other tables, with the check test. `fix-links --apply` and `MOVES` deleted; the check moves in.
 9. Merge `gate-miner` into `speed-report`; delete `ledger-miner.mjs` and its constant/vocabulary entry (per ruling). Wire `summary-data.mjs` into `owner-summary` and `mint-id.mjs` into `reconcile-findings` (skill text only).
-10. Move files into the folders; `cli/` shims keep today's command names; `fix-links` check confirms every prose path. Re-cut `integration.test.mjs` into the five flow files; merge the 13 drive fixtures into `drive-states` + `drive-ledger`.
+10. **DONE (2026-09-01).** Files moved into the folders; the flat `reviews/lib/<name>.mjs` entry points keep today's command names **permanently** (see "Command surface"), pinned by `unit/shims.test.mjs`; `docs-sync --check` confirms every prose path. `integration.test.mjs` re-cut into five flow files under `tests/flows/` — named for what they drive, not for the loop stages this note first sketched, because the assertions cut across the stages. The `drive-states` fixture root landed (7 targets: 903, 904, 909, 913, 914, both 919-override-*). **The `drive-ledger` merge is refused as unimplementable:** each of those 14 targets is a full four-file target whose *ledger differs* (918 needs an open 🔴, 943 needs that same lineage settled), so no shared ledger with per-case metrics tails can serve them, and the CLIs take the target as a positional with no variant selector. Reducing that dir count needs a run-time fixture builder — a separate decision about checked-in vs generated fixtures.
 11. 7c: archive-validation scope per ruling 3 (delete V2/V3 tiers, `LEGACY_TOP`, `D<n>` id allowance); stale prose (`doc-contracts.md:22-30, 175`, `self-driving:206, 208`, `discovery-review.wf.js:35`); drop `micro-review-*` from the stamper vocabulary; comment rule and commit style move to `coding-standards.md`.
 
 ## 9. Open questions for the owner

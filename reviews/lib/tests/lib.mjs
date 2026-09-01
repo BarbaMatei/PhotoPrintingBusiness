@@ -15,6 +15,9 @@ const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 export const GOOD_ROOT = join(FIXTURES, 'repo')
 export const BAD_STATE_ROOT = join(FIXTURES, 'bad-state')
 export const SPEED_FIXTURE = join(FIXTURES, 'speed-report')
+// The router/policy state targets: record shapes with no ledger, kept out of the records root so
+// the whole-root auditor scans only what it is meant to validate.
+export const DRIVE_STATES = join(FIXTURES, 'drive-states')
 
 let count = 0
 const failures = []
@@ -35,10 +38,20 @@ export const firstLine = out => out.split('\n')[0]
 // A fixture's `git config` write reaching the real repository rewrites who authors every later
 // commit, and nothing in a green run would say so: the runner compares this against the identity
 // left behind once every test file has run.
+// An unset key exits 1 with no output, which is a real answer; any other nonzero means the config
+// could not be read at all, and a guard that cannot read is reported as failing, never as clean.
 export function gitIdentity() {
-  const get = key => spawnSync('git', ['-C', REPO, 'config', '--get', key],
-    { encoding: 'utf8', env: scrubbedGitEnv() }).stdout?.trim() ?? ''
-  return { name: get('user.name'), email: get('user.email') }
+  const get = key => {
+    const r = spawnSync('git', ['-C', REPO, 'config', '--get', key], { encoding: 'utf8', env: scrubbedGitEnv() })
+    if (r.error) return { error: `git config --get ${key} could not run: ${r.error.message}` }
+    if (r.status !== 0 && r.status !== 1) {
+      return { error: `git config --get ${key} exited ${r.status}: ${`${r.stdout ?? ''}${r.stderr ?? ''}`.trim() || '(no output)'}` }
+    }
+    return { value: r.stdout?.trim() ?? '' }
+  }
+  const name = get('user.name')
+  const email = get('user.email')
+  return { name: name.value ?? '', email: email.value ?? '', error: name.error ?? email.error ?? null }
 }
 export const IDENTITY_AT_LOAD = gitIdentity()
 

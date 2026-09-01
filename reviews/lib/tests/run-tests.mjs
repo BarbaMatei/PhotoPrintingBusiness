@@ -32,11 +32,19 @@ if (only) {
 
 let total = 0
 const failures = []
+// A test file that throws (a fixtureGit setup call refusing, say) must not take the identity guard
+// down with it: the throw becomes a failed assertion of its own and the run carries on to the guard.
 for (const f of files) {
   resetTally()
-  await import(pathToFileURL(join(TESTS_DIR, f)).href)
+  let threw = null
+  try {
+    await import(pathToFileURL(join(TESTS_DIR, f)).href)
+  } catch (e) {
+    threw = e
+  }
+  if (threw) check(`${f} ran to completion`, false, `threw: ${threw?.message ?? threw}`)
   const { count, failures: fileFailures } = currentTally()
-  console.log(`  ${f}: ${count}`)
+  console.log(`  ${f}: ${count}${threw ? ' (threw)' : ''}`)
   total += count
   failures.push(...fileFailures)
 }
@@ -45,9 +53,12 @@ resetTally()
 {
   const before = IDENTITY_AT_LOAD
   const after = gitIdentity()
+  const unreadable = before.error ?? after.error
   check("the suite left the repository's git identity untouched",
-    after.name === before.name && after.email === before.email,
-    `git config now reads "${after.name} <${after.email}>", was "${before.name} <${before.email}>" — a fixture repo's config write leaked into the real repository; restore it before committing`)
+    !unreadable && after.name === before.name && after.email === before.email,
+    unreadable
+      ? `the repository's git config was unreadable, so the guard cannot clear the run: ${unreadable}`
+      : `git config now reads "${after.name} <${after.email}>", was "${before.name} <${before.email}>" — a fixture repo's config write leaked into the real repository; restore it before committing`)
   const { count, failures: guard } = currentTally()
   console.log(`  (git identity guard): ${count}`)
   total += count

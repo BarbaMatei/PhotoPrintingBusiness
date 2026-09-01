@@ -16,8 +16,6 @@ import { REVIEWS } from '../../records/schema.mjs'
     console.log('note: sh unavailable — the pre-commit override-log checks were skipped')
   } else {
     const T = mkdtempSync(join(tmpdir(), 'hook-override-'))
-    // A git hook's own GIT_DIR/GIT_INDEX_FILE would override -C and land these commits
-    // on the real repository, so the throwaway repo gets a scrubbed environment.
     const g = fixtureGit(T)
     g('init', '-q', '-b', 'main')
     g('config', 'user.email', 'fixture@test'); g('config', 'user.name', 'fixture')

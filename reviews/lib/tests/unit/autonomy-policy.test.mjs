@@ -1,7 +1,7 @@
 // Tests for autonomy-policy.mjs: the decide subcommand across gate kinds.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only autonomy-policy
-import { check, run, GOOD_ROOT } from '../lib.mjs'
+import { check, run, GOOD_ROOT, DRIVE_STATES } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -22,7 +22,7 @@ import { fixedRows } from '../../records/resolution.mjs'
   check('policy routes a re-certification as a single pass', r.code === 0 && r.out.includes('NEXT: certification (single)'), r.out.trim())
 }
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '913-loop-quiet', 'decide', 'certification-go-ahead'])
+  const r = run('drive/autonomy-policy.mjs', ['--root', DRIVE_STATES, '913-loop-quiet', 'decide', 'certification-go-ahead'])
   check('policy answers a clean discovery loop-quiet gate with a first certification pair', r.code === 0 && r.out.includes('ACTION: auto') && r.out.includes('NEXT: certification (pair)'), r.out.trim())
 }
 {
@@ -30,16 +30,16 @@ import { fixedRows } from '../../records/resolution.mjs'
   check('policy answers a loop-quiet gate for a re-certified target with a single pass', r.code === 0 && r.out.includes('NEXT: certification (single)'), r.out.trim())
 }
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '914-resolution-above-review', 'decide', 'delta-worthiness'])
+  const r = run('drive/autonomy-policy.mjs', ['--root', DRIVE_STATES, '914-resolution-above-review', 'decide', 'delta-worthiness'])
   check('policy judges the newest resolution, not the one paired with the newest review', r.code === 0 && r.out.includes('NEXT: certification (pair)'), r.out.trim())
   check('policy calls a round with no review file of its own patch-grade', r.out.includes('patch-grade'), r.out.trim())
 }
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '909-certified-target', 'decide', 'loop-close'])
+  const r = run('drive/autonomy-policy.mjs', ['--root', DRIVE_STATES, '909-certified-target', 'decide', 'loop-close'])
   check('policy closes the loop under the standing approval', r.out.includes('ACTION: auto') && r.out.includes('NEXT: close the loop'), r.out.trim())
 }
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '909-certified-target', 'decide', 'mystery-gate'])
+  const r = run('drive/autonomy-policy.mjs', ['--root', DRIVE_STATES, '909-certified-target', 'decide', 'mystery-gate'])
   check('policy fails closed on an unknown gate kind', r.out.includes('ACTION: stop'), r.out.trim())
 }
 
@@ -84,12 +84,12 @@ for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
 }
 
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-stop', 'decide', 'loop-close'])
+  const r = run('drive/autonomy-policy.mjs', ['--root', DRIVE_STATES, '919-override-stop', 'decide', 'loop-close'])
   check('policy stops when a gate override was logged after the run started', r.out.includes('ACTION: stop') && r.out.includes('COMMENTS_OK'), r.out.trim())
 }
 
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '919-override-clean', 'decide', 'loop-close'])
+  const r = run('drive/autonomy-policy.mjs', ['--root', DRIVE_STATES, '919-override-clean', 'decide', 'loop-close'])
   check('policy ignores overrides logged before the run started', r.out.includes('ACTION: auto'), r.out.trim())
 }
 
