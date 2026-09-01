@@ -26,7 +26,7 @@ import { join, relative } from 'node:path'
 import { sliceSpans, strictSpans } from '../model/spans.mjs'
 import { newest } from '../model/target.mjs'
 import { repoRoot, takeRoot } from '../cli/args.mjs'
-import { INDEX, REVIEWS as REVIEWS_HOME } from './schema.mjs'
+import { CAPS, INDEX, REVIEWS as REVIEWS_HOME } from './schema.mjs'
 import { parse, word } from './frontmatter.mjs'
 import { TALLY, rows as resolutionRows, zeroTally } from './resolution.mjs'
 import { appendLine, readMetrics } from './metrics.mjs'
@@ -70,7 +70,7 @@ if (VERIFY && !Number.isFinite(passNum(PASS))) fail(`--verification "${PASS}" �
 if (VERIFY && ROUND !== null) fail('--verification and --round are different modes — pass one')
 const pass = VERIFY ? passNum(PASS) : null
 
-const OUTCOME_CAP = 50
+const OUTCOME_CAP = CAPS.passDescriptionWords
 if (OUTCOME === undefined) fail(`--outcome takes the text of the index row's Outcome cell; ${USAGE}`)
 if (OUTCOME != null) {
   if (/^--/.test(OUTCOME)) fail(`--outcome reads "${OUTCOME}", which is another flag — quote the outcome text; ${USAGE}`)

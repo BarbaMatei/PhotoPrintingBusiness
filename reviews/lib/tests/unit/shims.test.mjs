@@ -6,7 +6,7 @@
 import { check, run, firstLine, BAD_STATE_ROOT } from '../lib.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { REVIEWS } from '../../records/schema.mjs'
+import { MANIFEST_LENSES, REVIEWS } from '../../records/schema.mjs'
 import * as wlHome from '../../records/wl.mjs'
 
 // No args, so each command answers its own usage line — ~100ms apiece. records-auditor is the
@@ -51,4 +51,16 @@ check('records/wl.mjs exports the main() that the wl.mjs entry point calls',
   check('runbook-discovery.md still names that exact scriptPath',
     readFileSync(runbook, 'utf8').includes("scriptPath: 'reviews/lib/discovery-review.wf.js'"),
     'the runbook no longer names reviews/lib/discovery-review.wf.js')
+
+  // The workflow cannot be imported (its top-level `return` is a syntax error outside the
+  // Workflow harness's wrapper), so its LENS_LIBRARY keys are read the same way hookCoverage
+  // reads the pre-commit hook: a text scan of the source, not a module import.
+  const libStart = text.indexOf('const LENS_LIBRARY = {')
+  const libEnd = libStart === -1 ? -1 : text.indexOf('\n}', libStart)
+  const libBlock = libStart === -1 || libEnd === -1 ? '' : text.slice(libStart, libEnd)
+  const libKeys = [...libBlock.matchAll(/^\s*(?:'([\w-]+)'|([\w-]+)):\s*`/gm)].map(m => m[1] ?? m[2]).sort()
+  const manifestKeys = [...MANIFEST_LENSES].sort()
+  check('discovery-review.wf.js LENS_LIBRARY keys are the same set as records/schema.mjs MANIFEST_LENSES',
+    libStart !== -1 && libEnd !== -1 && libKeys.length === manifestKeys.length && libKeys.every((k, i) => k === manifestKeys[i]),
+    `LENS_LIBRARY [${libKeys.join(',')}] vs MANIFEST_LENSES [${manifestKeys.join(',')}]`)
 }

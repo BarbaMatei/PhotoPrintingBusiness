@@ -94,7 +94,8 @@ export function listTargets(reviews, { only = [], all = false } = {}) {
   }
   const arch = join(reviews, 'archive')
   if (existsSync(arch)) for (const e of readdirSync(arch, { withFileTypes: true })) {
-    if (e.isDirectory()) out.push({ name: e.name, dir: join(arch, e.name), archived: true })
+    if (!e.isDirectory() || TARGETLESS.has(e.name)) continue
+    out.push({ name: e.name, dir: join(arch, e.name), archived: true })
   }
   return only.length && !all ? out.filter(t => only.some(o => t.name.includes(o))) : out
 }

@@ -45,6 +45,16 @@ import { versions } from '../../model/target.mjs'
     listTargets(REVIEWS, { only: ['921'], all: true }).length === all.length,
     `${listTargets(REVIEWS, { only: ['921'], all: true }).length} vs ${all.length}`)
 
+  // The archive scan used to skip the TARGETLESS filter, so a folder like archive/experiments
+  // (real in the live repo) was listed as if it were an archived target.
+  const archiveRoot = mkdtempSync(join(tmpdir(), 'listtargets-archive-'))
+  mkdirSync(join(archiveRoot, 'archive', 'experiments'), { recursive: true })
+  mkdirSync(join(archiveRoot, 'archive', '900-old-target'), { recursive: true })
+  check('the archive scan drops TARGETLESS folders too, so "experiments" is never an archived target',
+    listTargets(archiveRoot).map(t => t.name).join(',') === '900-old-target',
+    JSON.stringify(listTargets(archiveRoot).map(t => t.name)))
+  rmSync(archiveRoot, { recursive: true, force: true })
+
   // The validator reports through the reporters the CLI passes in and never prints or exits
   // itself; an archived target is not validated at all.
   const collect = () => { const o = { errors: [], warnings: [], infos: [] }; return { ...o, err: m => o.errors.push(m), warn: m => o.warnings.push(m), info: m => o.infos.push(m) } }
