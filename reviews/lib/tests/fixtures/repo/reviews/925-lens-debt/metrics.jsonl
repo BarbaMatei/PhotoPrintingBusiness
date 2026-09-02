@@ -1,1 +1,0 @@
-{"target":"925-lens-debt","pass":1,"type":"discovery","lenses":["correctness","security","requirements","quality","tests-coverage","completeness-critic","db-parity","input-validation","observability","race"],"date":"2026-08-20","commit":"eeeee15","verdict":"approve-with-followups","new_findings":{"high":0,"medium":0,"low":0,"cleanup":0},"reopened":0,"verified":0}

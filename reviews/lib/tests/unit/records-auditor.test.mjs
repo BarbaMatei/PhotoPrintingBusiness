@@ -38,7 +38,7 @@ import { REPO } from '../../records/schema.mjs'
   const REVIEWS = join(GOOD_ROOT, 'reviews')
   const all = listTargets(REVIEWS)
   check('listTargets skips the folders under reviews/ that are not targets',
-    !all.some(t => ['state', 'lib', 'archive', 'system'].includes(t.name)) && all.length > 30,
+    !all.some(t => ['state', 'lib', 'archive', 'system'].includes(t.name)) && all.length > 10,
     JSON.stringify(all.map(t => t.name).slice(0, 5)))
   check('a positional filter matches target names by substring',
     listTargets(REVIEWS, { only: ['921'] }).map(t => t.name).join(',') === '921-gates-bad',
@@ -334,4 +334,5 @@ closed: 2026-07-15
   check('a voided mis-stamp no longer trips the R1 ordering gate',
     !r.out.includes('954-voided-misstamp resolution-v1.md:'), r.out.split('\n').find(l => l.includes('954-voided-misstamp resolution-v1.md:')) ?? '')
   check('auditor grandfathers resolved rounds from before the 2026-08-28 cut-off', !r.out.includes('901-good-target resolution-v1.md:') && !r.out.includes('901-good-target: resolved without'), r.out.split('\n').find(l => l.includes('901-good-target resolution')) ?? '')
+
 }

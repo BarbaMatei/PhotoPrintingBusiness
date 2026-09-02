@@ -2,6 +2,8 @@
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only route-next-pass
 import { check, run, GOOD_ROOT, DRIVE_STATES } from '../lib.mjs'
+import { buildTarget, fixRound } from '../fixture-builder.mjs'
+import { MANIFEST_LENSES } from '../../records/schema.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -113,22 +115,89 @@ updated: 2026-08-22
 
 // ---------- convergence rule + lens-coverage debt (audit R5, 2026-08-28) ----------
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '925-lens-debt'])
+  // Every manifest lens but the last one has run, so frontend-ux is the lens still owed.
+  const root = buildTarget({
+    target: '925-lens-debt', reviews: 1,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: MANIFEST_LENSES.slice(0, -1), date: '2026-08-20', commit: 'eeeee15', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+    ],
+  })
+  const r = run('drive/route-next-pass.mjs', ['--root', root, '925-lens-debt'])
   check('router refuses row 6 on lens-coverage debt and routes the owed lens', r.code === 0 && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '926-unmeasured-seed'])
+  // A substantive round with no blind pass after it: its seed rate has never been measured.
+  const root = buildTarget({
+    target: '926-unmeasured-seed', reviews: 1,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: MANIFEST_LENSES, date: '2026-08-20', commit: 'eeeee16', verdict: 'request-changes', new_findings: { high: 0, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      fixRound({ round: 1, date: '2026-08-21', fixed: 2, invocations: 3 }),
+      { pass: 1, type: 'verification', date: '2026-08-22', commit: 'eeeee17', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 2 },
+    ],
+    resolutions: [{ v: 1, status: 'resolved', fixedCommit: 'eeeee17', fixed: ['PPW-9601', 'PPW-9602'] }],
+  })
+  const r = run('drive/route-next-pass.mjs', ['--root', root, '926-unmeasured-seed'])
   check('router flags an unmeasured seed rate at the delta-worthiness gate', r.code === 3 && r.out.includes('seed rate is unmeasured'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
+// Rounds r1 (3 fixed) and r2 (2 fixed) each seeded a serious "payments" finding a later blind
+// pass attributed back to them: s = 1/3 and 1/2, both at or over the 0.3 rate the rule brakes on.
+const NON_CONVERGENT_ROUNDS = [
+  fixRound({ round: 1, date: '2026-07-02', fixed: 3, invocations: 4 }),
+  fixRound({ round: 2, date: '2026-07-04', fixed: 2, invocations: 3 }),
+]
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '927-non-convergent'])
+  const root = buildTarget({
+    target: '927-non-convergent', reviews: 3,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: ['correctness'], date: '2026-07-01', commit: 'ccccc17', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      NON_CONVERGENT_ROUNDS[0],
+      {
+        pass: 2, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-03', commit: 'ccccc18', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9711', new: true, sev: 'high', seed_round: 1, area: 'payments' }, { f: 'F2', d: 'PPW-9712', new: true, sev: 'medium', seed_round: 1, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      NON_CONVERGENT_ROUNDS[1],
+      {
+        pass: 3, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-05', commit: 'ccccc19', verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9713', new: true, sev: 'high', seed_round: 2, area: 'payments' }], reopened: 0, verified: 0,
+      },
+    ],
+    resolutions: [
+      { v: 1, status: 'resolved', fixedCommit: 'ccccc18', fixed: ['PPW-9701', 'PPW-9702', 'PPW-9703'] },
+      { v: 2, status: 'resolved', fixedCommit: 'ccccc19', fixed: ['PPW-9711', 'PPW-9712'] },
+    ],
+  })
+  const r = run('drive/route-next-pass.mjs', ['--root', root, '927-non-convergent'])
   check('router declares a component non-convergent at s >= 0.3 on two consecutive rounds', r.code === 2 && r.out.includes('GATE_KIND: design-pass') && r.out.includes('"payments"'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
 {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, '928-design-capped'])
+  // The same non-convergent shape, plus a third round whose notes record the design pass that
+  // "payments" is allowed once per loop — the brake lifts and the fix round proceeds.
+  const root = buildTarget({
+    target: '928-design-capped', reviews: 4,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: ['correctness'], date: '2026-07-01', commit: 'ddddd17', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      NON_CONVERGENT_ROUNDS[0],
+      {
+        pass: 2, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-03', commit: 'ddddd18', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9811', new: true, sev: 'high', seed_round: 1, area: 'payments' }, { f: 'F2', d: 'PPW-9812', new: true, sev: 'medium', seed_round: 1, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      NON_CONVERGENT_ROUNDS[1],
+      {
+        pass: 3, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-05', commit: 'ddddd19', verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9813', new: true, sev: 'high', seed_round: 2, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      fixRound({ round: 3, date: '2026-07-06', fixed: 1, invocations: 2, notes: 'design-pass:payments — component protocol spec and reimplementation' }),
+      {
+        pass: 4, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-07', commit: 'ddddd20', verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9814', new: true, sev: 'high', seed_round: 3, area: 'payments' }], reopened: 0, verified: 0,
+      },
+    ],
+    resolutions: [{ v: 3, status: 'resolved', fixedCommit: 'ddddd20', fixed: ['PPW-9813'] }],
+  })
+  const r = run('drive/route-next-pass.mjs', ['--root', root, '928-design-capped'])
   check('router routes a fix round once the component used its one design pass', r.code === 0 && r.out.includes('NEXT: fix round') && r.out.includes('design pass per loop already ran'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
@@ -137,12 +206,81 @@ updated: 2026-08-22
 // and the pre-certification sweep row never went through: a non-convergent component kept being
 // patched by whichever row answered first. All three now consult it, and a convergent state on the
 // same three rows must still route its fix round.
+// The three states below carry the same non-convergent metrics shape as 927 and differ in the
+// ledger: an open 🔴 arms the loop, three open 🟠 are a batch, one open 🟠 is the sweep.
+const NON_CONVERGENT_SPECS = {
+  '929-armed-non-convergent': {
+    target: '929-armed-non-convergent', reviews: 3,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: ['correctness'], date: '2026-07-01', commit: 'ddd9297', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      NON_CONVERGENT_ROUNDS[0],
+      {
+        pass: 2, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-03', commit: 'ddd9298', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9292', new: true, sev: 'high', seed_round: 1, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      NON_CONVERGENT_ROUNDS[1],
+      {
+        pass: 3, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-05', commit: 'ddd9299', verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9293', new: true, sev: 'high', seed_round: 2, area: 'payments' }], reopened: 0, verified: 0,
+      },
+    ],
+    ledgerRows: [['PPW-9291', '🔴', 'open']],
+    resolutions: [
+      { v: 1, status: 'resolved', fixedCommit: 'ddd9298', fixed: ['PPW-9294', 'PPW-9295', 'PPW-9296'] },
+      { v: 2, status: 'resolved', fixedCommit: 'ddd9299', fixed: ['PPW-9297', 'PPW-9298'] },
+    ],
+  },
+  '930-batch-non-convergent': {
+    target: '930-batch-non-convergent', reviews: 3,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: ['correctness'], date: '2026-07-01', commit: 'ddd9397', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      NON_CONVERGENT_ROUNDS[0],
+      {
+        pass: 2, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-03', commit: 'ddd9398', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9309', new: true, sev: 'high', seed_round: 1, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      NON_CONVERGENT_ROUNDS[1],
+      {
+        pass: 3, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-05', commit: 'ddd9399', verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9310', new: true, sev: 'high', seed_round: 2, area: 'payments' }], reopened: 0, verified: 0,
+      },
+    ],
+    ledgerRows: [['PPW-9301', '🟠', 'open'], ['PPW-9302', '🟠', 'open'], ['PPW-9303', '🟠', 'open']],
+    resolutions: [
+      { v: 1, status: 'resolved', fixedCommit: 'ddd9398', fixed: ['PPW-9304', 'PPW-9305', 'PPW-9306'] },
+      { v: 2, status: 'resolved', fixedCommit: 'ddd9399', fixed: ['PPW-9307', 'PPW-9308'] },
+    ],
+  },
+  '931-sweep-non-convergent': {
+    target: '931-sweep-non-convergent', reviews: 4,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: ['correctness'], date: '2026-07-01', commit: 'ddd9497', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      NON_CONVERGENT_ROUNDS[0],
+      {
+        pass: 2, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-03', commit: 'ddd9498', verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9312', new: true, sev: 'high', seed_round: 1, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      NON_CONVERGENT_ROUNDS[1],
+      {
+        pass: 3, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-05', commit: 'ddd9499', verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+        findings: [{ f: 'F1', d: 'PPW-9313', new: true, sev: 'high', seed_round: 2, area: 'payments' }], reopened: 0, verified: 0,
+      },
+      // The clean pass 4 is what puts the target on the loop-quiet road, where the sweep row sits.
+      { pass: 4, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-07', commit: 'ddd949a', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+    ],
+    ledgerRows: [['PPW-9311', '🟠', 'open']],
+    resolutions: [
+      { v: 1, status: 'resolved', fixedCommit: 'ddd9498', fixed: ['PPW-9314', 'PPW-9315', 'PPW-9316'] },
+      { v: 2, status: 'resolved', fixedCommit: 'ddd9499', fixed: ['PPW-9317', 'PPW-9318'] },
+    ],
+  },
+}
 for (const [target, row, reason] of [
   ['929-armed-non-convergent', 'armed', 'the loop is armed — 1 open 🔴 in the ledger (PPW-9291)'],
   ['930-batch-non-convergent', 'batch', 'batch of 3 open mediums'],
   ['931-sweep-non-convergent', 'sweep', 'sweep before certification — 1 open medium must drain'],
 ]) {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, target])
+  const r = run('drive/route-next-pass.mjs', ['--root', buildTarget(NON_CONVERGENT_SPECS[target]), target])
   check(`the ${row} row brakes on a non-convergent component instead of routing a fix round`,
     r.code === 2 && r.out.includes('GATE_KIND: design-pass') && !r.out.includes('NEXT: fix round'), `exit ${r.code}: ${r.out.trim()}`)
   check(`the braked ${row} row still states the row it matched and names the component and both rounds`,
@@ -152,8 +290,41 @@ for (const [target, row, reason] of [
   check(`the ${row} row's gate line names the trigger it refuses, not only the design pass`,
     gate.includes('The fix round it refuses was triggered by:') && gate.includes(reason.replace('ROUTER: ', '')), gate || r.out.trim())
 }
+// The same three rows over a convergent target — one fix round each, so the brake reads nothing.
+const CONVERGENT_SPECS = {
+  '918-open-blocker': {
+    target: '918-open-blocker', reviews: 1, blockers: { 1: ['PPW-9181', 'PPW-9182'] },
+    metricsLines: [
+      { pass: 1, type: 'discovery', date: '2026-08-22', commit: '4444440', verdict: 'request-changes', new_findings: { high: 2, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      fixRound({ round: 1, date: '2026-08-22', fixed: 1 }),
+      { pass: 1, type: 'verification', date: '2026-08-22', commit: '4444441', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 1 },
+    ],
+    ledgerRows: [['PPW-9181', '🔴', 'open'], ['PPW-9182', '🔴', 'verified']],
+    resolutions: [{ v: 1, status: 'resolved', fixedCommit: '4444441', closed: '2026-08-22', fixed: ['PPW-9182'] }],
+  },
+  '916-medium-batch': {
+    target: '916-medium-batch', reviews: 1, blockers: { 1: ['PPW-9161'] },
+    metricsLines: [
+      { pass: 1, type: 'discovery', date: '2026-08-22', commit: '2222220', verdict: 'request-changes', new_findings: { high: 1, medium: 3, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      fixRound({ round: 1, date: '2026-08-22', fixed: 1 }),
+      { pass: 1, type: 'verification', date: '2026-08-22', commit: '2222221', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 1 },
+    ],
+    ledgerRows: [['PPW-9161', '🔴', 'verified'], ['PPW-9162', '🟠', 'open'], ['PPW-9163', '🟠', 'in-progress'], ['PPW-9164', '🟠', 'open']],
+    resolutions: [{ v: 1, status: 'resolved', fixedCommit: '2222221', closed: '2026-08-22', fixed: ['PPW-9161'] }],
+  },
+  '917-sweep-before-cert': {
+    target: '917-sweep-before-cert', reviews: 2, blockers: { 1: ['PPW-9171'] },
+    metricsLines: [
+      { pass: 1, type: 'discovery', date: '2026-08-22', commit: '3333330', verdict: 'request-changes', new_findings: { high: 1, medium: 2, low: 1, cleanup: 0 }, reopened: 0, verified: 0 },
+      { pass: 1, type: 'verification', date: '2026-08-22', commit: '3333331', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 1 },
+      { pass: 2, type: 'delta-discovery', date: '2026-08-22', commit: '3333332', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+    ],
+    ledgerRows: [['PPW-9171', '🔴', 'verified'], ['PPW-9172', '🟠', 'open'], ['PPW-9173', '🟠', 'deferred'], ['PPW-9174', '🟡', 'open']],
+    resolutions: [{ v: 1, status: 'resolved', fixedCommit: '3333331', closed: '2026-08-22', fixed: ['PPW-9171'] }],
+  },
+}
 for (const [target, row] of [['918-open-blocker', 'armed'], ['916-medium-batch', 'batch'], ['917-sweep-before-cert', 'sweep']]) {
-  const r = run('drive/route-next-pass.mjs', ['--root', GOOD_ROOT, target])
+  const r = run('drive/route-next-pass.mjs', ['--root', buildTarget(CONVERGENT_SPECS[target]), target])
   check(`a convergent ${row} row still routes its fix round`,
     r.code === 0 && r.out.includes('NEXT: fix round') && !r.out.includes('GATE_KIND: design-pass'), `exit ${r.code}: ${r.out.trim()}`)
 }

@@ -2,10 +2,12 @@
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only autonomy-policy
 import { check, run, GOOD_ROOT, DRIVE_STATES } from '../lib.mjs'
+import { buildTarget, fixRound } from '../fixture-builder.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fixedRows } from '../../records/resolution.mjs'
+import { MANIFEST_LENSES } from '../../records/schema.mjs'
 
 // ---------- autonomy-policy: decide ----------
 {
@@ -44,32 +46,93 @@ import { fixedRows } from '../../records/resolution.mjs'
 }
 
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '925-lens-debt', 'decide', 'certification-go-ahead'])
+  // Every manifest lens but the last one has run, so frontend-ux is the lens still owed.
+  const root = buildTarget({
+    target: '925-lens-debt', reviews: 1,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: MANIFEST_LENSES.slice(0, -1), date: '2026-08-20', commit: 'eeeee15', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+    ],
+  })
+  const r = run('drive/autonomy-policy.mjs', ['--root', root, '925-lens-debt', 'decide', 'certification-go-ahead'])
   check('policy refuses auto-certification on lens debt and routes the owed lens', r.out.includes('ACTION: auto') && r.out.includes('NEXT: lens-coverage discovery (frontend-ux)'), r.out.trim())
 }
 
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '926-unmeasured-seed', 'decide', 'delta-worthiness'])
+  // A substantive round with no blind pass after it: its seed rate has never been measured.
+  const root = buildTarget({
+    target: '926-unmeasured-seed', reviews: 1,
+    metricsLines: [
+      { pass: 1, type: 'discovery', lenses: MANIFEST_LENSES, date: '2026-08-20', commit: 'eeeee16', verdict: 'request-changes', new_findings: { high: 0, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      fixRound({ round: 1, date: '2026-08-21', fixed: 2, invocations: 3 }),
+      { pass: 1, type: 'verification', date: '2026-08-22', commit: 'eeeee17', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 2 },
+    ],
+    resolutions: [{ v: 1, status: 'resolved', fixedCommit: 'eeeee17', fixed: ['PPW-9601', 'PPW-9602'] }],
+  })
+  const r = run('drive/autonomy-policy.mjs', ['--root', root, '926-unmeasured-seed', 'decide', 'delta-worthiness'])
   check('policy routes an unmeasured final round to a measuring delta discovery', r.out.includes('ACTION: auto') && r.out.includes('NEXT: delta discovery') && r.out.includes('unmeasured'), r.out.trim())
 }
 
+// Rounds r1 (3 fixed) and r2 (2 fixed) each seeded a serious "payments" finding a later blind pass
+// attributed back to them: s = 1/3 and 1/2, both at or over the 0.3 rate the rule brakes on. The
+// three states differ in the ledger, which is what decides which answer the brake intercepts.
+const NON_CONVERGENT_ROUNDS = [
+  fixRound({ round: 1, date: '2026-07-02', fixed: 3, invocations: 4 }),
+  fixRound({ round: 2, date: '2026-07-04', fixed: 2, invocations: 3 }),
+]
+const nonConvergent = ({ target, reviews, seeds, commits, ledgerRows, tailPass }) => buildTarget({
+  target, reviews, ledgerRows,
+  metricsLines: [
+    { pass: 1, type: 'discovery', lenses: ['correctness'], date: '2026-07-01', commit: commits[0], verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+    NON_CONVERGENT_ROUNDS[0],
+    {
+      pass: 2, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-03', commit: commits[1], verdict: 'request-changes', new_findings: { high: 1, medium: 1, low: 0, cleanup: 0 },
+      findings: [{ f: 'F1', d: seeds[0], new: true, sev: 'high', seed_round: 1, area: 'payments' }], reopened: 0, verified: 0,
+    },
+    NON_CONVERGENT_ROUNDS[1],
+    {
+      pass: 3, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-05', commit: commits[2], verdict: 'request-changes', new_findings: { high: 1, medium: 0, low: 0, cleanup: 0 },
+      findings: [{ f: 'F1', d: seeds[1], new: true, sev: 'high', seed_round: 2, area: 'payments' }], reopened: 0, verified: 0,
+    },
+    ...(tailPass ? [tailPass] : []),
+  ],
+  resolutions: [
+    { v: 1, status: 'resolved', fixedCommit: commits[1], fixed: ['PPW-9294', 'PPW-9295', 'PPW-9296'] },
+    { v: 2, status: 'resolved', fixedCommit: commits[2], fixed: ['PPW-9297', 'PPW-9298'] },
+  ],
+})
+
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '927-non-convergent', 'decide', 'design-pass'])
+  const root = nonConvergent({
+    target: '927-non-convergent', reviews: 3, seeds: ['PPW-9711', 'PPW-9713'],
+    commits: ['ccccc17', 'ccccc18', 'ccccc19'],
+  })
+  const r = run('drive/autonomy-policy.mjs', ['--root', root, '927-non-convergent', 'decide', 'design-pass'])
   check('policy stops on a design-pass gate', r.out.includes('ACTION: stop'), r.out.trim())
 }
 
 // The policy answers a fix round of its own at both certification-bound gates, so the brake has to
 // guard those answers too (owner ruling 1, 2026-08-28) — and a design pass has no written
 // delegation, so the policy fails closed and stops.
-for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '931-sweep-non-convergent', 'decide', gate])
-  check(`policy stops instead of sweeping a non-convergent component at the ${gate} gate`,
-    r.out.includes('ACTION: stop') && !r.out.includes('NEXT: fix round'), r.out.trim())
-  check(`the ${gate} stop names the component and the two rounds`,
-    r.out.includes('"payments"') && r.out.includes('rounds r1 and r2'), r.out.trim())
+{
+  const root = nonConvergent({
+    target: '931-sweep-non-convergent', reviews: 4, seeds: ['PPW-9312', 'PPW-9313'],
+    commits: ['ddd9497', 'ddd9498', 'ddd9499'], ledgerRows: [['PPW-9311', '🟠', 'open']],
+    tailPass: { pass: 4, type: 'delta-discovery', lenses: ['correctness'], date: '2026-07-07', commit: 'ddd949a', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+  })
+  for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
+    const r = run('drive/autonomy-policy.mjs', ['--root', root, '931-sweep-non-convergent', 'decide', gate])
+    check(`policy stops instead of sweeping a non-convergent component at the ${gate} gate`,
+      r.out.includes('ACTION: stop') && !r.out.includes('NEXT: fix round'), r.out.trim())
+    check(`the ${gate} stop names the component and the two rounds`,
+      r.out.includes('"payments"') && r.out.includes('rounds r1 and r2'), r.out.trim())
+  }
 }
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '929-armed-non-convergent', 'decide', 'certification-go-ahead'])
+  const root = nonConvergent({
+    target: '929-armed-non-convergent', reviews: 3, seeds: ['PPW-9292', 'PPW-9293'],
+    commits: ['ddd9297', 'ddd9298', 'ddd9299'], ledgerRows: [['PPW-9291', '🔴', 'open']],
+  })
+  const r = run('drive/autonomy-policy.mjs', ['--root', root, '929-armed-non-convergent', 'decide', 'certification-go-ahead'])
   check('policy stops rather than arming a fix round on a non-convergent component',
     r.out.includes('ACTION: stop') && r.out.includes('"payments"'), r.out.trim())
   // The stop is the owner's whole report in an unattended run, so it must say what is waiting:
@@ -78,7 +141,17 @@ for (const gate of ['delta-worthiness', 'certification-go-ahead']) {
     r.out.includes('waiting behind it: the loop is armed — 1 open 🔴 (PPW-9291)'), r.out.trim())
 }
 {
-  const r = run('drive/autonomy-policy.mjs', ['--root', GOOD_ROOT, '918-open-blocker', 'decide', 'certification-go-ahead'])
+  const root = buildTarget({
+    target: '918-open-blocker', reviews: 1, blockers: { 1: ['PPW-9181', 'PPW-9182'] },
+    metricsLines: [
+      { pass: 1, type: 'discovery', date: '2026-08-22', commit: '4444440', verdict: 'request-changes', new_findings: { high: 2, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 0 },
+      fixRound({ round: 1, date: '2026-08-22', fixed: 1 }),
+      { pass: 1, type: 'verification', date: '2026-08-22', commit: '4444441', verdict: 'approve-with-followups', new_findings: { high: 0, medium: 0, low: 0, cleanup: 0 }, reopened: 0, verified: 1 },
+    ],
+    ledgerRows: [['PPW-9181', '🔴', 'open'], ['PPW-9182', '🔴', 'verified']],
+    resolutions: [{ v: 1, status: 'resolved', fixedCommit: '4444441', closed: '2026-08-22', fixed: ['PPW-9182'] }],
+  })
+  const r = run('drive/autonomy-policy.mjs', ['--root', root, '918-open-blocker', 'decide', 'certification-go-ahead'])
   check('a convergent armed ledger still gets the policy fix round, not a stop',
     r.out.includes('ACTION: auto') && r.out.includes('NEXT: fix round'), r.out.trim())
 }
