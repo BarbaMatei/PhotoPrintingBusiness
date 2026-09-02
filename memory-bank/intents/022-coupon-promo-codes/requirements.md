@@ -4,7 +4,7 @@ phase: inception
 status: inception-complete
 created: 2026-05-25T10:45:00Z
 updated: 2026-06-05T10:30:00Z
-source: docs/architecture-analysis-2026-05-25.md#10
+source: docs/analysis/architect-review-2026-05-25.md#10
 priority_score: 15
 ---
 

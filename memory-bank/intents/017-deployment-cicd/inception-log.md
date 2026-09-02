@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Containerise the API/UI, add docker-compose for dev + prod, and ship GitHub Actions CI + CD.
 **Type**: ops / brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #5 (priority score 20)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #5 (priority score 20)
 **Created**: 2026-05-25T10:20:00Z
 
 ## Artifacts Created

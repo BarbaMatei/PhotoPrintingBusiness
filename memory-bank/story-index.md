@@ -679,7 +679,7 @@
 
 ---
 
-> Intents 013–022 generated from `docs/architecture-analysis-2026-05-25.md`.
+> Intents 013–022 generated from `docs/analysis/architect-review-2026-05-25.md`.
 > Total new stories: 51 · New bolts: 033–048 · Last updated: 2026-05-25T10:50:00Z
 
 ### 013-upload-cleanup-fix

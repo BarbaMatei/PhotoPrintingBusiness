@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Wire OpenTelemetry traces + custom metrics + Sentry to bring observability from 2/5 to 5/5.
 **Type**: ops / brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #8 (priority score 15)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #8 (priority score 15)
 **Created**: 2026-05-25T10:35:00Z
 
 ## Artifacts Created

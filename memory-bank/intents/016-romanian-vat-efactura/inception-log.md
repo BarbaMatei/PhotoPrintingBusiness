@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Add Romanian 19% VAT calculation and ANAF e-Factura (SPV) compliance to every paid order.
 **Type**: brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #4 (priority score 19)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #4 (priority score 19)
 **Created**: 2026-05-25T10:15:00Z
 
 ## Artifacts Created
