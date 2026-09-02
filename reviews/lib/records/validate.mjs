@@ -436,6 +436,6 @@ export function citationScan({ git, info, warn }) {
     if (cs !== -1 && re.test(m[2].slice(cs))) hits.push(`${m[1]}: ${m[2].trim()}`)
   }
   const files = new Set(hits.map(h => h.slice(0, h.indexOf(':')))).size
-  info(`citation-leak scan (comments only): ${hits.length} occurrence(s) in ${files} file(s) — target is 0 (CLAUDE.md comment rule)`)
+  info(`citation-leak scan (comments only, finding/ADR-style ids): ${hits.length} occurrence(s) in ${files} file(s) — target is 0`)
   return hits
 }

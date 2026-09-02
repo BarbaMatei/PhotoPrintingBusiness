@@ -35,7 +35,7 @@ const shaCache = new Map()
 // leaves the cache empty, and checkSha below then asks per sha exactly as it always did.
 function warmShaCache(shas) {
   if (!shas.length) return
-  const batch = spawnSync('git', ['cat-file', '--batch-check'], { cwd: ROOT, encoding: 'utf8', input: `${shas.join('\n')}\n` })
+  const batch = spawnSync('git', ['cat-file', '--batch-check'], { cwd: ROOT, encoding: 'utf8', input: `${shas.join('\n')}\n`, maxBuffer: 1 << 28 })
   if (batch.status !== 0 || typeof batch.stdout !== 'string') return
   const out = batch.stdout.split('\n')
   const oids = new Map()

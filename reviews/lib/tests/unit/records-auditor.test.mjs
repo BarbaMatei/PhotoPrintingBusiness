@@ -6,9 +6,11 @@ import { check, run, GOOD_ROOT } from '../lib.mjs'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { execSync } from 'node:child_process'
 import { auditIds, auditTarget, citationScan, listTargets } from '../../records/validate.mjs'
 import { auditHandBackGates } from '../../fix/handback-gates.mjs'
 import { versions } from '../../model/target.mjs'
+import { REPO } from '../../records/schema.mjs'
 
 // ---------- records auditor: smoke run against the real repo ----------
 {
@@ -193,6 +195,20 @@ import { versions } from '../../model/target.mjs'
     citationScan({ git: exiting(128), info: c7.info, warn: c7.warn }) === null &&
     !c7.infos.length && c7.warnings.length === 1 && /could not run \(exit 128\)/.test(c7.warnings[0]),
     JSON.stringify([c7.infos, c7.warnings]))
+}
+
+// ---------- citation scan: pin the real tree's zero ----------
+// The fake-git cases above prove the scan's parsing logic; this runs the real one-grep scan over
+// this repo's actual src/ tree so a planted citation regression reddens this test, not just the
+// synthetic ones. `git grep -P` is one process over a small pattern — sub-second.
+{
+  const realGit = cmd => execSync(`git ${cmd}`, { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
+  const infos = [], warnings = []
+  const hits = citationScan({ git: realGit, info: m => infos.push(m), warn: m => warnings.push(m) })
+  check('the real scan over this repo\'s src/ finds no finding/ADR-style citations in comments',
+    hits !== null && hits.length === 0 && !warnings.length, JSON.stringify({ hits, warnings, infos }))
+  check('the live scan reports its count as 0 occurrence(s)',
+    infos.length === 1 && /0 occurrence\(s\) in 0 file\(s\)/.test(infos[0]), JSON.stringify(infos))
 }
 
 // ---------- handback-gates.mjs: called directly ----------
