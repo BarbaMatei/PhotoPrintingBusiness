@@ -15,14 +15,11 @@ import { V2_FIELDS, V3_FIX_FIELDS } from '../../records/validate.mjs'
 import { ROWS } from '../../drive/rows.mjs'
 import { GATE_DOCS } from '../../drive/gates.mjs'
 import { MARKED_FILES } from '../../cli/docs-blocks.mjs'
-// Broken links the records carry today, each with an owner outside this dispatch's reach: the two
-// `<target>` paths are deliberate placeholders in a planning note, the two v13 files were never
-// written for the pass their index rows name. A fifth broken link fails this test.
+// Broken links the records carry today: the two `<target>` paths are deliberate placeholders in a
+// planning note. A third broken link fails this test.
 const TOLERATED_LINKS = [
   'reviews/notes/loop-speed-plan.md: ../<target>/resolution-v<round>.md',
   'reviews/notes/loop-speed-plan.md: ../<target>/ledger.md',
-  'reviews/state/index.md: ../038-039-invoicing/review-v13.md',
-  'reviews/state/index.md: ../038-039-invoicing/summary-v13.md',
 ]
 
 const SKILLS = join(REPO, '.claude', 'skills')
@@ -54,7 +51,7 @@ const problemsIn = out => lines(out).filter(l => l.startsWith('PROBLEM'))
   const broken = brokenIn(r.out)
   const unexpected = broken.filter(l => !TOLERATED_LINKS.includes(l))
   const gone = TOLERATED_LINKS.filter(l => !broken.includes(l))
-  check('no broken link beyond the tolerated four', unexpected.length === 0,
+  check('no broken link beyond the tolerated list', unexpected.length === 0,
     `new broken link(s):\n      ${unexpected.join('\n      ')}`)
   check('every tolerated broken link is still the one the list names', gone.length === 0,
     `fixed (drop from TOLERATED_LINKS):\n      ${gone.join('\n      ')}`)
