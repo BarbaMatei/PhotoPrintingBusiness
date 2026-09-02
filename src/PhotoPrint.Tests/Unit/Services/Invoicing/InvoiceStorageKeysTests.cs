@@ -5,7 +5,7 @@ using PhotoPrint.API.Services.Invoicing;
 namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
 /// <summary>
-/// ADR-007 / ADR-021 — storage key shape for invoice PDFs. The path is
+/// Storage key shape for invoice PDFs. The path is
 /// caller-supplied; adapters persist bytes at the literal key. Stable key
 /// shape matters because object lifecycle rules (S3 expirations, R2 cache
 /// invalidation) match on this prefix.

@@ -1,0 +1,10 @@
+{"t":"2026-08-31T14:00:00+03:00","ev":"round-start","round":3}
+{"t":"2026-08-31T14:10:00+03:00","ev":"triage-done","round":3,"clusters":1,"checks_needed":0,"pre_cleared":0}
+{"t":"2026-08-31T14:30:00+03:00","ev":"test-run","kind":"red","filter":"PhotoPrint.Tests.Unit.Orders","passed":16,"failed":1,"duration_s":24,"round":3,"cluster":"retry"}
+{"t":"2026-08-31T14:35:00+03:00","ev":"test-audit-dispatched","round":3}
+{"t":"2026-08-31T14:45:00+03:00","ev":"test-audit-returned","round":3,"verdict":"approve"}
+{"t":"2026-08-31T15:00:00+03:00","ev":"round-review-dispatched","round":3}
+{"t":"2026-08-31T15:15:00+03:00","ev":"round-review-returned","round":3,"found":0}
+{"t":"2026-08-31T15:25:00+03:00","ev":"test-run","kind":"final","filter":"PhotoPrint.Tests.Unit.Orders","passed":17,"failed":0,"duration_s":23,"round":3}
+{"t":"2026-08-31T15:30:00+03:00","ev":"finding","id":"PPW-9852","status":"fixed","commit":"b3f98e2"}
+{"t":"2026-08-31T15:35:00+03:00","ev":"round-end","round":3}

@@ -5,6 +5,7 @@ version: 1
 answers: review-v1.md
 status: resolved
 fixed_commit: ffffff3
+closed: 2026-07-15
 ---
 
 # Resolution v1 — 912-recert

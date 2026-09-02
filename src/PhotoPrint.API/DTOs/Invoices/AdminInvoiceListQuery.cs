@@ -2,8 +2,8 @@ namespace PhotoPrint.API.DTOs.Invoices;
 
 /// <summary>
 /// Query-string params for the admin invoice list endpoint.
-/// Validated by <c>AdminInvoiceListQueryValidator</c> via FluentValidation
-/// per ADR-002 — no <c>[Required]</c> data annotations.
+/// Validated by <c>AdminInvoiceListQueryValidator</c> via FluentValidation —
+/// no <c>[Required]</c> data annotations.
 /// </summary>
 public sealed class AdminInvoiceListQuery
 {

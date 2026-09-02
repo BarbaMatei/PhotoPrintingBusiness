@@ -2,7 +2,7 @@
 type: review-system-design
 status: research notes — v2, updated 2026-08-11
 created: 2026-07-04
-updated: 2026-08-20
+updated: 2026-08-28
 owner: Matei Barba
 extends: README.md
 ---
@@ -20,7 +20,7 @@ operation. The two closing sections hold the completion audit and the direction 
 *operational* — router, entry tiers, stop rule, pass mechanics. The
 [doc contract](../rules/doc-contracts.md) owns the *file shapes and the language rules*.
 The [rationale notes](rationale.md) own the *evidence*. The
-[path constants](../lib/paths.mjs) own every path for scripts. This file owns the
+[path constants](../lib/records/schema.mjs) own every path for scripts. This file owns the
 *research*: the assumptions autonomy needs, the experiments that test them, and what is
 still missing. On any overlap, the README wins.
 
@@ -198,14 +198,13 @@ Built and operating:
 | Discovery fan-out script (lenses → dedup + `hinted` → trace-first skeptics tiered by severity and convergence, delta budget guard, decided-re-raise skip) | [lib/discovery-review.wf.js](../lib/discovery-review.wf.js) |
 | Mechanical router (state → next pass → cost → gates, exit codes for owner gates) | [lib/route-next-pass.mjs](../lib/route-next-pass.mjs) |
 | Loop driver (audit → route → announce → gate → execute → record; session-model guard; archive-on-close; runs the doc gate) | `.claude/skills/loop-driver/SKILL.md` |
-| Fixer contract, descheduled 2026-08-03 (triage → one batched owner gate → background approach-checks, test runs, micro-reviews while fixing) | `/fix-review` skill |
+| Fixer contract, descheduled 2026-08-03 (triage → one batched owner gate → background approach-checks and test runs while fixing → one round review before hand-back) | `/fix-review` skill |
 | Reconciler (mints `PPW-<n>` from the id counter; scored 2026-07-27: 0 over-merges) | `.claude/skills/reconcile-findings/SKILL.md` |
 | Owner summary (contract-bound page per decision pass) | `.claude/skills/owner-summary/SKILL.md` |
 | Metrics **v3** (per-finding lens/severity/verdict/fix-lineage; fix-round lines; runtime from the worklog) | [metrics-schema.md](../rules/metrics-schema.md) + [lib/render-records.mjs](../lib/render-records.mjs) |
 | Records auditor (schema, tallies, pairing, commit reachability, citation-leak count with target 0) | [lib/records-auditor.mjs](../lib/records-auditor.mjs) |
-| Doc gate (deterministic lint, target + `state` modes, + Sonnet judge; pre-commit backstop; 36-assertion fixture suite) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
-| Path constants + link keeper (every move: `git mv`, constant, `--apply`, check) | [lib/paths.mjs](../lib/paths.mjs) + [lib/fix-links.mjs](../lib/fix-links.mjs) |
-| Ledger miner (ranks defect classes by measured cost into definition-of-done) — **built, unfed**: the class sidecar backfill has not run | [lib/ledger-miner.mjs](../lib/ledger-miner.mjs) + [spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md) |
+| Doc gate (deterministic lint, target + `state` modes, + Sonnet judge on owner-facing prose; pre-commit backstop; its own fixture suite — 45 assertions on 2026-09-01) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
+| Path constants + link keeper (every move: `git mv`, constant, then the link check) | [lib/records/schema.mjs](../lib/records/schema.mjs) + [lib/cli/docs-sync.mjs](../lib/cli/docs-sync.mjs) |
 | Ledgers + worklogs (template-bound; append-only enforced against git HEAD by the gate) | per-target files, shapes in [doc-contracts.md](../rules/doc-contracts.md) |
 
 To build — re-audited item by item against today's system:
@@ -220,8 +219,10 @@ To build — re-audited item by item against today's system:
 | 6 | ~~compress-review + plain-language skills~~ | — | — | Closed, done differently: templates + caps + automated close sequence + compressed index + judge-enforced language (section above) |
 
 Approved and waiting to run (not a build): the prevention-sweep backfill — ~290 ledger rows
-classified into the sidecar, ~150–250k tokens, then the miner's first real ranking
-([spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md)).
+classified into the spec's class sidecar, ~150–250k tokens, then the ranking's first real run
+([spec](../../docs/superpowers/specs/2026-08-10-prevention-sweep-design.md)). The first cut of
+the ranking script was deleted unfed on 2026-08-31; when the backfill is scheduled, rebuild it
+against `records/` from the spec and the deleted version in git history.
 
 System backlog (from live runs): auto-append findings as inline PR comments once `gh` is
 in play · a reusable cross-repo lens pack is now a direction option (D below), not a side
@@ -254,7 +255,7 @@ with a manual or unproven half; missing = does not exist.
 | Judge severity | partial | single synthesis judgment; measured once (run 1: erred high ~4 of 10, never low); `sev_delta` recorded, unread |
 | Fix | built | fixer contract descheduled; 234 fixes verified, 6 reopened (2.6%) |
 | Verify fixes | built | verify-fixes.mjs + one subagent per pass |
-| Record | built | contracts + templates + doc gate (lint + judge) + auditor + pre-commit backstop + 36-assertion fixture suite |
+| Record | built | contracts + templates + doc gate (lint + judge) + auditor + pre-commit backstop + the gate's own fixture suite |
 | Self-route | built | mechanical router + loop driver; hand-routing only when it abstains |
 | Self-check its own records | built | auditor on every append; gate on every round; but the pair has never processed a genuinely new target end to end — all five targets were retrofitted |
 | Prove its own recall | missing | run 1 could not test it (0 misses); run 2 deferred; interim track record: 2 certifications, 0 escapes, low power |
@@ -352,3 +353,40 @@ until one external adoption target actually exists.
 **The one question the owner must answer:** approve seeded-bug run 2 now, at ~2–2.5M
 tokens — or explicitly choose to keep building on unproven recall? Everything else in this
 file follows from that answer.
+
+## Script backlog (2026-08-22)
+
+Seven small scripts the loop keeps hand-doing. Each is an afternoon at most, and each one
+removes a step a human currently performs from memory — the same trade the router, the
+renderer and the stamper already made.
+
+- **Discovery prep** — collects the pass's diff set, checks the target branch's HEAD is the
+  commit the pass will name, and suggests lenses from the touched areas. Removes the
+  hand-assembled scoping block at the top of every discovery, and the mis-stated `commit:`
+  frontmatter that a stale HEAD produces.
+- **Close-target sequence** — writes `closed:` into the ledger frontmatter, rolls every
+  `backlog` row and every 🟠 standing down into [backlog.md](../state/backlog.md), stamps
+  `archived:` on the index row, and `git mv`s the folder into `archive/`. Removes the
+  four-step close checklist whose order is the part that gets dropped.
+- **Run-end report printer** — reads a run's `gate-parked` events and prints the parked
+  items (kind, default taken, what needs a ruling) as the report's skeleton. Removes the
+  hand-reconstruction of what an unattended run decided alone, which is the one part of the
+  report the owner actually acts on.
+- **Commit-subject lint** — a `.githooks/pre-commit` check for the one-sentence,
+  subject-only, no-trailer rule, with the finding/round id where one is expected. Removes
+  the after-the-fact discovery that a commit body or a `Co-Authored-By` trailer landed.
+- **Judge input packager** — lists the round's changed `reviews/` files from git and packs
+  them with doc-contracts.md into the judge's prompt. Removes the judge's re-read of a
+  target's whole file set, which is why judge rounds cost what they cost.
+- **Blinding auditor** — scans a lens's inputs before launch for `reviews/` content, git
+  history and `PPW-` id strings, and refuses the launch on a hit. Removes the "blinded
+  best-effort, enforced by prompts" caveat in the README's hard rules — the one claim the
+  system makes and cannot currently check.
+- **Reconcile pre-matcher** — offers fuzzy same-problem candidates (file, symbol, title
+  overlap) for each new finding against the ledger, for the reconciler to accept or reject.
+  Removes the full-ledger read per finding, without moving the same/new judgment off the
+  reconciler.
+
+None of these is queued. Each stays unbuilt until the lint-miner habit surfaces it as a
+measured cost — the same way the prevention sweep is meant to rank defect classes — or the owner
+asks for it outright.

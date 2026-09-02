@@ -48,7 +48,13 @@ and nowhere else.
    `reviews/`). If ambiguous, list `reviews/*/` and ask which one.
 2. In `reviews/<target>/`, find the **highest** `review-v<n>.md` and its paired
    `resolution-v<n>.md`. If the resolution file is missing, create it from the review's
-   finding list (all `status: open`) before starting — copy `reviews/templates/resolution.md`.
+   finding list (all `status: open`) before starting —
+   `node reviews/lib/mint-id.mjs scaffold-resolution <target> --version <n>` seeds it from
+   `review-v<n>.md`'s findings table and `reviews/templates/resolution.md`. A round that answers
+   a **verification** pass has no review file of its own: its round number is the next free
+   resolution version (so it runs ahead of the newest review), its Findings rows are seeded from
+   the reopened and new ids that verification recorded on the ledger, and the file is hand-copied
+   from the template — `scaffold-resolution` needs a review file and refuses without one.
 3. Read the review's frontmatter `blockers:` list and its findings table (id, severity,
    location). The defect detail lives on each id's **ledger detail block** — What / Evidence /
    Suggested fix / History; serious findings' Suggested-fix lines carry the **Fix brief**
@@ -82,27 +88,41 @@ file and the worklog.
 
 ## The worklog — write it as you work, not after
 
-Append one JSON line per event to `reviews/<target>/worklog.jsonl` **at the moment the
-event happens** (`date -Is` for the timestamp). This is what survives a cancelled session —
-the loss that forced three findings' fix records to be reconstructed from commits must stay
-impossible — and it is the source the renderer and the runtime metric read. Never edit a
-past line.
+Append one event to `reviews/<target>/worklog.jsonl` **at the moment the event happens**,
+always through the stamper. It owns the timestamp, enforces the event vocabulary and each
+event's required fields, and refuses a second open round — a hand-typed `echo` line skips
+all three, which is how mislabelled rounds reached the live records:
 
 ```bash
-echo '{"t":"'$(date -Is)'","ev":"round-start","round":1}' >> "reviews/<target>/worklog.jsonl"
+node reviews/lib/wl.mjs <target> <ev> [--<key> <value>]... [--json '<obj>']
+node reviews/lib/wl.mjs <target> round-start --round 1
+node reviews/lib/wl.mjs <target> check-dispatched --round 1 --cluster awb --ids PPW-557,PPW-561
 ```
 
+`--ids` comma-splits into an array; `--json` merges an object for what flags cannot express.
+This is what survives a cancelled session — the loss that forced three findings' fix records
+to be reconstructed from commits must stay impossible — and it is the source the renderer and
+the runtime metric read. Never edit a past line: a stamp that was wrong is retracted by a
+`void` event naming it, never by rewriting history.
+
+<!-- generated:fixer-events -->
 | Event | When | Extra fields |
 |---|---|---|
 | `round-start` / `round-end` | first action / after hand-back summary | `round` |
-| `triage-done` | cluster plan written | `clusters`, `checks_needed`, `pre_cleared` (review pre-checks consumed), `gates` |
+| `triage-done` | cluster plan written | `round`, `clusters` (both required), plus `checks_needed`, `pre_cleared` (review pre-checks consumed), `gates` |
 | `protocol-written` | a cluster's protocol block is written — BEFORE any of its `finding` events | `round`, `cluster`, `ids` (the cluster's PPW ids) |
 | `gate-open` / `gate-closed` | before asking the owner / when the answer arrives | `reason` |
-| `check-dispatched` / `check-returned` | approach-check out / verdict in | `round`, `cluster`, `ids` (the PPW ids the check covers — the auditor matches on them), on return `verdict`, `tokens` if known |
-| `test-run` | each suite invocation finishes | `kind: red\|green\|final`, `filter`, `passed`, `failed`, `duration_s` |
+| `check-dispatched` / `check-returned` | approach-check out / verdict in | out: `round`, `cluster`, `ids` (the PPW ids the check covers — the auditor matches on them); back: `round`, `cluster`, `verdict`, and `tokens` if known. `ids` belongs to the dispatch only |
+| `test-run` | stamped for you by `run-scoped-tests.mjs` when a run finishes — never by hand | `kind: red\|green\|final\|baseline\|revert-and-rerun`, `filter`, `passed`, `failed`, `duration_s` |
 | `finding` | a finding reaches a status | `id`, `status`, `commit` |
 | `round-review-dispatched` / `round-review-returned` | once, when the last cluster's commits land | `round`, on return `found` |
 | `test-audit-dispatched` / `test-audit-returned` | once, alongside the round review | `round`, on return `verdict` |
+<!-- /generated:fixer-events -->
+
+Every field named above is one `wl.mjs` refuses the event without — the stamper prints
+`ERROR` and appends nothing, so a stamp you thought you took is simply missing. `round` must
+be a number (an unquoted `--round 3` becomes one); `ids` must be a non-empty list of
+`PPW-<n>`.
 
 The auditor refuses `status: resolved` without this evidence (rounds closed on/after
 2026-08-28): a `protocol-written` event timestamped before each protocol cluster's first
@@ -110,6 +130,15 @@ fix, a consumed pre-check or a `check-dispatched` event naming every trigger-cla
 fix in its `ids`, the `round-review-dispatched`/`-returned` pair on every code round, and
 `test-audit-returned` whenever a red run happened. Write the events as the work happens —
 they are the gate's input, not decoration.
+
+**The round's mandatory events, once each:** `round-start` … `round-end` (a round stopped
+and resumed re-stamps `round-start` for each part — the renderer measures paired spans only,
+and the time between two parts belongs to no round), `triage-done`, a `protocol-written` per
+protocol cluster before any of its fixes, a `check-dispatched`/`-returned` pair per check, a
+`test-run` per run (the wrapper stamps it), a `finding` per finding, the
+`round-review-dispatched`/`-returned` pair, and `test-audit-dispatched`/`-returned` when any
+test ran red. The unit's `verify-result` events are **not yours**: `verify-fixes.mjs` writes
+one per row during the verification that follows, and the driver commits them.
 
 ## Workflow
 
@@ -172,8 +201,9 @@ cluster the prompt is the protocol block plus the findings and files, asked to r
 trigger fix it is the finding, your drafted approach, and its files, asked to refute the
 approach and name what it misses.
 **Hard cap ~20–30k output tokens each** — the 044-045 round let them balloon to 95–154k;
-the cap is part of the contract. Stamp `check-dispatched` with the `ids` the check covers
-(the auditor matches trigger-classified fixes against them). Then start fixing the clusters
+the cap is part of the contract. Stamp `check-dispatched` with the round, the cluster and the ids the check covers
+(`--round <n> --cluster <label> --ids PPW-…` — all three are required fields, and the
+auditor matches trigger-classified fixes against the ids). Then start fixing the clusters
 that need no check; fold each verdict in when it returns (`check-returned`), and record in
 the resolution note that the check ran and what it flagged. If you later deviate from a
 checked or pre-cleared approach, a new check is needed **only if the deviation itself is
@@ -196,9 +226,10 @@ this skill still applies except stage 0b:
 - **Blocker exception.** A decision that blocks a 🔴 fix ends the round: leave
   `status: in-progress`, append `round-end`, and hand the driver the question — the run
   stops with it.
-- Hand-back is unchanged: renderer, auditor, doc gate, index row. `status: resolved` is
-  legal with parked findings — `deferred` is a terminal status, and the run-end report
-  carries every parked item to the owner.
+- Hand-back is unchanged: `round-end`, the round's commit, hand to the driver — the unit's
+  records and its single doc gate run after the verification. `status: resolved` is legal
+  with parked findings — `deferred` is a terminal status, and the run-end report carries
+  every parked item to the owner.
 
 ### Per cluster (rigor scaling unchanged: 🔴/🟠 get every step; 🟡/⚪ batched, class-swept)
 
@@ -239,16 +270,29 @@ this skill still applies except stage 0b:
 8. Move on to the next cluster. There is no per-cluster review — the round review (next
    section) covers the whole round's diff at once.
 
-**Test-runner rules:** exactly one test process at any moment; runs queue FIFO; every run
-background-launched so you work while it executes; scope filters per CLAUDE.md
-(`--filter FullyQualifiedName~<Namespace>` / `--include='**/<name>*.spec.ts'`); one final
-scoped run over all touched namespaces before hand-back (`test-run kind:final`).
+**Every test run goes through the wrapper** — it builds the scoped command, holds a
+machine-global lock so only one test process runs on this machine (exit 3 if another holds
+it), and stamps exactly one `test-run` event with the parsed counts and the measured duration:
+
+```bash
+node reviews/lib/run-scoped-tests.mjs <target> --kind red --filter "PhotoPrint.Tests.Unit.Orders" --round 1 --cluster orders
+node reviews/lib/run-scoped-tests.mjs <target> --kind green --ui --include "order-summary" --round 1 --cluster orders
+```
+
+`--kind` is `red|green|final|baseline|revert-and-rerun`; `--filter` (API) or `--ui --include`
+(UI) is required either way, so every stamped event carries the scope it ran. Runs queue FIFO
+and every run is background-launched so you work while it executes; one final scoped run over
+all touched namespaces before hand-back (`--kind final`).
 
 Two rules against runs whose result is thrown away:
 
-- **`--no-build` when no source changed since the previous run** — a rebuild of an unchanged
-  tree costs ~15 s per invocation and proves nothing. Docs-only and records-only steps between
-  two runs do not invalidate the build.
+- **Skip the rebuild when no source changed since the previous run** — a rebuild of an
+  unchanged tree costs ~15 s per invocation and proves nothing. The wrapper has no
+  `--no-build` flag of its own; hand it the command instead, `{filter}` and all:
+  `--cmd "dotnet test src/PhotoPrint.Tests --no-build --filter \"FullyQualifiedName~{filter}\""`
+  — and keep passing `--filter` (or `--ui --include`) alongside it, or the wrapper exits 2:
+  the flag is what the stamped event records as the scope, whatever command ran.
+  Docs-only and records-only steps between two runs do not invalidate the build.
 - **Never launch the final run while the round review is in flight.** Its follow-up fixes
   land after, so the run is dead on arrival and pays full cost. Wait for
   `round-review-returned`, fold the follow-ups in, then run once.
@@ -303,9 +347,11 @@ After each finding (worklog `finding` event at the same moment), update its entr
   the story behind it goes in the decisions section, each decision ≤ 15 lines, per
   `reviews/rules/doc-contracts.md`. A mechanism-adding fix's note also names the **new surface** —
   that is where the re-review points the owning lens.
-- `node reviews/lib/render-records.mjs <target>` no longer generates any table — it reads
-  your Findings rows for the tallies and computes the round's runtime + metrics line. You
-  hand-write everything: the table, the decisions section, deviations, boundaries.
+- `render-records.mjs` no longer generates any table — it reads your Findings rows for the
+  tallies and computes the round's runtime + metrics line, and the **driver** runs it after
+  the verification, not you. You hand-write everything: the table, the decisions section,
+  deviations, boundaries; your rows are the renderer's only input, so a missing row is a
+  missing tally.
 
 Status values: `fixed` · `wont-fix` · `deferred` · `backlog` · `disputed` ·
 `false-positive` (never `verified`). For anything other than `fixed`, write the
@@ -325,24 +371,29 @@ leave `status: in-progress` — the worklog means a cancelled round loses nothin
 
 When the round review and the test audit are folded in and the final scoped run is green:
 
-1. Append `round-end`, then run `node reviews/lib/render-records.mjs <target>` — it
-   computes the round's runtime (active / blocked / idle) from the worklog, reads your
-   Findings rows for the tallies, and appends the round's `fix-round` line to
-   `metrics.jsonl`.
-2. Run `node reviews/lib/records-auditor.mjs <target>` — it must exit clean. Then the doc
-   gate on the resolution: `node reviews/lib/doc-gate.mjs <target> <n>` (must exit clean)
-   plus the Sonnet judge (Agent, `model: sonnet`; input `reviews/rules/doc-contracts.md` + this
-   round's changed `reviews/` files; approve, or disapprove with reasons you then fix).
-   Append a `doc-gate` worklog event with the verdict.
-3. Hand-write the round's row in `reviews/state/index.md`'s Passes table — adapt the
-   suggestion line the renderer printed — and refresh the target's State cell if the
-   round changed what it says.
-4. Summarize to the user: which findings are `fixed` / `deferred` / `wont-fix`, the
-   commits, the round's runtime split, and that the resolution is `resolved`/`in-progress`.
-   Then state plainly that the next step is a **verification pass** against `fixed_commit` —
-   it writes no files; it flips surviving findings to `verified` on the ledger (or reopens
-   them) and records its verdict in the index row. Offer to trigger it, but don't mark
-   verification yourself.
+1. **Close the round.** `node reviews/lib/wl.mjs <target> round-end --round <n>`, then commit
+   the code and the resolution together — frontmatter `status: resolved`, `fixed_commit:`,
+   `closed:`. `worklog.jsonl` is tracked and your round's stamps are still uncommitted, so
+   either include the worklog in that commit or leave it for the driver's records commit,
+   which takes it up before the verification — but say in the hand-back which you did. The
+   tree must be clean at the round's tip: `verify-fixes.mjs` refuses a dirty tree by design,
+   and that tip is the commit its reverts are measured against.
+2. **Hand to the driver.** A fix round and its verification are **one reviewed unit**: the
+   verification runs now, at this tip, and the unit's records follow it — the renderer, then
+   the auditor, then one doc-gate sitting covering both halves. So you do **not** run
+   `render-records.mjs`, **not** `records-auditor.mjs`, **not** the doc gate, and you do
+   **not** write the index row. The evidence those gates read is still entirely yours: the
+   round's worklog events, the revert proofs, the round review and the test audit — a round
+   that skimped on them fails the driver's auditor, not yours.
+3. **Invoked standalone, with no driver:** stop after step 1 and say so — "unit records
+   pending verification; run the loop-driver". Never render or gate the round yourself to
+   make it look finished; a rendered round with no verification is exactly the split-unit
+   record this sequence removes.
+4. Summarize to the user: which findings are `fixed` / `deferred` / `wont-fix`, the commits,
+   and that the resolution is `resolved`/`in-progress`. Then state plainly that the next step
+   is the **verification pass** against `fixed_commit`, run by the driver as the rest of this
+   unit — it writes no files of its own; it flips surviving findings to `verified` on the
+   ledger (or reopens them). Never mark verification yourself.
 
 ## Guardrails recap
 
@@ -366,7 +417,10 @@ When the round review and the test audit are folded in and the final scoped run 
   full-suite run — that happens once, at the certification freeze.
 - One round review over the whole diff plus the test-meaning audit gate hand-back;
   self-review alone doesn't count.
-- Worklog events at the moment they happen; renderer + auditor clean before hand-back.
+- Worklog events at the moment they happen, always via `wl.mjs`; every test run via
+  `run-scoped-tests.mjs` — no hand-typed stamps, no unwrapped test process.
+- Hand back at `round-end` plus the round's commit: the renderer, the auditor, the doc gate
+  and the index row belong to the driver's verification step, not to you.
 - Never `COMMENTS_OK=1` or `DOCGATE_OK=1` — an override is logged, and during an
   unattended run it stops the run; fix the cause instead.
 - Never self-mark `verified`; hand back for re-review.

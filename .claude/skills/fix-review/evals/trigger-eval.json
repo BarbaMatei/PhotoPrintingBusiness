@@ -5,10 +5,12 @@
   { "query": "we got the review back — resolve the blockers and leave the nits for later", "should_trigger": true },
   { "query": "go close out the findings from yesterday's review of the cart service", "should_trigger": true },
   { "query": "work through the resolution file for the discount module and knock out the bugs the reviewer found", "should_trigger": true },
+  { "query": "run the fix round for the blockers in review 044-045-v3, unattended", "should_trigger": true },
   { "query": "review this PR for bugs and security issues", "should_trigger": false },
   { "query": "can you do a security review of the changes on this branch", "should_trigger": false },
   { "query": "this function returns the wrong value for negative input, fix it", "should_trigger": false },
   { "query": "simplify the changed code in checkout.js, it's too repetitive", "should_trigger": false },
   { "query": "verify that my fix actually works by running the app", "should_trigger": false },
-  { "query": "summarize the findings in the review doc for me", "should_trigger": false }
+  { "query": "summarize the findings in the review doc for me", "should_trigger": false },
+  { "query": "continue the review loop for 038-039 and tell me what's next", "should_trigger": false }
 ]

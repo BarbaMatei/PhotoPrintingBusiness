@@ -2,9 +2,9 @@ namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
 /// Allocates monotone, gap-free (in normal flow) invoice numbers per
-/// <c>(series, year)</c> partition. See ADR-020 for the load-bearing
-/// trade-off (Postgres SEQUENCE vs counter-table) and the operational
-/// mitigation for the rare rollback-gap case.
+/// <c>(series, year)</c> partition. The Postgres sequence behind it advances
+/// even when the calling transaction rolls back, so a rare numbering gap is
+/// the accepted trade-off.
 /// </summary>
 public interface IInvoiceNumberingService
 {

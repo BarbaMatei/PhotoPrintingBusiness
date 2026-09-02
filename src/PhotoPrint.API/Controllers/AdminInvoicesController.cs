@@ -87,7 +87,7 @@ public sealed class AdminInvoicesController : ControllerBase
     /// <summary>
     /// POST /api/admin/invoices/{id}/retry — flip <c>Rejected</c> or
     /// <c>Failed</c> back to <c>Pending</c> so the worker re-processes
-    /// on its next tick. 409 per ADR-004 on any other status.
+    /// on its next tick. 409 on any other status.
     /// </summary>
     [HttpPost("{invoiceId:guid}/retry")]
     [ProducesResponseType(StatusCodes.Status200OK)]

@@ -74,7 +74,7 @@ nothing sweeps for orders that are Paid with no email sent. The Sentry capture m
 rather than silent, which is the difference between an operator finding out and nobody finding out.
 An outbox is a design decision about a new persistent artefact, and it belongs to the owner.
 
-### The seven 🟡 rows are backlogged, not judged
+### The seven 🟡 rows are backlogged, not judged (PPW-677, PPW-678, PPW-681, PPW-682, PPW-683, PPW-684, PPW-685)
 
 The earlier 87 backlog rows got there by the owner's triage. These seven follow the same route
 without a ruling from him, because none of them can strand a payment or an invoice: four are in the

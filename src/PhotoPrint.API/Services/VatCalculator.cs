@@ -5,8 +5,8 @@ namespace PhotoPrint.API.Services;
 /// total at a given rate. Romanian convention: customer-facing prices are
 /// gross; VAT is extracted, never added on top.
 ///
-/// Rounding is fixed at <see cref="MidpointRounding.AwayFromZero"/> per
-/// ADR-019. The default <c>decimal.Round(x, 2)</c> overload (no mode argument)
+/// Rounding is fixed at <see cref="MidpointRounding.AwayFromZero"/>.
+/// The default <c>decimal.Round(x, 2)</c> overload (no mode argument)
 /// uses banker's rounding which disagrees with Romanian accountancy
 /// convention and ANAF tooling — callers must NOT change the mode in any
 /// regulatory path.

@@ -44,6 +44,7 @@ anything a lens receives; commit messages and test names are an accepted leak.
 
 Core lenses on every full pass:
 
+<!-- generated:core-lenses -->
 | Lens | Question | Backing |
 |---|---|---|
 | Correctness | What input/state/timing makes this wrong? | `/code-review`, Explore finders |
@@ -52,9 +53,11 @@ Core lenses on every full pass:
 | Quality / altitude | Reuse, simplification, right layer — **report-only, never auto-apply** | `/simplify` |
 | Tests & verification | Untested failure modes; test the tests | main agent + Explore |
 | Completeness critic | What did we *not* look at? Runs **last** | Explore |
+<!-- /generated:core-lenses -->
 
 Added by what the change touches:
 
+<!-- generated:added-lenses -->
 | Change touches… | Add lens |
 |---|---|
 | DB migration / schema | DB / migration-parity (does the DDL run in any test? provider divergence) |
@@ -64,6 +67,7 @@ Added by what the change touches:
 | Concurrency / idempotency / retries | Race (TOCTOU, transaction boundaries, crash windows) |
 | Money / charges / orders | Security at full strength |
 | Frontend change | Accessibility / UX |
+<!-- /generated:added-lenses -->
 
 ## Launch
 

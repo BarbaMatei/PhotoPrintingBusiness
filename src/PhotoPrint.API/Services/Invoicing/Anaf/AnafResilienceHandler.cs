@@ -10,7 +10,7 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 /// shape so the project keeps a single resilience pattern.
 ///
 /// Retry set: 5xx, 408, 429, <see cref="HttpRequestException"/>.
-/// **401 is NOT here** — that's owned by <see cref="AnafAuthHandler"/> per ADR-014.
+/// **401 is NOT here** — that's owned by <see cref="AnafAuthHandler"/>.
 ///
 /// 3 attempts, exponential backoff 1s / 2s / 4s.
 /// </summary>

@@ -5,7 +5,7 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
-/// Compare-and-swap status transitions for <see cref="Invoice"/> per ADR-016.
+/// Compare-and-swap status transitions for <see cref="Invoice"/>.
 /// Each method is a single <c>ExecuteUpdateAsync</c> with a literal
 /// <c>SetProperty</c> list — EF Core 8 translates it cleanly without
 /// closure-capture surprises.

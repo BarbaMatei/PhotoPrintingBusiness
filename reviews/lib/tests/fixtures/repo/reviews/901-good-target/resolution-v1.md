@@ -5,6 +5,7 @@ version: 1
 answers: review-v1.md
 status: resolved
 fixed_commit: ccccccc
+closed: 2026-07-15
 ---
 
 # Resolution v1 — 901-good-target
@@ -28,3 +29,7 @@ fixed_commit: ccccccc
 
 A lock around the whole init would serialize every visitor. The fix shares the
 in-flight call instead, so a burst pays one round trip.
+
+### Send the retry-count gap to the queue (PPW-9002)
+
+Low severity, no user impact — send it to the queue behind higher-priority work.

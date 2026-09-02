@@ -7,10 +7,10 @@ using PhotoPrint.API.Configuration;
 namespace PhotoPrint.API.Services.Invoicing.Anaf;
 
 /// <summary>
-/// In-process singleton OAuth token cache for ANAF SPV (ADR-013 shape).
+/// In-process singleton OAuth token cache for ANAF SPV.
 /// Loads a PKCS#12 client cert once at first refresh and attaches it to
 /// every token request thereafter. Cert path and password come from the
-/// <see cref="AnafSettings"/> options block (env vars in prod, ADR-006).
+/// <see cref="AnafSettings"/> options block (env vars in prod).
 ///
 /// Logging: token refresh is logged at Information without the bearer
 /// value, expiry, or cert metadata. The token bytes never reach a Serilog

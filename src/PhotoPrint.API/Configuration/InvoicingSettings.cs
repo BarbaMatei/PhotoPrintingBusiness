@@ -13,7 +13,7 @@ public sealed class InvoicingSettings
 }
 
 /// <summary>
-/// Dual-write rollout flag for customer-facing PDF attachments (ADR-022).
+/// Dual-write rollout flag for customer-facing PDF attachments.
 /// Default <c>false</c>: no PDF is attached to the order-confirmation email and no
 /// follow-up "Invoice ready" email is sent. What the XML, ANAF and PDF pipeline does is
 /// governed by <see cref="AnafSettings"/>, not by this flag.

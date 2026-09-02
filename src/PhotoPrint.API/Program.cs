@@ -240,7 +240,6 @@ builder.Services.AddSingleton<
     PhotoPrint.API.Validators.AnafSettingsValidator>();
 builder.Services.AddOptions<PhotoPrint.API.Configuration.AnafSettings>().ValidateOnStart();
 
-// Dual-write rollout flag (ADR-022).
 builder.Services.Configure<PhotoPrint.API.Configuration.InvoicingSettings>(
     builder.Configuration.GetSection(PhotoPrint.API.Configuration.InvoicingSettings.SectionName));
 builder.Services.AddSingleton<
@@ -248,10 +247,7 @@ builder.Services.AddSingleton<
     PhotoPrint.API.Validators.InvoicingSettingsValidator>();
 builder.Services.AddOptions<PhotoPrint.API.Configuration.InvoicingSettings>().ValidateOnStart();
 
-// QuestPDF Community License (ADR-021). Declared explicitly per QuestPDF
-// 2024.10+ requirement; the Community License is valid for businesses with
-// revenue < $1M USD/year. Operations checklist: re-evaluate the license
-// tier annually (see DEPLOYMENT.md).
+// QuestPDF 2024.10+ refuses to render until the license is declared here; Community is valid below $1M USD/year revenue, so re-check the tier annually (DEPLOYMENT.md).
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // Always wired even when Anaf:Enabled = false: the Invoice row is still created at Paid and the

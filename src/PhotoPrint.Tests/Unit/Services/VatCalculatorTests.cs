@@ -4,7 +4,7 @@ using PhotoPrint.API.Services;
 namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
-/// Pins the Romanian VAT-extraction contract and — critically — ADR-019's
+/// Pins the Romanian VAT-extraction contract and — critically — its
 /// rounding-mode invariant. The default .NET `decimal.Round(x, 2)` uses
 /// banker's rounding (`ToEven`), which disagrees with our convention.
 /// If a future PR drops the explicit `MidpointRounding.AwayFromZero`
@@ -52,7 +52,7 @@ public class VatCalculatorTests
     [Fact]
     public void Rounding_uses_AwayFromZero_not_banker_s_rounding()
     {
-        // ADR-019 invariant: the rounding mode is MidpointRounding.AwayFromZero,
+        // The invariant: the rounding mode is MidpointRounding.AwayFromZero,
         // not the .NET default (ToEven). Construct an input where the two modes
         // disagree, then assert AwayFromZero's answer.
         //

@@ -3,7 +3,7 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 /// <summary>
 /// Thrown when ANAF returns 401 twice in a row (after the
 /// <c>AnafAuthHandler</c> attempted a single token refresh + retry).
-/// Per the ADR-014 pattern, this exits the auth pipeline and propagates
+/// This exits the auth pipeline and propagates
 /// to the worker, which logs and leaves the invoice in <c>Pending</c>
 /// for the next tick.
 /// </summary>

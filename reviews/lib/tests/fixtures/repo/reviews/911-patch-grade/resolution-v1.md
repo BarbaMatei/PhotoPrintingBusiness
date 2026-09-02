@@ -5,6 +5,7 @@ version: 1
 answers: review-v1.md
 status: resolved
 fixed_commit: ffffff2
+closed: 2026-07-15
 ---
 
 # Resolution v1 — 911-patch-grade
