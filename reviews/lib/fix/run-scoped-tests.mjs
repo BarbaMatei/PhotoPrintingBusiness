@@ -25,8 +25,9 @@
 // handlers do the same release on POSIX; Windows does not reliably deliver a targeted kill
 // to these handlers, so there the dead-pid steal above is the real recovery path.
 // Output parsing: dotnet's `Failed: n, Passed: n(, Skipped: n)?` summary line, or (--ui)
-// vitest's `Tests (n failed )?n passed`. Unparsable output stamps passed/failed as null with
-// a note, but the process still exits with the runner's own exit code.
+// vitest's `Tests (n failed )?n passed`; either half falls back to `node --test`'s TAP
+// totals (`# pass n` / `# fail n`, plus `# skipped n` when present). Unparsable output stamps
+// passed/failed as null with a note, but the process still exits with the runner's own exit code.
 // Exit: N the runner's own exit code (0 on a green run, non-zero on red) · 2 usage error ·
 // 3 another test process already holds the lock.
 import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
@@ -41,6 +42,9 @@ const DEFAULT_UI_CMD = 'npm --prefix src/PhotoPrint.UI test -- --watch=false --i
 const LOCK_PATH = join(tmpdir(), 'photoprint-test.lock')
 const DOTNET_RE = /Failed:\s*(\d+), Passed:\s*(\d+)(?:, Skipped:\s*(\d+))?/
 const VITEST_RE = /Tests\s+(?:(\d+) failed[^\d]*)?(\d+) passed/
+const TAP_PASS_RE = /^# pass (\d+)\s*$/m
+const TAP_FAIL_RE = /^# fail (\d+)\s*$/m
+const TAP_SKIP_RE = /^# skipped (\d+)\s*$/m
 
 function usageError(message) {
   console.error(`usage: ${message}`)
@@ -96,14 +100,25 @@ function acquireLock() {
   }
 }
 
+// `node --test` prints its totals as TAP comment lines, so both halves fall back to it: the
+// review machinery's own suites run under that runner and used to stamp nulls.
+function parseTap(text) {
+  const pass = TAP_PASS_RE.exec(text), fail = TAP_FAIL_RE.exec(text)
+  if (!pass || !fail) return null
+  const out = { passed: Number(pass[1]), failed: Number(fail[1]) }
+  const skipped = TAP_SKIP_RE.exec(text)
+  if (skipped) out.skipped = Number(skipped[1])
+  return out
+}
+
 function parseOutput(mode, text) {
   if (mode === 'ui') {
     const m = VITEST_RE.exec(text)
-    if (!m) return { passed: null, failed: null, note: 'unparsed runner output' }
-    return { passed: Number(m[2]), failed: m[1] !== undefined ? Number(m[1]) : 0 }
+    if (m) return { passed: Number(m[2]), failed: m[1] !== undefined ? Number(m[1]) : 0 }
+    return parseTap(text) ?? { passed: null, failed: null, note: 'unparsed runner output' }
   }
   const m = DOTNET_RE.exec(text)
-  if (!m) return { passed: null, failed: null, note: 'unparsed runner output' }
+  if (!m) return parseTap(text) ?? { passed: null, failed: null, note: 'unparsed runner output' }
   const out = { passed: Number(m[2]), failed: Number(m[1]) }
   if (m[3] !== undefined) out.skipped = Number(m[3])
   return out
