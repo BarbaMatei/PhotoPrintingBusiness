@@ -1,6 +1,6 @@
 ---
 type: review-backlog
-updated: 2026-08-21
+updated: 2026-09-02
 ---
 
 # Backlog — unfixed minors from closed targets
@@ -27,6 +27,17 @@ provider: PPW-20, PPW-36, PPW-74, PPW-262 and PPW-279, each with its terminal
 state and evidence written back to its home ledger row @`90b5683`. PPW-39 and
 PPW-40 stayed, with their blocker recorded as gone; PPW-394 stayed and was
 narrowed to the half that survives.
+
+On 2026-09-02 038-039-invoicing closed and its 118 surviving rows entered here.
+107 are the minors the owner triaged to the queue. The other 11 were still
+**open** at close — 4 🔴 and 7 🟠 — because the owner closed the loop by ruling rather than by
+certification, judging seventeen passes disproportionate to the feature. They are listed with the
+rest so this file stays the one place that knows what is owed, but they are not minors:
+PPW-687 to PPW-690 are one defect — a declined card retires the key that prevents duplicate
+orders, so the abandoned payment is never cancelled, and the `PaymentFailed → Paid` transition
+added in the same round lets a late success on it fulfil a second order from the same basket.
+Two paid orders, both invoiced and labelled, reachable from a mistyped card number. Nothing is
+deployed, so nobody can hit it; it must be fixed before this feature takes a real card.
 
 | ID | Target | Sev | What | Area |
 |---|---|---|---|---|
@@ -167,3 +178,121 @@ narrowed to the half that survives.
 | PPW-467 | inbox | 🟡 | `/health` is proxied ungated and echoes each check's `Data` bag verbatim to anonymous callers; today only `freeGb`, but any future check publishing hostnames or connection strings leaks them | `edge` |
 | PPW-555 | 038-039 | 🟠 | The admin order ZIP export reads each blob unguarded after the response has begun, so one missing file aborts a part-sent download instead of answering an error — the class PPW-550 fixed for invoices | `orders` |
 | PPW-556 | 038-039 | 🟠 | `ShipmentTrackingJob`'s outage alert window is a flat 30 minutes against a `TrackingIntervalMinutes` with no maximum, so any longer interval pages every tick — the class PPW-553 fixed for the ANAF job | `jobs` |
+| PPW-494 | 038-039-invoicing | 🟡 | Cloned retry `HttpRequestMessage` in `AnafAuthHandler` is never disposed | `jobs` |
+| PPW-495 | 038-039-invoicing | 🟡 | `status=""` is rejected by the query validator but treated as "no filter" by the controller | `jobs` |
+| PPW-496 | 038-039-invoicing | 🟡 | No backfill path for orders already Paid before this deploy | `jobs` |
+| PPW-497 | 038-039-invoicing | 🟡 | Discovery manifest omitted ~24 changed files, including the VAT math itself | `records` |
+| PPW-498 | 038-039-invoicing | ⚪ | Polly retry pipeline in `AnafResilienceHandler` never disposes intermediate failed responses | `jobs` |
+| PPW-499 | 038-039-invoicing | ⚪ | `AnafAuthHandler.CloneAsync` duplicates `SamedayAuthHandler`'s request-cloning logic verbatim | `jobs` |
+| PPW-500 | 038-039-invoicing | ⚪ | Response-status classification duplicated between `AnafSpvClient.UploadAsync` and `GetStatusAsync` | `jobs` |
+| PPW-501 | 038-039-invoicing | ⚪ | Buyer-name fallback logic duplicated between `InvoiceXmlBuilder` and the PDF renderer | `jobs` |
+| PPW-502 | 038-039-invoicing | ⚪ | Invoice entity config uses a literal `"Sqlite"` string instead of the `DbProviders.Sqlite` constant | `data` |
+| PPW-503 | 038-039-invoicing | ⚪ | `PostgresInvoiceNumberingService` interpolates the sequence name into raw SQL with no in-service validation | `jobs` |
+| PPW-504 | 038-039-invoicing | ⚪ | `OrderDetailDto` grew 3 required fields with no lens covering the frontend contract | `orders` |
+| PPW-505 | 038-039-invoicing | 🟡 | Fiscal-year numbering constraint can disagree between Postgres and .NET at a Dec 31/Jan 1 boundary | `jobs` |
+| PPW-536 | 038-039-invoicing | 🟡 | RetryAsync resets every ANAF field except ClaimedAt, which the success path never releases either | `jobs` |
+| PPW-537 | 038-039-invoicing | 🟡 | Residual reconciliation is unguarded — negative line amount, silently absorbed snapshot mismatch, crash on an empty line list | `jobs` |
+| PPW-538 | 038-039-invoicing | 🟡 | Upload batch query ignores ClaimedAt, unlike the existing AWB claim precedent | `uploads` |
+| PPW-539 | 038-039-invoicing | 🟡 | New ClaimedAt column and unique index never land on an existing dev SQLite database | `records` |
+| PPW-540 | 038-039-invoicing | 🟡 | Postgres numbering tests draw a random year and assert absolute sequence values, so they collide and leak sequences | `jobs` |
+| PPW-541 | 038-039-invoicing | 🟡 | claim-lost log asserts "another worker" for causes it cannot distinguish | `uploads` |
+| PPW-542 | 038-039-invoicing | 🟡 | submitted-but-not-recorded logs Error twice and gets no Sentry capture | `uploads` |
+| PPW-543 | 038-039-invoicing | 🟡 | LastError is persisted before the exception is logged, so a DB blip loses the root cause | `uploads` |
+| PPW-544 | 038-039-invoicing | ⚪ | New Must rules have no WithMessage, so 400s carry English default messages | `payments` |
+| PPW-545 | 038-039-invoicing | ⚪ | CreateForOrderAsync(Guid) has no production caller left | `jobs` |
+| PPW-546 | 038-039-invoicing | ⚪ | Retry pre-read pulls the whole XmlPayload from the DB just to log its length | `jobs` |
+| PPW-547 | 038-039-invoicing | ⚪ | data-stack standard never mentions the Invoices table it must describe | `data` |
+| PPW-548 | 038-039-invoicing | ⚪ | ADR-023/decision-index still credit CAS for multi-replica safety, now superseded by the ClaimedAt lease | `records` |
+| PPW-549 | 038-039-invoicing | ⚪ | Unknown ANAF status warns twice and the job's line drops the diagnostic fields | `uploads` |
+| PPW-552 | 038-039-invoicing | 🟡 | PPW-515's fix orphaned `AnafUnreachableException`'s XML doc comment | `jobs` |
+| PPW-554 | 038-039-invoicing | 🟡 | The bucket-versus-key miss-cause preference has no regression test | `jobs` |
+| PPW-561 | 038-039-invoicing | 🟡 | PostgresTestDatabase catch-all turns any CREATE DATABASE failure into "no PostgreSQL server", with no retry | `data` |
+| PPW-563 | 038-039-invoicing | 🟡 | Removing the skip guard hard-fails every Postgres-backed test, and the default credentials do not match docker-compose | `data` |
+| PPW-570 | 038-039-invoicing | 🟡 | PostgresTestDatabase contexts omit the split-query behaviour production configures | `data` |
+| PPW-571 | 038-039-invoicing | 🟡 | PostgresTestDatabase.Dispose clears every Npgsql pool in the process while parallel test classes hold their own databases | `data` |
+| PPW-572 | 038-039-invoicing | 🟡 | MemoryCacheOnceRegistry.MarkOnce is a non-atomic read-then-write despite promising first-caller-only | `records` |
+| PPW-573 | 038-039-invoicing | 🟡 | data-stack standard and the deployment guide left stale by the migration squash and the provider removal | `data` |
+| PPW-574 | 038-039-invoicing | ⚪ | InvoiceAddressFormatter.Truncate with maxLength 0 indexes before the string start and throws IndexOutOfRangeException | `jobs` |
+| PPW-575 | 038-039-invoicing | ⚪ | PostalZone is truncated with the borrowed CityNameMaxLength constant | `jobs` |
+| PPW-576 | 038-039-invoicing | ⚪ | Blob-missing log omits the stamped storage tier, so a cloud-off misconfiguration reads as a lost file | `jobs` |
+| PPW-577 | 038-039-invoicing | ⚪ | Dead DatabaseProvider environment entry left in the Dockerfile, .env.example and both compose files | `records` |
+| PPW-589 | 038-039-invoicing | 🟡 | nextval commits outside the insert transaction, so a lost duplicate-delivery race permanently burns a fiscal invoice number | `jobs` |
+| PPW-590 | 038-039-invoicing | 🟡 | PollSubmittedAsync takes no claim, so every replica polls every Submitted row on every tick | `uploads` |
+| PPW-593 | 038-039-invoicing | 🟡 | Admin retry's Rejected/Failed status whitelist has no test; only the 409-free happy path is covered | `jobs` |
+| PPW-594 | 038-039-invoicing | 🟡 | The new Invoice.StorageLocation stamp is never asserted after a PDF save | `uploads` |
+| PPW-595 | 038-039-invoicing | 🟡 | QuestPDF licence is set by the test class itself, so the production licence wiring is unverified | `jobs` |
+| PPW-601 | 038-039-invoicing | 🟡 | system-architecture.md was never updated for the invoicing feature, breaking the descriptive-standards rule | `records` |
+| PPW-603 | 038-039-invoicing | 🟡 | The poll leg has no catch, so an ANAF outage logs Error row-failed there while the upload leg logs Warning unreachable | `uploads` |
+| PPW-606 | 038-039-invoicing | ⚪ | Only the pre-commit attempted invoice number is logged; the committed number is never logged | `jobs` |
+| PPW-610 | 038-039-invoicing | 🟡 | The invoice-number-exhausted 409 message is replaced by a generic admin failure toast | `orders` |
+| PPW-617 | 038-039-invoicing | 🟡 | The paid-transition invoice retry/rollback state machine is implemented twice with divergent guards and no shared test | `payments` |
+| PPW-618 | 038-039-invoicing | 🟡 | Cloud tier and the new cross-tier fallback read are proven only against fakes | `jobs` |
+| PPW-619 | 038-039-invoicing | 🟡 | OrderNumberService's manually opened DbConnection is never closed, pinning it for the rest of the scope | `records` |
+| PPW-620 | 038-039-invoicing | 🟡 | Admin invoice paging orders by a non-unique CreatedAt with no unique tiebreaker | `jobs` |
+| PPW-621 | 038-039-invoicing | 🟡 | Per-customer invoice PDF is cached for a year with no revalidation | `jobs` |
+| PPW-622 | 038-039-invoicing | 🟡 | Buyer fiscal address survives logout in sessionStorage and prefills the next account | `auth` |
+| PPW-623 | 038-039-invoicing | 🟡 | the legacy processor IPN fingerprint is verified with a non-fixed-time string compare | `records` |
+| PPW-624 | 038-039-invoicing | 🟡 | ANAF response body is read into memory with no size cap and then persisted unbounded | `jobs` |
+| PPW-625 | 038-039-invoicing | 🟡 | The PDF-ready notification fires inside the render-once branch, so a throw there loses it permanently | `uploads` |
+| PPW-626 | 038-039-invoicing | 🟡 | Cloud blob is orphaned when the storage tier flips between a failed path-stamp and the retry | `uploads` |
+| PPW-627 | 038-039-invoicing | 🟡 | Vat:Rate accepts unlimited decimal places while Orders.VatRate is numeric(5,4) and rounds silently | `records` |
+| PPW-628 | 038-039-invoicing | 🟡 | Migration Down() drops only invoice_seq_ft_2026, so lazily-created year sequences survive a rebuild and skip numbers | `data` |
+| PPW-629 | 038-039-invoicing | 🟡 | Admin invoice ListAsync output is never asserted — paging, ordering, status filter and the Orders join are unverified | `jobs` |
+| PPW-630 | 038-039-invoicing | 🟡 | Quarterly gap-audit query uses session-timezone EXTRACT while the unique index uses AT TIME ZONE 'UTC' | `records` |
+| PPW-631 | 038-039-invoicing | 🟡 | Bolt-038 test report cites a migration that no longer exists and misstates numbering test coverage | `records` |
+| PPW-632 | 038-039-invoicing | 🟡 | Customer-facing blob-missing error is English and carries no correlationId, against api-conventions | `jobs` |
+| PPW-633 | 038-039-invoicing | 🟡 | Full fiscal address is now mandatory for Easybox orders — a customer-visible scope change with no story or AC | `payments` |
+| PPW-634 | 038-039-invoicing | 🟡 | Lazy creation of a fiscal-year invoice sequence is completely silent | `data` |
+| PPW-635 | 038-039-invoicing | 🟡 | Polly retry pipeline has no OnRetry logging, so a degrading ANAF is invisible | `jobs` |
+| PPW-636 | 038-039-invoicing | 🟡 | A garbage HTTP 200 body is reported as the same unreachable incident as a network outage | `jobs` |
+| PPW-637 | 038-039-invoicing | 🟡 | Unhandled-Stripe-event line is LogDebug under an Information floor, so it never emits | `payments` |
+| PPW-638 | 038-039-invoicing | 🟡 | Fulfilment ZIP entry name interpolates an unsanitized product name | `payments` |
+| PPW-639 | 038-039-invoicing | 🟡 | Upload quota is enforced for guests only; registered users are uncapped | `uploads` |
+| PPW-640 | 038-039-invoicing | 🟡 | /checkout/recapitulare has no delivery-complete guard and mislabels a null method as courier | `records` |
+| PPW-641 | 038-039-invoicing | 🟡 | No admin UI for the invoice list, ANAF retry, or UBL XML endpoints | `records` |
+| PPW-642 | 038-039-invoicing | 🟡 | logout() resets returnUrl, so a mid-checkout token expiry dumps the user at the upload page | `auth` |
+| PPW-643 | 038-039-invoicing | 🟡 | Two unbounded subscriptions in ReviewStep.ngOnInit | `records` |
+| PPW-644 | 038-039-invoicing | 🟡 | Order ZIP blob URL is revoked synchronously after click, which can abort the download | `records` |
+| PPW-645 | 038-039-invoicing | 🟡 | A DDL DO-block runs before every number allocation instead of once per series/year | `jobs` |
+| PPW-646 | 038-039-invoicing | 🟡 | Polling loads the whole invoice row, including XmlPayload, to read two fields | `uploads` |
+| PPW-647 | 038-039-invoicing | ⚪ | AddInvoiceUnknownUploadOutcomes leaves a permanent DEFAULT 0 that the model does not declare | `uploads` |
+| PPW-648 | 038-039-invoicing | ⚪ | The VAT rounding-mode test mostly asserts decimal.Round's own behaviour and never pins the net-side mode | `tests` |
+| PPW-650 | 038-039-invoicing | ⚪ | Story 001's AC to document shipping as VAT-inclusive in decision-index.md is not done | `records` |
+| PPW-651 | 038-039-invoicing | ⚪ | Both admin retry-refusal branches log nothing despite the class's audit-logged claim | `jobs` |
+| PPW-652 | 038-039-invoicing | ⚪ | Paid webhook spends two extra round-trips re-loading order relations it could have Included | `payments` |
+| PPW-653 | 038-039-invoicing | ⚪ | Duplicated ANAF status triage with a provably dead branch, repeated in both client methods | `jobs` |
+| PPW-654 | 038-039-invoicing | ⚪ | Migration hardcodes invoice_seq_ft_2026, duplicating a name the service derives from config | `data` |
+| PPW-655 | 038-039-invoicing | ⚪ | Runtime Math.Max clamps duplicate ANAF ranges the settings validator already enforces, with a divergent floor | `uploads` |
+| PPW-656 | 038-039-invoicing | ⚪ | Third copy of the mandatory-address field list in checkout-state.service.ts | `records` |
+| PPW-657 | 038-039-invoicing | ⚪ | Lens manifest omits three changed files and names one that did not change | `uploads` |
+| PPW-677 | 038-039-invoicing | 🟡 | Webhook AlreadyInvoiced return leaves the uncommitted Paid transition on the scoped context | `payments` |
+| PPW-678 | 038-039-invoicing | 🟡 | Invoice number allocated outside the transaction that inserts the row, against the numbering service's contract | `jobs` |
+| PPW-681 | 038-039-invoicing | 🟡 | Non-owner invoice PDF served with a one-year immutable browser cache | `jobs` |
+| PPW-682 | 038-039-invoicing | 🟡 | ResetForTest deletes the migration's 42 EasyboxLocker seed rows and never restores them | `data` |
+| PPW-683 | 038-039-invoicing | 🟡 | DropAllForeignKeys does not mark the pooled database dirty, so a constraint-free schema can be handed on | `data` |
+| PPW-684 | 038-039-invoicing | 🟡 | Test-database sweep is scoped to its own salt, so pools from other worktrees are never reclaimed | `data` |
+| PPW-685 | 038-039-invoicing | 🟡 | ResetSequences drops every public sequence the migration script did not literally CREATE, including identity-owned ones | `data` |
+| PPW-687 | 038-039-invoicing | 🔴 | payment-step's discardDeadIntent retires the idempotency key on every confirm error — card typos and already-succeeded charges included — wiping the form and creating a second order | `payments` |
+| PPW-688 | 038-039-invoicing | 🔴 | The server's PaymentFailed intent-abandon path is unreachable because the SPA retires the key instead of reusing it, so the declined order's intent stays chargeable and the widened PaymentFailed→Paid transition can auto-fulfil the duplicate | `payments` |
+| PPW-689 | 038-039-invoicing | 🔴 | Reclassified 403/404/405 misconfiguration responses now spend the blind-repost budget and park invoices with a false duplicate-filing reason, with no test over the join | `uploads` |
+| PPW-690 | 038-039-invoicing | 🔴 | The new wasWaiting gate stops the cart from ever being cleared on the 409 "already paid" redirect | `orders` |
+| PPW-691 | 038-039-invoicing | 🟠 | One failed status poll ends the confirmation page's settle wait permanently — no reschedule and no give-up message | `orders` |
+| PPW-692 | 038-039-invoicing | 🟠 | The destroy guard clears the poll timer but not the in-flight status request, so the poll chain can restart after destroy and clear a new basket | `orders` |
+| PPW-693 | 038-039-invoicing | 🟠 | The new rejected-invoice slice cap trades pending-starvation for rejection-starvation — not-yet-due rejections fill all 5 rows — and only the first case is tested | `uploads` |
+| PPW-694 | 038-039-invoicing | 🟠 | Widening the transition table silently widened the admin status endpoint, and its only guard test was inverted | `payments` |
+| PPW-695 | 038-039-invoicing | 🟠 | RequeueRejectedAsync clears XmlPayload but keeps PdfStoragePath, so the filed XML and the customer's PDF can diverge — and the new test pins that stale path | `jobs` |
+| PPW-696 | 038-039-invoicing | 🟠 | InvoicesController's ownership check still trusts the null-returning GetUserIdOrNull for merged principals; only the audit line was fixed | `jobs` |
+| PPW-697 | 038-039-invoicing | 🟠 | EnsureSchemaApplied's pending-migrations early return skips both repair of an interrupted first use and the foreign-key drop on a reused slot | `data` |
+| PPW-698 | 038-039-invoicing | 🟡 | Minting a key after retirement silently drops the stored orderId the settling page depends on, and the spec asserts before minting so it stays hidden | `payments` |
+| PPW-699 | 038-039-invoicing | 🟡 | delivery-step's shipping-costs continue gate is untested and the new per-field maxlength branch is unreachable in the case it was added for | `shipping` |
+| PPW-700 | 038-039-invoicing | 🟡 | TryDropDatabase drops the database without the ClearAllPools() its sibling Drop() documents as necessary | `data` |
+| PPW-701 | 038-039-invoicing | 🟡 | The folded AddColumn left Invoices.UnknownUploadOutcomes with a permanent DEFAULT 0 that the model and snapshot do not declare | `data` |
+| PPW-702 | 038-039-invoicing | 🟡 | The irreversible Stripe intent cancellation runs before the local transaction commits | `payments` |
+| PPW-703 | 038-039-invoicing | 🟡 | The abandon-intent test asserts through the SUT's own DbContext, so a missing save stays green | `payments` |
+| PPW-704 | 038-039-invoicing | 🟡 | The new gateway idempotency-race branch has no test and cannot be reached with the existing fake | `payments` |
+| PPW-705 | 038-039-invoicing | 🟡 | The gateway-race 409's crafted message is never shown — the SPA's existing 409 branch swallows it | `payments` |
+| PPW-706 | 038-039-invoicing | 🟡 | The slot-repair test leases a second pool slot while its class fixture already holds one | `data` |
+| PPW-707 | 038-039-invoicing | 🟡 | No schema-level assertion covers the folded Invoices columns after the migration squash | `data` |
+| PPW-708 | 038-039-invoicing | 🟡 | The squash reuses the baseline migration id while a coexisting worktree still carries the two AddColumn migrations | `data` |
+| PPW-709 | 038-039-invoicing | ⚪ | A code comment on the confirmation page cites a finding ID, which CLAUDE.md forbids and the pre-commit hook blocks | `orders` |
+| PPW-710 | 038-039-invoicing | ⚪ | The OrderStatusMachine transition-table doc comment was not updated with PaymentFailed → Paid | `payments` |

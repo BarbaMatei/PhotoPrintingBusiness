@@ -54,8 +54,8 @@ this loop's own earlier fixes. The verdict is request-changes ([review-v9.md](re
 ## Reasons to doubt
 
 - **Six of eleven lenses did not search this diff** — five is this pass type's cap
-  ([runbook-discovery.md](../runbooks/runbook-discovery.md)); the client side is still unreviewed at nine passes ([PPW-524](ledger.md)).
-- **This pass type cannot certify** ([README](../README.md)) — clean would have meant "this diff is clean", never
+  ([runbook-discovery.md](../../runbooks/runbook-discovery.md)); the client side is still unreviewed at nine passes ([PPW-524](ledger.md)).
+- **This pass type cannot certify** ([README](../../README.md)) — clean would have meant "this diff is clean", never
   "the feature is clean".
 - **Each 🔴 rests on one lens plus a built trace**, not on lenses agreeing ([metrics.jsonl](metrics.jsonl), `conv: 1`),
   and eleven of the 24 got no adversarial check at all, by this pass type's own rules (`unverified-*`).

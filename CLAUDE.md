@@ -30,9 +30,20 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
 
 ## LSP (semantic code lookup — C# and TypeScript)
 
-Language servers attach to every session automatically: `csharp-ls` for `.cs`,
-`typescript-language-server` for `.ts/.tsx/.js/.jsx` (both installed globally). The `LSP`
-tool is deferred — the first time a task touches C# or TS code, load it once via
+Language servers attach to every session automatically (enabled via the `csharp-lsp` and
+`typescript-lsp` plugins in `.claude/settings.json`, so worktrees inherit them): `csharp-ls`
+for `.cs`, `typescript-language-server` for `.ts/.tsx/.js/.jsx`. Two version constraints keep
+them alive — break either and the server dies at startup:
+
+- `csharp-ls` is pinned to **0.20.0**, the newest build targeting `net9.0`, matching the only
+  installed SDK (9.0.317). 0.21+ target `net10.0`; MSBuildLocator refuses an SDK newer than the
+  server's own runtime, so those fail with `No instances of MSBuild could be detected.`
+- The global `typescript` is 7.x (the Go rewrite, no `lib/tsserver.js`), which
+  `typescript-language-server` cannot drive. A classic TypeScript 5.9.3 lives in the server's own
+  `node_modules` so it resolves from any directory, worktrees included; reinstalling the server
+  globally wipes that copy.
+
+The `LSP` tool is deferred — the first time a task touches C# or TS code, load it once via
 ToolSearch (`select:LSP`) and prefer it over Grep for any question about *symbols*:
 
 - where is X defined · who calls/uses X (rename and refactor blast radius)

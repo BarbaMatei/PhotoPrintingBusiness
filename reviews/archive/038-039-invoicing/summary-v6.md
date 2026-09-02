@@ -43,12 +43,12 @@ decisions-needed: 4
 ## Reasons to doubt
 
 - **Six of eleven lenses did not run** — the cap for this pass type is five
-  ([runbook-discovery.md](../runbooks/runbook-discovery.md)). `security`, `requirements`,
+  ([runbook-discovery.md](../../runbooks/runbook-discovery.md)). `security`, `requirements`,
   `quality`, `input-validation`, `race` and `frontend-ux` never searched this work
   ([review-v6.md](review-v6.md) frontmatter).
 - **The client side has never been reviewed at all**, across six passes ([PPW-524](ledger.md)).
 - **This pass type cannot certify** — its verdict is capped by design
-  ([README](../README.md)). Clean here means "this diff is clean", never "the feature is clean".
+  ([README](../../README.md)). Clean here means "this diff is clean", never "the feature is clean".
 - **New findings per pass are not decaying**: 37 at v1, 38 here, after four rounds of fixing
   ([metrics.jsonl](metrics.jsonl)).
 - **PPW-521, PPW-524 and PPW-531 are `plausible`, not `confirmed`**, and the 15 minor rows got no
