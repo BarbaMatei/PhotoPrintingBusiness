@@ -1,6 +1,6 @@
 ---
 type: implementation-plan
-status: in execution — Phase 0 ruled 2026-09-02 (D1 a · D2 c · D3 b · D4 c · D5 b · D6 b · D7 a)
+status: in execution — Phase 0 ruled 2026-09-02 (D1 a · D2 c · D3 b · D4 c · D5 b · D6 d · D7 a)
 created: 2026-09-02
 owner: Matei Barba
 spec: docs/agent-systems/theory-vs-practice-2026-09.md
@@ -58,11 +58,10 @@ section it implements. Read the spec's §3–§8 and §10–§12 before any task
 
 ## Phase 0 — Decisions register (owner rulings; the gate)
 
-**Rulings (owner, 2026-09-02):** D1 **a** · D2 **c** · D3 **b** · D4 **c** · D5 **b** · D6 **b** ·
-D7 **a**. Consequence of D6 b under D1 a: the Reviewer's remaining dimensions are planned as two
-new lenses (`design`, `docs-accuracy`) plus an accept / block / revise mapping of the loop's
-verdict, as a unit of the re-scoped intent 035 (P2.3, P4.1, P4.2); error-handling / silent-failure
-review stays with the defect-side `observability` lens, since both lens kinds run in one engine.
+**Rulings (owner, 2026-09-02):** D1 **a** · D2 **c** · D3 **b** · D4 **c** · D5 **b** · D6 **d** ·
+D7 **a**. Consequence of D6 d: the Reviewer's remaining dimensions stay deferred; only the concept
+note's open decision is resolved — error-handling / silent-failure review belongs to the defect side
+(the `observability` lens) — and the note records the three reviewer lenses that already run.
 
 Seven decisions I could not settle at very high confidence. Each has three or more options,
 scored 1–5 per dimension (5 = best), a total, my recommendation and my confidence in it. Below
@@ -428,9 +427,9 @@ bug-hunter guide.
 
 - [ ] **Step 1: Status block** → `> **Status: PARTIALLY BUILT, UNPLANNED (2026-09).** Three of the five dimensions below run today as lenses of the review loop (`reviews/`): intent fidelity as `requirements` (against the bolt's own documents, not an oracle), design quality as `quality` (report-only), test adequacy as `tests-coverage`. The verdict exists (`request-changes` / `approve-with-followups` / `approved`) but is a loop outcome, not the accept / block / revise synthesis described here. Comment/doc accuracy and contract fidelity are not built. The rest of this note stands as the design for the remainder.`
 
-- [ ] **Step 2: Resolve the OPEN DECISION** (ruled D6 b under D1 a) — replace the ⚠️ bullet with:
-`- **Resolved (2026-09): error-handling / silent-failure review belongs to the defect side.** The review loop's `observability` lens (swallowed exceptions, indistinguishable incident types, partial-state failures) already owns it. With one engine running both lens kinds (ruling D1), the reviewer lenses do not look for it.`
-Then add a subsection `### Planned remainder (ruling D6 b, 2026-09)`: two new lenses — `design` (type design, encapsulation, API surface, naming, pattern consistency against `memory-bank/standards/`; report-only like `quality`) and `docs-accuracy` (comments, doc comments, standards and ADR text that the diff makes false) — and a verdict mapping: `approved` → accept, `request-changes` → block, `approve-with-followups` → revise-and-resubmit, computed by the loop's synthesis step, no separate system. Planned as unit `007-reviewer-remainder` of intent 035 (P4.2); intent fidelity against a contract waits for the knowledge-builder (D4).
+- [ ] **Step 2: Resolve the OPEN DECISION** (ruled D6 d) — replace the ⚠️ bullet with:
+`- **Resolved (2026-09): error-handling / silent-failure review belongs to the Inspector.** The review loop's `observability` lens (swallowed exceptions, indistinguishable incident types, partial-state failures) already owns it, and it is defect-hunting by nature. The Reviewer does not look for it.`
+The remaining reviewer dimensions (design, comment/doc accuracy, contract fidelity, the accept / block / revise synthesis) stay deferred as the note already says; do not add planned lenses.
 
 - [ ] **Step 3: New section "What exists today (2026-09)"** after the disjointness section:
 
@@ -642,7 +641,7 @@ bolts are removed, not completed. Every removal is logged in `maintenance-log.md
 - Modify: `memory-bank/intents/035-bug-hunter-agent-system/requirements.md` (the header note, "Intent Overview", "In Scope")
 
 - [ ] **Step 1: Header note** — after the tooling-only paragraph add: `> **Re-scoped 2026-09 (reconciliation, rulings D1/D4/D5).** The system's engine exists as the review loop (`reviews/`), built in pre-merge mode. This intent now covers only what that engine lacks: the 16 missing briefs and the gaps of the 15 partial ones, in the order ruled in D4. The status of every brief is the guide's "Implementation status (2026-09)" table.`
-- [ ] **Step 2: In Scope** — replace the phase bullets with the gap list grouped as: **Trust upgrades** (tool-ingest P9; severity risk score + reachability weight P8/14b; verifier execution proof P10 per D3; git-revision moved/fixed detection P11) · **Map & breadth** (app-mapping P12, code-index P13, reachability P14, taint P16, dependency-audit P20, config-auditor P21, root-cause one-record-many-locations P23, budget unit + incremental scanning P24d) · **Learn & measure** (standing corpus + poison fixture P27, recall + escape metrics P28, curator automation P29/29b) · **Remediation hand-off** (regression-harvest by a non-fixer P30, fix-request-emit P33) · **Reviewer remainder** (ruling D6 b: `design` lens, `docs-accuracy` lens, accept / block / revise verdict mapping — no separate system) · **Oracle tier** (P24, 24b, 24c — after the knowledge-builder, D4) · **Optional** (SARIF, issue-sync, ci-gate). Each item names its workbench seam (the `reviews/lib` file it extends).
+- [ ] **Step 2: In Scope** — replace the phase bullets with the gap list grouped as: **Trust upgrades** (tool-ingest P9; severity risk score + reachability weight P8/14b; verifier execution proof P10 per D3; git-revision moved/fixed detection P11) · **Map & breadth** (app-mapping P12, code-index P13, reachability P14, taint P16, dependency-audit P20, config-auditor P21, root-cause one-record-many-locations P23, budget unit + incremental scanning P24d) · **Learn & measure** (standing corpus + poison fixture P27, recall + escape metrics P28, curator automation P29/29b) · **Remediation hand-off** (regression-harvest by a non-fixer P30, fix-request-emit P33) · **Oracle tier** (P24, 24b, 24c — after the knowledge-builder, D4) · **Optional** (SARIF, issue-sync, ci-gate). Each item names its workbench seam (the `reviews/lib` file it extends).
 - [ ] **Step 3: Out of scope** — add: "Re-building what the review loop already does (Phase 1, Prompts 1–7, 11b, 19, 22, 26, 31, 31b)."
 - [ ] **Step 4: Commit** — `git commit -m "docs(memory-bank): re-scope intent 035 to the inspector gaps the review loop leaves (reconciliation P4.1)"`
 
@@ -652,7 +651,7 @@ bolts are removed, not completed. Every removal is logged in `maintenance-log.md
 - Modify: `memory-bank/intents/035-bug-hunter-agent-system/units.md`
 
 - [ ] **Step 1** — Decomposition note: "43 briefs" stays; add "12 satisfied by the review loop, tracked in the guide's status table; units below cover the remaining 31 (16 missing + 15 partial)."
-- [ ] **Step 2** — Units: `001-phase-1-skeleton` → marked "satisfied by the review loop (2026-09) — no bolt"; `002-phase-2-trust` → trust upgrades (P8/14b, P9, P10, P11); `003-phase-3-breadth-and-scale` → split in text into 003a map (P12–P14, P16, P24d budget) and 003b specialists (P20, P21, P23) with the oracle tier (P24, 24b, 24c) moved to a new `006-oracle-tier` unit gated on the knowledge-builder; `004-phase-4-learn-and-measure` → P27, P28, P29, 29b; `005-phase-5-remediation` → P30, P33 (+ P32 note); optional unchanged; new `007-reviewer-remainder` (ruling D6 b): the `design` lens, the `docs-accuracy` lens, the accept / block / revise verdict mapping — three stories, workbench seam `reviews/lib/records/schema.mjs` (lens manifest) and `reviews/lib/discovery-review.wf.js` (lens prompts, synthesis). Order per D4, the reviewer remainder after the trust upgrades.
+- [ ] **Step 2** — Units: `001-phase-1-skeleton` → marked "satisfied by the review loop (2026-09) — no bolt"; `002-phase-2-trust` → trust upgrades (P8/14b, P9, P10, P11); `003-phase-3-breadth-and-scale` → split in text into 003a map (P12–P14, P16, P24d budget) and 003b specialists (P20, P21, P23) with the oracle tier (P24, 24b, 24c) moved to a new `006-oracle-tier` unit gated on the knowledge-builder; `004-phase-4-learn-and-measure` → P27, P28, P29, 29b; `005-phase-5-remediation` → P30, P33 (+ P32 note); optional unchanged. Order per D4.
 - [ ] **Step 3: Commit** — `git commit -m "docs(memory-bank): re-cut the intent 035 units around the missing inspector pieces (reconciliation P4.2)"`
 
 ### Task P4.3: Bolts 085–094
