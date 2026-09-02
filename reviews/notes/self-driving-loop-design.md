@@ -20,7 +20,7 @@ operation. The two closing sections hold the completion audit and the direction 
 *operational* — router, entry tiers, stop rule, pass mechanics. The
 [doc contract](../rules/doc-contracts.md) owns the *file shapes and the language rules*.
 The [rationale notes](rationale.md) own the *evidence*. The
-[path constants](../lib/paths.mjs) own every path for scripts. This file owns the
+[path constants](../lib/records/schema.mjs) own every path for scripts. This file owns the
 *research*: the assumptions autonomy needs, the experiments that test them, and what is
 still missing. On any overlap, the README wins.
 
@@ -204,7 +204,7 @@ Built and operating:
 | Metrics **v3** (per-finding lens/severity/verdict/fix-lineage; fix-round lines; runtime from the worklog) | [metrics-schema.md](../rules/metrics-schema.md) + [lib/render-records.mjs](../lib/render-records.mjs) |
 | Records auditor (schema, tallies, pairing, commit reachability, citation-leak count with target 0) | [lib/records-auditor.mjs](../lib/records-auditor.mjs) |
 | Doc gate (deterministic lint, target + `state` modes, + Sonnet judge on owner-facing prose; pre-commit backstop; its own fixture suite — 45 assertions on 2026-09-01) | [lib/doc-gate.mjs](../lib/doc-gate.mjs) + [lib/tests/run-tests.mjs](../lib/tests/run-tests.mjs) |
-| Path constants + link keeper (every move: `git mv`, constant, then the link check) | [lib/paths.mjs](../lib/paths.mjs) + [lib/cli/docs-sync.mjs](../lib/cli/docs-sync.mjs) |
+| Path constants + link keeper (every move: `git mv`, constant, then the link check) | [lib/records/schema.mjs](../lib/records/schema.mjs) + [lib/cli/docs-sync.mjs](../lib/cli/docs-sync.mjs) |
 | Ledgers + worklogs (template-bound; append-only enforced against git HEAD by the gate) | per-target files, shapes in [doc-contracts.md](../rules/doc-contracts.md) |
 
 To build — re-audited item by item against today's system:

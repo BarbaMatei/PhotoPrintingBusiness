@@ -9,7 +9,9 @@ import {
   STATUSES, TARGETLESS, V3_CUTOFF, V4_CUTOFF,
 } from '../../records/schema.mjs'
 import * as schema from '../../records/schema.mjs'
-import * as shim from '../../vocab.mjs'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { REVIEWS } from '../../records/schema.mjs'
 
 {
   check('the lens manifest is the 11 keys', MANIFEST_LENSES.length === 11, String(MANIFEST_LENSES.length))
@@ -72,7 +74,9 @@ import * as shim from '../../vocab.mjs'
     V3_CUTOFF === '2026-08-03' && V4_CUTOFF === '2026-08-28' && schema.V2_CUTOFF === undefined,
     [V3_CUTOFF, V4_CUTOFF, String(schema.V2_CUTOFF)].join(' '))
 
-  check('the old vocab.mjs path still serves the same objects',
-    shim.AREAS === AREAS && shim.MANIFEST_LENSES === MANIFEST_LENSES && shim.V4_CUTOFF === V4_CUTOFF,
-    Object.keys(shim).join(','))
+  // The two re-export shims are gone: schema.mjs is the only path to this vocabulary, so a
+  // resurrected lib/vocab.mjs or lib/paths.mjs means a caller is importing the old name again.
+  check('the vocab.mjs and paths.mjs re-export shims stay deleted',
+    !existsSync(join(REVIEWS, 'lib', 'vocab.mjs')) && !existsSync(join(REVIEWS, 'lib', 'paths.mjs')),
+    [join(REVIEWS, 'lib', 'vocab.mjs'), join(REVIEWS, 'lib', 'paths.mjs')].filter(existsSync).join(', '))
 }

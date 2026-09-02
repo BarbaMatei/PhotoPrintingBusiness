@@ -23,7 +23,7 @@ protocol blocks, round-scope review, test-meaning audit, override log, convergen
 lens-coverage debt, design-pass gate, verify-fixes `revert-broke-build`) into this branch
 at `2831ffb`. None of the redesign's vocabulary was in that merge's doc text, so Tasks
 14–17 stay as written but become **integration edits over the merged text** — never
-overwrite the audit sections. `reviews/lib/vocab.mjs` (MANIFEST_LENSES, AREAS, V4_CUTOFF)
+overwrite the audit sections. `reviews/lib/records/schema.mjs` (MANIFEST_LENSES, AREAS, V4_CUTOFF)
 is now the machine authority the scripts share.
 
 ## Done (tasks 1–13 of 18, plus the suite split)

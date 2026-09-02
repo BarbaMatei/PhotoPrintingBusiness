@@ -59,7 +59,7 @@ the owner conversation of 2026-08-22.
 
 # Task 1: wl.mjs — the validated worklog stamper
 
-New file `reviews/lib/wl.mjs`. Read first: `reviews/lib/paths.mjs`,
+New file `reviews/lib/wl.mjs`. Read first: `reviews/lib/records/schema.mjs`,
 `reviews/lib/render-records.mjs` (event usage), `reviews/rules/metrics-schema.md` (worklog
 section), a sample: `reviews/038-039-invoicing/worklog.jsonl` (do not modify it).
 
@@ -150,7 +150,7 @@ Extend `reviews/lib/render-records.mjs` (after Task 2). Read first:
 `reviews/state/index.md` (Passes table + Targets at a glance), a real ledger
 (`reviews/038-039-invoicing/ledger.md`, read-only), `reviews/rules/doc-contracts.md`
 (index and ledger contracts), `reviews/lib/doc-gate.mjs` (the caps it enforces),
-`reviews/lib/paths.mjs` (INDEX path).
+`reviews/lib/records/schema.mjs` (INDEX path).
 
 ### Behavior
 
@@ -280,7 +280,7 @@ fix-round line is appended → still exits 0 without the warning. Existing smoke
 
 # Task 7: gate-miner.mjs — the lint miner
 
-New file `reviews/lib/gate-miner.mjs`. Read first: `reviews/lib/paths.mjs`, a real
+New file `reviews/lib/gate-miner.mjs`. Read first: `reviews/lib/records/schema.mjs`, a real
 worklog's `doc-gate` events (`reviews/038-039-invoicing/worklog.jsonl`, read-only),
 `reviews/lib/doc-gate.mjs` (what lint already covers).
 
