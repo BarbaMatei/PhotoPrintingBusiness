@@ -346,6 +346,8 @@ const minerWorklog = (T, target, events, archived) => {
   {
     const r = mined(T)
     check('--disapprovals exits 0 with no --since', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+    check('the report is headed DISAPPROVALS, the mode\'s name under speed-report',
+      r.out.startsWith('DISAPPROVALS: 1 target(s) scanned, since ') && !r.out.includes('GATE MINER'), r.out.split('\n')[0])
     check('both disapprovals print their full reason/judge text', r.out.includes(REASON_A) && r.out.includes(JUDGE_C), r.out.trim())
     check('the approve event does not print', !r.out.includes(NOTE_B), r.out.trim())
     check('a voided disapproval is neither printed nor counted', !r.out.includes(REASON_VOIDED), r.out.trim())

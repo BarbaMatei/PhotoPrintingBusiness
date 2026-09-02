@@ -69,7 +69,7 @@ export function disapprovalLines(reviewsDir, { since: sinceArg = null, filters =
     .filter(({ event }) => { const d = dayOf(event); return d && (!since || d >= since) })
     .sort((a, b) => epochOf(a.event) - epochOf(b.event))
 
-  const out = [`GATE MINER: ${targets.length} target(s) scanned, since ${since ?? '(no worklog events found)'}`, '']
+  const out = [`DISAPPROVALS: ${targets.length} target(s) scanned, since ${since ?? '(no worklog events found)'}`, '']
   for (const { target, event } of disapprovals) {
     const which = event.round !== undefined ? `round ${event.round}` : event.pass !== undefined ? `pass ${event.pass}` : '—'
     out.push(`${dayOf(event)} · ${target} · ${which}`, `  ${textOf(event)}`, '')
