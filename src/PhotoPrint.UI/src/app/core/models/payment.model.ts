@@ -1,20 +1,13 @@
 import { DeliveryType, ShippingAddressForm } from './shipping.model';
 
 export interface CreateOrderRequest {
-  paymentProcessor: 'Stripe' | 'EuPlatesc';
   deliveryType: DeliveryType;
   easyboxLockerId: string | null;
   shippingAddress: ShippingAddressForm | null;
-  shippingCostRon: number;
 }
 
 export interface StripeIntentResponse {
   clientSecret: string;
-  orderId: string;
-}
-
-export interface EuPlatescInitiateResponse {
-  redirectUrl: string;
   orderId: string;
 }
 
@@ -27,15 +20,14 @@ export type OrderStatus =
   | 'PaymentFailed'
   | 'Cancelled';
 
-export interface OrderDto {
+export interface OrderPaymentStatusDto {
   id: string;
   orderNumber: string;
   status: OrderStatus;
   totalRon: number;
-  subtotalRon: number;
-  shippingCostRon: number;
+  vatRon: number;
+  vatRate: number;
   deliveryType: DeliveryType;
-  paymentProcessor: 'Stripe' | 'EuPlatesc';
   createdAt: string;
   paidAt: string | null;
 }

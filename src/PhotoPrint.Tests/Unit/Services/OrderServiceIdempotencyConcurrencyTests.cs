@@ -1,8 +1,8 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Moq;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Payments;
@@ -15,33 +15,27 @@ namespace PhotoPrint.Tests.Unit.Services;
 
 /// <summary>
 /// Regression tests for the concurrent same-key race. These run
-/// against a REAL SQLite database rather than the EF InMemory provider on purpose: the
+/// against a REAL PostgreSQL database rather than the EF InMemory provider on purpose: the
 /// bug is "the losing INSERT violates the unique index and throws an unhandled
 /// DbUpdateException → 500", and InMemory does not enforce unique indexes, so it can
-/// never reproduce it. SQLite enforces <c>ix_orders_idempotency_key</c>, which is what
+/// never reproduce it. PostgreSQL enforces <c>ix_orders_idempotency_key</c>, which is what
 /// makes these tests meaningful.
 /// </summary>
-public class OrderServiceIdempotencyConcurrencyTests : IDisposable
+public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTestDatabase>
 {
-    private readonly SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database;
 
-    public OrderServiceIdempotencyConcurrencyTests()
+    public OrderServiceIdempotencyConcurrencyTests(PostgresTestDatabase database)
     {
-        // A single open connection keeps the in-memory database alive for the test and
-        // lets multiple DbContexts (the racing "winner" + "loser") share it.
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-
-        using var db = NewContext();
-        db.Database.EnsureCreated(); // builds schema incl. the unique idempotency index
+        _database = database;
+        database.ResetForTest();
     }
 
-    public void Dispose() => _connection.Dispose();
 
     private PhotoPrintDbContext NewContext(params IInterceptor[] interceptors)
     {
         var opts = new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
+            .UseNpgsql(_database.ConnectionString)
             .AddInterceptors(interceptors)
             .Options;
         return new PhotoPrintDbContext(opts);
@@ -57,10 +51,11 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         return new OrderService(db, numberMock.Object, shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
     }
 
-    // The REAL OrderNumberService (SQLite COUNT+1 branch) — the mock's always-unique
+    // The REAL OrderNumberService — the mock's always-unique
     // Interlocked.Increment masked the concurrent order-number collision this exercises.
     private static OrderService NewServiceWithRealNumberService(PhotoPrintDbContext db)
     {
@@ -68,7 +63,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         return new OrderService(db, new OrderNumberService(db), shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
     }
 
     // Build the concurrent "winner" by running the REAL
@@ -86,7 +82,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         var svc = new OrderService(winnerDb, numberMock.Object, shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()));
+            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Options.Create(new VatSettings()));
 
         var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);
         return result.Order;
@@ -111,7 +108,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     private async Task<(Guid userId, Guid productId, Guid uploadId)> SeedCartAsync(
         decimal unitPrice = 2.00m, int quantity = 3)
     {
-        var userId = await SeedUserAsync(); // SQLite enforces the CartItem/Upload → User FKs
+        var userId = await SeedUserAsync(); // the CartItem/Upload → User FKs are enforced
         using var db = NewContext();
 
         // Shared canonical cart graph — see TestCartSeed.
@@ -122,10 +119,10 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         return (userId, graph.Product.Id, graph.Upload.Id);
     }
 
-    // Courier delivery avoids the Order → EasyboxLocker FK (SQLite enforces it), so the
+    // Courier delivery avoids the Order → EasyboxLocker FK, so the
     // ONLY constraint a colliding INSERT can violate is the unique idempotency index.
     private static CreateOrderRequest MakeRequest()
-        => new(PaymentProcessor.Stripe, DeliveryType.Courier, null, null);
+        => new(DeliveryType.Courier, null, null);
 
     [Fact]
     public async Task CreateFromCart_CrossTenantKeyCollisionOnInsert_Returns409_NotServerError()
@@ -176,7 +173,7 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         var svc = NewService(db);
 
         var easyboxWithBogusLocker = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(), ShippingAddress: null);
 
         await Assert.ThrowsAsync<DbUpdateException>(
@@ -276,14 +273,12 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
     }
 
     [Fact]
-    public async Task SqliteIdempotencyCollision_SurfacesUniqueExtendedCode_AndColumnName()
+    public async Task IdempotencyCollision_SurfacesUniqueViolationSqlState_AndConstraintName()
     {
-        // IsIdempotencyKeyViolation classifies the SQLite arm off the
-        // EXTENDED result code SQLITE_CONSTRAINT_UNIQUE (2067) plus the column name in the
-        // message (tied to nameof(Order.IdempotencyKey)). Pin both premises here so a
-        // Microsoft.Data.Sqlite upgrade that re-words the message or changes the code fails
-        // in THIS test — loudly — instead of silently degrading the canonical double-submit
-        // from a clean 409 to an unhandled 500 (the fragility 5 lenses converged on).
+        // IsIdempotencyKeyViolation classifies the violation off SQLSTATE 23505 plus the
+        // constraint name (tied to the DbContext index-name constant). Pin both premises here
+        // so a driver upgrade or an index rename fails in THIS test — loudly — instead of
+        // silently degrading the canonical double-submit from a clean 409 to an unhandled 500.
         var ownerId = await SeedUserAsync();
         const string key = "dupe-key-classify";
 
@@ -297,22 +292,20 @@ public class OrderServiceIdempotencyConcurrencyTests : IDisposable
         db.Orders.Add(MinimalOrder("FT-DUP-B", ownerId, key)); // same key → idempotency index
 
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
-        var sqlite = Assert.IsType<SqliteException>(ex.InnerException);
-        Assert.Equal(2067, sqlite.SqliteExtendedErrorCode); // SQLITE_CONSTRAINT_UNIQUE
-        Assert.Contains(nameof(Order.IdempotencyKey), sqlite.Message,
-            StringComparison.OrdinalIgnoreCase);
+        var pg = Assert.IsType<Npgsql.PostgresException>(ex.InnerException);
+        Assert.Equal("23505", pg.SqlState); // unique_violation
+        Assert.Equal(PhotoPrintDbContext.IdempotencyKeyIndexName, pg.ConstraintName);
     }
 
     [Fact]
     public async Task CreateFromCart_ConcurrentSameKey_OrderNumberCollidesFirst_RecoversToReplay_NotServerError()
     {
-        // On SQLite the OrderNumber is a racy COUNT+1, so a same-key
-        // concurrent double-submit can collide on ix_orders_order_number FIRST (it is created
-        // before the idempotency index, so SQLite reports it first). That collision is NOT an
-        // idempotency violation, so pre-fix it propagated as a 500 instead of replaying the
-        // winner. The fix regenerates the number and retries; the genuine same-key collision
-        // then surfaces and resolves to a clean replay. Uses the REAL OrderNumberService (the
-        // mock's always-unique Interlocked.Increment masked this).
+        // A same-key concurrent double-submit can collide on ix_orders_order_number FIRST when
+        // both callers land on the same generated number. That collision is NOT an idempotency
+        // violation, so pre-fix it propagated as a 500 instead of replaying the winner. The fix
+        // regenerates the number and retries; the genuine same-key collision then surfaces and
+        // resolves to a clean replay. Uses the REAL OrderNumberService (the mock's
+        // always-unique Interlocked.Increment masked this).
         var (userId, _, _) = await SeedCartAsync();
         const string key = "race-key-ordernum";
 

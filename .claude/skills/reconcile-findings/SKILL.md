@@ -35,7 +35,8 @@ review loop measure overlap, stop re-arguing settled decisions, and keep one can
    no number at all (a test-gap row, an aside, a fix-note observation), give it one before
    matching: an unnumbered finding escapes any ledger.
 2. `reviews/<target>/ledger.md` — every known row, status, and prior decisions (ledger mode).
-3. `reviews/state/id-counter` — the next free `PPW-<n>` (ledger mode).
+3. `reviews/state/id-counter` — the next free `PPW-<n>` (ledger mode). Read it for context; the
+   minting itself goes through `node reviews/lib/mint-id.mjs mint --count N`, never a hand edit.
 4. The code at the reviewed commit, read only to adjudicate close calls.
 
 ## Matching rules
@@ -46,6 +47,11 @@ review loop measure overlap, stop re-arguing settled decisions, and keep one can
   they have different fixes).
 - **Fix-residual ≠ re-find.** A new defect living inside the fix of an earlier finding is NEW,
   linked as lineage (`residual-of: PPW-<n>`), never merged — chains run generations deep.
+  Since 2026-08-28 the lineage also names the round: the metrics `findings[]` entry carries
+  `seed_round` (the fix round whose commits caused the defect — locate the causing commit in
+  its resolution) and `area` (the backlog area word). Write `null` when the round cannot be
+  named with confidence — the router treats missing as "not yet measured", never as zero, and
+  a guessed round corrupts the convergence rule it feeds.
 - **A defect inside code an earlier pass explicitly cleared or judged benign** is distinct,
   and the match note must say it re-opens that judgment.
 - **A re-find of a decided item** (wont-fix / deferred / disputed / false-positive): match it
@@ -71,10 +77,23 @@ One row per new finding:
 plus `residual-of` lineage links, and the prior decision attached to every matched decided
 item. Then:
 
-- **Ledger mode:** per NEW finding, mint the next id — read `reviews/state/id-counter`, assign in
-  order, and write the incremented number back **in the same change**, so two instances
-  minting at once collide in git instead of reusing a number. Add its table row **and its
-  detail block**
+- **Ledger mode:** mint the ids for the whole batch in one call —
+
+  ```
+  node reviews/lib/mint-id.mjs mint --count <how many NEW findings>
+  ```
+
+  — which prints the range and writes the incremented counter back in the same change, so two
+  instances minting at once collide in git instead of reusing a number (`--dry-run` shows the
+  range without writing). Assign the printed ids in order. Then, per id,
+
+  ```
+  node reviews/lib/mint-id.mjs scaffold-ledger <target> --id PPW-<n> --sev <emoji>
+    --title "<t>" --file "<path:line>" --pass v<p>
+  ```
+
+  writes its table row **and its detail block** skeleton (creating the ledger from the template
+  when the target has none). The skeleton's `<fill in>` lines are yours to write
   per `reviews/templates/ledger.md` — What / Evidence / Suggested fix / History, the defect's
   only full description anywhere (`reviews/rules/doc-contracts.md`, describe-once). The History's
   first line records this pass, the convergence count and the `hinted` flag; serious findings'

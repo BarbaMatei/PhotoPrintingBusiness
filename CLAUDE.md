@@ -5,11 +5,11 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
 
 ## Constraints that bite when unknown
 
-- **Dual database.** SQLite in dev (via `EnsureCreated` — migrations never run in dev),
-  PostgreSQL 16 in prod (migrations at boot), EF InMemory as the integration-test default.
-  Nothing currently proves migrations/SQL against Postgres. Details + test implications:
-  `memory-bank/standards/data-stack.md` — read it before touching entities, queries, or
-  migrations.
+- **PostgreSQL 16 everywhere.** Every environment runs Npgsql and applies the migration
+  chain at boot (`Database.Migrate()`); EF InMemory is the integration-test default, and
+  relational tests get a throwaway Postgres database via `PostgresTestDatabase`. Details +
+  test implications: `memory-bank/standards/data-stack.md` — read it before touching
+  entities, queries, or migrations.
 - **Two-tier storage.** Every upload read/write/delete must route via
   `IStorageRouter.For(upload.StorageLocation)` — never assume local disk. See
   system-architecture.md (storage section) and ADR-007/008/011.
@@ -30,9 +30,25 @@ xUnit tests (`src/PhotoPrint.Tests`). UI strings are Romanian.
 
 ## LSP (semantic code lookup — C# and TypeScript)
 
-Language servers attach to every session automatically: `csharp-ls` for `.cs`,
-`typescript-language-server` for `.ts/.tsx/.js/.jsx` (both installed globally). The `LSP`
-tool is deferred — the first time a task touches C# or TS code, load it once via
+Both servers are enabled via the `csharp-lsp` and `typescript-lsp` plugins in
+`.claude/settings.json`, so worktrees inherit them. **Only the TypeScript one actually
+answers** (`.ts/.tsx/.js/.jsx`); for `.cs` use Grep, because:
+
+- `csharp-ls` starts but never loads `PhotoPrint.sln` under Claude Code: at `initialized` it
+  blocks until the client answers its `client/registerCapability` and `workspace/configuration`
+  requests, which never happens, so every `.cs` request returns no symbols. Driven by a
+  minimal hand-written LSP client the same binary loads the solution in ~10s and returns full
+  symbol trees, so the binary is fine — killing and respawning it changes nothing.
+- Its version still matters for when that is fixed: `csharp-ls` is pinned to **0.20.0**, the
+  newest build targeting `net9.0`, matching the only installed SDK (9.0.317). 0.21+ target
+  `net10.0`; MSBuildLocator refuses an SDK newer than the server's own runtime, so those fail
+  with `No instances of MSBuild could be detected.`
+- The global `typescript` is 7.x (the Go rewrite, no `lib/tsserver.js`), which
+  `typescript-language-server` cannot drive. A classic TypeScript 5.9.3 lives in the server's own
+  `node_modules` so it resolves from any directory, worktrees included; reinstalling the server
+  globally wipes that copy.
+
+The `LSP` tool is deferred — the first time a task touches TS code, load it once via
 ToolSearch (`select:LSP`) and prefer it over Grep for any question about *symbols*:
 
 - where is X defined · who calls/uses X (rename and refactor blast radius)
@@ -43,7 +59,7 @@ ToolSearch (`select:LSP`) and prefer it over Grep for any question about *symbol
 Grep stays right for strings, config keys, UI text, and cross-language searches. Edit-time
 diagnostics surface automatically when the server is connected — read them before calling
 an edit done. This applies to subagents too: investigator/reviewer agents answering
-"who calls X" load LSP first instead of grepping.
+"who calls X" in TypeScript load LSP first instead of grepping — in C# they grep.
 
 ## Running tests (hard rule — full runs overload this machine)
 

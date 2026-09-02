@@ -24,7 +24,7 @@ this bolt observes about them:
     sampled at the moment `Order.Status` transitions to `Shipped`)
 - **`PaymentWebhook` events** — observed via:
   - `payment_webhook_total{processor, result}` counter (incremented in
-    `WebhooksController.Stripe` and `WebhooksController.EuPlatesc`)
+    `WebhooksController.Stripe` and `WebhooksController.the legacy processor`)
 - **`Upload`** — observed via:
   - `upload_size_bytes` histogram (recorded in `UploadService.UploadAsync`)
 - **`AwbCreation`** — observed via:
@@ -54,7 +54,7 @@ Metric
   `_bytes` for byte histograms).
 - Label keys are stable (no free-form values that would explode cardinality).
 - `ValueSet` for a label is enumerated, not arbitrary. Examples:
-  `processor ∈ {stripe, euplatesc}`, `result ∈ {ok, failed, duplicate, rejected}`.
+  `processor ∈ {stripe, legacy-processor}`, `result ∈ {ok, failed, duplicate, rejected}`.
 
 #### Span
 
@@ -183,7 +183,7 @@ them in our DB.
 | **Metric** | A numeric measurement. Three kinds: counter (monotonic), histogram (bucketed observations), up-down-counter (gauge-like). |
 | **Sampler** | A decision function: "should this span be recorded?". Trades observability completeness for cost. |
 | **Exporter** | A SDK pipeline component that ships spans/metrics to a backend. We use OTLP (traces, to a collector) and Prometheus scrape (metrics, pulled by Prometheus). |
-| **Cardinality** | The product of a label's distinct values. `processor × result` = 2 × 4 = 8 series. Free-form label values (e.g. user emails) → unbounded cardinality → metrics backend collapses. |
+| **Cardinality** | The product of a label's distinct values. `processor × result` = 2 × 7 = 14 series. Free-form label values (e.g. user emails) → unbounded cardinality → metrics backend collapses. |
 | **W3C trace-context** | The `traceparent` + `tracestate` HTTP headers that propagate trace identity across service boundaries. Standard at <https://www.w3.org/TR/trace-context/>. |
 | **Hot endpoint** | A high-RPS endpoint that, if traced 100%, dominates trace storage cost. Examples in this codebase: `GET /api/uploads/{id}/preview`, `GET /api/products`. |
 | **Hot path** | A code path on the request critical-line where allocations matter. The metric record sites (`counter.Add(1, tags)`) are on hot paths; the tag-list construction must be allocation-light. |

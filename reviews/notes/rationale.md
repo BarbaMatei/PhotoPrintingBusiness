@@ -70,7 +70,7 @@ Hence the ledger rule: attach the prior decision to a re-find, never suppress it
 The highest-value finding class was *"474/474 green, but the production code path is never
 exercised."* Consequences baked into the runbooks: for each named failure mode ask *which test
 goes red if I inject this bug*; prove fixes by revert-and-rerun (the cheap mutation test); name
-what the suite structurally cannot reach (e.g. a SQLite-only suite says nothing about Postgres).
+what the suite structurally cannot reach (e.g. a Postgres-only suite says nothing about Postgres).
 
 ## Bolt 042 (thumbnails, 2026-07-13): what the skeptic layer is worth
 

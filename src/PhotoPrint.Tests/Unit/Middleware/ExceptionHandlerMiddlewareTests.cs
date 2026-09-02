@@ -247,7 +247,7 @@ public class ExceptionHandlerMiddlewareTests
         var sut = CreateSut();
         var context = CreateContext();
         RequestDelegate next = _ =>
-            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+            throw new IdempotencyConflictException(new[] { "deliveryType", "totalRon" });
 
         // Act
         await sut.InvokeAsync(context, next);
@@ -257,7 +257,7 @@ public class ExceptionHandlerMiddlewareTests
         var body = await ReadResponseBodyAsync(context);
         var fields = body.RootElement.GetProperty("divergentFields")
             .EnumerateArray().Select(e => e.GetString()).ToArray();
-        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+        fields.Should().BeEquivalentTo("deliveryType", "totalRon");
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public class ExceptionHandlerMiddlewareTests
         var sut = CreateSut();
         var context = CreateContext();
         RequestDelegate next = _ =>
-            throw new IdempotencyConflictException(new[] { "paymentProcessor", "totalRon" });
+            throw new IdempotencyConflictException(new[] { "deliveryType", "totalRon" });
 
         // Act
         await sut.InvokeAsync(context, next);
@@ -281,7 +281,7 @@ public class ExceptionHandlerMiddlewareTests
         body.RootElement.TryGetProperty("divergentFields", out var divergent)
             .Should().BeTrue("the 409 contract field must be present in Development too (OBS-1)");
         var fields = divergent.EnumerateArray().Select(e => e.GetString()).ToArray();
-        fields.Should().BeEquivalentTo("paymentProcessor", "totalRon");
+        fields.Should().BeEquivalentTo("deliveryType", "totalRon");
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public class ExceptionHandlerMiddlewareTests
         var sut = CreateSut();
         var context = CreateContext();
         RequestDelegate next = _ =>
-            throw new IdempotencyConflictException(new[] { "paymentProcessor" });
+            throw new IdempotencyConflictException(new[] { "deliveryType" });
 
         await sut.InvokeAsync(context, next);
 
@@ -393,6 +393,52 @@ public class ExceptionHandlerMiddlewareTests
             Times.Once);
     }
 
+    [Theory]
+    [InlineData(413)]
+    [InlineData(400)]
+    public async Task InvokeAsync_KestrelRejectedRequest_AnswersItsOwnStatusAtWarning(int status)
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new BadHttpRequestException("Request body too large.", status);
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(status,
+            "a rejected request body is the caller's fault, not a 500 that burns the error budget");
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_KestrelRejectionAskingForA5xx_KeepsTheServerErrorTreatment()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new BadHttpRequestException("HTTP version not supported.", 505);
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(500,
+            "the client-error shortcut must not become a way to skip the Sentry capture invariant");
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
     [Fact]
     public async Task InvokeAsync_KnownException_IncludesCorrelationIdFromContext()
     {
@@ -410,5 +456,43 @@ public class ExceptionHandlerMiddlewareTests
         // Assert
         var body = await ReadResponseBodyAsync(context);
         body.RootElement.GetProperty("correlationId").GetString().Should().Be(expectedId);
+    }
+    [Fact]
+    public async Task InvokeAsync_IdempotencyKeyConsumed_Returns409CarryingTheOrderId()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        var orderId = Guid.NewGuid();
+        RequestDelegate next = _ => throw new IdempotencyKeyConsumedException(orderId);
+
+        await sut.InvokeAsync(context, next);
+
+        context.Response.StatusCode.Should().Be(409);
+        var body = await ReadResponseBodyAsync(context);
+        body.RootElement.GetProperty("orderId").GetString().Should().Be(orderId.ToString());
+        body.RootElement.TryGetProperty("divergentFields", out _).Should().BeFalse(
+            "a consumed key is not a divergent request — the client must be able to tell them apart");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_IdempotencyKeyConsumed_LogsTheReservedEvent()
+    {
+        _envMock.Setup(e => e.EnvironmentName).Returns(Environments.Production);
+        var sut = CreateSut();
+        var context = CreateContext();
+        RequestDelegate next = _ => throw new IdempotencyKeyConsumedException(Guid.NewGuid());
+
+        await sut.InvokeAsync(context, next);
+
+        _loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, _) =>
+                    v.ToString()!.Contains("payments.idempotency.key-consumed")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 }

@@ -162,7 +162,7 @@ Type a number or describe your choice.
 ```markdown
 ## Database
 
-1. **SQLite** - Simple, file-based, great for small apps
+1. **PostgreSQL** - Simple, file-based, great for small apps
 2. **PostgreSQL** - Robust, scalable, widely supported
 3. **MySQL** - Popular, good for web apps
 4. **MongoDB** - Document store, flexible schema

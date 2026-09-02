@@ -36,7 +36,7 @@ change is safe** and the **config is well-formed**, and defers the rest to a doc
 
 ### Issues Found
 
-- **Migration provider inconsistency** (pre-existing, surfaced by the merge): `20260527075359_AddOrderIdempotencyKey` is SQLite-flavoured (`TEXT`, plain unique index). `TEXT` is valid on Postgres so boot-migrate won't crash, but it should be verified/regenerated against a real Postgres before first deploy. Documented in `docs/DEPLOYMENT.md` §7 and the walkthrough; **not** fixed here (out of scope for containers/pipelines).
+- **Migration provider inconsistency** (pre-existing, surfaced by the merge): `20260527075359_AddOrderIdempotencyKey` is Npgsql-typed (`TEXT`, plain unique index). `TEXT` is valid on Postgres so boot-migrate won't crash, but it should be verified/regenerated against a real Postgres before first deploy. Documented in `docs/DEPLOYMENT.md` §7 and the walkthrough; **not** fixed here (out of scope for containers/pipelines).
 
 ### Notes
 

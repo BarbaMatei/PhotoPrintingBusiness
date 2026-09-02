@@ -57,9 +57,9 @@ last_updated: 2026-05-25T14:15:00Z
 
 - Two ADRs created at Stage 3: **ADR-004** (state conflict → 409, distinct from validation's 422) and **ADR-005** (`LogicalRequest` excludes `ShippingAddress`). Decision index bumped 3 → 5.
 - Two deviations from the Stage-2 design, both documented in the implementation walkthrough:
-  1. EuPlatesc redirect URL is **persisted** (`Order.EuPlatescRedirectUrl`) and returned verbatim on replay — `BuildInitiateUrl` is not deterministic (timestamp + nonce). This is the option story 003 left open.
+  1. the legacy processor redirect URL is **persisted** (`Order.LegacyProcessorRedirectUrl`) and returned verbatim on replay — `BuildInitiateUrl` is not deterministic (timestamp + nonce). This is the option story 003 left open.
   2. Idempotency resolution lives in `OrderService.CreateFromCartAsync` (returning `OrderCreationResult`), not split into the controller, because the `TotalRon` comparison needs the server-resolved total.
-- Migration `20260527075359_AddOrderIdempotencyKey` is SQLite-flavoured (`TEXT`, plain unique index), consistent with the project's entire SQLite-generated migration history; behaviourally equivalent on Postgres (multiple NULLs allowed in a unique index on both providers).
+- Migration `20260527075359_AddOrderIdempotencyKey` is Npgsql-typed (`TEXT`, plain unique index), consistent with the project's entire PostgreSQL-generated migration history; behaviourally equivalent on Postgres (multiple NULLs allowed in a unique index on both providers).
 - One Stage-5 test bug fixed (false conflict from `MakeRequest()` randomizing `EasyboxLockerId`); production unaffected.
 - Honest coverage gap: the multi-instance DB-arbitrated race is not automatically tested (EF InMemory doesn't enforce unique indexes); deferred to intent 021 with a real Postgres test container.
 - Full suite: **457 / 457 passed**.

@@ -1,39 +1,71 @@
 {
   "skill_name": "fix-review",
+  "notes": "Fixture: evals/fixtures/discount-module — a tiny node project (src/, test/, docs/) with a full review target under reviews/discount-module/: review-v1.md (immutable), ledger.md with a fix brief and a trigger classification per finding, resolution-v1.md scaffolded with every row `open`, metrics.jsonl, and reviews/state/. Two seeded blockers in two different files, so no protocol cluster is owed; PPW-9702 is trigger-list-shaped with no pre-check verdict, so an approach-check must run and be stamped. A fix round commits, so the round may not run in the checked-in fixture: `setup` builds a throwaway git repository at evals/.run/discount-module (git-ignored) whose first commit holds the whole fixture, and prints RUN_ROOT and BASE_COMMIT for the grader to diff against. Every review-system script takes --root <run root>. run-scoped-tests.mjs parses dotnet and vitest summary lines and falls back to `node --test`'s TAP totals, so the fixture's suite stamps its real passed/failed counts. The records name no real commit sha (`commit: fixture-base`) because the throwaway repository has no pushed ref for the auditor to resolve one against.",
+  "status": {
+    "these-cases": "REBUILT 2026-09-01 and UNRUN. The 2026-07-30 runs of cases 0 and 1 were measured against a fixture root that no longer exists and against the pre-audit fixer contract (per-finding approach drafting, per-cluster micro-reviews, FIX-/DOC-/CLEAN- finding ids); no result recorded here applies to the cases below.",
+    "trigger-eval": "trigger-eval.json is a description test, not a fixture test: it survives unchanged apart from two rows added 2026-09-01 — one unattended fix round (trigger) and one loop-driver phrase (must not trigger)."
+  },
   "evals": [
     {
       "id": 0,
-      "name": "fix-all-findings",
-      "prompt": "Address the open findings in the code review for the discount module (the review is under reviews/discount-module/).",
-      "expected_output": "All 4 findings driven to a terminal status; blockers FIX-1/FIX-2 fixed in code WITH new regression tests; DOC-1 comment + CLEAN-1 duplicate constant addressed; resolution-v1.md updated per finding (status+commit+note) with top-level status=resolved; review-v1.md untouched; nothing marked 'verified'; one commit per finding referencing its ID.",
-      "files": [],
-      "expectations": [
-        "review-v1.md is byte-identical to the base commit (immutable, not edited)",
-        "resolution-v1.md contains no finding with status 'verified'",
-        "FIX-1 and FIX-2 are marked status: fixed in resolution-v1.md with a commit SHA",
-        "applyDiscount clamps: applyDiscount(100,150)===0 and applyDiscount(100,-10)===100",
-        "getUserCart is scoped: getUserCart('bob') returns Bob's items, not Alice's",
-        "At least 2 new regression tests were added and the full test suite passes (node --test, >2 tests)",
-        "DOC-1 and CLEAN-1 are at a terminal status (fixed) in resolution-v1.md",
-        "resolution-v1.md top-level status is 'resolved' with fixed_commit set",
-        "At least one git commit message references a finding ID (FIX-1/FIX-2/DOC-1/CLEAN-1)"
-      ]
+      "eval_name": "fix-all-findings",
+      "fixture": ".claude/skills/fix-review/evals/fixtures/discount-module",
+      "setup": [
+        "node .claude/skills/fix-review/evals/init-run.mjs    # prints RUN_ROOT and BASE_COMMIT"
+      ],
+      "prompt": "Address the open findings in the code review for the discount module — the review is under reviews/discount-module/. The module and its review live in a throwaway git repository at .claude/skills/fix-review/evals/.run/discount-module: work and commit there, and pass --root \".claude/skills/fix-review/evals/.run/discount-module\" to the review-system scripts (reviews/lib/wl.mjs, reviews/lib/run-scoped-tests.mjs), which stay in this repository. The test suite is `node --test` run from the fixture root — hand it to the wrapper as --cmd \"node --test\" alongside a --filter, and expect the wrapper to record the run without counts, since it parses dotnet and vitest output. Do not push.",
+      "expected_output": "All four findings driven to a terminal status: PPW-9701 and PPW-9702 fixed in code WITH the regression tests their fix briefs specify, PPW-9703 (the pricing doc) and PPW-9704 (the duplicated ceiling) addressed; resolution-v1.md updated per finding (status + commit + note) with top-level status resolved, fixed_commit and closed; review-v1.md untouched; nothing marked verified; one commit per finding referencing its ID; the round's worklog written through wl.mjs as the work happens — round-start, triage-done, an approach-check dispatched and returned for the trigger-classified PPW-9702, test-run events through the wrapper, a finding event per finding, the round-review pair and, because tests ran red, the test-audit pair — and round-end at hand-back. The fixer runs no renderer, no auditor and no doc gate: those belong to the driver's verification step.",
+      "assertions": [
+        { "text": "review-v1.md is byte-identical to the base commit the setup printed (immutable, not edited)" },
+        { "text": "resolution-v1.md contains no finding with status 'verified'" },
+        { "text": "PPW-9701 and PPW-9702 are marked status: fixed in resolution-v1.md, each with a commit sha in its Commit cell" },
+        { "text": "applyDiscount clamps: applyDiscount(100,150)===0 and applyDiscount(100,-10)===100" },
+        { "text": "getUserCart is scoped: getUserCart('bob') returns Bob's lines only, and getUserCart('alice') Alice's" },
+        { "text": "at least 2 new regression tests were added and `node --test` in the run root passes with more than the 4 tests the fixture started with" },
+        { "text": "PPW-9703 and PPW-9704 are at a terminal status, and the pricing doc no longer states the unclamped behaviour as the rule" },
+        { "text": "resolution-v1.md top-level status is 'resolved' with fixed_commit and closed set" },
+        { "text": "at least one git commit message in the run repository references a finding ID (PPW-9701/9702/9703/9704)" },
+        { "text": "worklog.jsonl carries the round's mandatory events, all written through wl.mjs: round-start, triage-done, a check-dispatched whose ids include PPW-9702 with its check-returned, a test-run per run, a finding event per finding, the round-review-dispatched/returned pair, the test-audit-dispatched/returned pair, and round-end" },
+        { "text": "no test process was launched outside run-scoped-tests.mjs (every test-run event in the worklog was stamped by the wrapper)" },
+        { "text": "the fixer ran none of render-records.mjs, records-auditor.mjs or doc-gate.mjs, and wrote no index row — the hand-back says the unit's records are pending its verification" },
+        { "text": "records-auditor.mjs --root <run root> discount-module exits 0 afterwards, with the single expected warning 'resolution-v1 resolved, no fix-round line yet — unit records pending' and no error (the hand-back gates R1-R4 pass on the round's own evidence)" }
+      ],
+      "verify": [
+        "cd <RUN_ROOT> && node --test    # green, more than 4 tests",
+        "git -C <RUN_ROOT> diff <BASE_COMMIT> -- reviews/discount-module/review-v1.md    # prints nothing",
+        "git -C <RUN_ROOT> log --oneline <BASE_COMMIT>..HEAD    # one commit per finding, each naming its PPW id",
+        "node reviews/lib/records-auditor.mjs --root <RUN_ROOT> discount-module    # exit 0, one 'unit records pending' warning",
+        "rm -rf .claude/skills/fix-review/evals/.run    # runner's teardown, after grading"
+      ],
+      "files": []
     },
     {
       "id": 1,
-      "name": "blockers-only",
-      "prompt": "Fix just the two blocker findings (FIX-1 and FIX-2) from the discount-module review. Leave the rest for later.",
-      "expected_output": "Only FIX-1 and FIX-2 fixed (code + regression tests), recorded in resolution-v1.md; DOC-1 and CLEAN-1 left at status: open; review-v1.md untouched; nothing marked 'verified'; commits reference the finding IDs.",
-      "files": [],
-      "expectations": [
-        "review-v1.md is byte-identical to the base commit (immutable, not edited)",
-        "resolution-v1.md contains no finding with status 'verified'",
-        "FIX-1 and FIX-2 are marked status: fixed with a commit SHA",
-        "applyDiscount clamps and getUserCart is scoped (both blocker bugs fixed in code)",
-        "Regression tests added for the blockers and the suite passes (node --test)",
-        "DOC-1 and CLEAN-1 remain status: open (scope respected, not over-reaching)",
-        "At least one commit message references FIX-1 or FIX-2"
-      ]
+      "eval_name": "blockers-only",
+      "fixture": ".claude/skills/fix-review/evals/fixtures/discount-module",
+      "setup": [
+        "node .claude/skills/fix-review/evals/init-run.mjs    # prints RUN_ROOT and BASE_COMMIT"
+      ],
+      "prompt": "Fix just the two blocker findings (PPW-9701 and PPW-9702) from the discount-module review. Leave the rest for later. The module and its review live in a throwaway git repository at .claude/skills/fix-review/evals/.run/discount-module: work and commit there, and pass --root \".claude/skills/fix-review/evals/.run/discount-module\" to the review-system scripts (reviews/lib/wl.mjs, reviews/lib/run-scoped-tests.mjs), which stay in this repository. The test suite is `node --test` run from the fixture root — hand it to the wrapper as --cmd \"node --test\" alongside a --filter. Do not push.",
+      "expected_output": "Only PPW-9701 and PPW-9702 fixed (code + the regression tests their fix briefs specify), recorded in resolution-v1.md with commits; PPW-9703 and PPW-9704 left at status open; the top-level status left in-progress, because a resolution reads resolved only when every finding is terminal; review-v1.md untouched; nothing marked verified; commits reference the finding IDs; the worklog carries the round's events including the approach-check for the trigger-classified PPW-9702.",
+      "assertions": [
+        { "text": "review-v1.md is byte-identical to the base commit the setup printed (immutable, not edited)" },
+        { "text": "resolution-v1.md contains no finding with status 'verified'" },
+        { "text": "PPW-9701 and PPW-9702 are marked status: fixed with a commit sha" },
+        { "text": "applyDiscount clamps and getUserCart is scoped (both blocker bugs fixed in code)" },
+        { "text": "regression tests were added for both blockers and `node --test` in the run root passes" },
+        { "text": "PPW-9703 and PPW-9704 remain status: open (scope respected, not over-reaching), and docs/pricing.md is unchanged" },
+        { "text": "the resolution's top-level status is in-progress, not resolved — two findings are still open" },
+        { "text": "at least one commit message references PPW-9701 or PPW-9702" },
+        { "text": "the worklog carries round-start, triage-done, a check-dispatched naming PPW-9702, the test runs through run-scoped-tests.mjs, a finding event per fixed finding, and round-end" }
+      ],
+      "verify": [
+        "cd <RUN_ROOT> && node --test    # green",
+        "git -C <RUN_ROOT> diff <BASE_COMMIT> -- reviews/discount-module/review-v1.md docs/pricing.md    # prints nothing",
+        "node reviews/lib/records-auditor.mjs --root <RUN_ROOT> discount-module    # exit 0, no warning (an in-progress resolution is not a pending unit)",
+        "rm -rf .claude/skills/fix-review/evals/.run    # runner's teardown, after grading"
+      ],
+      "files": []
     }
   ]
 }

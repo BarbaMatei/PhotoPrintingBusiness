@@ -36,8 +36,18 @@ contract (headings verbatim, vocabulary, cap 60 body lines — aim for ~40). Fro
    manifest lenses owed but not run · the new-findings-per-pass trend (full passes,
    `metrics.jsonl`) · counts of `unverified-*` and `hinted` findings · budget skips ·
    pass-type caps (a verification or delta pass cannot certify) · blinding is best-effort.
+   Do not count these by hand — run
+
+   ```
+   node reviews/lib/summary-data.mjs <target> <pass>
+   ```
+
+   (`<pass>` is the bare pass number) and assemble its markdown-ready fragments into prose; it
+   reads that pass's metrics line, merges a certification pair's two lines, and prints nothing
+   it cannot support.
 3. **Filed automatically** — one line: how many 🟡/⚪ went to the ledger backlog, with a link.
-   Flag at most one if it deserves the owner's eye anyway.
+   The same script prints that count for the pass. Flag at most one if it deserves the owner's
+   eye anyway.
 4. **State** — one line: where the router stands and what happens next.
 
 ## Rules

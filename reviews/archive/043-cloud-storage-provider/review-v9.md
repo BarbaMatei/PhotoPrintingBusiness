@@ -22,7 +22,7 @@ tests: { dotnet: "719/719 (+10 skipped MinIO)", frontend: "439/439" }
 | ID | Sev | Title | File | Fix now? |
 |---|---|---|---|---|
 | PPW-232 | 🟠 | "Photos no longer available" is shown for a just-paid order and for pending orders | `UI/…/order-detail-page.ts` | yes |
-| PPW-233 | 🟠 | No test asserts that the EuPlatesc payment notification enqueues promotion | `Tests/…/PaymentControllerIntegrationTests.cs` | yes |
+| PPW-233 | 🟠 | No test asserts that the legacy processor payment notification enqueues promotion | `Tests/…/PaymentControllerIntegrationTests.cs` | yes |
 | PPW-234 | 🟠 | The backfill command was outside the review file list, and backfill against the live worker is untested | `Cli/BackfillCommand.cs` | no |
 | PPW-199 | 🟠 | Purge and retention destroy a photo a second still-active order needs | `Services/OriginalPurger.cs:103` | no |
 | PPW-211 | 🟡 | A read failure part-way through the admin ZIP truncates the archive after the headers are sent | `Services/AdminOrderService.cs` | no |

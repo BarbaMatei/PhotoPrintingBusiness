@@ -8,9 +8,9 @@ namespace PhotoPrint.Tests.Unit.Data;
 /// <summary>
 /// Regression guard for the <c>Order.StripeClientSecret</c> column
 /// width. The column was sized at exactly Stripe's documented 255-char ceiling — zero
-/// headroom. On SQLite/InMemory (dev/test) <c>HasMaxLength</c> is not enforced, so an
-/// over-length secret stores silently and every idempotency test stays green; only prod
-/// Postgres (<c>character varying(N)</c>) throws "value too long" on SaveChangesAsync,
+/// headroom. On the InMemory test provider <c>HasMaxLength</c> is not enforced, so an
+/// over-length secret stores silently and every idempotency test stays green; only
+/// PostgreSQL (<c>character varying(N)</c>) throws "value too long" on SaveChangesAsync,
 /// after Stripe already created the charge. Asserting the configured max length here is a
 /// provider-independent guard: it fails the moment the width regresses below the agreed
 /// margin, without needing a Postgres connection in the test matrix.

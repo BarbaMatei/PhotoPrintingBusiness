@@ -21,9 +21,8 @@
 ## Backend — `src/PhotoPrint.API`
 
 - **ASP.NET Core 8 Web API** (.NET 8 / C# 12), single deployable, can also serve the SPA.
-- Data: **EF Core 8** with BOTH `Npgsql.EntityFrameworkCore.PostgreSQL` (prod) and
-  `Microsoft.EntityFrameworkCore.Sqlite` (dev/tests) — the dual-provider setup is load-bearing;
-  see [data-stack.md](data-stack.md).
+- Data: **EF Core 8** with `Npgsql.EntityFrameworkCore.PostgreSQL` — the only provider, in
+  every environment; see [data-stack.md](data-stack.md).
 - Key libraries: `FluentValidation` (all request validation — data annotations prohibited,
   ADR-002) · `Serilog.AspNetCore` + enrichers, compact JSON · `Stripe.net` ·
   `AWSSDK.S3` (R2/S3/MinIO via one client) · `Polly` (S3 transient retry) ·
@@ -41,11 +40,11 @@ SameSite=Strict cookie + Google OAuth (server-side id_token verification) + gues
 
 ## Infrastructure & delivery
 
-- **Dev**: SQLite file DB (no Docker needed for the API); optional MinIO for real-S3 tests
+- **Dev**: a local PostgreSQL 16 server (`localhost:5432`); optional MinIO for real-S3 tests
   (`STORAGE_TEST_*` env vars); SMTP dev default `localhost:1025` (MailHog-style).
-- **CI (GitHub Actions)**: `ci.yml` — .NET build + test (with a MinIO container un-skipping the
-  S3 suite; a postgres:16 service is provisioned but currently unused by tests) and UI Vitest +
-  production build; no lint step. `secret-scan.yml` — gitleaks on every push/PR.
+- **CI (GitHub Actions)**: `ci.yml` — .NET build + test (a MinIO container un-skips the S3
+  suite; a postgres:16 service backs the relational tests via `POSTGRES_TEST_CONNECTION`) and UI
+  Vitest + production build; no lint step. `secret-scan.yml` — gitleaks on every push/PR.
   `deploy.yml` — on green main CI: build/push `ghcr.io/<owner>/fototipar/api` image, SSH
   `docker compose pull/up` (self-skips without a `DEPLOY_HOST` secret).
 - **Prod shape**: Docker Compose (`docker-compose.prod.yml`) + Caddy (`Caddyfile`) for TLS;

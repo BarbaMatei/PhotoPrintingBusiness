@@ -12,6 +12,7 @@ using PhotoPrint.API.Data;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Services;
+using PhotoPrint.Tests.Helpers;
 using PhotoPrint.API.Services.Sameday;
 
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
@@ -22,17 +23,17 @@ namespace PhotoPrint.Tests.Unit.Services.Sameday;
 /// Delivered from Sameday, assert the UPDATE has no effect AND the email
 /// is NOT enqueued.
 ///
-/// In-memory provider doesn't support EF's <c>ExecuteUpdateAsync</c>, so the
-/// suite uses SQLite — same approach as parts of the existing bolt-051
-/// PromotionRecoveryScanner integration paths.
+/// The InMemory provider does not support EF's <c>ExecuteUpdateAsync</c>, so the
+/// suite runs against a real PostgreSQL database.
 /// </summary>
-public class ShipmentTrackingJobTests : IDisposable
+public class ShipmentTrackingJobTests : IClassFixture<PostgresTestDatabase>, IDisposable
 {
-    private readonly SqliteScopeFactory _scopes;
+    private readonly PostgresScopeFactory _scopes;
 
-    public ShipmentTrackingJobTests()
+    public ShipmentTrackingJobTests(PostgresTestDatabase database)
     {
-        _scopes = new SqliteScopeFactory();
+        database.ResetForTest();
+        _scopes = new PostgresScopeFactory(database);
     }
 
     public void Dispose() => _scopes.Dispose();
@@ -423,30 +424,24 @@ public class ShipmentTrackingJobTests : IDisposable
 }
 
 /// <summary>
-/// Wraps a SQLite in-memory database + a scope factory. SQLite is required
-/// (not the EF InMemory provider) because <c>ShipmentTrackingJob</c> calls
-/// <c>ExecuteUpdateAsync</c> for the CAS transition, which isn't
-/// supported by the InMemory provider.
+/// Wraps a throwaway PostgreSQL database + a scope factory. A real relational database is
+/// required (not the EF InMemory provider) because <c>ShipmentTrackingJob</c> calls
+/// <c>ExecuteUpdateAsync</c> for the CAS transition, which InMemory does not support.
 /// </summary>
-internal sealed class SqliteScopeFactory : IDisposable
+internal sealed class PostgresScopeFactory : IDisposable
 {
-    private readonly Microsoft.Data.Sqlite.SqliteConnection _connection;
+    private readonly PostgresTestDatabase _database;
     private readonly ServiceProvider _provider;
     private readonly Dictionary<Type, object> _overrides = new();
 
-    public SqliteScopeFactory()
+    public PostgresScopeFactory(PostgresTestDatabase database)
     {
-        _connection = new Microsoft.Data.Sqlite.SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-
+        _database = database;
         var services = new ServiceCollection();
-        services.AddDbContext<PhotoPrintDbContext>(options => options.UseSqlite(_connection));
+        services.AddDbContext<PhotoPrintDbContext>(
+            options => options.UseNpgsql(_database.ConnectionString));
         services.AddLogging();
         _provider = services.BuildServiceProvider();
-
-        using var scope = _provider.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
-        db.Database.EnsureCreated();
     }
 
     public IServiceScopeFactory Factory => new ScopeFactoryAdapter(_provider, _overrides);
@@ -459,7 +454,6 @@ internal sealed class SqliteScopeFactory : IDisposable
     public void Dispose()
     {
         _provider.Dispose();
-        _connection.Dispose();
     }
 
     private sealed class ScopeFactoryAdapter : IServiceScopeFactory

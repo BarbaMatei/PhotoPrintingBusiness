@@ -47,15 +47,6 @@ dist/
 /.angular-cli.json
 
 # -------------------------------------------------------------
-#  Databases (local dev data)
-# -------------------------------------------------------------
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite3
-
-# -------------------------------------------------------------
 #  Logs
 # -------------------------------------------------------------
 logs/
@@ -101,3 +92,11 @@ appsettings.*.Local.json
 .DS_Store
 Thumbs.db
 *.swp
+
+# -------------------------------------------------------------
+#  Editor / IDE
+# -------------------------------------------------------------
+.vscode/
+
+# Review-gate override log (local evidence for the unattended policy, never shared)
+reviews/state/overrides.jsonl

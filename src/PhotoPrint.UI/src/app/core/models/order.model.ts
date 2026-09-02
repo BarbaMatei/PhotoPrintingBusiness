@@ -32,9 +32,11 @@ export interface OrderItemDto {
 
 export interface OrderDetailDto extends OrderSummaryDto {
   subtotalRon: number;
+  netTotalRon: number;
+  vatRon: number;
+  vatRate: number;
   shippingCostRon: number;
   paidAt: string | null;
-  paymentProcessor: string;
   lockerId: string | null;
   lockerName: string | null;
   lockerAddress: string | null;

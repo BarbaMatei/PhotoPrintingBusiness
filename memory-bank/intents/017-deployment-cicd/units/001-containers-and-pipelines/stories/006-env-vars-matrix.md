@@ -20,7 +20,7 @@ implemented: true
 ## Acceptance Criteria
 
 - [ ] `.env.example` at repo root lists every required variable with a placeholder and a comment.
-- [ ] `README.md` has an "Environment matrix" table grouping vars by feature (DB, JWT, Stripe, EuPlatesc, Sameday, ANAF, SendGrid).
+- [ ] `README.md` has an "Environment matrix" table grouping vars by feature (DB, JWT, Stripe, the legacy processor, Sameday, ANAF, SendGrid).
 - [ ] Each `IOptions<T>` settings class binds via `AddOptions<T>().Bind(...).ValidateDataAnnotations().ValidateOnStart()`.
 - [ ] Missing required env var → boot fails with clear `OptionsValidationException` naming the field.
 - [ ] No secret values committed; CI verifies via `git diff --check` + `gitleaks` step (basic ruleset).
@@ -35,8 +35,8 @@ Jwt__PrivateKeyPem=
 Jwt__PublicKeyPem=
 Stripe__SecretKey=
 Stripe__WebhookSecret=
-EuPlatesc__MerchantId=
-EuPlatesc__SecretKey=
+LegacyProcessor__MerchantId=
+LegacyProcessor__SecretKey=
 Sameday__Enabled=false
 Sameday__Username=
 Sameday__Password=

@@ -307,7 +307,7 @@ surface change is `/health`:
 
 Two columns added to `Orders`:
 
-| Column | Type (Postgres) | Type (SQLite — dev) | Nullable | Notes |
+| Column | Type (Postgres) | Type (PostgreSQL — dev) | Nullable | Notes |
 |---|---|---|---|---|
 | `AwbLabelUrl` | `varchar(500)` | `TEXT` (max-length 500 enforced by EF) | yes | URL to Sameday-hosted PDF label. |
 | `LastTrackingSyncAt` | `timestamptz` | `TEXT` (ISO-8601 UTC, EF default) | yes | UTC timestamp of last successful tracking poll. |
@@ -345,7 +345,7 @@ behind a flag.
 **Cross-provider compatibility**:
 
 - Npgsql: `varchar(500)` and `timestamp with time zone` map cleanly.
-- SQLite (dev/test): EF translates both to `TEXT`. Lossless for our
+- PostgreSQL (dev/test): EF translates both to `TEXT`. Lossless for our
   read/write patterns.
 
 ### `Order` entity (extension)
@@ -617,7 +617,7 @@ src/PhotoPrint.Tests/
 - [x] Outbound API contracts mapped (`AuthenticateAsync` fully; the
       rest declared for bolt 037).
 - [x] Schema additions designed (two nullable columns on `Orders`)
-      with cross-provider notes (Postgres / SQLite).
+      with cross-provider notes (Postgres / PostgreSQL).
 - [x] NFRs addressed (latency, rate-limit, log redaction, token
       cache lifetime, hermetic tests via `TimeProvider` +
       MockHttp).
@@ -729,6 +729,6 @@ identical to what the FluentValidation version would have produced.
   credentials. `appsettings.Development.json` overrides `BaseUrl` to
   the Sameday sandbox.
 - Migration `20260602141429_AddSamedayOrderFields` was scaffolded
-  against the SQLite dev provider and hand-edited to use Postgres
+  against the PostgreSQL provider and hand-edited to use Postgres
   column types (`text` + `timestamp with time zone`), per the
   established pattern in `AddUploadArchiveFields.cs`.

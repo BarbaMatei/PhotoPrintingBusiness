@@ -20,7 +20,7 @@ Build the operator-facing administration interface for FotoTipar. Includes a sta
 | Operator can move orders through the print workflow | Status transitions Paid→Printing→Shipped→Delivered work | Must |
 | Operator can view KPI metrics at a glance | Dashboard loads with charts in < 2 s | Must |
 | Operator can adjust product prices without code deploy | Price change reflected on storefront within 60 s | Must |
-| Operator can cancel and refund orders | Stripe/EuPlatesc refund initiated; status = Cancelled | Must |
+| Operator can cancel and refund orders | Stripe/legacy-processor refund initiated; status = Cancelled | Must |
 
 ---
 
@@ -34,7 +34,7 @@ Build the operator-facing administration interface for FotoTipar. Includes a sta
 
 ### FR-2: Admin Orders API
 - **Description**: Full CRUD for order management: list all orders, view detail, patch status, download ZIP of photos, cancel with refund, save internal notes. SignalR hub broadcasts new orders and status changes.
-- **Acceptance Criteria**: All `/api/admin/*` require `[Authorize(Roles="Admin")]`; status transitions validated (Paid→Printing→Shipped→Delivered); ZIP streams all order photo files; cancel triggers Stripe or EuPlatesc refund based on `PaymentProcessor` field; `AdminOrderHub` broadcasts `NewOrderReceived` and `OrderStatusChanged`.
+- **Acceptance Criteria**: All `/api/admin/*` require `[Authorize(Roles="Admin")]`; status transitions validated (Paid→Printing→Shipped→Delivered); ZIP streams all order photo files; cancel triggers Stripe or the legacy processor refund based on `PaymentProcessor` field; `AdminOrderHub` broadcasts `NewOrderReceived` and `OrderStatusChanged`.
 - **Priority**: Must
 - **Related Stories**: US-504
 
@@ -68,7 +68,7 @@ Build the operator-facing administration interface for FotoTipar. Includes a sta
 | Real-time | SignalR hub for new orders and status changes |
 | Performance | Stats queries cached 5 min; revenue query uses indexed CreatedAt, Status columns |
 | File handling | ZIP download streams (no temp file); UUID-named paths only |
-| Refund | Stripe `RefundAsync` via Stripe SDK; EuPlatesc refund via API call |
+| Refund | Stripe `RefundAsync` via Stripe SDK; the legacy processor refund via API call |
 
 ---
 

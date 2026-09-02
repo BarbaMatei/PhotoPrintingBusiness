@@ -22,7 +22,7 @@ implemented: true
 - [ ] `Upload.LargePreviewPath varchar(512) NULL` added.
 - [ ] `Upload.OriginalPurgedAt timestamptz NULL` added (set when the original is deleted post-printing).
 - [ ] EF Core configuration via Fluent API (ADR-002 — no data annotations).
-- [ ] Migration applies cleanly on **Postgres and SQLite**.
+- [ ] Migration applies cleanly on **Postgres and PostgreSQL**.
 - [ ] `Upload.StorageLocation` is assumed present (added in bolt 043); this story does not re-add it.
 
 ## Technical Notes

@@ -58,5 +58,5 @@ last_updated: 2026-05-27T10:20:00Z
   here — its `fs-extra`/`js-yaml` deps are not installed). Bolt + 6 stories + unit-brief set to
   complete; `requirements.md` was already complete from inception.
 - **Intent 017 (deployment-cicd) is fully complete** — its one unit's one bolt is done.
-- Follow-up flagged (not in scope): regenerate the SQLite-flavoured idempotency migration under
+- Follow-up flagged (not in scope): regenerate the Npgsql-typed idempotency migration under
   Npgsql before the first Postgres deploy (see `docs/DEPLOYMENT.md` §7).

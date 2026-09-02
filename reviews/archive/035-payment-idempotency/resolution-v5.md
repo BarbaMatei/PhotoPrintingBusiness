@@ -14,7 +14,7 @@ closed: 2026-06-19
 
 | ID | Status | Commit | Note |
 |---|---|---|---|
-| PPW-20 | deferred | `659056a` | The durable fix is per-provider migration assemblies, the same follow-up PPW-9 already left open. Did the review's stated minimum instead: the migration comment now spells out the exact phantom difference the next author will see. |
+| PPW-20 | deferred | `659056a` | The durable fix is re-scaffolding the migration chain, the same follow-up PPW-9 already left open. Did the review's stated minimum instead: the migration comment now spells out the exact phantom difference the next author will see. |
 | PPW-21 | fixed | `11e72c1` | Widened to 512 in the model, the undeployed migration and the snapshot. A guard asserts the configured maximum is at least 512, so it runs on any provider and needs no Postgres. |
 | PPW-22 | fixed | `e957ac1` | The divergent-field list is computed once and written into both the development shape and the production shape. Unit tests cover both, and one HTTP test reads the field names out of the body. |
 | PPW-23 | fixed | `6aad926` | The catch now confirms the violated constraint instead of inferring it from a second lookup, so unrelated write failures propagate honestly. The test forces a double violation and was proven by reverting the fix. |
@@ -49,11 +49,10 @@ closed: 2026-06-19
 
 ### The snapshot was left alone and only its trap was documented
 
-The durable fix is per-provider migration assemblies, which is the follow-up PPW-9's fix already left open.
+The durable fix is re-scaffolding the chain, which is the follow-up PPW-9's fix already left open.
 Regenerating the snapshot now means either committing a phantom migration or hand-rewriting a generated
-file into Postgres form, and the application creates its schema directly and never runs migrations, so
-none of it is exercised yet. The review's own stated minimum was a breadcrumb, and that is what was
-written: the exact column and index changes the next author will see and should discard.
+file, and no test exercised the DDL at the time. The review's own stated minimum was a breadcrumb, and
+that is what was written: the exact column and index changes the next author will see and should discard.
 
 ### The conflict event was scoped to the divergent-request case only
 
@@ -68,9 +67,9 @@ The path was already safe, because the gateway is keyed by the order id. The rou
 distinct log event and a test that characterises the path. The new event line itself is not asserted,
 which matches the existing replay event.
 
-### The constraint test leans on the order SQLite reports two violations in
+### The constraint test leans on the order PostgreSQL reports two violations in
 
-The test forces an order-number collision and a key collision at once and relies on SQLite reporting the
+The test forces an order-number collision and a key collision at once and relies on PostgreSQL reporting the
 order-number index first, which is deterministic for a directly created schema. Reverting the fix flips
 the exception type, so the test is not vacuous. The fix itself does not depend on that ordering: the
 match returns true only for the key index, whichever violation is reported.

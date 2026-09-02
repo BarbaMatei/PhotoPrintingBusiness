@@ -13,7 +13,7 @@ FotoTipar is a Romanian photo printing e-commerce website where customers upload
 - **Backend**: ASP.NET Core 8 Web API
 - **Database**: PostgreSQL 16 (EF Core Code-First)
 - **Real-time**: SignalR (admin order notifications)
-- **Payments**: Stripe (international cards) + EuPlatesc (Romanian cards)
+- **Payments**: Stripe (card payments)
 - **Shipping**: Sameday/Easybox (Phase 1: static locker list; Phase 2: API integration)
 - **Email**: MailKit (dev) / SendGrid (prod) via `IEmailService` abstraction
 
@@ -26,7 +26,7 @@ FotoTipar is a Romanian photo printing e-commerce website where customers upload
 5. **Guest orders**: linked by guest token; can be claimed after registration
 6. **Prices in RON** (Romanian Lei)
 7. **All UI text in Romanian**
-8. **Dual payment**: Stripe (embedded card form) or EuPlatesc (redirect to hosted page)
+8. **Payment**: Stripe (embedded card form)
 9. **Order lifecycle**: AwaitingPayment → Paid → Printing → Shipped → Delivered (or Cancelled)
 10. **Admin workflow**: receive paid order → download photos ZIP → print → enter AWB → mark shipped
 
@@ -66,8 +66,7 @@ docs/
 
 | Service | Purpose | Phase |
 |---------|---------|-------|
-| Stripe | International card payments | MVP |
-| EuPlatesc | Romanian card payments | MVP |
+| Stripe | Card payments | MVP |
 | Google OAuth | Social login | MVP |
 | Sameday API | Locker list + AWB generation | Phase 2 |
 | SendGrid | Production email delivery | MVP |

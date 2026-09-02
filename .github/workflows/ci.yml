@@ -69,9 +69,10 @@ jobs:
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
         env:
-          # Integration tests swap to an InMemory DB; this is here for any test
-          # that opts into the real provider in future.
           ConnectionStrings__Default: Host=localhost;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
+          # PostgresTestDatabase creates and drops a database per test class from this
+          # connection, so the role must be allowed to CREATE DATABASE.
+          POSTGRES_TEST_CONNECTION: Host=localhost;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
           # Bolt 043: enables cloud-tier integration tests against the MinIO service.
           # Local runs without Docker leave these unset and the [SkippableFact] tests
           # skip themselves — see bolt-043 ddd-02-technical-design.md §Test Plan.

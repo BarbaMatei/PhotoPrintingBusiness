@@ -1,5 +1,6 @@
 using FluentValidation;
 using PhotoPrint.API.DTOs.Account;
+using PhotoPrint.API.Services.Invoicing;
 
 namespace PhotoPrint.API.Validators.Account;
 
@@ -25,7 +26,8 @@ public class SavedAddressValidator : AbstractValidator<SavedAddressRequest>
 
         RuleFor(x => x.City)
             .NotEmpty().WithMessage("Localitatea este obligatorie.")
-            .MaximumLength(100).WithMessage("Localitatea nu poate depăși 100 de caractere.");
+            .MaximumLength(InvoiceAddressFormatter.CityNameMaxLength)
+            .WithMessage($"Localitatea nu poate depăși {InvoiceAddressFormatter.CityNameMaxLength} de caractere.");
 
         RuleFor(x => x.County)
             .NotEmpty().WithMessage("Județul este obligatoriu.")

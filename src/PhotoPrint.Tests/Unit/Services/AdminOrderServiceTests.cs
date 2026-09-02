@@ -14,6 +14,7 @@ using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
 using PhotoPrint.API.Services;
+using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
 using PhotoPrint.Tests.Helpers;
 using Stripe;
@@ -24,7 +25,6 @@ public class AdminOrderServiceTests
 {
     private readonly PhotoPrintDbContext _db;
     private readonly Mock<IOrderEmailService> _emailSvc = new();
-    private readonly Mock<IEuPlatescService> _euPlatesc = new();
     private readonly Mock<IStripeClient> _stripeClient = new();
     private readonly Mock<IStorageRouter> _router = new();
     private readonly Mock<IStorageService> _localStore = new();
@@ -34,6 +34,7 @@ public class AdminOrderServiceTests
     private readonly Mock<IHubClients> _hubClients = new();
     private readonly Mock<IClientProxy> _clientProxy = new();
     private readonly Mock<IAwbCreationNotifier> _awbNotifier = new();
+    private readonly Mock<IInvoiceCreationService> _invoiceCreator = new();
 
     private readonly AdminOrderService _sut;
 
@@ -67,6 +68,8 @@ public class AdminOrderServiceTests
 
         _awbNotifier.Setup(n => n.NotifyPaidAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .Returns(Task.CompletedTask);
+        _invoiceCreator.Setup(c => c.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync((PhotoPrint.API.Models.Invoice?)null);
 
         _sut = BuildService(_db);
     }
@@ -74,13 +77,13 @@ public class AdminOrderServiceTests
     private AdminOrderService BuildService(PhotoPrintDbContext db) =>
         new(db,
             _emailSvc.Object,
-            _euPlatesc.Object,
             _stripeClient.Object,
             _router.Object,
             _purger.Object,
             Options.Create(new ArchiveSettings()),
             _hub.Object,
             _awbNotifier.Object,
+            _invoiceCreator.Object,
             NullLogger<AdminOrderService>.Instance);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -98,17 +101,13 @@ public class AdminOrderServiceTests
 
     private async Task<Order> SeedOrderAsync(
         OrderStatus status = OrderStatus.Paid,
-        PaymentProcessor processor = PaymentProcessor.Stripe,
-        string? paymentIntentId = "pi_test_123",
-        string? euTxId = null)
+        string? paymentIntentId = "pi_test_123")
     {
         var order = new Order
         {
             OrderNumber = "FT-TEST-001",
             Status = status,
-            PaymentProcessor = processor,
             PaymentIntentId = paymentIntentId,
-            EuPlatescTransactionId = euTxId,
             DeliveryType = DeliveryType.Courier,
             ShippingAddress = DefaultAddress(),
             SubtotalRon = 30m,
@@ -195,7 +194,6 @@ public class AdminOrderServiceTests
             {
                 OrderNumber = $"FT-TIE-{i:D2}",
                 Status = OrderStatus.Paid,
-                PaymentProcessor = PaymentProcessor.Stripe,
                 DeliveryType = DeliveryType.Courier,
                 ShippingAddress = DefaultAddress(),
                 CreatedAt = sharedTime,                       // all tied — ThenBy(Id) is the sole discriminator
@@ -396,6 +394,21 @@ public class AdminOrderServiceTests
         _awbNotifier.Verify(
             n => n.NotifyPaidAsync(order.Id, It.IsAny<CancellationToken>()), Times.Once);
         _emailSvc.Verify(e => e.FireOrderConfirmedEmail(It.IsAny<Order>()), Times.Once);
+        _invoiceCreator.Verify(
+            c => c.CreateForOrderAsync(It.Is<Order>(o => o.Id == order.Id), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_AlreadyPaidToPrinting_DoesNotCreateInvoiceAgain()
+    {
+        var order = await SeedOrderAsync(OrderStatus.Paid);
+        order.PaidAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync();
+
+        await _sut.UpdateStatusAsync(order.Id, "Printing", null, null);
+
+        _invoiceCreator.Verify(
+            c => c.CreateForOrderAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ── Bolt 052: original-purge hook on production-complete transition ──────
@@ -406,9 +419,9 @@ public class AdminOrderServiceTests
     /// PurgeOriginalAtStatus = Delivered without disturbing the shared _sut.
     /// </summary>
     private AdminOrderService BuildSutWithArchive(ArchiveSettings archive)
-        => new(_db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+        => new(_db, _emailSvc.Object, _stripeClient.Object,
             _router.Object, _purger.Object, Options.Create(archive),
-            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
 
     [Fact]
     public async Task UpdateStatusAsync_PrintingToShipped_TriggersOriginalPurge()
@@ -434,9 +447,9 @@ public class AdminOrderServiceTests
         cloudOffRouter.SetupGet(r => r.Local).Returns(_localStore.Object);
         cloudOffRouter.Setup(r => r.For(StorageLocation.Local)).Returns(_localStore.Object);
         var sut = new AdminOrderService(
-            _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            _db, _emailSvc.Object, _stripeClient.Object,
             cloudOffRouter.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
         var order = await SeedOrderAsync(OrderStatus.Printing);
 
         await sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null);
@@ -543,7 +556,6 @@ public class AdminOrderServiceTests
         {
             OrderNumber = "FT-ZIP-001",
             Status = OrderStatus.Printing,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Courier,
             ShippingAddress = DefaultAddress(),
             SubtotalRon = 10m, ShippingCostRon = 5m, TotalRon = 15m,
@@ -615,7 +627,6 @@ public class AdminOrderServiceTests
         {
             OrderNumber = "FT-ZIP-OFF",
             Status = OrderStatus.Printing,
-            PaymentProcessor = PaymentProcessor.Stripe,
             DeliveryType = DeliveryType.Courier,
             ShippingAddress = DefaultAddress(),
             SubtotalRon = 10m, ShippingCostRon = 5m, TotalRon = 15m,
@@ -642,9 +653,9 @@ public class AdminOrderServiceTests
         router.Setup(r => r.For(StorageLocation.Cloud))
               .Throws(new InvalidOperationException("Cloud storage is not enabled."));
         var sut = new AdminOrderService(
-            _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            _db, _emailSvc.Object, _stripeClient.Object,
             router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
 
         var httpContext = new DefaultHttpContext();
         using var body = new MemoryStream();
@@ -664,7 +675,6 @@ public class AdminOrderServiceTests
     {
         var order = await SeedOrderAsync(
             OrderStatus.Paid,
-            PaymentProcessor.Stripe,
             "pi_real_123");
 
         _stripeClient
@@ -685,36 +695,20 @@ public class AdminOrderServiceTests
     }
 
     [Fact]
-    public async Task CancelOrderAsync_EuPlatescOrder_AttemptsEuPlatescRefund()
-    {
-        var order = await SeedOrderAsync(
-            OrderStatus.Paid,
-            PaymentProcessor.EuPlatesc,
-            null,
-            "EP-TX-999");
-
-        _euPlatesc
-            .Setup(e => e.RefundAsync("EP-TX-999", 45m, It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        var result = await _sut.CancelOrderAsync(order.Id, null);
-
-        result.Status.Should().Be("Cancelled");
-        _euPlatesc.Verify(e => e.RefundAsync("EP-TX-999", 45m, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
     public async Task CancelOrderAsync_RefundThrows_OrderStillCancelledAndExceptionSwallowed()
     {
         var order = await SeedOrderAsync(
             OrderStatus.Paid,
-            PaymentProcessor.EuPlatesc,
-            null,
-            "EP-TX-FAIL");
+            "pi_fail_123");
 
-        _euPlatesc
-            .Setup(e => e.RefundAsync(It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new HttpRequestException("EuPlatesc gateway timeout"));
+        _stripeClient
+            .Setup(c => c.RequestAsync<Refund>(
+                It.IsAny<HttpMethod>(),
+                It.IsAny<string>(),
+                It.IsAny<BaseOptions>(),
+                It.IsAny<RequestOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Stripe gateway timeout"));
 
         // Should NOT throw — refund errors are swallowed
         var result = await _sut.CancelOrderAsync(order.Id, null);
@@ -749,9 +743,9 @@ public class AdminOrderServiceTests
         var router = new Mock<IStorageRouter>();
         router.SetupGet(r => r.CloudEnabled).Returns(false);
         var sut = new AdminOrderService(
-            _db, _emailSvc.Object, _euPlatesc.Object, _stripeClient.Object,
+            _db, _emailSvc.Object, _stripeClient.Object,
             router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, _awbNotifier.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
 
         var order = await SeedOrderAsync(OrderStatus.Paid);
 
@@ -842,4 +836,6 @@ public class AdminOrderServiceTests
         total.Should().Be(1);
         items.Single().Status.Should().Be("Paid");
     }
+
+    // The manual mark-Paid path's invoice races live in AdminOrderServicePaidRaceTests — they need the real unique indexes.
 }

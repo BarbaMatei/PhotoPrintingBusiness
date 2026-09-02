@@ -2,9 +2,9 @@
 unit: 002-efactura-generation-and-anaf
 intent: 016-romanian-vat-efactura
 phase: inception
-status: draft
-created: 2026-05-25T10:15:00Z
-updated: 2026-05-25T10:15:00Z
+status: complete
+created: 2026-05-25T10:15:00.000Z
+updated: 2026-05-25T10:15:00.000Z
 ---
 
 # Unit Brief: e-Factura Generation & ANAF Submission

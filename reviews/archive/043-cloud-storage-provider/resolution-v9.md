@@ -15,7 +15,7 @@ closed: 2026-07-27
 | ID | Status | Commit | Note |
 |---|---|---|---|
 | PPW-232 | fixed | `b9af326` | The empty-archive message is gated on the order's lifecycle: before payment and during production it says the photos are being prepared, and the "no longer available" copy is kept for the later statuses. First fix at `d041295`. |
-| PPW-233 | wont-fix | — | Owner ruling on 2026-07-27: the EuPlatesc gateway is slated for removal, so testing its wiring buys nothing durable. The Stripe twin stays tested. See Decisions. |
+| PPW-233 | wont-fix | — | Owner ruling on 2026-07-27: the legacy processor is slated for removal, so testing its wiring buys nothing durable. The Stripe twin stays tested. See Decisions. |
 | PPW-234 | deferred | — | Owner ruling on 2026-07-27: the backfill command is operator tooling for the deployment stage, so its scrutiny lands there with PPW-169 and PPW-209. See Decisions. |
 
 ## Scope
@@ -33,10 +33,10 @@ The certification pass left exactly three Medium items needing a decision; every
 was already terminal on the ledger. The owner ruled all three on 2026-07-27 through the owner summary
 for this pass.
 
-### EuPlatesc coverage will not be built
+### the legacy processor coverage will not be built
 
 The reason is strategic rather than technical: the owner intends to remove that payment gateway. Any
-later finding about EuPlatesc-only coverage or parity should cite this ruling instead of being fixed.
+later finding about the legacy processor-only coverage or parity should cite this ruling instead of being fixed.
 
 ### The backfill command is re-checked at the deployment stage
 

@@ -714,6 +714,10 @@ closed: 2026-08-10 — owner sign-off @`a4eb7e5` after the v6 verification (v5 r
   - v4: re-affirmed @`dc203c7`
   - v5: re-affirmed @`52a0cb9` — the carve-out at `:50` unchanged; the round edited `:67-72` and `:269-273`
   - 2026-08-10: target closed — row carried to the backlog
+  - 2026-08-21: narrowed, still open @`90b5683` — the provider half is void, since the tests now run on
+    real PostgreSQL. The defect stands: `:50` still matches only `OperationCanceledException`, so an
+    Npgsql cancellation (`PostgresException` 57014 / `NpgsqlException`) is still recorded as `error` —
+    now directly testable on the Postgres fixture
 
 ### PPW-395 — `CapturingSentryTransport.Payloads` is an unsynchronized `List` across threads
 

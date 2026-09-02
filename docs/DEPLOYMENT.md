@@ -67,7 +67,7 @@ are on you**.
 
 | File | Role |
 |------|------|
-| `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. |
+| `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. The runtime stage installs `icu-libs` + `icu-data-full` and sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, because the invoice PDF is rendered in `ro-RO` (§15.1) and the Alpine base ships no ICU at all. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
 | `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
 | `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
@@ -83,7 +83,7 @@ are on you**.
 - A **domain** with DNS you control (e.g. `fototipar.ro`).
 - A **container registry** — GHCR is used automatically (`ghcr.io/<owner>/fototipar/api`). Make the package visible to the deploy host or use a PAT.
 - A **managed PostgreSQL 16** instance (connection string), or accept the in-compose Postgres + your own backups.
-- **Secrets ready**: JWT keypair, Stripe keys, EuPlatesc credentials, SendGrid API key, Google OAuth client ID. See `.env.example` and the [README env matrix](../README.md#environment--secret-matrix).
+- **Secrets ready**: JWT keypair, Stripe keys, SendGrid API key, Google OAuth client ID. See `.env.example` and the [README env matrix](../README.md#environment--secret-matrix).
 - For Proposal A: an SSH-reachable Linux VM with Docker Engine + Compose v2.
 
 ---
@@ -157,24 +157,39 @@ docker compose -f docker-compose.prod.yml up -d
 ## 7. Database migrations — READ BEFORE FIRST DEPLOY
 
 The API applies **EF Core migrations automatically at boot** when it connects to
-PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). SQLite
-dev uses `EnsureCreated()` instead. So a normal deploy needs no manual migration step.
+PostgreSQL (`Database.Migrate()`, guarded by `IsNpgsql()` in `Program.cs`). Every
+environment — local dev included — uses that same path, so a normal deploy needs no
+manual migration step.
 
-> ⚠️ **Known gap to resolve before the first real Postgres deploy.**
-> Most migrations are Npgsql-native (`uuid`, `character varying`, `timestamp with time zone`),
-> but the newest one — `20260527075359_AddOrderIdempotencyKey` — was generated under the
-> **SQLite** provider (`TEXT` columns, a plain — not partial — unique index). `TEXT` is a
-> valid Postgres type so boot won't crash, but the migration history is provider-inconsistent.
-> **Before deploying to Postgres**, verify migrations apply against a real PG instance and,
-> ideally, regenerate that migration under Npgsql:
-> ```sh
-> # against a scratch Postgres, with the prod provider:
-> DatabaseProvider=Postgres ConnectionStrings__Default="Host=...;..." \
->   dotnet ef database update --project src/PhotoPrint.API
-> ```
-> If it applies cleanly and the unique index behaves as intended (Postgres allows multiple
-> NULLs in a unique index, which matches the nullable idempotency key), you're good. This is
-> tracked as a follow-up; it is not a containers/pipelines deliverable.
+**There is exactly one migration:** `20260820133204_InitialPostgres`, scaffolded under the Npgsql
+design-time provider. It carries `uuid`, `timestamp with time zone`, `jsonb`, `numeric`, a partial
+unique index on `Orders.IdempotencyKey`, both one-owner check constraints, the 42 Easybox locker
+seed rows, the `uq_invoices_series_year_number` expression index, and the `invoice_seq_ft_2026`
+sequence. It has been applied against a real PostgreSQL 16 instance from an empty database.
+
+**Until the first deploy there is only ever one migration, edited in place.** Nothing is deployed,
+so no database history has to be respected, and the branch that reaches `main` carries a single
+migration rather than a trail of corrections. A schema change means editing
+`20260820133204_InitialPostgres` and its `.Designer.cs`, never scaffolding a second file.
+
+The cost is that `Database.Migrate()` compares ids, not contents: an id already in
+`__EFMigrationsHistory` is skipped whatever it now says, so an edited baseline never reaches a
+database that already ran it. A developer whose database predates the edit brings it in line by
+hand — `ALTER TABLE ... ADD COLUMN` / `DROP COLUMN` keeps the data, and recreating the database is
+always safe while nothing is live. A `NOT NULL` column the model no longer maps fails every
+`INSERT` with `23502`; a column the model expects and the database lacks fails every read of that
+table. Neither shows up as a pending migration, so neither is caught at boot.
+
+**This stops at the first deploy.** From the moment a real environment has run the chain, an
+applied migration is frozen and a column is removed by adding a migration, never by rewriting an
+old one.
+
+**If a database ever carries a migration id this repo no longer contains**, boot tries to apply
+the baseline over existing tables and aborts with `42P07`. No such database exists — the deleted
+pre-squash chain was never applied anywhere, and dev ran on SQLite through `EnsureCreated`, which
+records no migration history at all. Should one appear, do not delete data: replace its
+`__EFMigrationsHistory` rows with the single id above so EF sees the migration as already applied,
+then restart the API.
 
 Seeding the product catalog (first deploy only):
 ```sh
@@ -192,7 +207,7 @@ docker compose -f docker-compose.prod.yml run --rm api dotnet PhotoPrint.API.dll
 - [ ] API reachable (e.g. `GET /api/products` returns catalog JSON).
 - [ ] A test login / registration succeeds (JWT signing key wired).
 - [ ] Logs clean: `docker compose -f docker-compose.prod.yml logs --tail=100 api` — no `OptionsValidationException` (means a required secret is missing) and no migration errors.
-- [ ] A Stripe test-mode payment completes end-to-end (and the EuPlatesc redirect builds).
+- [ ] A Stripe test-mode payment completes end-to-end.
 
 ---
 
@@ -216,11 +231,12 @@ backwards-compatible migrations.
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Caddy can't get a cert | DNS not pointing at the VM yet, or port 80/443 blocked | Fix DNS/firewall; use the staging `acme_ca` line in `Caddyfile` while testing. |
-| API exits on boot with `OptionsValidationException` | A required secret (Stripe/EuPlatesc/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
+| API exits on boot with `OptionsValidationException` | A required secret (Stripe/JWT) is empty in Production | Set it in the server `.env`; `docker compose up -d` again. |
 | `docker compose pull` 403/denied | GHCR package private and host not logged in | `docker login ghcr.io` with a PAT that has `read:packages`. |
-| Migration error on first PG connect | The SQLite-flavored migration (see §7) | Verify/regenerate per §7 against a scratch Postgres first. |
+| Migration error on first PG connect | Role lacks DDL rights, or a partially-created schema | Confirm the role owns the database, then re-run against a scratch Postgres per §7. |
 | Uploaded images vanish on redeploy | `Storage` not on a volume | Confirm the `apidata:/app/Storage` volume in `docker-compose.prod.yml`. |
 | Site shows API 404 instead of the app | UI not built into `wwwroot` (image built without the UI stage) | Rebuild with the standard `Dockerfile`; the `ui-build` stage populates `wwwroot`. |
+| Every invoice sits at `Pending` with no PDF, and `GET /api/orders/{id}/invoice` 404s forever. `Invoice.LastError` reads "The type initializer for … `InvoicePdfDocument` threw an exception"; the `anaf.upload-job.build-failed` log line carries a `CultureNotFoundException` | The image is running in globalization-invariant mode, so the `ro-RO` invoice culture does not exist | Rebuild with the standard `Dockerfile` (it installs `icu-libs` + `icu-data-full`), and make sure nothing in the server `.env` or a compose `environment:` block sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT`. The API's own `runtimeconfig` pins it off, which outranks the variable. The stuck rows are still `Pending`, so they file themselves on the next worker tick — no admin retry needed. |
 
 ---
 
@@ -1281,3 +1297,314 @@ legal values.
    multi-tenant or cross-org scrape consumer would need client certificates — a new ADR
    superseding ADR-018 for that topology.
 3. **Log export.** Serilog writes to stdout only; the OTel logs signal is not wired.
+
+---
+
+## 15. Invoicing — VAT, e-Factura XML, ANAF SPV submission (intent 016 / bolts 038 + 039)
+
+### 15.1 What the integration does
+
+For every paid order the API:
+
+1. **Computes a VAT breakdown** ([`VatCalculator`](../src/PhotoPrint.API/Services/VatCalculator.cs)) at order creation (bolt 038). The 3 columns `Order.NetTotalRon`, `Order.VatRon`, `Order.VatRate` are snapshotted from `Vat:Rate` at the moment of creation and never re-derived. Legal trail = the rate that was in effect when the customer paid.
+2. **Allocates an invoice number** inside the payment webhook's existing transaction (bolt 039), via `IInvoiceNumberingService.NextNumberAsync("FT", year)`, which uses `nextval()` on a per-`(series, year)` `SEQUENCE`. The number is `FT-YYYY-NNNNN`. See [ADR-020](../memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md) for the gap-on-rollback trade-off and the quarterly audit (§15.8).
+3. **Inserts the `Invoice` row** in the same transaction as the Order → Paid transition. The Invoice is the frozen legal artefact; the Order can be modified later (admin notes, status corrections) but the Invoice's monetary snapshot is immutable.
+4. **Builds a UBL 2.1 + CIUS-RO compliant XML payload** ([`InvoiceXmlBuilder`](../src/PhotoPrint.API/Services/Invoicing/InvoiceXmlBuilder.cs)) asynchronously via `InvoiceUploadJob`. Stored on `Invoice.XmlPayload`.
+5. **Renders a customer-facing PDF** ([`InvoicePdfRenderer`](../src/PhotoPrint.API/Services/Invoicing/InvoicePdfRenderer.cs)) via QuestPDF; stores it via `IStorageService` at `invoices/yyyy/MM/{InvoiceNumber}.pdf`. See [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md) for why QuestPDF over PuppeteerSharp. Dates and amounts print in `ro-RO` (`03 august 2026`, `1.234,56`), so the host must carry real ICU data — the image installs it and pins globalization-invariant mode off (§2); a host without it renders no PDF at all (§10).
+6. **Uploads the XML to ANAF SPV** via OAuth 2 client-credentials + PKCS#12 client cert, polls for status, and lands the invoice in `Accepted` / `Rejected` / `Failed`. `InvoiceUploadJob : BackgroundService` runs every 30 minutes by default.
+7. **Exposes admin tooling** at `/api/admin/invoices` — list, retry, raw-XML download.
+
+VAT computation runs **unconditionally**; ANAF submission is gated by a master flag (§15.2).
+
+### 15.2 Three knobs
+
+| Flag | Path | Purpose |
+|---|---|---|
+| `Vat:Rate` | `Vat__Rate` | The Romanian VAT rate (default `0.19`). Snapshotted at order creation; changing this does NOT mutate existing orders. **Always on**; no master flag. |
+| `Anaf:Enabled` | `Anaf__Enabled` | Master gate for ANAF submission. Off → no OAuth, no HTTP client, no worker. Invoice rows are still created (you need the legal artefact), but no XML or PDF is built either — the worker is their only caller — so `GET /api/orders/{id}/invoice` always answers 404. Boot fails fast if any required ANAF credential is missing when this is on. |
+| `Invoicing:CustomerEmailAttachments:Enabled` | `Invoicing__CustomerEmailAttachments__Enabled` | **Dual-write rollout flag** per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md). **Currently changes nothing customer-visible: no email send path is implemented.** Flipping it on only swaps which log line the notifier writes. It becomes the real seam once an email integration lands (§15.7). |
+
+**Why three flags, not one:** the rollout posture for regulated work is "exercise the pipeline against real production data, but don't expose the customer-visible side effect until you've inspected the output." The dual-write flag is the seam.
+
+**One tuning knob worth knowing (multi-replica deploys):** `Anaf:ClaimTtlMinutes` / `Anaf__ClaimTtlMinutes`, default `10`. When a worker picks up a `Pending` invoice it stamps a claim; this is how long that claim holds before another replica may reclaim the row. Set it **above** the duration of one full pass (XML build + PDF render + storage write + a 30 s ANAF upload timeout) or two replicas can work the same invoice at once and submit it twice — nothing in this codebase can then tell the duplicate filing from the first one. Set it too high and a replica that crashes mid-pass strands its invoice for that long. The validator rejects anything outside `2`–`1440`; single-replica deploys can leave the default alone.
+
+**The knob beside it:** `Anaf:MaxUnknownUploadOutcomes` / `Anaf__MaxUnknownUploadOutcomes`, default `3`, validator range `1`–`10`. An upload that hits the client timeout may already be filed at ANAF, so every later attempt on that invoice is a blind re-post of the same number. The worker counts them on the row and, once this many have accumulated, parks the invoice as `Failed` with a `LastError` telling the operator to reconcile the number in SPV; `POST /api/admin/invoices/{id}/retry` accepts `Failed`, and retrying resets the count. Three attempts spend about two hours of the five-business-day submission deadline — but only at the default `Anaf:ClaimTtlMinutes`: the wait before the next attempt is whichever is longer, that TTL or the poll interval, so a TTL raised towards its 1440-minute ceiling spaces the same three attempts across days and leaves the operator far less of the deadline. Raise it only if your ANAF link times out routinely and duplicate filings are cheaper to reconcile than late ones.
+
+### 15.3 Seller fiscal identity
+
+Every UBL XML and PDF embeds the seller's fiscal identity. The `Seller:` config section is read at boot and validated by [`SellerSettingsValidator`](../src/PhotoPrint.API/Validators/SellerSettingsValidator.cs). A typo here invalidates every emitted invoice — fail fast at startup.
+
+Required values (validator rejects empties / wrong shapes):
+
+| Setting | Format | Example |
+|---|---|---|
+| `Seller:Name` | non-empty, ≤ 200 chars | `"FotoTipar SRL"` |
+| `Seller:Cui` | `^RO\d{2,10}$` | `"RO12345678"` |
+| `Seller:RegistrationNumber` | non-empty, ≤ 50 chars | `"J40/1234/2026"` |
+| `Seller:Address:Line1` | non-empty | `"Str. Exemplu 1, Sector 1"` |
+| `Seller:Address:City` | non-empty | `"București"` |
+| `Seller:Address:PostalCode` | non-empty | `"010101"` |
+| `Seller:Address:CountryCode` | ISO 3166-1 alpha-2 | `"RO"` |
+| `Seller:IbanRon` | optional (cash-on-delivery sellers leave blank) | `"RO49AAAA1B31007593840000"` |
+
+The `appsettings.json` ships placeholder values (`"FotoTipar SRL"`, `"RO12345678"`, etc.) — **these are placeholders only**; replace with the real entity's data before the first production deploy. The shipped placeholders pass the validator (so the API boots in dev), but emit invalid invoices.
+
+The CUI **must** match the entity registered with ANAF, otherwise SPV will reject every upload.
+
+### 15.4 ANAF SPV provisioning (OAuth + PKCS#12 cert)
+
+ANAF requires two credentials for SPV API access:
+
+1. **OAuth 2 client-credentials** (`Anaf:ClientId` + `Anaf:ClientSecret`) — issued via ANAF's "Aplicații OAuth" portal at `anaf.ro` after the entity registers as a regulated submitter.
+2. **A PKCS#12 (`.p12`) client certificate** issued by a Romanian Qualified Trust Service Provider (typically certSIGN, DigiSign, or Trans Sped). Cost: ~€50–150/year for an entity-level cert; the cert files are emailed after fiscal-identity verification (CUI + ID document).
+
+**The cert is what ANAF authenticates against** — the OAuth token is an additional layer on top. Without the cert, OAuth refuses to issue a token.
+
+Provisioning workflow (operator-facing):
+
+1. **Register the entity in ANAF SPV.** Go to `anaf.ro` → SPV → "Înregistrare persoană juridică". You'll need the CUI, the registration number (`J40/...`), and an authorised representative's qualified electronic signature.
+2. **Order a Qualified Electronic Signature certificate.** Provider's website (`certsign.ro`, `digisign.ro`, `transsped.ro`). Choose the **company-level** variant (not personal). Validity: 1 or 2 years; renew before expiry (§15.10).
+3. **Receive the `.p12` file and its password by email.** Cert files arrive as encrypted email attachments. The password is delivered separately (SMS or signed letter, per provider). **Treat the file as a secret — it grants tax-authority write access.**
+4. **Register the OAuth app in ANAF.** ANAF SPV portal → "Aplicații" → register a new OAuth client. You'll upload the `.p12` cert here. ANAF returns `client_id` + `client_secret`.
+5. **Confirm sandbox vs production endpoints.**
+   - **Sandbox**: `https://api.anaf.ro/test/FCTEL/rest/` (validates submissions but never reports them to the fiscal authority — safe for the dual-write inspection week).
+   - **Production**: `https://api.anaf.ro/prod/FCTEL/rest/` (real submissions reported to ANAF — invoices count toward your fiscal obligations).
+
+### 15.5 Secret management
+
+Aligned with [ADR-006](../memory-bank/bolts/041-secrets-management/adr-006-secret-history-accept-and-rotate.md): **credentials never live in source.** `appsettings.json` ships with `ClientSecret`, `CertPath`, `CertPassword` empty; the validator refuses to boot the app with `Anaf:Enabled = true` if any of these are blank, and **checks `File.Exists` on `CertPath` at boot** so a missing cert file is a fail-fast.
+
+**Local dev** — `dotnet user-secrets`:
+```powershell
+cd src/PhotoPrint.API
+dotnet user-secrets set "Anaf:Enabled"      "true"
+dotnet user-secrets set "Anaf:BaseUrl"      "https://api.anaf.ro/test/FCTEL/rest/"
+dotnet user-secrets set "Anaf:ClientId"     "your-sandbox-client-id"
+dotnet user-secrets set "Anaf:ClientSecret" "your-sandbox-client-secret"
+dotnet user-secrets set "Anaf:CertPath"     "C:/secrets/anaf-sandbox.p12"
+dotnet user-secrets set "Anaf:CertPassword" "your-cert-password"
+```
+
+**Staging / production** — environment variables (double-underscore for nesting):
+```bash
+Anaf__Enabled=true
+Anaf__BaseUrl=https://api.anaf.ro/prod/FCTEL/rest/
+Anaf__ClientId=<from-anaf-portal>
+Anaf__ClientSecret=<from-anaf-portal>
+Anaf__CertPath=/etc/photoprint/secrets/anaf.p12
+Anaf__CertPassword=<from-provider-sms>
+Anaf__PollIntervalMinutes=30
+Anaf__MaxBatchSize=50
+Anaf__ClaimTtlMinutes=10
+Anaf__MaxUnknownUploadOutcomes=3
+Anaf__BackoffHours__0=1
+Anaf__BackoffHours__1=4
+Anaf__BackoffHours__2=16
+Anaf__BackoffHours__3=64
+
+# Stays off during the inspection week (§15.7):
+Invoicing__CustomerEmailAttachments__Enabled=false
+```
+
+**Cert file deployment**: copy the `.p12` to the production host at `/etc/photoprint/secrets/anaf.p12` (or wherever you point `Anaf__CertPath`). File mode `0400` (read-only by the API process owner). **Never commit the cert.** **Never log the cert subject, thumbprint, or password.**
+
+For systemd-managed deploys, the existing `EnvironmentFile=` pattern + a separate path mount handles both the env vars and the cert file.
+
+Sentry's scope scrubber (§13.6) doesn't yet recognise `cert` / `password` / `client_secret` as sensitive substrings by default — verify your `SensitiveFieldNames` list includes substrings that cover ANAF before flipping prod. The base list already covers `password`; consider adding `cert` and `client_secret` if you log option blocks at debug level.
+
+### 15.6 QuestPDF Community License obligation
+
+The PDF renderer uses QuestPDF (per [ADR-021](../memory-bank/bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md)). The Community License is **free for companies with revenue < $1M USD/year** — sufficient for FotoTipar today.
+
+The license is declared at process startup in `Program.cs`:
+```csharp
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+```
+
+**Ops checklist**:
+- **Annual review**: at end of fiscal year, check whether revenue exceeded $1M. If yes, purchase a Professional license (~$700/year as of writing) at [questpdf.com](https://www.questpdf.com/pricing) and update the license type in `Program.cs`.
+- **The check is on the honour system** — QuestPDF doesn't phone home. Compliance is the operator's responsibility.
+
+### 15.7 Recommended rollout sequence
+
+Two-stage rollout per [ADR-022](../memory-bank/bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md).
+
+1. **Pre-flight (config only).** All `Anaf__*` env vars set with `Anaf__Enabled=false`. `Invoicing__CustomerEmailAttachments__Enabled=false`. Cert file at `/etc/photoprint/secrets/anaf.p12`. Deploy. Verify boot succeeds — note this proves nothing about the ANAF values themselves: every rule in `AnafSettingsValidator` is guarded by `Enabled`, so they are first checked at the stage-1 flip. Verify no `Anaf` log lines appear at Information level.
+
+2. **Schema sanity.** Bolt 038's migration is **already applied** if you ran the standard deploy flow (§7). Confirm via:
+   ```sql
+   \dt invoices;
+   SELECT relname FROM pg_class WHERE relname LIKE 'invoice_seq_%';
+   -- Should list invoice_seq_ft_2026 (or current year).
+   ```
+
+3. **Stage 1 — sandbox flip.** In staging, point at the ANAF **sandbox** (`BaseUrl=https://api.anaf.ro/test/FCTEL/rest/`) and set `Anaf__Enabled=true`. Redeploy. Trigger a test order. Watch for:
+   ```
+   invoice.creation.number-attempted invoice_number=FT-2026-00001
+   anaf.token.refreshed
+   anaf.upload-job.batch size=1
+   anaf.upload-job.xml-built invoice_id=…
+   anaf.upload-job.pdf-rendered invoice_id=… key=invoices/2026/06/FT-2026-00001.pdf
+   anaf.spv.upload upload_id=…
+   ```
+   Then after the next poll (≤ 30 min):
+   ```
+   anaf.spv.status upload_id=… status=Validated
+   invoice.lifecycle.transition invoice_id=… Submitted -> Accepted
+   ```
+   Verify the row's `AnafStatus=Accepted`, `XmlPayload` non-null, `PdfStoragePath` non-null. **Run for 1 day in sandbox to flush any wire-protocol surprises.**
+
+   If the credentials are wrong (the common stage-1 failure), the shape is:
+   ```
+   anaf.upload-job.auth-failed invoice_id=…              ← Error + Sentry, ONCE per alert window per replica
+   anaf.upload-job.auth-outage-continues invoice_id=… alert_window_minutes=120 interval_minutes=30
+                                                        ← Warning, ~every 2nd tick (see below)
+   anaf.upload-job.auth-failure-skipped count=N          ← Warning, when the batch had other rows
+   ```
+   If an order cannot produce an invoice at all, the shape is one line and the row is parked, not retried:
+   ```
+   anaf.upload-job.not-buildable invoice_id=… order_id=… parked=True   ← Error, once; see the retry note in §15.2
+   ```
+   The Error is deliberately rate-limited to one page per **alert window**: without it a multi-day
+   outage pages every poll interval. That window is four poll intervals with a two-hour floor, so
+   it is 2 h at the default 30-minute cadence and it widens with `Anaf__PollIntervalMinutes` —
+   slowing the worker down cannot outrun the rate limit. Four, because a row that just recorded an
+   error sits out one interval, so consecutive auth attempts on it are up to two intervals apart.
+   At the validated maximum of 1440 minutes the window is 96 h, still inside the 5-business-day
+   submission deadline, so an outage nobody acts on pages at least twice before an invoice is
+   late. Both numbers are on every `auth-outage-continues` line, so the pair is checkable in the
+   logs rather than inferred. **Silence is not recovery** — the `auth-outage-continues`
+   Warning is what tells them apart, and each affected row also carries the reason in
+   `Invoices.LastError` (visible in the admin invoice list). Expect that Warning about every
+   **other** tick (~60 min at the default cadence), not every tick: a row that just recorded an
+   error waits out one poll interval before it is picked up again. A tick whose batch comes back
+   empty logs nothing at all. The window is per-process, so N replicas page up to N times per
+   window and a restart re-pages immediately.
+
+4. **Stage 2 — production flip with customer emails OFF (dual-write inspection week).** In production:
+   ```bash
+   Anaf__Enabled=true
+   Anaf__BaseUrl=https://api.anaf.ro/prod/FCTEL/rest/
+   Invoicing__CustomerEmailAttachments__Enabled=false   # ← stays off
+   ```
+   Redeploy. **Every paid order now lands in ANAF for real.** The PDF is generated, stored, and available at `GET /api/orders/{id}/invoice` for the customer who knows to look. No email surfaces it — that integration does not exist yet, so the flag below is not what is holding it back.
+
+5. **Inspection week (7 days):**
+   - Daily: open `GET /api/admin/invoices` and verify the day's orders show `AnafStatus=Accepted`. If any are `Rejected` or `Failed`, read the `LastError` and address (typo in `Seller`, wrong VAT category, etc.). Use `POST /api/admin/invoices/{id}/retry` to re-queue. **One `Failed` reason retry cannot fix:** a `LastError` starting `Invoice cannot be built and will not be retried` means the order itself carries no usable buyer address (or no items), so the XML and PDF can never be produced from it — every retry parks the row again on the first attempt. Parcel-locker orders taken before checkout collected a fiscal address are the known source; nothing in the admin panel edits an order's address today, so escalate these rather than retrying them.
+   - Spot-check the rendered PDFs: download a few via `GET /api/orders/{id}/invoice` and verify they look right (logo, totals, buyer address, fiscal note). PDF fidelity issues found here are cheap to fix — the customer hasn't seen them yet.
+   - Check `invoice_anaf_status_total` metric — `accepted` should dominate; ratio of `accepted : rejected` should be > 95:5.
+
+6. **Stage 3 — flip customer emails on.** Blocked: there is no email send path to turn on. Setting
+   ```bash
+   Invoicing__CustomerEmailAttachments__Enabled=true
+   ```
+   changes nothing a customer sees — the notifier logs `invoice.pdf-ready.no-email-integration` instead of `invoice.pdf-ready.suppressed` and returns. Do this step only once an email attachment integration ships; until then customers reach their invoice at `GET /api/orders/{id}/invoice` and nowhere else.
+
+7. **Post-rollout cleanup (eventually):** When the dual-write flag stays `true` for ≥ 30 days, a follow-up PR removes the flag + the `if (settings.Enabled)` branches. Tracked in the bolt-039 construction log per ADR-022.
+
+**Rollback paths:**
+- *PDF renderer bug surfaces.* This flag is not a rollback path today — it gates no customer-visible send. Flip `Anaf__Enabled=false` to stop the pipeline, or fix forward and re-render via `POST /api/admin/invoices/{id}/retry`.
+- *ANAF rejecting most submissions.* Flip `Anaf__Enabled=false`. Invoices still get created with numbers (legal artefact), but no XML, no PDF, no SPV upload — and the customer download endpoint 404s until you re-enable. Investigate the rejection cause, fix, then re-enable. Use `POST /api/admin/invoices/{id}/retry` after re-enabling to push the accumulated backlog.
+- *Total integration failure.* Flip both flags off. The Order → Paid transition still creates the Invoice row (you need the numbering allocated for the legal sequence), but no XML, no PDF, no upload. You're back to the pre-bolt-039 behaviour with a forward-compatible schema.
+
+### 15.8 Quarterly invoice-number-gap audit
+
+[ADR-020](../memory-bank/bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md) accepts that Postgres `SEQUENCE` advances on transaction rollback — meaning if the Stripe webhook's transaction rolls back after `nextval()` was called but before commit, the sequence has advanced and that number is "burned" (no invoice claims it). Romanian Fiscal Code forbids gaps.
+
+**Mitigation: run the audit query quarterly** (end of March, June, September, December). Surface any gaps to the accountant with a brief explanation.
+
+```sql
+-- Find gaps in the current fiscal year's invoice numbering.
+WITH expected AS (
+  SELECT generate_series(1, COALESCE(MAX("Number"), 0)) AS n
+  FROM "Invoices"
+  WHERE "Series" = 'FT'
+    AND EXTRACT(YEAR FROM "IssuedAt") = EXTRACT(YEAR FROM CURRENT_DATE)
+)
+SELECT expected.n AS missing_number
+FROM expected
+LEFT JOIN "Invoices" i
+  ON i."Series" = 'FT'
+  AND i."Number" = expected.n
+  AND EXTRACT(YEAR FROM i."IssuedAt") = EXTRACT(YEAR FROM CURRENT_DATE)
+WHERE i."Id" IS NULL
+ORDER BY expected.n;
+```
+
+If the result is empty: no gaps, nothing to explain. If the result lists numbers: each one represents either (a) a Stripe webhook that crashed mid-transaction (extraordinarily rare with bolt 035's idempotency), or (b) a manual DB intervention. Document each gap + cause in an accountant-facing memo for the fiscal year close.
+
+**Expected gap rate**: zero or near-zero. A handful of gaps over a year is defensible; systematic gaps would be a finding under audit.
+
+### 15.9 Admin retry runbook
+
+`POST /api/admin/invoices/{id}/retry` flips a `Rejected` or `Failed` invoice back to `Pending` for the next worker tick. 409 if the status isn't retryable.
+
+**When to retry vs investigate first:**
+
+| `LastError` symptom | Action |
+|---|---|
+| `"Conexiunea cu serverul a fost întreruptă"` / 5xx | Retry — likely a transient ANAF outage. |
+| `"CUI invalid"` | **Do not retry.** Fix the `Seller:Cui` config first. The cert may be tied to a different CUI. |
+| `"Documentul este invalid"` (XML schema) | **Do not retry blindly.** Inspect the XML via `GET /api/admin/invoices/{id}/xml` and diff against a known-good invoice. The error usually reveals a schema deviation introduced by a recent change. |
+| `"Această factură a fost deja primită"` | Already-accepted. Retry is safe; ANAF will return the existing `index_incarcare`. |
+| Status `Failed` (budget exhausted) | Investigate the original `LastError`, fix the cause, then retry. The retry re-uploads from scratch. |
+
+**Batch retry** (no built-in endpoint — use the admin UI loop or a one-shot SQL):
+```sql
+-- Flip all Failed invoices from a specific date back to Pending. The worker picks up next tick.
+-- Every column below matters: keeping XmlPayload reposts the same rejected XML, keeping
+-- PdfStoragePath serves the old PDF, and keeping UnknownUploadOutcomes re-parks the row on its
+-- first timeout. A stale ClaimedAt makes the worker skip the row until the claim TTL expires.
+UPDATE "Invoices"
+   SET "AnafStatus" = 'Pending',
+       "AnafUploadId" = NULL,
+       "LastError" = NULL,
+       "XmlPayload" = NULL,
+       "PdfStoragePath" = NULL,
+       "UnknownUploadOutcomes" = 0,
+       "ClaimedAt" = NULL,
+       "UpdatedAt" = NOW()
+ WHERE "AnafStatus" = 'Failed'
+   AND "CreatedAt" >= '2026-06-01';
+```
+
+### 15.10 What to monitor
+
+The Sentry section (§13.8) covers exception alerts. For invoicing-specific signals, use Prometheus metrics + the Grafana dashboard:
+
+| Signal | Source | Action if it fires |
+|---|---|---|
+| `invoice_anaf_status_total{status="failed"}` rate > 0 in 1h | Prometheus | Page — every Failed invoice is a manual-remediation candidate. |
+| `invoice_anaf_status_total{status="rejected"}` rate > 5/day | Prometheus | Investigate. A sustained Rejected rate means a misconfiguration (Seller, VAT rate) is rejecting everything. |
+| `admin.order.invoice-number-collision-exhausted` (Error) | Logs — alert on the event name; this path emits **no metric**, and the Sentry capture is silent wherever `Sentry:Enabled=false` (the shipped default) | The manual mark-as-paid answered 409 and the order stayed `AwaitingPayment`, so money that arrived out of band has no invoice. The number the sequence handed out was already taken — check `invoice_seq_<series>_<year>` against `MAX("Number")` (§15.8), fix the sequence, then re-issue the transition. It is an API-only call (`PATCH /api/admin/orders/{id}/status`, body `{"status":"Paid"}`); the admin panel has no button for it. The log line carries the order number, total and both payment identifiers. |
+| Cert expiry < 30 days | Manual / OpenSSL cron | Renew at the provider. New cert → new env var → restart. |
+| Days-since-`Anaf__Enabled` flip with `CustomerEmailAttachments=false` > 14 | Manual | Document why the inspection extended. Flipping the flag on is not yet an option — no email send path exists (§15.7 step 6). |
+| Quarter end | Calendar | Run the gap audit query (§15.8). |
+
+**Cert expiry monitoring** (manual cron, no metric for this):
+```bash
+openssl pkcs12 -in /etc/photoprint/secrets/anaf.p12 -nodes -passin pass:$ANAF_CERT_PASSWORD \
+  | openssl x509 -noout -enddate
+# notAfter=Jun 15 12:00:00 2027 GMT
+```
+Set a calendar reminder 60 days before that date.
+
+### 15.11 Cost envelope
+
+| Cost item | Annual estimate |
+|---|---|
+| Qualified Electronic Signature cert (certSIGN / DigiSign / Trans Sped) | €50–€150 |
+| ANAF SPV submissions | Free (regulated; ANAF doesn't charge per submission) |
+| QuestPDF Community License | $0 (free below $1M revenue; ~$700/yr above) |
+| PDF storage (S3 / R2) | Negligible — invoices are tens of KB; 1k orders/year = ~10 MB. Within R2's free tier. |
+| Total marginal cost of bolt 039 | **€50–€150/year** (cert) — everything else is in the noise. |
+
+### 15.12 Not implemented (future considerations)
+
+1. **Credit notes / storno invoices.** Out of scope for this intent. Will reuse `IInvoiceNumberingService` with `Series="FS"` — no code rework needed.
+2. **B2B invoices with buyer CUI.** Today every buyer is treated as a `Persoană fizică` (guest) and `BT-48 BuyerVATIdentifier` is omitted. Adding B2B requires capturing the buyer's CUI at checkout and emitting the corresponding party block.
+3. **Multi-currency invoices.** Romanian invoices are RON-only by convention (and our shop is RON-only by design). A foreign-currency intent would require new UBL fields and a daily exchange-rate source.
+4. **e-Receipts (`eAMEF`).** Romania's electronic-receipt mandate covers physical-presence retail; e-commerce is exempt. If we ever open a physical kiosk, a separate intent is needed.
+5. **Frontend invoice viewer.** Today the customer hits `GET /api/orders/{id}/invoice` and gets a raw PDF. A dedicated Angular view (with download button + zoom + print) is a UX-team follow-up.
+6. **Cert rotation without restart.** The `AnafTokenProvider` loads the cert once at first use. To rotate, restart the API. A SIGHUP-driven reload pattern exists but adds complexity not justified by the ~annual rotation cadence.
+7. **Per-row attempt counter.** Per [ADR-024](../memory-bank/bolts/039-efactura-anaf/adr-024-implicit-attempt-count-from-updatedat-no-persisted-counter.md), the retry budget is derived from `(now - CreatedAt)` rather than a persisted column. If incidents make per-row retry history a frequent ops query, add the column under a new ADR.

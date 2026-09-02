@@ -6,7 +6,7 @@
 
 FotoTipar is a monolithic **ASP.NET Core 8 REST API** (`src/PhotoPrint.API`) with an
 **Angular 21 SPA** (`src/PhotoPrint.UI`, standalone/zoneless, SPA-only — no SSR). Persistence is
-**dual-provider** (SQLite dev / PostgreSQL 16 prod — see [data-stack.md](data-stack.md)); file
+**PostgreSQL 16** in every environment (see [data-stack.md](data-stack.md)); file
 storage is **two-tier** (local disk + S3-compatible cloud). Real-time admin notifications via
 SignalR. The API can serve the built SPA from `wwwroot` (`MapFallbackToFile`).
 
@@ -17,9 +17,9 @@ SignalR. The API can serve the built SPA from `wwwroot` (`MapFallbackToFile`).
 └────────────┘                         └───────────┬─────────────────┘
                      ┌────────────┬────────────────┼──────────────┬───────────────┐
                ┌─────▼─────┐ ┌────▼─────┐ ┌────────▼───────┐ ┌────▼────┐ ┌────────▼──────┐
-               │ SQLite dev│ │ Local    │ │ S3-compatible  │ │ Stripe  │ │ SMTP (dev)    │
-               │ Postgres  │ │ disk     │ │ cloud (R2/S3/  │ │ EuPlat- │ │ SendGrid(prod)│
-               │ 16 (prod) │ │ (tier 1) │ │ MinIO, tier 2) │ │ esc     │ │ via EmailQueue│
+               │ PostgreSQL│ │ Local    │ │ S3-compatible  │ │ Stripe  │ │ SMTP (dev)    │
+               │ 16        │ │ disk     │ │ cloud (R2/S3/  │ │ EuPlat- │ │ SendGrid(prod)│
+               │ (Npgsql)  │ │ (tier 1) │ │ MinIO, tier 2) │ │ esc     │ │ via EmailQueue│
                └───────────┘ └──────────┘ └────────────────┘ └─────────┘ └───────────────┘
 ```
 
@@ -88,12 +88,12 @@ this blocks multi-VM scale-out by design until the Redis work (bolt 046, deliber
 
 ## Payments
 
-- **Stripe** (Elements client-side; server creates PaymentIntents with gateway-side idempotency
-  keyed by order Id) and **EuPlatesc** (signed redirect + HMAC-MD5-verified IPN callback, storno
-  refunds). Webhooks are anonymous endpoints with signature verification.
+- **Stripe** is the only payment processor (Elements client-side; server creates PaymentIntents
+  with gateway-side idempotency keyed by order Id). The webhook is an anonymous endpoint with
+  signature verification.
 - **Idempotency (bolt 035)**: `Idempotency-Key` header (≤80 chars) → `Orders.IdempotencyKey`,
   globally-unique index, 24 h replay window; replays return the cached client
-  secret/redirect URL; divergent replays → 409 with `divergentFields` (ADR-004/005). There is
+  secret; divergent replays → 409 with `divergentFields` (ADR-004/005). There is
   no separate idempotency table and **no optimistic-concurrency tokens anywhere** — uniqueness
   violations + retry are the concurrency mechanism.
 - Payment success: order → `Paid` (state machine), SignalR `NewOrderReceived`, confirmation

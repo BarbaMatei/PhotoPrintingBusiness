@@ -559,9 +559,9 @@ boolean.
 
 One column on `Orders`:
 
-| Column | Type (Postgres) | Type (SQLite — dev) | Nullable | Notes |
+| Column | Type (Postgres) | Type (PostgreSQL — dev) | Nullable | Notes |
 |---|---|---|---|---|
-| `DeliveredAt` | `timestamp with time zone` | `INTEGER` (via SQLite-only Unix-ms converter) | yes | UTC. Set exactly once by the tracking job when transitioning Shipped → Delivered. |
+| `DeliveredAt` | `timestamp with time zone` | `INTEGER` (via Postgres-only Unix-ms converter) | yes | UTC. Set exactly once by the tracking job when transitioning Shipped → Delivered. |
 
 EF Core configuration (added to existing `Order` entity block in
 `PhotoPrintDbContext.OnModelCreating`):
@@ -582,8 +582,8 @@ migrationBuilder.AddColumn<DateTimeOffset>(
     nullable: true);
 ```
 
-`Down` is a `DropColumn`. SQLite uses `EnsureCreated`; only Postgres
-runs the migration.
+`Down` is a `DropColumn`. The migration runs at boot on PostgreSQL.
+
 
 ### `Order` entity (extension)
 

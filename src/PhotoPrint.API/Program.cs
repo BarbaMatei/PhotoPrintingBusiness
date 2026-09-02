@@ -84,20 +84,13 @@ var metricsPath = builder.Configuration
     .GetValue<string>("Metrics:PrometheusEndpoint") ?? "/metrics";
 
 // ── Database ─────────────────────────────────────────────────────────────────
-var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Postgres";
 builder.Services.AddDbContext<PhotoPrintDbContext>(options =>
 {
     var connStr = builder.Configuration.GetConnectionString("Default");
     // Default to split queries so multi-collection Includes don't trigger a cartesian
     // explosion (and silence the MultipleCollectionInclude warning). No effect on the
     // InMemory provider used in tests.
-    // The split-query option is intentionally repeated in both
-    // arms — the UseSqlite/UseNpgsql calls differ, so a shared helper would save only the
-    // one option line and obscure the provider branch. Not worth extracting.
-    if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
-        options.UseSqlite(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
-    else
-        options.UseNpgsql(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+    options.UseNpgsql(connStr, o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 });
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -207,12 +200,6 @@ builder.Services
     .Validate(s => !paymentsRequired || !string.IsNullOrWhiteSpace(s.SecretKey),
         "Stripe:SecretKey is required in Production.")
     .ValidateOnStart();
-builder.Services
-    .AddOptions<PhotoPrint.API.Configuration.EuPlatescSettings>()
-    .Bind(builder.Configuration.GetSection(PhotoPrint.API.Configuration.EuPlatescSettings.SectionName))
-    .Validate(s => !paymentsRequired || (!string.IsNullOrWhiteSpace(s.MerchantId) && !string.IsNullOrWhiteSpace(s.SecretKey)),
-        "EuPlatesc:MerchantId and EuPlatesc:SecretKey are required in Production.")
-    .ValidateOnStart();
 builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 {
     var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.StripeSettings>>().Value;
@@ -220,8 +207,93 @@ builder.Services.AddSingleton<Stripe.IStripeClient>(sp =>
 });
 builder.Services.AddScoped<PhotoPrint.API.Services.IStripePaymentGateway, PhotoPrint.API.Services.StripePaymentGateway>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IStripeSignatureVerifier, PhotoPrint.API.Services.StripeSignatureVerifier>();
-builder.Services.AddScoped<PhotoPrint.API.Services.IEuPlatescService, PhotoPrint.API.Services.EuPlatescService>();
 builder.Services.AddScoped<PhotoPrint.API.Services.IOrderService, PhotoPrint.API.Services.OrderService>();
+
+// ── Invoicing ─────────────────────────────────────────────────────────────────
+// VAT calculation + invoice numbering. No master flag — VAT is unconditional
+// for legal compliance.
+builder.Services.Configure<PhotoPrint.API.Configuration.VatSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.VatSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.VatSettings>,
+    PhotoPrint.API.Validators.VatSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.VatSettings>().ValidateOnStart();
+
+builder.Services.AddScoped<
+    PhotoPrint.API.Services.Invoicing.IInvoiceNumberingService,
+    PhotoPrint.API.Services.Invoicing.PostgresInvoiceNumberingService>();
+
+// ── Invoicing (intent 016 / bolt 039 — e-Factura/ANAF) ────────────────────────
+// Seller fiscal identity (always validated — embedded in every invoice).
+builder.Services.Configure<PhotoPrint.API.Configuration.SellerSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.SellerSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.SellerSettings>,
+    PhotoPrint.API.Validators.SellerSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.SellerSettings>().ValidateOnStart();
+
+// ANAF SPV (gated by master flag per intent goal — disabled-by-default).
+builder.Services.Configure<PhotoPrint.API.Configuration.AnafSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.AnafSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.AnafSettings>,
+    PhotoPrint.API.Validators.AnafSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.AnafSettings>().ValidateOnStart();
+
+builder.Services.Configure<PhotoPrint.API.Configuration.InvoicingSettings>(
+    builder.Configuration.GetSection(PhotoPrint.API.Configuration.InvoicingSettings.SectionName));
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<PhotoPrint.API.Configuration.InvoicingSettings>,
+    PhotoPrint.API.Validators.InvoicingSettingsValidator>();
+builder.Services.AddOptions<PhotoPrint.API.Configuration.InvoicingSettings>().ValidateOnStart();
+
+// QuestPDF 2024.10+ refuses to render until the license is declared here; Community is valid below $1M USD/year revenue, so re-check the tier annually (DEPLOYMENT.md).
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
+// Always wired even when Anaf:Enabled = false: the Invoice row is still created at Paid and the
+// admin endpoints still work. The builders are registered either way, but the worker is their
+// only caller, so with the flag off no XML and no PDF is ever built.
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceCreationService,
+                            PhotoPrint.API.Services.Invoicing.InvoiceCreationService>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceXmlBuilder,
+                            PhotoPrint.API.Services.Invoicing.InvoiceXmlBuilder>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoicePdfRenderer,
+                            PhotoPrint.API.Services.Invoicing.InvoicePdfRenderer>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.IInvoiceLifecycle,
+                            PhotoPrint.API.Services.Invoicing.InvoiceLifecycle>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Invoicing.InvoicePdfReadyNotifier>();
+
+// ANAF SPV client + worker — gated by Anaf:Enabled (two-stage rollout).
+var anafEnabled = builder.Configuration
+    .GetSection(PhotoPrint.API.Configuration.AnafSettings.SectionName)
+    .GetValue<bool>("Enabled");
+
+if (anafEnabled)
+{
+    var anafBase = builder.Configuration
+        .GetSection(PhotoPrint.API.Configuration.AnafSettings.SectionName)
+        .GetValue<string>("BaseUrl");
+
+    builder.Services.AddSingleton<PhotoPrint.API.Services.Invoicing.Anaf.IAnafTokenProvider,
+                                   PhotoPrint.API.Services.Invoicing.Anaf.AnafTokenProvider>();
+    builder.Services.AddTransient<PhotoPrint.API.Services.Invoicing.Anaf.AnafAuthHandler>();
+    builder.Services.AddTransient<PhotoPrint.API.Services.Invoicing.Anaf.AnafResilienceHandler>();
+
+    builder.Services
+        .AddHttpClient<PhotoPrint.API.Services.Invoicing.Anaf.IAnafSpvClient,
+                       PhotoPrint.API.Services.Invoicing.Anaf.AnafSpvClient>((sp, http) =>
+        {
+            var s = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PhotoPrint.API.Configuration.AnafSettings>>().Value;
+            var baseUrl = s.BaseUrl.EndsWith('/') ? s.BaseUrl : s.BaseUrl + "/";
+            http.BaseAddress = new Uri(baseUrl);
+            http.Timeout     = TimeSpan.FromSeconds(30);
+        })
+        .AddHttpMessageHandler<PhotoPrint.API.Services.Invoicing.Anaf.AnafAuthHandler>()
+        .AddHttpMessageHandler<PhotoPrint.API.Services.Invoicing.Anaf.AnafResilienceHandler>();
+
+    builder.Services.AddSingleton<PhotoPrint.API.Services.Invoicing.Anaf.AnafOutageRegistry>();
+    builder.Services.AddHostedService<PhotoPrint.API.Services.Invoicing.Anaf.InvoiceUploadJob>();
+}
 
 // ── Admin ────────────────────────────────────────────────────────────────────────────
 
@@ -240,45 +312,10 @@ builder.Services.AddResponseCaching();
 
 var app = builder.Build();
 
-// ── SQLite: auto-create schema (bypasses Postgres-specific migrations) ────────
-if (dbProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+// ── Apply EF migrations at boot ───────────────────────────────────────────────
+// Guarded by IsNpgsql so the Testing host (InMemory) is a no-op; only a real
+// PostgreSQL connection triggers migration.
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
-    var schemaLog = scope.ServiceProvider.GetRequiredService<ILogger<PhotoPrintDbContext>>();
-
-    bool created = db.Database.EnsureCreated();
-
-    if (!created)
-    {
-        // DB already existed — verify the schema is complete.
-        // A previous startup may have created only a subset of tables if EnsureCreated
-        // was interrupted; detect this by checking for tables added after the 11 early ones.
-        var conn = db.Database.GetDbConnection();
-        conn.Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table'" +
-            " AND name IN ('Uploads','CartItems','Orders','OrderItems','EasyboxLockers')";
-        var present = Convert.ToInt64(cmd.ExecuteScalar());
-        conn.Close();
-
-        if (present < 5)
-        {
-            schemaLog.LogWarning(
-                "SQLite schema is incomplete ({Present}/5 core tables). " +
-                "Dropping and recreating the dev database — all local data will be lost.",
-                present);
-            db.Database.EnsureDeleted();
-            db.Database.EnsureCreated();
-        }
-    }
-}
-else
-{
-    // ── Postgres (production): apply EF migrations at boot ────────────────────
-    // Guarded by IsNpgsql so the Testing host (InMemory) and any non-relational
-    // provider are a no-op; only a real PostgreSQL connection triggers migration.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<PhotoPrintDbContext>();
     if (db.Database.IsNpgsql())

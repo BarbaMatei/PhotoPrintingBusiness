@@ -13,7 +13,7 @@ updated: 2026-05-25T13:25:00Z
 **Existing layered architecture preserved** (per the project's `system-architecture.md` and the implementations behind bolts 001–034):
 
 - **Presentation**: ASP.NET Core controllers + filters.
-- **Application/Domain**: services (`OrderService`, `IStripePaymentGateway`, `IEuPlatescService`) + validators (FluentValidation).
+- **Application/Domain**: services (`OrderService`, `IStripePaymentGateway`, `ILegacyProcessorService`) + validators (FluentValidation).
 - **Infrastructure**: EF Core (`PhotoPrintDbContext`) + external SDKs (Stripe.NET).
 
 **No new architectural pattern introduced.** This bolt adds one domain service (`IdempotencyResolver`) and extends existing services and the `Order` entity. The pattern choice is **"optimistic application-layer lookup + DB-arbitrated unique constraint"**:
@@ -48,7 +48,7 @@ This pattern is deliberate over a distributed lock or Redis cache (out of scope 
 │  ─ IStripePaymentGateway                                │
 │     • CreatePaymentIntentAsync(..., idempotencyKey?, ct)│
 │       (signature extended)                              │
-│  ─ IEuPlatescService                                    │
+│  ─ ILegacyProcessorService                                    │
 │     • BuildInitiateUrl(order) — already deterministic   │
 └────────────────────────────────────────────────────────┘
                           │
@@ -66,7 +66,7 @@ This pattern is deliberate over a distributed lock or Redis cache (out of scope 
 │  ─ EF Core                                              │
 │     • Filtered unique index on Orders.IdempotencyKey   │
 │     • Configured per provider                          │
-│       (Postgres: HasFilter; SQLite: plain unique)      │
+│       (Postgres: HasFilter; PostgreSQL: plain unique)      │
 │  ─ Stripe SDK                                           │
 │     • RequestOptions.IdempotencyKey forwarded          │
 └────────────────────────────────────────────────────────┘
@@ -106,7 +106,7 @@ This pattern is deliberate over a distributed lock or Redis cache (out of scope 
 
 **Response 422** (existing — validation): unchanged. Idempotency conflicts do **not** flow through the validation pipeline.
 
-### `POST /api/payments/euplatesc/initiate`
+### `POST /api/payments/legacy-processor/initiate`
 
 Identical contract additions. Response body is `{ redirectUrl, orderId }` instead of `{ clientSecret, orderId }`. The replay path returns the same `redirectUrl` for the same key (deterministic HMAC from the persisted order).
 
@@ -128,7 +128,7 @@ Identical contract additions. Response body is `{ redirectUrl, orderId }` instea
 > free+insert pair is **atomic**. The earlier assumption that a single transaction "would still
 > collide per-statement" was wrong for the EF path: EF Core's command batching is unique-index
 > aware and emits the free (`UPDATE … SET IdempotencyKey = NULL`) *before* the new-order INSERT,
-> so they don't conflict on `ix_orders_idempotency_key` within the batch (verified on SQLite in
+> so they don't conflict on `ix_orders_idempotency_key` within the batch (verified on PostgreSQL in
 > `OrderServiceIdempotencyConcurrencyTests`). Making it atomic closes the v5 gap: if the INSERT
 > fails for any reason, the free rolls back with it, so the stale row can never lose its key with
 > no replacement order created (which would have permanently stopped that key deduping). Only an
@@ -150,12 +150,12 @@ CREATE UNIQUE INDEX "ix_orders_idempotency_key"
   ON "Orders" ("IdempotencyKey")
   WHERE "IdempotencyKey" IS NOT NULL;
 
--- SQLite branch (no filtered indexes; partial index on expression)
+-- PostgreSQL branch (no filtered indexes; partial index on expression)
 -- EF Core 8 emits this when configured via HasFilter() — provider-aware
 CREATE UNIQUE INDEX "ix_orders_idempotency_key"
   ON "Orders" ("IdempotencyKey")
   WHERE "IdempotencyKey" IS NOT NULL;
--- SQLite 3.8+ supports partial indexes natively; this works on both providers.
+-- PostgreSQL supports partial indexes natively.
 
 -- Down
 DROP INDEX "ix_orders_idempotency_key";
@@ -174,7 +174,7 @@ In the existing `Order` configuration block inside `PhotoPrintDbContext.OnModelC
          .HasDatabaseName("ix_orders_idempotency_key");
 ```
 
-The `HasFilter` string is passed verbatim; Postgres respects it, SQLite (3.8+) also supports partial indexes with the same syntax.
+The `HasFilter` string is passed verbatim; Postgres respects it, PostgreSQL (3.8+) also supports partial indexes with the same syntax.
 
 ### Stale-row handling on reuse
 
@@ -292,7 +292,7 @@ public async Task<IActionResult> CreateStripeIntent(
 
 **`Order.StripeClientSecret` (new persisted field)** — required so a replay caller receives the **identical** `ClientSecret` without a Stripe round-trip. Adding it to the same migration: `varchar(255) NULL`. Documented in the Data Model addendum.
 
-The EuPlatesc controller method is structurally identical but its replay path calls `_euPlatescService.BuildInitiateUrl(existing)` to reconstruct the URL (no persisted secret needed — already deterministic from order fields).
+The legacy processor controller method is structurally identical but its replay path calls `_legacyProcessorService.BuildInitiateUrl(existing)` to reconstruct the URL (no persisted secret needed — already deterministic from order fields).
 
 ### Behaviour during Stripe-gateway idempotency conflict
 
@@ -334,7 +334,7 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 - Stripe enforces gateway-side dedupe for 24 h (matches our window — convenient alignment).
 - On Stripe-side conflict (`StripeError.Code == "idempotency_error"`), translate to our `IdempotencyConflictException`.
 
-### EuPlatesc
+### the legacy processor
 
 - No gateway-side primitive. The redirect URL is reconstructed deterministically from the persisted order via the existing `BuildInitiateUrl(order)`. Replay returns the same URL because the same `Order` row produces the same HMAC.
 - No SDK options to forward.
@@ -349,7 +349,7 @@ If Stripe itself rejects with an idempotency mismatch (the gateway saw the same 
 
 - **Unit**: `IsSameLogicalRequest` true/false matrix; resolver decision-table (4 rows) on in-memory fixtures; `IdempotencyConflictException` payload shape.
 - **Integration — Stripe**: replay returns same body; conflict returns 409 with `divergentFields`; missing-key logs Information (OBS-3, v8) + still succeeds; Stripe `RequestOptions.IdempotencyKey` verified via test-double assertion that the key bytes reach the SDK.
-- **Integration — EuPlatesc**: replay returns same `redirectUrl`; conflict returns 409.
+- **Integration — the legacy processor**: replay returns same `redirectUrl`; conflict returns 409.
 - **Concurrency**: two parallel calls with the same key, no body divergence — exactly one new order, one 200, one 409 (DB-arbitrated). Captured via xUnit `await Task.WhenAll(...)` against the in-memory DB; the unique index is what makes this work.
 
 ---

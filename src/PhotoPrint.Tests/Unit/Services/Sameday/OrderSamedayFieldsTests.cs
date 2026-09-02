@@ -80,7 +80,6 @@ public class OrderSamedayFieldsTests : IDisposable
         SubtotalRon     = 100m,
         ShippingCostRon = 20m,
         TotalRon        = 120m,
-        PaymentProcessor = PaymentProcessor.Stripe,
         Status          = OrderStatus.AwaitingPayment,
     };
 }

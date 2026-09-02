@@ -16,9 +16,16 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ShippingService } from '../../../core/services/shipping.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { AccountService } from '../../../core/services/account.service';
 import { GuestAuthService } from '../../../core/services/guest-auth.service';
+import { SavedAddressDto } from '../../../core/models/account.model';
 import { LockerMapComponent } from '../components/locker-map';
-import { LockerDto, DeliveryType, ROMANIAN_COUNTIES } from '../../../core/models/shipping.model';
+import {
+  LockerDto,
+  DeliveryType,
+  ROMANIAN_COUNTIES,
+  ShippingAddressForm,
+} from '../../../core/models/shipping.model';
 
 // Mirror the server's phone rule (charset + realistic digit count) so a bad phone is caught at the
 // client gate, not only at CreateOrder.
@@ -30,6 +37,19 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
   return digits >= 9 && digits <= 15 ? null : { phone: true };
 }
 
+// The invoice line takes street, number and block as one field, so the server caps their total.
+const CITY_MAX = 50;
+const RECIPIENT_MAX = 200;
+const STREET_LINE_MAX = 150;
+
+function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
+  const parts = ['street', 'number', 'block']
+    .map(name => (group.get(name)?.value ?? '').toString().trim())
+    .filter(part => part.length > 0);
+  const combined = parts.join(' ');
+  return combined.length > STREET_LINE_MAX ? { streetLineTooLong: true } : null;
+}
+
 @Component({
   selector: 'app-delivery-step',
   standalone: true,
@@ -39,6 +59,13 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
     <div class="delivery-step">
       <h2 class="step-title">Metoda de livrare</h2>
 
+      @if (shippingCostsFailed()) {
+        <div class="cost-error" role="alert">
+          <span>Nu am putut încărca costurile de livrare.</span>
+          <button type="button" class="btn-retry-costs" (click)="loadShippingCosts()">Reîncearcă</button>
+        </div>
+      }
+
       <!-- Delivery method cards -->
       <div class="delivery-cards">
         <label class="delivery-card" [class.selected]="deliveryMethod() === 'Easybox'">
@@ -46,11 +73,18 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             type="radio"
             name="delivery"
             value="Easybox"
+            [disabled]="!shippingCostsReady()"
             (change)="selectMethod('Easybox')"
           />
           <div class="card-body">
             <div class="card-title">📦 Easybox Sameday</div>
-            <div class="card-price">{{ easyboxCostRon() | number:'1.2-2' }} RON</div>
+            <div class="card-price">
+              @if (easyboxCostRon() !== null) {
+                {{ easyboxCostRon() | number:'1.2-2' }} RON
+              } @else {
+                <span class="card-price--pending">se încarcă…</span>
+              }
+            </div>
             <div class="card-desc">Ridicare dintr-un easybox în 24h</div>
           </div>
         </label>
@@ -60,11 +94,18 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             type="radio"
             name="delivery"
             value="Courier"
+            [disabled]="!shippingCostsReady()"
             (change)="selectMethod('Courier')"
           />
           <div class="card-body">
             <div class="card-title">🚚 Livrare la ușă</div>
-            <div class="card-price">{{ courierCostRon() | number:'1.2-2' }} RON</div>
+            <div class="card-price">
+              @if (courierCostRon() !== null) {
+                {{ courierCostRon() | number:'1.2-2' }} RON
+              } @else {
+                <span class="card-price--pending">se încarcă…</span>
+              }
+            </div>
             <div class="card-desc">Curier la domiciliu în 2–4 zile</div>
           </div>
         </label>
@@ -115,34 +156,27 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
           @if (showLockerError()) {
             <div class="field-error">Selectează un easybox pentru a continua.</div>
           }
-
-          <form [formGroup]="easyboxContactForm" class="address-form" novalidate>
-            <div class="form-group">
-              <label for="ebName">Nume destinatar</label>
-              <input id="ebName" type="text" formControlName="recipientName" />
-              @if (easyboxContactForm.get('recipientName')?.touched && easyboxContactForm.get('recipientName')?.invalid) {
-                <span class="field-error">Câmp obligatoriu</span>
-              }
-            </div>
-            <div class="form-group">
-              <label for="ebPhone">Telefon</label>
-              <input id="ebPhone" type="tel" formControlName="phone" />
-              @if (easyboxContactForm.get('phone')?.touched && easyboxContactForm.get('phone')?.invalid) {
-                <span class="field-error">Câmp obligatoriu</span>
-              }
-            </div>
-          </form>
         </div>
       }
 
-      <!-- Home delivery address form -->
-      @if (deliveryMethod() === 'Courier') {
+      <!-- One address form for both methods: the invoice needs a real buyer address either way -->
+      @if (deliveryMethod()) {
+        <h3 class="form-title">
+          {{ deliveryMethod() === 'Easybox' ? 'Adresa de facturare' : 'Adresa de livrare' }}
+        </h3>
+        @if (deliveryMethod() === 'Easybox') {
+          <p class="form-hint">
+            Coletul ajunge la easybox, dar factura are nevoie de adresa ta completă.
+          </p>
+        }
         <form [formGroup]="addressForm" class="address-form" novalidate>
           <div class="form-row">
             <div class="form-group">
               <label for="street">Strada</label>
               <input id="street" type="text" formControlName="street" />
-              @if (touched('street') && addressForm.get('street')?.invalid) {
+              @if (touched('street') && addressForm.get('street')?.errors?.['maxlength']) {
+                <span class="field-error">Prea lung pentru factură</span>
+              } @else if (touched('street') && addressForm.get('street')?.invalid) {
                 <span class="field-error">Câmp obligatoriu</span>
               }
             </div>
@@ -203,6 +237,12 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
             }
           </div>
         </form>
+      }
+
+      @if (addressForm.errors?.['streetLineTooLong']) {
+        <div class="field-error form-error" role="alert">
+          Strada, numărul și blocul depășesc împreună 150 de caractere, limita liniei de adresă de pe factură.
+        </div>
       }
 
       <div class="step-actions">
@@ -280,6 +320,9 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
 
     .no-lockers { color: #6c757d; font-size: 0.9rem; }
 
+    .form-title { font-size: 1.05rem; font-weight: 600; margin: 0; }
+    .form-hint { font-size: 0.85rem; color: #6c757d; margin: -0.5rem 0 0; }
+
     .address-form { display: flex; flex-direction: column; gap: 0.75rem; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
     .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
@@ -293,6 +336,7 @@ function phoneDigits(control: AbstractControl): ValidationErrors | null {
       font-size: 0.95rem;
     }
     .field-error { color: #dc3545; font-size: 0.8rem; }
+    .form-error { margin: 0.5rem 0; }
 
     .step-actions {
       display: flex;
@@ -309,6 +353,7 @@ export class DeliveryStep implements OnInit {
   private readonly shippingService = inject(ShippingService);
   readonly checkoutState = inject(CheckoutStateService);
   private readonly auth = inject(AuthService);
+  private readonly accountService = inject(AccountService);
   private readonly guestAuth = inject(GuestAuthService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
@@ -322,8 +367,11 @@ export class DeliveryStep implements OnInit {
   readonly deliveryMethod = signal<DeliveryType | null>(
     this.checkoutState.snapshot.method,
   );
-  readonly easyboxCostRon = signal(20);
-  readonly courierCostRon = signal(25);
+  // Null until the server answers: a default that differs from the configured price is charged
+  // and invoiced at the server value, so the customer would agree to a total nobody bills.
+  readonly easyboxCostRon = signal<number | null>(null);
+  readonly courierCostRon = signal<number | null>(null);
+  readonly shippingCostsFailed = signal(false);
   readonly lockers = signal<LockerDto[]>([]);
   readonly selectedLockerId = signal<string | null>(this.checkoutState.snapshot.lockerId);
   readonly showLockerError = signal(false);
@@ -331,30 +379,21 @@ export class DeliveryStep implements OnInit {
 
   readonly citySearch = this.fb.control('');
 
+  // Mirrors the server caps: a value the API rejects should be caught on the screen that asks
+  // for it, not two screens later as a 400 on a field the customer can no longer see.
   readonly addressForm = this.fb.group({
-    street: ['', Validators.required],
-    number: ['', Validators.required],
-    block: [''],
-    city: ['', Validators.required],
-    county: ['', Validators.required],
-    postalCode: ['', Validators.required],
-    recipientName: ['', Validators.required],
+    street: ['', [Validators.required, Validators.maxLength(255)]],
+    number: ['', [Validators.required, Validators.maxLength(50)]],
+    block: ['', Validators.maxLength(100)],
+    city: ['', [Validators.required, Validators.maxLength(CITY_MAX)]],
+    county: ['', [Validators.required, Validators.maxLength(100)]],
+    postalCode: ['', [Validators.required, Validators.maxLength(20)]],
+    recipientName: ['', [Validators.required, Validators.maxLength(RECIPIENT_MAX)]],
     phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
-  });
-
-  // Easybox still needs a person + phone for the courier to notify; the locker
-  // supplies the address.
-  readonly easyboxContactForm = this.fb.group({
-    recipientName: ['', Validators.required],
-    phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
-  });
+  }, { validators: combinedStreetLength });
 
   // Form validity is not a signal, so mirror it into one — otherwise the computed
   // below memoizes a stale value and the button never re-enables after typing.
-  private readonly easyboxContactValid = toSignal(
-    this.easyboxContactForm.statusChanges.pipe(map(s => s === 'VALID')),
-    { initialValue: this.easyboxContactForm.valid },
-  );
   private readonly addressValid = toSignal(
     this.addressForm.statusChanges.pipe(map(s => s === 'VALID')),
     { initialValue: this.addressForm.valid },
@@ -363,23 +402,20 @@ export class DeliveryStep implements OnInit {
   readonly canContinue = computed(() => {
     const method = this.deliveryMethod();
     if (!method) return false;
-    if (method === 'Easybox') return !!this.selectedLockerId() && this.easyboxContactValid();
+    // A restored method carries a stored price; continuing before the server confirms it invoices
+    // a total the customer never agreed to.
+    if (!this.shippingCostsReady()) return false;
+    if (method === 'Easybox') return !!this.selectedLockerId() && this.addressValid();
     return this.addressValid();
   });
 
   ngOnInit(): void {
-    // Load shipping costs
-    this.shippingService.getShippingCost('Easybox').subscribe(r => this.easyboxCostRon.set(r.costRon));
-    this.shippingService.getShippingCost('Courier').subscribe(r => this.courierCostRon.set(r.costRon));
+    this.loadShippingCosts();
 
-    // Restore a previously entered address / contact.
     const saved = this.checkoutState.snapshot.shippingAddress;
-    if (saved) {
-      this.addressForm.patchValue(saved);
-      this.easyboxContactForm.patchValue({ recipientName: saved.recipientName, phone: saved.phone });
-    }
+    if (saved) this.addressForm.patchValue(saved);
 
-    this.prefillEasyboxContact();
+    this.prefillAddress();
 
     // Locker search + the full-list prime run through ONE stream so switchMap cancels a superseded
     // fetch (a debounced search cancels an in-flight prime — never the reverse). The prime leg is
@@ -407,8 +443,8 @@ export class DeliveryStep implements OnInit {
     }
   }
 
-  private prefillEasyboxContact(): void {
-    const c = this.easyboxContactForm;
+  private prefillAddress(): void {
+    const c = this.addressForm;
 
     // Guest checkout keeps contact under the guestSession key — read it through the service that
     // owns that key/shape (not an inline localStorage parse that would silently drift).
@@ -421,13 +457,56 @@ export class DeliveryStep implements OnInit {
 
     // Signed-in display name (phone isn't exposed on the client-side user).
     this.auth.currentUser$.pipe(take(1)).subscribe(user => {
-      if (user?.displayName && !c.value.recipientName) {
+      if (!user) return;
+      if (user.displayName && !c.value.recipientName) {
         c.patchValue({ recipientName: user.displayName });
       }
+      this.prefillFromSavedAddress();
     });
   }
 
+  private prefillFromSavedAddress(): void {
+    const c = this.addressForm;
+    if (c.value.street && c.value.city && c.value.postalCode) return;
+    this.accountService
+      .getAddresses()
+      .pipe(take(1), catchError(() => of([] as SavedAddressDto[])))
+      .subscribe(addresses => {
+        const saved = addresses.find(a => a.isDefault) ?? addresses[0];
+        if (!saved) return;
+        // The saved shape has one addressLine and the form has three fields, so the street is left unguessed.
+        if (!c.value.city && saved.city) c.patchValue({ city: saved.city });
+        if (!c.value.county && saved.county) c.patchValue({ county: saved.county });
+        if (!c.value.postalCode && saved.postalCode) c.patchValue({ postalCode: saved.postalCode });
+        if (!c.value.recipientName && saved.fullName) c.patchValue({ recipientName: saved.fullName });
+        if (!c.value.phone && saved.phone) c.patchValue({ phone: saved.phone });
+      });
+  }
+
+  loadShippingCosts(): void {
+    this.shippingCostsFailed.set(false);
+    this.shippingService.getShippingCost('Easybox').subscribe({
+      next: r => this.applyCost('Easybox', r.costRon),
+      error: () => this.shippingCostsFailed.set(true),
+    });
+    this.shippingService.getShippingCost('Courier').subscribe({
+      next: r => this.applyCost('Courier', r.costRon),
+      error: () => this.shippingCostsFailed.set(true),
+    });
+  }
+
+  private applyCost(method: DeliveryType, costRon: number): void {
+    if (method === 'Easybox') this.easyboxCostRon.set(costRon);
+    else this.courierCostRon.set(costRon);
+    if (this.deliveryMethod() === method) this.checkoutState.setShippingCost(costRon);
+  }
+
+  readonly shippingCostsReady = computed(
+    () => this.easyboxCostRon() !== null && this.courierCostRon() !== null,
+  );
+
   selectMethod(method: DeliveryType): void {
+    if (!this.shippingCostsReady()) return;
     if (this.deliveryMethod() === method) return; // a no-op re-click must not wipe a restored locker
     this.deliveryMethod.set(method);
     // Mirror the state setMethod clears: without this the stale selectedLockerId leaves canContinue
@@ -435,7 +514,7 @@ export class DeliveryStep implements OnInit {
     this.selectedLockerId.set(null);
     this.showLockerError.set(false);
     this.lockerSearchError.set(false);
-    const cost = method === 'Easybox' ? this.easyboxCostRon() : this.courierCostRon();
+    const cost = method === 'Easybox' ? this.easyboxCostRon()! : this.courierCostRon()!;
     this.checkoutState.setMethod(method, cost);
     if (method === 'Easybox') this.primeLockers$.next();
   }
@@ -453,34 +532,30 @@ export class DeliveryStep implements OnInit {
 
   continue(): void {
     if (!this.canContinue()) {
-      if (this.deliveryMethod() === 'Easybox') {
-        if (!this.selectedLockerId()) this.showLockerError.set(true);
-        this.easyboxContactForm.markAllAsTouched();
+      if (this.deliveryMethod() === 'Easybox' && !this.selectedLockerId()) {
+        this.showLockerError.set(true);
       }
-      if (this.deliveryMethod() === 'Courier') {
-        this.addressForm.markAllAsTouched();
-      }
+      this.addressForm.markAllAsTouched();
       return;
     }
 
-    if (this.deliveryMethod() === 'Courier') {
-      const val = this.addressForm.value;
-      this.checkoutState.setShippingAddress({
-        street: val['street'] ?? '',
-        number: val['number'] ?? '',
-        block: val['block'] ?? '',
-        city: val['city'] ?? '',
-        county: val['county'] ?? '',
-        postalCode: val['postalCode'] ?? '',
-        recipientName: val['recipientName'] ?? '',
-        phone: val['phone'] ?? '',
-      });
-    } else if (this.deliveryMethod() === 'Easybox') {
-      const c = this.easyboxContactForm.value;
-      this.checkoutState.setEasyboxContact({
-        recipientName: c.recipientName ?? '',
-        phone: c.phone ?? '',
-      });
+    const val = this.addressForm.value;
+    const address: ShippingAddressForm = {
+      street: val['street'] ?? '',
+      number: val['number'] ?? '',
+      block: val['block'] ?? '',
+      city: val['city'] ?? '',
+      county: val['county'] ?? '',
+      postalCode: val['postalCode'] ?? '',
+      recipientName: val['recipientName'] ?? '',
+      phone: val['phone'] ?? '',
+    };
+
+    // Two setters on purpose: the courier one clears the locker, and a locker order must keep it.
+    if (this.deliveryMethod() === 'Easybox') {
+      this.checkoutState.setEasyboxAddress(address);
+    } else {
+      this.checkoutState.setShippingAddress(address);
     }
 
     this.router.navigate(['/checkout/recapitulare']);

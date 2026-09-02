@@ -11,7 +11,7 @@ BACKEND — ASP.NET Core
 EPIC-5 | Panou Admin
 
 ## Dependencies
-- US-305/US-306 (Orders + Payment infrastructure)
+- US-305 (Orders + Payment infrastructure)
 - US-802 (Security — Admin role authorization)
 - US-605 (IEmailService for status change notifications)
 
@@ -22,7 +22,7 @@ EPIC-5 | Panou Admin
 3. **`GET /api/admin/orders/{id}`** — full detail + internalNotes
 4. **`PATCH /api/admin/orders/{id}/status {status, awbNumber?}`** — validates transitions: Paid→Printing→Shipped→Delivered; any→Cancelled
 5. **`GET /api/admin/orders/{id}/download-zip`** — streams ZIP (`System.IO.Compression`) of all order photo files
-6. **`POST /api/admin/orders/{id}/cancel`** — initiates Stripe refund OR EuPlatesc refund based on `PaymentProcessor` field; sets `status=Cancelled`
+6. **`POST /api/admin/orders/{id}/cancel`** — initiates a Stripe refund; sets `status=Cancelled`
 7. **`PATCH /api/admin/orders/{id}/notes {notes}`** — saves internal note
 8. **SignalR `AdminOrderHub`**: broadcasts `NewOrderReceived` and `OrderStatusChanged` to admin clients on order events
 
@@ -60,7 +60,7 @@ PATCH /api/admin/orders/{id}/notes
   - Cancel: from Paid or Printing → Cancelled
   - All other transitions → 400
 - **ZIP download**: use `System.IO.Compression.ZipArchive`; stream directly to response (no temp file); set `Content-Disposition: attachment; filename="order-{number}-photos.zip"`
-- **Cancel + refund**: check `PaymentProcessor` field on order; call `StripePaymentService.RefundAsync()` or `EuPlatescService.RefundAsync()` accordingly; set status=Cancelled; send cancellation email
+- **Cancel + refund**: call the Stripe refund API for the order's `PaymentIntentId`; set status=Cancelled; send cancellation email
 - **SignalR hub**: `AdminOrderHub` — requires Admin role; methods: none (server→client only); broadcasts on order creation and status change
 - **Internal notes**: free-text field on Orders table, only returned in admin detail endpoint
 
@@ -80,7 +80,6 @@ PATCH /api/admin/orders/{id}/notes
 - Unit test: status transition validation (all valid + invalid transitions)
 - Unit test: ZIP generation with files
 - Unit test: cancel + refund flow (Stripe)
-- Unit test: cancel + refund flow (EuPlatesc)
 - Unit test: SignalR broadcast on status change
 - Unit test: admin authorization enforcement
 - Integration test: full admin order workflow

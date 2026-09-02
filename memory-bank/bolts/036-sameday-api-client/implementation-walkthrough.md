@@ -81,7 +81,7 @@ warnings, all pre-existing).
 - `Models/Order.cs` — added `AwbLabelUrl: string?` and
   `LastTrackingSyncAt: DateTimeOffset?` properties.
 - `Data/PhotoPrintDbContext.cs` — added `HasMaxLength(500)` + `IsRequired(false)`
-  for `AwbLabelUrl`; `IsRequired(false)` for `LastTrackingSyncAt` (the SQLite
+  for `AwbLabelUrl`; `IsRequired(false)` for `LastTrackingSyncAt` (the PostgreSQL
   Unix-ms converter from the top of `OnModelCreating` applies automatically
   via the loop).
 - `Program.cs` — registered `TimeProvider.System` as singleton; added the
@@ -95,8 +95,8 @@ warnings, all pre-existing).
 ### Migration
 
 - `Migrations/20260602141429_AddSamedayOrderFields.cs` — scaffolded against
-  SQLite, hand-edited to Postgres column types (`text` for the URL with
-  `maxLength: 500`, `timestamp with time zone` for the timestamp). SQLite
+  PostgreSQL, hand-edited to Postgres column types (`text` for the URL with
+  `maxLength: 500`, `timestamp with time zone` for the timestamp). PostgreSQL
   never executes this — it uses `EnsureCreated` (Program.cs lines 152-184).
 - `Migrations/20260602141429_AddSamedayOrderFields.Designer.cs` — generated
   by `dotnet ef migrations add` (snapshot capture).
@@ -143,7 +143,7 @@ When `Sameday:Enabled = true`:
    decoupled and lets bolt 037 swap behaviours independently.
 
 3. **Migration types fixed for Postgres post-scaffold.** EF scaffolds
-   against the *configured* provider, which is SQLite in dev. Migrations
+   against the *configured* provider, which is PostgreSQL in dev. Migrations
    only run on Postgres (Program.cs guards on `IsNpgsql()`). The existing
    `AddUploadArchiveFields.cs` documents the same pattern; this migration
    follows it.

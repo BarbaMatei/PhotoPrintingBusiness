@@ -65,7 +65,7 @@ builder.Services.AddRateLimiter(options =>
 #### Secret Management
 - Development: .NET Secret Manager (`dotnet user-secrets`)
 - Production: environment variables
-- Never commit: Stripe keys, Google OAuth credentials, DB connection string, JWT signing key, email credentials, EuPlatesc merchant key
+- Never commit: Stripe keys, Google OAuth credentials, DB connection string, JWT signing key, email credentials
 
 ## Files to Create/Modify
 - `src/PhotoPrint.API/Middleware/SecurityHeadersMiddleware.cs`

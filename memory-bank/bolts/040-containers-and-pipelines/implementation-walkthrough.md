@@ -28,7 +28,7 @@ migrations at boot, and fail fast on missing payment secrets in Production.
 - [x] `docker-compose.yml` — dev stack; Postgres healthcheck-gated; MailHog; named volumes for DB + uploads.
 - [x] `docker-compose.prod.yml` — Caddy + API; API not host-exposed; managed-DB default with a commented all-in-one `db`; image tag parameterised via `${IMAGE_TAG}`.
 - [x] `Caddyfile` — TLS termination + HSTS/security headers + gzip/zstd + access logs; LE-staging hint for pre-cutover.
-- [x] `.env.example` — every var with real section names (`JwtSettings:*`, `Stripe:*`, `EuPlatesc:*`, …) and the `:`→`__` convention.
+- [x] `.env.example` — every var with real section names (`JwtSettings:*`, `Stripe:*`, `the legacy processor:*`, …) and the `:`→`__` convention.
 - [x] `.gitignore` — added `!.env.example` so the template is committed despite the `.env.*` ignore.
 - [x] `.github/workflows/ci.yml` — `dotnet` job (restore/build/test, NuGet cache, Postgres service, trx artefact) + `web` job (npm ci/lint/test/build) against the **root** `PhotoPrint.sln`.
 - [x] `.github/workflows/deploy.yml` — `workflow_run` after CI on `main`; build+push `:sha-xxxx` and `:latest` to GHCR with buildx GHA cache; SSH deploy gated on `DEPLOY_HOST` (self-skips with a notice otherwise).
@@ -39,13 +39,13 @@ migrations at boot, and fail fast on missing payment secrets in Production.
 ### Program.cs changes (the only compiled change)
 
 - [x] **D1 — serve the SPA**: `UseDefaultFiles()` + `UseStaticFiles()`, and `MapFallbackToFile("index.html")` **only when `wwwroot/index.html` exists**. API-only dev/test keep their 404 behaviour (fallback not registered).
-- [x] **D2 — Postgres boot-migrate**: `else` branch on the DB-init runs `Database.Migrate()` **guarded by `IsNpgsql()`** — InMemory (tests) and SQLite (dev) are unaffected. SQLite keeps its existing `EnsureCreated()` path.
-- [x] **Story 006 — fail fast**: Stripe/EuPlatesc moved to `AddOptions<T>().Bind(...).Validate(...).ValidateOnStart()`, **Production-gated** so the Testing host and local dev (no live keys) start normally.
+- [x] **D2 — Postgres boot-migrate**: the DB-init block runs `Database.Migrate()` **guarded by `IsNpgsql()`**, so the InMemory test host is a no-op.
+- [x] **Story 006 — fail fast**: Stripe/legacy-processor moved to `AddOptions<T>().Bind(...).Validate(...).ValidateOnStart()`, **Production-gated** so the Testing host and local dev (no live keys) start normally.
 
 ### Key Decisions
 
 - **D1 combined image, but fallback is file-gated** — avoids changing test/dev 404 semantics and avoids serving `index.html` for unknown `/api` routes when no SPA is bundled.
-- **`IsNpgsql()`/`IsSqlite()` provider detection** rather than the `DatabaseProvider` string for the migrate guard — robust against the Testing host (which swaps to InMemory while the string still defaults to `Postgres`).
+- **`IsNpgsql()`/`IsPostgres()` provider detection** rather than the `DatabaseProvider` string for the migrate guard — robust against the Testing host (which swaps to InMemory while the string still defaults to `Postgres`).
 - **Production-gated payment validation** — delivers story 006's "missing required var fails boot" without breaking the 457-test suite (tests run under `Testing` and don't configure payment keys).
 - **Standalone `secret-scan.yml`** kept (D4); CI references it rather than duplicating gitleaks.
 - **Single combined image + managed Postgres** recommended to launch (D3 / runbook), parameterised so a managed-platform swap is config-only.
@@ -61,6 +61,6 @@ migrations at boot, and fail fast on missing payment secrets in Production.
 
 ### Developer Notes
 
-- **Migration hygiene gap (flagged, not fixed here):** `20260527075359_AddOrderIdempotencyKey` is SQLite-flavoured (`TEXT`, plain unique index) amid otherwise-Npgsql migrations. `TEXT` is valid on Postgres so boot-migrate won't crash, but it should be verified/regenerated against a real Postgres before the first deploy — see `docs/DEPLOYMENT.md` §7. Out of scope for this bolt.
+- **Migration hygiene gap (flagged, not fixed here):** `20260527075359_AddOrderIdempotencyKey` is Npgsql-typed (`TEXT`, plain unique index) amid otherwise-Npgsql migrations. `TEXT` is valid on Postgres so boot-migrate won't crash, but it should be verified/regenerated against a real Postgres before the first deploy — see `docs/DEPLOYMENT.md` §7. Out of scope for this bolt.
 - API builds clean (0 errors; pre-existing Stripe NU1603 + EF1002 warnings only).
 - **Stage 3 reality (D5):** Docker is not installed on this box, and GitHub Actions / a live site can't run locally. Stage 3 verification here = full `dotnet test` green (confirming the `Program.cs` changes don't regress the suite) + workflow/compose YAML sanity. Container build, CI/CD green runs, and the HTTPS check are operator steps in the runbook.

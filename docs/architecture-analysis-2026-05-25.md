@@ -25,7 +25,7 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 
 **Backend** (`PhotoPrint.API.csproj`):
 - .NET 8, C# 12, ASP.NET Core 8 Web API
-- EF Core 8 (Code-First, Npgsql provider for Postgres, SQLite for dev)
+- EF Core 8 (Code-First, Npgsql provider for PostgreSQL)
 - FluentValidation 11.3, Serilog 10, SignalR, RazorLight 2.3
 - SixLabors.ImageSharp 3.1, Stripe.net 46.3, MailKit 4.16, SendGrid 9.29
 
@@ -33,7 +33,7 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 - Angular 21.2, TypeScript 5.9, RxJS 7.8, Vitest (test runner)
 - `@stripe/stripe-js` 9.6, `@microsoft/signalr` 10, `leaflet` 1.9, `chart.js` 4.5
 
-**Database**: PostgreSQL 16 (prod) / SQLite (dev fallback with DateTimeOffset→Unix ms value converter)
+**Database**: PostgreSQL 16 (Npgsql, every environment)
 
 ---
 
@@ -96,7 +96,6 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 | Security headers | HSTS (365d), CSP, X-Content-Type-Options, X-Frame-Options via `SecurityHeadersMiddleware` |
 | File uploads | MIME magic-byte validation; 50 MB/file, 100 uploads/guest session |
 | Stripe webhooks | SDK signature verification (`StripeSignatureVerifier`) |
-| EuPlatesc webhooks | HMAC-MD5 v3 spec signature + amount validation |
 | Secrets | **⚠️ Real RSA private key committed to `appsettings.Development.json`** |
 
 ---
@@ -143,7 +142,7 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 
 ## Inferred Business Workflows
 
-**Detected domain**: **E-commerce (photo printing)** — customers upload photos, choose format × finish × quantity with tiered pricing, check out via Stripe or EuPlatesc, ship via Sameday Easybox locker or home courier. Romanian market.
+**Detected domain**: **E-commerce (photo printing)** — customers upload photos, choose format × finish × quantity with tiered pricing, check out via Stripe, ship via Sameday Easybox locker or home courier. Romanian market.
 
 | Workflow | Key endpoints | Key models | Status |
 |---|---|---|---|
@@ -153,8 +152,8 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 | Photo upload | `/api/uploads`, `/api/uploads/batch`, `/api/uploads/{id}/preview` | `Upload` | ⚠️ Partial |
 | Cart | `/api/cart`, `/api/cart/merge` | `CartItem` | ✅ Complete |
 | Shipping | `/api/shipping/lockers`, `/api/shipping/cost`, `/api/shipping/awb` | `EasyboxLocker` | ❌ Stub |
-| Checkout / payment | `/api/payments/stripe/intent`, `/api/payments/euplatesc/initiate` | `Order`, `OrderItem` | ⚠️ Partial |
-| Payment confirmation (webhooks) | `/api/webhooks/stripe`, `/api/webhooks/euplatesc` | `Order` | ✅ Complete |
+| Checkout / payment | `/api/payments/stripe/intent` | `Order`, `OrderItem` | ⚠️ Partial |
+| Payment confirmation (webhooks) | `/api/webhooks/stripe` | `Order` | ✅ Complete |
 | Customer orders | `/api/orders`, `/api/orders/{id}` | `Order`, `OrderItem` | ✅ Complete |
 | Admin order workflow | `/api/admin/orders/*` (status, cancel+refund, ZIP, notes) | `Order` | ✅ Complete |
 | Admin stats | `/api/admin/stats` | `Order` (aggregated) | ✅ Complete |
@@ -203,7 +202,7 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 | Cart persistence | ✅ | `CartItem` table, server-synced |
 | Inventory management | N/A | Print-on-demand, no stock |
 | Order state machine | ✅ | `OrderStatusMachine` with 7 valid transitions |
-| Payment integration | ✅ | Stripe + EuPlatesc, both signature-verified |
+| Payment integration | ✅ | Stripe, signature-verified |
 | Refund flow | ✅ | `AdminOrderService.CancelOrderAsync` for both gateways |
 | Tax / VAT | ❌ | **Zero references to TVA/VAT in codebase**; Romania mandates 19% VAT + invoices |
 | Invoicing / e-Factura | ❌ | No `Invoice` entity; Romania's e-Factura (SPV) is legally mandatory |
@@ -228,10 +227,9 @@ Monorepo (single deployment unit, no microservices) with three .NET projects und
 1. **Client-trusted shipping cost** — `CreateOrderRequest.ShippingCostRon` flows into `order.TotalRon` with no validator. POST `ShippingCostRon: -100` → discounted order.
 2. **No payment idempotency** — every POST `/api/payments/stripe/intent` creates a new `Order` + Stripe PaymentIntent. Retry or double-click → duplicate orders + charges.
 3. **RSA private key in source control** — real key in `appsettings.Development.json#L13`. JWT forgery risk if the key is reused for staging/prod or if the repo is/becomes public.
-4. **EuPlatesc amount mismatch goes unmonitored** — on mismatch, the order is left in `AwaitingPayment` silently with no alert; the signed IPN response is still returned to EuPlatesc.
-5. **PII stored in plaintext** — `User.Email`, `User.Phone`, `Order.ShippingAddress` (JSONB) unencrypted at rest.
-6. **No image decompression-bomb protection** — `ImageSharp` has no `MAX_PIXELS` cap configured; a crafted image could exhaust memory.
-7. **Stack trace in dev responses** — `ExceptionHandlerMiddleware` includes `stackTrace` when `IsDevelopment()`; must ensure `ASPNETCORE_ENVIRONMENT=Production` in prod.
+4. **PII stored in plaintext** — `User.Email`, `User.Phone`, `Order.ShippingAddress` (JSONB) unencrypted at rest.
+5. **No image decompression-bomb protection** — `ImageSharp` has no `MAX_PIXELS` cap configured; a crafted image could exhaust memory.
+6. **Stack trace in dev responses** — `ExceptionHandlerMiddleware` includes `stackTrace` when `IsDevelopment()`; must ensure `ASPNETCORE_ENVIRONMENT=Production` in prod.
 
 ### Observability score: **2 / 5**
 

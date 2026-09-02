@@ -10,14 +10,14 @@ updated: 2026-05-21T12:00:00Z
 
 ## Intent Overview
 
-Delivers the entire customer purchase journey for FotoTipar — from uploading photos through delivery selection, dual-processor payment (Stripe + EuPlatesc), and order confirmation. This is the **core revenue-generating flow** of the platform.
+Delivers the entire customer purchase journey for FotoTipar — from uploading photos through delivery selection, dual-processor payment (Stripe + the legacy processor), and order confirmation. This is the **core revenue-generating flow** of the platform.
 
 ## Business Goals
 
 | Goal | Success Metric | Priority |
 |------|----------------|----------|
 | Customers can complete a purchase end-to-end | Order created with Paid status after payment | Must |
-| Romanian market payment support | EuPlatesc IPN confirms orders for Romanian cards | Must |
+| Romanian market payment support | the legacy processor IPN confirms orders for Romanian cards | Must |
 | Guests can checkout without registering | Guest token accepted across upload/cart/checkout | Must |
 | Photos preserved with orders indefinitely | Cleanup job never deletes ordered uploads | Must |
 
@@ -95,9 +95,9 @@ Delivers the entire customer purchase journey for FotoTipar — from uploading p
 - **Acceptance Criteria**: `POST /api/payments/stripe/intent` returns `{ clientSecret, orderId }`; `POST /api/webhooks/stripe` validates `Stripe-Signature`; `payment_intent.succeeded` → Order Paid + email; `payment_intent.payment_failed` → PaymentFailed; idempotent on duplicate events.
 - **Priority**: Must
 
-### FR-15: EuPlatesc payment integration
-- **Description**: Backend generates an EuPlatesc redirect URL with HMAC-MD5 signature and confirms orders via IPN callback.
-- **Acceptance Criteria**: `POST /api/payments/euplatesc/initiate` returns `{ redirectUrl, orderId }`; `POST /api/webhooks/euplatesc` validates HMAC, sets Order Paid on `action=0`; IPN amount cross-checked against order amount.
+### FR-15: the legacy processor payment integration
+- **Description**: Backend generates a legacy-processor redirect URL with HMAC-MD5 signature and confirms orders via IPN callback.
+- **Acceptance Criteria**: `POST /api/payments/legacy-processor/initiate` returns `{ redirectUrl, orderId }`; `POST /api/webhooks/legacy-processor` validates HMAC, sets Order Paid on `action=0`; IPN amount cross-checked against order amount.
 - **Priority**: Must
 
 ### FR-16: Delivery step UI (checkout Step 1)
@@ -111,8 +111,8 @@ Delivers the entire customer purchase journey for FotoTipar — from uploading p
 - **Priority**: Must
 
 ### FR-18: Payment step & order confirmation UI (checkout Steps 3 + Confirmation)
-- **Description**: Step 3 offers Stripe Elements (embedded card form) and EuPlatesc (redirect button) tabs. Confirmation page at `/comanda/{orderId}/confirmare` shows order number, status stepper, and delivery details.
-- **Acceptance Criteria**: Stripe tab calls `POST /api/payments/stripe/intent`, initializes Elements, calls `stripe.confirmCardPayment()` on submit; EuPlatesc tab calls `POST /api/payments/euplatesc/initiate` then `window.location.href` redirect; confirmation page fetches order, redirects home if not Paid; guest CTA shown.
+- **Description**: Step 3 offers Stripe Elements (embedded card form) and the legacy processor (redirect button) tabs. Confirmation page at `/comanda/{orderId}/confirmare` shows order number, status stepper, and delivery details.
+- **Acceptance Criteria**: Stripe tab calls `POST /api/payments/stripe/intent`, initializes Elements, calls `stripe.confirmCardPayment()` on submit; the legacy processor tab calls `POST /api/payments/legacy-processor/initiate` then `window.location.href` redirect; confirmation page fetches order, redirects home if not Paid; guest CTA shown.
 - **Priority**: Must
 
 ---
@@ -123,11 +123,11 @@ Delivers the entire customer purchase journey for FotoTipar — from uploading p
 
 | Requirement | Standard | Measurement |
 |-------------|----------|-------------|
-| NFR-1: No card data on server | Stripe Elements client-side only; EuPlatesc redirect | Security audit — zero card fields in any API log |
+| NFR-1: No card data on server | Stripe Elements client-side only; the legacy processor redirect | Security audit — zero card fields in any API log |
 | NFR-3: MIME validation at byte level | Read first 8 magic bytes, not file extension | Integration test: renamed .exe rejected with 415 |
 | NFR-4: Upload path traversal prevention | UUID-generated filenames only | File path in DB contains no user-supplied string |
 | NFR-5: Stripe webhook signature verification | `EventUtility.ConstructEvent` before processing | Unit test: tampered signature → 400 |
-| NFR-6: EuPlatesc IPN amount validation | Cross-check IPN amount vs. stored order amount | Unit test: mismatched amount → warning + error response |
+| NFR-6: the legacy processor IPN amount validation | Cross-check IPN amount vs. stored order amount | Unit test: mismatched amount → warning + error response |
 
 ### Reliability
 
@@ -145,8 +145,8 @@ Delivers the entire customer purchase journey for FotoTipar — from uploading p
 Intent-specific constraints (project standards loaded separately by Construction Agent):
 
 - `IStorageService` abstraction required — Phase 1 filesystem, Phase 2 S3/Azure Blob swappable without callers changing
-- EuPlatesc IPN uses HMAC-MD5 as required by EuPlatesc specification; cannot be upgraded
+- the legacy processor IPN uses HMAC-MD5 as required by the legacy processor specification; cannot be upgraded
 - Sameday locker list Phase 1: static seeded data; `IShippingService` stub for Phase 2 API swap
-- Order must be created before payment initiates (required by both Stripe and EuPlatesc flows)
+- Order must be created before payment initiates (required by both Stripe and the legacy processor flows)
 - Pricing snapshot stored as JSON column on Order at creation time (historical accuracy)
 - HEIC client-side preview via `heic2any` — no server-side HEIC conversion

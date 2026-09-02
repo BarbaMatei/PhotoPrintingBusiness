@@ -19,5 +19,5 @@ per pass.
 
 | Date | Target | Pass | Verdict | New H/M/L/C | Outcome | Files |
 |---|---|---|---|---|---|---|
-| 2026-08-11 | 904 | v1 verification | approve-with-followups | 0/0/0/0 | Every fix held and nothing reopened | — |
+| 2026-08-11 | 908 | v1 verification | approve-with-followups | 0/0/0/0 | Every fix held and nothing reopened | — |
 | 2026-08-11 | 901 | v1 discovery (2 lenses) | request-changes | 1/0/1/0 | Worst is PPW-9001, a parallel init that drops the guest token; one low row went to the queue | — |

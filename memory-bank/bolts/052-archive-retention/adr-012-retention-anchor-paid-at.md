@@ -94,7 +94,7 @@ The fix for slow fulfilment is operational (SLA, courier integration), not archi
 
 - **Minimal schema change.** No `CompletedAt` column. The only bolt-052 migration is a
   one-line nullability flip on `Upload.FilePath` (orthogonal to this decision; see the
-  design doc) — no Postgres-vs-SQLite type quirks, no backfill.
+  design doc) — no Postgres-vs-PostgreSQL type quirks, no backfill.
 - **One query covers every order shape.** No special-cases for Cancelled, no `COALESCE`,
   no status-history lookups.
 - **Stable**: `PaidAt` is write-once. The retention clock never resets.

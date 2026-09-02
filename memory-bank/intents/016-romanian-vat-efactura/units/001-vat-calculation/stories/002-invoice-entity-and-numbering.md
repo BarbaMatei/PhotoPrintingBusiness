@@ -2,11 +2,11 @@
 id: 002-invoice-entity-and-numbering
 unit: 001-vat-calculation
 intent: 016-romanian-vat-efactura
-status: draft
+status: complete
 priority: must
-created: 2026-05-25T10:15:00Z
+created: 2026-05-25T10:15:00.000Z
 assigned_bolt: 038-vat-calculation
-implemented: false
+implemented: true
 ---
 
 # Story: 002-invoice-entity-and-numbering
@@ -47,7 +47,7 @@ implemented: false
 ## Technical Notes
 
 - A separate sequence per series-year keeps numbers gap-free per the legal requirement and naturally resets on January 1.
-- On SQLite (dev), fall back to a `MAX + 1` SELECT inside a transaction; acceptable because SQLite is single-writer.
+- The sequence is created idempotently per `(series, year)` on first use, so a new year needs no migration.
 
 ## Dependencies
 

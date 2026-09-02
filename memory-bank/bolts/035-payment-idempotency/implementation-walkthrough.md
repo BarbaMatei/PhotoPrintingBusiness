@@ -8,11 +8,11 @@ created: 2026-05-25T13:55:00Z
 
 ### Summary
 
-End-to-end idempotent payment-intent creation. A repeat `POST` with the same `Idempotency-Key` within 24 h replays the original order (same `OrderId`, same Stripe `ClientSecret` / EuPlatesc redirect URL, no new row, no new gateway charge). A divergent body under the same key returns 409. Enforced at three layers: DB (unique index), application (resolver in `OrderService`), and Stripe (`RequestOptions.IdempotencyKey`).
+End-to-end idempotent payment-intent creation. A repeat `POST` with the same `Idempotency-Key` within 24 h replays the original order (same `OrderId`, same Stripe `ClientSecret` / the legacy processor redirect URL, no new row, no new gateway charge). A divergent body under the same key returns 409. Enforced at three layers: DB (unique index), application (resolver in `OrderService`), and Stripe (`RequestOptions.IdempotencyKey`).
 
 ### Completed Work
 
-- [x] `Models/Order.cs` — added `IdempotencyKey?`, `StripeClientSecret?`, `EuPlatescRedirectUrl?` (all nullable, additive).
+- [x] `Models/Order.cs` — added `IdempotencyKey?`, `StripeClientSecret?`, `LegacyProcessorRedirectUrl?` (all nullable, additive).
 - [x] `Data/PhotoPrintDbContext.cs` — column lengths (80 / 255 / 1000) + unique index `ix_orders_idempotency_key`; `HasFilter("IdempotencyKey IS NOT NULL")` applied on Postgres only.
 - [x] `Migrations/20260527075359_AddOrderIdempotencyKey.cs` — generated via `dotnet ef migrations add`; three columns + unique index.
 - [x] `Exceptions/IdempotencyConflictException.cs` — carries `DivergentFields` (names only). New.
@@ -20,19 +20,19 @@ End-to-end idempotent payment-intent creation. A repeat `POST` with the same `Id
 - [x] `Services/IStripePaymentGateway.cs` + `StripePaymentGateway.cs` — added optional `idempotencyKey` → `RequestOptions.IdempotencyKey`.
 - [x] `Services/IOrderService.cs` + `OrderService.cs` — `CreateFromCartAsync` now takes `idempotencyKey` and returns `OrderCreationResult`; added `GetByIdempotencyKeyAsync` (24h-windowed) + private `DivergentFields`; stale-key null-out before insert.
 - [x] `DTOs/Orders/OrderCreationResult.cs` — `(Order, bool WasIdempotentReplay)`. New.
-- [x] `Controllers/PaymentsController.cs` — `Idempotency-Key` header on both endpoints; replay short-circuit (Stripe returns stored secret, EuPlatesc returns stored URL); missing-key Warning; injected `ILogger`.
+- [x] `Controllers/PaymentsController.cs` — `Idempotency-Key` header on both endpoints; replay short-circuit (Stripe returns stored secret, the legacy processor returns stored URL); missing-key Warning; injected `ILogger`.
 - [x] `Tests` — `FakeStripePaymentGateway` matches new signature + records `CreateCallCount` / `LastIdempotencyKey`; `OrderServiceTests` call sites use `.Order`.
 
 ### Key Decisions
 
 - **Resolution lives in `OrderService`, not the controller.** The story sketched a controller-side `GetByIdempotencyKeyAsync` + `IsSameLogicalRequest` flow, but the `TotalRon` comparison needs the server-resolved total, which is computed inside `CreateFromCartAsync` (after cart load + shipping resolution from bolt 034). Keeping resolution in the service makes the total comparison feasible without recomputing the cart in the controller. The controller distinguishes replay-vs-new via `OrderCreationResult.WasIdempotentReplay`. `GetByIdempotencyKeyAsync` stays public for testing/future use.
-- **Replay parity via stored secrets.** `Order.StripeClientSecret` and `Order.EuPlatescRedirectUrl` are persisted so a replay returns byte-identical tokens with no gateway round-trip.
+- **Replay parity via stored secrets.** `Order.StripeClientSecret` and `Order.LegacyProcessorRedirectUrl` are persisted so a replay returns byte-identical tokens with no gateway round-trip.
 - **Stale-key null-out is a separate `SaveChanges`** before the new insert — Postgres checks unique constraints per-statement, so freeing the key in its own save avoids a transient violation.
 
 ### Deviations from Design
 
-1. **EuPlatesc redirect URL is persisted, not reconstructed.** Stage 2 assumed the URL was deterministically reproducible. It is not — `BuildInitiateUrl` embeds `DateTime.UtcNow` + a random nonce. So replay returns the **stored** `Order.EuPlatescRedirectUrl` instead of rebuilding. This is the option story 003 explicitly left open ("persist… or reconstruct"); persisting is the only way to honour the "same redirect URL" AC literally. Added `Order.EuPlatescRedirectUrl` for this.
-2. **Migration is SQLite-flavoured (`TEXT`, plain unique index).** `dotnet ef` resolved the SQLite design-time provider (dev default `DatabaseProvider: Sqlite`), matching the project's entire existing migration history (e.g. `AddFinishNameToCartItem` is also `TEXT`). `TEXT` is valid on Postgres; a plain unique index on a nullable column allows multiple NULLs on both providers, so it is behaviourally equivalent to the filtered index. The `HasFilter` optimisation is expressed in the DbContext model config for Postgres runtime/EnsureCreated.
+1. **the legacy processor redirect URL is persisted, not reconstructed.** Stage 2 assumed the URL was deterministically reproducible. It is not — `BuildInitiateUrl` embeds `DateTime.UtcNow` + a random nonce. So replay returns the **stored** `Order.LegacyProcessorRedirectUrl` instead of rebuilding. This is the option story 003 explicitly left open ("persist… or reconstruct"); persisting is the only way to honour the "same redirect URL" AC literally. Added `Order.LegacyProcessorRedirectUrl` for this.
+2. **Migration store types drifted from the model (`TEXT`, plain unique index).** `TEXT` is valid on PostgreSQL, and a plain unique index on a nullable column allows multiple NULLs, so it was behaviourally equivalent to the filtered index. The `HasFilter` optimisation is expressed in the DbContext model config. *(Superseded: the chain was later re-scaffolded under Npgsql as a single baseline.)*
 
 ### Dependencies Added
 

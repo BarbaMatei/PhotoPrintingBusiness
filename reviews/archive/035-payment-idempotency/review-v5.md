@@ -51,8 +51,8 @@ tests: { dotnet: "466/466", frontend: "not recorded" }
 | Two different carts can produce the same item signature | The signature is built from identifier pairs and quantities in a fixed order, so distinct carts cannot collide. |
 | Two same-owner same-key requests double-create or return 500 | The loser catches the violation, re-resolves the winner and replays; one row survives. Proven by a real-database test. |
 | The divergence check still misses the cart items | Items take part through the signature, and a same-total different-items request is refused. |
-| The EuPlatesc redirect URL overflows, or key namespaces can be griefed | The URL fits its column with wide margin, and global keys are inherent to any globally scoped key. |
-| A EuPlatesc body at the Stripe endpoint replays across processors | A mismatched body is refused on the processor field; the remaining edge only ever builds a value for the caller's own order. |
+| The legacy processor redirect URL overflows, or key namespaces can be griefed | The URL fits its column with wide margin, and global keys are inherent to any globally scoped key. |
+| A the legacy processor body at the Stripe endpoint replays across processors | A mismatched body is refused on the processor field; the remaining edge only ever builds a value for the caller's own order. |
 
 ## Notes for the fixer
 

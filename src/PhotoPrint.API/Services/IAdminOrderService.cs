@@ -12,7 +12,7 @@ public interface IAdminOrderService
 
     Task<AdminOrderDetailDto> UpdateStatusAsync(
         Guid orderId, string status, string? awbNumber, string? trackingUrl,
-        CancellationToken ct = default);
+        Guid? adminUserId = null, CancellationToken ct = default);
 
     Task StreamZipAsync(Guid orderId, HttpResponse response, CancellationToken ct = default);
 

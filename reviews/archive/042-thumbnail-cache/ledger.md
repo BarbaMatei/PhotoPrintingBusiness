@@ -33,7 +33,7 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
 | PPW-71 | ⚪ | v1 | The dimension check and its message are duplicated across two layers | `Services/UploadService.cs:83` | verified | `095285c` |
 | PPW-72 | ⚪ | v1 | The 30-day cache lifetime is the inline number `2592000` | `Controllers/UploadsController.cs:126` | verified | `095285c` |
 | PPW-73 | ⚪ | v1 | Split-query configuration is written out separately in both database branches | `Program.cs:33` | verified | `095285c` |
-| PPW-74 | 🟡 | v1 | The migration's Postgres arm and the model snapshot are exercised by no test | `Migrations/20260527102718_AddUploadThumbnailPath.cs:19` | backlog | `bd0d5fd` |
+| PPW-74 | 🟡 | v1 | The migration's Postgres arm and the model snapshot are exercised by no test | `Migrations/20260527102718_AddUploadThumbnailPath.cs:19` | fixed | `90b5683` |
 | PPW-75 | 🟡 | v1 | The HEIC magic-byte check accepts any ISO-BMFF container, including video | `Services/MimeValidator.cs:33` | verified | `095285c` |
 | PPW-76 | 🟠 | v1 | The real image processor, and so the bomb guard, is mocked in every test | `Services/ImageProcessor.cs` | verified | `095285c` |
 | PPW-77 | 🟠 | v1 | Cache persistence is unproven because one database context is shared across both calls | `Tests/…/UploadServiceTests.cs` | verified | `095285c` |
@@ -328,6 +328,9 @@ closed: 2026-08-11 — retroactive owner sign-off (loop quiet since v9 @bd0d5fd 
   - v6: re-raised (F24, F25) · v8: re-raised — both deferred to the three-environment phase
   - v9: deferral upheld; the provider branch is still present at `bd0d5fd`
   - 2026-08-11: row carried to the backlog
+  - 2026-08-21: fixed @`90b5683` — provider branch gone, snapshot regenerated under Npgsql, and
+    `UploadMigrationSchemaTests` applies the real chain on PostgreSQL asserting both `Uploads` columns
+    from `information_schema`; `has-pending-model-changes` reports no drift
 
 ### PPW-75 — The HEIC magic-byte check accepts any ISO-BMFF container, including video
 

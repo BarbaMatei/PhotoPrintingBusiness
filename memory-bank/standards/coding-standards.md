@@ -83,9 +83,9 @@ Routing: Romanian slugs, everything lazy (`loadComponent`/`loadChildren`); heavy
 - Naming: `Method_Scenario_ExpectedOutcome`. Arrange-Act-Assert.
 - Integration tests use the `WebApplicationFactory<Program>` family (`AuthFactory` base →
   feature factories). **Default DB is EF InMemory** — it cannot enforce unique indexes or
-  check constraints; for relational behavior use the `SqlitePaymentFactory` pattern (real
-  SQLite on a shared in-memory connection). See data-stack.md *"what the test matrix can and
-  cannot prove"*.
+  check constraints; for relational behavior use the `PostgresPaymentFactory` pattern, or
+  `PostgresTestDatabase` for a unit-level throwaway database. See data-stack.md
+  *"what the test matrix proves"*.
 - Real-S3 tests are `[SkippableFact]` gated on `STORAGE_TEST_*` env vars (set in CI's MinIO
   step; skipped locally unless you run MinIO).
 - **The mocking rule (definition-of-done class 5): mock only at system boundaries** — network,
@@ -134,6 +134,33 @@ Routing: Romanian slugs, everything lazy (`loadComponent`/`loadChildren`); heavy
 
 ## Comments
 
-Minimal. Comment only non-obvious intent or invariants the code can't express. Never narrate a
-fix in-code ("now handles X") — rationale lives in the commit message and, for review fixes,
-the resolution file.
+A last resort, kept to one short line. Never add a comment to narrate a change, a bug fix, or a
+feature ("now handles X"). Only two reasons justify one:
+
+- **Why non-obvious code exists** — state the constraint or gotcha itself, with **no reference**
+  to the bolt, review, finding or decision id (`PPW-12`, `F3`, `D50`, `BUG-2`…), ADR, ticket, PR,
+  or past discussion where it was decided. That history lives in the commit and, for review
+  fixes, the resolution file.
+- **A short behaviour description on an interface member** (`///`, JSDoc) — never on a concrete
+  class, and never a restatement of the signature.
+
+When you edit a file, delete the non-essential comments you pass through.
+
+Enforced at commit time: `.githooks/pre-commit` lists every `//` or `///` line the commit adds to
+a `.cs` or `.ts` file and refuses the commit. Delete the narration and recommit; only if every
+listed line is genuinely allowed, re-run the exact same commit prefixed with `COMMENTS_OK=1` —
+which the hook records in `reviews/state/overrides.jsonl`, where an unattended review run reads
+it. Never `--no-verify`.
+
+## Commit messages
+
+Conventional style, **exactly one sentence, subject line only** — no body and no trailers (no
+`Co-Authored-By`). Sole exception: a breaking change may carry a body. Name the bolt or finding
+ids in the subject where they apply, e.g.
+`fix(orders): guard duplicate AWB creation (PPW-284, review 015-v3)`.
+
+Both rules above hold at every entry point, so `CLAUDE.md` states them for each session too;
+this file is their home as a standard, and the two are edited together. `CLAUDE.md` states the
+comment gate unqualified — "any commit adding comment lines", without the `.cs`/`.ts` scope named
+above — by the owner's choice: it is the stricter reading, it holds for every file type, and it is
+not to be "corrected" here or there.

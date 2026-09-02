@@ -20,7 +20,7 @@ closed: 2026-07-27
 | PPW-285 | fixed | `aada94b` | The Easybox branch of the completeness check now requires the recipient contact, so the stepper cannot skip to a payment 400. |
 | PPW-286 | fixed | `2c434ad` | A vendor-call timeout becomes a transient retry in the creator; the dispatcher and the retry job shutdown catches were gated (5fc330b). |
 | PPW-287 | fixed | `18e7815` | The sync timestamp is the poll clock, which always moves forward, and the monotonic guard is gone, so a later delivered snapshot with an earlier vendor timestamp is no longer dropped. |
-| PPW-288 | fixed | `19cd0b8` | The EuPlatesc webhook's label enqueue is now asserted, mirroring the Stripe test. |
+| PPW-288 | fixed | `19cd0b8` | The legacy processor webhook's label enqueue is now asserted, mirroring the Stripe test. |
 | PPW-289 | deferred | — | The dispatcher's outcome routing and re-enqueue got no runtime test: a faithful one needs a background-service harness with an injected delay. The backoff decision is already a tested pure function. Open coverage gap. |
 | PPW-290 | fixed | `2c434ad` | A test pins the persist guard, so an order that moves Paid to Printing mid-call keeps its label. |
 | PPW-291 | fixed | `6606c25` | A rate-limit response surviving the retries becomes the transient unreachable exception, not a permanent give-up, which matches the exception's own documentation. |
@@ -45,7 +45,7 @@ closed: 2026-07-27
 | C — Durable per-order AWB claim (`2c434ad`) | PPW-284, PPW-286, PPW-290, PPW-293, PPW-261 | `Services/Sameday/AwbCreator.cs`, `Migrations/` | run before implementation — sound-with-changes, all six required changes folded in |
 | D — Transient 429, vendor body off the logs, enqueue log level (`6606c25`) | PPW-291, PPW-260, PPW-267 | `Services/Sameday/SamedayClient.cs`, `AwbCreationNotifier.cs` | not needed (classification and log levels) |
 | E — Manual-label endpoint and cleanups (`f3d2508`) | PPW-270, PPW-275, PPW-280 | `Services/SamedayShippingService.cs`, `Services/Sameday/ParcelWeight.cs` | not needed (no new mechanism) |
-| F — EuPlatesc enqueue test (`19cd0b8`) | PPW-288 | `Tests/…/PaymentControllerIntegrationTests.cs` | not needed (test only) |
+| F — the legacy processor enqueue test (`19cd0b8`) | PPW-288 | `Tests/…/PaymentControllerIntegrationTests.cs` | not needed (test only) |
 | G — ADR-015 amendment (`ce4941a`) | PPW-292 | `memory-bank/…/adr-015-*.md` | not needed (document only) |
 | H — Retry-job cancellation gate, the micro-review's class sweep (`5fc330b`) | PPW-283, PPW-286 | `BackgroundJobs/AwbRetryJob.cs` | covered by cluster C's check |
 | I — Left deferred | PPW-289, PPW-262 | — | not needed (no code changed) |

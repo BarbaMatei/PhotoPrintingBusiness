@@ -55,10 +55,9 @@ The complete checkout flow: delivery, review, payment, confirmation.
 |-------|-------|-------|------|-------------|
 | 3.1 | **US-302** | Shipping API | BE | US-801 |
 | 3.2 | **US-305** | Stripe Payment — Backend | BE | US-206, US-801 |
-| 3.3 | **US-306** | EuPlatesc Payment — Backend | BE | US-305 (shared Order model) |
 | 3.4 | **US-301** | Delivery Method — Frontend | FE | US-302, US-804 |
 | 3.5 | **US-303** | Order Review — Frontend | FE | US-301, US-205 |
-| 3.6 | **US-304** | Payment — Frontend | FE | US-305, US-306, US-303 |
+| 3.6 | **US-304** | Payment — Frontend | FE | US-305, US-303 |
 | 3.7 | **US-307** | Order Confirmation — Frontend | FE | US-304, US-403 |
 
 ---
@@ -68,7 +67,7 @@ Order history for customers and the orders API.
 
 | Order | Story | Title | Type | Dependencies |
 |-------|-------|-------|------|-------------|
-| 4.1 | **US-403** | Orders API | BE | US-305, US-306 |
+| 4.1 | **US-403** | Orders API | BE | US-305 |
 | 4.2 | **US-401** | Order History List — Frontend | FE | US-403 |
 | 4.3 | **US-402** | Order Detail Page — Frontend | FE | US-403 |
 

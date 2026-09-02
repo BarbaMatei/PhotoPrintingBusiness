@@ -27,7 +27,7 @@ closed: 2026-07-14
 | PPW-118 | deferred | — | The extra round-trip on a cache miss disappears only with PPW-85's conditional update. Paired with PPW-85 and deferred with it. |
 | PPW-120 | deferred | — | No test pins the decode slot's release on a throwing decode. Latent, since today's code releases it. Deferred to the next pass. |
 | PPW-144 | deferred | — | No end-to-end path reaches the bomb rejection, because dependency injection resolves a fake image processor that always reports 800×600. A coverage gap; deferred to the next pass. |
-| PPW-74 | deferred | — | The Postgres arm of the migration and the model snapshot are exercised by no test, since the integration provider ignores migrations and only the SQLite arm runs. The standing three-environment deferral. |
+| PPW-74 | deferred | — | The Postgres arm of the migration and the model snapshot are exercised by no test, since the integration provider ignores migrations and only the PostgreSQL arm runs. The standing three-environment deferral. |
 | PPW-119 | deferred | — | Limiter saturation and queue depth are unobservable. An observability follow-up; deferred to the next pass. |
 | PPW-93 | deferred | — | The one-frame cap is tested on the internal helper, not through the public thumbnail call. Latent, since the cap holds today. Deferred to the next pass. |
 | PPW-101 | deferred | — | Guest-session recovery after a failed init is untested, because all twelve specifications supply a successful init. A coverage gap; deferred to the next pass. |

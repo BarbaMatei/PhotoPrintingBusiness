@@ -15,7 +15,7 @@ The cloud photo storage feature is certified clean of serious defects at `ac97e4
 ## Needs your decision
 
 1. 🟠 A customer who has just paid can see "Fotografiile … nu mai sunt disponibile" on their order page, in the minutes before the photos finish moving to cloud storage — the wrong message, shown to real customers. Suggested: fix now, a small change gating the message on the order's state in `order-detail-page.ts`. PPW-232 on [ledger.md](ledger.md). Ruled 2026-07-27: fix now. Fixed at `d041295` and `b9af326`.
-2. 🟠 The EuPlatesc payment path is never tested for triggering photo archiving. The wiring exists and the Stripe twin has a test, but nothing asserts this one, so deleting the call would go unnoticed. Suggested: fix now, about one test. PPW-233 on [ledger.md](ledger.md). Ruled 2026-07-27: wont-fix, because the EuPlatesc gateway is slated for removal.
+2. 🟠 The legacy processor payment path is never tested for triggering photo archiving. The wiring exists and the Stripe twin has a test, but nothing asserts this one, so deleting the call would go unnoticed. Suggested: fix now, about one test. PPW-233 on [ledger.md](ledger.md). Ruled 2026-07-27: wont-fix, because the legacy processor is slated for removal.
 3. 🟠 The photo-backfill admin command got lighter review scrutiny than everything else, and running it while the live archiver works is untested. Suggested: defer to the three-environment stage, since it is an operator tool nobody uses before then. PPW-234 on [ledger.md](ledger.md). Ruled 2026-07-27: defer to the three-environment stage.
 
 ## Reasons to doubt

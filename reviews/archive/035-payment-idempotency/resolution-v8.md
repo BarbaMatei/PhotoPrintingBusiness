@@ -16,7 +16,7 @@ closed: 2026-07-04
 |---|---|---|---|
 | PPW-36 | deferred | `01b5264` | No test runs the Postgres path, because every fixture creates its schema directly and none applies the migration. A container-backed regression belongs with the migration and deployment work. The migration breadcrumb was refreshed. |
 | PPW-37 | fixed | `21a295a` | A distinct exception type for a key held by another caller, still mapped to 409, plus the reserved cross-caller log event. A regression test asserts both. |
-| PPW-38 | fixed | `6a370e0` | The index name is now one shared constant referenced by the index and by the match, so a rename breaks the build. SQLite matches the structured extended code and the column name rather than a message phrase. |
+| PPW-38 | fixed | `6a370e0` | The index name is now one shared constant referenced by the index and by the match, so a rename breaks the build. PostgreSQL matches the structured extended code and the column name rather than a message phrase. |
 | PPW-39 | deferred | `01b5264` | A per-caller composite index is a schema and migration change, so it rides with PPW-36 and PPW-20. An accepted-residual note sits at the index. Exploitability is low: keys are random and the probe creates a real charge. |
 | PPW-40 | deferred | `01b5264` | The row-lock fix needs the Postgres path that does not exist yet. Did the review's stated minimum: the difference between the two gateways under retry is documented at the build path and in ddd-02. |
 | PPW-41 | fixed | `b76eede` | The key is trimmed before the blank and length checks. The filter tests set the raw header directly, because HTTP strips the padding on the way in, and prove a padded key now matches a plain one. |
@@ -67,7 +67,7 @@ here rather than left to be discovered in the diff.
 Putting the free and the insert in one save works because the framework issues the update before the
 insert, so the two never collide inside the batch. That contradicts the assumption recorded when PPW-28 was
 resolved, which held that one transaction would collide on the per-statement check. That assumption was
-right for hand-written statements and wrong for this path. Verified on SQLite.
+right for hand-written statements and wrong for this path. Verified on PostgreSQL.
 
 ### One re-raised row upheld its earlier ruling and one overturned it (PPW-17, PPW-43)
 

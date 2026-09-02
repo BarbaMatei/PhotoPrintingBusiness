@@ -24,7 +24,7 @@ decompression-bomb guard that rejects oversized images at both upload and decode
 
 - [x] `Models/Upload.cs` — added `string? ThumbnailPath`.
 - [x] `Data/Configurations/UploadConfiguration.cs` — `ThumbnailPath` nullable, `HasMaxLength(512)` (matches `FilePath`).
-- [x] `Migrations/20260527102718_AddUploadThumbnailPath.cs` (+ Designer + snapshot) — provider-aware `AddColumn Uploads.ThumbnailPath` (nullable; `character varying(512)` on Npgsql, `TEXT` on SQLite — DB-1, review 042-v1).
+- [x] `Migrations/20260527102718_AddUploadThumbnailPath.cs` (+ Designer + snapshot) — provider-aware `AddColumn Uploads.ThumbnailPath` (nullable; `character varying(512)` on Npgsql, `TEXT` on PostgreSQL — DB-1, review 042-v1).
 - [x] `Services/IStorageService.cs` — new `ExistsAsync(path, ct)`.
 - [x] `Services/LocalStorageService.cs` — `ExistsAsync` via `File.Exists`.
 - [x] `Services/ImageProcessor.cs` — `public const MaxDecodePixels = 100_000_000` (100 MP total-pixel area cap — BUG-1/NEW-1); `GenerateThumbnailAsync` `Identify`s and rejects over-cap images before `Image.Load` (`UnprocessableEntityException` → 422) and decodes with `MaxFrames=1`.
@@ -41,7 +41,7 @@ decompression-bomb guard that rejects oversized images at both upload and decode
 
 ### Deviations from Plan
 
-- **Migration is provider-aware** (DB-1, review 042-v1): it emits `character varying(512)` on Npgsql and `TEXT` on SQLite (mirroring the sibling `AddOrderIdempotencyKey`), so the shipped column matches the Npgsql runtime model and no phantom `AlterColumn` is scaffolded on a Postgres `migrations add`. The model **snapshot remains SQLite-flavoured** (bolt-035 legacy), so an Npgsql regeneration would still diff `TEXT`→`varchar(512)` for every column — the **whole-history / per-provider-assembly remediation stays the documented follow-up** (DEPLOYMENT.md §7; deferred to the 3-env phase — v4 L10/DB-1).
+- **Migration is provider-aware** (DB-1, review 042-v1): it emits `character varying(512)` on Npgsql and `TEXT` on PostgreSQL (mirroring the sibling `AddOrderIdempotencyKey`), so the shipped column matches the Npgsql runtime model and no phantom `AlterColumn` is scaffolded on a Postgres `migrations add`. The model **snapshot remains Npgsql-typed** (bolt-035 legacy), so an Npgsql regeneration would still diff `TEXT`→`varchar(512)` for every column — the **whole-history / per-provider-assembly remediation stays the documented follow-up** (DEPLOYMENT.md §7; deferred to the 3-env phase — v4 L10/DB-1).
 - Caching placed in the **service**, not the controller (story snippet); thumbnail long edge is **800px** per stories 001/002 (C7, review 042-v4 — was 300px pre-review).
 - **ImageSharp `Configuration.MaxImageWidth/Height` (story 003) is not used** — that API isn't present in ImageSharp 3.1.11; the `Identify`-dimension guard is the version-independent equivalent.
 

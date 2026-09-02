@@ -31,8 +31,11 @@ anything a lens receives; commit messages and test names are an accepted leak.
    file set: changed files in full + collaborators trimmed to their relevant members, **≤50k
    tokens**, **never anything under `reviews/`**; pass its path as `args.codePackPath`.
    Collaborators matter either way: discovery-critical defects live in *unchanged* code.
-4. **Build + run both suites yourself**; record pass/fail. A green suite that can't reach a
-   named failure mode is itself a finding — feed it to the tests lens.
+4. **Build + run the suites scoped to the reviewed diff**; record pass/fail. The **full**
+   suites run exactly once per loop, at the certification freeze — a certification pass
+   runs them (sequential batches per CLAUDE.md); every other pass runs only what the diff
+   touches. A green suite that can't reach a named failure mode is itself a finding —
+   feed it to the tests lens.
 5. **decidedFindings.** Pull the terminal-status rows from `reviews/<target>/ledger.md` as
    `[{dId, title, file, status, decision}]` — the script's field name; `dId` carries the
    row's `PPW-<n>`. Blinding holds: only the post-lens dedup agent sees them.
@@ -41,6 +44,7 @@ anything a lens receives; commit messages and test names are an accepted leak.
 
 Core lenses on every full pass:
 
+<!-- generated:core-lenses -->
 | Lens | Question | Backing |
 |---|---|---|
 | Correctness | What input/state/timing makes this wrong? | `/code-review`, Explore finders |
@@ -49,9 +53,11 @@ Core lenses on every full pass:
 | Quality / altitude | Reuse, simplification, right layer — **report-only, never auto-apply** | `/simplify` |
 | Tests & verification | Untested failure modes; test the tests | main agent + Explore |
 | Completeness critic | What did we *not* look at? Runs **last** | Explore |
+<!-- /generated:core-lenses -->
 
 Added by what the change touches:
 
+<!-- generated:added-lenses -->
 | Change touches… | Add lens |
 |---|---|
 | DB migration / schema | DB / migration-parity (does the DDL run in any test? provider divergence) |
@@ -61,6 +67,7 @@ Added by what the change touches:
 | Concurrency / idempotency / retries | Race (TOCTOU, transaction boundaries, crash windows) |
 | Money / charges / orders | Security at full strength |
 | Frontend change | Accessibility / UX |
+<!-- /generated:added-lenses -->
 
 ## Launch
 
@@ -116,8 +123,14 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
    would otherwise re-derive:
    - **Fix brief** — files:lines (the trace skeptic's `filesTouched`, or your own recheck
      for convergence-confirmed findings), the traced failing path, a suggested
-     regression-test shape (`testShape`), and whether the suggested fix is
-     **trigger-list-shaped** (the list lives in the `/fix-review` skill).
+     regression-test shape (`testShape`) — since 2026-08-28 that shape is the **assertion
+     spec**: the fixer writes the test to its words and the test-meaning audit checks the
+     test against them, so state the assertions, not a vibe — and the trigger
+     classification, written exactly as `**Trigger-list-shaped:** yes (<why>)` or
+     `Not trigger-list-shaped (<why>)` (the list lives in the `/fix-review` skill; the
+     auditor matches the `yes` marker mechanically, so the wording is load-bearing).
+     The brief's file paths feed the auditor's overlap detection for protocol clusters —
+     name every real file, or two findings on one surface will not be seen to share it.
    - **Approach pre-check** — for trigger-list-shaped suggested fixes, dispatch the
      adversarial approach-check NOW, in parallel, in the background (~20–30k output-token
      cap each, same posture as skeptics: this pass's findings + the code, nothing from
@@ -133,7 +146,11 @@ unchallenged, not refuted). `disputed` appears only in records older than trace-
    the round's doc gate passes. **There is no findings file** (retired 2026-08-10).
 4. Append the [metrics.jsonl](../rules/metrics-schema.md) line (v3: include the per-finding
    `findings[]` array, `runtime: {started, ended}` from the loop-driver's worklog stamps,
-   and count the pre-checks under `cost.agents_by_stage.approach_checks`) and the one-line
+   and count the pre-checks under `cost.agents_by_stage.approach_checks`; v4: every
+   fix-caused entry carries `seed_round` — the fix round whose commits it is attributed
+   to, the reconciler's judgment — and `area`, its backlog area word; `null` when
+   unattributable, never guessed — the router refuses certification on a missing value as
+   "unmeasured" rather than reading it as zero) and the one-line
    [index.md](../state/index.md) row, then run
    `node reviews/lib/records-auditor.mjs <target>` — it must exit clean.
 5. Write `summary-v<n>.md` via the **`owner-summary` skill**, from

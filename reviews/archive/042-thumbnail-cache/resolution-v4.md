@@ -22,7 +22,7 @@ closed: 2026-07-14
 | PPW-89 | fixed | `fea0d45` | A missing original on the cache-miss path is caught and raised as a 404, since the original is unrecoverable, which also lets the interface drop the dead entry. Regression test, red on revert. |
 | PPW-90 | fixed | `2b22e25` | The generate catch logs a warning naming the storage path and carries the caught error inward, mirroring the sibling method. The test asserts both. |
 | PPW-91 | fixed | `1bdb21b` | A restored entry is dropped on a 403 and on a still-failing 401 after re-init, as it already was on a 404. Only server errors and network failures keep it. Two tests, red on revert. |
-| PPW-74 | deferred | `2945bda` | A SQLite smoke test now applies the real migration chain and asserts the column lands. The Postgres arm and the model snapshot stay deferred to the three-environment phase. See Decisions. |
+| PPW-74 | deferred | `2945bda` | A PostgreSQL smoke test now applies the real migration chain and asserts the column lands. The Postgres arm and the model snapshot stay deferred to the three-environment phase. See Decisions. |
 | PPW-92 | fixed | `7a7170e` | The dimensions test now asserts the stored file is deleted exactly once. Proven by removing the delete and watching it redden. |
 | PPW-93 | fixed | `1108d47` | The decode moved into an internal helper carrying the one-frame limit, which production uses. A reflection test asserts a three-frame image decodes to one frame; dropping the limit reddens it. |
 | PPW-94 | fixed | `dfb8f56` | The cache-hit path reads directly and catches a missing file to regenerate, so there is no failure window and no second storage call. Test proves it regenerates rather than failing. |
@@ -69,7 +69,7 @@ the finding stated; the narrower symmetric window stays open behind PPW-82's swe
 
 ### The read-replica hazard was documented, not designed away
 
-The preview writes on a cache miss. There is no read replica today — development uses SQLite and
+The preview writes on a cache miss. There is no read replica today — development uses PostgreSQL and
 production a single Postgres — so the hazard cannot fire. The finding's own minimum option was taken:
 a constraint note at the write site. Moving the cache fill off the read path waits until read-replica
 routing actually exists, rather than being built ahead of need.

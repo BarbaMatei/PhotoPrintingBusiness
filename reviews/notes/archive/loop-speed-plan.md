@@ -1,0 +1,657 @@
+> **Historical record (archived 2026-09-02)** — describes decisions and states as of its
+> dates; the machinery has since been restructured, and the CURRENT map is the
+> `reviews/lib` folder layout plus `reviews/README.md`.
+
+# Loop speed redesign — implementation plan
+
+Owner-approved 2026-08-22. Reduces the review loop's wall-clock cost without moving the
+quality bar: Design A (reviewed units + batched tail), Design B (records rendered from the
+worklog), the lint miner, the persistent fixer, and the support scripts. Measured baseline
+(2026-08-21, target 038-039-invoicing): 702-minute day, ~200 min records+doc-gates, 5 judge
+disapprovals in 12 sittings, 25 correction lines in metrics.jsonl, 35–50 all-in minutes per
+fixed finding on small rounds. Targets: ≤15 min/fix all-in, ≥90% doc-gate first-pass
+approval, ≤0.15 record sittings per fixed finding, ~0 correction lines.
+
+There is no external spec file; this plan is the authority. The design rationale lives in
+the owner conversation of 2026-08-22.
+
+## Global constraints (bind every task)
+
+- Repo: the current worktree (branch `chore/loop-speed-redesign`). All paths repo-relative.
+- Scripts are Node ESM matching the style of `reviews/lib/*.mjs`: `import` from `node:*`
+  only, no dependencies, LF line endings, a header comment block stating purpose, usage,
+  and exit codes (this matches every existing lib script and is the ONLY comment style
+  allowed — no narration comments in code bodies, no finding/bolt/review references).
+- After ANY change under `reviews/lib/`, run `node reviews/lib/tests/run-tests.mjs` from
+  the repo root — every assertion must pass, including the pre-existing ones.
+- The test suite style is `reviews/lib/tests/run-tests.mjs`: plain asserts via `check()`,
+  scripts run as child processes with `--root` pointing at fixture trees under
+  `reviews/lib/tests/fixtures/repo/` (targets numbered 9xx), or at throwaway `mkdtempSync`
+  trees built inline. Follow it exactly; add fixture targets with fresh 9xx numbers.
+- NEVER edit `reviews/**/review-v*.md`. NEVER edit the live records of
+  `reviews/038-039-invoicing/` (worklog.jsonl, metrics.jsonl, ledger.md, resolutions) —
+  fixtures use copies.
+- Commits: conventional style, exactly ONE sentence, subject line only — no body, no
+  trailers, no Co-Authored-By. One commit per task. The pre-commit hook runs the lib suite
+  and blocks added comment lines: if the only listed lines are the script header block,
+  re-run the same commit with `COMMENTS_OK=1 git commit ...`. Never `--no-verify`.
+- Do not run `dotnet test` or `npm test` — nothing here touches them.
+- Do not edit standards/docs files in Tasks 1–13; the doc updates are Tasks 14–17.
+
+## Reference formats (read the real files; this is the map)
+
+- worklog events: one JSON per line, `t` (ISO with local offset, e.g.
+  `2026-08-21T10:15:47+03:00`) + `ev` + event fields. Vocabulary today: round-start,
+  round-end, triage-done, gate-open, gate-closed, gate-parked, check-dispatched,
+  check-returned, test-run, finding, micro-review-dispatched, micro-review-returned,
+  doc-gate, pass-launch, pass-records-done, run-start, run-end, note. This plan adds:
+  `void`, `verify-result`.
+- metrics schema: `reviews/rules/metrics-schema.md` (v3). Fix-round line fields and the
+  runtime derivation (active = gaps ≤ 30 min between non-gate events; blocked = gate-open→
+  gate-closed spans; idle = rest) are defined there.
+- index Passes row (`reviews/state/index.md`): `| Date | Target | Pass | Verdict |
+  New H/M/L/C | Outcome | Files |` — 7 content cells, or 5 when Outcome/Files don't apply;
+  Target is the short key (e.g. `038`); Outcome ≤ 50 words; counts cell opens with
+  `<h>/<m>/<l>/<c>`.
+- ledger table row (`reviews/<target>/ledger.md`): `| ID | Sev | First seen | Title |
+  File | Status | Affirmed |`. Detail blocks `### PPW-<n> — <title>` with What / Evidence /
+  Suggested fix / History; History lines look like `  - v9: found by the delta pass — …`;
+  blocks are append-only except new History lines; the table's Status and Affirmed cells
+  may change.
+- resolution `## Findings` row: `| ID | Status | Commit | Note |`, statuses
+  fixed · wont-fix · deferred · backlog · disputed · false-positive (never verified).
+
+# Task 1: wl.mjs — the validated worklog stamper
+
+New file `reviews/lib/wl.mjs`. Read first: `reviews/lib/records/schema.mjs`,
+`reviews/lib/render-records.mjs` (event usage), `reviews/rules/metrics-schema.md` (worklog
+section), a sample: `reviews/038-039-invoicing/worklog.jsonl` (do not modify it).
+
+### Behavior
+
+- CLI: `node reviews/lib/wl.mjs [--root <repoRoot>] <target> <ev> [--<key> <value>]...`
+  Numeric-looking values become numbers; everything else stays a string. `--json '<obj>'`
+  merges a raw JSON object for fields flags can't express (e.g. nested `of`).
+- Also export `appendEvent(root, target, event)` — validates and appends, used by other
+  lib scripts. The CLI is a thin wrapper over it.
+- Timestamp: generated by the script, ISO-8601 **with the local UTC offset** (like
+  `date -Is`), never UTC-Z. A passed `--t` value is rejected — the stamper owns time.
+- Event vocabulary: exactly the list in "Reference formats" above plus `void` and
+  `verify-result`. Unknown `ev` → error, exit 1.
+- Required fields per event (error when missing): round-start/round-end → `round` (number);
+  triage-done → `round`, `clusters`; gate-open/gate-closed → `reason`; gate-parked →
+  `kind`, `default`, `reason`; check-dispatched/check-returned → none required beyond ev;
+  test-run → `kind` (one of red|green|final|baseline|revert-and-rerun); finding → `id`
+  (`PPW-<n>`), `status`; micro-review-* → `cluster`; doc-gate → none; pass-launch →
+  `pass`, `type`; pass-records-done → `pass`; verify-result → `id` (`PPW-<n>`), `verdict`;
+  void → `of` (object with at least `ev` and `t`).
+- Round guards (the defect this kills: on 2026-08-21 a fixer stamped `round-start round:7`
+  while answering resolution-v6, poisoning the renderer's slice):
+  - `round-start --round N` requires `reviews/<target>/resolution-v<N>.md` to exist, and
+    errors if the worklog holds an un-ended round-start for a DIFFERENT round (one round
+    open at a time). A repeated round-start for the SAME number after its round-end is
+    legal (multi-part rounds).
+  - `round-end --round N` requires an open round-start for N.
+- `void` guard: the `of` object must match at least one existing worklog event — every
+  key in `of` equal on that event (string-compare `t` exactly). No match → error listing
+  the closest timestamps.
+- Append to `reviews/<target>/worklog.jsonl` (create if absent), print the appended line,
+  exit 0. Validation failure: print `ERROR <reason>`, append nothing, exit 1.
+
+### Fixtures (extend run-tests.mjs)
+
+Throwaway `mkdtempSync` tree with a minimal target. Assert: valid event appends and prints;
+unknown ev refused; missing required field refused (one case per shape class); `--t`
+refused; round-start refused when resolution-v<N> missing; round-start refused while a
+different round is open; same-number restart after round-end accepted; round-end without
+open start refused; void with no matching event refused; void with matching event appends;
+timestamp matches `/[+-]\d{2}:\d{2}$/`; appendEvent export usable in-process.
+
+# Task 2: render-records.mjs — correct slicing, void events, render-at-resolved
+
+Modify `reviews/lib/render-records.mjs`. Read first: the whole file,
+`reviews/rules/metrics-schema.md`, `reviews/lib/tests/run-tests.mjs` (its existing
+render-records assertions MUST stay green), `reviews/lib/wl.mjs` (Task 1).
+
+### Behavior changes
+
+1. **Void filtering.** Before any slicing, drop every event matched by a `void` event
+   (match = every key of `of` strictly equal on the event). `void` and voided events never
+   count as activity.
+2. **Paired spans replace the single slice.** Today lines 73–77 take the FIRST
+   `round-start` with the round number through the LAST `round-end` — duplicate round
+   numbers in the log made rounds 7 and 8 over-count ~5×, and multi-part rounds counted
+   the records/gate time between parts as active. New rule: walk the (void-filtered)
+   events in order; each `round-start` N opens a span, the next `round-end` N closes it.
+   The round's runtime = the sum over its spans; `started` = first span's start,
+   `ended` = last span's end. Active/blocked/idle are computed per span with the existing
+   gap logic (≤ 30 min cap, gate spans blocked) and summed; time BETWEEN spans is not
+   counted in any bucket. `idle_s` = Σ span durations − active_s − blocked_s (floor 0).
+   Event counters (test-run, check-*, micro-review-*) count only events inside spans.
+3. **Fail loud on unpairable stamps.** A `round-end` N with no open span N, or a second
+   `round-start` N while span N is open, aborts with exit 1 naming both timestamps and
+   suggesting a `void` event (`wl.mjs <target> void --json ...`). Never silently
+   over-count.
+4. **Render-at-resolved.** When the resolution's `status` is not `resolved`, an actual
+   append is refused with a message ("finish the round or pass --in-progress");
+   `--in-progress` overrides. `--dry-run` is always allowed regardless of status (the
+   existing 920-open-round assertions rely on this — keep them green).
+
+### Fixtures (extend run-tests.mjs; throwaway trees)
+
+- The 2026-08-21 mislabel shape: events `round-start(8) 10:15 · round-end(7) 10:44 ·
+  round-start(8) 11:36 · round-end(8) 12:00` plus a `void` of the 10:15 round-start and a
+  paired 7-start; assert round 8 renders ~24 min, not ~104, and round 7 pairs correctly.
+- Same shape WITHOUT the void → exit 1, message names 10:15 and 11:36.
+- A three-part round (three start/end pairs, same number, records gaps between parts):
+  assert runtime sums only the spans and `started`/`ended` bracket first/last.
+- Append (no --dry-run) on `status: in-progress` → exit 1 unless `--in-progress`.
+- All pre-existing render-records assertions still pass unchanged.
+
+# Task 3: render-records.mjs — index rows, ledger flips, verification mode
+
+Extend `reviews/lib/render-records.mjs` (after Task 2). Read first:
+`reviews/state/index.md` (Passes table + Targets at a glance), a real ledger
+(`reviews/038-039-invoicing/ledger.md`, read-only), `reviews/rules/doc-contracts.md`
+(index and ledger contracts), `reviews/lib/doc-gate.mjs` (the caps it enforces),
+`reviews/lib/records/schema.mjs` (INDEX path).
+
+### Behavior
+
+**Fix-round render** (existing mode) gains, after appending the metrics line:
+
+- **Index row append**: requires `--outcome "<text>"` (refuse to append records without
+  it; ≤ 50 words counted the way doc-gate counts — links stripped; refuse over-cap).
+  Build the row `| <date> | <targetKey> | v<round> fix round (<clusters> clusters,
+  <checks> approach-checks, <micros> micro-reviews) | — (<resolution status>) |
+  0/0/0/0 | <outcome> | [resolution](../<target>/resolution-v<round>.md) ·
+  [ledger](../<target>/ledger.md) |` where targetKey = the target name's first numeric
+  segment (e.g. `038-039-invoicing` → `038`). Insert it as the FIRST data row of the
+  `## Passes` table (newest first), touching nothing else. `--no-index` skips (for
+  targets outside the index).
+- **Ledger flips**: for every row of the resolution's `## Findings` table, update that
+  `PPW-<n>`'s ledger TABLE row: Status cell ← the resolution status, Affirmed cell ← the
+  resolution's `fixed_commit` (only for status `fixed`; other statuses keep Affirmed).
+  Append one History line to the detail block:
+  `  - v<round>: fix round — <status>` + (for fixed) ` at <commit from the row>`.
+  Never touch any other line of the block (append-only; doc-gate diff-checks this).
+  A `PPW-<n>` with no ledger row → warning, not error.
+
+**New verification mode**: `node reviews/lib/render-records.mjs <target> --verification
+<pass> --outcome "<text>" [--new-findings h,m,l,c]`:
+
+- Reads the worklog span from `pass-launch {pass}` to `pass-records-done {pass}` (void
+  filtering and fail-loud pairing as in Task 2; `pass-records-done` may be absent →
+  in-progress refusal, same rule).
+- Tallies `verify-result` events in the span: verdict `held` → verified count; anything
+  else → reopened count (list the non-held ids in `notes`).
+- Appends the verification metrics line per schema v3: `{target, pass, type:
+  "verification", date, verdict: "approve-with-followups", new_findings: {h,m,l,c from
+  --new-findings, default zeros}, verified, reopened, tests: from test-run events in the
+  span or null, cost: {agents: null, tokens: null}, runtime: {started, ended}, notes}`.
+- Ledger flips from the same events: `held` → Status `verified`, Affirmed ← the event's
+  `commit` when present; otherwise → Status `open`. History line:
+  `  - v<pass>: verification — held` / `— reopened (<verdict>)`.
+- Index row: same append mechanics, Pass cell `v<pass> verification (anchored)`, Verdict
+  cell `approve-with-followups`, counts from --new-findings.
+- Duplicate guard: refuse when a verification line for that pass already exists (same
+  correction-line guidance as fix rounds).
+
+### Fixtures
+
+Throwaway tree with worklog + resolution + ledger + a state/index.md copy shaped like the
+real one: assert fix-round render appends exactly one Passes row with the right cells and
+leaves other rows byte-identical; over-50-word `--outcome` refused; ledger Status/Affirmed
+flip and History append leave the rest of the block byte-identical; verification mode
+tallies held/reopened correctly, writes the metrics line, flips `verified`, and refuses a
+second render for the same pass; missing `--outcome` refuses before writing anything.
+
+# Task 4: verify-fixes.mjs — emit verify-result events
+
+Modify `reviews/lib/verify-fixes.mjs`. Read first: the whole file, `reviews/lib/wl.mjs`.
+
+### Behavior
+
+- After each row's verdict is final (the loop in the second half of the file), call
+  Task 1's `appendEvent(root, target, {ev: 'verify-result', id, verdict, commit})` —
+  commit = the row's Commit cell string. `--dry-run` emits nothing.
+- The events are appended as rows finish, so a killed run leaves a partial trail (that is
+  the point — the worklog is the crash-safe record).
+- New flag `--no-events` to suppress (fixture/sandbox runs that lack a worklog).
+
+### Fixtures
+
+Extend the existing verify-fixes throwaway-repo block: after the `held` run, assert the
+target's worklog gained exactly one `verify-result` line with `id: PPW-9501`,
+`verdict: "held"`; assert `--dry-run` and `--no-events` append nothing; existing
+assertions all stay green (pass `--no-events` where a worklog would interfere, but at
+least one live-event assertion must exist).
+
+# Task 5: doc-gate.mjs — one invocation, two new checks
+
+Modify `reviews/lib/doc-gate.mjs`. Read first: the whole file,
+`reviews/rules/doc-contracts.md`, `reviews/lib/tests/run-tests.mjs` (doc-gate blocks),
+`reviews/lib/tests/fixtures/repo/` and `bad-state/` layouts.
+
+### Behavior
+
+1. **Target mode also lints the state files.** `doc-gate.mjs <target> <pass>` runs the
+   existing target checks AND the existing state checks in the same invocation (state
+   violations listed under their `state/...` file labels; the final label reads
+   `<target> v<pass> + state`). The standalone `state` argument keeps working. This
+   closes the sequencing hole where the index row was written after the target gate ran
+   and reached the judge unlinted.
+2. **Decisions-block check (resolution).** Every `## Findings` row whose status is not
+   `fixed` must have a `### ` heading inside the `## Decisions` section whose text
+   contains that row's `PPW-<n>`. Violation message: `<id> status <status> has no
+   Decisions block — every non-fixed status needs its rationale (doc-contracts.md)`.
+3. **Sha and id sanity in state files.** In the target's glance State cell and in Passes
+   rows naming this target: every `PPW-\d+` must exist in the target's ledger (when the
+   target has one), and every 7–40-hex token that parses as a sha must resolve via
+   `git cat-file -e` (warnings-as-violations only for non-resolving shas; skip when git
+   is unavailable, as the ledger HEAD check already does).
+
+### Fixtures
+
+Add to `902-broken-target`: a resolution row with status `deferred` and no matching
+Decisions heading → expected violation string. Add to `bad-state` (or a new fixture pair):
+a glance cell citing `PPW-9999` absent from the ledger and a Passes row with sha
+`abcdef1` that does not resolve → expected violations. Assert target mode now also
+reports a planted state violation in the same run, and that `901-good-target` + good
+state stays clean end to end.
+
+# Task 6: records-auditor.mjs — the reviewed-unit window
+
+Modify `reviews/lib/records-auditor.mjs`. Read first: its header and the fix-round
+cross-check section (find where a resolution's tallies and rounds are compared to
+metrics lines), `reviews/rules/metrics-schema.md`.
+
+### Behavior
+
+A resolution with `status: resolved` whose round has NO fix-round metrics line yet is a
+legal in-flight state (the reviewed unit renders records once, after its verification).
+The auditor must not error on it; it reports one info/warning line
+(`<target>: resolution-v<N> resolved, no fix-round line yet — unit records pending`).
+Everything else (a line existing with wrong tallies, etc.) stays as-is. Also accept the
+two new worklog event kinds (`void`, `verify-result`) wherever event shapes are checked.
+
+### Fixtures
+
+A throwaway or 9xx fixture target with a resolved resolution and a metrics.jsonl lacking
+its fix-round line → auditor exits 0 with the warning text; the same target after a
+fix-round line is appended → still exits 0 without the warning. Existing smoke runs
+(044-045, 043) must stay green.
+
+# Task 7: gate-miner.mjs — the lint miner
+
+New file `reviews/lib/gate-miner.mjs`. Read first: `reviews/lib/records/schema.mjs`, a real
+worklog's `doc-gate` events (`reviews/038-039-invoicing/worklog.jsonl`, read-only),
+`reviews/lib/doc-gate.mjs` (what lint already covers).
+
+### Behavior
+
+- CLI: `node reviews/lib/gate-miner.mjs [--root <repoRoot>] [--since YYYY-MM-DD]
+  [target ...]` (default: all targets incl. archive, since 30 days back).
+- Scans every target worklog for `doc-gate` events whose verdict/judge/reason text
+  contains `disapprove` (case-insensitive). For each, prints one block: date, target,
+  round/pass, and the reason text.
+- After the list, prints a summary: total disapprovals, disapprovals per target, and for
+  each distinct reason a stub checklist entry:
+  `[ ] lintable? -> add a check to doc-gate.mjs + a fixture to run-tests.mjs`.
+- It is a reporter, not a classifier: it never edits anything, exit 0 always (exit 1 only
+  on IO errors). The follow-up (turning a catch into lint) is a human/agent decision.
+
+### Fixtures
+
+Throwaway tree with a worklog containing two disapprove doc-gate events (one `verdict:
+"disapprove"`, one `judge: "disapprove-then-fixed: ..."`) and one approve; assert both
+disapprovals print with their reasons, the approve does not, `--since` filters by date,
+and the summary counts 2.
+
+# Task 8: route-next-pass.mjs — threshold, queue, sweep, reviewed unit
+
+Modify `reviews/lib/route-next-pass.mjs`. Read first: the whole file,
+`reviews/README.md` (router table — Task 15 rewrites it to match this),
+`reviews/lib/tests/run-tests.mjs` (router blocks), the ledger table format in
+"Reference formats".
+
+### Behavior
+
+- **Ledger-derived counts.** When `reviews/<target>/ledger.md` exists, parse its Findings
+  table rows (`| PPW-n | sev | ... | status | ...` — columns ID·Sev·First seen·Title·
+  File·Status·Affirmed) and compute `openHigh` (status open|in-progress, sev 🔴) and
+  `openMedium` (same statuses, sev 🟠). When no ledger exists (old fixtures), fall back
+  to the current metrics-derived `serious` logic unchanged.
+- **New routing, replacing the current row-2 behavior** (constant
+  `QUEUE_THRESHOLD = 3` at top of file):
+  1. `openHigh > 0` OR latest-line `reopened > 0` OR the latest verification line has a
+     `findings[]` entry with `fix_generated` non-null and `sev: "medium"` → NEXT: fix
+     round (say which trigger).
+  2. `openMedium >= QUEUE_THRESHOLD` (and no resolved resolution answering them) →
+     NEXT: fix round, reason `batch of <n> open mediums`.
+  3. `0 < openMedium < QUEUE_THRESHOLD` and nothing above fired → print
+     `QUEUED: <the ids> (<n> below the threshold of ${QUEUE_THRESHOLD})` and fall
+     through to the later rows (verification/delta/quiet) as if they were absent —
+     EXCEPT any row that would reach certification: there, NEXT: fix round with reason
+     `sweep before certification — <n> open mediums must drain` (exit 0, not a gate).
+  4. Everything else unchanged (verification branch, delta-worthiness gate,
+     certification gate, loop-close).
+- **Reviewed-unit wording.** Where the router today answers `NEXT: verification`, it now
+  answers `NEXT: verification (reviewed unit — render records once, after it)` and the
+  COST line stays. No behavioral change beyond the wording; the unit sequencing lives in
+  the loop-driver skill (Task 16).
+- `reviews/lib/autonomy-policy.mjs`: no new gate kinds are introduced (queue/sweep are
+  exit-0 routes); leave it untouched unless a fixture proves an existing kind's reason
+  text now mismatches — then update only the reason text.
+
+### Fixtures
+
+New 9xx fixture targets: (a) ledger with 2 open 🟠, clean verification metrics → output
+contains `QUEUED:` and the delta-worthiness gate still prints; (b) ledger with 3 open 🟠
+→ NEXT fix round with `batch of 3`; (c) ledger with 1 open 🟠 and a state where the old
+router would print the certification gate → NEXT fix round `sweep before certification`;
+(d) ledger with 1 open 🔴 → NEXT fix round immediately; (e) a reopened>0 latest line →
+fix round. All pre-existing router assertions stay green (they have no ledgers → fallback
+path, or update the fixture expectations ONLY where this plan changes the rule — record
+any such update in the report).
+
+# Task 9: run-scoped-tests.mjs — the stamping, locking test wrapper
+
+New file `reviews/lib/run-scoped-tests.mjs`. Read first: `reviews/lib/wl.mjs`,
+`reviews/lib/verify-fixes.mjs` (command templates + injection pattern), CLAUDE.md's
+test-scoping section (repo root).
+
+### Behavior
+
+- CLI: `node reviews/lib/run-scoped-tests.mjs [--root <repoRoot>] <target> --kind
+  red|green|final|baseline --filter "<FQN fragment>"` for the API suite, or `--ui
+  --include "<name>"` for the frontend. `--cluster <c>`, `--round <n>`, `--note "<t>"`
+  pass through to the stamp. `--cmd "<template with {filter}>"` overrides the command
+  (fixtures). `--dry-run` prints the command and exits.
+- Commands: API `dotnet test src/PhotoPrint.Tests --filter
+  "FullyQualifiedName~{filter}"`; UI `npm --prefix src/PhotoPrint.UI test --
+  --watch=false --include='**/{name}*.spec.ts'`.
+- **Machine-global lock**: before running, create `<os.tmpdir()>/photoprint-test.lock`
+  with `wx` (exclusive) containing `{pid, started}`. If it exists: read it; if that pid
+  is dead (`process.kill(pid, 0)` throws), replace it (stale); else exit 3 with
+  `another test process is running (pid <p>) — the machine takes one at a time`.
+  Always remove the lock on exit (finally + signal handlers).
+- Parse the runner output: dotnet (`Failed:\s*(\d+), Passed:\s*(\d+)(?:, Skipped:\s*(\d+))?`
+  on the summary line — handles both `Passed!` and `Failed!` forms) and vitest
+  (`Tests\s+(?:(\d+) failed[^\d]*)?(\d+) passed`). On parse failure, stamp with
+  `passed: null, failed: null` and a note `unparsed runner output`, and exit with the
+  runner's exit code either way.
+- Stamp exactly one `test-run` worklog event via `appendEvent`: `{kind, filter (or
+  include), passed, failed, skipped?, duration_s (measured), cluster?, round?, note?}`.
+  `--no-events` suppresses.
+- Exit code = the runner's exit code (a red run exits non-zero — callers rely on it).
+
+### Fixtures
+
+Use `--cmd` with `node -e` stand-ins: a passing command printing a dotnet-style summary →
+event stamped with parsed counts and exit 0; a failing command → non-zero exit, counts
+parsed; unparsable output → nulls + note; lock: create the lock file with a live pid →
+exit 3 without running; with a dead pid (e.g. 999999) → steals and runs; lock removed
+after both legs; vitest-style summary parses.
+
+# Task 10: mint-id.mjs — id minting and scaffolds
+
+New file `reviews/lib/mint-id.mjs`. Read first: `reviews/state/id-counter` (one number),
+`reviews/rules/doc-contracts.md` (IDs rule), `reviews/templates/ledger.md`,
+`reviews/templates/resolution.md`.
+
+### Behavior
+
+- `node reviews/lib/mint-id.mjs [--root <r>] mint --count N [--dry-run]`: prints
+  `PPW-<a>..PPW-<b>`, writes the incremented counter back (the file's whole content is
+  the next free number + newline). Refuses non-numeric counter content.
+- `... scaffold-ledger <target> --id PPW-<n> --sev 🔴|🟠|🟡|⚪ --title "<t>" --file
+  "<path:line>" --pass v<p>`: appends the table row (Status `open`, Affirmed empty) and a
+  detail block skeleton from the template (What/Evidence/Suggested fix left as
+  `<fill in>`, History first line `  - v<p>: found by <fill in>`). Creates ledger.md from
+  the template if absent. Refuses an id that already exists in the file.
+- `... scaffold-resolution <target> --version N`: creates `resolution-v<N>.md` from the
+  template with target/version/answers filled and one `| PPW-x | open | — | — |` Findings
+  row per ID in `review-v<N>.md`'s findings table. Refuses to overwrite an existing file.
+
+### Fixtures
+
+Throwaway tree: mint increments the counter and is refused on a garbage counter;
+scaffold-ledger appends a row + block matching the template shape and refuses a duplicate
+id; scaffold-resolution copies the review's ids and refuses overwrite; `--dry-run` writes
+nothing.
+
+# Task 11: speed-report.mjs — the acceptance metrics
+
+New file `reviews/lib/speed-report.mjs`. Read first: `reviews/rules/metrics-schema.md`
+(runtime derivation), a real worklog (read-only).
+
+### Behavior
+
+`node reviews/lib/speed-report.mjs [--root <r>] <target> [--day YYYY-MM-DD]` prints:
+
+1. **Buckets** over the (optionally day-filtered) worklog, by a state machine over
+   consecutive event pairs, priority gate > round > pass: `fix-round work` (inside any
+   round-start→round-end span, same-number pairing as the renderer, void-aware),
+   `pass work` (inside pass-launch→pass-records-done), `owner wait` (inside
+   gate-open→gate-closed), `records+gates` (outside rounds/passes where the segment
+   starts or ends at a doc-gate event, or follows a round-end/pass-records-done and ends
+   at a doc-gate), `idle/other` (the rest). Minutes and % of span.
+2. **Metrics**: `all-in min per fixed finding` = for each round, (its first round-start →
+   the first doc-gate approve after its last round-end, plus the span of the verification
+   pass that follows, when one exists) ÷ the round's `finding status:fixed` event count —
+   printed per round and as the median; `doc-gate first-pass approval` = share of doc-gate
+   sittings (events grouped by same round/pass key) whose first event is not a
+   disapprove; `record sittings per fixed finding` = doc-gate sitting count ÷ total fixed
+   findings; `correction lines` = metrics.jsonl lines with `correction_for`.
+3. `--json` emits the same as one JSON object.
+
+### Fixtures
+
+Freeze a copy of `reviews/038-039-invoicing/worklog.jsonl` and `metrics.jsonl` as of this
+commit into `reviews/lib/tests/fixtures/speed-report/` (copy the real files — they are
+the baseline evidence). Assert for `--day 2026-08-21`: total span 700–704 min; fix-round
+work 255–275; records+gates 185–215; correction lines = 25; doc-gate first-pass rate
+0.5–0.65; and that `--json` round-trips. (The reference measurement from the owner's
+2026-08-22 analysis: span 702, fix work ≈263, records+gates ≈200, 5 disapprovals in 12
+sittings. The state machine must land inside the asserted ranges; if it cannot, the
+report's definitions are wrong — do not widen the ranges, fix the machine.)
+
+# Task 12: summary-data.mjs — the computed half of the owner summary
+
+New file `reviews/lib/summary-data.mjs`. Read first:
+`.claude/skills/owner-summary/SKILL.md` (the "Reasons to doubt" definition),
+`reviews/rules/metrics-schema.md` (findings[] fields), `reviews/runbooks/
+runbook-discovery.md` (the core lens manifest).
+
+### Behavior
+
+`node reviews/lib/summary-data.mjs [--root <r>] <target> <pass>` reads metrics.jsonl and
+prints markdown-ready bullet fragments:
+
+- Core manifest lenses not in the pass line's `lenses` array (core list, as data in the
+  script: correctness, security, requirements, quality, tests, completeness-critic).
+- New-serious-per-pass trend: one line per discovery-type line, `v<p>: <high>+<medium>`.
+- Counts over the pass's `findings[]`: `unverified-*` verdicts, `hinted: true`,
+  `budget_skipped` from `cost.agents_by_stage`.
+- Pass-type cap reminder when type is delta/verification.
+- Backlog filings: the pass's new low+cleanup count.
+- Exit 2 with a usage line when the pass has no metrics line.
+
+### Fixtures
+
+Throwaway metrics.jsonl with two discovery lines (one with owed lenses, hinted and
+unverified entries, a budget skip) → assert each fragment appears with the right numbers;
+missing pass → exit 2.
+
+# Task 13: lib suite consolidation for phases 1–4
+
+Run `node reviews/lib/tests/run-tests.mjs`; fix any cross-task breakage (e.g. shared
+fixture drift between Tasks 2/3/5/8). Then run every new CLI once with `--help`-style bad
+args to confirm each prints usage and a correct exit code. No new features; this task
+exists so phases land coherently. Report the final assertion count (baseline before this
+plan: 74… plus whatever Tasks 1–12 added — state the exact number).
+
+# Task 14: metrics-schema.md and doc-contracts.md
+
+Modify `reviews/rules/metrics-schema.md` and `reviews/rules/doc-contracts.md` (standards
+are descriptive — this states what Tasks 1–12 made true). Read both files fully first.
+
+### metrics-schema.md changes
+
+- Runtime derivation paragraph: replace the single-slice description with paired spans:
+  "`runtime` sums the round's paired round-start→round-end spans; time between spans
+  belongs to records and gates and is counted nowhere in the round line. A mis-stamped
+  event is repaired by an appended `void` event, never edited."
+- New worklog events documented in the v3 worklog paragraph: `void`
+  (`{"ev":"void","of":{...}}` — the renderer and every reader drop events matched by
+  `of`), `verify-result` (`{"ev":"verify-result","id":"PPW-<n>","verdict":"held|...",
+  "commit":"..."}` — appended by verify-fixes.mjs as each row finishes).
+- The fix-round line paragraph: "the renderer appends it **once per round, when the
+  resolution is `resolved`** — an in-progress round has no line; the worklog carries
+  everything until then" and "the renderer also appends the round's index row and applies
+  the ledger status flips (doc-contracts.md names these as its two mechanical writes)".
+- Verification lines: add that `verified`/`reopened`/`runtime`/`tests` are rendered from
+  `verify-result` and stamp events by `render-records.mjs --verification`.
+- Corrections section: add one sentence — "Corrections exist for facts discovered wrong
+  after the fact; a value the renderer can recompute is fixed by `void` + re-render
+  before the line is written, not by a correction."
+
+### doc-contracts.md changes
+
+- Replace the gate description sentence ("It judges and explains; it never edits.") with:
+  "The deterministic lint never edits and covers the target's files and the state files
+  in one run. The judge returns, per violation, the exact replacement text; the driver
+  applies it verbatim and re-runs the lint — one judge sitting per reviewed unit. A
+  correction that would change a recorded fact (a count, a commit, a status) is returned
+  as a question, never as text. Judge scope: hand-written prose (summaries, Decisions,
+  glance cells); machine-rendered rows are the lint's alone."
+- In "The artifact set": verification bullets updated — "Verification passes write no
+  prose files. Their record — ledger flips, the metrics line, the index row — is rendered
+  by `render-records.mjs --verification` from the worklog's `verify-result` events."
+- New vocabulary entries (keep the list's style, one line each):
+  **reviewed unit** — one fix round plus the verification of its fixes: the verification
+  runs at the round's tip, and the unit renders one set of records and passes one doc
+  gate; the verifier is never the fixer. **queued** — an open 🟠 below the fix-round
+  threshold, waiting for a batch; it still blocks certification. **sweep round** — the
+  fix round that drains every queued 🟠 before certification. **void** — an appended
+  worklog event that repairs a mis-stamped one; readers drop what it matches.
+- In "Core rules", the renderer exception: "`render-records.mjs` owns exactly two writes
+  into prose files: appending a fix-round or verification row to the index's Passes
+  table, and flipping a ledger row's Status/Affirmed cells plus appending its History
+  line. Every other prose line stays a person's or agent's hand."
+- Update the ledger contract's status flow sentence to mention flips are rendered.
+
+Doc-gate lints these files' targets, not the rules files themselves; still run
+`node reviews/lib/tests/run-tests.mjs` (unchanged behavior expected) before committing.
+
+# Task 15: README.md and runbook-verification.md
+
+Modify `reviews/README.md` and `reviews/runbooks/runbook-verification.md`. Read both
+fully first, plus the new `route-next-pass.mjs` (Task 8) so the table matches the code.
+
+### README router table — replace the current table with
+
+| State | Next pass |
+|---|---|
+| No `review-v1.md` | **Full discovery** |
+| An open 🔴 · a reopened fix · a fix-caused 🟠 regression | **Fix round now** (quiet counter resets) |
+| ≥ 3 open non-regression 🟠 with no resolution answering them | **Fix round** (the batch) |
+| 1–2 open non-regression 🟠 | **Queued** — proceed as if quiet; the sweep row fires before certification |
+| Resolution `resolved`, not yet re-reviewed | **Verification** — runs at the round's tip; round + verification are one **reviewed unit** with one set of records and one doc gate |
+| Verification clean + fix round delta-worthy¹ + no delta since | **Delta discovery** |
+| Verification clean + fix round patch-grade | Loop **quiet** |
+| Loop quiet, any 🟠 still open (queued or not) | **Sweep round**, then its verification, then certification |
+| Loop quiet, nothing open | **Certification**² |
+| Certification quiet | **Certified** — verdict `approved`; loop done |
+
+(Footnotes ¹ ² keep their current text.)
+
+### README other edits
+
+- After the table, one new paragraph: "**The reviewed unit.** A fix round and the
+  verification of its fixes are one unit: the verification runs immediately at the
+  round's tip, in the same driver invocation, and the unit writes one set of records and
+  passes one doc gate. The verifier is never the fixer. The threshold (3) and the sweep
+  guarantee no 🟠 outlives the loop: queued findings still block certification."
+- The records hard-rule bullet: replace "the fixer hand-writes the index row, adapting
+  the suggestion the renderer prints" with "`render-records.mjs` appends the metrics
+  line, the unit's index rows, and the ledger flips, from the worklog; the fixer
+  hand-writes the resolution and its Decisions".
+- "Who writes what": stamps go through `reviews/lib/wl.mjs`; test runs through
+  `reviews/lib/run-scoped-tests.mjs` (which enforces the one-test-process rule).
+
+### runbook-verification.md edits
+
+- Step 1 gains: "The verification runs at the fixed round's tip, immediately after the
+  fixer's hand-back, inside the same reviewed unit — commit any pending `reviews/`
+  edits first (the script refuses a dirty tree)."
+- Step 5 (records) rewritten: "Write no prose files. Run
+  `node reviews/lib/render-records.mjs <target> --verification <pass> --outcome
+  \"<one line>\"` — it renders the metrics line, the index row, and the ledger flips
+  from the `verify-result` events; then the unit's single doc gate covers this pass's
+  records together with the fix round's."
+
+# Task 16: loop-driver and fix-review skills
+
+Modify `.claude/skills/loop-driver/SKILL.md` and `.claude/skills/fix-review/SKILL.md`.
+Read both fully first, plus the Task 15 README text (they must agree; the README owns
+the rules, the skills sequence them).
+
+### loop-driver changes
+
+- Section 3 execute table, verification row → "verification (reviewed unit)": run
+  verify-fixes + judgment items immediately after the fix round's hand-back in this same
+  invocation, then render the unit's records (`render-records.mjs` for the round, then
+  `--verification` for the pass), then ONE doc-gate sitting (lint + judge) covering both.
+  You must still not be the fixer (unchanged rule + its test-only exception).
+- Section 4: the fix-round + verification records are rendered, not hand-written; the
+  judge is dispatched once per reviewed unit; on disapprove, apply the judge's returned
+  replacement text verbatim, re-run the lint, and re-judge only when the judge returned a
+  question instead of text. Discovery-type passes keep their existing records flow.
+- New subsection "Persistent fixer": inside one target, the driver keeps a single fixer
+  subagent and continues it (send the next unit's findings to the same agent) instead of
+  spawning fresh; the fixer is retired — next unit gets a fresh agent — after any
+  discovery-type pass, any reopened fix, or the target's close. Unattended variant: same
+  rule; the run-end report names how many units each fixer served.
+- Unattended iteration table: the fix-round row and verification row merge into one
+  "reviewed unit" row (fix-round subagent → verify → render → one gate).
+- The no-progress guard sentence: metrics gains its lines at unit end; the guard compares
+  against units, wording updated accordingly.
+
+### fix-review changes
+
+- Worklog bullets: every stamp goes through `node reviews/lib/wl.mjs <target> <ev> ...`
+  (never a hand-typed echo); test runs go through `node reviews/lib/run-scoped-tests.mjs`
+  which stamps and enforces the single test process.
+- Hand back section rewritten: (1) append `round-end` (via wl.mjs), commit the code and
+  the resolution (`status: resolved`); (2) hand to the driver: the verification runs now,
+  at this tip, and the unit's records (renderer) + single doc gate follow it — the fixer
+  no longer runs the renderer, the auditor, or the doc gate, and no longer writes the
+  index row; (3) invoked standalone with no driver, say so and stop after (1) — "unit
+  records pending verification; run the loop-driver".
+- Guardrails recap updated to match (renderer/auditor/gate lines).
+- Everything else — triage, one owner gate, approach-checks, micro-reviews, regression
+  tests, one-test-process, unattended variant's parking rules — unchanged.
+
+# Task 17: future-ideas section
+
+Modify `reviews/notes/self-driving-loop-design.md`: append a `## Script backlog
+(2026-08-22)` section — one line each, "what it would do — what it removes":
+discovery prep (diffs, HEAD check, lens suggestions), close-target sequence (closed:,
+backlog rollup, index stamp, git mv), run-end report printer (parked items from
+gate-parked events), commit-subject lint in the pre-commit hook, judge input packager
+(changed reviews/ files via git), blinding auditor (scan lens inputs for reviews/ content
+and PPW ids before launch), reconcile pre-matcher (fuzzy candidate matches for the
+reconciler). Note each stays unbuilt until the lint-miner habit or an owner ask pulls it
+in. Read the file's style first and match it.
+
+# Task 18: replay verification (controller task — no subagent)
+
+Sandbox replay proving the machinery against the real 2026-08-21 records: copy
+`reviews/038-039-invoicing/` records + `reviews/state/` into a temp `--root` tree, add
+the two `void` events the mislabel needs, and confirm: the renderer computes round 7
+≈ 28 min and round 8 ≈ 24 min (the old code said 156/104); the router reads each
+historical state to a sensible next pass; speed-report reproduces the baseline day.
+Record the outputs in the final report. Then the final whole-branch review per the SDD
+skill, one fix wave max, push, PR.

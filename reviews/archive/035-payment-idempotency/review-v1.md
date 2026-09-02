@@ -58,7 +58,7 @@ tests: { dotnet: "8/8 targeted idempotency tests; the commit claims 457/457 over
 - PPW-5, PPW-6, PPW-7, PPW-13, PPW-14 and PPW-15 carry no behaviour change. PPW-6, PPW-7 and PPW-14 are one theme: idempotency
   handling is copied per endpoint instead of living in one place.
 - Four untested behaviours were listed with no finding id and are still work this round owes: divergence
-  on delivery type, locker id and total; the EuPlatesc conflict path; a replay whose stored value is
+  on delivery type, locker id and total; the legacy processor conflict path; a replay whose stored value is
   null; and a whitespace-only key.
 - Every test in the suite passes today and none of them covers a second caller, a second thread or a
   second database engine. A green suite here proves the single-caller happy path only.

@@ -23,6 +23,13 @@ public class PhotoPrintDbContext : DbContext
     /// </summary>
     public const string OrderNumberIndexName = "ix_orders_order_number";
 
+    // Shared with WebhooksController's violation classifiers so a rename here is a compile break there.
+    public const string InvoiceOrderIdIndexName = "ix_invoices_order_id";
+    public const string InvoiceNumberIndexName = "ix_invoices_invoice_number";
+
+    /// <summary>Raw-SQL composite index from the migration, so it has no model-side declaration to name it.</summary>
+    public const string InvoiceSeriesYearNumberIndexName = "uq_invoices_series_year_number";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {
@@ -44,34 +51,13 @@ public class PhotoPrintDbContext : DbContext
     public DbSet<EasyboxLocker> EasyboxLockers { get; set; } = null!;
     public DbSet<Order> Orders { get; set; } = null!;
     public DbSet<OrderItem> OrderItems { get; set; } = null!;
+    public DbSet<Invoice> Invoices { get; set; } = null!;
     public DbSet<SavedAddress> SavedAddresses { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // SQLite doesn't support DateTimeOffset natively — store as Unix ms (long)
-        // so that range comparisons (<=, >=) translate correctly in LINQ queries.
-        if (Database.ProviderName == DbProviders.Sqlite)
-        {
-            var dtConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, long>(
-                v => v.ToUnixTimeMilliseconds(),
-                v => DateTimeOffset.FromUnixTimeMilliseconds(v));
-            var dtNullConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset?, long?>(
-                v => v == null ? (long?)null : v.Value.ToUnixTimeMilliseconds(),
-                v => v == null ? (DateTimeOffset?)null : DateTimeOffset.FromUnixTimeMilliseconds(v.Value));
-
-            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-            {
-                foreach (var property in entityType.GetProperties())
-                {
-                    if (property.ClrType == typeof(DateTimeOffset))
-                        property.SetValueConverter(dtConverter);
-                    else if (property.ClrType == typeof(DateTimeOffset?))
-                        property.SetValueConverter(dtNullConverter);
-                }
-            }
-        }
         modelBuilder.Entity<EmailQueue>(entity =>
         {
             entity.HasKey(e => e.Id);
@@ -200,8 +186,7 @@ public class PhotoPrintDbContext : DbContext
         modelBuilder.Entity<PricingTier>(entity =>
         {
             entity.HasKey(pt => pt.Id);
-            if (Database.ProviderName != DbProviders.Sqlite)
-                entity.Property(pt => pt.UnitPrice).HasColumnType("decimal(10,2)");
+            entity.Property(pt => pt.UnitPrice).HasColumnType("decimal(10,2)");
             entity.HasIndex(pt => pt.ProductSizeId)
                   .HasDatabaseName("ix_pricing_tiers_product_size_id");
             entity.HasOne(pt => pt.ProductSize)
@@ -298,10 +283,8 @@ public class PhotoPrintDbContext : DbContext
             entity.HasIndex(o => o.PaymentIntentId)
                   .HasDatabaseName("ix_orders_payment_intent_id");
             entity.Property(o => o.Status).HasConversion<string>();
-            entity.Property(o => o.PaymentProcessor).HasConversion<string>();
             entity.Property(o => o.DeliveryType).HasConversion<string>();
             entity.Property(o => o.PaymentIntentId).HasMaxLength(200);
-            entity.Property(o => o.EuPlatescTransactionId).HasMaxLength(200);
             entity.Property(o => o.OrderNumber).HasMaxLength(20);
             entity.Property(o => o.AwbNumber).HasMaxLength(100);
             entity.Property(o => o.TrackingUrl).HasMaxLength(500);
@@ -319,15 +302,13 @@ public class PhotoPrintDbContext : DbContext
             // 512, not Stripe's exact 255-char ID ceiling. Today's
             // client secrets are ~60–90 chars, but a zero-headroom column throws "value
             // too long" on prod Postgres AFTER the Stripe charge exists if Stripe ever
-            // lengthens IDs (SQLite/InMemory don't enforce it, so tests wouldn't catch it).
+            // lengthens IDs (InMemory doesn't enforce it, so those tests wouldn't catch it).
             entity.Property(o => o.StripeClientSecret).HasMaxLength(512);
-            entity.Property(o => o.EuPlatescRedirectUrl).HasMaxLength(1000);
 
             // At most one order may carry any given non-null IdempotencyKey.
-            // Both Postgres and SQLite permit multiple NULLs in a unique index, so
-            // key-less orders coexist freely. The explicit HasFilter on Postgres
-            // documents intent and keeps the index small; SQLite gets a plain unique
-            // index (multiple NULLs still permitted).
+            // Postgres permits multiple NULLs in a unique index, so key-less orders
+            // coexist freely. The explicit HasFilter documents intent and keeps the
+            // index small.
             //
             // Accepted residual — deferred: this uniqueness is
             // GLOBAL single-column, while the lookup/reclamation are owner-scoped. Consequences:
@@ -346,12 +327,12 @@ public class PhotoPrintDbContext : DbContext
                   .HasDatabaseName(IdempotencyKeyIndexName);
             if (Database.ProviderName == DbProviders.Postgres)
                 idempotencyIndex.HasFilter("\"IdempotencyKey\" IS NOT NULL");
-            if (Database.ProviderName != DbProviders.Sqlite)
-            {
-                entity.Property(o => o.ShippingCostRon).HasColumnType("decimal(10,2)");
-                entity.Property(o => o.SubtotalRon).HasColumnType("decimal(10,2)");
-                entity.Property(o => o.TotalRon).HasColumnType("decimal(10,2)");
-            }
+            entity.Property(o => o.ShippingCostRon).HasColumnType("decimal(10,2)");
+            entity.Property(o => o.SubtotalRon).HasColumnType("decimal(10,2)");
+            entity.Property(o => o.TotalRon).HasColumnType("decimal(10,2)");
+            entity.Property(o => o.NetTotalRon).HasColumnType("decimal(18,2)");
+            entity.Property(o => o.VatRon).HasColumnType("decimal(18,2)");
+            entity.Property(o => o.VatRate).HasColumnType("decimal(5,4)");
 
             entity.Property(o => o.ShippingAddress)
                   .HasConversion(shippingConverter);
@@ -381,11 +362,8 @@ public class PhotoPrintDbContext : DbContext
             entity.HasKey(oi => oi.Id);
             entity.HasIndex(oi => oi.OrderId)
                   .HasDatabaseName("ix_order_items_order_id");
-            if (Database.ProviderName != DbProviders.Sqlite)
-            {
-                entity.Property(oi => oi.UnitPriceRon).HasColumnType("decimal(10,2)");
-                entity.Property(oi => oi.LineTotalRon).HasColumnType("decimal(10,2)");
-            }
+            entity.Property(oi => oi.UnitPriceRon).HasColumnType("decimal(10,2)");
+            entity.Property(oi => oi.LineTotalRon).HasColumnType("decimal(10,2)");
 
             entity.Property(oi => oi.ProductSnapshot)
                   .HasConversion(productSnapshotConverter);
@@ -406,6 +384,42 @@ public class PhotoPrintDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(oi => oi.ProductId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Invoice (bolt 038) ─────────────────────────────────────────────────────
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasKey(i => i.Id);
+            entity.Property(i => i.InvoiceNumber).HasMaxLength(50);
+            entity.Property(i => i.Series).HasMaxLength(10);
+            entity.Property(i => i.AnafStatus).HasConversion<string>().HasMaxLength(30);
+            entity.Property(i => i.AnafUploadId).HasMaxLength(Invoice.AnafUploadIdMaxLength);
+            entity.Property(i => i.PdfStoragePath).HasMaxLength(500);
+            // Int-stored like Upload.StorageLocation, the other exception to the enums-as-strings rule.
+            entity.Property(i => i.StorageLocation)
+                  .IsRequired()
+                  .HasDefaultValue(StorageLocation.Local);
+            entity.Property(i => i.XmlPayload).HasColumnType("text");
+            entity.Property(i => i.LastError).HasColumnType("text");
+
+            entity.Property(i => i.NetTotalRon).HasColumnType("decimal(18,2)");
+            entity.Property(i => i.VatRon).HasColumnType("decimal(18,2)");
+            entity.Property(i => i.TotalRon).HasColumnType("decimal(18,2)");
+
+            entity.HasIndex(i => i.InvoiceNumber)
+                  .IsUnique()
+                  .HasDatabaseName(InvoiceNumberIndexName);
+            entity.HasIndex(i => i.OrderId)
+                  .IsUnique()
+                  .HasDatabaseName(InvoiceOrderIdIndexName);
+            entity.HasIndex(i => i.AnafStatus)
+                  .HasDatabaseName("ix_invoices_anaf_status");
+
+            entity.HasOne(i => i.Order)
+                  .WithMany()
+                  .HasForeignKey(i => i.OrderId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired();
         });
 
         // ── SavedAddress ───────────────────────────────────────────────────────────

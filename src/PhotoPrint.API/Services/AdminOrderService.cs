@@ -11,6 +11,7 @@ using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Hubs;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
+using PhotoPrint.API.Services.Invoicing;
 using PhotoPrint.API.Services.Sameday;
 using Stripe;
 
@@ -20,37 +21,41 @@ public class AdminOrderService : IAdminOrderService
 {
     private readonly PhotoPrintDbContext _db;
     private readonly IOrderEmailService _orderEmailService;
-    private readonly IEuPlatescService _euPlatescService;
     private readonly IStripeClient _stripeClient;
     private readonly IStorageRouter _storageRouter;
     private readonly IOriginalPurger _originalPurger;
     private readonly ArchiveSettings _archiveSettings;
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly IAwbCreationNotifier _awbNotifier;
+    private readonly IInvoiceCreationService _invoiceCreator;
     private readonly ILogger<AdminOrderService> _logger;
+    private readonly Sentry.IHub? _sentry;
 
     public AdminOrderService(
         PhotoPrintDbContext db,
         IOrderEmailService orderEmailService,
-        IEuPlatescService euPlatescService,
         IStripeClient stripeClient,
         IStorageRouter storageRouter,
         IOriginalPurger originalPurger,
         IOptions<ArchiveSettings> archiveSettings,
         IHubContext<AdminOrderHub> hub,
         IAwbCreationNotifier awbNotifier,
-        ILogger<AdminOrderService> logger)
+        IInvoiceCreationService invoiceCreator,
+        ILogger<AdminOrderService> logger,
+        // No hub is registered unless Sentry:Enabled, so this cannot be a required dependency.
+        Sentry.IHub? sentry = null)
     {
         _db = db;
         _orderEmailService = orderEmailService;
-        _euPlatescService = euPlatescService;
         _stripeClient = stripeClient;
         _storageRouter = storageRouter;
         _originalPurger = originalPurger;
         _archiveSettings = archiveSettings.Value;
         _hub = hub;
         _awbNotifier = awbNotifier;
+        _invoiceCreator = invoiceCreator;
         _logger = logger;
+        _sentry = sentry;
     }
 
     // ── List ──────────────────────────────────────────────────────────────────
@@ -107,7 +112,7 @@ public class AdminOrderService : IAdminOrderService
 
     public async Task<AdminOrderDetailDto> UpdateStatusAsync(
         Guid orderId, string statusStr, string? awbNumber, string? trackingUrl,
-        CancellationToken ct = default)
+        Guid? adminUserId = null, CancellationToken ct = default)
     {
         if (!Enum.TryParse<OrderStatus>(statusStr, true, out var newStatus))
             throw new BadRequestException($"Unknown order status '{statusStr}'.");
@@ -118,6 +123,8 @@ public class AdminOrderService : IAdminOrderService
         OrderStatusMachine.Transition(order, newStatus);
 
         double? processingSeconds = null;
+        var savedWithInvoice = false;
+        PaidSaveOutcome? paidOutcome = null;
 
         if (newStatus == OrderStatus.Shipped)
         {
@@ -141,9 +148,19 @@ public class AdminOrderService : IAdminOrderService
             // Offline / manual reconciliation — PaidAt is what the AWB retry sweep
             // keys off, so it must be stamped like the webhook Paid path does.
             order.PaidAt = DateTimeOffset.UtcNow;
+            paidOutcome = await SaveWithInvoiceAsync(order, ct);
+            savedWithInvoice = true;
+            if (paidOutcome == PaidSaveOutcome.Created)
+                await LogManualInvoiceIssueAsync(order, adminUserId, ct);
         }
 
-        await _db.SaveChangesAsync(ct);
+        if (!savedWithInvoice)
+            await _db.SaveChangesAsync(ct);
+
+        // The order is still awaiting payment, so a 200 carrying a Paid-looking DTO would tell the admin the opposite of what happened.
+        if (paidOutcome == PaidSaveOutcome.NumberExhausted)
+            throw new ConflictException(
+                $"Comanda {order.OrderNumber} nu a fost marcată ca plătită: nu s-a putut aloca un număr de factură. Comanda a rămas neschimbată — reîncearcă după verificarea seriei de facturare.");
 
         // Cumulative histogram: a shipment that never committed can never be un-observed.
         if (processingSeconds is { } seconds)
@@ -153,8 +170,9 @@ public class AdminOrderService : IAdminOrderService
             _orderEmailService.FireOrderShippedEmail(order);
         else if (newStatus == OrderStatus.Delivered)
             _orderEmailService.FireOrderDeliveredEmail(order);
-        else if (newStatus == OrderStatus.Paid)
+        else if (newStatus == OrderStatus.Paid && paidOutcome is null or PaidSaveOutcome.Created)
         {
+            // Gated positively: a delivery that invoiced this order already sent both, and a second confirmation email cannot be unsent.
             _orderEmailService.FireOrderConfirmedEmail(order);
             await _awbNotifier.NotifyPaidAsync(order.Id, ct);
         }
@@ -261,19 +279,12 @@ public class AdminOrderService : IAdminOrderService
 
         try
         {
-            if (order.PaymentProcessor == Models.PaymentProcessor.Stripe &&
-                !string.IsNullOrEmpty(order.PaymentIntentId))
+            if (!string.IsNullOrEmpty(order.PaymentIntentId))
             {
                 var refundSvc = new RefundService(_stripeClient);
                 await refundSvc.CreateAsync(
                     new RefundCreateOptions { PaymentIntent = order.PaymentIntentId },
                     cancellationToken: ct);
-            }
-            else if (order.PaymentProcessor == Models.PaymentProcessor.EuPlatesc &&
-                     !string.IsNullOrEmpty(order.EuPlatescTransactionId))
-            {
-                await _euPlatescService.RefundAsync(
-                    order.EuPlatescTransactionId, order.TotalRon, ct);
             }
         }
         catch (Exception ex)
@@ -390,9 +401,7 @@ public class AdminOrderService : IAdminOrderService
             order.EasyboxLocker?.Name,
             order.EasyboxLocker?.Address,
             shippingAddress,
-            order.PaymentProcessor.ToString(),
             order.PaymentIntentId,
-            order.EuPlatescTransactionId,
             order.AwbNumber,
             order.TrackingUrl,
             order.AwbLabelUrl,
@@ -400,5 +409,101 @@ public class AdminOrderService : IAdminOrderService
             order.DeliveredAt,
             order.InternalNotes,
             items);
+    }
+
+    // Only Created may run the caller's Paid side effects; the webhook's own enum is private and pinned by a test that reflects on it.
+    // Outside the payment processors this is the only line that can answer who issued a fiscal number.
+    private async Task LogManualInvoiceIssueAsync(Order order, Guid? adminUserId, CancellationToken ct)
+    {
+        var invoiceNumber = await _db.Invoices
+            .Where(i => i.OrderId == order.Id)
+            .Select(i => i.InvoiceNumber)
+            .FirstOrDefaultAsync(ct);
+
+        _logger.LogInformation(
+            "admin.order.mark-paid admin_user_id={AdminUserId} order_id={OrderId} order_number={OrderNumber} invoice_number={InvoiceNumber} total_ron={TotalRon}",
+            adminUserId, order.Id, order.OrderNumber, invoiceNumber, order.TotalRon);
+    }
+
+    private enum PaidSaveOutcome { Created, AlreadyInvoiced, NumberExhausted }
+
+    // Mirrors the webhook Paid path: a concurrent delivery or taken number must not 500 an admin status change.
+    private async Task<PaidSaveOutcome> SaveWithInvoiceAsync(Order order, CancellationToken ct)
+    {
+        const int maxNumberRetries = 3;
+        for (var attempt = 0; ; attempt++)
+        {
+            var invoice = await _invoiceCreator.CreateForOrderAsync(order, ct);
+
+            // The creation service's existence query returns a winner's committed row as an unchanged entity, so this window throws nothing to catch.
+            if (invoice is not null && _db.Entry(invoice).State == EntityState.Unchanged)
+                return await AbandonToWinnerAsync(order, "pre-insert", ct);
+
+            try
+            {
+                await _db.SaveChangesAsync(ct);
+                return PaidSaveOutcome.Created;
+            }
+            catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsOrderIdViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                return await AbandonToWinnerAsync(order, "unique-index", ct);
+            }
+            catch (DbUpdateException ex) when (attempt < maxNumberRetries && InvoiceUniqueViolation.IsNumberViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                _logger.LogWarning(
+                    "admin.order.invoice-number-collision-retry order_id={OrderId} attempt={Attempt}",
+                    order.Id, attempt);
+                await _invoiceCreator.ReconcileNumberingAsync(order, ct);
+            }
+            catch (DbUpdateException ex) when (InvoiceUniqueViolation.IsNumberViolation(ex))
+            {
+                if (invoice is not null) _db.Entry(invoice).State = EntityState.Detached;
+                // Logged before the rollback discards them: on an offline reconciliation these are the only handles on the payment being recorded.
+                _logger.LogError(ex,
+                    "admin.order.invoice-number-collision-exhausted order_id={OrderId} order_number={OrderNumber} total_ron={TotalRon} payment_intent_id={PaymentIntentId} — order not marked Paid, manual reconciliation required",
+                    order.Id, order.OrderNumber, order.TotalRon, order.PaymentIntentId);
+                // A conflict is a 4xx and the request pipeline captures only 5xx, so nothing downstream would page anyone.
+                _sentry?.CaptureException(ex);
+
+                await RollBackTransitionAsync(order, ct);
+                return PaidSaveOutcome.NumberExhausted;
+            }
+        }
+    }
+
+    // A reload, not a second save: saving here would commit the admin's own PaidAt over the one the winner's invoice was issued against.
+    private async Task<PaidSaveOutcome> AbandonToWinnerAsync(Order order, string window, CancellationToken ct)
+    {
+        _logger.LogInformation(
+            "admin.order.invoice-already-created order_id={OrderId} window={Window}", order.Id, window);
+
+        // Swallowed like the rollback's: a lost race is a benign outcome, and a failing reload here would turn it into a 500 plus a Sentry capture for an order that is Paid.
+        try
+        {
+            await _db.Entry(order).ReloadAsync(ct);
+        }
+        catch (Exception reloadEx)
+        {
+            _logger.LogWarning(reloadEx,
+                "admin.order.abandon-reload-failed order_id={OrderId}", order.Id);
+        }
+
+        return PaidSaveOutcome.AlreadyInvoiced;
+    }
+
+    private async Task RollBackTransitionAsync(Order order, CancellationToken ct)
+    {
+        // Reload rather than unwind field by field, and swallow a failure: the caller answers a conflict either way, and a throw here would turn it into an unexplained 500.
+        try
+        {
+            await _db.Entry(order).ReloadAsync(ct);
+        }
+        catch (Exception reloadEx)
+        {
+            _logger.LogWarning(reloadEx,
+                "admin.order.rollback-reload-failed order_id={OrderId}", order.Id);
+        }
     }
 }

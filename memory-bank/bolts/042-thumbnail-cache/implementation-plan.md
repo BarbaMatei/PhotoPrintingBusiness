@@ -25,7 +25,7 @@ to track it; and harden ImageSharp against decompression-bomb (pixel-bomb) image
 - **Caching belongs in `UploadService.GetPreviewAsync`** (the service), not the controller — that's where preview generation + ownership checks already live. The controller stays thin.
 - The controller (`UploadsController.GetPreviewAsync`) already sets an **ETag + 304** path; I'll add `Cache-Control: public, max-age=2592000, immutable` there.
 - **ImageSharp 3.1.11**: `Configuration.Default.MaxImageWidth/MaxImageHeight` (per story 003) **likely does not exist** in this version. Primary approach: a dimension guard in `ImageProcessor` using the already-present `Image.IdentifyAsync` (header-only, cheap) *before* `Image.LoadAsync`, throwing on oversize. If a built-in cap does exist in 3.1.11, prefer it; confirm at implement.
-- **Migration provider**: generate/author the migration for **Npgsql** (don't repeat bolt-035's SQLite-typed migration). SQLite dev gets the column automatically via `EnsureCreated()` from the model.
+- **Migration provider**: generate/author the migration under the **Npgsql** design-time provider so the store types match the model.
 
 ### Dependencies
 

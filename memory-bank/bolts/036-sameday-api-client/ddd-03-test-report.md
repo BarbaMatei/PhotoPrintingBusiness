@@ -94,7 +94,7 @@ Mapped against the three stories in unit `001-sameday-api-client`.
   `Models/Order.cs`.
 - ✅ EF model builder configures column types + max lengths —
   `Data/PhotoPrintDbContext.cs:294-296` (`HasMaxLength(500).IsRequired(false)`).
-- ✅ Migration applies cleanly on Postgres and SQLite (SQLite uses
+- ✅ Migration applies cleanly on Postgres and PostgreSQL (PostgreSQL uses
   `EnsureCreated` from the model) —
   `OrderSamedayFieldsTests` round-trips both columns on the same in-memory
   provider used elsewhere in the suite; the design-time build of the

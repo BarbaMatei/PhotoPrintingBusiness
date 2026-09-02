@@ -9,9 +9,7 @@ public class Order
     public Guid? GuestSessionId { get; set; }
 
     public OrderStatus Status { get; set; } = OrderStatus.AwaitingPayment;
-    public PaymentProcessor PaymentProcessor { get; set; }
     public string? PaymentIntentId { get; set; }
-    public string? EuPlatescTransactionId { get; set; }
 
     public ShippingAddressSnapshot ShippingAddress { get; set; } = null!;
     public DeliveryType DeliveryType { get; set; }
@@ -20,6 +18,23 @@ public class Order
     public decimal ShippingCostRon { get; set; }
     public decimal SubtotalRon { get; set; }
     public decimal TotalRon { get; set; }
+
+    // ── VAT breakdown (bolt 038) ─────────────────────────────────────────────
+    /// <summary>Net (VAT-exclusive) total in RON. Snapshot at order creation;
+    /// not re-derived from a live config rate. Invariant:
+    /// <c>NetTotalRon + VatRon ≈ TotalRon</c> within ±0.01.</summary>
+    public decimal NetTotalRon { get; set; }
+
+    /// <summary>VAT amount extracted from <see cref="TotalRon"/> at
+    /// <see cref="VatRate"/>. Romanian convention — VAT is included in
+    /// customer-facing prices and extracted, not added on top.</summary>
+    public decimal VatRon { get; set; }
+
+    /// <summary>The VAT rate applied to this order, snapshotted at creation
+    /// (default 0.19 = 19%). Changing <c>Vat:Rate</c> in config later does
+    /// NOT mutate existing orders — the legal trail records the rate at
+    /// time of sale.</summary>
+    public decimal VatRate { get; set; }
 
     public string? AwbNumber { get; set; }
     public string? TrackingUrl { get; set; }
@@ -57,11 +72,6 @@ public class Order
     /// <summary>Cached Stripe ClientSecret so an idempotent replay returns the exact
     /// same secret without a second Stripe round-trip.</summary>
     public string? StripeClientSecret { get; set; }
-
-    /// <summary>Cached EuPlatesc redirect URL. Persisted on first initiate because
-    /// the URL embeds a timestamp + nonce and is therefore NOT reproducible on a
-    /// later call; replay returns this stored value verbatim.</summary>
-    public string? EuPlatescRedirectUrl { get; set; }
 
     /// <summary>Captured at order creation for guest orders (no User nav property).</summary>
     public string? GuestEmail { get; set; }

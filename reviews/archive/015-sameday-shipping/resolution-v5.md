@@ -36,7 +36,7 @@ closed: 2026-07-29
 | PPW-313 | fixed | `c611a23` | The prefill reads the guest session through the shared accessor instead of an inline local-storage parse. |
 | PPW-314 | fixed | `56320c0` | One status-check chokepoint in the client, sharing the policy helper's classification, so the four ladders cannot drift. |
 | PPW-315 | fixed | `16d065b` | A two-order tick test exercises the parallel per-order scope fan-out. |
-| PPW-316 | fixed | `aa995c1` | The retry-sweep tests moved to SQLite, with fresh-claim skip and stale-claim re-drive cases added. |
+| PPW-316 | fixed | `aa995c1` | The retry-sweep tests moved to PostgreSQL, with fresh-claim skip and stale-claim re-drive cases added. |
 | PPW-317 | fixed | `c611a23` | Tests: selecting a locker preserves the Easybox contact, and the review step renders no address line for an Easybox order. |
 | PPW-318 | fixed | `c611a23` | The token service adds a name claim and the auth service populates the current-user stream from it on login and on session restore, so the signed-in prefill is live rather than dead code. |
 | PPW-319 | fixed | `c611a23` | A transient locker-search error sets a distinct error signal, reset per fetch, with a retry, instead of showing "no easybox here". Test covers error then recovery. Approach-checked. |

@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-03T02:00:00Z
-total_decisions: 18
+last_updated: 2026-06-03T12:30:00Z
+total_decisions: 24
 ---
 
 # Decision Index
@@ -17,6 +17,54 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-024: Implicit Attempt Count from `(now - CreatedAt)`, No Persisted `RejectionCount` Column
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 039-efactura-anaf (efactura-generation-and-anaf)
+- **Path**: `bolts/039-efactura-anaf/adr-024-implicit-attempt-count-from-updatedat-no-persisted-counter.md`
+- **Summary**: `InvoiceUploadJob` enforces the `1h/4h/16h/64h then Failed` retry budget by comparing `(now - Invoice.CreatedAt)` against the cumulative backoff sum (85h default). No `Invoice.RejectionCount` column is persisted. Trade-off: clock skew at the 85h boundary can shift the give-up decision by seconds (CAS resolves the race; same-minute either-way outcome is noise), and admin retry doesn't extend the budget. Wins: no migration in bolt 039; clean state machine (5 statuses, no counter shadow); behaviour fully derivable from the persisted row. If the column is ever needed for ops queries or budget-extension semantics, the addition must engage with this ADR's trade-off rather than silently "fix" what looks like missing state.
+- **Read when**: working on `InvoiceUploadJob.PollSubmitted` or the backoff schedule logic; reviewing PRs that add a counter column to `Invoices`; reviewing PRs that change `Anaf:BackoffHours`; debugging "why did this invoice escalate to Failed at hour 86"; designing admin-retry behaviour for similar lifecycle workers; reasoning about the regulated 5-business-day SLA vs the worker's give-up boundary.
+
+### ADR-023: `InvoiceUploadJob` Uses DB Polling, Not In-Process `Channel<T>`
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 039-efactura-anaf (efactura-generation-and-anaf)
+- **Path**: `bolts/039-efactura-anaf/adr-023-worker-dispatch-db-polling-not-in-process-channel.md`
+- **Summary**: The ANAF invoice-upload worker uses a `PeriodicTimer`-driven DB poll every 30 minutes, NOT an in-process `Channel<T>`. Explicitly diverges from ADR-010 (which chose `Channel<T>` for the photo-promotion worker). ADR-010's load-bearing reasons — sub-second reaction latency, polling-table DB load, simpler code — all flip for the ANAF worker: the 5-business-day SLA tolerates 30-min cadence (240× headroom); the `Invoices` table is cold; polling is the *simpler* shape because it removes producer-side coupling (Stripe webhook, admin retry, future replay tools all just write to DB without notifying anyone). Admin retry becomes one UPDATE; multi-replica safety comes from ADR-015 + ADR-016 (CAS); ANAF outages absorb naturally as DB backlog. Future bolt 046 (Redis) may revisit with leader election.
+- **Read when**: working on `InvoiceUploadJob`; reviewing PRs that add invoice-creation paths (need to remember: just write to DB, no notification needed); reviewing PRs that touch dispatch cadence; debugging "why didn't my admin retry kick off immediately"; planning multi-replica scaling (bolt 046); designing the next BackgroundService and choosing between polling and `Channel<T>` (the SLA distinction is the rule).
+
+### ADR-022: Dual-Write Rollout for Regulated Integrations via Feature Flag, Not Branch Deploy
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 039-efactura-anaf (efactura-generation-and-anaf)
+- **Path**: `bolts/039-efactura-anaf/adr-022-dual-write-rollout-via-feature-flag.md`
+- **Summary**: Regulated integrations (e-Factura today; credit notes, e-receipts later) are rolled out via a config feature flag that suppresses the customer-facing side effect while the full pipeline runs. For bolt 039 the pattern is only half-built: `Invoicing:CustomerEmailAttachments:Enabled` (default `false`) gates nothing customer-visible yet, because no email send path exists — and the XML build, ANAF upload, PDF render and storage write it describes are themselves gated by `Anaf:Enabled`, not unconditional. Flipped to `true` after a one-week inspection window. Wins over branch-deploy approach: reversibility (config-only rollback), production code path identical to inspection week, clean audit trail. Pattern is intended to recur for the next regulated integration. The flag is one if-statement of permanent code surface; deletion after permanent rollout is a tracked cleanup.
+- **Read when**: planning a rollout of any new regulated integration (credit notes, e-receipts, anything ANAF-adjacent); reviewing PRs that add a new "off by default" feature flag; reviewing PRs that read `Invoicing:CustomerEmailAttachments`; flipping the flag in production (use this ADR to recall what side effect is gated and what's NOT gated); cleaning up unused feature flags after a permanent rollout.
+
+### ADR-021: PDF Library — QuestPDF, Not PuppeteerSharp
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 039-efactura-anaf (efactura-generation-and-anaf)
+- **Path**: `bolts/039-efactura-anaf/adr-021-pdf-library-questpdf-not-puppeteersharp.md`
+- **Summary**: `InvoicePdfRenderer` uses QuestPDF (pure-managed C# DSL, ~15MB DLL, sub-100ms cold render, Community License free under $1M revenue). PuppeteerSharp is explicitly forbidden in this codebase without a superseding ADR. The decision is operational-cost-driven: PuppeteerSharp adds ~200MB Chromium to the prod image, cold-start latency, version-drift exposure, and per-host browser cache management. QuestPDF's downsides — DSL learning curve, future ~$100/year commercial-license fee above $1M revenue — are bounded and well-known. The PDF document tree lives as C# in `Services/Invoicing/InvoicePdfDocument.cs`; no Razor `.cshtml` intermediate. Community License declared at process startup in `Program.cs`.
+- **Read when**: working on `InvoicePdfRenderer` or `InvoicePdfDocument`; reviewing PRs that touch the PDF rendering path; reviewing PRs that add a new PDF use case (refund receipt, customer statement); evaluating PDF library alternatives; reviewing the DEPLOYMENT.md License Obligations section; debugging "this PDF looks different on prod than dev" (font drift); planning a Chromium-based feature (HTML email previews) that might tempt a PuppeteerSharp adoption.
+
+### ADR-020: Postgres `SEQUENCE` for Invoice Numbering — Accept Gap-on-Rollback
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 038-vat-calculation (vat-calculation)
+- **Path**: `bolts/038-vat-calculation/adr-020-postgres-sequence-for-invoice-numbering-accept-gap-on-rollback.md`
+- **Summary**: Invoice numbering uses Postgres `SEQUENCE` per `(series, year)` partition with `CREATE SEQUENCE IF NOT EXISTS` + `nextval()`. Atomic, concurrent, idiomatic — but gaps on transaction rollback by Postgres design. The counter-table alternative (`FOR UPDATE` + increment + INSERT in one transaction) was considered and rejected: it eliminates gaps at the cost of row-level lock contention on the Paid path. Rollback is extraordinarily rare in our flow (single SaveChanges, no external I/O inside the transaction); mitigation is a quarterly audit query that surfaces any gap for the accountant. Composite unique index `(Series, year, Number)` is the last-line-of-defence against the database-restore-error case.
+- **Read when**: working on `IInvoiceNumberingService` or `Invoice` insertion; reviewing PRs that touch the Paid transition's transactional scope; designing the bolt-039 worker that creates invoices; tempted to "harden" the numbering by switching to a counter table (don't, without re-engaging with this ADR's trade-off); debugging "why is there a gap between `FT-2026-00042` and `FT-2026-00044`?"; auditing invoices for a fiscal period; planning Redis-backed alternatives at scale.
+
+### ADR-019: `MidpointRounding.AwayFromZero` for Legal / Regulatory Decimal Math
+- **Status**: accepted
+- **Date**: 2026-06-03
+- **Bolt**: 038-vat-calculation (vat-calculation)
+- **Path**: `bolts/038-vat-calculation/adr-019-decimal-rounding-away-from-zero-for-regulatory-math.md`
+- **Summary**: All decimal rounding in legal / regulatory code paths uses `MidpointRounding.AwayFromZero`. The default `decimal.Round(x, 2)` overload (no mode argument) is FORBIDDEN in any path that produces a value written to an invoice, submitted to ANAF, or reported to a customer as a tax amount. The default uses banker's rounding (`ToEven`) which disagrees with Romanian accountancy convention + ANAF tooling; small per-row, accumulates across many invoices, audit-time finding. `VatCalculator.ExtractBreakdown` is the canonical reference; future tax-adjacent classes follow it. Unit test pins the contract against the .NET default.
+- **Read when**: writing any code that rounds a `decimal` to a fixed number of decimal places in a financial / regulatory context; reviewing PRs that touch VAT, totals, discounts, refunds, or any value written to an invoice or report; debugging "why does my invoice's `VatRon` disagree with ANAF's recomputation?"; tempted to "simplify" a `decimal.Round(x, 2, MidpointRounding.AwayFromZero)` call by dropping the mode argument (don't — it's load-bearing); designing similar rounding rules for other regulatory domains.
 
 ### ADR-018: `/metrics` Uses IP Allow-List, Not JWT
 - **Status**: accepted

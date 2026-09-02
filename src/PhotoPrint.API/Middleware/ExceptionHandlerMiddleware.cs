@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Extensions;
 
@@ -13,6 +14,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(ConflictException)]             = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(IdempotencyConflictException)]  = (StatusCodes.Status409Conflict, "Idempotency conflict"),
         [typeof(IdempotencyKeyTakenException)]  = (StatusCodes.Status409Conflict, "Conflict"),
+        [typeof(IdempotencyKeyConsumedException)] = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(ForbiddenException)]            = (StatusCodes.Status403Forbidden, "Forbidden"),
         [typeof(UnauthorizedException)]         = (StatusCodes.Status401Unauthorized, "Unauthorized"),
         [typeof(BadGatewayException)]           = (StatusCodes.Status502BadGateway, "Bad Gateway"),
@@ -72,6 +74,21 @@ public class ExceptionHandlerMiddleware : IMiddleware
     {
         var correlationId = context.GetCorrelationId() ?? Guid.NewGuid().ToString();
 
+        // Kestrel rejects an oversize or malformed request with this and names the status it wants; unmapped it would be a 500 plus a Sentry capture, so anyone could turn a rejected body into an error-budget burn. A 5xx it asks for still falls through, so nothing skips the capture invariant below.
+        if (exception is BadHttpRequestException badRequest
+            && badRequest.StatusCode < StatusCodes.Status500InternalServerError)
+        {
+            _logger.LogWarning(
+                "request.rejected status={Status} reason={Reason} path={Path} correlation_id={CorrelationId}",
+                badRequest.StatusCode, badRequest.Message, context.Request.Path, correlationId);
+
+            var reason = ReasonPhrases.GetReasonPhrase(badRequest.StatusCode);
+            await WriteProblemDetailsAsync(context, badRequest.StatusCode,
+                string.IsNullOrEmpty(reason) ? "Bad Request" : reason,
+                badRequest.Message, correlationId, exception);
+            return;
+        }
+
         if (_exceptionMappings.TryGetValue(exception.GetType(), out var mapping))
         {
             // A mapped status is not the same as an expected outcome: a mapped 5xx is a
@@ -112,6 +129,11 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 _logger.LogWarning(
                     "payments.idempotency.cross-tenant-conflict correlation_id={CorrelationId}",
                     correlationId);
+
+            if (exception is IdempotencyKeyConsumedException consumed)
+                _logger.LogWarning(
+                    "payments.idempotency.key-consumed correlation_id={CorrelationId} order_id={OrderId}",
+                    correlationId, consumed.OrderId);
 
             // A rejected decompression bomb 422s like an ordinary
             // "unreadable image" 422, so ops can't alert on a bomb spike. Emit a distinct
@@ -184,6 +206,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         // so a FE built against the dev API never saw the contract field. Field NAMES only,
         // never values (no PII).
         var divergentFields = (exception as IdempotencyConflictException)?.DivergentFields;
+        var consumedOrderId = (exception as IdempotencyKeyConsumedException)?.OrderId;
 
         object response;
 
@@ -201,6 +224,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 detail,
                 correlationId,
                 divergentFields,
+                orderId = consumedOrderId,
                 exception = new
                 {
                     type = exception.GetType().FullName,
@@ -222,6 +246,9 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
             if (divergentFields is not null)
                 problem.Extensions["divergentFields"] = divergentFields;
+
+            if (consumedOrderId is not null)
+                problem.Extensions["orderId"] = consumedOrderId.ToString();
 
             response = problem;
         }

@@ -11,10 +11,22 @@ hits=$(git diff --cached -U0 --diff-filter=ACMR -- '*.cs' '*.ts' | awk '
   }
 ')
 
+# Every gate override leaves a machine-readable trace: an unattended run reading one
+# newer than its own start stops (autonomy-policy.mjs, audit R2).
+log_override() {
+  mkdir -p reviews/state
+  printf '{"t":"%s","var":"%s","files":"%s"}\n' "$(date -Is)" "$1" \
+    "$(printf '%s' "$2" | tr '\n' ' ' | sed 's/"/\\"/g')" >> reviews/state/overrides.jsonl
+}
+
 # Doc-gate backstop: staged review artifacts of contracts-era targets must pass the
 # structure lint. Targets without detail blocks in the ledger are exempt.
+if [ -n "$DOCGATE_OK" ]; then
+  staged=$(git diff --cached --name-only -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' reviews/state/backlog.md reviews/state/index.md)
+  [ -n "$staged" ] && log_override DOCGATE_OK "$staged"
+fi
 if [ -z "$DOCGATE_OK" ]; then
-  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' | sed 's|/[^/]*$||' | sort -u)
+  dirs=$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/*/review-v*.md' 'reviews/*/resolution-v*.md' 'reviews/*/summary-v*.md' 'reviews/*/ledger.md' ':!reviews/lib/**' ':!reviews/archive/**' | sed 's|/[^/]*$||' | sort -u)
   for d in $dirs; do
     [ -f "$d/ledger.md" ] || continue
     grep -q "^### PPW-" "$d/ledger.md" || continue
@@ -50,7 +62,27 @@ if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')"
   fi
 fi
 
-if [ -n "$COMMENTS_OK" ] || [ -z "$hits" ]; then exit 0; fi
+# Tables inside <!-- generated:... --> markers are rendered from the code, so a hand edit there is
+# drift. The full check — drift plus the link scan — runs here: reviews/ carries no broken link,
+# and the whole run costs ~0.4s on this machine.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- reviews/README.md 'reviews/rules/*.md' 'reviews/runbooks/*.md' .claude/skills/loop-driver/SKILL.md .claude/skills/fix-review/SKILL.md)" ]; then
+  if ! node reviews/lib/cli/docs-sync.mjs --check >&2; then
+    echo "" >&2
+    echo "Either a generated block no longer matches the code that renders it — edit the data behind" >&2
+    echo "it (reviews/lib/drive/rows.mjs, reviews/lib/drive/gates.mjs, reviews/lib/records/schema.mjs," >&2
+    echo "reviews/lib/records/validate.mjs), then run:" >&2
+    echo "  node reviews/lib/cli/docs-sync.mjs --write" >&2
+    echo "— or a markdown link under reviews/ no longer resolves: fix the link the BROKEN line names," >&2
+    echo "or wrap it in backticks if it is a template rather than a link." >&2
+    exit 1
+  fi
+fi
+
+if [ -z "$hits" ]; then exit 0; fi
+if [ -n "$COMMENTS_OK" ]; then
+  log_override COMMENTS_OK "$(printf '%s\n' "$hits" | cut -d: -f1 | sort -u)"
+  exit 0
+fi
 
 n=$(printf '%s\n' "$hits" | wc -l | tr -d ' ')
 {

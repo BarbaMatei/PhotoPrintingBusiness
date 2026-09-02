@@ -14,28 +14,57 @@ namespace PhotoPrint.API.Services;
 public class OrderService : IOrderService
 {
     private readonly PhotoPrintDbContext _db;
+    private readonly IStripePaymentGateway? _paymentGateway;
+    private readonly ILogger<OrderService>? _logger;
     private readonly IOrderNumberService _orderNumberService;
     private readonly IShippingService _shipping;
     private readonly IStorageRouter _storageRouter;
     private readonly StorageSettings _storageSettings;
+    private readonly VatSettings _vatSettings;
 
     public OrderService(
         PhotoPrintDbContext db,
         IOrderNumberService orderNumberService,
         IShippingService shipping,
         IStorageRouter storageRouter,
-        IOptions<StorageSettings> storageSettings)
+        IOptions<StorageSettings> storageSettings,
+        IOptions<VatSettings> vatSettings,
+        IStripePaymentGateway? paymentGateway = null,
+        ILogger<OrderService>? logger = null)
     {
         _db = db;
         _orderNumberService = orderNumberService;
         _shipping = shipping;
         _storageRouter = storageRouter;
         _storageSettings = storageSettings.Value;
+        _vatSettings = vatSettings.Value;
+        _paymentGateway = paymentGateway;
+        _logger = logger;
     }
 
     // ── Idempotency ────────────────────────────────────────────────
 
     private static readonly TimeSpan IdempotencyWindow = TimeSpan.FromHours(24);
+
+    private async Task AbandonPaymentIntentAsync(Order holder, CancellationToken ct)
+    {
+        holder.StripeClientSecret = null;
+        if (_paymentGateway is null || string.IsNullOrEmpty(holder.PaymentIntentId)) return;
+
+        try
+        {
+            var cancelled = await _paymentGateway.CancelPaymentIntentAsync(holder.PaymentIntentId, ct);
+            _logger?.LogInformation(
+                "payments.idempotency.intent-abandoned order_id={OrderId} payment_intent_id={PaymentIntentId} cancelled={Cancelled}",
+                holder.Id, holder.PaymentIntentId, cancelled);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The new order still gets created: a live old intent is a risk, a blocked checkout is certain.
+            _logger?.LogWarning(ex,
+                "payments.idempotency.intent-abandon-failed order_id={OrderId}", holder.Id);
+        }
+    }
 
     // The non-Postgres OrderNumber generator is a racy COUNT, so a
     // concurrent insert can pick a duplicate number. That is transient — regenerate and retry
@@ -51,7 +80,7 @@ public class OrderService : IOrderService
         string? idempotencyKey = null,
         CancellationToken ct = default)
     {
-        // 1. Load cart items with everything needed for price calculation
+        // Load cart items with everything needed for price calculation
         var cartItems = await _db.CartItems
             .Where(ci => userId.HasValue
                 ? ci.UserId == userId
@@ -69,7 +98,7 @@ public class OrderService : IOrderService
         if (cartItems.Count == 0)
             throw new BadRequestException("Coșul este gol.");
 
-        // 2. Build order items with price snapshots
+        // Build order items with price snapshots
         var orderItems = cartItems.Select(ci =>
         {
             var unitPrice = ResolveUnitPrice(ci.Product, ci.Quantity);
@@ -107,9 +136,17 @@ public class OrderService : IOrderService
             var holder = await FindKeyHolderAsync(idempotencyKey, userId, guestSessionId, ct);
             if (holder is not null)
             {
-                // Fresh match for this caller → replay or (on divergence) 409.
-                if (IsFresh(holder))
+                // A settled order must not hand back its client secret; a failed one frees the key.
+                if (IsFresh(holder) && holder.Status == OrderStatus.AwaitingPayment)
                     return ReplayOrConflict(holder, request, total, orderItems);
+
+                if (IsFresh(holder) && holder.Status != OrderStatus.PaymentFailed)
+                    throw new IdempotencyKeyConsumedException(holder.Id);
+
+                // A failed order keeps a confirmable intent, so handing its key to a new order
+                // would leave one basket with two chargeable intents.
+                if (IsFresh(holder) && holder.Status == OrderStatus.PaymentFailed)
+                    await AbandonPaymentIntentAsync(holder, ct);
 
                 // Stale (>24h) row this caller owns still holds the key. Null it on the
                 // in-memory entity WITHOUT an intermediate save, so
@@ -124,7 +161,7 @@ public class OrderService : IOrderService
             }
         }
 
-        // 3. Capture guest email before building the order
+        // Capture guest email before building the order
         string? guestEmail = null;
         if (guestSessionId.HasValue)
         {
@@ -132,7 +169,12 @@ public class OrderService : IOrderService
             guestEmail = gs?.Email;
         }
 
-        // 4. Build and persist the order
+        // Romanian convention: prices are VAT-inclusive, so VAT is extracted from the gross total
+        // (shipping folded in at the same rate as goods), and the rate is snapshotted onto the
+        // order so later config changes never mutate existing rows.
+        var vat = VatCalculator.ExtractBreakdown(total, _vatSettings.Rate);
+
+        // Build and persist the order
         var order = new Order
         {
             OrderNumber = await _orderNumberService.GenerateAsync(ct),
@@ -140,13 +182,15 @@ public class OrderService : IOrderService
             GuestSessionId = guestSessionId,
             GuestEmail = guestEmail,
             Status = OrderStatus.AwaitingPayment,
-            PaymentProcessor = request.PaymentProcessor,
             ShippingAddress = request.ShippingAddress ?? new ShippingAddressSnapshot(),
             DeliveryType = request.DeliveryType,
             EasyboxLockerId = request.EasyboxLockerId,
             ShippingCostRon = shippingCostRon,
             SubtotalRon = subtotal,
             TotalRon = total,
+            NetTotalRon = vat.NetTotalRon,
+            VatRon = vat.VatRon,
+            VatRate = vat.VatRate,
             IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
             Items = orderItems,
         };
@@ -155,19 +199,18 @@ public class OrderService : IOrderService
 
         var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
 
-        // 5. Persist. Two unique indexes can reject the INSERT, each with its own recovery;
+        // Persist. Two unique indexes can reject the INSERT, each with its own recovery;
         // any OTHER DbUpdateException (FK, NOT NULL) matches neither `when` filter and
         // propagates honestly — we never infer the cause from a follow-up AnyAsync probe.
         //
         //  • ix_orders_idempotency_key: a concurrent request with the SAME key won
         //    the race between our resolution above and this save → resolve the winner
         //    (replay / 409) instead of a 500. Terminal — no retry.
-        //  • ix_orders_order_number: the non-Postgres OrderNumber is a
-        //    racy COUNT (OrderNumberService's SQLite branch), so two concurrent inserts can
-        //    pick the SAME number. That is transient and unrelated to idempotency —
-        //    regenerate the number and retry the (still-tracked) order rather than 500.
-        //    Bounded, so a genuine persistent number clash still surfaces. Postgres uses a
-        //    per-year sequence, so this branch is effectively SQLite/dev-only.
+        //  • ix_orders_order_number: on InMemory the OrderNumber comes from a racy COUNT,
+        //    so two concurrent inserts can pick the SAME number. That is transient and
+        //    unrelated to idempotency — regenerate the number and retry the (still-tracked)
+        //    order rather than 500. Bounded, so a genuine persistent clash still surfaces.
+        //    Postgres uses a per-year sequence and cannot hit this.
         for (var attempt = 0; ; attempt++)
         {
             try
@@ -177,16 +220,10 @@ public class OrderService : IOrderService
                 // Observability: orders_created_total{processor,status}.
                 // Status is "created" — the order is in AwaitingPayment; the Paid
                 // transition is observed via payment_webhook_total at the webhook handlers.
-                var processorLabel = order.PaymentProcessor switch
-                {
-                    PaymentProcessor.Stripe    => MetricNames.ProcessorValues.Stripe,
-                    PaymentProcessor.EuPlatesc => MetricNames.ProcessorValues.EuPlatesc,
-                    _                          => "unknown",
-                };
                 FotoMetrics.OrdersCreated.Add(1,
                     new TagList
                     {
-                        { MetricNames.Labels.Processor, processorLabel },
+                        { MetricNames.Labels.Processor, MetricNames.ProcessorValues.Stripe },
                         { MetricNames.Labels.Status,    MetricNames.OrderStatusValues.Created },
                     });
 
@@ -200,10 +237,15 @@ public class OrderService : IOrderService
                 var candidateItems = order.Items.ToList();
                 DetachFailedInsert(order);
 
-                // Same caller won the race → replay it (or 409 if the request diverged).
                 var winner = await FindKeyHolderAsync(idempotencyKey!, userId, guestSessionId, ct);
                 if (winner is not null && IsFresh(winner))
-                    return ReplayOrConflict(winner, request, total, candidateItems);
+                {
+                    if (winner.Status == OrderStatus.AwaitingPayment)
+                        return ReplayOrConflict(winner, request, total, candidateItems);
+
+                    if (winner.Status != OrderStatus.PaymentFailed)
+                        throw new IdempotencyKeyConsumedException(winner.Id);
+                }
 
                 // The constraint error already proves the key is taken, but this caller owns
                 // no (fresh) row for it → it is held by a *different* caller (global unique
@@ -229,21 +271,12 @@ public class OrderService : IOrderService
     /// handle ONLY a real key collision and rethrow everything else, instead of inferring the
     /// cause from a follow-up query.
     ///
-    /// Hardened both arms against silent regressions:
-    /// <list type="bullet">
-    /// <item>Postgres matches <see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/> (the
-    /// same constant the index is named with) so a rename is a compile break, not a fall-through.</item>
-    /// <item>SQLite has no structured constraint name, so it keys off the <b>extended</b> result
-    /// code <c>SQLITE_CONSTRAINT_UNIQUE</c> (2067 — narrower than the generic <c>SQLITE_CONSTRAINT</c>
-    /// 19) plus the column name via <c>nameof</c>, so a column rename also breaks at compile time.</item>
-    /// </list>
+    /// Matching <see cref="PhotoPrintDbContext.IdempotencyKeyIndexName"/> — the same constant the
+    /// index is named with — makes a rename a compile break rather than a silent fall-through.
     /// </summary>
     private static bool IsIdempotencyKeyViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
-            Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
-                sqlite.Message.Contains(nameof(Order.IdempotencyKey), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.IdempotencyKeyIndexName,
@@ -253,7 +286,7 @@ public class OrderService : IOrderService
     /// <summary>
     /// True iff <paramref name="ex"/> is the database rejecting the INSERT because of the
     /// OrderNumber unique index (<see cref="PhotoPrintDbContext.OrderNumberIndexName"/>).
-    /// Only the non-Postgres COUNT-based generator can produce a duplicate number under
+    /// Only the InMemory COUNT-based generator can produce a duplicate number under
     /// concurrency, and that is transient — the caller regenerates
     /// and retries. Same provider-error inspection (and same compile-break coupling) as
     /// <see cref="IsIdempotencyKeyViolation"/>.
@@ -261,9 +294,6 @@ public class OrderService : IOrderService
     private static bool IsOrderNumberViolation(DbUpdateException ex)
         => ex.InnerException switch
         {
-            Microsoft.Data.Sqlite.SqliteException sqlite =>
-                sqlite.SqliteExtendedErrorCode == 2067 /* SQLITE_CONSTRAINT_UNIQUE */ &&
-                sqlite.Message.Contains(nameof(Order.OrderNumber), StringComparison.OrdinalIgnoreCase),
             Npgsql.PostgresException pg =>
                 pg.SqlState == "23505" /* unique_violation */ &&
                 pg.ConstraintName == PhotoPrintDbContext.OrderNumberIndexName,
@@ -348,7 +378,6 @@ public class OrderService : IOrderService
         IReadOnlyList<OrderItem> candidateItems)
     {
         var fields = new List<string>();
-        if (existing.PaymentProcessor != request.PaymentProcessor) fields.Add("paymentProcessor");
         if (existing.DeliveryType != request.DeliveryType) fields.Add("deliveryType");
         if (existing.EasyboxLockerId != request.EasyboxLockerId) fields.Add("easyboxLockerId");
         if (existing.TotalRon != candidateTotal) fields.Add("totalRon");
@@ -457,12 +486,14 @@ public class OrderService : IOrderService
             order.OrderNumber,
             order.Status.ToString(),
             order.SubtotalRon,
+            order.NetTotalRon,
+            order.VatRon,
+            order.VatRate,
             order.ShippingCostRon,
             order.TotalRon,
             order.CreatedAt,
             order.PaidAt,
             order.DeliveryType.ToString(),
-            order.PaymentProcessor.ToString(),
             order.EasyboxLockerId,
             order.EasyboxLocker?.Name,
             order.EasyboxLocker?.Address,

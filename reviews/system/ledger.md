@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: system
-updated: 2026-08-12
+updated: 2026-08-27
 ---
 
 # Ledger — the review system (meta-target)
@@ -10,7 +10,9 @@ Status registry for `SF<n>` ids — the system target's own sequence, outside `P
 (doc-contracts scope note). Detail lives in the pass folders: v1 findings in
 [review-v1](review-v1/review-v1.md) + [resolution-v1](review-v1/resolution-v1.md), v2 in
 [review-v2](review-v2/review-v2.md) + [resolution-v2](review-v2/resolution-v2.md).
-History goes on the row's History cell, newest first, `;`-separated.
+History goes on the row's History cell, newest first, `;`-separated. Rows first seen
+`audit` come from the accepted fix-round audit of 2026-08-27 (owner-accepted, no pass
+folder — the audit examined the 038-039 v12/v15 rounds).
 
 ## Findings
 
@@ -52,3 +54,14 @@ History goes on the row's History cell, newest first, `;`-separated.
 | SF34 | ⚪ | v2 | Index pass rows ragged; gate silent on cell count | verified | v3: verified (revert-and-rerun on the bad-state 6-cell row; contract states 5-or-7); v2: fixed `1528576` (5-or-7 rule + gate check) |
 | SF35 | ⚪ | v2 | Stale prose inside the machinery (comments, runbook dates) | verified | v3: verified (30-min comment, Sonnet judge header, 2026-08-12 runbook dates, weak-spots bullets read); v2: fixed `152de93` + `ff3e64f` |
 | SF36 | ⚪ | v3 | fix-links.mjs has no automated test — SF26's rewrite logic is verifiable only by hand | open | v3: named at verification of SF26 (fix-generated surface without a fixture) |
+| SF37 | 🟠 | v4 | verify-fixes guards a dirty tree at startup but its `reset --hard` destroys any edit made while it runs | open | v4: hit during the 038-039 v13 verification — an index.md edit written mid-run vanished at the next restore point. The pre-flight check reads the tree once; nothing re-checks or warns, and the run holds the tree for the better part of an hour |
+| SF38 | 🟡 | v4 | verify-fixes buffers every verdict until exit, so a long run is indistinguishable from a hung one | open | v4: `for (const r of results) console.log(...)` runs after the loop, so a 21-row run wrote nothing for 40+ minutes. A per-row emit would cost nothing and make the run observable |
+| SF39 | 🟡 | v4 | A red leg that fails to build counts as red, so a fix touching a file later changed elsewhere verifies for the wrong reason | fixed | 2026-08-27: fixed `0b2cb00` (audit R6) — a red leg counts only when the runner output names a failing test (recorded in `red_evidence`); a compile error or an unattributable non-zero exit is the new verdict `revert-broke-build`; fixture-pinned; v4: reverting one file of a commit whose neighbours moved on can break compilation; the runner reads any non-zero exit as the test reddening. The tool already warns when HEAD is past `fixed_commit`, but the warning does not distinguish a build failure from a failing assertion |
+| SF40 | 🟡 | v4 | discovery-review silently ignores an unknown arg key, so a `*Path` typo costs a whole pass its decided-findings list | open | v4: hit launching the 038-039 delta — `decidedFindingsPath` and `changedFilesPath` bound nothing, and the run would have re-reported 97 already-decided rows as new. The script already aborts when no diff binds; the same guard should reject arg keys it does not read |
+| SF41 | 🟠 | audit | No stage owns the composed state of a fix round — per-finding fixes, each verified alone, composed into a double charge | fixed | 2026-08-27: fixed `6a76ad9` + `15759f8` + `e7951d2` (audit R1) — protocol-first clusters: a quantified protocol block precedes the cluster's code (`protocol-written`, order-checked by the auditor), the approach-check critiques the spec instead of the patches, and the cluster carries one invariant test over the composed flows |
+| SF42 | 🟠 | audit | The trigger-list rule is enforced by the judgment of the agent it constrains — one round wrote "not needed" six times and nothing refused | fixed | 2026-08-27: fixed `15759f8` + `e7951d2` (audit R2) — the auditor refuses `resolved` when a trigger-classified fix has no consumed pre-check verdict and no `check-dispatched` event naming it; the scope table's free-text Approach-check column is retired, so "not needed" has no home |
+| SF43 | 🟠 | audit | `COMMENTS_OK`/`DOCGATE_OK` route around the unattended policy's fail-closed design | fixed | 2026-08-27: fixed `42dff22` + `aaf53c0` (audit R2) — the pre-commit hook logs every override to the override log, and the policy answers `stop` at the next gate when one is logged after the run's start |
+| SF44 | 🟠 | audit | Per-cluster micro-reviews each see one cluster; cross-cluster interactions are reviewed by nobody | fixed | 2026-08-27: fixed `6a76ad9` + `15759f8` (audit R3) — one round-scope composition review over the whole diff with a fixed brief (pairs sharing state/files/schedules, callers of changed transitions, readers of retired signals), event-gated at hand-back |
+| SF45 | 🟠 | audit | The fixer authors and grades its own regression tests — three passed for reasons unrelated to their bug | fixed | 2026-08-27: fixed `6a76ad9` + `15759f8` (audit R4) — a test-meaning audit runs over the round's new tests (assert the literal, fresh-context reads, asynchronous fakes), and the fix brief's suggested test shape is the assertion spec the tests are checked against |
+| SF46 | 🟠 | audit | Certification is reachable with owed lenses and an unmeasured seed rate, and no non-convergence verb exists, so the loop can be run indefinitely | fixed | 2026-08-27: fixed `aaf53c0` (audit R5 + convergence rule) — the router refuses row 6 while a manifest lens never ran (lens-coverage pass first) or no blind pass followed the last substantive fix round; `s(r)` is computed from `seed_round`/`area` lineage, missing means unmeasured; two consecutive rounds seeding one component at s ≥ 0.3 gate a design pass, one per component per loop |
+| SF47 | 🟡 | audit | Full suites run at every round end, and the verification pass re-proves what the round already proved | fixed | 2026-08-27: fixed `6a76ad9` (audit, stop-doing) — the full suites run once per loop at the certification freeze; a round recording per-fix revert proofs gets an evidence audit (2–3 sampled re-runs, non-reproduction reverts the target to full re-runs) instead of wholesale re-proving |

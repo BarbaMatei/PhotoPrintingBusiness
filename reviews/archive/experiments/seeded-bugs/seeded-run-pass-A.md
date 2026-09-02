@@ -28,7 +28,7 @@ DB-parity, tests, completeness critic) over the seeded worktree. Deduped by defe
 | A8 | PhotoPrintDbContext.cs:310 | `IdempotencyKey` model `HasMaxLength(40)` vs migration/snapshot/filter 80 (3-way drift) | medium | 2/7 | high |
 | A9 | ExceptionHandlerMiddleware.cs:82-85 | cross-tenant conflict comment promises "Error event incl. key"; code logs Warning, no key | minor | 3/7 | high (mismatch) |
 | A10 | PaymentsController.cs:135 | dead local `hasCachedValue` (switch recomputes inline) | cleanup | 4/7 | high |
-| A11 | Snapshot / model index filter + TEXT | SQLite-flavored snapshot → phantom Npgsql migration diff (known/deferred DB-1/DB-2) | medium | 1/7 | high |
+| A11 | Snapshot / model index filter + TEXT | Npgsql-typed snapshot → phantom Npgsql migration diff (known/deferred DB-1/DB-2) | medium | 1/7 | high |
 | A12 | tests: cross-tenant InMemory test | asserts 200+distinct order (non-prod behavior; vacuous green on the provider that can't enforce the index) | minor | 1/7 | medium |
 | A13 | PaymentsController.cs:57 | `(long)(o.TotalRon*100)` truncates instead of rounds | minor | 1/7 | low |
 | A14 | replay / replay-recovery log events | never asserted by any test | minor | 1/7 | high |

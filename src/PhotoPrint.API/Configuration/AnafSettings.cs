@@ -1,0 +1,45 @@
+namespace PhotoPrint.API.Configuration;
+
+/// <summary>
+/// ANAF SPV (e-Factura submission) integration — intent 016, bolt 039.
+///
+/// Enabled=false still creates the Invoice row at Paid, but builds no XML or PDF (the worker is their only caller), so the download endpoint always 404s.
+///
+/// Secrets (<see cref="ClientSecret"/>, <see cref="CertPath"/>,
+/// <see cref="CertPassword"/>) live in environment variables in production
+/// (<c>Anaf__ClientSecret</c>, <c>Anaf__CertPath</c>, <c>Anaf__CertPassword</c>) —
+/// never in <c>appsettings.json</c>.
+/// </summary>
+public sealed class AnafSettings
+{
+    public const string SectionName = "Anaf";
+
+    public bool Enabled { get; set; }
+
+    public string BaseUrl      { get; set; } = string.Empty;
+    public string ClientId     { get; set; } = string.Empty;
+    public string ClientSecret { get; set; } = string.Empty;
+    public string CertPath     { get; set; } = string.Empty;
+    public string CertPassword { get; set; } = string.Empty;
+
+    /// <summary>Worker poll cadence. Default 30 min matches the
+    /// 5-business-day ANAF SLA with ~240× headroom.</summary>
+    public int PollIntervalMinutes { get; set; } = 30;
+
+    /// <summary>Max invoices the worker fetches per tick. Caps DB read
+    /// pressure and bounds per-tick HTTP fan-out.</summary>
+    public int MaxBatchSize { get; set; } = 50;
+
+    /// <summary>Retry budget for ANAF rejections in hours.
+    /// Default <c>1h, 4h, 16h, 64h</c> then escalate to <c>Failed</c>.
+    /// Attempt count is derived from
+    /// <c>(now - Invoice.CreatedAt)</c> against the cumulative sum;
+    /// no persisted counter.</summary>
+    public int[] BackoffHours { get; set; } = [1, 4, 16, 64];
+
+    // How long one worker owns a Pending invoice before it's reclaimable — must exceed one full pass, not the poll cadence.
+    public int ClaimTtlMinutes { get; set; } = 10;
+
+    // Uploads per invoice whose outcome ANAF never confirmed before the row is parked for an operator: a timeout is more often a slow success than a lost request, so each further attempt is likelier to file a duplicate than to rescue the invoice, and 3 spends ~2 h of the 5-business-day deadline.
+    public int MaxUnknownUploadOutcomes { get; set; } = 3;
+}

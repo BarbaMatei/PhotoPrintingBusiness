@@ -22,26 +22,12 @@ public class CreateOrderRequestValidatorTests
         Phone = "0700000000",
     };
 
-    // ── PaymentProcessor / DeliveryType enum validation ───────────────────────
-
-    [Fact]
-    public void UnknownPaymentProcessor_FailsValidation()
-    {
-        var request = new CreateOrderRequest(
-            PaymentProcessor: (PaymentProcessor)99,
-            DeliveryType: DeliveryType.Easybox,
-            EasyboxLockerId: Guid.NewGuid(),
-            ShippingAddress: null);
-
-        _sut.TestValidate(request)
-            .ShouldHaveValidationErrorFor(x => x.PaymentProcessor);
-    }
+    // ── DeliveryType enum validation ──────────────────────────────────────────
 
     [Fact]
     public void UnknownDeliveryType_FailsValidation()
     {
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: (DeliveryType)99,
             EasyboxLockerId: Guid.NewGuid(),
             ShippingAddress: null);
@@ -56,7 +42,6 @@ public class CreateOrderRequestValidatorTests
     public void Easybox_WithoutLockerId_FailsWithFieldErrorAndMessage()
     {
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Easybox,
             EasyboxLockerId: null,
             ShippingAddress: null);
@@ -74,14 +59,24 @@ public class CreateOrderRequestValidatorTests
         Street = "", Number = "", City = "", County = "", PostalCode = "",
     };
 
+    private static ShippingAddressSnapshot EasyboxAddress()
+    {
+        var addr = EasyboxContact();
+        addr.Street = "Str. Test";
+        addr.Number = "1";
+        addr.City = "București";
+        addr.County = "Ilfov";
+        addr.PostalCode = "010101";
+        return addr;
+    }
+
     [Fact]
-    public void Easybox_WithLockerAndContact_Passes()
+    public void Easybox_WithLockerAndFullAddress_Passes()
     {
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(),
-            ShippingAddress: EasyboxContact());
+            ShippingAddress: EasyboxAddress());
 
         var result = _sut.TestValidate(request);
         result.IsValid.Should().BeTrue();
@@ -91,7 +86,6 @@ public class CreateOrderRequestValidatorTests
     public void Easybox_WithoutRecipientContact_Fails()
     {
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(),
             ShippingAddress: null);
@@ -100,13 +94,28 @@ public class CreateOrderRequestValidatorTests
     }
 
     [Fact]
-    public void Easybox_WithBlankPhone_FailsOnPhone()
+    public void Easybox_WithABlankFiscalAddress_FailsOnStreetCityAndPostalCode()
     {
         var contact = EasyboxContact();
+
+        var request = new CreateOrderRequest(
+            DeliveryType.Easybox,
+            EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
+
+        var result = _sut.TestValidate(request);
+        result.ShouldHaveValidationErrorFor("ShippingAddress.Street");
+        result.ShouldHaveValidationErrorFor("ShippingAddress.City");
+        result.ShouldHaveValidationErrorFor("ShippingAddress.PostalCode");
+    }
+
+    [Fact]
+    public void Easybox_WithBlankPhone_FailsOnPhone()
+    {
+        var contact = EasyboxAddress();
         contact.Phone = "";
 
         var request = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Phone");
@@ -118,7 +127,6 @@ public class CreateOrderRequestValidatorTests
     public void Courier_WithoutShippingAddress_FailsWithFieldErrorAndMessage()
     {
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Courier,
             EasyboxLockerId: null,
             ShippingAddress: null);
@@ -136,7 +144,6 @@ public class CreateOrderRequestValidatorTests
         address.PostalCode = "";
 
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Courier,
             EasyboxLockerId: null,
             ShippingAddress: address);
@@ -152,7 +159,6 @@ public class CreateOrderRequestValidatorTests
         address.City = "";
 
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Courier,
             EasyboxLockerId: null,
             ShippingAddress: address);
@@ -168,7 +174,6 @@ public class CreateOrderRequestValidatorTests
         address.County = "";
 
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Courier,
             EasyboxLockerId: null,
             ShippingAddress: address);
@@ -181,13 +186,36 @@ public class CreateOrderRequestValidatorTests
     public void Courier_WithValidAddress_Passes()
     {
         var request = new CreateOrderRequest(
-            PaymentProcessor: PaymentProcessor.Stripe,
             DeliveryType: DeliveryType.Courier,
             EasyboxLockerId: null,
             ShippingAddress: ValidAddress());
 
         var result = _sut.TestValidate(request);
         result.IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("ShippingAddress.RecipientName")]
+    [InlineData("ShippingAddress.Street")]
+    [InlineData("ShippingAddress.City")]
+    public void Courier_FieldContainsXmlInvalidControlChar_FailsOnThatField(string field)
+    {
+        var controlChar = ((char)1).ToString();
+        var address = ValidAddress();
+        switch (field)
+        {
+            case "ShippingAddress.RecipientName": address.RecipientName = "Bad" + controlChar + "Name"; break;
+            case "ShippingAddress.Street":         address.Street = "Str." + controlChar + "Test"; break;
+            case "ShippingAddress.City":           address.City = "Cluj" + controlChar + "Napoca"; break;
+        }
+
+        var request = new CreateOrderRequest(
+            DeliveryType: DeliveryType.Courier,
+            EasyboxLockerId: null,
+            ShippingAddress: address);
+
+        _sut.TestValidate(request)
+            .ShouldHaveValidationErrorFor(field);
     }
 
     // ── Courier recipient fields must be present + sane (else the AWB request
@@ -210,7 +238,7 @@ public class CreateOrderRequestValidatorTests
         }
 
         var request = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Courier,
+            DeliveryType.Courier,
             EasyboxLockerId: null, ShippingAddress: address);
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor(field);
@@ -223,7 +251,7 @@ public class CreateOrderRequestValidatorTests
         address.Phone = "not-a-phone";
 
         var request = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Courier,
+            DeliveryType.Courier,
             EasyboxLockerId: null, ShippingAddress: address);
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Phone");
@@ -236,7 +264,7 @@ public class CreateOrderRequestValidatorTests
         address.RecipientName = new string('x', 256);
 
         var request = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Courier,
+            DeliveryType.Courier,
             EasyboxLockerId: null, ShippingAddress: address);
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.RecipientName");
@@ -251,7 +279,7 @@ public class CreateOrderRequestValidatorTests
         contact.Phone = phone;
 
         var request = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Phone");
@@ -264,8 +292,49 @@ public class CreateOrderRequestValidatorTests
         contact.Street = new string('x', 300);
 
         var request = new CreateOrderRequest(
-            PaymentProcessor.Stripe, DeliveryType.Easybox,
+            DeliveryType.Easybox,
             EasyboxLockerId: Guid.NewGuid(), ShippingAddress: contact);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Street");
+    }
+
+    [Fact]
+    public void Courier_WithRecipientNameOverTheCiusRoPartyNameLimit_FailsOnRecipientName()
+    {
+        var address = ValidAddress();
+        address.RecipientName = new string('x', 201);   // legal e-Factura PartyName limit is 200
+
+        var request = new CreateOrderRequest(
+            DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.RecipientName");
+    }
+
+    [Fact]
+    public void Courier_WithCityOverTheCiusRoCityNameLimit_FailsOnCity()
+    {
+        var address = ValidAddress();
+        address.City = new string('x', 51);   // legal e-Factura CityName limit is 50
+
+        var request = new CreateOrderRequest(
+            DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
+
+        _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.City");
+    }
+
+    [Fact]
+    public void Courier_WithStreetNumberBlockCombinedOverTheCiusRoStreetNameLimit_FailsOnStreet()
+    {
+        var address = ValidAddress();
+        address.Street = new string('a', 100);   // passes alone (<=255)
+        address.Number = "1";                    // passes alone (<=50)
+        address.Block = new string('b', 60);      // passes alone (<=100); combined = 163 > 150
+
+        var request = new CreateOrderRequest(
+            DeliveryType.Courier,
+            EasyboxLockerId: null, ShippingAddress: address);
 
         _sut.TestValidate(request).ShouldHaveValidationErrorFor("ShippingAddress.Street");
     }

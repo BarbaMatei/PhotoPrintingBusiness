@@ -26,7 +26,7 @@ implemented: true
   ```
 - [ ] `Order` entity exposes both as nullable properties.
 - [ ] EF Core model builder configures column types + max lengths.
-- [ ] Migration applies cleanly on Postgres and SQLite (use EF type conventions; `timestamptz` becomes `TEXT` on SQLite — acceptable).
+- [ ] Migration applies cleanly on Postgres and PostgreSQL (use EF type conventions; `timestamptz` becomes `TEXT` on PostgreSQL — acceptable).
 
 ## Technical Notes
 

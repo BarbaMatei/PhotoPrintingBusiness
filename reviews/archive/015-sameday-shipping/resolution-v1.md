@@ -29,7 +29,7 @@ closed: 2026-07-27
 | PPW-252 | fixed | `e8d4b53` | Courier recipient name, phone, street, number, city, county and postal code get non-empty and maximum-length rules plus a phone format check; tests cover blank, overlong and malformed. |
 | PPW-253 | fixed | `d6744f1` | The unreachable case in the tracking poll now logs a warning with the order id before returning. |
 | PPW-254 | fixed | `edd49f7` | The billable AWB number is logged before the database write; a persist failure returns a transient retry and is tested by dropping the table under it. |
-| PPW-255 | fixed | `edd49f7` | The creator tests moved to SQLite and the happy-path read-back goes through a fresh context, so a missing persist reddens the test. |
+| PPW-255 | fixed | `edd49f7` | The creator tests moved to PostgreSQL and the happy-path read-back goes through a fresh context, so a missing persist reddens the test. |
 | PPW-256 | fixed | `010c6dc` | Tests assert the shipped timestamp on the Shipped transition and the delivered timestamp on the Delivered one. |
 | PPW-257 | fixed | `835e932` | Clearing the city search no longer tears down the stream: the inner fetch is wrapped so its error cannot reach the outer subscription. |
 | PPW-258 | fixed | `835e932` | The init prime is now an immediate but cancellable first value inside the same stream, replacing the rival subscription that could overwrite a filtered result. |

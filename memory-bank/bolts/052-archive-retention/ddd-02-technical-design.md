@@ -433,7 +433,7 @@ type` warning from `OriginalPurger.cs`.
 
 - `Upload.FilePath` → `string?` (model + Fluent config).
 - New migration `20260529123952_MakeUploadFilePathNullable` — one `AlterColumn` to
-  remove NOT NULL. Type stays `TEXT`, works on both Postgres and SQLite without
+  remove NOT NULL. Type stays `TEXT`, works on both Postgres and PostgreSQL without
   hand-editing (unlike bolt 051's `OriginalPurgedAt` which needed the timestamp-type
   override).
 - Three readers updated: `UploadService.GetPreviewAsync` (throws `NotFoundException`

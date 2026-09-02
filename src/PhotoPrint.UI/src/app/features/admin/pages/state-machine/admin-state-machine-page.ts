@@ -35,7 +35,7 @@ export class AdminStateMachinePage {
       id: 'Paid',
       label: 'Plătit',
       colorClass: 'state--paid',
-      description: 'Plata a fost confirmată de Stripe / EuPlatesc. Comanda intră în coada de producție.',
+      description: 'Plata a fost confirmată de Stripe. Comanda intră în coada de producție.',
     },
     {
       id: 'Printing',
@@ -67,7 +67,7 @@ export class AdminStateMachinePage {
       id: 'Cancelled',
       label: 'Anulat',
       colorClass: 'state--cancelled',
-      description: 'Comanda a fost anulată de admin. Rambursarea este inițiată automat prin Stripe / EuPlatesc.',
+      description: 'Comanda a fost anulată de admin. Rambursarea este inițiată automat prin Stripe.',
       isTerminal: true,
     },
   ];
@@ -83,12 +83,12 @@ export class AdminStateMachinePage {
   ];
 
   readonly rules: string[] = [
-    'Tranzițiile sunt validate server-side prin OrderStatusMachine.cs — orice tranziție invalidă returnează 400.',
+    'Tranzițiile sunt validate server-side prin OrderStatusMachine.cs — orice tranziție invalidă returnează 400. Marcarea manuală ca Plătit returnează 409 dacă nu se poate aloca un număr de factură.',
     'Statusurile terminale (Livrat, Anulat, Plată eșuată) nu pot fi modificate ulterior.',
     'Anularea unui ordin Plătit sau În printare declanșează automat rambursarea prin procesatorul de plată.',
     'Tranziția la Expediat necesită obligatoriu un număr AWB. URL de tracking este opțional.',
-    'AwaitingPayment → Paid și AwaitingPayment → PaymentFailed sunt declanșate exclusiv de webhook-uri, nu de admin.',
-    'Notificările email sunt trimise automat la: Confirmare comandă, Expediat, Livrat, Anulat.',
+    'AwaitingPayment → Paid și AwaitingPayment → PaymentFailed sunt declanșate de webhook-uri. Marcarea manuală ca Plătit, pentru reconciliere offline, există doar prin API — panoul nu are buton pentru ea.',
+    'Notificările email sunt trimise automat la: Confirmare comandă, Expediat, Livrat, Anulat. Confirmarea nu se retrimite dacă o altă livrare a emis deja factura comenzii.',
   ];
 
   stateLabel(id: string): string {

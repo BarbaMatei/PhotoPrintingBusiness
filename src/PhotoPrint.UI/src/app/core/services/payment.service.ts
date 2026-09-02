@@ -5,8 +5,7 @@ import { environment } from '../../../environments/environment';
 import {
   CreateOrderRequest,
   StripeIntentResponse,
-  EuPlatescInitiateResponse,
-  OrderDto,
+  OrderPaymentStatusDto,
 } from '../models/payment.model';
 
 @Injectable({ providedIn: 'root' })
@@ -15,18 +14,22 @@ export class PaymentService {
   private readonly paymentsBase = `${environment.apiUrl}/payments`;
   private readonly ordersBase = `${environment.apiUrl}/orders`;
 
-  createStripeIntent(request: CreateOrderRequest): Observable<StripeIntentResponse> {
-    return this.http.post<StripeIntentResponse>(`${this.paymentsBase}/stripe/intent`, request);
+  createStripeIntent(
+    request: CreateOrderRequest,
+    idempotencyKey?: string,
+  ): Observable<StripeIntentResponse> {
+    return this.http.post<StripeIntentResponse>(`${this.paymentsBase}/stripe/intent`, request, {
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
+    });
   }
 
-  initiateEuPlatesc(request: CreateOrderRequest): Observable<EuPlatescInitiateResponse> {
-    return this.http.post<EuPlatescInitiateResponse>(
-      `${this.paymentsBase}/euplatesc/initiate`,
-      request,
-    );
+  getPaymentStatus(orderId: string): Observable<OrderPaymentStatusDto> {
+    return this.http.get<OrderPaymentStatusDto>(`${this.ordersBase}/${orderId}/payment-status`);
   }
 
-  getOrder(orderId: string): Observable<OrderDto> {
-    return this.http.get<OrderDto>(`${this.ordersBase}/${orderId}`);
+  // Fetched rather than linked: the endpoint authenticates a guest by header, which a plain
+  // anchor cannot send.
+  downloadInvoice(orderId: string): Observable<Blob> {
+    return this.http.get(`${this.ordersBase}/${orderId}/invoice`, { responseType: 'blob' });
   }
 }

@@ -2,7 +2,7 @@
 
 Romanian photo-printing e-commerce platform — ASP.NET Core 8 API + Angular 21 SPA.
 
-- `src/PhotoPrint.API/` — Web API (EF Core, Postgres prod / SQLite dev)
+- `src/PhotoPrint.API/` — Web API (EF Core + Npgsql, PostgreSQL 16)
 - `src/PhotoPrint.UI/` — Angular SPA
 - `src/PhotoPrint.Tests/` — xUnit unit + integration tests
 - `memory-bank/` — Specs.md / AI-DLC planning artifacts (intents, units, stories, bolts)
@@ -54,7 +54,7 @@ The API **fails fast at startup** if `JwtSettings:PrivateKeyPem` is empty — th
 ### 3. Run
 
 ```sh
-dotnet run --project src/PhotoPrint.API     # API (SQLite dev DB auto-created)
+dotnet run --project src/PhotoPrint.API     # API (applies migrations at boot)
 cd src/PhotoPrint.UI && npm install && npm start   # SPA
 ```
 
@@ -97,10 +97,8 @@ Production secrets are validated at boot — a missing one fails startup with th
 | Key | Purpose | Required |
 |-----|---------|----------|
 | `ConnectionStrings:Default` | Database connection string | always |
-| `DatabaseProvider` | `Postgres` (prod/Docker) or `Sqlite` (local dev) | always |
 | `JwtSettings:PrivateKeyPem` | RSA private key for signing JWTs | always (boot-fails if empty) |
 | `Stripe:SecretKey`, `Stripe:WebhookSecret` | Stripe payment + webhook verification | Production |
-| `EuPlatesc:MerchantId`, `EuPlatesc:SecretKey` | EuPlatesc payment gateway | Production |
 | `Cors:AllowedOrigins` | Comma-separated allowed SPA origins | always |
 | `Email:Provider` (+ `Email:Smtp:*` / `Email:SendGrid:ApiKey`) | SMTP (dev) or SendGrid (prod) | always |
 | `GoogleAuth:ClientId` | Google OAuth | if Google sign-in enabled |

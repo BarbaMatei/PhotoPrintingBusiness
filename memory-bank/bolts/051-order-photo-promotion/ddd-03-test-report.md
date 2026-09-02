@@ -38,7 +38,7 @@ caller-supplied keys made the new code drop in cleanly).
 - ✅ `Upload.LargePreviewPath varchar(512) NULL` added (migration `AddUploadArchiveFields`).
 - ✅ `Upload.OriginalPurgedAt timestamptz NULL` added (same migration).
 - ✅ EF Core configuration via Fluent API (`UploadConfiguration` — no data annotations; ADR-002).
-- ✅ Migration applies cleanly on both providers (Postgres types written into the migration file by hand because the scaffold ran against SQLite; SQLite never executes this migration — it uses `EnsureCreated` from the model).
+- ✅ Migration applies cleanly against PostgreSQL, with store types matching the model.
 - ✅ `Upload.StorageLocation` from bolt 043 left intact; not re-added.
 
 ### Story 002 — Large Preview Generation
@@ -50,7 +50,7 @@ caller-supplied keys made the new code drop in cleanly).
 
 ### Story 003 — Promote on Paid
 
-- ✅ Promotion enqueued from webhook (Stripe + EuPlatesc) after `SaveChangesAsync` — wired in `WebhooksController` (verified by inspection; the integration of an enqueue call on a webhook is impossible to assert via a unit test without a webhook integration harness, which would duplicate bolt 035's existing webhook coverage).
+- ✅ Promotion enqueued from webhook (Stripe + the legacy processor) after `SaveChangesAsync` — wired in `WebhooksController` (verified by inspection; the integration of an enqueue call on a webhook is impossible to assert via a unit test without a webhook integration harness, which would duplicate bolt 035's existing webhook coverage).
 - ✅ Background worker processes the queue with bounded concurrency — `OrderPhotoPromotionWorker` reads `Channel<PromotionJob>` with `SemaphoreSlim(MaxConcurrentOrders)`.
 - ✅ **Confirmed-Write-Then-Delete** (ADR-011) — verified by `HappyPath_WritesThreeCloudObjects_FlipsRow_DeletesLocal` (cloud writes happen, then row update, then local delete) and by `CloudOriginalSaveFails_LeavesRowLocal_CountsFailed` (no local delete attempted when cloud write fails).
 - ✅ **Idempotent** — verified by `AlreadyCloud_Skips`: an upload at `StorageLocation = Cloud` produces `Skipped = 1, Promoted = 0`, no storage calls made.
@@ -71,7 +71,7 @@ caller-supplied keys made the new code drop in cleanly).
 
 ## Test Patterns Used
 
-- **InMemory EF provider** for any test that needed a `DbContext` (`OrderPhotoPromoterTests`, `PromotionRecoveryScannerTests`). Same pattern bolt 042/043 used; the SQLite-only DateTimeOffset converter doesn't apply on InMemory, so `DateTimeOffset` works natively.
+- **InMemory EF provider** for any test that needed a `DbContext` (`OrderPhotoPromoterTests`, `PromotionRecoveryScannerTests`). Same pattern bolt 042/043 used; the Postgres-only DateTimeOffset converter doesn't apply on InMemory, so `DateTimeOffset` works natively.
 - **`Mock<IStorageService>` strict-mode for the cloud adapter** in the promoter tests — flushes any unexpected call into a test failure, which is what we want for a "no cloud activity when not paid" assertion.
 - **Real ImageSharp encode/decode** in `ImageProcessorLargePreviewTests` — no mocking of the image pipeline; the test exercises the real codec path on small synthetic images.
 - **Forged JPEG SOF0 marker** in `BombSizedSource_Throws` — a 50-byte JPEG with the header rewritten to claim 26000×26000 dimensions, so the guard rejects before any decode allocation.

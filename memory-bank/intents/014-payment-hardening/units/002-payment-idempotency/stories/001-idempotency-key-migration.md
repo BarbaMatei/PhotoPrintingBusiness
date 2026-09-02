@@ -22,7 +22,7 @@ implemented_at: 2026-05-25T14:15:00Z
 
 - [ ] EF Core migration adds `IdempotencyKey` nullable `varchar(80)` to `Orders`.
 - [ ] Filtered unique index `ix_orders_idempotency_key` enforces uniqueness only when the column is not null.
-- [ ] Migration applies cleanly to both Postgres and the SQLite dev fallback (skip index syntax differences via `migrationBuilder.HasFilter(...)` Postgres-only path; SQLite emits a plain unique index — acceptable).
+- [ ] Migration applies cleanly to both Postgres and the PostgreSQL fallback (skip index syntax differences via `migrationBuilder.HasFilter(...)` Postgres-only path; PostgreSQL emits a plain unique index — acceptable).
 - [ ] Down-migration drops the index and column.
 
 ## Technical Notes
@@ -53,7 +53,7 @@ migrationBuilder.CreateIndex(
 - bolt 015-shipping-and-order-core (Orders table)
 
 ### Enables
-- 002-stripe-intent-idempotency, 003-euplatesc-initiate-idempotency
+- 002-stripe-intent-idempotency, 003-legacy-processor-initiate-idempotency
 
 ## Edge Cases
 

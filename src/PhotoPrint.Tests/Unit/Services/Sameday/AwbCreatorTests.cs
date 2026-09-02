@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,31 +14,31 @@ using PhotoPrint.Tests.Helpers;
 namespace PhotoPrint.Tests.Unit.Services.Sameday;
 
 /// <summary>
-/// Full outcome-matrix for <see cref="AwbCreator"/>. Uses SQLite (not the EF
+/// Full outcome-matrix for <see cref="AwbCreator"/>. Uses a real PostgreSQL database (not EF
 /// InMemory provider) because the guarded persist runs <c>ExecuteUpdateAsync</c>,
 /// which InMemory doesn't support; the read-backs go through a FRESH context so
 /// a missing/last-writer-wins persist reddens the test.
 /// </summary>
-public class AwbCreatorTests : IDisposable
+public class AwbCreatorTests : IClassFixture<ForeignKeyFreeTestDatabase>
 {
-    private readonly SqliteConnection _connection;
+    private PostgresTestDatabase _database;
 
-    public AwbCreatorTests()
+    public AwbCreatorTests(ForeignKeyFreeTestDatabase database)
     {
-        // FK enforcement off: these exercise AWB-creation logic, not referential
-        // integrity, so an OrderItem can reference a synthetic product/upload id.
-        _connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=False");
-        _connection.Open();
-        using var db = CreateDb();
-        db.Database.EnsureCreated();
+        _database = database;
+        database.ResetForTest();
     }
 
-    public void Dispose() => _connection.Dispose();
+    private PostgresTestDatabase UseIsolatedDatabase()
+    {
+        var own = PostgresTestDatabase.Throwaway();
+        own.DropAllForeignKeys();
+        _database = own;
 
-    private PhotoPrintDbContext CreateDb() =>
-        new(new DbContextOptionsBuilder<PhotoPrintDbContext>()
-            .UseSqlite(_connection)
-            .Options);
+        return own;
+    }
+
+    private PhotoPrintDbContext CreateDb() => _database.NewContext();
 
     private static readonly DateTimeOffset Now = new(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
 
@@ -226,6 +225,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Returns_transient_RetryLater_when_the_persist_fails_after_a_successful_create()
     {
+        using var isolated = UseIsolatedDatabase();
         var order = SeedOrder();
 
         // The vendor AWB is created, then the DB write fails (table gone mid-call).
@@ -233,9 +233,7 @@ public class AwbCreatorTests : IDisposable
         client.Setup(c => c.CreateAwbAsync(It.IsAny<AwbCreationRequest>(), It.IsAny<CancellationToken>()))
             .Returns<AwbCreationRequest, CancellationToken>((_, _) =>
             {
-                using var cmd = _connection.CreateCommand();
-                cmd.CommandText = "DROP TABLE Orders;";
-                cmd.ExecuteNonQuery();
+                _database.BreakOrdersTable();
                 return Task.FromResult(new AwbCreationResult("RO-LOST", "https://x/y.pdf", 1m));
             });
 
@@ -467,6 +465,7 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task Preserves_the_claim_when_the_persist_fails_after_the_vendor_created_the_AWB()
     {
+        using var isolated = UseIsolatedDatabase();
         // The AWB is created and billed but the DB write throws: the claim must be held so the
         // re-attempt waits out the TTL rather than re-calling the vendor in ~30 s for a 2nd label.
         var order = SeedOrder();
@@ -476,7 +475,7 @@ public class AwbCreatorTests : IDisposable
             .ReturnsAsync(() =>
             {
                 // Break the DB between the vendor call and the persist.
-                _connection.Close();
+                _database.BreakOrdersTable();
                 return new AwbCreationResult("RO12345678", "https://sameday/labels/abc.pdf", 18.50m);
             });
         var sut = Build(db, client);
@@ -558,13 +557,14 @@ public class AwbCreatorTests : IDisposable
     [Fact]
     public async Task A_thrown_db_failure_records_an_error_outcome_and_rethrows()
     {
+        using var isolated = UseIsolatedDatabase();
         var order = SeedOrder();
         using var db = CreateDb();
         var sut = Build(db, new Mock<ISamedayClient>(MockBehavior.Strict));
         using var metrics = new MetricCapture(MetricNames.Instruments.AwbCreationTotal);
 
-        // Kills the :memory: database under the creator, standing in for an unreachable Postgres.
-        _connection.Close();
+        // Stands in for an unreachable database under the creator.
+        _database.BreakOrdersTable();
 
         var act = () => sut.CreateForOrderAsync(order.Id, attempt: 1);
 

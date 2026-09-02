@@ -32,7 +32,7 @@ export const meta = {
 //   guardEvidence, traceEvidence. The '_canonical' overall line reports skeptic-run counts for
 //   the metrics entry (cost.agents_by_stage). The main agent then synthesizes.
 //
-// TOKEN-EFFICIENCY MEASURES BAKED IN (see reviews/README.md "Cost discipline"):
+// TOKEN-EFFICIENCY MEASURES BAKED IN (the per-pass costs they buy: reviews/lib/drive/rows.mjs):
 //   #1 Dedup-before-verify: all lenses run, then ONE dedup agent clusters duplicates; each real
 //      defect is verified once, not once-per-lens-that-found-it. (Distinct from the cross-pass
 //      "ledger reconciler" of the self-driving loop, which does not exist yet.)
@@ -105,8 +105,9 @@ const DELTA_NOTE = PASSTYPE === 'delta'
 
 // Shared hints seeded into EVERY lens — a recall aid, but agreement on these topics is not
 // independent evidence (the dedup agent flags findings these hints planted).
-const HINTS = `dual database — SQLite for local/dev/test, PostgreSQL for prod; tests use the EF
-InMemory provider (so migration DDL is usually NOT exercised). Storage is two-tier — every upload
+const HINTS = `PostgreSQL 16 in every environment, migrations applied at boot; the default test
+provider is EF InMemory (so migration DDL is exercised only by the tests that opt into a real
+PostgreSQL database via PostgresTestDatabase). Storage is two-tier — every upload
 read/write/delete routes via IStorageRouter.For(upload.StorageLocation) (local + S3-compatible
 cloud); never assume local disk. Auth supports logged-in users AND anonymous guests.`
 
@@ -156,10 +157,11 @@ cleanup/deletion), and no undocumented scope is bundled with no story/AC/test.`,
 tracking a read, re-reading just-written data, extra round-trips), duplicated logic/constants/strings,
 magic numbers, wrong-layer fixes.`,
 
-  'db-parity': `DB / MIGRATION-PARITY (dual SQLite+Postgres). Shared vs per-provider migrations? Does a
-new migration hardcode a SQLite type ("TEXT") that diverges on Postgres (unbounded text vs varchar(N),
-maxLength unenforced, snapshot drift -> phantom AlterColumn diff)? Compare to sibling migrations. Is the
-DDL exercised by any test, or only InMemory/EnsureCreated (which skips migrations)?`,
+  'db-parity': `DB / MIGRATION FIDELITY (PostgreSQL only). Was the migration scaffolded against the
+Npgsql design-time provider — uuid, timestamptz, jsonb, numeric, varchar(N) — or does it hardcode a
+type that drifts from the model (unbounded text vs varchar(N), maxLength unenforced, snapshot drift
+-> phantom AlterColumn diff)? Compare to the baseline migration. Is the DDL exercised by any test,
+or only by the InMemory provider (which ignores migrations entirely)?`,
 
   'input-validation': `INPUT-VALIDATION depth. For image/file input: per-axis dimension cap (misses
 total-megapixel bombs) vs real area budget? Frame count for animated formats bounded? Fail-open vs
@@ -344,7 +346,7 @@ const decidedBlock = DECIDED.length
   ? `\n\nKNOWN DECIDED ITEMS (terminal-status ledger rows — each already judged real and decided in a prior pass):\n${DECIDED.map(d => `${d.dId} [${d.status}] ${d.file || ''} — ${d.title}${d.decision ? ` | decision: ${d.decision}` : ''}`).join('\n')}\nIf a group re-raises one of these — SAME root cause at the SAME site, not merely the same theme — set matchesDecided to its ledger id. Match conservatively: when unsure, leave it "". Matching never suppresses a finding; it only attaches the prior decision.`
   : ''
 const recon = await agent(
-  `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, SQLite/Postgres parity, two-tier storage routing / StorageLocation, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nSet matchesDecided="" for every group unless the KNOWN DECIDED ITEMS block below says otherwise.${decidedBlock}\n\nFINDINGS:\n${digest}`,
+  `You are the DEDUP agent for a multi-lens review of ${TARGET}. Below are ${flat.length} raw findings from independent lenses. Group findings that describe the SAME underlying defect (same root cause + location), even if worded differently or a few lines apart. A finding with no duplicate is its own group of one. EVERY id must appear in exactly one group. For each group pick the clearest representativeId, the MAX severity across its members, and a canonical one-line title. Do NOT invent findings.\n\nEvery lens was seeded with these shared project hints:\n"${HINTS}"\nSet hinted=true for a group whose topic those hints directly plant (migration DDL not exercised by tests, PostgreSQL parity, two-tier storage routing / StorageLocation, guest-vs-logged-in auth branches) — agreement there is prompted, not independent. Otherwise hinted=false.\n\nSet matchesDecided="" for every group unless the KNOWN DECIDED ITEMS block below says otherwise.${decidedBlock}\n\nFINDINGS:\n${digest}`,
   { label: 'dedup', phase: 'Dedup', schema: DEDUP_SCHEMA })
 
 // Build canonical findings from groups; fall back to no-dedup if the dedup agent failed.

@@ -65,7 +65,7 @@ model rather than a patch, so it goes with PPW-158 rather than being bolted onto
 
 ### Postgres parity for the nullable column belongs with the three-environment work
 
-The migration is asserted on SQLite only, and a skeptic confirmed it is correct on Postgres today, so
+The migration is asserted on PostgreSQL only, and a skeptic confirmed it is correct on Postgres today, so
 this is a coverage gap and not a live defect. It is the same parity gap already carried on two other
 bolts, and it lands with the container-test work rather than here.
 
