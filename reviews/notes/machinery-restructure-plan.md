@@ -119,7 +119,7 @@ D9. The migration order and every deviation are recorded in
 | Duplicate parsers one; each rule one home, prose cites it | met — one reader per artifact, one void rule, 11 generated doc blocks with a drift alarm the hook runs on doc-only edits |
 | docs-sync passes | met — the hook runs the full `--check` (drift + links, ~0.4 s measured) since the chapter-close wave: no broken link is left, the tolerated list is empty, and a link quoted inside code reads as the template it is |
 | Suite green and smaller | green met (835 after the chapter close); **smaller NOT MET** — 565→835 assertions by design (every fix pinned), fixture count ~unchanged (the drive-ledger merge was twice refused on evidence: 14 materially different ledgers) |
-| Full run under one minute | **met** (chapter close, 2026-09-02) — 30–47 s warm, ~74 s cold, measured over eight runs by two independent agents; won by batching the auditor's git subprocesses (553→336 per run, output byte-identical) and running test files in four lanes, with zero checks converted or weakened. The remaining floor is `flows/verify-fixes` (~31 s of real revert-and-rerun cycles, kept by design) |
+| Full run under one minute | **machine-load-dependent — met only on an idle machine**: 30–47 s warm on an idle machine (2026-09-02 morning), ~74 s cold; the same machine under load later that same day measured 82–103 s, with the prior commit — before the fixture-builder conversion — re-measured at 81.9 s in the same loaded session, so that conversion added nothing to the loaded number. Won by batching the auditor's git subprocesses (553→336 per run, output byte-identical) and running test files in four lanes, with zero checks converted or weakened. The remaining floor is `flows/verify-fixes` (~31 s of real revert-and-rerun cycles, kept by design) |
 | No legacy tolerance for shapes the repo cannot produce | met — V2 tier, LEGACY_TOP, D-ids, frontmatter-map fallback gone; V3/V4 cut-offs stay (live records behind them) |
 
 **Owner items left open by this phase:** the two NOT MET criteria above; the runbook's
@@ -132,9 +132,16 @@ verifier's own instruction now — runbook-verification step 3 flags an unclear 
 Decisions block as a finding, with no detector; the citation scan reads 0; and
 `038-039`'s resolution-v15 passes the doc gate.
 
-**Next-session list:** the 67 auditor errors on the deliberately-broken fixture root
-(noise, assertion-free); optional runtime fixture builder for the drive-ledger family;
-cold-run suite time (~74 s) if it ever matters. The chapter-close waves took the rest:
+**Closed by the fixture-cleanup wave (2026-09-02, same day):** the deliberately-broken
+fixture root's auditor error count fell from 186 to 30 — twenty-five router-and-policy-only
+states (the drive-ledger family among them) moved out to a run-time fixture builder
+(`reviews/lib/tests/fixture-builder.mjs`), and the remaining 30 are all intentional (planted
+schema violations plus placeholder commits that can never resolve), with the count now
+pinned by an assertion so a careless addition reddens the suite instead of hiding in the
+noise.
+
+**Next-session list:** cold/loaded-machine suite time (82–103 s under load vs. the ≤1 min
+idle-machine criterion above) if it ever matters. The chapter-close waves took the rest:
 the suite runs in 30–47 s warm (auditor git subprocesses batched byte-identically, test
 files in four lanes, zero checks converted), both re-export shims are deleted, the
 disapprovals report is headed `DISAPPROVALS:`, metrics-schema's third event list is a
