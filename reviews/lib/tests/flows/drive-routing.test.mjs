@@ -1,7 +1,4 @@
-// Flow: route-next-pass over the ledger'd routing states — the threshold/queue/sweep rows, the
-// reviewed unit, the regression lineage, and the loop-close gate. Spawns the CLI per case.
-// Each state is built from the spec beside its checks (fixture-builder.mjs); only 901-good-target,
-// which four other suites read as a file, comes from the on-disk fixture root.
+// Flow: route-next-pass over the ledger'd routing states, each built from the spec beside it.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only drive-routing
 import { check, run, GOOD_ROOT } from '../lib.mjs'

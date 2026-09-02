@@ -1,6 +1,4 @@
-// Flow: autonomy-policy deciding at the gates over the same kind of ledger states the router
-// walks — the medium queue draining before a certification, the ledger guard, the loop-close
-// answer. Each state is built from the spec beside its checks (fixture-builder.mjs).
+// Flow: autonomy-policy deciding at the gates, each state built from the spec beside it.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only drive-policy
 import { check, run } from '../lib.mjs'

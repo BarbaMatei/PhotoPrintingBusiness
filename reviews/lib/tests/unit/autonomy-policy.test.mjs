@@ -46,7 +46,6 @@ import { MANIFEST_LENSES } from '../../records/schema.mjs'
 }
 
 {
-  // Every manifest lens but the last one has run, so frontend-ux is the lens still owed.
   const root = buildTarget({
     target: '925-lens-debt', reviews: 1,
     metricsLines: [
@@ -58,7 +57,6 @@ import { MANIFEST_LENSES } from '../../records/schema.mjs'
 }
 
 {
-  // A substantive round with no blind pass after it: its seed rate has never been measured.
   const root = buildTarget({
     target: '926-unmeasured-seed', reviews: 1,
     metricsLines: [
@@ -72,9 +70,6 @@ import { MANIFEST_LENSES } from '../../records/schema.mjs'
   check('policy routes an unmeasured final round to a measuring delta discovery', r.out.includes('ACTION: auto') && r.out.includes('NEXT: delta discovery') && r.out.includes('unmeasured'), r.out.trim())
 }
 
-// Rounds r1 (3 fixed) and r2 (2 fixed) each seeded a serious "payments" finding a later blind pass
-// attributed back to them: s = 1/3 and 1/2, both at or over the 0.3 rate the rule brakes on. The
-// three states differ in the ledger, which is what decides which answer the brake intercepts.
 const NON_CONVERGENT_ROUNDS = [
   fixRound({ round: 1, date: '2026-07-02', fixed: 3, invocations: 4 }),
   fixRound({ round: 2, date: '2026-07-04', fixed: 2, invocations: 3 }),

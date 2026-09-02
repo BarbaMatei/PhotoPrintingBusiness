@@ -1,27 +1,15 @@
-// Materializes a review target from a compact spec into a throwaway root, for the tests whose
-// fixture is a *routing state* and nothing else: the router and the autonomy policy read a
-// ledger's open rows, the metrics lines, the resolution frontmatter and the review-file
-// inventory, so a state that used to need four hand-written markdown files under
-// fixtures/repo/reviews is six lines of spec beside the assertion that cares about it.
-//
-// Two things follow from that, and both are the point:
-//   - the state a check routes on is readable where the check is, not three files away;
-//   - fixtures/repo stays the *deliberately-broken* root — a state parked there for the router
-//     also lands in front of the whole-root records auditor, where its every unfilled schema
-//     field reads as an error nobody planted.
-// A target any other suite reads (the doc gate, the auditor's own fixtures, the renderer) stays
-// on disk: those suites check the files themselves, which is the opposite requirement.
-//
-// The spec states only what a reader routes on; everything else the schema requires is filled in
-// here, so a line stays valid without the spec restating it.
-//   target       the folder name (also the `target` field of every metrics line)
-//   reviews      how many review-v<n>.md exist (their content is never read — only the count)
+// Materializes one review target from a compact spec into a throwaway root, for the tests whose
+// fixture is a routing state and nothing else. A target any other suite reads as files (doc gate,
+// records auditor, renderer) stays on disk under fixtures/repo — see that root's README.
+// The spec states only what a reader routes on; the rest of the schema is filled in here.
+//   target       folder name, and the `target` field of every metrics line
+//   reviews      how many review-v<n>.md exist (only the count is ever read)
 //   blockers     { <review version>: ['PPW-<n>', …] } — the policy's delta-worthiness read
-//   metricsLines pass lines as literal objects, fix-round lines via fixRound() below
-//   ledgerRows   [id, severity emoji, status] per row — what "open" means to the loop
+//   metricsLines pass lines as literal objects, fix-round lines via fixRound()
+//   ledgerRows   [id, severity emoji, status] per row
 //   resolutions  [{ v, status, fixedCommit?, closed?, fixed?: [id…], answers? }]
 //
-// Every root is removed when the test process exits, so a test never cleans up after itself.
+// Usage: const root = buildTarget({ … }) — pass it as `--root`; every root is removed on exit.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -32,9 +20,7 @@ process.on('exit', () => { if (scratch) rmSync(scratch, { recursive: true, force
 
 const zeroTally = { fixed: 0, wont_fix: 0, deferred: 0, disputed: 0, false_positive: 0, open: 0 }
 
-// A fix-round line: the spec states the round, its date, how many findings it fixed and whether
-// it ran tests (a round is "substantive" to the convergence rule only if it did both), plus the
-// notes cell, which is where a design pass records that it ran.
+// A round counts as substantive to the convergence rule only if it both fixed and ran tests.
 export const fixRound = ({ round, date, fixed, invocations = null, notes = '' }) => ({
   round, type: 'fix-round', date, base_commit: null, fixed_commit: null,
   findings: { ...zeroTally, fixed },
@@ -45,8 +31,7 @@ export const fixRound = ({ round, date, fixed, invocations = null, notes = '' })
   notes,
 })
 
-// A key whose value is empty is left out rather than written blank: `value()` lets the gap after
-// a colon cross a newline, so an empty key silently reads the next key's value.
+// An empty key is left out, not written blank: `value()` would read the next key's value.
 const frontmatter = pairs =>
   `---\n${pairs.filter(([, v]) => v !== '').map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n`
 

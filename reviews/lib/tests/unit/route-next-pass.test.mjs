@@ -141,8 +141,7 @@ updated: 2026-08-22
   check('router flags an unmeasured seed rate at the delta-worthiness gate', r.code === 3 && r.out.includes('seed rate is unmeasured'), `exit ${r.code}: ${r.out.trim()}`)
 }
 
-// Rounds r1 (3 fixed) and r2 (2 fixed) each seeded a serious "payments" finding a later blind
-// pass attributed back to them: s = 1/3 and 1/2, both at or over the 0.3 rate the rule brakes on.
+// r1 (3 fixed) and r2 (2 fixed) each seeded one "payments" finding: s = 1/3 and 1/2, both over 0.3.
 const NON_CONVERGENT_ROUNDS = [
   fixRound({ round: 1, date: '2026-07-02', fixed: 3, invocations: 4 }),
   fixRound({ round: 2, date: '2026-07-04', fixed: 2, invocations: 3 }),
@@ -173,8 +172,7 @@ const NON_CONVERGENT_ROUNDS = [
 }
 
 {
-  // The same non-convergent shape, plus a third round whose notes record the design pass that
-  // "payments" is allowed once per loop — the brake lifts and the fix round proceeds.
+  // Round 3's notes record the one design pass "payments" gets per loop, which lifts the brake.
   const root = buildTarget({
     target: '928-design-capped', reviews: 4,
     metricsLines: [
@@ -206,8 +204,7 @@ const NON_CONVERGENT_ROUNDS = [
 // and the pre-certification sweep row never went through: a non-convergent component kept being
 // patched by whichever row answered first. All three now consult it, and a convergent state on the
 // same three rows must still route its fix round.
-// The three states below carry the same non-convergent metrics shape as 927 and differ in the
-// ledger: an open 🔴 arms the loop, three open 🟠 are a batch, one open 🟠 is the sweep.
+// The three below share 927's metrics shape and differ only in the ledger that picks the row.
 const NON_CONVERGENT_SPECS = {
   '929-armed-non-convergent': {
     target: '929-armed-non-convergent', reviews: 3,
