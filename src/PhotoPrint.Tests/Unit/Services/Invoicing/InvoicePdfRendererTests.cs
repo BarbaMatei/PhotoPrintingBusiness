@@ -94,7 +94,9 @@ public class InvoicePdfRendererTests
     [Fact]
     public void Pdf_output_is_well_formed_and_non_trivial_size()
     {
-        // QuestPDF compresses text streams (FlateDecode), so no literal text appears in the byte view — this asserts structural validity only; content correctness is pinned at the XML builder layer.
+        // QuestPDF compresses text streams (FlateDecode), so no literal text appears in the byte
+        // view — this asserts structural validity only; content correctness is pinned at the XML
+        // builder layer.
         var (order, invoice) = Fixture();
         var bytes = new InvoicePdfRenderer().Render(order, invoice, Seller());
 

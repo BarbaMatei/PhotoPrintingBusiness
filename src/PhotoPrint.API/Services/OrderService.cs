@@ -80,7 +80,7 @@ public class OrderService : IOrderService
         string? idempotencyKey = null,
         CancellationToken ct = default)
     {
-        // 1. Load cart items with everything needed for price calculation
+        // Load cart items with everything needed for price calculation
         var cartItems = await _db.CartItems
             .Where(ci => userId.HasValue
                 ? ci.UserId == userId
@@ -98,7 +98,7 @@ public class OrderService : IOrderService
         if (cartItems.Count == 0)
             throw new BadRequestException("Coșul este gol.");
 
-        // 2. Build order items with price snapshots
+        // Build order items with price snapshots
         var orderItems = cartItems.Select(ci =>
         {
             var unitPrice = ResolveUnitPrice(ci.Product, ci.Quantity);
@@ -161,7 +161,7 @@ public class OrderService : IOrderService
             }
         }
 
-        // 3. Capture guest email before building the order
+        // Capture guest email before building the order
         string? guestEmail = null;
         if (guestSessionId.HasValue)
         {
@@ -169,10 +169,12 @@ public class OrderService : IOrderService
             guestEmail = gs?.Email;
         }
 
-        // Romanian convention: prices are VAT-inclusive, so VAT is extracted from the gross total (shipping folded in at the same rate as goods), and the rate is snapshotted onto the order so later config changes never mutate existing rows.
+        // Romanian convention: prices are VAT-inclusive, so VAT is extracted from the gross total
+        // (shipping folded in at the same rate as goods), and the rate is snapshotted onto the
+        // order so later config changes never mutate existing rows.
         var vat = VatCalculator.ExtractBreakdown(total, _vatSettings.Rate);
 
-        // 5. Build and persist the order
+        // Build and persist the order
         var order = new Order
         {
             OrderNumber = await _orderNumberService.GenerateAsync(ct),
@@ -197,7 +199,7 @@ public class OrderService : IOrderService
 
         var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
 
-        // 5. Persist. Two unique indexes can reject the INSERT, each with its own recovery;
+        // Persist. Two unique indexes can reject the INSERT, each with its own recovery;
         // any OTHER DbUpdateException (FK, NOT NULL) matches neither `when` filter and
         // propagates honestly — we never infer the cause from a follow-up AnyAsync probe.
         //
