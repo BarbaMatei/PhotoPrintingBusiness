@@ -58,7 +58,8 @@ feature clean?".
    `git diff <last-affirmed-commit>..HEAD -- <cited files>` yourself. Unchanged → record
    "unchanged since `<commit>`, stands" with **no agent**. Changed → one anchored Explore
    agent, given the finding + resolution note + fix delta, not the whole feature. Update each
-   ledger row's last-affirmed commit.
+   ledger row's last-affirmed commit. If a resolution's `Decisions` block is unclear or
+   misleading, flag it as a finding.
 4. **Read the round review before dispatching anything.** Rounds from 2026-08-28 carry one
    round-scope composition review (`round-review-returned` in the worklog, findings folded
    into the resolution) — read what it found and left open; do not re-run its questions
