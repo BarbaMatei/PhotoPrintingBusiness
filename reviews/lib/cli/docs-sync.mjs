@@ -6,12 +6,12 @@
 // A generated block is the text between `<!-- generated:<name> -->` and its closing marker; the
 // prose around the markers is the owner's and is never touched. docs-blocks.mjs names the one
 // machine home of each table, so a rule with two homes cannot drift apart silently.
-// Drift and broken links are separate signals: the drift half is fast and mechanical, the link
-// half reads records nobody may edit to make a hook green, so only the drift half is hook-grade.
+// Drift and broken links are separate signals, reported on their own lines, but both are
+// hook-grade: the records carry zero broken links, and the whole --check costs ~0.4s.
 //
 // Usage: node reviews/lib/cli/docs-sync.mjs [--root <repoRoot>] [--check | --write] [--no-links] [--links]
 // Exit: 0 in step (or written) · 1 a block is stale, a marker is missing, or --check found a
-//       broken link. `--no-links` skips the link scan (drift only, what the pre-commit hook runs);
+//       broken link. `--no-links` skips the link scan (drift only);
 //       `--write` never counts links in its exit unless `--links` asks for it.
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
@@ -67,7 +67,9 @@ for (const s of stale) {
 problems.push(...lensCoverage())
 problems.push(...hookCoverage(REPO))
 
-// Every markdown link under reviews/ must resolve to a file.
+// Every markdown link under reviews/ must resolve to a file. Code spans and fenced blocks are
+// stripped first: a link inside them is a row template a planning note is quoting, not a link.
+const outsideCode = text => text.replace(/^```[\s\S]*?^```/gm, '').replace(/`[^`]*`/g, '')
 const mdFiles = []
 if (!flag('--no-links')) (function walk(d) {
   for (const e of readdirSync(d, { withFileTypes: true })) {
@@ -78,7 +80,7 @@ if (!flag('--no-links')) (function walk(d) {
 })(REVIEWS)
 let broken = 0
 for (const p of mdFiles) {
-  for (const m of readFileSync(p, 'utf8').matchAll(/\]\(([^)\s]+)\)/g)) {
+  for (const m of outsideCode(readFileSync(p, 'utf8')).matchAll(/\]\(([^)\s]+)\)/g)) {
     const t = m[1]
     if (/^https?:|^#|^mailto:/.test(t)) continue
     if (!existsSync(join(dirname(p), t.split('#')[0]))) { console.log(`BROKEN ${relative(REPO, p)}: ${t}`); broken++ }

@@ -15,12 +15,10 @@ import { V2_FIELDS, V3_FIX_FIELDS } from '../../records/validate.mjs'
 import { ROWS } from '../../drive/rows.mjs'
 import { GATE_DOCS } from '../../drive/gates.mjs'
 import { MARKED_FILES } from '../../cli/docs-blocks.mjs'
-// Broken links the records carry today: the two `<target>` paths are deliberate placeholders in a
-// planning note. A third broken link fails this test.
-const TOLERATED_LINKS = [
-  'reviews/notes/loop-speed-plan.md: ../<target>/resolution-v<round>.md',
-  'reviews/notes/loop-speed-plan.md: ../<target>/ledger.md',
-]
+// Every link under reviews/ resolves, so this list is empty and the assertions below hold it that
+// way in both directions: any new broken link fails, and an entry added here that is no longer
+// broken fails too, so a tolerated link cannot outlive its reason.
+const TOLERATED_LINKS = []
 
 const SKILLS = join(REPO, '.claude', 'skills')
 const body = (file, name) => {
@@ -55,9 +53,11 @@ const problemsIn = out => lines(out).filter(l => l.startsWith('PROBLEM'))
     `new broken link(s):\n      ${unexpected.join('\n      ')}`)
   check('every tolerated broken link is still the one the list names', gone.length === 0,
     `fixed (drop from TOLERATED_LINKS):\n      ${gone.join('\n      ')}`)
-  check('the link scan counts what it printed', r.out.includes(`${broken.length} broken link(s)`), r.out.trim())
-  check('a broken link fails --check even when no block has drifted', r.code === 1, `exit ${r.code}`)
-  check('the block verdict prints even while links are broken',
+  check('no link is tolerated broken any more', TOLERATED_LINKS.length === 0 && broken.length === 0,
+    `${TOLERATED_LINKS.length} tolerated, ${broken.length} broken`)
+  check('the link scan states that every link resolves', r.out.includes('all reviews/ links resolve'), r.out.trim())
+  check('the full --check exits 0 — drift and links both clean', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+  check('the block verdict prints alongside the link verdict',
     r.out.includes('generated blocks in step'), r.out.trim())
 }
 
@@ -134,6 +134,25 @@ for (const [file, name, expected] of [
     check('the copied tree is in step again after --write', after.code === 0 && staleIn(after.out).length === 0, after.out.trim())
     check('the hand edit never reached the live file',
       !readFileSync(join(REVIEWS, 'rules', 'doc-contracts.md'), 'utf8').includes('jobsss'))
+
+    // The other direction of the empty tolerated list: a real broken link is still caught, while a
+    // link quoted inside a code span or fence is a template and is not scanned.
+    // The copy carries only the marked files, so its own cross-references are broken; the fixture
+    // is judged against that baseline.
+    const before = brokenIn(run('cli/docs-sync.mjs', ['--root', root, '--check']).out)
+    const note = join(root, 'reviews', 'notes', 'link-fixture.md')
+    mkdirSync(dirname(note), { recursive: true })
+    writeFileSync(note, ['[gone](./nowhere.md)', '`[template](../<target>/resolution-v<round>.md)`',
+      '```', '[fenced](./also-nowhere.md)', '```', ''].join('\n'))
+    const links = run('cli/docs-sync.mjs', ['--root', root, '--check'])
+    const added = brokenIn(links.out).filter(l => !before.includes(l))
+    check('a broken link the fixture adds is reported',
+      added.includes('reviews/notes/link-fixture.md: ./nowhere.md'), links.out.trim())
+    check('a link inside a code span or a fence is not scanned', added.length === 1, added.join('\n'))
+    check('the link half alone fails --check, with no block stale',
+      links.code === 1 && staleIn(links.out).length === 0, `exit ${links.code}: ${links.out.trim()}`)
+    check('the link scan counts what it printed',
+      links.out.includes(`${brokenIn(links.out).length} broken link(s)`), links.out.trim())
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

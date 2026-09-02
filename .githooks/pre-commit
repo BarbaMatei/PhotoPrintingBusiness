@@ -63,14 +63,17 @@ if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')"
 fi
 
 # Tables inside <!-- generated:... --> markers are rendered from the code, so a hand edit there is
-# drift. Drift only (--no-links): the link scan reads records this hook cannot ask anyone to fix.
+# drift. The full check — drift plus the link scan — runs here: reviews/ carries no broken link,
+# and the whole run costs ~0.4s on this machine.
 if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- reviews/README.md 'reviews/rules/*.md' 'reviews/runbooks/*.md' .claude/skills/loop-driver/SKILL.md .claude/skills/fix-review/SKILL.md)" ]; then
-  if ! node reviews/lib/cli/docs-sync.mjs --check --no-links >&2; then
+  if ! node reviews/lib/cli/docs-sync.mjs --check >&2; then
     echo "" >&2
-    echo "A generated block no longer matches the code that renders it. Edit the data behind it" >&2
-    echo "(reviews/lib/drive/rows.mjs, reviews/lib/drive/gates.mjs, reviews/lib/records/schema.mjs," >&2
+    echo "Either a generated block no longer matches the code that renders it — edit the data behind" >&2
+    echo "it (reviews/lib/drive/rows.mjs, reviews/lib/drive/gates.mjs, reviews/lib/records/schema.mjs," >&2
     echo "reviews/lib/records/validate.mjs), then run:" >&2
     echo "  node reviews/lib/cli/docs-sync.mjs --write" >&2
+    echo "— or a markdown link under reviews/ no longer resolves: fix the link the BROKEN line names," >&2
+    echo "or wrap it in backticks if it is a template rather than a link." >&2
     exit 1
   fi
 fi

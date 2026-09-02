@@ -74,8 +74,8 @@ export function hookCoverage(repo) {
   const hook = join(repo, '.githooks', 'pre-commit')
   if (!existsSync(hook)) return []
   const text = readFileSync(hook, 'utf8')
-  const call = text.indexOf('docs-sync.mjs --check --no-links')
-  if (call === -1) return ['.githooks/pre-commit no longer calls docs-sync --check --no-links']
+  const call = text.indexOf('docs-sync.mjs --check >&2')
+  if (call === -1) return ['.githooks/pre-commit no longer calls the full docs-sync --check (drift + links)']
   const gate = text.lastIndexOf('--diff-filter=ACMR --', call)
   if (gate === -1) return ['.githooks/pre-commit: no staged-path gate found before the docs-sync call']
   const spec = text.slice(gate + '--diff-filter=ACMR --'.length, text.indexOf(')', gate))
