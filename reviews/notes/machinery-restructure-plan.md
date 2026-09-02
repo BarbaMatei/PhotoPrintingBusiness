@@ -117,22 +117,24 @@ D9. The migration order and every deviation are recorded in
 |---|---|
 | Every piece in one named system | met — records/model/drive/fix/verify/measure/review/cli; 11 flat command shims are the permanent surface (pinned); `discovery-review.wf.js` stays flat by ruling (the Workflow harness wraps its source) |
 | Duplicate parsers one; each rule one home, prose cites it | met — one reader per artifact, one void rule, 11 generated doc blocks with a drift alarm the hook runs on doc-only edits |
-| docs-sync passes | met as wired (`--no-links`); plain `--check` stays red on 4 tolerated broken links until the two index v13 rows are repaired or ruled tolerated |
-| Suite green and smaller | green met (816); **smaller NOT MET** — 565→816 assertions by design (every fix pinned), fixture count ~unchanged (the drive-ledger merge was twice refused on evidence: 14 materially different ledgers) |
+| docs-sync passes | met — the hook runs the full `--check` (drift + links, ~0.4 s measured) since the chapter-close wave: no broken link is left, the tolerated list is empty, and a link quoted inside code reads as the template it is |
+| Suite green and smaller | green met (816, 828 after the chapter-close wave); **smaller NOT MET** — 565→816 assertions by design (every fix pinned), fixture count ~unchanged (the drive-ledger merge was twice refused on evidence: 14 materially different ledgers) |
 | Full run under one minute | **NOT MET** — 1m18–2m15 measured; three spawn-heavy test files own ~117 s; closing it needs their in-process rewrite (next session) |
 | No legacy tolerance for shapes the repo cannot produce | met — V2 tier, LEGACY_TOP, D-ids, frontmatter-map fallback gone; V3/V4 cut-offs stay (live records behind them) |
 
-**Owner items left open by this phase:** the ruling-4 premise correction (Decisions-block
-wording now has no automatic detector — the judge left it and the miner cannot see it);
-the two NOT MET criteria above; the citation scan now reads 38 — ADR references in
-bolt-038's own `src/` doc comments, pre-dating this branch; `038-039`'s resolution-v15
-carries 7 pre-existing doc-gate violations; the runbook's "Per-provider symmetry" lens row
-has no manifest key; the rebuilt skill evals are UNRUN (first `claude plugin eval` run is
-their shakedown); the recommended one-real-target run has still not happened.
+**Owner items left open by this phase:** the two NOT MET criteria above; the runbook's
+"Per-provider symmetry" lens row has no manifest key; the rebuilt skill evals are UNRUN
+(first `claude plugin eval` run is their shakedown); the recommended one-real-target run
+has still not happened.
+
+**Closed by the chapter-close wave (2026-09-02):** the ruling-4 premise correction is the
+verifier's own instruction now — runbook-verification step 3 flags an unclear or misleading
+Decisions block as a finding, with no detector; the citation scan reads 0; and
+`038-039`'s resolution-v15 passes the doc gate.
 
 **Next-session list:** suite under one minute (in-process rewrite of unit/records,
-flows/verify-fixes, unit/records-auditor); vocab.mjs/paths.mjs shim deletion decision;
-GATE MINER header rename with a baseline re-freeze; metrics-schema's running-prose event
-list (third copy); run-scoped-tests TAP parsing for `node --test`; the 67 auditor errors
-on the deliberately-broken fixture root (noise, assertion-free); optional runtime fixture
-builder for the drive-ledger family.
+flows/verify-fixes, unit/records-auditor); the 67 auditor errors on the deliberately-broken
+fixture root (noise, assertion-free); optional runtime fixture builder for the drive-ledger
+family. The chapter-close wave took the rest: both re-export shims are deleted, the
+disapprovals report is headed `DISAPPROVALS:`, metrics-schema's third event list is a
+citation now, and run-scoped-tests reads `node --test`'s TAP totals.
