@@ -126,10 +126,7 @@ D9. The migration order and every deviation are recorded in
 | Full run under one minute | **machine-load-dependent — met only on an idle machine**: 30–47 s warm on an idle machine (2026-09-02 morning), ~74 s cold; the same machine under load later that same day measured 82–103 s, with the prior commit — before the fixture-builder conversion — re-measured at 81.9 s in the same loaded session, so that conversion added nothing to the loaded number. Won by batching the auditor's git subprocesses (553→336 per run, output byte-identical) and running test files in four lanes, with zero checks converted or weakened. The remaining floor is `flows/verify-fixes` (~31 s of real revert-and-rerun cycles, kept by design) |
 | No legacy tolerance for shapes the repo cannot produce | met — V2 tier, LEGACY_TOP, D-ids, frontmatter-map fallback gone; V3/V4 cut-offs stay (live records behind them) |
 
-**Owner items left open by this phase:** the two NOT MET criteria above; the runbook's
-"Per-provider symmetry" lens row has no manifest key; the rebuilt skill evals are UNRUN
-(first `claude plugin eval` run is their shakedown); the recommended one-real-target run
-has still not happened.
+**Open items from this phase:** tracked live in [open-items.md](../open-items.md), not restated here.
 
 **Closed by the chapter-close wave (2026-09-02):** the ruling-4 premise correction is the
 verifier's own instruction now — runbook-verification step 3 flags an unclear or misleading
@@ -144,9 +141,4 @@ schema violations plus placeholder commits that can never resolve), with the cou
 pinned by an assertion so a careless addition reddens the suite instead of hiding in the
 noise.
 
-**Next-session list:** cold/loaded-machine suite time (82–103 s under load vs. the ≤1 min
-idle-machine criterion above) if it ever matters. The chapter-close waves took the rest:
-the suite runs in 30–47 s warm (auditor git subprocesses batched byte-identically, test
-files in four lanes, zero checks converted), both re-export shims are deleted, the
-disapprovals report is headed `DISAPPROVALS:`, metrics-schema's third event list is a
-citation now, and run-scoped-tests reads `node --test`'s TAP totals.
+**Next-session list:** tracked live in [open-items.md](../open-items.md), not restated here.
