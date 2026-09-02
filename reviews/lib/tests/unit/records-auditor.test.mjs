@@ -335,4 +335,10 @@ closed: 2026-07-15
     !r.out.includes('954-voided-misstamp resolution-v1.md:'), r.out.split('\n').find(l => l.includes('954-voided-misstamp resolution-v1.md:')) ?? '')
   check('auditor grandfathers resolved rounds from before the 2026-08-28 cut-off', !r.out.includes('901-good-target resolution-v1.md:') && !r.out.includes('901-good-target: resolved without'), r.out.split('\n').find(l => l.includes('901-good-target resolution')) ?? '')
 
+  // The fixture root is intentional-only: every error it reports is either named by an assertion
+  // above or listed in fixtures/repo/README.md as planted, so the count is worth pinning — a
+  // record added there carelessly reddens this instead of disappearing into the noise.
+  const errorLines = r.out.split('\n').filter(l => l.startsWith('ERROR'))
+  check('the deliberately-broken fixture root reports exactly its 30 planted errors',
+    errorLines.length === 30, `${errorLines.length} error line(s):\n      ${errorLines.join('\n      ')}`)
 }
