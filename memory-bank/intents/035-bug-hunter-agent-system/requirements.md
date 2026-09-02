@@ -9,7 +9,7 @@ updated: 2026-06-10T10:40:14Z
 # Requirements: Bug-Hunting Agent System (Tooling Intent)
 
 > **Tooling-only intent.** Builds the multi-agent bug-hunting system described in
-> `docs/agent-systems/bug-hunter-build-guide.md` — **42 numbered briefs** across 5 additive phases
+> `docs/agent-systems/bug-hunter-build-guide.md` — **43 numbered briefs** across 5 additive phases
 > plus an optional integration tier. Components are Claude Code skills (agents are
 > built as skills defining their procedure, per the guide's shared conventions).
 > **The system is read-only on application source** — this intent ships no production
@@ -54,7 +54,7 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
 ## Scope
 
 ### In Scope
-- All 42 briefs from the guide's master build order, one story each:
+- All 43 briefs from the guide's master build order, one story each:
   - **Phase 1 — Skeleton** (Prompts 1–7): `ledger-io`, `bug-documentation`,
     `deduplication`, `report-rendering`, `triage-intake`, `general-hunter`,
     `orchestrator` [skeleton].

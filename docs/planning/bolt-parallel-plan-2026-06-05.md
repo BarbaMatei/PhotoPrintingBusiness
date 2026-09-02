@@ -2,7 +2,7 @@
 
 > Author: bolt-parallel-planner. Repo: photo-printing e-commerce (.NET 8 API + Angular + PostgreSQL/EF Core).
 > Scope: every **planned, unimplemented** bolt remaining in `memory-bank/bolts/`.
-> Branch state at planning time: `analysis/architect-review` (43 commits ahead of `main`, `main` is a strict ancestor).
+> Branch state at planning time: `analysis/architect-review` (43 commits ahead of `main`, `main` is a strict ancestor). — *historical: `main` absorbed the cascade through PR #10 on 2026-09-02; only this branch's docs remained.*
 > **How to execute this plan**: see `docs/planning/agent-commands.md` — the command reference for the planner and orchestrator agents.
 
 ---

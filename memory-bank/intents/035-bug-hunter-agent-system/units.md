@@ -11,7 +11,7 @@ updated: 2026-06-10T10:40:14Z
 > backend/frontend DDD decomposition does **not** apply. Units mirror the guide's
 > **additive phases** (Part I, master build order): each unit is a phase after which
 > the whole system still runs end-to-end. Stories map 1:1 to the guide's numbered
-> briefs (42 total). All bolts are `simple-construction-bolt`; outputs are Claude Code
+> briefs (43 total). All bolts are `simple-construction-bolt`; outputs are Claude Code
 > skills, not application code.
 >
 > ⚠️ **Cross-cutting (FR-1, FR-2), binding for every unit:** every component is built
@@ -22,7 +22,7 @@ updated: 2026-06-10T10:40:14Z
 
 ## Units Overview
 
-This intent decomposes into **6 units** (42 stories):
+This intent decomposes into **6 units** (43 stories):
 
 ### Unit 1: 001-phase-1-skeleton
 
