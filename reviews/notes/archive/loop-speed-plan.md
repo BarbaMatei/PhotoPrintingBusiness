@@ -1,3 +1,7 @@
+> **Historical record (archived 2026-09-02)** — describes decisions and states as of its
+> dates; the machinery has since been restructured, and the CURRENT map is the
+> `reviews/lib` folder layout plus `reviews/README.md`.
+
 # Loop speed redesign — implementation plan
 
 Owner-approved 2026-08-22. Reduces the review loop's wall-clock cost without moving the

@@ -5,6 +5,10 @@ created: 2026-08-28
 owner: Matei Barba
 ---
 
+> **Historical record (archived 2026-09-02)** — describes decisions and states as of its
+> dates; the machinery has since been restructured, and the CURRENT map is the
+> `reviews/lib` folder layout plus `reviews/README.md`.
+
 # Phase 7 — restructure the review machinery into named subsystems
 
 Owner decision 2026-08-28: after the loop-speed redesign finishes (phases 5 and 6 in

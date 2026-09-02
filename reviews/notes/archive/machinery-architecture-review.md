@@ -6,6 +6,10 @@ owner: Matei Barba
 charter: machinery-restructure-plan.md
 ---
 
+> **Historical record (archived 2026-09-02)** — describes decisions and states as of its
+> dates; the machinery has since been restructured, and the CURRENT map is the
+> `reviews/lib` folder layout plus `reviews/README.md`.
+
 # Review machinery — architecture review (phase 7a)
 
 ## In plain words — read this first
@@ -79,6 +83,8 @@ all green, 2–3 minutes wall (the handoff's figure; not re-timed here). No real
 
 ## 1. Dependency map
 
+*Pre-restructure snapshot — see the historical-record banner at the top of this file.*
+
 Imports between modules (`a → b` = a imports b):
 
 | Module | Imports | Reads | Writes |
@@ -119,6 +125,8 @@ Who invokes which script (prose → code):
 Prose that restates a code rule: see section 4.
 
 ## 2. Inventory with verdicts
+
+*Pre-restructure snapshot — see the historical-record banner at the top of this file.*
 
 Confidence: H = evidence in this file, M = evidence but a live run could change it, L = judgment.
 
