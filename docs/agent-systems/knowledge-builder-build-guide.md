@@ -19,7 +19,7 @@ it, and it wins over any brief.*
 
 > **What v3.4 adds (changelog).** Code-index seam closure from cross-system review v4 of 2026-06-15
 > (findings J1, J2, J3, J4 in
-> `docs/agent-systems/reviews/cross-system-review-v4-2026-06-15.md`): the sole-writer convention now
+> cross-system review v4 (2026-06-15; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v4-2026-06-15.md`)): the sole-writer convention now
 > **carves out the shared code index** as the one sanctioned exception (J2); the close audit keeps
 > its store-scoped diff **and** gains a **forbidden-ground check** (no write under repo source /
 > `memory-bank/` / `docs/`) (J1); the shared code index is an **untracked, gitignored, regenerable**
@@ -30,7 +30,7 @@ it, and it wins over any brief.*
 
 > **What v3.3 adds (changelog).** Runtime co-residence fixes from cross-system review v3 of
 > 2026-06-12 (findings I1, I7, I8 + the owner decision on I3 in
-> `docs/agent-systems/reviews/cross-system-review-v3-2026-06-12.md`): the orchestrator's Open
+> cross-system review v3 (2026-06-12; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v3-2026-06-12.md`)): the orchestrator's Open
 > checks the **bug-hunter's `.run-lock`** (cross-system mutex — at most one active run across both
 > systems); the write audit is **scoped to `knowledge/**` + the shared code index** so a sibling
 > run can't trip it; the publish-commit is **path-scoped** (`git add -- knowledge/`) and serialized
@@ -42,7 +42,7 @@ it, and it wins over any brief.*
 
 > **What v3.2 adds (changelog).** Mechanisms from cross-system review v2 of 2026-06-12 (findings
 > H3, H4, H8, H11, H13, H16, H25–H28, H30, H31 + shares of H2/H12 in
-> `docs/agent-systems/reviews/cross-system-review-v2-2026-06-12.md`): the ledger gains a
+> cross-system review v2 (2026-06-12; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v2-2026-06-12.md`)): the ledger gains a
 > **`proposals` section** + `queue_proposal`/`record_decision` ops so the approval queue, rejections,
 > and quarantines persist (H11); the orchestrator **creates/removes the run lock** with a stale-lock
 > rule, **audits its run's writes** at close, and **commits each publish to git** (H3, H12, H16 —
@@ -55,7 +55,7 @@ it, and it wins over any brief.*
 > contract is **v1.2**, the bug-hunter guide **v3.3**.
 
 > **What v3.1 adds (changelog).** Point fixes from the cross-system review of 2026-06-11 (findings
-> G4, G11, G12, G13 in `docs/agent-systems/reviews/cross-system-review-v1-2026-06-11.md`) — all
+> G4, G11, G12, G13 in cross-system review v1 (2026-06-11; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v1-2026-06-11.md`)) — all
 > additive: a **within-anchor ordinal** whenever one anchor yields more than one contract of the
 > same kind, so signatures can't silently merge distinct contracts (G4); a **Windows-safe publish**
 > note (rename-over-open-file fails on win32 — retry with backoff; G11); `approval-intake` takes the

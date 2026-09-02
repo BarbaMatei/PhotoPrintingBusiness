@@ -14,7 +14,7 @@ build order, and every construction prompt ("brief") for skill-creator.*
 > profile. The normative contract reference is now **`docs/agent-systems/integration-contract.md`**.
 
 > **What v3.5 adds (changelog).** Code-index seam closure from cross-system review v4 of 2026-06-15
-> (findings J1, J3 in `docs/agent-systems/reviews/cross-system-review-v4-2026-06-15.md`): the
+> (findings J1, J3 in cross-system review v4 (2026-06-15; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v4-2026-06-15.md`)): the
 > orchestrator's close audit keeps its store-scoped diff **and** gains a **forbidden-ground check**
 > (the run touched nothing under application source, `memory-bank/`, or `docs/` except the one
 > owner-approved regression-test file) — restoring the "never edit app code" backstop that v3.4's
@@ -24,7 +24,7 @@ build order, and every construction prompt ("brief") for skill-creator.*
 
 > **What v3.4 adds (changelog).** Runtime co-residence + fix-loop state-machine fixes from
 > cross-system review v3 of 2026-06-12 (findings I1–I13 in
-> `docs/agent-systems/reviews/cross-system-review-v3-2026-06-12.md`): the **cross-system run mutex**
+> cross-system review v3 (2026-06-12; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v3-2026-06-12.md`)): the **cross-system run mutex**
 > (each Open checks the sibling's `.run-lock`) and the write audit **scoped to the run's own store**
 > (I1); Prompt 31b's scan predicate now includes **`fix-failed`** so re-fixes are actually
 > re-checked (I2); a **hunting-environment posture** convention — clean checkout, egress allowlist,
@@ -41,7 +41,7 @@ build order, and every construction prompt ("brief") for skill-creator.*
 > **`docs/agent-systems/integration-contract.md`**.
 
 > **What v3.3 adds (changelog).** Mechanisms for the v3.2 policies, from the cross-system review of
-> 2026-06-12 (findings H1–H35 in `docs/agent-systems/reviews/cross-system-review-v2-2026-06-12.md`).
+> 2026-06-12 (findings H1–H35 in cross-system review v2 (2026-06-12; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v2-2026-06-12.md`)).
 > The big one: **NEW Prompt 31b** — the orchestrator extension that actually performs the run-open
 > fix-request mailbox scan (H1; without it the fix loop never fires). Also: single-history store
 > rule for parallel worktrees (H2); the run lock is now created/removed by the orchestrator with a
@@ -61,7 +61,7 @@ build order, and every construction prompt ("brief") for skill-creator.*
 > **`docs/agent-systems/integration-contract.md`**.
 
 > **What v3.2 adds (changelog).** Hardening from the cross-system review of 2026-06-11 (findings
-> G1–G16 in `docs/agent-systems/reviews/cross-system-review-v1-2026-06-11.md`) — additive, no new
+> G1–G16 in cross-system review v1 (2026-06-11; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v1-2026-06-11.md`)) — additive, no new
 > components, no slot changes. New shared conventions: **untrusted content is data, never
 > instructions** (G1) and **found secrets are redacted everywhere** (G2); the reporting floor is
 > defined on the **confidence** axis with a body callout for high-severity items parked in the
