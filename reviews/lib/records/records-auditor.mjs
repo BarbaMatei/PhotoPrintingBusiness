@@ -9,7 +9,7 @@
 // Usage: node reviews/lib/records-auditor.mjs [--root <repoRoot>] [--citations] [target ...]
 // Exit 0 = no errors (warnings allowed) · 1 = errors.
 import { readFileSync, existsSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execSync, spawnSync } from 'node:child_process'
 import { join, relative } from 'node:path'
 import { ID_COUNTER, INDEX as INDEX_FILE, REVIEWS as LIVE_REVIEWS, TRACK_RECORD } from './schema.mjs'
 import { auditIds, auditTarget, citationScan, listTargets } from './validate.mjs'
@@ -31,6 +31,29 @@ function git(cmd) {
   return execSync(`git ${cmd}`, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim()
 }
 const shaCache = new Map()
+// Two git processes for a whole records tree instead of three per commit; a batch that cannot run
+// leaves the cache empty, and checkSha below then asks per sha exactly as it always did.
+function warmShaCache(shas) {
+  if (!shas.length) return
+  const batch = spawnSync('git', ['cat-file', '--batch-check'], { cwd: ROOT, encoding: 'utf8', input: `${shas.join('\n')}\n` })
+  if (batch.status !== 0 || typeof batch.stdout !== 'string') return
+  const out = batch.stdout.split('\n')
+  const oids = new Map()
+  shas.forEach((sha, i) => {
+    const parts = (out[i] ?? '').trim().split(' ')
+    if (parts[1] === 'commit') oids.set(sha, parts[0])
+  })
+  let pushed = new Set()
+  if (oids.size) {
+    const revs = spawnSync('git', ['rev-list', '--remotes', '--tags'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 })
+    if (revs.status !== 0 || typeof revs.stdout !== 'string') return
+    pushed = new Set(revs.stdout.split('\n').filter(Boolean))
+  }
+  for (const sha of shas) {
+    const oid = oids.get(sha)
+    shaCache.set(sha, oid ? { resolves: true, pushed: pushed.has(oid) } : { resolves: false, pushed: false })
+  }
+}
 function checkSha(sha) {
   if (shaCache.has(sha)) return shaCache.get(sha)
   const r = { resolves: false, pushed: false }
@@ -49,8 +72,20 @@ const INDEX = existsSync(underRoot(INDEX_FILE)) ? readFileSync(underRoot(INDEX_F
 if (!INDEX) warn('reviews/state/index.md not found — index pairing skipped')
 const TRACK = existsSync(underRoot(TRACK_RECORD)) ? readFileSync(underRoot(TRACK_RECORD), 'utf8') : null
 
+const targets = listTargets(REVIEWS, { only })
+
+// The commits are named deep inside auditTarget, so a silent pass reported nowhere collects them
+// first and the batch below resolves the whole set at once.
+const probed = new Set()
+const quiet = () => { }
+for (const t of targets) {
+  auditTarget(t, { err: quiet, warn: quiet, info: quiet, gates: quiet, versions, index: INDEX, track: TRACK,
+    checkSha: sha => { probed.add(sha); return { resolves: true, pushed: true } } })
+}
+warmShaCache([...probed])
+
 const ctx = { err, warn, info, checkSha, versions, gates: auditHandBackGates, index: INDEX, track: TRACK }
-for (const t of listTargets(REVIEWS, { only })) auditTarget(t, ctx)
+for (const t of targets) auditTarget(t, ctx)
 
 auditIds(listTargets(REVIEWS, { only, all: true }), { err, counterPath: underRoot(ID_COUNTER) })
 
