@@ -229,9 +229,10 @@ backfilled with estimates.
   `cost.agents`.
 - **A design pass** is recorded as an ordinary fix round whose `notes` carry
   `design-pass:<area>` — the router's one-design-pass-per-component cap reads that marker.
-- **Hand-back evidence events** (see the worklog contract in doc-contracts.md):
-  `protocol-written`, `round-review-dispatched`/`-returned`,
-  `test-audit-dispatched`/`-returned`. The auditor refuses a `resolved` resolution
+- **Hand-back evidence events** are listed by the worklog contract in
+  [doc-contracts.md](doc-contracts.md), generated from the stamper's vocabulary. This file
+  names none of them, for the same reason it names none of the fixer's other events: a
+  hand-typed second list is a copy that drifts. The auditor refuses a `resolved` resolution
   whose round lacks the evidence its content requires.
 
 ## Corrections
