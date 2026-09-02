@@ -9,7 +9,7 @@ using PhotoPrint.API.Services.Invoicing;
 namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
 /// <summary>
-/// CAS transition tests for <see cref="InvoiceLifecycle"/> (ADR-016). Uses
+/// CAS transition tests for <see cref="InvoiceLifecycle"/>. Uses
 /// a real PostgreSQL database (NOT EF InMemory) because <c>ExecuteUpdateAsync</c> is
 /// what we're verifying — it doesn't translate cleanly under EF InMemory.
 /// </summary>

@@ -8,7 +8,7 @@ using QuestPDF.Infrastructure;
 namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
-/// QuestPDF document tree for a Romanian invoice (ADR-021). One <c>.cs</c>
+/// QuestPDF document tree for a Romanian invoice. One <c>.cs</c>
 /// file replaces the originally-planned Razor template — operationally
 /// simpler, no Chromium dependency, deterministic byte output across hosts.
 ///

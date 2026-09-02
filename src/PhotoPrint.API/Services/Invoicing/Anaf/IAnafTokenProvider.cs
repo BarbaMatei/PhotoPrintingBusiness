@@ -2,7 +2,7 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 
 /// <summary>
 /// Owns the OAuth bearer token used against ANAF SPV. In-process singleton
-/// cache per ADR-013 (Sameday's pattern). 60s pre-expiry safety window;
+/// cache (Sameday's pattern). 60s pre-expiry safety window;
 /// thundering-herd gated by a <see cref="SemaphoreSlim"/>.
 /// </summary>
 public interface IAnafTokenProvider

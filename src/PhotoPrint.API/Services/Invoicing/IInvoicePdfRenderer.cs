@@ -5,7 +5,7 @@ namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
 /// Renders a customer-facing invoice PDF from <c>(Order, Invoice, Seller)</c>.
-/// Implementation uses QuestPDF per ADR-021 (no Chromium dependency).
+/// Implementation uses QuestPDF (no Chromium dependency).
 /// </summary>
 public interface IInvoicePdfRenderer
 {

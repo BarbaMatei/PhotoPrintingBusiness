@@ -9,7 +9,7 @@ namespace PhotoPrint.API.Validators;
 /// Seller fields are embedded in every UBL XML and PDF, so a typo here
 /// silently invalidates every emitted invoice — surface it at startup.
 /// Bolt 039 follows the project's <c>IValidateOptions&lt;T&gt;</c> pattern;
-/// FluentValidation remains the path for controller DTOs (ADR-002).
+/// FluentValidation remains the path for controller DTOs.
 /// </summary>
 public sealed partial class SellerSettingsValidator : IValidateOptions<SellerSettings>
 {

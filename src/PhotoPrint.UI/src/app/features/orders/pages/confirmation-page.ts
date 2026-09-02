@@ -303,7 +303,7 @@ export class ConfirmationPage implements OnInit {
         this.pollFailed.set(false);
         if (this.polls < MAX_SETTLE_POLLS) {
           this.polls++;
-          // PPW-672: a timer that outlives the page would clear a basket built after it.
+          // A timer that outlives the page would clear a basket built after it.
           this.settleTimer = setTimeout(() => this.read(), SETTLE_POLL_MS);
           return;
         }

@@ -6,7 +6,7 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 /// <summary>
 /// Attaches the bearer token to every outbound ANAF SPV call and implements
 /// the "401 → invalidate → re-auth → retry once → <see cref="AnafAuthException"/>"
-/// rule per ADR-014 pattern (same shape as <c>SamedayAuthHandler</c>).
+/// rule (same shape as <c>SamedayAuthHandler</c>).
 /// Lives OUTSIDE the Polly resilience pipeline so a session refresh does
 /// not burn the transport-retry budget.
 /// </summary>

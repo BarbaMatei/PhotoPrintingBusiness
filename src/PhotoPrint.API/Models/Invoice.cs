@@ -17,7 +17,7 @@ public class Invoice
 
     /// <summary>Full formatted invoice number, e.g. <c>"FT-2026-00001"</c>.
     /// Immutable once written. The unique constraint on this column is the
-    /// last-line-of-defence against numbering races (ADR-020).</summary>
+    /// last-line-of-defence against numbering races.</summary>
     public string InvoiceNumber { get; set; } = string.Empty;
 
     /// <summary>Series code, e.g. <c>"FT"</c>. Denormalised from

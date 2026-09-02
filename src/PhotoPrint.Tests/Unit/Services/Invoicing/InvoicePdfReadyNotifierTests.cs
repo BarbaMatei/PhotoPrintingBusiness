@@ -10,7 +10,7 @@ using PhotoPrint.Tests.Helpers;
 namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
 /// <summary>
-/// ADR-022 — the customer-facing "your invoice is ready" follow-up email
+/// The customer-facing "your invoice is ready" follow-up email
 /// is suppressed during the dual-write rollout window. This test pins the
 /// feature flag so a future PR can't silently flip the default to <c>true</c>.
 /// </summary>
@@ -19,8 +19,7 @@ public class InvoicePdfReadyNotifierTests
     [Fact]
     public void Default_settings_have_attachments_disabled()
     {
-        // Pin the default. Production rollout flips this to true AFTER the
-        // inspection week — flipping it BEFORE is what ADR-022 prevents.
+        // The rollout may only flip this to true after the inspection week.
         var defaults = new InvoicingSettings();
         defaults.CustomerEmailAttachments.Enabled.Should().BeFalse();
     }

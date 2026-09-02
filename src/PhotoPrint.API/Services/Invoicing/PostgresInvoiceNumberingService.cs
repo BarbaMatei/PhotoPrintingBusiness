@@ -4,8 +4,6 @@ using PhotoPrint.API.Data;
 namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
-/// Postgres implementation per ADR-020.
-///
 /// Gap-on-rollback is the documented trade-off (the sequence advances
 /// even if the calling transaction rolls back). Callers must invoke this
 /// inside the same transaction that persists the <c>Invoice</c> row, and

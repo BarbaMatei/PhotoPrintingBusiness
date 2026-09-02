@@ -169,13 +169,7 @@ public class OrderService : IOrderService
             guestEmail = gs?.Email;
         }
 
-        // 4. VAT breakdown (bolt 038). Romanian convention: prices are
-        // VAT-inclusive; VAT is extracted from the gross total, not added
-        // on top. Shipping is folded into the gross at the same rate as
-        // goods (the simpler/common B2C convention — see ADR-019 rounding,
-        // and a code-level comment in VatCalculator on the shipping
-        // assumption). Rate is snapshotted onto the order; later config
-        // changes do NOT mutate existing rows.
+        // Romanian convention: prices are VAT-inclusive, so VAT is extracted from the gross total (shipping folded in at the same rate as goods), and the rate is snapshotted onto the order so later config changes never mutate existing rows.
         var vat = VatCalculator.ExtractBreakdown(total, _vatSettings.Rate);
 
         // 5. Build and persist the order

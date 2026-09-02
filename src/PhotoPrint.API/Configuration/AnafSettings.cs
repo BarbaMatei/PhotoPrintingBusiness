@@ -8,7 +8,7 @@ namespace PhotoPrint.API.Configuration;
 /// Secrets (<see cref="ClientSecret"/>, <see cref="CertPath"/>,
 /// <see cref="CertPassword"/>) live in environment variables in production
 /// (<c>Anaf__ClientSecret</c>, <c>Anaf__CertPath</c>, <c>Anaf__CertPassword</c>) —
-/// never in <c>appsettings.json</c> (ADR-006).
+/// never in <c>appsettings.json</c>.
 /// </summary>
 public sealed class AnafSettings
 {
@@ -23,7 +23,7 @@ public sealed class AnafSettings
     public string CertPassword { get; set; } = string.Empty;
 
     /// <summary>Worker poll cadence. Default 30 min matches the
-    /// 5-business-day ANAF SLA with ~240× headroom (ADR-023).</summary>
+    /// 5-business-day ANAF SLA with ~240× headroom.</summary>
     public int PollIntervalMinutes { get; set; } = 30;
 
     /// <summary>Max invoices the worker fetches per tick. Caps DB read
@@ -31,8 +31,8 @@ public sealed class AnafSettings
     public int MaxBatchSize { get; set; } = 50;
 
     /// <summary>Retry budget for ANAF rejections in hours.
-    /// Default <c>1h, 4h, 16h, 64h</c> then escalate to <c>Failed</c>
-    /// (ADR-024). Attempt count is derived from
+    /// Default <c>1h, 4h, 16h, 64h</c> then escalate to <c>Failed</c>.
+    /// Attempt count is derived from
     /// <c>(now - Invoice.CreatedAt)</c> against the cumulative sum;
     /// no persisted counter.</summary>
     public int[] BackoffHours { get; set; } = [1, 4, 16, 64];

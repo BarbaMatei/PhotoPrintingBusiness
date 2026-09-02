@@ -7,7 +7,7 @@ using PhotoPrint.API.Services.Invoicing;
 namespace PhotoPrint.Tests.Unit.Services.Invoicing;
 
 /// <summary>
-/// Smoke tests for <see cref="InvoicePdfRenderer"/> (ADR-021 — QuestPDF).
+/// Smoke tests for <see cref="InvoicePdfRenderer"/> (QuestPDF).
 /// We don't pixel-diff the output; we verify that the renderer produces a
 /// non-empty PDF file containing the expected literals (invoice number,
 /// seller name, totals). This is enough to catch "the template stopped
@@ -94,13 +94,7 @@ public class InvoicePdfRendererTests
     [Fact]
     public void Pdf_output_is_well_formed_and_non_trivial_size()
     {
-        // QuestPDF compresses text streams (FlateDecode), so literal text
-        // doesn't appear in the byte view. We assert structural validity:
-        // the PDF starts with %PDF-, ends with %%EOF, and is large enough
-        // to contain actual rendered content (not a blank page). Content
-        // correctness is verified at the XML builder layer (same input
-        // data) and via manual inspection during the dual-write rollout
-        // inspection week (ADR-022).
+        // QuestPDF compresses text streams (FlateDecode), so no literal text appears in the byte view — this asserts structural validity only; content correctness is pinned at the XML builder layer.
         var (order, invoice) = Fixture();
         var bytes = new InvoicePdfRenderer().Render(order, invoice, Seller());
 

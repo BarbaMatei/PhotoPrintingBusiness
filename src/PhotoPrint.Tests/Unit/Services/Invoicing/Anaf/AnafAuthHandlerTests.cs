@@ -8,7 +8,7 @@ using PhotoPrint.Tests.Unit.Services.Sameday;     // reuse ScriptedHttpMessageHa
 namespace PhotoPrint.Tests.Unit.Services.Invoicing.Anaf;
 
 /// <summary>
-/// ADR-014 pattern applied to ANAF: 401 triggers token-invalidate + retry once,
+/// 401 triggers token-invalidate + retry once,
 /// a second 401 raises <see cref="AnafAuthException"/>. The retry uses the
 /// FRESH token, not the original. Polly is NOT involved in the 401 path.
 /// </summary>

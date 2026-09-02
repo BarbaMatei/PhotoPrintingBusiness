@@ -10,7 +10,7 @@ namespace PhotoPrint.API.Services.Invoicing.Anaf;
 /// Typed <see cref="HttpClient"/> for ANAF SPV. The HTTP pipeline (configured
 /// by <c>IHttpClientFactory</c> in <c>Program.cs</c>):
 ///
-///   outer:  AnafAuthHandler   (bearer + 401-retry-once per ADR-014)
+///   outer:  AnafAuthHandler   (bearer + 401-retry-once)
 ///   inner:  Polly transient   (5xx / 408 / 429 with exponential backoff)
 ///
 /// Body content is never logged — buyer PII would leak. Endpoint paths

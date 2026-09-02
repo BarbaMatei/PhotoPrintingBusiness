@@ -3,7 +3,7 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
-/// CAS façade over <c>ExecuteUpdateAsync</c> per ADR-016 for
+/// CAS façade over <c>ExecuteUpdateAsync</c> for
 /// <see cref="Invoice.AnafStatus"/> transitions. Every status mutation in
 /// bolt 039 — worker poll outcomes, admin retries, give-up after backoff
 /// exhaustion — goes through one of these methods.

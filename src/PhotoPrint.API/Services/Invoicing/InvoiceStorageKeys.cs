@@ -3,7 +3,7 @@ using PhotoPrint.API.Models;
 namespace PhotoPrint.API.Services.Invoicing;
 
 /// <summary>
-/// Caller-supplied storage key policy for invoice PDFs (ADR-007).
+/// Caller-supplied storage key policy for invoice PDFs.
 /// The adapter (<c>IStorageService</c>) persists bytes at this exact key;
 /// naming lives in the application layer.
 /// </summary>
