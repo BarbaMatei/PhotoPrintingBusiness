@@ -21,6 +21,7 @@
 - **Last index change (prior 5)**: 2026-06-02 (drift repair — see notes below)
 - **Note**: intent 024 (order-photo archive) shipped 2026-05-30 → 2026-06-01 (bolts 051, 052, 053). Intent 015 (Sameday shipping integration) shipped 2026-06-02 (bolts 036, 037). Story 019-003 superseded → backfill done via intent 024 bolt 051. Bolt 050 is unallocated (no directory exists).
 - **Drift-repair note (2026-06-02)**: prior to this edit, the index undercounted ~51 stories. Flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED`: all stories under intents 004, 010, 012, 015, 023. Added sections for intents 005–009 + 011 which were missing from the index entirely.
+- **Drift-repair note (2026-09-03)**: 11 stories of intents 016 (bolts 038/039) and 020 (bolts 044/045) flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED` — shipped in `0c6938c` and `c09675d`; roll-up corrected (IMPLEMENTED 80→91, NOT STARTED 20→9).
 
 ---
 
@@ -793,13 +794,13 @@
 
 #### Unit: 001-vat-calculation (2 stories) — Bolt: 038
 
-### 001-vat-fields-and-computation.md ⬜ NOT STARTED
+### 001-vat-fields-and-computation.md ✅ IMPLEMENTED
 **Title**: Schema additions + VAT computed on order creation
 **Priority**: Must
 **Path**: `intents/016-romanian-vat-efactura/units/001-vat-calculation/stories/001-vat-fields-and-computation.md`
 **Bolt**: 038
 
-### 002-invoice-entity-and-numbering.md ⬜ NOT STARTED
+### 002-invoice-entity-and-numbering.md ✅ IMPLEMENTED
 **Title**: Invoice entity + Postgres sequence per series per year
 **Priority**: Must
 **Path**: `intents/016-romanian-vat-efactura/units/001-vat-calculation/stories/002-invoice-entity-and-numbering.md`
@@ -807,25 +808,25 @@
 
 #### Unit: 002-efactura-generation-and-anaf (4 stories) — Bolt: 039
 
-### 001-ubl-xml-builder.md ⬜ NOT STARTED
+### 001-ubl-xml-builder.md ✅ IMPLEMENTED
 **Title**: UBL 2.1 + CIUS-RO compliant XML builder
 **Priority**: Must
 **Path**: `intents/016-romanian-vat-efactura/units/002-efactura-generation-and-anaf/stories/001-ubl-xml-builder.md`
 **Bolt**: 039
 
-### 002-anaf-spv-client.md ⬜ NOT STARTED
+### 002-anaf-spv-client.md ✅ IMPLEMENTED
 **Title**: ANAF SPV OAuth + upload + status-check client + retry job
 **Priority**: Must
 **Path**: `intents/016-romanian-vat-efactura/units/002-efactura-generation-and-anaf/stories/002-anaf-spv-client.md`
 **Bolt**: 039
 
-### 003-invoice-pdf-renderer-and-endpoint.md ⬜ NOT STARTED
+### 003-invoice-pdf-renderer-and-endpoint.md ✅ IMPLEMENTED
 **Title**: PDF rendering + customer endpoint + email attachment
 **Priority**: Must
 **Path**: `intents/016-romanian-vat-efactura/units/002-efactura-generation-and-anaf/stories/003-invoice-pdf-renderer-and-endpoint.md`
 **Bolt**: 039
 
-### 004-admin-invoice-list-and-retry.md ⬜ NOT STARTED
+### 004-admin-invoice-list-and-retry.md ✅ IMPLEMENTED
 **Title**: Admin invoice list + retry failed ANAF uploads + XML download
 **Priority**: Should
 **Path**: `intents/016-romanian-vat-efactura/units/002-efactura-generation-and-anaf/stories/004-admin-invoice-list-and-retry.md`
@@ -959,19 +960,19 @@
 
 #### Unit: 001-tracing-and-metrics (3 stories) — Bolt: 044
 
-### 001-otel-tracing-instrumentation.md ⬜ NOT STARTED
+### 001-otel-tracing-instrumentation.md ✅ IMPLEMENTED
 **Title**: OpenTelemetry SDK + ASP.NET / HttpClient / EF Core instrumentation
 **Priority**: Should
 **Path**: `intents/020-observability-stack/units/001-tracing-and-metrics/stories/001-otel-tracing-instrumentation.md`
 **Bolt**: 044
 
-### 002-business-metrics-and-prometheus.md ⬜ NOT STARTED
+### 002-business-metrics-and-prometheus.md ✅ IMPLEMENTED
 **Title**: Define business counters/histograms and expose `/metrics`
 **Priority**: Should
 **Path**: `intents/020-observability-stack/units/001-tracing-and-metrics/stories/002-business-metrics-and-prometheus.md`
 **Bolt**: 044
 
-### 003-per-route-sampling.md ⬜ NOT STARTED
+### 003-per-route-sampling.md ✅ IMPLEMENTED
 **Title**: Per-route OTel sampler (5 % for hot read endpoints)
 **Priority**: Should
 **Path**: `intents/020-observability-stack/units/001-tracing-and-metrics/stories/003-per-route-sampling.md`
@@ -979,13 +980,13 @@
 
 #### Unit: 002-error-tracking-and-slos (2 stories) — Bolt: 045
 
-### 001-sentry-aspnet-integration.md ⬜ NOT STARTED
+### 001-sentry-aspnet-integration.md ✅ IMPLEMENTED
 **Title**: Sentry SDK with correlation + release tagging + PII scrubbing
 **Priority**: Must
 **Path**: `intents/020-observability-stack/units/002-error-tracking-and-slos/stories/001-sentry-aspnet-integration.md`
 **Bolt**: 045
 
-### 002-slo-documentation-and-dashboard.md ⬜ NOT STARTED
+### 002-slo-documentation-and-dashboard.md ✅ IMPLEMENTED
 **Title**: SLO doc + sample Grafana dashboard JSON
 **Priority**: Should
 **Path**: `intents/020-observability-stack/units/002-error-tracking-and-slos/stories/002-slo-documentation-and-dashboard.md`
