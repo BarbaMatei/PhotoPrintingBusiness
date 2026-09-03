@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Bucharest",
+  "schedule": ["* * 1 * *"],
+  "labels": ["dependencies"],
+  "automerge": false,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "pin",
+  "packageRules": [
+    {
+      "description": "Major upgrades are a quarterly, deliberate exercise, not a monthly one.",
+      "matchUpdateTypes": ["major"],
+      "schedule": ["* * 1 1,4,7,10 *"]
+    },
+    {
+      "description": "The OpenTelemetry packages must move as a set; a version skew across them breaks SDK init.",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["/^OpenTelemetry\\./"],
+      "groupName": "OpenTelemetry"
+    },
+    {
+      "description": "EF Core and the Npgsql provider are a matched pair.",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["/^Microsoft\\.EntityFrameworkCore/", "/^Npgsql/"],
+      "groupName": "EF Core + Npgsql"
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["/^@angular/"],
+      "groupName": "Angular"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "description": "A published advisory does not wait for the monthly window, and is never merged unread.",
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "automerge": false,
+    "prPriority": 10
+  }
+}
