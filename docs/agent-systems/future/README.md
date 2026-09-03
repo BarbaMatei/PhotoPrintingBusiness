@@ -47,8 +47,9 @@ See [conductor-system.md](conductor-system.md) for the pipeline and the planner-
 
 - **The review loop is the Inspector's engine in pre-merge mode.** It gates every bolt today (all
   eleven lenses) and holds the ledger, the fix verification and the certification record. The
-  scheduled whole-codebase posture the guide describes is the same engine's second mode, not built
-  yet (D1, 2026-09).
+  standing-sweep mode the guide describes — a scheduled pass over the whole codebase on `main` — is
+  the same engine's second mode, not built yet: the owner's ruling of September 2026 that the two
+  postures are one engine (see [the reconciliation](../theory-vs-practice-2026-09.md)).
 - **Conductor** sits *above* all the doing-systems: it reads their outputs (the bug ledger, the
   oracle's drift flags, the fix-request mailbox, the feature backlog, tech debt) and *proposes* what
   AI-DLC should work on next. It sits above the existing **execution** planners

@@ -60,8 +60,8 @@ point.) The oracle then flows back as read-only context to all three.
 
 The **Reviewer** is dashed: partly present as three lenses of the review loop, its verdict synthesis
 and contract fidelity still on paper (see [code-review-system.md](future/code-review-system.md)).
-The **Inspector** box is the review loop in pre-merge mode; its scheduled whole-codebase mode is not
-built (§0).
+The **Inspector** box is the review loop in pre-merge mode; its standing-sweep mode — a scheduled
+pass over the whole codebase on `main` — is not built (§0).
 
 > **The org is bigger than this diagram.** Beyond the Reviewer, three more systems are captured for
 > later — a **Conductor** (coordinates *what to build next* across all the systems' signals),
