@@ -2,7 +2,7 @@
 type: review-system-design
 status: research notes — v2, updated 2026-08-11
 created: 2026-07-04
-updated: 2026-08-28
+updated: 2026-09-03
 owner: Matei Barba
 extends: README.md
 ---
@@ -311,7 +311,8 @@ end state needs all three, and the second and third are the point of the word
 
 ## Directions — the decision menu
 
-Four argued options. Costs are tokens unless marked; build effort is sessions of work.
+Four argued options, then one record of what has since been done (E). Costs are tokens
+unless marked; build effort is sessions of work.
 
 **A — Prove recall first (trust).** Build: seeded run 2 (~2–2.5M, different implanter,
 harder seeds, per-severity recall, shared-miss analysis) + the blinding auditor's workspace
