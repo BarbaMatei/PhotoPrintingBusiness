@@ -2,7 +2,7 @@
 type: review-system
 status: active
 created: 2026-06-18
-updated: 2026-08-28
+updated: 2026-09-03
 owner: Matei Barba
 ---
 
@@ -214,6 +214,19 @@ are capped at `approve-with-followups` — "this fix held" and "this diff is cle
   top of one; any exception states its expiry (a date, or "next calibration"). The router
   table is the single decision surface for pass selection — executed mechanically by
   [lib/route-next-pass.mjs](lib/route-next-pass.mjs), hand-read only when it abstains.
+
+## Where this sits in the bigger design
+
+This loop is the Inspector engine of the agent-systems blueprint
+([docs/agent-systems/README.md](../docs/agent-systems/README.md)), built first and by hand, running
+in the blueprint's **pre-merge mode**: one feature branch at a time, before merge. The blueprint's
+other mode — a scheduled sweep of the whole codebase that drains [backlog.md](state/backlog.md) —
+is not built. The reconciliation of the two, concept by concept, with the owner's rulings, is
+[theory-vs-practice-2026-09.md](../docs/agent-systems/theory-vs-practice-2026-09.md); its Appendix A
+maps this README's words (pass, lens, skeptic, `PPW-n`) onto the blueprint's (run, hunter,
+verifier, `correlation_id`). The rules the blueprint now states for this loop — blinding, never
+suppress, verifier ≠ fixer, the fix-verdict mapping — are in
+[integration-contract.md](../docs/agent-systems/integration-contract.md) §1, §4, §6, §6.5.
 
 ## Files & conventions
 
