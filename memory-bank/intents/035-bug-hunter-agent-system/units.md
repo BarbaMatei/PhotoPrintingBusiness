@@ -19,7 +19,8 @@ updated: 2026-06-10T10:40:14Z
 > "Implementation status (2026-09)" table; the units below cover the **remaining 31**
 > (16 missing + 15 partial). Unit order follows the build order the owner ruled
 > (integration contract §7): trust upgrades → Map slot → specialists → learn & measure →
-> remediation hand-off → oracle tier (last, gated on the knowledge-builder) → optional.
+> remediation hand-off → the oracle tier (unit 003's last bolt, gated on the knowledge-builder)
+> → optional integration (after the oracle in §7's list, and adoption-gated).
 > Bolts 085 and 086 are retired; story files never move, so a story's folder still names
 > the phase it was decomposed under.
 >
@@ -34,9 +35,10 @@ updated: 2026-06-10T10:40:14Z
 
 ## Units Overview
 
-This intent decomposes into **7 units** (43 stories: 12 satisfied by the review loop,
-31 remaining). The oracle tier is the unit added by the 2026-09 re-cut; its stories stay on
-disk under `003-phase-3-breadth-and-scale`.
+This intent decomposes into **6 units** (43 stories: 12 satisfied by the review loop,
+31 remaining) — the same six as at inception. The 2026-09 re-cut changed what each unit covers,
+not how many there are: the oracle tier is the **last bolt of unit 003** (bolt 091, gated on the
+knowledge builder), not a unit of its own.
 
 ### Unit 1: 001-phase-1-skeleton — satisfied by the review loop (2026-09), no bolt
 
@@ -82,12 +84,13 @@ Phase 2 sandbox recipe (requirements D4) is no longer a gate on this unit.
 
 **Estimated Complexity**: M · **Assigned Requirements**: FR-4.
 
-### Unit 3: 003-phase-3-breadth-and-scale — split in two by the re-cut (17 stories on disk)
+### Unit 3: 003-phase-3-breadth-and-scale — three waves in one unit (17 stories)
 
-This is where the hole is: the review loop has no Map slot at all. The folder stays one unit on
-disk; the work splits into **3a — the Map slot** and **3b — the specialists**, and its oracle
-stories move out to Unit 7. The oracle's external gate (requirements D6) therefore no longer
-holds up 3a or 3b.
+This is where the hole is: the review loop has no Map slot at all. The unit keeps all 17 stories
+and its three bolts, read in this order: **3a — the Map slot** (bolt 088), **3b — the
+specialists** (bolts 089 ∥ 090), then **the oracle tier** (bolt 091, last and gated). Only the
+oracle bolt carries the external gate (requirements D6), so it no longer holds up 3a or 3b — the
+change the 2026-09 re-cut made here.
 
 **3a — Map slot (bolt 088)**: `app-mapping` (12), `code-index` (13) and `reachability` (14),
 all missing today, plus the scoring extension that consumes reachability (14b) and
@@ -108,10 +111,21 @@ locations. Stories: 010-dependency-audit-agent, 011-config-auditor-agent,
 012-concurrency-auditor-agent (22) = the race lens. Left as-is: 007-flow-tracer-agent (17) and
 008-file-sweeper-agent (18) — lenses do both, without a tools-first pass.
 
-**Moved out**: 014-intent-lookup, 015-hunters-contract-ext, 016-verifier-scoring-contract-ext
-and the oracle half of 017-orchestrator-scale-ext → **Unit 7: 007-oracle-tier**.
+**Last bolt of this unit — the oracle tier (bolt 091), gated**: 014-intent-lookup (24),
+015-hunters-contract-ext (24b), 016-verifier-scoring-contract-ext (24c) and the oracle half of
+017-orchestrator-scale-ext (24d) — all four missing. They ground a finding in written intent
+instead of the model's opinion: `intent-lookup` reads the knowledge builder's `ledger-query`
+interface, the lens extension surfaces contract contradictions, the verification/scoring
+extension weights contract corroboration and tags a model-prior-only finding
+"intent-unconfirmed". Bolt 091 stays in this unit (`unit: 003-phase-3-breadth-and-scale`), runs
+after 089/090, and is **⛔ gated on the knowledge builder's `ledger-query`** (requirements D6 —
+the cross-system gate; contract §7). It is the last bolt of the whole intent bar the optional
+tier, and nothing waits on it — which is why the map and the specialists are no longer held up
+by its gate.
 
-**Dependencies**: Depends on — Unit 2 (3b also on 3a). Depended by — Units 4–5.
+**Dependencies**: Depends on — Unit 2 (3b also on 3a; the oracle bolt on 3a/3b plus the external
+knowledge-builder gate). Depended by — Units 4–5, which depend on 3a/3b only, never on the
+oracle bolt.
 
 **Estimated Complexity**: L · **Assigned Requirements**: FR-5.
 
@@ -128,8 +142,9 @@ loop's statuses, reopen and lineage, and 001-suppression-learning (25), **supers
 loop never suppresses a finding, it attaches the prior decision to it (guide Prompt 25,
 contract §6.5).
 
-**Dependencies**: Depends on — Units 2 and 3a (the corpus scores what the map and the proof
-produce). Depended by — Unit 5 (the remediation gate reads the metrics).
+**Dependencies**: Depends on — Units 2 and 3 (bolts 089/090 — the corpus scores what the map,
+the proof and the specialists produce; never the oracle bolt). Depended by — Unit 5 (the
+remediation gate reads the metrics).
 
 **Estimated Complexity**: M · **Assigned Requirements**: FR-6.
 
@@ -165,33 +180,14 @@ Depended by — none.
 
 **Estimated Complexity**: S · **Assigned Requirements**: FR-8 (Could).
 
-### Unit 7: 007-oracle-tier — oracle tier (bolt 091, LAST)
-
-**Description**: New unit, cut out of Unit 3 in 2026-09 so its external gate stops holding up
-the Map slot and the specialists. Ground a finding in written intent instead of the model's
-opinion: `intent-lookup` (24) reads the knowledge builder's `ledger-query` interface; the hunter
-extension surfaces contract contradictions (24b); the verifier/scoring extension weights
-contract corroboration and tags a model-prior-only finding "intent-unconfirmed" (24c); the
-orchestrator's oracle wiring (the other half of 24d). All four are missing.
-
-**Stories** (4, Prompts 24–24d — files stay under `003-phase-3-breadth-and-scale`):
-014-intent-lookup, 015-hunters-contract-ext, 016-verifier-scoring-contract-ext,
-017-orchestrator-scale-ext (its oracle half; the budget half belongs to Unit 3a).
-
-**Dependencies**: Depends on — Units 3a/3b, and **externally on the knowledge builder's
-`ledger-query`** (requirements D6, contract §7): this unit is last in the order and cannot start
-before the knowledge builder's Phases 1–2 exist. No unit depends on it.
-
-**Estimated Complexity**: M · **Assigned Requirements**: FR-5 (oracle half).
-
 ## Requirement-to-Unit Mapping
 
 - **FR-1** (skill-creator build loop) → cross-cutting, every story
 - **FR-2** (shared conventions) → cross-cutting, every story
 - **FR-3** (Phase 1 skeleton) → `001-phase-1-skeleton` — satisfied by the review loop
 - **FR-4** (Phase 2 trust) → `002-phase-2-trust`
-- **FR-5** (Phase 3 breadth/scale) → `003-phase-3-breadth-and-scale` (3a map, 3b specialists)
-- **FR-5** (Phase 3 oracle half) → `007-oracle-tier`
+- **FR-5** (Phase 3 breadth/scale + oracle) → `003-phase-3-breadth-and-scale` (3a map,
+  3b specialists, then the oracle tier as its last bolt — 091, gated)
 - **FR-6** (Phase 4 learn/measure) → `004-phase-4-learn-and-measure`
 - **FR-7** (Phase 5 remediation) → `005-phase-5-remediation`
 - **FR-8** (Optional integration) → `006-optional-integration`
@@ -203,11 +199,11 @@ before the knowledge builder's Phases 1–2 exist. No unit depends on it.
         │
         ▼
 [002-trust] ─► [003a-map] ─► [003b-specialists] ─► [004-learn-and-measure] ─► [005-remediation]
-                                                            │                        │
-                                                            └────► [006-optional]    ▼
-                                                                            [007-oracle-tier]
-                                                                    (waits on the knowledge
-                                                                     builder's ledger-query)
+                                    │                       │
+                                    │                       └────► [006-optional] (⏸ adoption)
+                                    ▼
+                       [003 oracle tier — bolt 091, LAST]
+                       (⛔ waits on the knowledge builder's ledger-query; nothing waits on it)
                        (within Unit 3b, bolts 089 ∥ 090 are the one wave-parallel pair)
 ```
 
@@ -223,18 +219,21 @@ a discovery pass, so a satisfied bolt is removed rather than closed.
    finding leans on it.
 2. **088** (Unit 3a): the Map slot — `app-mapping`, `code-index` (shared with the knowledge
    builder), `reachability`, the scoring extension, and the budget unit.
-3. **089 ∥ 090** (Unit 3b): specialists — taint + the flow/file/security stories (089) ∥
-   dependency-audit, config-auditor, concurrency, clustering (090). Both wait for **088**, not
-   for 087's `tool-ingest` alone, because they read the map; disjoint files, so they are the one
-   safe parallel pair.
+3. **089 ∥ 090** (Unit 3b): specialists — **089** builds `taint-analysis` (16), the one gap of
+   its four stories, since the security lens (19) is satisfied and the flow-tracer (17) and
+   file-sweeper (18) stories stay as they are; **090** builds `dependency-audit-agent` (20),
+   `config-auditor-agent` (21) and `root-cause-clustering` (23), the concurrency story (22) being
+   satisfied by the race lens. Both wait for **088**, not for 087's `tool-ingest` alone, because
+   they read the map; disjoint files, so they are the one safe parallel pair.
 4. **092** (Unit 4): learn & measure — standing corpus, recall/escape metrics, curator
    automation.
 5. **093** (Unit 5): remediation hand-off — non-fixer regression harvest, `fix-request-emit`.
-6. **091** (Unit 7): oracle tier — **last**, and ⛔ blocked until the knowledge builder's
-   `ledger-query` exists (requirements D6, contract §7). It re-opens pieces from 088–090, so it
-   never runs in parallel with anything.
-7. **094** (Unit 6): optional integration — ⏸ on owner adoption; may follow 092 whenever the
-   owner adopts a tracker or a CI gate.
+6. **091** (Unit 3, its last bolt): oracle tier — **last**, and ⛔ blocked until the knowledge
+   builder's `ledger-query` exists (requirements D6, contract §7). It re-opens pieces from
+   088–090, so it never runs in parallel with anything.
+7. **094** (Unit 6): optional integration — listed after 091 in the §7 order and **⏸
+   adoption-gated**; its only bolt dependency is 092, so it may be built any time after that
+   once the owner adopts a tracker or a CI gate.
 
 Standing-sweep mode — the same engine on a schedule over all of `main` rather than a pre-merge
 pass over one branch — has no bolt of its own yet (contract §7, step 5).

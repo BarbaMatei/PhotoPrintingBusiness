@@ -34,7 +34,10 @@ complexity:
 Tooling-only bolt, **parked until owner adoption** (guide: "build only if you adopt
 CI or an issue tracker"). Guide Prompts A–C: the SARIF twin, idempotent issue-sync,
 and the baseline-aware CI gate. All three are still missing; all three are **Could**
-priority. Unchanged by the 2026-09 re-scope, except that it now hangs off bolt 092 alone.
+priority. Unchanged by the 2026-09 re-scope, except for the order: the optional integrations are
+listed **after the oracle tier (091)** in the integration contract §7 and stay **⏸
+adoption-gated**; the only bolt this one depends on is 092, so once the owner adopts, it can be
+built any time after that.
 
 ## ⏸ Adoption gate (owner decision)
 

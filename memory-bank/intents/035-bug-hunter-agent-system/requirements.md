@@ -299,6 +299,6 @@ loop's fixer applies patches directly, by design; plus one missing brief the des
 | FR-7 | 005-phase-5-remediation | 5 (Prompts 30–33 + 31b) |
 | FR-8 | 006-optional-integration | 3 (Prompts A–C) |
 
-Story files stay where they are. `units.md` tracks the oracle stories (014–017 of unit 003) as
-their own unit — the oracle tier, last in the order — while the files remain under
-`003-phase-3-breadth-and-scale`.
+Story files stay where they are, and so do the six units. The oracle stories (014–017 of unit
+003) are built by that unit's **last bolt** — 091, gated on the knowledge builder — not by a
+unit of their own.

@@ -69,7 +69,7 @@ Normalized 21 bolts from non-standard done-states to the template-standard `comp
 
 ---
 
-## 2026-09-03 — Reconciliation of intent 035 with the review loop
+## 2026-09-03T08:29:15Z - Reconciliation of intent 035 with the review loop
 
 **Triggered by**: the theory-vs-practice comparison of the bug-hunter blueprint against the
 review loop that was built while reviewing, and the owner's ruling to rewrite the intent in
@@ -100,7 +100,7 @@ it — the history is kept, the schedule is not.
 | Artifact | Change |
 |----------|--------|
 | intents/035/requirements.md | Header note, "Intent Overview", In Scope and Out of Scope rewritten around the gaps; each gap names the `reviews/lib` seam it extends; the skill-creator mandate narrowed to new standalone skills; five dangling citations in the inception log repointed at `git show b4329a8^:…` |
-| intents/035/units.md | Re-cut into 7 units in the ruled order: unit 001 satisfied (no bolt), unit 003 split into 3a map / 3b specialists, and a new `007-oracle-tier` unit carrying the oracle stories so their external gate stops holding up the map |
+| intents/035/units.md | Re-cut in the ruled order, still **6 units**: unit 001 satisfied (no bolt), unit 003 read as three waves — 3a map (088), 3b specialists (089 ∥ 090), then the oracle tier as its last bolt (091, gated), so the oracle's external gate no longer holds up the map |
 | bolts 087–094 (8 bolt.md files) | Overviews re-scoped to the gaps; the construction-method box now points at the review-loop seam instead of skill-creator-for-everything; 087 `requires_bolts` → `[]`; `requires_units` no longer names the satisfied unit 001; 091 marked last in the order with a `notes:` key (nothing waits on it) and 092 re-pointed at 089/090; statuses all still `planned` |
 | intents/035 stories (43 files) | Each satisfied story carries `**Status:** satisfied by <path> (2026-09)`; every other story carries `**Workbench seam:** <path>`; `001-suppression-learning` marked superseded (decision attachment); the seven unit-001 stories now have `assigned_bolt: null`; prose references to bolts 085/086 repointed at the review loop |
 | story-index.md | Overview planned-bolt list 085–094 → 087–094; a dated re-scope note under the 035 heading; the 12 satisfied stories marked `✅ GENERATED · satisfied by the review loop (2026-09)`. No listing added, removed or renumbered |
@@ -111,7 +111,9 @@ Ruled by the owner and written up in the integration contract §7: **087** (trus
 tool ingest, risk score, execution proof, moved/fixed detection) → **088** (the Map slot:
 application map, code index, reachability, budget) → **089 ∥ 090** (specialists, both waiting on
 the map) → **092** (learn & measure) → **093** (remediation hand-off) → **091** (oracle tier,
-last, gated on the knowledge builder's `ledger-query`); **094** optional, on adoption.
+last, gated on the knowledge builder's `ledger-query`, and the last bolt of unit 003); **094**
+optional integration comes after 091 in §7's list and stays ⏸ adoption-gated — its only bolt
+dependency is 092.
 
 ### Pointers
 
