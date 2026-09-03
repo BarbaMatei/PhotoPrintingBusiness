@@ -51,6 +51,11 @@ admin pages need a bolt of their own.
 **Unit suite unaffected**: `npm test -- --watch=false` → `Test Files 50 passed (50)`,
 `Tests 520 passed (520)`.
 
+**The budget gate runs in CI, not just locally**: the existing `ci` workflow is green on this branch
+at every pushed commit (runs 33806693610, 33807234738, 33807570561), and its `web` job is the one
+that builds `--configuration=production`. The API job in the same workflow is also green, which is
+the evidence that nothing here touched the backend.
+
 ### Failure-mode table (from the plan, with the test that proves each)
 
 | What can fail | What should happen | Which test proves it | Result |
