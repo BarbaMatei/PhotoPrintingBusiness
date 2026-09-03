@@ -1443,8 +1443,10 @@ finding. (2) Tests are **red first**: the test is seen failing on the unfixed co
 red is recorded, not asserted. (3) A **non-author audits** every proving test for the three ways a
 test lies (Prompt 10). (4) One **composition review** covers the round's whole diff, looking for
 what the individual fixes did to each other — no per-finding review can see that.
-**Tests (v3.7):** a fixer-authored test that asserts the literal value the code produces fails the
-test-meaning audit.
+**Tests (v3.7):** a fix round with no protocol block for a cluster sharing one stateful surface is
+refused at hand-back; a fixer-authored test that asserts the literal value the code produces fails
+the test-meaning audit; a round with no composition-review event over its whole diff is refused at
+hand-back.
 
 ## Prompt 31 — Skill: `fix-verification` (extends `bug-lifecycle`) — the loop's verification GATE
 
@@ -1531,8 +1533,9 @@ built in. The exception is priced, not free: such a round runs only under the mi
 (Prompt 30) and the verdict vocabulary (Prompt 31), and the fixer is never the agent that verifies
 its own fix. In the standing-sweep mode inspector and fixer stay fully separate and the fix leaves
 through `fix-request-emit`.
-**Tests (v3.7):** a fix round with no protocol block for a cluster sharing one stateful surface is
-refused at hand-back.
+**Tests (v3.7):** a verification run whose actor is the author of the fix under verification is
+refused; a `fix-proposal` patch applied to the repository outside a fix round fails the store-scoped
+forbidden-ground check, in either mode.
 
 ## Prompt 33 — Skill: `fix-request-emit` (NEW in v3)
 
