@@ -19,7 +19,7 @@ The three current systems map to roles in a software organization:
 | Builder | AI-DLC / specsmd | writes specs + code | new work |
 | Inspector / QA | bug-hunter | periodic runs | the **whole standing codebase** (read-only) |
 | Librarian / oracle | knowledge-builder | distillation runs | intent contracts |
-| **Reviewer** | **— missing —** | **at the moment of change** | **one diff / bolt** |
+| **Reviewer** | **partial** — three dimensions run as lenses of the review loop (`reviews/`); the rest deferred | **at the moment of change** | **one diff / bolt** |
 
 Nothing today gates a change *at merge time*. The bug-hunter is post-hoc and **defect-focused**; it
 runs over standing state and finds bugs. A reviewer is **pre-merge** and **change-focused**: it judges
