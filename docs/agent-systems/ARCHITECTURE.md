@@ -1,8 +1,25 @@
 # Agent Systems — Architecture at a Glance
 
-A visual summary of the closed-loop AI software organization. Specs of record: bug-hunter **v3.6**,
-knowledge-builder **v3.5**, integration contract **v1.5** (see [README](README.md)). Diagrams are the
-map; the guides are the territory.
+A visual summary of the closed-loop AI software organization. Specs of record: bug-hunter **v3.7**,
+knowledge-builder **v3.6**, integration contract **v1.6** (see [README](README.md)). Diagrams are the
+map; the guides are the territory. Implementation status as of 2026-09 in §0.
+
+---
+
+## 0. What exists today (2026-09)
+
+| Role | Blueprint name | Exists as | Status |
+|---|---|---|---|
+| Builder | AI-DLC / specsmd | the bolt process (`memory-bank/`) | built |
+| Inspector | bug-hunter | the review loop — `reviews/`, skills `loop-driver`, `fix-review`, `reconcile-findings`, `owner-summary` — running in pre-merge mode on every bolt | Phase 1 complete; 2/4/5 partial; 3 missing |
+| Reviewer | code-review | three lenses of the same loop (`requirements`, `quality`, `tests-coverage`) plus its verdict | partial, unplanned |
+| Librarian | knowledge-builder | — (the `requirements` lens reads bolt documents directly) | not started |
+| Planner / Wave-orchestrator | — | `.claude/agents/bolt-parallel-planner.md`, `bolt-wave-orchestrator.md` | built |
+
+The review loop was built between June and September 2026 without reference to these specs, and
+these specs without reference to it. The reconciliation is recorded in
+[theory-vs-practice-2026-09.md](theory-vs-practice-2026-09.md); the 43-brief status table is in the
+bug-hunter guide.
 
 ---
 
@@ -41,9 +58,10 @@ artifacts and the standing code state and *distils* them into contracts — for 
 alike. (An oracle the Builder could write to wouldn't be an independent oracle — that firewall is the
 point.) The oracle then flows back as read-only context to all three.
 
-The **Reviewer** is dashed: a captured-but-deferred idea (see
-[future-code-review-system.md](future/code-review-system.md)) — built only after the other three are
-real. Everything else here is specced and ready to build.
+The **Reviewer** is dashed: partly present as three lenses of the review loop, its verdict synthesis
+and contract fidelity still on paper (see [code-review-system.md](future/code-review-system.md)).
+The **Inspector** box is the review loop in pre-merge mode; its scheduled whole-codebase mode is not
+built (§0).
 
 > **The org is bigger than this diagram.** Beyond the Reviewer, three more systems are captured for
 > later — a **Conductor** (coordinates *what to build next* across all the systems' signals),
@@ -158,7 +176,8 @@ flowchart TB
 ```
 
 KB **Phase 5 (Measure) may precede Phase 4 (Loop Integration)** — the eval doesn't exercise the fix
-loop, so the oracle's accuracy is proven before anything trusts it in a loop.
+loop, so the oracle's accuracy is proven before anything trusts it in a loop. Superseded order
+(2026-09): see the future README's sequencing and contract §7.
 
 ---
 
@@ -251,7 +270,8 @@ until the bug-hunter's Phase 3 specialists are actually being built.
 The same closed loop as [§1](#1-the-organization--four-roles-one-human), grown to the complete
 organisation: the **coordinate** layer that decides *what to do next*, the **operate** layer that
 watches the running product, and Test-Quality alongside the doing-systems. **Solid = built or
-specced-ready; dashed = planned / partial** (see the [future/](future/README.md) notes).
+specced-ready; dashed = planned / partial** (the Inspector is solid because its engine exists; its
+standing-sweep mode does not; see the [future/](future/README.md) notes).
 
 ```mermaid
 flowchart TB
