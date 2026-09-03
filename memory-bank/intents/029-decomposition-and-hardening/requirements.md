@@ -56,7 +56,7 @@ Once the layered folder structure (intent 027) is in place, the oversized classe
 - **Related Stories**: TBD
 
 ### FR-4 (P15): Per-entity `IEntityTypeConfiguration<T>` files; shrink `DbContext` < 100 LOC
-- **Description**: Move each of the 17 entities' inline `modelBuilder.Entity<X>(...)` blocks from `OnModelCreating` (437 LOC) into `Data/Configurations/<Entity>Configuration.cs`, and replace the body with `ApplyConfigurationsFromAssembly(...)` (keeping the cross-cutting SQLite-`DateTimeOffset` value-converter loop).
+- **Description**: Move each of the 17 entities' inline `modelBuilder.Entity<X>(...)` blocks from `OnModelCreating` (437 LOC) into `Data/Configurations/<Entity>Configuration.cs`, and replace the body with `ApplyConfigurationsFromAssembly(...)`.
 - **Acceptance Criteria**:
   - One config file per entity; `OnModelCreating` ≤ 100 LOC.
   - `Add-Migration NoOpRefactorVerify` produces empty up/down (no dropped `HasIndex`/`HasConversion` — visually inspected).

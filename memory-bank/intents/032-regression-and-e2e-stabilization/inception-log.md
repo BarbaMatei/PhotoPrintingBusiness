@@ -60,7 +60,7 @@ status: complete
 | 2026-06-05 | Coupon/refund journeys authored but gated (`test.fixme`) | Features (047/048, 068/069) may not have shipped; un-gating is a trivial follow-up | Self-validated |
 | 2026-06-05 | All units use simple-construction-bolt | Test/CI/methodology work, no domain model | Self-validated |
 | 2026-06-05 | Unit 002 keeps 8 stories in one bolt despite the 5–6 soft cap | Thin, parallel, domain-sliced specs over one shared fixture layer; splitting would be artificial | Self-validated (flagged for owner) |
-| 2026-06-05 | E2e runs against real Postgres (not in-memory/SQLite) | Surfaces the DEPLOYMENT.md §7 provider gap; tests production-shaped behaviour | Self-validated |
+| 2026-06-05 | E2e runs against real Postgres (not in-memory/SQLite) — *superseded 2026-08-20: Postgres-only everywhere* | Surfaces the DEPLOYMENT.md §7 provider gap; tests production-shaped behaviour | Self-validated |
 
 ## Scope Changes
 

@@ -1,5 +1,7 @@
 # Architecture Review — FotoTipar Photo Printing Platform
 
+> **Snapshot of June 2026.** Statements about SQLite describe the app at that date; since 2026-08-20 the application is PostgreSQL-only in every environment (see memory-bank/standards/data-stack.md).
+
 **Date:** 2026-06-03
 **Branch:** `analysis/architect-review` (stacked off the bolt-039 line)
 **Reviewer:** ArchitectAnalyst (senior architect persona)

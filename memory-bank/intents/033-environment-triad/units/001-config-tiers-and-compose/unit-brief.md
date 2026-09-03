@@ -106,7 +106,7 @@ ASP.NET Core layered configuration (`appsettings.{Environment}.json`), Options +
 
 ## Constraints
 
-- Dev-env is Postgres-backed (prod-shaped); only local stays SQLite.
+- Dev-env is Postgres-backed (prod-shaped); local runs Postgres via docker-compose too.
 - Prod compose/Caddy behaviour unchanged.
 - Readiness only — no host provisioning.
 - Secrets never in config files (ADR-006); the appsettings layer carries non-secret defaults only.

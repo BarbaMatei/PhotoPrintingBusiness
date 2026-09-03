@@ -132,7 +132,7 @@ The regression-pass half is a **methodology + execution** deliverable: a documen
 **Intent-specific constraints**:
 - **Build on, do not duplicate, bolt 066**: same Playwright runner, same `playwright-e2e.yml` harness, same docker-compose boot. This intent extends that module; it does not introduce a second e2e framework.
 - **Build on, do not duplicate, bolt 062**: e2e seed/data fixtures reuse the fluent Builders and shared factory base; no parallel test-data layer.
-- The e2e module exercises the app through the **real backend** (docker-compose API + Postgres + UI), so it is the first place that catches the SQLite-vs-Postgres provider gap flagged in DEPLOYMENT.md §7 / ai-workflow-review §2.4. (Closing that gap mechanically is a separate concern — migration-guard CI; this intent simply runs against real Postgres.)
+- The e2e module exercises the app through the **real backend** (docker-compose API + Postgres + UI), so it is the first place that catches the InMemory-vs-Postgres parity gap (the `db-parity` review lens exists for it). (Closing that gap in the unit and integration suites is a separate concern; this intent simply runs against real Postgres.)
 - Coupon (047/048) and refund (068/069) journeys are **authored but gated**: written as `should`, marked `test.fixme`/skipped until the feature bolts ship, then un-gated. This intent must not re-implement or re-plan those features.
 
 ### Business Constraints

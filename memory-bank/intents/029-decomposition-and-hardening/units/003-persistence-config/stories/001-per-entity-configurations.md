@@ -19,7 +19,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the 17 inline `modelBuilder.Entity<X>(...)` blocks, **When** moved to `Data/Configurations/<Entity>Configuration.cs` implementing `IEntityTypeConfiguration<T>`, **Then** `OnModelCreating` becomes `ApplyConfigurationsFromAssembly(...)` + the SQLite-DateTimeOffset converter loop
+- [ ] **Given** the 17 inline `modelBuilder.Entity<X>(...)` blocks, **When** moved to `Data/Configurations/<Entity>Configuration.cs` implementing `IEntityTypeConfiguration<T>`, **Then** `OnModelCreating` becomes `ApplyConfigurationsFromAssembly(...)`
 - [ ] **Given** `OnModelCreating`, **When** refactored, **Then** it is ≤ 100 LOC
 - [ ] **Given** the refactor, **When** `Add-Migration NoOpRefactorVerify` runs, **Then** it produces empty up/down (no dropped index/conversion)
 

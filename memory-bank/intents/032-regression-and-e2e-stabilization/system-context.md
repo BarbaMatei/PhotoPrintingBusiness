@@ -26,7 +26,7 @@ C4Context
     System(seed, "E2E Data Strategy", "Reuses bolt 062 Builders + --seed/--seed-dev")
     System(ui, "PhotoPrint.UI", "Angular 17+ SPA (data-testid selectors)")
     System(api, "PhotoPrint.API", "ASP.NET Core 8 — exercised end-to-end")
-    SystemDb(pg, "PostgreSQL 16", "Real DB via docker-compose (not in-memory/SQLite)")
+    SystemDb(pg, "PostgreSQL 16", "Real DB via docker-compose (not EF InMemory)")
     System_Ext(stripe, "Stripe (test mode)", "Card success + decline + 3DS test cards")
     System_Ext(eup, "EuPlatesc (test mode)", "Initiate + signed IPN callback")
     System_Ext(ci, "GitHub Actions", "playwright-e2e.yml: fast tier on PR, full suite scheduled")
@@ -49,7 +49,7 @@ C4Context
 - **Stripe (test mode)**: drives card success, decline, and 3DS-required journeys with documented test cards. No live keys.
 - **EuPlatesc (test mode)**: initiate + a signed test IPN callback to exercise the redirect-payment journey.
 - **GitHub Actions / Playwright**: builds on bolt 066's `playwright-e2e.yml`; adds a fast PR tier and a scheduled full suite with trace/video/screenshot artifacts.
-- **PostgreSQL 16 (docker-compose)**: the e2e module is the first layer to exercise the app against the real production-shaped DB, surfacing the SQLite-vs-Postgres provider gap (DEPLOYMENT.md §7).
+- **PostgreSQL 16 (docker-compose)**: the e2e module is the first layer to exercise the app against the real production-shaped DB, surfacing the InMemory-vs-Postgres parity gap (the `db-parity` review lens exists for it).
 
 ## Builds-On Dependencies (do not duplicate)
 

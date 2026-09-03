@@ -12,9 +12,9 @@ priority_score: roadmap-phase-4
 
 ## Intent Overview
 
-The application today understands exactly **two** environment shapes: `Development` (SQLite, MailHog, relaxed CORS/rate-limits) and `Production` (Postgres, SendGrid, strict everything). The owner's roadmap Phase 4 (`docs/analysis/ai-workflow-review-2026-06-05.md` §6) calls for the infrastructure to be **ready to run in three distinct states**:
+The application today understands exactly **two** environment shapes: `Development` (Postgres via docker-compose, MailHog, relaxed CORS/rate-limits) and `Production` (Postgres, SendGrid, strict everything). The owner's roadmap Phase 4 (`docs/analysis/ai-workflow-review-2026-06-05.md` §6) calls for the infrastructure to be **ready to run in three distinct states**:
 
-1. **Local testing** — a developer's machine (the existing `docker-compose.yml` + SQLite/`appsettings.Development.json` story).
+1. **Local testing** — a developer's machine (the existing `docker-compose.yml` + `appsettings.Development.json` story).
 2. **Deployable dev environment** — *the first thing that will ever be deployed*: a sandbox to test and experiment freely, with its **own** config, secrets handling, and seed data. **This tier does not exist yet** — that is the central gap this intent fills.
 3. **Production** — the existing `docker-compose.prod.yml` + Caddy + managed Postgres story, kept untouched in behaviour.
 
@@ -95,7 +95,7 @@ This intent prepares **infrastructure readiness only**. It is **NOT deployment**
 
 ### FR-5: Documented dev→prod promotion path (readiness runbook)
 
-- **Description**: Write a repeatable promotion runbook describing how a change moves from the dev-env tier toward production — as **readiness documentation**, not an executed deployment. It ties together the config/secret differences (FR-1–3), the seeding differences (FR-4), the existing image-tag flow in `deploy.yml`, and the migration steps (incl. the known SQLite-vs-Postgres caveat from DEPLOYMENT.md §7).
+- **Description**: Write a repeatable promotion runbook describing how a change moves from the dev-env tier toward production — as **readiness documentation**, not an executed deployment. It ties together the config/secret differences (FR-1–3), the seeding differences (FR-4), the existing image-tag flow in `deploy.yml`, and the migration steps (DEPLOYMENT.md §7).
 - **Acceptance Criteria**:
   - A `docs/environments/promotion-path.md` (or §-in-DEPLOYMENT.md) describes the dev-env → prod promotion as ordered, repeatable steps: config swap, secret swap (test→live), image tag/promote, migration apply, seed policy, smoke verification — clearly labelled **readiness, not a deploy instruction to run now**.
   - The runbook cross-references the three-tier config map (FR-2), the secrets matrix (FR-3), and the seeding policy (FR-4) rather than restating them.
@@ -157,10 +157,10 @@ This intent prepares **infrastructure readiness only**. It is **NOT deployment**
 | Assumption | Risk if Invalid | Mitigation |
 |------------|-----------------|------------|
 | A third `ASPNETCORE_ENVIRONMENT` value is acceptable to introduce | Naming churn / config confusion | Pick a conventional name (`DevEnvironment` or `Staging`) and document it once (Q1) |
-| The dev-env tier is Postgres-backed (prod-shaped DB) | Dev-env diverges from prod and hides bugs | Mandate Postgres for dev-env in FR-1; only local stays SQLite |
+| The dev-env tier is Postgres-backed (prod-shaped DB) | Dev-env diverges from prod and hides bugs | Mandate Postgres for dev-env in FR-1; local runs Postgres via docker-compose too |
 | Existing seed classes cover dev-env demo needs | Demo data insufficient for free experimentation | Extend `DevDataSeed` content if needed (still one seeder, not a new one) |
 | Defining the tier locally is enough for "readiness" | Owner expects a running dev host | Framing is explicit: standing up the host is Phase 6; this intent stops at definable + locally validated |
-| The SQLite→Postgres migration caveat is resolved elsewhere before a real promotion | A first prod apply breaks | Promotion runbook (FR-5) records it as a precondition; fixing it is migration-guard / a separate bolt |
+| The migration chain applies cleanly on a first real Postgres apply | A first prod apply breaks | Promotion runbook (FR-5) records verifying it as a precondition (DEPLOYMENT.md §7) |
 
 ---
 

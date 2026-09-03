@@ -21,7 +21,7 @@ C4Context
     Person(maint, "Maintainer", "Owns the secrets matrix + promotion runbook")
 
     System_Boundary(triad, "Three configuration tiers") {
-        System(local, "Local testing", "ASPNETCORE_ENVIRONMENT=Development · SQLite · MailHog · docker-compose.yml")
+        System(local, "Local testing", "ASPNETCORE_ENVIRONMENT=Development · Postgres · MailHog · docker-compose.yml")
         System(devenv, "Deployable dev env (NEW)", "Postgres · test-mode keys · seedable demo data · docker-compose.dev-env.yml")
         System(prod, "Production", "Postgres (managed) · live keys · Caddy · docker-compose.prod.yml — UNCHANGED")
     }
@@ -57,7 +57,7 @@ C4Context
 - **Infrastructure readiness only — NOT deployment.** No provisioning, no cutover, no go-live. Dev-env is defined + validated locally; standing it up is Phase 6.
 - Add a third tier *alongside* the two existing compose files; leave both behaviourally unchanged.
 - Reuse existing seed classes + `--seed`/`--seed-dev`; honour ADR-006 (secrets via env vars only).
-- Dev-env is Postgres-backed (prod-shaped); only local stays SQLite.
+- Dev-env is Postgres-backed (prod-shaped); local runs Postgres via docker-compose too.
 - No deployment-pressure language in any artifact.
 
 ## Key NFR Goals

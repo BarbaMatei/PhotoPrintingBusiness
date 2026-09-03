@@ -86,7 +86,7 @@ Establish the single, deterministic data foundation every e2e journey runs again
 ### External Dependencies
 | System | Purpose | Risk |
 |--------|---------|------|
-| PostgreSQL 16 (compose) | Real-DB e2e boot | Medium (surfaces SQLite→PG migration gap) |
+| PostgreSQL 16 (compose) | Real-DB e2e boot | Medium (surfaces the InMemory-vs-Postgres parity gap) |
 | Stripe / EuPlatesc test mode | Payment fixtures | Low |
 
 ---

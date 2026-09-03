@@ -45,13 +45,11 @@ TypeScript. The principles that make it good:
   first" is the right *instinct*, but the mechanism must be: a confirmed adversarial failure becomes a
   **fix-request** (`correlation_id`) → AI-DLC → Reviewer → merge. The failing test IS the proving test
   — the bug-hunter's `regression-harvest` pattern. Test-Quality must never patch app code directly.
-- **Dual-DB parity (this app runs SQLite locally/test, PostgreSQL in prod).** A suite green on SQLite
-  can give false confidence about production Postgres: the two diverge on concurrency (SQLite
-  serialises writes; Postgres has real MVCC), constraint strictness, collation/case, type affinity,
-  date/time, and migrations. So the **DB-sensitive and production-faithful e2e tests run against
-  Postgres** (what ships), with SQLite kept for the fast local loop. The parity gap is itself a "hole
-  in the net" Test-Quality should report. *(Also relevant to the bug-hunter's sandbox confirmation,
-  which runs proving tests on the local DB.)*
+- **InMemory-vs-Postgres parity.** Integration tests default to EF InMemory; a suite green there can
+  hide Postgres-only behaviour (concurrency, DDL, type mapping). The review loop's `db-parity` lens
+  exists for exactly this; Test-Quality inherits the concern for the e2e layer, which runs against
+  real Postgres. The parity gap is itself a "hole in the net" Test-Quality should report. *(Also
+  relevant to the bug-hunter's sandbox confirmation, which runs proving tests on the local DB.)*
 - **Oracle-grounded scan.** Don't re-scan the app from scratch (that duplicates the bug-hunter's
   `app-mapping` + `code-index`). Consume those + the knowledge ledger's **risk-classed flows**, so the
   test surface is *risk-weighted* (auth/money/data-write first), not flat.

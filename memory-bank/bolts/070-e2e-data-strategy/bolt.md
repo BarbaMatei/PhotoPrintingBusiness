@@ -35,7 +35,7 @@ The deterministic, seeded e2e data foundation: a documented data contract, Build
 
 ## Objective
 
-Give the journey specs (bolt 071) a single, stable, isolated data layer so they are deterministic and free of ad-hoc setup, and make the suite the first place the SQLite-vs-Postgres provider gap surfaces.
+Give the journey specs (bolt 071) a single, stable, isolated data layer so they are deterministic and free of ad-hoc setup, and make the suite the first place the InMemory-vs-Postgres parity gap surfaces (the `db-parity` review lens exists for it).
 
 ## Stories Included
 

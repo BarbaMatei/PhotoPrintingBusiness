@@ -43,7 +43,7 @@ implemented: false
 | Scenario | Expected Behavior |
 |----------|-------------------|
 | A check fails during the pass | Recorded as fail; routed to triage (story 003), not patched inline |
-| The SQLite→PG migration gap surfaces | Recorded as a known-issue; routed to the appropriate backlog item |
+| The InMemory-vs-Postgres parity gap surfaces | Recorded as a known-issue; routed to the appropriate backlog item |
 
 ## Out of Scope
 

@@ -63,7 +63,7 @@ This intent is **infrastructure readiness only — NOT deployment**. Deployment 
 | Date | Decision | Rationale | Approved |
 |------|----------|-----------|----------|
 | 2026-06-05 | Infrastructure readiness only — no deployment work | Roadmap Phase 4 explicitly precedes deployment (Phase 6) | Self-validated (owner to review) |
-| 2026-06-05 | Dev-env tier is Postgres-backed (prod-shaped); only local stays SQLite | A sandbox that hides the SQLite/PG gap defeats its purpose | Self-validated |
+| 2026-06-05 | Dev-env tier is Postgres-backed (prod-shaped); only local stays SQLite — *superseded 2026-08-20: Postgres-only everywhere* | A sandbox that hides the SQLite/PG gap defeats its purpose | Self-validated |
 | 2026-06-05 | Reuse existing seed classes + add a Production demo-data guard | No parallel seeder; make demo-in-prod structurally impossible | Self-validated |
 | 2026-06-05 | Standalone `docker-compose.dev-env.yml`, prod compose untouched | Clarity + regression safety (Q5) | Self-validated (flagged for owner) |
 | 2026-06-05 | All units use simple-construction-bolt | Config/infra/docs work, no domain model | Self-validated |

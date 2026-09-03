@@ -18,7 +18,7 @@ Move the 437-LOC `OnModelCreating` into per-entity `IEntityTypeConfiguration<T>`
 ## Scope
 
 ### In Scope
-- One `Data/Configurations/<Entity>Configuration.cs` per entity; `ApplyConfigurationsFromAssembly` in `OnModelCreating` (keeping the SQLite-DateTimeOffset converter loop).
+- One `Data/Configurations/<Entity>Configuration.cs` per entity; `ApplyConfigurationsFromAssembly` in `OnModelCreating`.
 
 ### Out of Scope
 - Any schema change (must be a no-op refactor).

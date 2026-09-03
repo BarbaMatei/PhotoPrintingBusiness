@@ -1,5 +1,7 @@
 # AI Workflow & Infrastructure Review — 2026-06-05
 
+> **Snapshot of June 2026.** Statements about SQLite describe the app at that date; since 2026-08-20 the application is PostgreSQL-only in every environment (see memory-bank/standards/data-stack.md).
+
 > What this document is: an honest look at how this project gets built today — the agents,
 > the skills, the pipelines, the process — and a concrete proposal for what to add so the
 > project can evolve faster and with less manual babysitting. Written after a full sweep of
