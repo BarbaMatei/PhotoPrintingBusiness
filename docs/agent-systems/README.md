@@ -26,7 +26,7 @@ map.
 | Document | Role |
 |---|---|
 | [future/](future/README.md) | **The full agentic-org map** — every system (built / specced / planned / roadmap-gated), the decide→coordinate→do→operate layers, and how the future pieces connect to what exists. (The `future/` folder's index.) |
-| [future/code-review-system.md](future/code-review-system.md) | **Reviewer** — pre-merge, diff-scoped gate composing the `pr-review-toolkit` plugins. Deferred until the other three are built. |
+| [future/code-review-system.md](future/code-review-system.md) | **Reviewer** — pre-merge, diff-scoped gate. Three of its five dimensions run today as lenses of the review loop; the remainder is deferred. |
 | [future/conductor-system.md](future/conductor-system.md) | **Conductor** — planning "engineering manager": aggregates every system's signals → proposes a ranked next-work queue (proposes, never decides). Hosts the **coordinate-layer** pipeline (Analyst → Conductor → Planner → Wave-orchestrator) — half already built. |
 | [future/analyst-system.md](future/analyst-system.md) | **Analyst** — proactive architectural review → ranked gap/improvement proposals that feed the Conductor. Exists as a proto (`architect-analyst` agent); note plans how to evolve it. |
 | [future/planner-system.md](future/planner-system.md) | **Planner & Wave-orchestrator** — the execution half of the coordinate layer: decided bolts → conflict-safe waves → run a wave. Already built (`bolt-parallel-planner` / `bolt-wave-orchestrator`); note records how to make them profile- and contract-aware. |
