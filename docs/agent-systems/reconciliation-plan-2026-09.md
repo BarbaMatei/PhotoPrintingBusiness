@@ -250,8 +250,8 @@ Keep the finding ids (G1–G16, H1–H35, J1, J3) exactly as they are.
 - [ ] **Step 2: Check**
 
 Run: `grep -n "agent-systems/reviews/" docs/agent-systems/*.md`
-Expected: only the two lines inside `theory-vs-practice-2026-09.md` (§10 table) and the
-`git show` pointers just written.
+Expected: only the `git show` pointers just written, plus lines inside
+`theory-vs-practice-2026-09.md` and `reconciliation-plan-2026-09.md`.
 
 - [ ] **Step 3: Commit**
 
@@ -276,8 +276,8 @@ in the 22 locations. Keep the `#<n>` fragments and the surrounding text.
 - [ ] **Step 2: Check**
 
 Run: `grep -rln "docs/architecture-analysis-2026-05-25" --include=*.md . | grep -v node_modules`
-Expected: exactly two files — `reviews/archive/038-039-invoicing/resolution-v9.md` and
-`docs/agent-systems/theory-vs-practice-2026-09.md`.
+Expected: exactly three files — `reviews/archive/038-039-invoicing/resolution-v9.md`,
+`docs/agent-systems/theory-vs-practice-2026-09.md`, `docs/agent-systems/reconciliation-plan-2026-09.md`.
 
 - [ ] **Step 3: Commit**
 
