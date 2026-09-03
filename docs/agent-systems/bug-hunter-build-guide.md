@@ -225,6 +225,41 @@ grounding. Phase 4 makes the system learn & measure itself. Phase 5 helps you fi
 Optional add-ons connect it to outside tools. Stop wherever your real bottleneck stops asking for the
 next phase.
 
+## Lessons from the first implementation (2026-06 → 2026-09)
+
+This system's engine was built between June and September 2026 as the review loop under
+`reviews/` (see "Implementation status"). Ten things that build paid for are folded into the briefs
+below as extensions; each line says which brief carries it.
+
+1. **One run is a sample.** Three blind passes over the same feature found 15, 15 and 18 problems,
+   nearly disjoint. Design for repetition and breadth, and read "the hunter went quiet" as a fact
+   about the hunter, not about the code. → Prompts 6/7, 27
+2. **Fixes seed defects.** Between a quarter and all of a late round's new serious findings were
+   caused by the fixes of earlier rounds. Remediation needs its own lineage, measurement and
+   gates. → Prompts 26, 30–33
+3. **Blinding is a mechanism, not a hope.** A hunter at discovery is given no prior records, finding
+   ids or repository history, and agreement a shared hint could have planted is marked `hinted` and
+   earns no convergence credit (`docs/agent-systems/integration-contract.md` §6). → Prompt 7
+4. **Never suppress.** A dismissed finding is re-found, its earlier ruling attached verbatim, and
+   re-argued by a fresh skeptic — 3 of the first 5 re-raises were overturned
+   (`docs/agent-systems/integration-contract.md` §6.5). → Prompt 25
+5. **The verifier is never the fixer, and no fixer grades its own test.** The contract's
+   between-systems rule is needed inside one system too; 234 fixes were verified by
+   revert-and-rerun, 6 of them later reopened. → Prompts 10, 30
+6. **Records need their own gate.** A wrong report that follows every template still passes, so
+   record quality (a deterministic lint plus a model judge) is graded separately from review truth,
+   and the difference is stated out loud. → Prompt 4
+7. **The owner's reading load is the throughput limit.** Summaries capped at 60 lines, a "reasons to
+   doubt" section computed from the pass's own data, decisions parked and batched into one
+   sitting. → Prompts 4, 5
+8. **A stop rule is a claim that needs an experiment.** The engine has certified twice with 0
+   escapes so far, under a rule whose gating experiment — a second seeded run — never ran, and it
+   records that as its own top open finding. → Prompts 27, 28
+9. **The system reviews itself.** 47 findings were raised against the machinery and 18 fixed, by the
+   machinery's own method. → Prompt 29
+10. **Build by running.** Every part the engine trusts was shaped by a failure on a real target; the
+    paths never exercised on one are the paths it distrusts. → Part I, The build loop
+
 ## Master build order (dependency-ordered; build top to bottom)
 
 ```
