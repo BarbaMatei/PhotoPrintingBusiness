@@ -587,8 +587,9 @@ overturned.
 
 Left deliberately for the final review or for the owner, one line each:
 
-- Bolts 085/086 (verification) are planned, not run: the equivalence claims on 12 stories are
-  unverified until they run.
+- Bolts 085/086 (verification) are planned, not run: the equivalence claims on the seven Phase 1
+  stories are unverified until bolts 085/086 run; the other six satisfied briefs are verified in
+  their construction bolt's plan stage.
 - The thesis proposal's M3 and §2 still read as if the Inspector does not exist — outside the
   four places the approved Phase 6 patch changed; the owner's call.
 - 34 story acceptance criteria under intent 035 still say "created via skill-creator"; the

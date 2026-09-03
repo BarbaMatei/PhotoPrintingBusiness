@@ -341,10 +341,9 @@ three were overturned.
 ## §7 — Cross-system build interleave
 
 Bug-hunter steps are named by bolt (its inception has run: bolts 085–094, of which 085 and 086 are
-verification bolts: they confirm the review loop satisfies Phase 1 and build nothing; they run
-first); knowledge-builder steps
-are named by phase **until its own inception assigns bolt numbers** — update this section when it
-does.
+verification bolts: they confirm the review loop satisfies Phase 1 and build nothing, and they run
+first); knowledge-builder steps are named by phase **until its own inception assigns bolt
+numbers** — update this section when it does.
 
 **Build order (v1.6 — re-ordered by the owner's September 2026 ruling on build order).** One step per
 numbered line, each naming the bolt it corresponds to so bolt-numbered gates elsewhere still resolve.

@@ -663,12 +663,12 @@ bolts are removed, not completed. Every removal is logged in `maintenance-log.md
 ### Task P4.3: Bolts 085–094
 
 **Files:**
-- Delete: `memory-bank/bolts/085-phase-1-skeleton-core/`, `memory-bank/bolts/086-phase-1-skeleton-agents/` (satisfied; stories stay under the intent's unit folder for history)
+- *(superseded by the 2026-09-03 amendment in Phase 0: the bolts are restored as verification bolts; 10 bolts remain)* Delete: `memory-bank/bolts/085-phase-1-skeleton-core/`, `memory-bank/bolts/086-phase-1-skeleton-agents/` (satisfied; stories stay under the intent's unit folder for history)
 - Modify: `memory-bank/bolts/087-phase-2-trust/bolt.md` … `094-optional-integration/bolt.md`
 
 - [ ] **Step 1: 087–094 frontmatter** — `requires_bolts` of 087 → `[]` (was 086); 091 `requires_bolts` unchanged, add `notes: gated on the knowledge-builder per D4; last in order`; 088 `enables_bolts` unchanged. Body: replace the "Construction Method" box's first sentence with "Each component extends the review loop (`reviews/lib`, `.claude/skills`) at the seam named in its story; build it as a skill or script in that tree, with a test under `reviews/lib/tests`, following `reviews/README.md`'s conventions." Keep the skill-creator mandate only where a new standalone skill is created.
 - [ ] **Step 2: Stories** — in each affected story file add a line `**Workbench seam:** <path>` naming the file it extends (from spec §8's "Workbench equivalent" column); stories of satisfied briefs get `**Status:** satisfied by <path> (2026-09)`.
-- [ ] **Step 3: Check** — `ls memory-bank/bolts | grep -c "08[5-9]\|09[0-4]"` → 8; `grep -rn "086-phase-1" memory-bank/bolts/087-phase-2-trust/bolt.md` → none.
+- [ ] **Step 3: Check** — *(superseded by the 2026-09-03 amendment in Phase 0: the bolts are restored as verification bolts; 10 bolts remain)* `ls memory-bank/bolts | grep -c "08[5-9]\|09[0-4]"` → 8; `grep -rn "086-phase-1" memory-bank/bolts/087-phase-2-trust/bolt.md` → none.
 - [ ] **Step 4: Commit** — `git commit -m "docs(memory-bank): retire the satisfied skeleton bolts and point 087-094 at the review loop's seams (reconciliation P4.3)"`
 
 ### Task P4.4: story-index + maintenance-log
