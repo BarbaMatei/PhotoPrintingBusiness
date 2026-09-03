@@ -273,3 +273,40 @@ for three reasons:
   `/metrics` "for consistency"; designing a NetworkPolicy / security
   group that bounds traffic to the API; debugging "why does the
   scraper get 403."
+
+## Amendment (2026-09-03) — the day the middleware was wired up
+
+The 2026-07-31 amendment predicted this day: it warned that `ForwardedHeadersMiddleware`
+consumes and removes `X-Forwarded-For`, so any rule keyed on that header would break
+silently once the middleware existed. Bolt 054 registered it, because three other
+readers of `Connection.RemoteIpAddress` — the rate limiter's partition key, the auth
+audit log, and (via `X-Forwarded-Proto`) the refresh cookie's `Secure` flag — were all
+seeing the proxy instead of the client.
+
+The decision above is unchanged, and is now enforced structurally rather than by
+convention. A **third invariant** joins the list:
+
+- The scrape listener MUST be excluded from `ForwardedHeadersMiddleware`. The middleware
+  is registered through `UseWhen`, whose predicate skips any request whose
+  `Connection.LocalPort` equals `Observability:Metrics:ScrapePort`. The predicate is keyed
+  on the **listener**, never on the configured metrics path: `PathString.StartsWithSegments`
+  matches everything against `"/"` or `""`, both of which the path setting accepts, so a
+  path-keyed predicate could silently disable forwarded headers for the entire site.
+
+Two supports make that invariant hold:
+
+1. Because the exclusion cannot fire when no scrape listener is configured, boot **fails**
+   when `ForwardedHeaders:TrustedProxies` is non-empty while observability is on and
+   `Observability:Metrics:ScrapePort` is 0. A non-empty trusted-proxy list is the operator
+   stating that a reverse proxy sits in front of the API, and the invariant above already
+   required such a deployment to bind a scrape listener the proxy does not route. Nothing
+   enforced that requirement before; now something does.
+2. `MetricsEndpointIntegrationTests.Forwarded_for_cannot_open_the_scrape_gate` pins the
+   behaviour. It is not decorative: with the exclusion removed, a request to the scrape
+   listener carrying `X-Forwarded-For: <an allow-listed address>` returns **200 and the full
+   metric store**, from any container that can reach the port.
+
+Story 004 of bolt 054 asked for the opposite — an `X-Forwarded-For` case that makes an
+allow-listed address return 200. That story was written on 2026-06-05, before the
+2026-07-31 amendment, and its acceptance criterion is recorded as superseded by this ADR
+rather than implemented.

@@ -22,6 +22,11 @@ services:
       - caddy_logs:/var/log/caddy
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env, e.g. fototipar.ro}
+    networks:
+      default:
+        # Fixed so ForwardedHeaders__TrustedProxies can name this proxy and nothing else.
+        # Trusting the whole subnet instead would let any container here forge a client IP.
+        ipv4_address: 172.28.0.2
 
   api:
     image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/fototipar/api:${IMAGE_TAG:-latest}
@@ -58,3 +63,11 @@ volumes:
   caddy_logs:
   apidata:
   # pgdata:
+
+# Declared so the proxy's address is knowable; Docker would otherwise pick the range at `up`
+# time. If the host already routes 172.28.0.0/24, change it here and in .env — DEPLOYMENT.md §16.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

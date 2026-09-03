@@ -53,6 +53,10 @@ public sealed class ScrapeIpAllowList
         return new ScrapeIpAllowList(addresses.ToFrozenSet(), [.. networks]);
     }
 
+    public IReadOnlyCollection<IPAddress> Addresses => _addresses;
+
+    public IReadOnlyList<IPNetwork> Networks => _networks;
+
     public bool Contains(IPAddress? address)
     {
         if (address is null)
