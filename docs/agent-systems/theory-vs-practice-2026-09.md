@@ -576,8 +576,8 @@ overturned.
   implements, the design notes and open items record the reconciliation (seeded run 2 is open
   item 6), and the contract's sections are named by the rules they hold, including the
   standing-sweep mode. `7afcecd`, `0428314`, `7b7ff40`, `3ac17f8`.
-- **Phase 6 — thesis wording**: no commit. The edits are proposed as a patch and await the
-  owner's approval (S8).
+- **Phase 6 — thesis wording**: the edits were proposed as a patch (S8), approved by the owner on
+  2026-09-03 and applied as `b40f6e3`.
 - **Phase 7 — bridge, verification, hand-back**: this section is its first commit; a
   whole-branch verification and an independent review follow. The companion artifact page was
   republished with the rulings after the final review.
@@ -586,8 +586,8 @@ overturned.
 
 Left deliberately for the final review or for the owner, one line each:
 
-- The thesis proposal's M3 and §2 still read as if the Inspector does not exist — part of the
-  Phase 6 patch that awaits approval.
+- The thesis proposal's M3 and §2 still read as if the Inspector does not exist — outside the
+  four places the approved Phase 6 patch changed; the owner's call.
 - 34 story acceptance criteria under intent 035 still say "created via skill-creator"; the
   construction box on each bolt governs instead.
 - The inception log's `Human review complete` checkbox is still unticked — an owner action, not
