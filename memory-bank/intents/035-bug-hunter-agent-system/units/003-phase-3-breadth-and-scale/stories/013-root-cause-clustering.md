@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 23, **When** built, **Then** skill `root-cause-clustering` exists, created via skill-creator, and the brief's three test prompts pass (twelve null-derefs → one clustered record; two unrelated same-file bugs stay separate; clustered record shows all locations)
+- [ ] **Given** Prompt 23, **When** built, **Then** skill `root-cause-clustering` exists, created via skill-creator, and the brief's three test prompts pass (twelve null-derefs → one clustered record; two unrelated same-file bugs stay separate; clustered record shows all locations) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** candidates after dedup, **When** clustering, **Then** shared-root-cause groups (same unchecked function called everywhere; same missing validation across endpoints; one data-flow origin) become ONE record with multiple `location` entries and a single root-cause `developer_detail`
 - [ ] **Given** the conservatism rule, **When** uncertain, **Then** distinct defects stay separate — only genuinely shared causes cluster
 

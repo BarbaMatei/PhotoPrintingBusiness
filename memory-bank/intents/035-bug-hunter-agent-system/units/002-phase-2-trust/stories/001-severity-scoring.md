@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 8, **When** built, **Then** skill `severity-scoring` exists, created via skill-creator, and the brief's three test prompts pass (High/High score; Critical/Low ranked below it with explanation; re-score & sort five)
+- [ ] **Given** Prompt 8, **When** built, **Then** skill `severity-scoring` exists, created via skill-creator, and the brief's three test prompts pass (High/High score; Critical/Low ranked below it with explanation; re-score & sort five) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a bug, **When** scoring, **Then** severity follows the brief's worst-case-impact ladder (Critical/High/Medium/Low), category comes from the fixed list, and `risk_score = severity × confidence` with documented, tunable numeric weights normalized to 0–100
 - [ ] **Given** output, **When** emitted, **Then** `{severity, category, risk_score, scoring_rationale}` is returned and the rationale explains the ordering
 - [ ] **Given** planned seams, **When** authored, **Then** the formula is explicitly easy to extend — Phase 3 adds **reachability** as a third factor (14b) and lets contract corroboration raise the `confidence` input (24c) — no rewrite needed then

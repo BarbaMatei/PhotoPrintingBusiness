@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 30, **When** built, **Then** skill `regression-harvest` exists, created via skill-creator, and the brief's three test prompts pass (harvest + link a null-deref's failing test; statically-only-confirmed bug noted "no test"; never edits app source)
+- [ ] **Given** Prompt 30, **When** built, **Then** skill `regression-harvest` exists, created via skill-creator, and the brief's three test prompts pass (harvest + link a null-deref's failing test; statically-only-confirmed bug noted "no test"; never edits app source) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a dynamically-confirmed bug, **When** harvesting, **Then** the Verifier's proving test is cleaned up, tagged with the bug ID, and **proposed** for the suite — written **only with owner approval** (the system's ONE allowed new-file write into the codebase, test code only; existing app code never altered)
 - [ ] **Given** a statically-only-confirmed bug, **When** harvesting, **Then** "no regression test exists" is recorded honestly
 - [ ] **Given** the v3.2 pre-approval checklist, **When** proposing, **Then** the proposal states (and the owner checks): **no network calls, no secrets/live credentials, deterministic, fixtures-only** — the test will run on dev machines and CI with full permissions once approved

@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 11, **When** built, **Then** skill `git-revision-tracking` exists, created via skill-creator, and the brief's three test prompts pass (SHA into run metadata; deleted code → propose Fixed with evidence; moved 40 lines → location updated)
+- [ ] **Given** Prompt 11, **When** built, **Then** skill `git-revision-tracking` exists, created via skill-creator, and the brief's three test prompts pass (SHA into run metadata; deleted code → propose Fixed with evidence; moved 40 lines → location updated) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** run start, **When** opening, **Then** the current commit SHA is recorded into run metadata via `ledger-io`
 - [ ] **Given** open prior bugs, **When** reconciling, **Then** each bug's file region is diffed old-vs-current commit: code gone/changed-as-described ⇒ **propose** `Fixed` (with the fixing commit); code merely moved ⇒ update location so the signature still resolves
 - [ ] **Given** the safety rule, **When** acting, **Then** changes are **proposed, never auto-closed** — surfaced for a human or (P4) the Curator

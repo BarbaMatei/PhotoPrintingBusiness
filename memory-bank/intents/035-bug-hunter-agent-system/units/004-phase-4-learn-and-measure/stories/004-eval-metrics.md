@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 28, **When** built, **Then** skill `eval-metrics` exists, created via skill-creator, and the brief's three test prompts pass (recall vs corpus; FP-rate from dismissals with the corpus-miss explanation; five-run trend)
+- [ ] **Given** Prompt 28, **When** built, **Then** skill `eval-metrics` exists, created via skill-creator, and the brief's three test prompts pass (recall vs corpus; FP-rate from dismissals with the corpus-miss explanation; five-run trend) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** the measurement nuance (binding), **When** scoring, **Then** a reported bug NOT in the corpus is **not** auto-counted a false positive (the corpus is incomplete): **recall** measures against the **seeded** corpus (reliable); **precision** is proxied by the **human-dismissal rate**; F1 computed; each metric's limits stated
 - [ ] **Given** trend tracking, **When** recording, **Then** per-run metrics + trend (improving/flat/regressing) persist so a post-change drop is visible
 - [ ] **Given** variance control (v3.2, aligned with the knowledge builder's eval policy), **When** running evals, **Then** the **model/version and settings are recorded per run and trends compare like-for-like only** — pinning isn't operationally meaningful in this environment; honesty about comparability replaces a pin

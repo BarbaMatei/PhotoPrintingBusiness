@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 3, **When** built, **Then** skill `deduplication` exists, created via skill-creator, and the brief's four test prompts pass (duplicate check vs ledger; dismissed-signature drop; same-line-different-defect → NEW; same-signature-but-distinct-defect → NEW, v3.2)
+- [ ] **Given** Prompt 3, **When** built, **Then** skill `deduplication` exists, created via skill-creator, and the brief's four test prompts pass (duplicate check vs ledger; dismissed-signature drop; same-line-different-defect → NEW; same-signature-but-distinct-defect → NEW, v3.2) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a candidate, **When** checking, **Then** the `signature` (path::symbol::bug_type) is computed **normalized so a moved line still matches**, and the verdict is one of `{new | duplicate | dismissed | suppressed}` with `matched_id_or_pattern` + rationale
 - [ ] **Given** the ledger via `ledger-io`, **When** matching, **Then** `bug_index` duplicates link to the existing ID (not re-reported), `dismissed` entries drop, `suppression_patterns` matches drop with the pattern noted — and the (empty-until-Phase-4) patterns section is already honored so no change is needed later
 - [ ] **Given** the brief's caution, **When** judging, **Then** "same area" is NOT collapsed into "same bug" — only true duplicates merge

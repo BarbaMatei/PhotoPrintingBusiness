@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 18, **When** built, **Then** skill `file-sweeper-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (sweep five files; linter-first then add what it missed; skip already-deep files and say which)
+- [ ] **Given** Prompt 18, **When** built, **Then** skill `file-sweeper-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (sweep five files; linter-first then add what it missed; skip already-deep files and say which) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** assigned files, **When** sweeping, **Then** deeply-covered files are skipped/shallow-passed (ledger coverage), deterministic findings come first via `tool-ingest`, then inspection for: null handling, boundaries, wrong operators, type coercion, resource leaks, unhandled exceptions, dead code hiding logic errors, hardcoded secrets, unsafe API usage
 - [ ] **Given** emission, **When** done, **Then** `deduplication` first, candidates only, coverage updated
 

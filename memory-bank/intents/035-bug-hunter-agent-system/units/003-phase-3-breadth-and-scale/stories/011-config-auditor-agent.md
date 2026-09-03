@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 21, **When** built, **Then** skill `config-auditor-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (Dockerfile+compose audit; committed secret / debug-on found; wildcard CORS flagged)
+- [ ] **Given** Prompt 21, **When** built, **Then** skill `config-auditor-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (Dockerfile+compose audit; committed secret / debug-on found; wildcard CORS flagged) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** env/config files, Dockerfiles, compose files, CI configs, IaC, **When** auditing, **Then** checks cover: committed secrets, overly-permissive settings (0.0.0.0 binding, debug mode, wildcard CORS, world-readable permissions), default/weak credentials, exposed ports, missing security headers
 - [ ] **Given** tooling, **When** available, **Then** deterministic scanners (gitleaks, hadolint, checkov, tfsec) feed in via `tool-ingest`, plus reasoning on top; `category = Configuration`; `deduplication` first; read-only
 

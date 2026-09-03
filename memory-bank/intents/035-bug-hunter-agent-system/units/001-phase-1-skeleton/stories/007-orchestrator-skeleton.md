@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 7, **When** built, **Then** skill `orchestrator` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (first run labeled unverified; second run surfaces only new; zero-new-bugs run correct)
+- [ ] **Given** Prompt 7, **When** built, **Then** skill `orchestrator` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (first run labeled unverified; second run surfaces only new; zero-new-bugs run correct) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** the heart of the additive design, **When** defined, **Then** ALL six slots exist now — (1) Open/Map [minimal], (2) Hunt → `general-hunter`, (3) Verify [PASS-THROUGH, candidates tagged `Confidence: Low`/"unverified"], (4) Triage → `deduplication` + rough severity, (5) Report → `report-rendering`, (6) Learn [empty; apply `triage-intake` decisions if present], (7) Close → coverage + run summary via `ledger-io` **single-writer merge** of staged hunter output
 - [ ] **Given** the v3 reporting policy, **When** reporting in Phase 1, **Then** the whole report is labeled **"unverified candidates — high false-positive rate until Phase 2"** and the reporting floor applies
 - [ ] **Given** discipline rules, **When** running, **Then** a per-run scope + stopping condition are defined; read-only on source; bugs are never invented to avoid an empty run, plausible ones never dropped

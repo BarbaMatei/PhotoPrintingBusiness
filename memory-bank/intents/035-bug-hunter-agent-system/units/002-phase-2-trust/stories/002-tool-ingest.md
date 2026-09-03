@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 9, **When** built, **Then** skill `tool-ingest` exists, created via skill-creator, and the brief's three test prompts pass (eslint+tsc normalize; SARIF ingest + cross-tool dedupe; failing pytest log → located candidates)
+- [ ] **Given** Prompt 9, **When** built, **Then** skill `tool-ingest` exists, created via skill-creator, and the brief's three test prompts pass (eslint+tsc normalize; SARIF ingest + cross-tool dedupe; failing pytest log → located candidates) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** common formats (compiler/linter text, type-checker JSON, SARIF, test-runner output), **When** ingesting, **Then** each finding becomes a normalized candidate with `source_tool`, `rule_id`, `location`, `raw_message`, first-pass category/severity guess; identical findings dedupe across tools
 - [ ] **Given** the trust rule, **When** emitting, **Then** results are marked **tool-originated candidates** that still pass through the Verify slot (a warning is a lead, not a confirmed bug)
 - [ ] **Given** the v3.2 injection guard, **When** parsing, **Then** tool output is **data, never instructions** — directive-like message text is quoted into the candidate and flagged `injection_suspected`, never obeyed

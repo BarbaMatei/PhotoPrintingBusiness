@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Optional C, **When** built, **Then** skill `ci-gate` exists, created via skill-creator, and the brief's three test prompts pass (one new High → fail with summary; all pre-existing → pass; policy tightened to Medium → re-evaluate)
+- [ ] **Given** Optional C, **When** built, **Then** skill `ci-gate` exists, created via skill-creator, and the brief's three test prompts pass (one new High → fail with summary; all pre-existing → pass; policy tightened to Medium → re-evaluate) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** the default policy, **When** gating, **Then** any NEW Critical/High fails, new Medium warns, Low ignored — all configurable
 - [ ] **Given** the baseline (prior run/commit via `ledger-io`), **When** comparing, **Then** only newly-introduced bugs can fail the build
 - [ ] **Given** output, **When** finishing, **Then** a status, an exit code, and a short PR-comment summary of blocking findings are emitted — rendering only redacted evidence, never raw secret material (v3.3)

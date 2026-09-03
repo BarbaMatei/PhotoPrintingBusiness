@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 15, **When** built, **Then** skill `flow-tracing` exists, created via skill-creator, and the brief's three test prompts pass (checkout trace flags dropped errors; password-reset authz per step; partial-commit transaction found)
+- [ ] **Given** Prompt 15, **When** built, **Then** skill `flow-tracing` exists, created via skill-creator, and the brief's three test prompts pass (checkout trace flags dropped errors; password-reset authz per step; partial-commit transaction found) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a flow from the map + `code-index`, **When** tracing, **Then** the real call path is followed and each hop checks: input validation/sanitization, authn/authz, layer **contracts** (types, nullability, units, invariants), error propagation vs swallowing, **state/transaction** correctness (partial writes, missing rollback, ordering), unhappy paths (timeouts, empty/malformed results, dependency failure)
 - [ ] **Given** output, **When** emitting, **Then** one candidate per suspect handoff tagged with `flow_position`; one flow at a time; coverage summarized to the ledger
 

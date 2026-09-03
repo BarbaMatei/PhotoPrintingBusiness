@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 32, **When** built, **Then** skill `fix-proposal` exists, created via skill-creator, and the brief's three test prompts pass (off-by-one fix validated vs harvested test + module suite; unvalidated proposal when no test; own-test-passes-but-sibling-breaks → NOT labeled validated)
+- [ ] **Given** Prompt 32, **When** built, **Then** skill `fix-proposal` exists, created via skill-creator, and the brief's three test prompts pass (off-by-one fix validated vs harvested test + module suite; unvalidated proposal when no test; own-test-passes-but-sibling-breaks → NOT labeled validated) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a confirmed bug, **When** drafting, **Then** a minimal diff addressing the **root cause** is produced with a short rationale
 - [ ] **Given** a harvested test, **When** validating, **Then** the patch is applied **in the sandbox** and not just the bug's own test but the relevant surrounding suite runs (at minimum the same module's tests) — "validated" only if the bug's test passes AND nothing else newly breaks; if the wider set isn't feasible, the label downgrades to "passes its own test, broader impact unchecked"
 - [ ] **Given** the hard boundary, **When** done, **Then** the patch is **never applied to the real repository** — attached to the bug record/report as a proposal only

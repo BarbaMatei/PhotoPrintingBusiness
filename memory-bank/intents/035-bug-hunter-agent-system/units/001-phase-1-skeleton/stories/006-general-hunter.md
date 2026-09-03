@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 6, **When** built, **Then** skill `general-hunter` exists (an agent built as a skill defining its procedure), created via skill-creator, and the brief's three test prompts pass (scan a small repo; only-new-vs-ledger; coverage report)
+- [ ] **Given** Prompt 6, **When** built, **Then** skill `general-hunter` exists (an agent built as a skill defining its procedure), created via skill-creator, and the brief's three test prompts pass (scan a small repo; only-new-vs-ledger; coverage report) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** no formal map yet, **When** hunting, **Then** entry points are identified by convention (routes/controllers/`main`/handlers) and main flows traced top-down (validation, auth, error handling, state/transactions per hop) AND files swept for local defects (null handling, boundaries, wrong operators, type coercion, resource leaks, unhandled exceptions, hardcoded secrets)
 - [ ] **Given** emission, **When** producing output, **Then** `deduplication` runs first; candidates use the shared shape with `category_guess`; **every plausible lead is surfaced** (no self-censoring — Verify gates); coverage is updated in the ledger
 - [ ] **Given** the conventions, **When** operating, **Then** strictly read-only on source

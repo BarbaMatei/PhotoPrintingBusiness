@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 20, **When** built, **Then** skill `dependency-audit-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (audit vs current advisories; fixed version per hit; dismissed dependency ignored)
+- [ ] **Given** Prompt 20, **When** built, **Then** skill `dependency-audit-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (audit vs current advisories; fixed version per hit; dismissed dependency ignored) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** dependency files + lockfiles, **When** auditing, **Then** actually-installed versions are resolved and checked against a **live** source at run time (OSV, GitHub Advisory, or ecosystem audit via `tool-ingest` — advisory data changes daily)
 - [ ] **Given** a hit, **When** emitting, **Then** the candidate carries library, current version, advisory/CVE id, affected range, fixed version; `category = Dependency`; `deduplication` first; read-only
 - [ ] **Given** verification, **When** handed over, **Then** the Verifier can confirm largely by version-matching (deterministic → genuinely High confidence)

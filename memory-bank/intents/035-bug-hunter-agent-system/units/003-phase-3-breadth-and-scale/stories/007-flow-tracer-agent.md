@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 17, **When** built, **Then** skill `flow-tracer-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (hunt the 3 highest-risk flows; skip flows already in the ledger; report coverage + depth)
+- [ ] **Given** Prompt 17, **When** built, **Then** skill `flow-tracer-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (hunt the 3 highest-risk flows; skip flows already in the ledger; report coverage + depth) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** assigned flows, **When** hunting, **Then** highest risk class first, `flow-tracing` per flow, `deduplication` before emitting, **candidates only** (no confirm/score — the Verifier's job), coverage updated
 - [ ] **Given** conventions, **When** operating, **Then** every plausible lead surfaced; strictly read-only
 

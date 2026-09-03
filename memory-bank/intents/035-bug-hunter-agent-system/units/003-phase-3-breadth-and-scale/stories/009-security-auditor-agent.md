@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 19, **When** built, **Then** skill `security-auditor-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (auth+payment security pass; object-level authz on every load-by-ID endpoint; hardcoded secrets / weak crypto)
+- [ ] **Given** Prompt 19, **When** built, **Then** skill `security-auditor-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (auth+payment security pass; object-level authz on every load-by-ID endpoint; hardcoded secrets / weak crypto) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** assigned flows/files, **When** auditing, **Then** `taint-analysis` runs for data-flow; authn/authz checked at each protected entry point and step (missing checks, broken object-level authorization, privilege escalation); exposed secrets and insecure config in code scanned; injection/XSS/SSRF/path traversal/insecure deserialization/weak crypto/open redirects checked
 - [ ] **Given** emission, **When** done, **Then** `deduplication` first; candidates only with precise `category_guess` + data-flow evidence; read-only
 

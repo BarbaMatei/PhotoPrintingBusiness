@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 26, **When** built, **Then** skill `bug-lifecycle` exists, created via skill-creator, and the brief's three test prompts pass (code removed → propose Fixed with evidence; fixed signature returns → regression flag; moved function → location update, still Confirmed)
+- [ ] **Given** Prompt 26, **When** built, **Then** skill `bug-lifecycle` exists, created via skill-creator, and the brief's three test prompts pass (code removed → propose Fixed with evidence; fixed signature returns → regression flag; moved function → location update, still Confirmed) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** transitions, **When** managing, **Then** the allowed set holds: `New → Confirmed | Dismissed`; `Confirmed → Fixed` (evidence from `git-revision-tracking`; from Phase 5, `fix-verification` runs first); `Fixed → Reopened`; location updates when code moves
 - [ ] **Given** a reappearing Fixed signature (v3.3), **When** judging, **Then** it is a regression **candidate**, not an identity — hypotheses/lines/trigger conditions are compared; same defect → `Reopened` (high-priority regression), different defect → NEW linked via `related` (no false regression, no false ticket reopen)
 - [ ] **Given** self-closing, **When** acting, **Then** it **proposes with evidence** and either auto-applies with an audit trail or requires confirmation (configurable) — never silently; approved transitions apply via `ledger-io`

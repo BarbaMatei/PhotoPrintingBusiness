@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 22, **When** built, **Then** skill `concurrency-auditor-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (check-then-act races in an inventory decrement; lock-ordering deadlocks; transaction racing the email it sends)
+- [ ] **Given** Prompt 22, **When** built, **Then** skill `concurrency-auditor-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (check-then-act races in an inventory decrement; lock-ordering deadlocks; transaction racing the email it sends) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** shared mutable state, async/parallel code, locks, transactional regions (via `code-index`/`flow-tracing`), **When** hunting, **Then** checks cover data races, non-atomic check-then-act (TOCTOU), missing/inconsistent locking, lock-ordering deadlocks, transaction-vs-external-effect races, unsafe lazy init
 - [ ] **Given** emission, **When** done, **Then** `deduplication` first; candidates only, with the triggering interleaving described as evidence
 - [ ] **Given** confirmability, **When** verified later, **Then** it is expected and acceptable that the Verifier marks most of these Medium ("reasoned, not reproduced")

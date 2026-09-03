@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 2, **When** built, **Then** skill `bug-documentation` exists, created via skill-creator, and the brief's three test prompts pass (full record for a null-deref; missing-reproduction flagged; contract-cited vs intent-unconfirmed `expected_behavior`)
+- [ ] **Given** Prompt 2, **When** built, **Then** skill `bug-documentation` exists, created via skill-creator, and the brief's three test prompts pass (full record for a null-deref; missing-reproduction flagged; contract-cited vs intent-unconfirmed `expected_behavior`) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a record, **When** validating, **Then** ALL required fields from the brief are enforced (id, signature, title, severity, category from the fixed list, confidence + why, status, risk_score, reachable, commit_sha, **correlation_id**, plain_summary, location[] + flow_position, developer_detail, evidence, reproduction, impact, fix_direction, related) — a record missing required fields is refused
 - [ ] **Given** v3 sourcing, **When** writing `expected_behavior`, **Then** an existing knowledge-ledger contract is cited (statement + source ref) when available; otherwise the field is derived from reasoning and tagged **"intent-unconfirmed"**
 - [ ] **Given** audience validation, **When** checking, **Then** `plain_summary` is jargon-free, `developer_detail` technical, `reproduction` runnable

@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 12, **When** built, **Then** skill `app-mapping` exists, created via skill-creator, and the brief's three test prompts pass (map this repo; risk-class tagging; new-route refresh shows a diff)
+- [ ] **Given** Prompt 12, **When** built, **Then** skill `app-mapping` exists, created via skill-creator, and the brief's three test prompts pass (map this repo; risk-class tagging; new-route refresh shows a diff) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** mapping, **When** recording via `ledger-io`, **Then** the `application_map` holds entry points (routes/controllers, UI actions, CLI, jobs, event handlers, public APIs), modules + dependency edges, end-to-end flows (ordered component lists entry→data layer), and external dependencies
 - [ ] **Given** prioritization, **When** tagging, **Then** each flow carries a **risk class** (auth, money, data-write = high; read-only = lower)
 - [ ] **Given** a refresh, **When** the map exists, **Then** it diffs and updates rather than overwriting

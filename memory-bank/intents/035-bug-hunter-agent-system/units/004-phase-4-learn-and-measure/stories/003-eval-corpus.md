@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 27, **When** built, **Then** skill `eval-corpus` exists, created via skill-creator, and the brief's four test prompts pass (corpus from ten historical confirmed bugs; three seeded SQL-injection bugs in the fixture; retire an obsolete entry; an eval run leaves the real ledger untouched — v3.2)
+- [ ] **Given** Prompt 27, **When** built, **Then** skill `eval-corpus` exists, created via skill-creator, and the brief's four test prompts pass (corpus from ten historical confirmed bugs; three seeded SQL-injection bugs in the fixture; retire an obsolete entry; an eval run leaves the real ledger untouched — v3.2) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** the two sources, **When** maintaining, **Then** labeled real bugs (historical confirmed: location/type/severity) and seeded synthetic bugs (deliberately injected defects in a test fixture/branch with known answers) both populate the corpus; each entry carries expected location, type/category, expected severity, and a **hit matcher** (signature/location proximity + category match)
 - [ ] **Given** the safety rule, **When** seeding, **Then** seeded bugs live strictly in fixtures (under `bug-hunting/eval/`), never shippable code; add/retire/version operations supported
 - [ ] **Given** eval isolation (v3.2), **When** a run executes over the corpus/fixtures, **Then** it writes to a **throwaway ledger** under `bug-hunting/eval-runs/<timestamp>/` — never the real `bug-ledger.json` (no seeded pollution of coverage, dedup, or lifecycle)

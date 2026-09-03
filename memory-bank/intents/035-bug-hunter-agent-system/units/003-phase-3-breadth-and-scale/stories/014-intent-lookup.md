@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 24, **When** built, **Then** skill `intent-lookup` exists, created via skill-creator, and the brief's three test prompts pass (contracts governing a file; superseded contract returned flagged; current-state/advisory entries never returned as contracts)
+- [ ] **Given** Prompt 24, **When** built, **Then** skill `intent-lookup` exists, created via skill-creator, and the brief's three test prompts pass (contracts governing a file; superseded contract returned flagged; current-state/advisory entries never returned as contracts) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a target, **When** querying the knowledge builder's **`ledger-query`** interface, **Then** relevant contracts return as `{statement, contract_kind, confidence, status, source_ref}`
 - [ ] **Given** the authority rules, **When** classifying, **Then** only `intent_contracts` are treated as authority (never current-state map or advisory entries); **superseded**, **retracted** (v3.2), and not-yet-`done` contracts return tagged so consumers don't over-rely
 - [ ] **Given** boundaries, **When** operating, **Then** strictly read-only on the knowledge ledger

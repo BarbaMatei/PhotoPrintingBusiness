@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 13, **When** built, **Then** skill `code-index` exists, created via skill-creator, and the brief's three test prompts pass (find definition + callers; 20-line slice around a location; re-index only the latest commit's changes)
+- [ ] **Given** Prompt 13, **When** built, **Then** skill `code-index` exists, created via skill-creator, and the brief's three test prompts pass (find definition + callers; 20-line slice around a location; re-index only the latest commit's changes) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** the operations, **When** queried, **Then** `find_symbol`, `find_callers`, `find_callees`, `definition_of`, `search_text`, `slice_around(location, context_lines)` all work (ctags-style map + grep-backed search is an acceptable baseline)
 - [ ] **Given** incrementality, **When** given a SHA, **Then** only changed files re-index
 - [ ] **Given** the v3.3 store location, **When** persisting, **Then** the index lives under `bug-hunting/code-index/` (Integration Contract §1 — derived, regenerable; the KB may refresh it as a shared tool)

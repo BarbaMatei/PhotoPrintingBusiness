@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 14, **When** built, **Then** skill `reachability` exists, created via skill-creator, and the brief's three test prompts pass (is X reachable; deleted-route-only → unreachable; reflection/DI → unknown without down-ranking everything)
+- [ ] **Given** Prompt 14, **When** built, **Then** skill `reachability` exists, created via skill-creator, and the brief's three test prompts pass (is X reachable; deleted-route-only → unreachable; reflection/DI → unknown without down-ranking everything) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a target location + the map, **When** tracing backwards through the call graph/references, **Then** the answer is `reachable` / `unreachable` / `unknown` — `unknown` is a valid honest answer (never guess `reachable`, never drop the bug), and reachable answers include the shortest entry→target path as evidence
 - [ ] **Given** the v3 **framework-aware unknown weight**, **When** the stack is metaprogramming-heavy (DI, decorators, route registration, event buses, reflection, serialization-driven calls), **Then** the stack is detected and the "unknown" penalty calibrated so genuinely reachable bugs aren't systematically flattened
 

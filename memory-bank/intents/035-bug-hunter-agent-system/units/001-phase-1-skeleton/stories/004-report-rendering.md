@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 4, **When** built, **Then** skill `report-rendering` exists, created via skill-creator, and the brief's three test prompts pass (High/Medium/Low mix → Low in appendix; zero-new-bugs run; second run writes a NEW file)
+- [ ] **Given** Prompt 4, **When** built, **Then** skill `report-rendering` exists, created via skill-creator, and the brief's three test prompts pass (High/Medium/Low mix → Low in appendix; zero-new-bugs run; second run writes a NEW file) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a run, **When** rendering, **Then** a NEW file `bug-hunting/reports/bug-report-run-<NN>-<YYYYMMDD-HHMM>.md` is written (never append/overwrite), with Run Summary (scope, counts by severity, uncovered areas, explicit zero-new-bugs note when applicable) then bugs sorted by risk descending
 - [ ] **Given** the **reporting floor** (v3, axis fixed in v3.2), **When** structuring, **Then** the floor is on **confidence**: High/Medium-confidence findings render in the body with all three audience sections; **Low-confidence** findings land in a separate "Also flagged — low confidence" appendix regardless of severity, never interleaved — and any **Critical/High-severity** item parked there gets a mandatory one-line body callout; optional top-N cap and per-run report budget are supported — prominence changes, nothing is deleted (everything stays in the ledger)
 - [ ] **Given** the v3.2 secret-safety rule, **When** rendering, **Then** only the record's redacted evidence appears — never raw secret material

@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 29, **When** built, **Then** skill `curator-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (curate after a run; record metrics + trend call-out; health summary)
+- [ ] **Given** Prompt 29, **When** built, **Then** skill `curator-agent` exists (agent-as-skill), created via skill-creator, and the brief's three test prompts pass (curate after a run; record metrics + trend call-out; health summary) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** a run close (or schedule), **When** curating, **Then** the four steps run: (1) **Learn** — pull new `triage-intake` dismissals, run `suppression-learning`, present proposals for approval (each validated vs Confirmed), activate approved; (2) **Reconcile** — `bug-lifecycle` (self-close with evidence, update moved, flag regressions); (3) **Measure** — `eval-corpus` + `eval-metrics`, record trend, call out drops coinciding with recent changes; (4) **Summarize** — short health report (FP-rate/recall trends, open bugs by severity, new patterns, regressions, **ledger size + growth with threshold callout — the compaction watcher (v3.3)**, a **model-changed flag that schedules an eval (v3.3)**, recommendation)
 - [ ] **Given** boundaries, **When** operating, **Then** read-only on source; writes only ledger + summary
 

@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 25, **When** built, **Then** skill `suppression-learning` exists, created via skill-creator, and the brief's three test prompts pass (five @NonNull dismissals → pattern; wouldn't-have-hidden-a-Confirmed-bug check; blast radius shown)
+- [ ] **Given** Prompt 25, **When** built, **Then** skill `suppression-learning` exists, created via skill-creator, and the brief's three test prompts pass (five @NonNull dismissals → pattern; wouldn't-have-hidden-a-Confirmed-bug check; blast radius shown) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** dismissed findings (with reasons, via `triage-intake` → `ledger-io`), **When** generalizing, **Then** shared traits (rule_id, category-within-package, sanitizer/annotation presence, framework idiom — dismissal reasons are the strong signal) become candidate patterns: human-readable description + a precise match rule `deduplication` can apply
 - [ ] **Given** the safety rule, **When** proposing, **Then** every pattern is **validated against the Confirmed set** (would it have suppressed a genuine bug? → reject or narrow); blast radius reported; patterns are **proposed, never auto-activated** — approval flows through `triage-intake`, storage via `ledger-io`
 

@@ -21,7 +21,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** Prompt 16, **When** built, **Then** skill `taint-analysis` exists, created via skill-creator, and the brief's three test prompts pass (param→SQL unsanitized; upload handler path traversal; escaped-before-output NOT flagged)
+- [ ] **Given** Prompt 16, **When** built, **Then** skill `taint-analysis` exists, created via skill-creator, and the brief's three test prompts pass (param→SQL unsanitized; upload handler path traversal; escaped-before-output NOT flagged) *(2026-09: a component that extends the review loop is a script or skill edit under `reviews/lib` / `.claude/skills`, built and tested there; skill-creator applies only to a new standalone skill — FR-1 as amended)*
 - [ ] **Given** sources (request params, headers, uploads, external responses) and sinks (SQL/command execution, file paths, HTML output, deserialization, redirects), **When** tracing via `code-index`, **Then** unsanitized source→sink paths emit candidates with the path as evidence and a precise `category_guess` (SQL injection, command injection, XSS, path traversal, SSRF, insecure deserialization, open redirect)
 - [ ] **Given** sanitizers, **When** data is correctly handled for the sink type, **Then** it is marked clean (no false flag); **Given** unresolvable paths, **Then** `unknown` is surfaced rather than guessed
 
