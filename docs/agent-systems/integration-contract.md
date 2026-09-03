@@ -104,11 +104,14 @@ lock.
 
 **Id reservation (v1.6 — from the ruling on where review records live):** a target reserves a range
 of `PPW` finding numbers in `reviews/state/id-counter` when it opens; two worktrees never mint from
-the same range. Until the reservation is implemented, the duplicate-mint alarm (`mint-id.mjs` refuses
-an id already in use) is the guard. The single-history rule above governs `bug-hunting/**` and
-`knowledge/**`; `reviews/**` is deliberately different — its records are part of the change under
-review, so they ride the feature branch as the working copy and become canonical on `main` when the
-branch merges.
+the same range. The file holds one number today — the next free id — so the format of a recorded
+range is part of the reservation's implementation, not something already in place. Until then the
+guard is the duplicate-mint alarm in `mint-id.mjs`, and it is a partial one: it compares a new id
+against the same target's ledger only, so two worktrees minting into two *different* targets are not
+caught — which is exactly why the reservation is the fix. The single-history rule above governs
+`bug-hunting/**` and `knowledge/**`; `reviews/**` is deliberately different — its records are part
+of the change under review, so they ride the feature branch as the working copy and become canonical
+on `main` when the branch merges.
 
 Cross-store reads are always allowed; cross-store **writes never are** — and **each orchestrator
 audits its own run's writes at close** (v1.2). The audit has **two parts (v1.4):** (1) a
@@ -221,7 +224,9 @@ If the map is absent or stale, flow queries return empty with
 **Mapping to the review loop's verdicts (v1.6).** `verify-fixes.mjs` verdicts are the pre-merge
 mode's `fix_status`: `held` ≡ `verified-fixed`; `test-never-red`, `no-test` ≡ `closed-unverified`
 (no oracle entry, the fix is not counted); `revert-broke-build` ≡ `fix-failed` (re-checked at the
-next pass). A fix is never counted on the fixer's word — the same rule, both modes.
+next pass). A fix is never counted on the fixer's word — the same rule, both modes. Every other
+verdict maps to `fix-failed` and is re-checked at the next pass; no verdict other than `held` ever
+counts as `verified-fixed`; `dry-run` is a mode, not a verdict.
 
 **Proof rule for high-severity findings (v1.6 — from the ruling on execution proof).** A 🔴 /
 Critical finding enters the ledger as such only with a failing test written by a non-fixer — an agent
@@ -318,9 +323,10 @@ sibling:
 **Rules for judgment agents (v1.6).** These two bind every judgment agent in both systems, not only
 the twin-named skills above:
 
-- **Blinding (v1.6):** a judgment agent (hunter, lens, skeptic, verifier) is given no prior records,
-  finding ids or repository history for the target it judges; agreement planted by a shared hint is
-  flagged (`hinted`) and earns no convergence credit.
+- **Blinding (v1.6):** at discovery, before synthesis, a judgment agent (hunter, lens, skeptic) is
+  given no prior records, finding ids or repository history for the target it judges; verification
+  and re-argument of a decided finding are anchored on purpose and read the record they verify.
+  Agreement planted by a shared hint is flagged (`hinted`) and earns no convergence credit.
 - **Verifier ≠ fixer (v1.6):** inside a system as between systems — the agent that verifies a fix or
   audits a test is never the agent that wrote it.
 
@@ -348,13 +354,14 @@ retired by the re-scope of intent 035.
    a proof has to name the commit it was taken on. (Bolt 087 as well; `git-revision-tracking` is one
    of its stories.)
 3. **Ingest of existing scanner tools** — dependency audit and static analysis, read in as untrusted
-   data instead of re-derived by hand. (Bolts 089 and 090, the specialist auditors; the `tool-ingest`
-   skill itself sits in bolt 087.)
+   data instead of re-derived by hand. (The `tool-ingest` skill, a story of bolt 087.)
 4. **The Inspector's Map slot** — application map and reachability, which builds the shared
    `code-index` tool. (Bolt 088.)
 5. **Standing-sweep mode** — a scheduled pass over the whole codebase on `main`, as against the
    pre-merge pass over one branch that exists today. (No bolt of its own yet; it arrives with the
-   re-scope of intent 035.)
+   re-scope of intent 035. The specialist agents that consume the ingested scanner output —
+   `dependency-audit` and `config-auditor`, bolts 089 and 090 — land here too: both declare the Map
+   slot, bolt 088, as their prerequisite, so they follow it rather than step 3.)
 6. **Knowledge-builder Phases 1–2** — only if intent-drift findings appear, meaning findings that the
    code has drifted from its written intent.
 7. **Knowledge-builder Phase 3** — keeping the ledger honest over time; straight after Phase 2.
