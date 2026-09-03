@@ -1,12 +1,14 @@
 # Future System — Code-Review Agentic System (concept note)
 
 > **Status: PARTIALLY BUILT, UNPLANNED (2026-09).** Three of the five dimensions below run today as
-> lenses of the review loop (`reviews/`): intent fidelity as `requirements` (against the bolt's own
-> documents, not an oracle), design quality as `quality` (report-only), test adequacy as
-> `tests-coverage`. The verdict exists (`request-changes` / `approve-with-followups` / `approved`)
-> but is a loop outcome, not the accept / block / revise synthesis described here. Comment/doc
-> accuracy and contract fidelity are not built. The rest of this note stands as the design for the
-> remainder.
+> lenses of the review loop (`reviews/`): intent fidelity as `requirements`, design quality as
+> `quality` (report-only), test adequacy as `tests-coverage`. The other two — standards adherence
+> and comment/doc accuracy — are not built. The `requirements` lens reads the bolt's own documents
+> rather than a distilled contract, so contract fidelity (the same intent-fidelity dimension,
+> checked against an oracle instead of against the bolt's own text) is still on paper. The verdict
+> exists (`request-changes` / `approve-with-followups` / `approved`) but is a loop outcome, not the
+> accept / block / revise synthesis described here. The rest of this note stands as the design for
+> the remainder.
 
 ---
 
@@ -21,12 +23,14 @@ The three current systems map to roles in a software organization:
 | Librarian / oracle | knowledge-builder | distillation runs | intent contracts |
 | **Reviewer** | **partial** — three dimensions run as lenses of the review loop (`reviews/`); the rest deferred | **at the moment of change** | **one diff / bolt** |
 
-Nothing today gates a change *at merge time*. The bug-hunter is post-hoc and **defect-focused**; it
-runs over standing state and finds bugs. A reviewer is **pre-merge** and **change-focused**: it judges
-whether *this specific diff* should be accepted at all. The classes it catches — intent drift, design
-degradation, standards violations, missing test coverage, comment rot — are exactly the things the
-bug-hunter structurally does not look for, and catching them before they land is the cheapest quality
-gate in the pipeline.
+The review loop under `reviews/` gates every bolt *at merge time* today, but with only three of
+these dimensions (intent fidelity, design quality, test adequacy); standards adherence, comment/doc
+accuracy and the accept / block / revise synthesis are still missing. The bug-hunter is post-hoc and
+**defect-focused**; it runs over standing state and finds bugs. A reviewer is **pre-merge** and
+**change-focused**: it judges whether *this specific diff* should be accepted at all. The classes it
+catches — intent drift, design degradation, standards violations, missing test coverage, comment rot
+— are exactly the things the bug-hunter structurally does not look for, and catching them before
+they land is the cheapest quality gate in the pipeline.
 
 ## The make-or-break constraint: dimension disjointness
 
@@ -102,7 +106,8 @@ checkpoint sits on that verdict.
 2. **Thin slice (preferred)** — wire `review-pr` + the oracle into a single "review this bolt against
    its contract" pass, run it on one real bolt, and let the result tell you what the spec should say.
 
-Either way, resolve the disjointness OPEN DECISION first.
+The disjointness question was settled in 2026-09 (error-handling review belongs to the Inspector);
+start from that.
 
 ## Non-goals for now
 
