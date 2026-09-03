@@ -2,16 +2,16 @@
 id: 001-ledger-io
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
-status: ready
+status: complete
 priority: must
 created: 2026-06-10T10:40:14Z
 assigned_bolt: 085-phase-1-skeleton-core
-implemented: false
+implemented: true
 ---
 
 # Story: 001-ledger-io (guide Prompt 1)
 
-**Status:** claimed satisfied by `reviews/lib/records/ledger.mjs`, `reviews/lib/review/mint-id.mjs` and `reviews/lib/records/render-records.mjs` (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
+**Status:** **satisfied with a gap** — verified by bolt 085-phase-1-skeleton-core (2026-09-03). The seam is wider than this line claimed: `reviews/lib/records/ledger.mjs` only reads; the ledger's writers are `reviews/lib/review/mint-id.mjs`, `reviews/lib/records/render-records.mjs` and the `reconcile-findings` agent. Two gaps carried forward as stories [008-id-reservation-parallel-worktrees](008-id-reservation-parallel-worktrees.md) and [012-atomic-record-publish](012-atomic-record-publish.md), both assigned to bolt 087. Evidence: `memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md`.
 
 ## User Story
 

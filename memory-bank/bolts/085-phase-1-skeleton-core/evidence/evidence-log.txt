@@ -1,0 +1,210 @@
+
+===== A1 — a fresh ledger, two defects, the human view (Prompt 1 test a) =====
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wtA scaffold-ledger 900-alpha --id PPW-9000 --sev 🔴 --title a defect in alpha --file Alpha.cs:10 --pass v1
+MINT-ID: created C:\Users\mbarba\AppData\Local\Temp\tmp.sS20zanWxJ\wtA\reviews\900-alpha\ledger.md (PPW-9000)
+[exit 0]
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wtA scaffold-ledger 900-alpha --id PPW-9001 --sev 🟠 --title a second defect in alpha --file Alpha.cs:44 --pass v1
+MINT-ID: appended C:\Users\mbarba\AppData\Local\Temp\tmp.sS20zanWxJ\wtA\reviews\900-alpha\ledger.md (PPW-9001)
+[exit 0]
+---
+type: review-ledger
+target: 900-alpha
+updated: 2026-09-03
+---
+
+# Ledger — 900-alpha
+
+## Findings
+
+| ID | Sev | First seen | Title | File | Status | Affirmed |
+|---|---|---|---|---|---|---|
+| PPW-9000 | 🔴 | v1 | a defect in alpha | `Alpha.cs:10` | open | |
+| PPW-9001 | 🟠 | v1 | a second defect in alpha | `Alpha.cs:44` | open | |
+
+## Details
+
+### PPW-9000 — a defect in alpha
+
+- **What:** <fill in>
+- **Evidence:** <fill in>
+- **Suggested fix:** <fill in>
+- **History:** <append-only, one line per event>
+  - v1: found by <fill in>
+
+### PPW-9001 — a second defect in alpha
+
+- **What:** <fill in>
+- **Evidence:** <fill in>
+- **Suggested fix:** <fill in>
+- **History:** <append-only, one line per event>
+  - v1: found by <fill in>
+
+===== A2 — the same id twice in one target is refused =====
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wtA scaffold-ledger 900-alpha --id PPW-9001 --sev 🟠 --title same id again --file Alpha.cs:44 --pass v2
+ERROR PPW-9001 already exists in C:\Users\mbarba\AppData\Local\Temp\tmp.sS20zanWxJ\wtA\reviews\900-alpha\ledger.md
+[exit 2]
+
+===== A3 — the coverage read: what has and has not been hunted (Prompt 1 test c) =====
+$ node reviews/lib/drive/route-next-pass.mjs --root reviews/lib/tests/fixtures/drive-states 913-loop-quiet
+TARGET: 913-loop-quiet
+STATE: latest review v1 · last pass v1 discovery → approve-with-followups · new serious 0 · reopened 0
+STATE: latest resolution v—
+ROUTER: discovery-type pass clean (0 new serious, 0 reopened) and every manifest lens has run — loop quiet (row 6).
+GATE: certification — ALWAYS needs the owner's explicit go-ahead outside an unattended run: first attempt = pair (~4.0–4.6M tokens (two blinded full passes)), re-certification after a small verified fix round = single pass (~2.9M tokens (re-certification after a small verified fix round)), README note ²
+GATE_KIND: certification-go-ahead
+[exit 2]
+
+===== A4 — six concurrent mints against one counter, same checkout =====
+PPW-9000..PPW-9001
+PPW-9002..PPW-9003
+ERROR id counter content "" is not a plain number
+PPW-9004..PPW-9005
+PPW-9006..PPW-9007
+PPW-9008..PPW-9009
+counter after 6 x --count 2 (12 ids expected): 9010
+
+===== A5 — THE GAP: two worktrees mint the same id into different targets =====
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wt1 mint --count 1
+PPW-9000..PPW-9000
+[exit 0]
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wt2 mint --count 1
+PPW-9000..PPW-9000
+[exit 0]
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wt1 scaffold-ledger 900-alpha --id PPW-9000 --sev 🔴 --title a defect in alpha --file Alpha.cs:10 --pass v1
+MINT-ID: created C:\Users\mbarba\AppData\Local\Temp\tmp.sS20zanWxJ\wt1\reviews\900-alpha\ledger.md (PPW-9000)
+[exit 0]
+$ node reviews/lib/mint-id.mjs --root /tmp/tmp.sS20zanWxJ/wt2 scaffold-ledger 901-beta --id PPW-9000 --sev 🟠 --title an unrelated defect in beta --file Beta.cs:20 --pass v1
+MINT-ID: created C:\Users\mbarba\AppData\Local\Temp\tmp.sS20zanWxJ\wt2\reviews\901-beta\ledger.md (PPW-9000)
+[exit 0]
+(exit 0 on the second scaffold = the duplicate was NOT caught)
+
+===== A6 — an out-of-band edit to a published record is refused =====
+$ node reviews/lib/records/doc-gate.mjs --root /tmp/tmp.sS20zanWxJ/fx 901-good-target 1
+DOC GATE: clean for 901-good-target v1 + state.
+[exit 0]
+$ node reviews/lib/records/doc-gate.mjs --root /tmp/tmp.sS20zanWxJ/fx 901-good-target 1
+DOC GATE: 1 violation(s) for 901-good-target v1 + state:
+
+  - ledger.md: detail block PPW-9001 line 1 changed — blocks are append-only (History lines are added, never edited)
+
+Fix the files and re-run. The gate judges only — it never edits (reviews/rules/doc-contracts.md).
+[exit 1]
+
+===== A7 — a dismissal with no reason is refused (Prompt 5 test c) =====
+$ node reviews/lib/records/doc-gate.mjs --root /tmp/tmp.sS20zanWxJ/fx2 901-good-target 1
+DOC GATE: 1 violation(s) for 901-good-target v1 + state:
+
+  - resolution-v1.md: PPW-9002 status wont-fix has no Decisions block — every non-fixed status needs its rationale (doc-contracts.md)
+
+Fix the files and re-run. The gate judges only — it never edits (reviews/rules/doc-contracts.md).
+[exit 1]
+
+===== A8 — an owner summary over 60 lines is refused (the guide's v3.7 test for Prompt 4) =====
+$ node reviews/lib/records/doc-gate.mjs --root /tmp/tmp.sS20zanWxJ/fx3 901-good-target 1
+DOC GATE: 1 violation(s) for 901-good-target v1 + state:
+
+  - summary-v1.md: body is 74 non-empty lines — cap is 60
+
+Fix the files and re-run. The gate judges only — it never edits (reviews/rules/doc-contracts.md).
+[exit 1]
+
+===== A9 — the clean baseline the A6-A8 refusals are measured against =====
+$ node reviews/lib/doc-gate.mjs state
+DOC GATE: clean for the state files.
+[exit 0]
+$ node reviews/lib/records/doc-gate.mjs --root reviews/lib/tests/fixtures/repo 901-good-target 1
+DOC GATE: clean for 901-good-target v1 + state.
+[exit 0]
+
+===== A10 — the loop-driver eval suite's read-only verify lines (bolt 086, story 007) =====
+$ node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 094-quiet
+
+0 error(s), 0 warning(s).
+[exit 0]
+$ node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 091-fixround
+
+0 error(s), 0 warning(s).
+[exit 0]
+$ node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 096-rotten
+ERROR   096-rotten: review-v2.md has no metrics line
+
+1 error(s), 0 warning(s).
+[exit 1]
+$ node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 095-postcert
+WARN    095-postcert: resolution-v3 resolved, no fix-round line yet — unit records pending
+
+0 error(s), 1 warning(s).
+[exit 0]
+$ node reviews/lib/records-auditor.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 097-mockpass
+WARN    097-mockpass: resolution-v1 resolved, no fix-round line yet — unit records pending
+
+0 error(s), 1 warning(s).
+[exit 0]
+$ node reviews/lib/drive/route-next-pass.mjs --root .claude/skills/loop-driver/evals/fixtures/loop-states 094-quiet
+TARGET: 094-quiet
+STATE: latest review v1 · last pass v2 verification → approve-with-followups · new serious 0 · reopened 0
+STATE: latest resolution v1 (resolved @147fa87)
+STATE: ledger open 🔴 0 · open 🟠 0 (queue threshold 3)
+ROUTER: verification clean (0 reopened, nothing open in the ledger).
+FACTS for the delta-worthiness call (row 4/5): delta-worthy = the fix round fixed a 🔴, added/converted a mechanism, or changed a design; anything else is patch-grade → loop quiet.
+NOTE: round r1's seed rate is unmeasured — no blind pass has run since it, so "quiet" is unmeasured and certification is refused until a delta discovery measures it (convergence rule, 2026-08-28).
+GATE: if delta-worthy → delta discovery (~0.6–1.2M tokens (5-lens cap, 600k output budget script-enforced)); if patch-grade → loop quiet and certification is next, which ALWAYS needs your explicit go-ahead — first attempt = pair (~4.0–4.6M tokens (two blinded full passes)), re-certification after a small verified fix round = single pass (~2.9M tokens (re-certification after a small verified fix round)), README note ² — but certification stays refused while a NOTE above names owed lenses or an unmeasured seed rate
+GATE_KIND: delta-worthiness
+[exit 3]
+
+===== A11 — the machine-wide test lock refuses a second test process (bolt 086, story 007) =====
+$ node reviews/lib/fix/run-scoped-tests.mjs --root /tmp/tmp.sS20zanWxJ/lk 900-lock --kind baseline --filter Y --no-events --cmd node -e "console.log('# pass 1')"
+another test process is running (pid 39480) — the machine takes one at a time
+[exit 3]
+(exit 3 = the lock held; the first process still had it)
+
+===== T1-T5 — the fixture suite, whole and per seam =====
+$ node reviews/lib/tests/run-tests.mjs
+  flows/drive-policy.test.mjs: 10
+  flows/drive-routing.test.mjs: 43
+  flows/hook-override.test.mjs: 3
+  flows/render-records.test.mjs: 36
+  flows/runner.test.mjs: 5
+  flows/verify-fixes-red-leg.test.mjs: 7
+  flows/verify-fixes.test.mjs: 27
+  unit/autonomy-policy.test.mjs: 24
+  unit/doc-gate.test.mjs: 45
+  unit/docs-sync.test.mjs: 46
+  unit/mint-id.test.mjs: 42
+  unit/model.test.mjs: 47
+  unit/records-auditor.test.mjs: 42
+  unit/records.test.mjs: 57
+  unit/render-records.test.mjs: 35
+  unit/route-next-pass.test.mjs: 50
+  unit/run-scoped-tests.test.mjs: 38
+  unit/schema.test.mjs: 27
+  unit/shims.test.mjs: 15
+  unit/speed-report.test.mjs: 116
+  unit/summary-data.test.mjs: 35
+  unit/wl.test.mjs: 85
+  (git identity guard): 1
+836 assertions, all passed
+[exit 0]
+$ node reviews/lib/tests/run-tests.mjs --only route-next-pass
+  unit/route-next-pass.test.mjs: 50
+  (git identity guard): 1
+51 assertions, all passed
+[exit 0]
+$ node reviews/lib/tests/run-tests.mjs --only doc-gate
+  unit/doc-gate.test.mjs: 45
+  (git identity guard): 1
+46 assertions, all passed
+[exit 0]
+$ node reviews/lib/tests/run-tests.mjs --only mint-id
+  unit/mint-id.test.mjs: 42
+  (git identity guard): 1
+43 assertions, all passed
+[exit 0]
+$ node reviews/lib/tests/run-tests.mjs --only records
+  flows/render-records.test.mjs: 36
+  unit/records-auditor.test.mjs: 42
+  unit/records.test.mjs: 57
+  unit/render-records.test.mjs: 35
+  (git identity guard): 1
+171 assertions, all passed
+[exit 0]

@@ -3,7 +3,7 @@ id: 085-phase-1-skeleton-core
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
 type: simple-construction-bolt
-status: planned
+status: review-pending
 stories:
   - 001-ledger-io
   - 002-bug-documentation
@@ -11,10 +11,19 @@ stories:
   - 004-report-rendering
   - 005-triage-intake
 created: 2026-06-10T10:40:14Z
-started: null
+started: 2026-09-03T20:38:46Z
 completed: null
-current_stage: null
-stages_completed: []
+current_stage: review
+stages_completed:
+  - name: plan
+    completed: 2026-09-03T21:05:00Z
+    artifact: implementation-plan.md
+  - name: verify
+    completed: 2026-09-04T00:30:00Z
+    artifact: test-walkthrough.md
+  - name: record
+    completed: 2026-09-04T00:50:00Z
+    artifact: test-walkthrough.md
 time_box: 2h
 
 requires_bolts: []
