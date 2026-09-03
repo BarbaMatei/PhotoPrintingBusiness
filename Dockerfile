@@ -41,7 +41,6 @@ USER app
 EXPOSE 8080
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080 \
-    DatabaseProvider=Postgres \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://localhost:8080/health || exit 1
