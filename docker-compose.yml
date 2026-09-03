@@ -41,7 +41,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      DatabaseProvider: Postgres
       ConnectionStrings__Default: Host=db;Port=5432;Database=fototipar;Username=fototipar;Password=fototipar
       Email__Provider: Smtp
       Email__Smtp__Host: mailhog
