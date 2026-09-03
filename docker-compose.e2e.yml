@@ -23,3 +23,8 @@ services:
       - "5052:8080"
     environment:
       JwtSettings__PrivateKeyPem: ${E2E_JWT_PRIVATE_KEY_PEM:?generate one with scripts/gen-dev-keys.sh and export it}
+      # The Stripe client is built when a controller that reaches it is resolved, and an empty
+      # key throws there — which turns unrelated admin endpoints into 500s. .env.example ships
+      # the key empty, and an env var outranks appsettings.Development.json's placeholder.
+      Stripe__SecretKey: sk_test_e2e_placeholder
+      Stripe__WebhookSecret: whsec_e2e_placeholder
