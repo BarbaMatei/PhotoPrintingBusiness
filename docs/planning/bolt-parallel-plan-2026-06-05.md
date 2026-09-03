@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-09-03** by [`bolt-parallel-plan-2026-09-03.md`](bolt-parallel-plan-2026-09-03.md), which covers every remaining bolt in both families (047-094); this file is kept for history only.
+
 # Bolt Parallel Implementation Plan — 2026-06-05
 
 > Author: bolt-parallel-planner. Repo: photo-printing e-commerce (.NET 8 API + Angular + PostgreSQL/EF Core).
