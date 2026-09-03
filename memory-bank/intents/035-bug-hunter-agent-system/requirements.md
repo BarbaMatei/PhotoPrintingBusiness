@@ -15,13 +15,26 @@ updated: 2026-06-10T10:40:14Z
 > **The system is read-only on application source** — this intent ships no production
 > code changes.
 >
+> **Re-scoped 2026-09 (reconciliation).** The system's engine exists as the review loop
+> (`reviews/`), built in pre-merge mode. This intent now covers only what that engine lacks:
+> the **16 missing** briefs and the gaps of the **15 partial** ones, in the order the owner
+> ruled (integration contract §7). The status of every brief is the guide's
+> "Implementation status (2026-09)" table — 43 briefs: 12 satisfied, 31 remaining. Three owner
+> rulings shape this re-scope: **one engine, two modes** (the pre-merge review that exists plus
+> a standing sweep over `main` that does not); **the contract §7 build order**; and **rewrite
+> this intent in place** — the two Phase 1 skeleton bolts (085, 086) are satisfied by the
+> review loop and are retired, not marked complete.
+>
 > ⚠️ **CONSTRUCTION METHOD (owner mandate + guide Part I):** every component **MUST be
 > created with the `skill-creator` skill** (invoke via the `Skill` tool, name
 > `skill-creator:skill-creator`). The guide is written for exactly this: each brief
 > ("Prompt N") is a self-contained construction prompt to paste into skill-creator.
 > Build loop per component: paste brief → build → run its three test prompts → fix →
 > only then move on. If skill-creator is unavailable in the construction context,
-> STOP and report — do not hand-roll skills.
+> STOP and report — do not hand-roll skills. **Amended 2026-09:** that mandate holds for a
+> *new standalone skill*; a piece that extends the review loop is built as a script or skill in
+> that tree (`reviews/lib`, `.claude/skills`) at the seam its story names, with a test under
+> `reviews/lib/tests`, following `reviews/README.md`'s conventions.
 >
 > Source feed (the spec of record): `docs/agent-systems/bug-hunter-build-guide.md`. Stories do
 > NOT duplicate the briefs — each story points at its Prompt N and adds memory-bank
@@ -39,6 +52,13 @@ Report → Learn — coordinated by an Orchestrator that exists from Phase 1. Gr
 **additive**: later phases fill or extend slots at planned seams; nothing built
 earlier is rewritten or thrown away. After every phase the system runs end-to-end.
 
+**Where it stands (2026-09).** That engine runs today as the review loop under `reviews/`,
+in one of its two modes: the pre-merge pass over a branch. The standing sweep over `main` is
+not built. Inside the pipeline, the Map slot is empty (no application map, no code index, no
+reachability), findings are argued rather than proven by running code, scanner output is not
+ingested, and the system does not measure its own recall. Those gaps — not the pipeline — are
+this intent's remaining work.
+
 ## Business Goals
 
 | Goal | Success Metric | Priority |
@@ -54,26 +74,52 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
 ## Scope
 
 ### In Scope
-- All 43 briefs from the guide's master build order, one story each:
-  - **Phase 1 — Skeleton** (Prompts 1–7): `ledger-io`, `bug-documentation`,
-    `deduplication`, `report-rendering`, `triage-intake`, `general-hunter`,
-    `orchestrator` [skeleton].
-  - **Phase 2 — Trust** (Prompts 8–11b): `severity-scoring`, `tool-ingest`,
-    `bug-verifier`, `git-revision-tracking`, orchestrator wiring extension.
-  - **Phase 3 — Breadth & Scale** (Prompts 12–24d): `app-mapping`, `code-index`,
-    `reachability` (+ scoring extension), `flow-tracing`, `taint-analysis`,
-    `flow-tracer-agent`, `file-sweeper-agent`, `security-auditor-agent`,
-    `dependency-audit-agent`, `config-auditor-agent`, `concurrency-auditor-agent`
-    (conditional), `root-cause-clustering`, `intent-lookup` + the three oracle/scale
-    extensions (hunters, verifier+scoring, orchestrator).
-  - **Phase 4 — Learn & Measure** (Prompts 25–29b): `suppression-learning`,
-    `bug-lifecycle`, `eval-corpus`, `eval-metrics`, `curator-agent`, orchestrator
-    Learn-slot extension.
-  - **Phase 5 — Remediation** (Prompts 30–33): `regression-harvest`,
-    `fix-verification`, `fix-proposal`, `fix-request-emit`.
-  - **Optional — Integration** (A–C): `report-rendering` SARIF extension,
-    `issue-sync`, `ci-gate`.
+The gaps the review loop leaves, in the ruled build order (integration contract §7). Each item
+names its brief (Prompt N) and its **workbench seam** — the `reviews/lib` file it extends.
+
+- **Trust upgrades** (bolt 087)
+  - `tool-ingest` (9) — dependency-audit and static-analysis output read in as untrusted
+    candidates instead of re-derived by hand · seam: `reviews/lib/discovery-review.wf.js`
+  - `severity-scoring` risk score + reachability weight (8, 14b) ·
+    seam: `reviews/lib/records/schema.mjs`
+  - `bug-verifier` execution proof (10) — a high-severity finding needs a failing test written
+    by someone who did not fix it, naming the commit it was taken on ·
+    seam: `reviews/lib/verify/verify-fixes.mjs`
+  - `git-revision-tracking` moved/fixed detection across runs (11) ·
+    seam: `reviews/lib/verify/git.mjs`
+- **Map & breadth** (bolts 088 → 089 ∥ 090; both specialists wait for the Map slot)
+  - `app-mapping` (12), `code-index` (13), `reachability` (14) — the empty Map slot; new shared
+    tools · seam: new files under `reviews/lib/`, wired into `reviews/lib/discovery-review.wf.js`
+  - `taint-analysis` (16) · seam: the security lens in `reviews/lib/records/schema.mjs`
+  - `dependency-audit-agent` (20), `config-auditor-agent` (21) — two lenses the manifest lacks ·
+    seam: `reviews/lib/records/schema.mjs`
+  - `root-cause-clustering` (23) — one record covering many locations ·
+    seam: `reviews/lib/records/ledger.mjs`
+  - budget unit + incremental scanning (24d) · seam: `reviews/lib/discovery-review.wf.js`
+- **Learn & measure** (bolt 092)
+  - standing corpus + poison fixture (27) · seam: `reviews/lib/tests/fixture-builder.mjs`
+  - recall + escape metrics (28) — recall is unproven today · seam: `reviews/lib/measure/`
+  - curator automation (29, 29b) — the system self-review and speed report run by hand ·
+    seam: `reviews/lib/measure/speed-report.mjs`
+- **Remediation hand-off** (bolt 093)
+  - `regression-harvest` by a non-fixer (30) · seam: `reviews/lib/fix/handback-gates.mjs`
+  - `fix-request-emit` (33) — a fix-request store for an out-of-loop fixer ·
+    seam: `reviews/lib/records/ledger.mjs`
+- **Oracle tier** (bolt 091, **last** — gated on the knowledge-builder's `ledger-query`,
+  contract §7): `intent-lookup` (24) plus the hunter (24b) and verifier/scoring (24c)
+  extensions · seam: `reviews/lib/records/schema.mjs` + the lens prompts they ground
+- **Standing-sweep mode** (no bolt of its own yet — contract §7 step 5): the same engine on a
+  schedule over all of `main`, as against today's pre-merge pass over one branch.
+- **Optional** (bolt 094, on owner adoption): SARIF output (A), `issue-sync` (B), `ci-gate` (C) ·
+  seam: `reviews/lib/records/render-records.mjs`
 - Pinned repo conventions for system outputs (see Decisions below).
+
+**Arithmetic.** 43 briefs = 12 satisfied + 31 remaining (16 missing + 15 partial). The lines
+above schedule 25 of the 31. The other six get no bolt work — five partials the loop covers
+another way: `bug-documentation` (2), `flow-tracing` (15), `flow-tracer-agent` (17) and
+`file-sweeper-agent` (18), which the lenses do by prompt, and `fix-proposal` (32), because the
+loop's fixer applies patches directly, by design; plus one missing brief the design replaces:
+`suppression-learning` (25) → decision attachment (guide Prompt 25, contract §6.5).
 
 ### Out of Scope (hard constraints)
 - ❌ **No application code changes — ever.** The system is read-only on app source
@@ -87,6 +133,9 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
   record; construction follows it verbatim (deviations are owner decisions).
 - ❌ **No deployment implications.** This is tooling; roadmap Phase 6 (deployment)
   is untouched.
+- ❌ **Re-building what the review loop already does.** The 12 satisfied briefs —
+  Prompts 1, 3–7 (Phase 1 bar the three-audience record of Prompt 2), 11b, 19, 22, 26, 31,
+  31b — are not re-implemented; the guide's status table is the record of who satisfies them.
 
 ---
 
@@ -116,7 +165,9 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
   still pass).
 - **Priority**: Must (applies to every story)
 
-### FR-3: Phase 1 — Skeleton (Prompts 1–7)
+### FR-3: Phase 1 — Skeleton (Prompts 1–7) — satisfied 2026-09
+> Met by the review loop under `reviews/`, bar Prompt 2's three-audience record; kept for the
+> record, not for building (see Out of Scope).
 - **Description**: The smallest complete end-to-end system: concurrency-safe ledger,
   canonical bug records, dedup, floored Markdown reports, the human-decision channel,
   one general hunter, and the Orchestrator defining all six slots (Verify/Learn as
@@ -239,5 +290,9 @@ earlier is rewritten or thrown away. After every phase the system runs end-to-en
 | FR-4 | 002-phase-2-trust | 5 (Prompts 8–11b) |
 | FR-5 | 003-phase-3-breadth-and-scale | 17 (Prompts 12–24d) |
 | FR-6 | 004-phase-4-learn-and-measure | 6 (Prompts 25–29b) |
-| FR-7 | 005-phase-5-remediation | 4 (Prompts 30–33) |
+| FR-7 | 005-phase-5-remediation | 5 (Prompts 30–33 + 31b) |
 | FR-8 | 006-optional-integration | 3 (Prompts A–C) |
+
+Story files stay where they are. `units.md` tracks the oracle stories (014–017 of unit 003) as
+their own unit — the oracle tier, last in the order — while the files remain under
+`003-phase-3-breadth-and-scale`.
