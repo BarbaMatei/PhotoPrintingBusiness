@@ -19,7 +19,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the secrets matrix (story 001), **When** the template is authored, **Then** `.env.dev-env.example` exists alongside `.env.example`, pre-set with the dev-env `ASPNETCORE_ENVIRONMENT`, `DatabaseProvider=Postgres`, dev-env hostnames, and **test-mode** payment/email placeholders
+- [ ] **Given** the secrets matrix (story 001), **When** the template is authored, **Then** `.env.dev-env.example` exists alongside `.env.example`, pre-set with the dev-env `ASPNETCORE_ENVIRONMENT`, a `ConnectionStrings__Default` targeting the dev-env PostgreSQL service, dev-env hostnames, and **test-mode** payment/email placeholders
 - [ ] **Given** the template, **When** inspected, **Then** it contains **no real secrets** (placeholders only) and passes the secret-scanning hook + Gitleaks (intent 018)
 - [ ] **Given** the template, **When** compared to `.env.example` (prod-oriented), **Then** the differences (test vs live, dev-env vs prod hostnames) are exactly those in the secrets matrix
 - [ ] **Given** the template, **When** used with `docker-compose.dev-env.yml`, **Then** the dev-env stack boots locally with `ValidateOnStart` passing once placeholders are filled with valid test values

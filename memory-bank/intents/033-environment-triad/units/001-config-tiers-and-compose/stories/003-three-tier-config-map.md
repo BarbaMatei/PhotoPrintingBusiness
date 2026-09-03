@@ -19,7 +19,7 @@ implemented: false
 
 ## Acceptance Criteria
 
-- [ ] **Given** the three tiers, **When** the map is written, **Then** it lists each setting that varies (DatabaseProvider, connection string shape, CORS origins, rate-limit posture, email provider, payment test-vs-live, Storage provider, observability/ANAF/Sameday enablement) with its value per tier
+- [ ] **Given** the three tiers, **When** the map is written, **Then** it lists each setting that varies (connection string shape, CORS origins, rate-limit posture, email provider, payment test-vs-live, Storage provider, observability/ANAF/Sameday enablement) with its value per tier
 - [ ] **Given** the map, **When** stored, **Then** it lives at `docs/environments/config-map.md` (Q4) and is the reference the promotion runbook (unit 003) links to
 - [ ] **Given** a setting that is identical across all tiers, **When** the map is written, **Then** it is omitted (the map shows only what differs, to stay maintainable)
 - [ ] **Given** the map, **When** reviewed, **Then** secret values are referenced by name only (actual values live in the secrets matrix, unit 002) — no secrets in the map

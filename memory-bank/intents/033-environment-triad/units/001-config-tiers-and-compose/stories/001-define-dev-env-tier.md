@@ -20,7 +20,7 @@ implemented: false
 ## Acceptance Criteria
 
 - [ ] **Given** the three-tier model, **When** the dev-env tier is defined, **Then** it has a documented `ASPNETCORE_ENVIRONMENT` value (Q1: recommend `Staging` or `DevEnvironment`) and an `appsettings.{tier}.json` that layers over `appsettings.json`
-- [ ] **Given** the dev-env tier, **When** it boots, **Then** it uses `DatabaseProvider=Postgres`, **test-mode** payment keys, a dev-env CORS/rate-limit posture (between local-relaxed and prod-strict), and dev-env email (Q2)
+- [ ] **Given** the dev-env tier, **When** it boots, **Then** its connection string targets the compose PostgreSQL service, and it uses **test-mode** payment keys, a dev-env CORS/rate-limit posture (between local-relaxed and prod-strict), and dev-env email (Q2)
 - [ ] **Given** the dev-env tier config, **When** compared to Development and Production, **Then** every differing setting is intentional and captured in the config map (story 003)
 - [ ] **Given** this story, **When** complete, **Then** the tier is **runnable locally** for validation only — no host is provisioned (Phase-6 boundary respected)
 

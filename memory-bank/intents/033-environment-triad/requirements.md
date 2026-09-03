@@ -54,7 +54,7 @@ This intent prepares **infrastructure readiness only**. It is **NOT deployment**
 - **Description**: Introduce a third, named environment for the deployable dev sandbox, with its own layered configuration. It is Postgres-backed (production-shaped DB) but non-customer-facing and freely seedable. Define the `ASPNETCORE_ENVIRONMENT` value, the `appsettings.{DevEnv}.json` layer, and which settings differ from both Development (local) and Production.
 - **Acceptance Criteria**:
   - The tier is named **`Staging`** (`ASPNETCORE_ENVIRONMENT=Staging` — resolved Q1, owner 2026-06-05) with an `appsettings.Staging.json` that layers over `appsettings.json`.
-  - The Staging tier uses `DatabaseProvider=Postgres`, **test-mode** payment keys, a relaxed-but-not-local CORS/rate-limit posture, and **MailHog** for email (resolved Q2 — captured inbox, nothing reaches a real address).
+  - The Staging tier's connection string targets its own PostgreSQL service, and the tier uses **test-mode** payment keys, a relaxed-but-not-local CORS/rate-limit posture, and **MailHog** for email (resolved Q2 — captured inbox, nothing reaches a real address).
   - Boot-time options validation (`ValidateOnStart`) passes for the dev-env tier exactly as it does for prod (required secrets enforced; no silent fallback to Development defaults).
   - The tier is documented as **runnable locally** for validation; standing it up on a host is explicitly out of scope.
 - **Priority**: Must
