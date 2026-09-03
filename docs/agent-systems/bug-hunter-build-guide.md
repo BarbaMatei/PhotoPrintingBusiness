@@ -128,7 +128,10 @@ mode. ✓ built in spirit · ◐ partial · ✗ missing. Totals: 12 · 15 · 16.
 the hole. The 16 missing briefs are the honest scope of the re-planned intent 035.
 
 A **lens** in the table below is one reviewing agent with a single job — the review loop's name for
-what this guide calls a hunter.
+what this guide calls a hunter. The **workbench** is the review loop itself; the cross analysis calls
+it that because it was built by hand while reviewing. **Certification** is the loop's declaration,
+after repeated blind passes, that no high-severity finding survives and every medium one carries a
+recorded decision.
 
 | Phase | Brief | Workbench equivalent | State |
 |---|---|---|---|
@@ -377,26 +380,36 @@ worth stealing.
 
 ## Operating the system (v3.3, profiled v3.6)
 
-- **What starts a run** is set by the active **operating profile's TriggerPolicy** (Integration
-  Contract §5.5), not hard-wired here. This repo's profile is **`solo-local`**: a `local-hook`
-  (`post-merge` on `main`) fires the run on your machine, serialized by the run lock; the `manual`
-  "refresh" command is the fallback trigger. (A cadence policy with no mechanism is how the loop
-  starves — the TriggerPolicy *is* the mechanism; the §4 mailbox is only checked at run open.) The
-  engine has **two modes (v3.7, ruling D1 — the owner's 2026-09 decision that both postures are one
-  engine).** **Pre-merge mode** — the mode built first, as the review loop: it runs on one feature
-  branch before merge, over the branch diff plus the unchanged code it touches, with every lens; it
-  is stateful (ledger rows, fix verification, certification) and its records travel with the branch
-  (Integration Contract §1, `reviews/**`). **Standing-sweep mode** — this guide's original posture:
+The bullets below describe the standing-sweep mode unless one says otherwise. The pre-merge mode —
+the review loop that exists — has its own operating rules, documented in `reviews/README.md`: it is
+triggered at stage 6 of the bolt process through the `loop-driver` skill, its records live in the
+target's folder on the feature branch and become canonical on `main` when the branch merges, and
+its fixes land as one commit per finding on that branch.
+
+- **What starts a run** (standing-sweep mode) is set by the active **operating profile's
+  TriggerPolicy** (Integration Contract §5.5), not hard-wired here. This repo's profile is
+  **`solo-local`**: a `local-hook` (`post-merge` on `main`) fires the run on your machine,
+  serialized by the run lock; the `manual` "refresh" command is the fallback trigger. (A cadence
+  policy with no mechanism is how the loop starves — the TriggerPolicy *is* the mechanism; the §4
+  mailbox is only checked at run open.) The engine has **two modes (v3.7, ruling D1 — the owner's
+  2026-09 decision that both postures are one engine).** **Pre-merge mode** — the mode built first,
+  as the review loop: it runs on one feature branch before merge, over the branch diff plus the
+  unchanged code it touches, with every lens; it is stateful (ledger rows, fix verification,
+  certification) and its records travel with the branch (Integration Contract §1, v1.6: the
+  `reviews/**` row — the target folder on the feature branch is the working copy, `main` is the
+  canonical store once the branch merges). **Standing-sweep mode** — this guide's original posture:
   scheduled, over `main`, whole codebase, Map slot first, draining the backlog; not built yet. A
   pre-merge run never writes standing-sweep state, and a sweep never edits a branch's records.
-- **Where runs happen:** only in the designated integration worktree on **`main`** (Integration Contract
-  §1 — the stores are single-history; other worktrees treat `bug-hunting/**` as read-only). Runs
-  resume from a **bookmark** (last processed commit) and catch up to current `main` in one pass, so
-  several merges accumulating between triggers self-heal into a single catch-up run.
-- **How to start one:** the profile's trigger invokes the `orchestrator` skill with a scope; it takes
-  the run lock, runs the six slots, **commits the published ledger per the active CommitPolicy**
-  (`solo-local` → `direct-to-main`: one small chore commit straight to `main`), and releases the lock.
-  When both systems fire together the **librarian (knowledge-builder) runs first**, then this one.
+- **Where runs happen:** (standing-sweep mode) only in the designated integration worktree on
+  **`main`** (Integration Contract §1 — the stores are single-history; other worktrees treat
+  `bug-hunting/**` as read-only). Runs resume from a **bookmark** (last processed commit) and catch
+  up to current `main` in one pass, so several merges accumulating between triggers self-heal into a
+  single catch-up run.
+- **How to start one:** (standing-sweep mode) the profile's trigger invokes the `orchestrator` skill
+  with a scope; it takes the run lock, runs the six slots, **commits the published ledger per the
+  active CommitPolicy** (`solo-local` → `direct-to-main`: one small chore commit straight to
+  `main`), and releases the lock. When both systems fire together the **librarian
+  (knowledge-builder) runs first**, then this one.
 - **Fixed assets you maintain:** the sandbox recipe (Dockerfile / compose + seed data), the decisions
   file `triage-intake` reads, the **pinned scanner toolchain** (version-pinned, checksum-verified —
   v3.4), and the eval cadence (run `eval-metrics` after meaningful changes and on
@@ -533,10 +546,10 @@ never drop existing data. Each publish records a **content hash** (v3.3) and fol
 detectable, never silent (v3.3). **Platform note (v3.2):** publish via temp-file-then-rename, but on Windows a
 rename over a file a reader holds open fails — retry with backoff (or use a versioned-filename +
 pointer-file pattern); never fall back to in-place partial writes. **Single-history store (v3.3,
-Integration Contract §1):** runs happen only in the designated integration worktree on `main`; other
-worktrees are read-only on `bug-hunting/**`, and a git merge conflict in the ledger JSON is never
-resolved textually — keep the integration branch's copy and re-run (runs are idempotent via signatures
-and coverage hashes). **Growth note (v3.2):** `runs`,
+Integration Contract §1):** runs of the standing-sweep mode happen only in the designated
+integration worktree on `main`; other worktrees are read-only on `bug-hunting/**`, and a git merge
+conflict in the ledger JSON is never resolved textually — keep the integration branch's copy and
+re-run (runs are idempotent via signatures and coverage hashes). **Growth note (v3.2):** `runs`,
 `bug_index` history, and per-run report files accumulate deliberately (they are the audit trail); when
 size becomes a problem, archive closed runs/bugs to a dated sidecar file as an explicit, versioned schema
 migration — never silently prune. **Output:** the structured ledger + Markdown mirror. **Dependencies:** none.
