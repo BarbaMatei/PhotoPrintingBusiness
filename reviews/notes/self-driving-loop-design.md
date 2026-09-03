@@ -244,7 +244,9 @@ item.
 4. **Building the remaining tools is small work.** The expensive item is the experiment,
    not code: items 2–5 above are each roughly an afternoon; run 2 is ~2M+ tokens.
 5. **The blueprint's Map slot (index, reachability) is the largest designed piece this loop
-   lacks.**
+   lacks.** Lens selection is by touched paths; nothing weighs a finding by whether its code
+   is reachable (the cross analysis lists the map, the index and reachability as missing —
+   Appendix A of theory-vs-practice-2026-09.md).
 
 ## Where this stands — completion audit (2026-08-11)
 
