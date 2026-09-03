@@ -51,7 +51,7 @@ the absent rows carry the story's stated purpose.
 claim; the row then names the component that does, and the story file is corrected.
 
 **What is and is not graded.** The guide's status table
-(`docs/agent-systems/bug-hunter-build-guide.md:125-166`) grades the review loop as the same
+(`docs/agent-systems/bug-hunter-build-guide.md:125-175`) grades the review loop as the same
 engine in pre-merge mode, so skill names and the skill-creator build route are out of scope —
 the stories' own 2026-09 amendment says exactly that, inside criterion 1 of each story
 (e.g. `001-ledger-io.md:24`). That amendment does **not** cover the pinned `bug-hunting/` paths,
@@ -90,7 +90,7 @@ scaffolded `<fill in>` lines by hand. Story 001's `**Status:**` line now says so
 | 5d | The remaining operations | **present** | `next_bug_id` → run A1 · `upsert_bug` / `set_status` → `scaffold-ledger` plus the renderer's flips (`render-records.mjs:126-181`) · `record_dismissal` → the resolution's Decisions block, gate-enforced (run A7) · `update_coverage` → `lenses-not-run` · `append_run_summary` → the metrics line and index row. `add_suppression_pattern` is a **divergence**: the loop never suppresses, ruling at `reviews/README.md:229-231` citing integration contract §6.5 |
 | 6a | The `Reopened` status | **substitute** | A reopened fix is a count on the pass line that re-arms the loop (`reviews/lib/drive/rows.mjs:56`, `:103-108`), not a status word. The information is carried; the enum value is not |
 | 6b | Each index entry embeds the full record | **present** | The describe-once rule: the detail block "is the defect's only full description anywhere" (`reviews/runbooks/runbook-discovery.md:119-121`) |
-| 6c | `runs` carries `oracle_as_of_commit` and per-run eval metrics | **N/A** for the oracle, **present** for metrics | There is no oracle — the guide's own table grades `intent-lookup` ✗ (`bug-hunter-build-guide.md:163`). Per-run metrics are `metrics.jsonl`, schema at `reviews/rules/metrics-schema.md` |
+| 6c | `runs` carries `oracle_as_of_commit` and per-run eval metrics | **N/A** for the oracle, **present** for metrics | There is no oracle — the guide's own table grades `intent-lookup` ✗ (`bug-hunter-build-guide.md:172`). Per-run metrics are `metrics.jsonl`, schema at `reviews/rules/metrics-schema.md` |
 | 7 | Single-history rule: runs only in the integration worktree on `main` | **divergence** | Ruled, verbatim: "The single-history rule above governs `bug-hunting/**` and `knowledge/**`; `reviews/**` is deliberately different — its records are part of the change under review, so they ride the feature branch" (`integration-contract.md:112-115`) |
 
 **Roll-up:** 3 absent rows (1b/4 — the same defect; 2b and 3a/5c — the same publish-and-load
@@ -110,7 +110,7 @@ History.
 |---|---|---|---|
 | 1 | Built; the three test prompts pass (a full record; a missing reproduction flagged; contract-cited vs intent-unconfirmed) | **absent — untested** | No adaptation exists. A record missing its reproduction cannot be flagged, because no record has a reproduction field |
 | 2 | Every required field enforced; a record missing one is refused | **absent** | The canonical record is four bullets — What · Evidence · Suggested fix · History (`reviews/templates/ledger.md:18-27`). The gate enforces shape and size only: the 20-line cap, the status vocabulary, append-only against HEAD (`reviews/lib/records/doc-gate.mjs:266-292`). Of the brief's required fields, `category`, `confidence`, `risk_score`, `reachable`, `plain_summary`, `location[]`, `flow_position`, `reproduction` and `impact` do not exist; `commit_sha` exists as the ledger row's Affirmed cell; `correlation_id` is N/A, as in story 001 row 2c |
-| 3 | `expected_behavior` cites a knowledge-ledger contract, else "intent-unconfirmed" | **N/A** | There is no knowledge ledger and no oracle in this repo; the guide grades `intent-lookup` ✗ (`bug-hunter-build-guide.md:163`). The nearest thing is the `requirements` lens reading the bolt's story docs directly (`reviews/lib/discovery-review.wf.js:149-153`), which is not a contract citation |
+| 3 | `expected_behavior` cites a knowledge-ledger contract, else "intent-unconfirmed" | **N/A** | There is no knowledge ledger and no oracle in this repo; the guide grades `intent-lookup` ✗ (`bug-hunter-build-guide.md:172`). The nearest thing is the `requirements` lens reading the bolt's story docs directly (`reviews/lib/discovery-review.wf.js:149-153`), which is not a contract citation |
 | 4 | Audience validation: plain summary jargon-free, developer detail technical, reproduction runnable | **substitute**, one audience of three | The developer is served: the fix brief carries files:lines, the traced failing path, and an assertion-spec test shape (`reviews/runbooks/runbook-discovery.md:121-133`). The non-technical reader is served **per pass, not per defect** — `summary-v<n>.md`, four sections, 60-line cap, plain words enforced by the judge (`reviews/rules/doc-contracts.md:11-22`). The tester is not served: a test shape to write is not a reproduction recipe, and it exists only for serious findings |
 | 5 | A secret-involving record carries location + fingerprint, never the value | **absent** | No redaction rule anywhere in the record contract. The only backstop is repo-wide and after the fact: `.github/workflows/secret-scan.yml:1` runs gitleaks over committed files, `reviews/**` included. It catches a leak; it does not shape a record |
 
@@ -118,7 +118,7 @@ History.
 structured record serving all three audiences" (`002-bug-documentation.md:19`). The loop does
 keep one canonical, gate-enforced, describe-once record per defect, but that is the developer's
 record, not the three-audience one. **Not satisfied.** This matches the guide's own ◐ grading
-(`bug-hunter-build-guide.md:140`) and the story's pre-existing seam note. Per this bolt's stage
+(`bug-hunter-build-guide.md:149`) and the story's pre-existing seam note. Per this bolt's stage
 5, story 002 is **re-assigned to bolt 087-phase-2-trust** rather than duplicated as a gap story.
 
 *(This verdict was "satisfied with a gap" in the first draft. The stage-4 fresh-eyes review
@@ -134,7 +134,7 @@ called it a ◐ laundered into a ✓ against the report's own roll-up rule, and 
 |---|---|---|---|
 | 1 | Built; the four test prompts pass | **absent — untested (currently)** | One blind ground-truth run is recorded: 2026-07-27 PASS, "0 over-merges across hard cases 1–7" (`SKILL.md:118-126`). The skill's own rule is to re-score "after any material change to the rules above" (`SKILL.md:109-110`), and `git log` shows two later changes: `c09675d` (2026-08-13, the id scheme the matching rules key on) and `0c6938c` (2026-09-02, a new required lineage rule with a "write `null`, never guess" clause). There is no current passing score to cite. **Filed as story 009** |
 | 2 | A normalized signature; a verdict plus matched id and rationale | **substitute** | No computed signature string. The rule is "same defect mechanism at the same site", with same file / same theme / same id string explicitly not enough (`SKILL.md:44-47`); output is one row per finding with a confidence and a one-line reason (`SKILL.md:73-75`). A moved line still matches, because the match is on mechanism rather than line number. Note the verdict set differs: the brief's is `{new | duplicate | dismissed | suppressed}`, the loop's is `PPW-<n>` or NEW — the two missing values are the suppression path row 3 rules out |
-| 3 | Duplicates link; `dismissed` entries drop; suppression matches drop | **divergence** | The loop refuses to drop, on purpose: a decided item is matched, its prior decision attached verbatim, and it is re-argued by a fresh skeptic (`SKILL.md:57-60`; `reviews/README.md:229-231`; integration contract §6.5). The guide's own v3.7 note supersedes this criterion identically (`bug-hunter-build-guide.md:634`, `:642`, `:646`). It is the story text that needs amending, not the loop |
+| 3 | Duplicates link; `dismissed` entries drop; suppression matches drop | **divergence** | The loop refuses to drop, on purpose: a decided item is matched, its prior decision attached verbatim, and it is re-argued by a fresh skeptic (`SKILL.md:57-60`; `reviews/README.md:229-231`; integration contract §6.5). The guide's own v3.7 note supersedes this criterion identically (`bug-hunter-build-guide.md:643`, `:651`, `:655`). It is the story text that needs amending, not the loop |
 | 4 | "Same area" is never "same bug" | **present** | `SKILL.md:44-47` states it as the first matching rule |
 | 5 | The collision guard: a signature match is a candidate only | **present**, and stronger | The rule is split-when-unsure, with the asymmetry spelled out: a wrong merge stops the loop early and ships a bug, a wrong split costs another look (`SKILL.md:61-63`). Lineage instead of merging is in production use: `reviews/archive/038-039-invoicing/metrics.jsonl` carries 22 non-null `fix_generated` values across 13 distinct parent ids, `seed_round: 15` on 24 findings, and `hinted: true` on 36 |
 
@@ -153,7 +153,7 @@ trust gate is two material rule-changes out of date, so no current score can be 
 |---|---|---|---|
 | 1 | Built; the three test prompts pass (Low → appendix; a zero-bug run; a second run writes a new file) | **absent — untested** | Test (c) passes: a second pass writes `review-v<n+1>.md` and never touches v`<n>` — files are numbered and immutable once the gate passes (`reviews/rules/doc-contracts.md:195`), and the ledger's append-only rule is machine-enforced (run A6). Test (a) cannot be run at all: there is no appendix (row 3). Test (b) has no adaptation — no template carries a zero-findings note (row 2) |
 | 2 | A new dated file per run; a Run Summary (scope, counts, uncovered areas, an explicit zero-bug note); findings sorted by **risk** descending | **substitute** | A new numbered file per pass, yes. The rest is close but not the same: `reviews/templates/review.md:12-15` gives counts, tests and verdict; `:11` gives uncovered **lenses**, not uncovered areas; no template has a zero-findings note; and "ranks worst first" (`doc-contracts.md:200`) is worst-by-**severity**, not by a risk score — the loop has no risk score, which is the Phase 2 brief the guide grades ◐ |
-| 3 | The reporting floor **on the confidence axis**; Low-confidence in an appendix; a body callout for a Critical/High parked there | **absent** | The loop floors on severity: 🟡/⚪ enter the ledger as `backlog` and appear in the summary's "Filed automatically" (`reviews/README.md:167-173`, `reviews/templates/summary.md:25-27`). Confidence exists only inside the per-lens schema (`reviews/lib/discovery-review.wf.js:135`, `:214`, `:216`) and never reaches a published record — `grep -rn "confidence" reviews/templates reviews/rules/doc-contracts.md` returns nothing. So a low-confidence 🔴 is foregrounded exactly like a proven one, and the brief's "⚠ unconfirmed but Critical if real" callout (`bug-hunter-build-guide.md:673-675`) has nothing to attach to. **Filed as story 010** |
+| 3 | The reporting floor **on the confidence axis**; Low-confidence in an appendix; a body callout for a Critical/High parked there | **absent** | The loop floors on severity: 🟡/⚪ enter the ledger as `backlog` and appear in the summary's "Filed automatically" (`reviews/README.md:167-173`, `reviews/templates/summary.md:25-27`). Confidence exists only inside the per-lens schema (`reviews/lib/discovery-review.wf.js:135`, `:214`, `:216`) and never reaches a published record — `grep -rn "confidence" reviews/templates reviews/rules/doc-contracts.md` returns nothing. So a low-confidence 🔴 is foregrounded exactly like a proven one, and the brief's "⚠ unconfirmed but Critical if real" callout (`bug-hunter-build-guide.md:682-684`) has nothing to attach to. **Filed as story 010** |
 | 4 | A record carrying `injection_suspected` surfaces the flag | **absent** | No such flag exists in `reviews/lib`, `reviews/templates` or `reviews/rules`. The `security` lens hunts injection as a defect class (`reviews/lib/records/schema.mjs:132`), which is a different thing. **Filed in story 010** |
 | 5 | Only redacted evidence renders; never raw secret material | **absent** | As story 002 row 5: no rule, CI gitleaks as the only backstop. **Filed in story 010** |
 | 6 | An optional non-defect Observations section | **absent** | No Observations section in any template. The nearest is the Refuted table (`reviews/templates/review.md:26-30`), which is for suspicions disproved, not observations. **Filed in story 010** |
@@ -250,13 +250,15 @@ runs A4–A6, which is why they are committed as a re-runnable script rather tha
 1. **`memory-bank/story-index.md` is stale.** It reads "Unit: 001-phase-1-skeleton (**7
    stories**)" at line 1767; the unit now has 12, and every Phase 1 story's "claimed satisfied"
    annotation is now a recorded verdict. This bolt is forbidden to edit any index file.
-2. **The guide's summary line contradicts its own table.**
-   `docs/agent-systems/bug-hunter-build-guide.md:128` says "Phase 1 is done" while the table at
-   line 140 grades `bug-documentation` ◐ — and this bolt grades that story *not satisfied*. The
-   table is right; the summary line is not. `docs/` is outside this bolt's write set.
-3. **Two more table rows are now overstated.** `ledger-io` ✓ (line 139) and `deduplication` ✓
-   with "ground-truth scored" (line 141): the first has two confirmed gaps, the second's score is
-   two material rule-changes old.
+2. **The guide's claim table — corrected 2026-09-04 on the coordinator's instruction**, because
+   standards are descriptive and this table is the claim this bolt verified. Three places, exactly
+   as reported: the "Phase 1 is done" sentence is gone, replaced by a paragraph stating what the
+   verification found and that a ✓ means "built in spirit", not "finished"; the `ledger-io` row
+   now says which files write and names its two gaps; the `deduplication` row now dates its
+   ground-truth score and says the gate is owed a re-run. `bug-documentation` keeps its ◐ — the
+   cell was already accurate. Every guide line number cited in this report was re-checked and
+   shifted after that edit; the `general-hunter` and `orchestrator` rows were left alone (see
+   bolt 086's report, hand-off 4).
 
 ### Human validation checkpoints (specsmd)
 
