@@ -2,16 +2,16 @@
 id: 006-general-hunter
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
-status: ready
+status: complete
 priority: must
 created: 2026-06-10T10:40:14Z
 assigned_bolt: 086-phase-1-skeleton-agents
-implemented: false
+implemented: true
 ---
 
 # Story: 006-general-hunter (guide Prompt 6 — agent-as-skill)
 
-**Status:** claimed satisfied by the core six lenses — `reviews/lib/records/schema.mjs` (`CORE_LENSES`) and their prompts (2026-09) — to be verified by bolt 086-phase-1-skeleton-agents; complete only after that verdict.
+**Status:** **satisfied with a gap** — verified by bolt 086-phase-1-skeleton-agents (2026-09-04). The core six lenses (`reviews/lib/records/schema.mjs:130-137`, prompts at `reviews/lib/discovery-review.wf.js:139-196`) do the file-sweep half and find real defects in production use. What is missing is the flow-trace half — the hunt is diff-scoped, so nothing identifies entry points by convention or walks a flow hop by hop — and two of the brief's v3.3 rules this story never captured: source text as data rather than instructions, and secret fingerprinting at the hunter. Gaps carried forward as stories [013-flow-trace-hunting](013-flow-trace-hunting.md) and [014-hunter-input-hygiene](014-hunter-input-hygiene.md), assigned to bolt 087. Evidence: `memory-bank/bolts/086-phase-1-skeleton-agents/test-walkthrough.md`.
 
 ## User Story
 

@@ -102,3 +102,60 @@ judgment call is inheriting bolt 085's method instead of re-deriving it — deli
 the method was already attacked and amended once and a second full attack on the same method
 would buy nothing. The stage-2 gate for this bolt is therefore scoped to what is genuinely new:
 the two seams and whether the inherited method transfers to an agent-shaped story.
+
+### Design-check amendments (the stage-2 gate, bolt-process.md)
+
+One adversarial agent was dispatched against this plan, scoped to what is new in 086 — the two
+seams, and whether a method built for scripts transfers to two stories whose subject is an agent
+procedure written in Markdown. It returned eight attacks; all eight are folded in.
+
+1 - **The five grounds apply here too.** This plan first said story 007's run mechanics would be
+    "absent, or N/A" — a two-way choice its own inherited method rejects. Each of the eight
+    criteria names one of the grounds with its citation. Two land on **divergence**, not absence:
+    the single-history rule is ruled the other way for `reviews/**`
+    (`docs/agent-systems/integration-contract.md:112-115`), and the forbidden-ground check —
+    never touch application source — is something the loop overrides on purpose every fix round
+    (`.claude/skills/loop-driver/SKILL.md:91`, `reviews/README.md:200-201`).
+2 - **The id-minting half of criterion 6 is a confirmed gap, not N/A.** Amendment 4 of bolt 085's
+    plan (no N/A for anything the loop's own contract documents as unimplemented) applies here as
+    well. Filed as story `008-id-reservation-parallel-worktrees` by bolt 085; this bolt cites it
+    rather than re-filing it.
+3 - **An eleventh amendment, and the reason this bolt needed its own gate: prose is not
+    enforcement.** Stories 001–005 pointed at scripts whose behaviour runs. Stories 006–007 point
+    at Markdown that instructs a model — `.claude/skills/loop-driver/SKILL.md`'s "Never" list, and
+    blinding *asked for* in the lens prompt (`reviews/lib/discovery-review.wf.js:127-129`), which
+    is exactly what Prompt 7's v3.7 extension says is not enough. A prose-only criterion is
+    therefore graded **present (instruction only)** at most, and rises to **present** only when a
+    production record shows the instruction followed under load. This sixth ground is used in
+    bolt 085's report too.
+4 - **Story 006's criterion 2 splits.** The sweep half and the flow-trace half get separate rows:
+    the hunt is diff-scoped by construction (`reviews/runbooks/runbook-discovery.md:20-22`) and
+    the core lens prompts are written "of the changed logic" / "across the change"
+    (`reviews/lib/discovery-review.wf.js:140,144,149`), so nothing identifies entry points by
+    convention or traces a flow top-down *as a hunting method*. The only top-down trace is the
+    per-finding trace skeptic (`wf.js:278-282`), which runs after a candidate already exists.
+5 - **A real machine-wide lock exists and the plan had missed it.**
+    `reviews/lib/fix/run-scoped-tests.mjs:18-32` holds `<os.tmpdir()>/photoprint-test.lock` with
+    the brief's own semantics — a live pid refuses, a dead pid is stolen once, release happens in
+    a `finally` only when the pid still matches. Being in `tmpdir()` it is machine-wide, so it
+    already serialises the four worktrees of this wave. Added to the dependencies; criterion 6's
+    lock half is a partial substitute — it serialises test runs, not passes, and nothing
+    serialises the records writes.
+6 - **The `loop-driver` eval suite is runnable evidence, and a trap if cited naively.**
+    `.claude/skills/loop-driver/evals/evals.json` holds seven cases over fixture targets with
+    per-case read-only `verify` command lines — and its own status block says "REBUILT 2026-09-01
+    and UNRUN … the pass rates under `history` were measured against the retired fixture root".
+    So the verify lines are run and recorded (run A10), and the suite's UNRUN status is reported
+    as the honest answer rather than its history quoted as a pass.
+7 - **Two of Prompt 6's v3.3 safety rules are in neither the story nor this plan.** The brief
+    requires source text including comments to be treated as data — instruction-like content
+    quoted, flagged `injection_suspected`, hunting continuing — and a suspected secret carried as
+    location plus fingerprint from the start (`docs/agent-systems/bug-hunter-build-guide.md:743-746`).
+    Both get criterion rows under story 006, and both are expected absent: lenses are handed raw
+    source (`wf.js:92-96`) with no such rule. The story text is incomplete against its own brief;
+    that is recorded too.
+8 - **Story 007's criterion 3 splits, and its v3.7 extension 3 gets its evidence.** The
+    honest-labelling half and the reporting-floor half are separate rows, the floor judged on the
+    confidence axis (`bug-hunter-build-guide.md:670`) against a severity-keyed frontmatter with no
+    confidence field (`reviews/templates/review.md`). `reviews/system/**` is added to the
+    dependencies: it is the running evidence for "the system is a target of its own hunters".

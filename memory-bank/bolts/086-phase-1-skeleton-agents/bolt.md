@@ -3,15 +3,24 @@ id: 086-phase-1-skeleton-agents
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
 type: simple-construction-bolt
-status: in-progress
+status: review-pending
 stories:
   - 006-general-hunter
   - 007-orchestrator-skeleton
 created: 2026-06-10T10:40:14Z
 started: 2026-09-03T21:30:00Z
 completed: null
-current_stage: plan
-stages_completed: []
+current_stage: review
+stages_completed:
+  - name: plan
+    completed: 2026-09-03T21:45:00Z
+    artifact: implementation-plan.md
+  - name: verify
+    completed: 2026-09-04T01:10:00Z
+    artifact: test-walkthrough.md
+  - name: record
+    completed: 2026-09-04T01:30:00Z
+    artifact: test-walkthrough.md
 time_box: 2h
 
 requires_bolts: []

@@ -2,16 +2,16 @@
 id: 007-orchestrator-skeleton
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
-status: ready
+status: complete
 priority: must
 created: 2026-06-10T10:40:14Z
 assigned_bolt: 086-phase-1-skeleton-agents
-implemented: false
+implemented: true
 ---
 
 # Story: 007-orchestrator-skeleton (guide Prompt 7 — agent-as-skill)
 
-**Status:** claimed satisfied by `.claude/skills/loop-driver/SKILL.md`, `reviews/lib/drive/route-next-pass.mjs` and `reviews/lib/discovery-review.wf.js` (2026-09) — to be verified by bolt 086-phase-1-skeleton-agents; complete only after that verdict.
+**Status:** **satisfied with a gap** — verified by bolt 086-phase-1-skeleton-agents (2026-09-04). `.claude/skills/loop-driver/SKILL.md`, `reviews/lib/drive/route-next-pass.mjs` and `reviews/lib/discovery-review.wf.js` fill all six permanent slots and run the pipeline end to end, and two of the three v3.7 extensions are met. The gaps: blinding is asked for in a prompt and enforced by nothing — `reviews/README.md:198` says so itself — the system's self-review is not scheduled, and no lock serialises a pass (only test runs). Gap carried forward as story [015-blinding-auditor-and-scheduled-self-review](015-blinding-auditor-and-scheduled-self-review.md); the pass-serialisation and reporting-floor halves are covered by [008-id-reservation-parallel-worktrees](008-id-reservation-parallel-worktrees.md) and [010-confidence-axis-reporting-floor](010-confidence-axis-reporting-floor.md). All assigned to bolt 087. Evidence: `memory-bank/bolts/086-phase-1-skeleton-agents/test-walkthrough.md`.
 
 ## User Story
 
