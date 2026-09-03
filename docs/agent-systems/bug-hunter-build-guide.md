@@ -379,7 +379,8 @@ OPTIONAL — Integration (build only if you adopt CI or an issue tracker)
   the scanner's *output* is untrusted data (the injection guard); the binary producing it is
   maintained, trusted code.
 - **Dedup before emitting.** Check candidates against the ledger's known / dismissed / suppressed sets so
-  sequential runs go deeper.
+  sequential runs go deeper (v3.7: superseded by decision attachment — Prompt 25, Integration Contract
+  §6.5 — the match is attached to the finding, not used to drop it).
 - **Read-only on application source.** No component edits your app code. Allowed writes: the ledger, the
   code index, the sandbox, run reports, the fix-request store, and — only with your approval — new test
   files (Phase 5).
@@ -629,7 +630,9 @@ pattern — so sequential runs go deeper instead of repeating. **Triggers:** bef
 verified/reported — pushy. **Method:** compute the candidate `signature` (path::symbol::bug_type,
 normalized so a moved line still matches); via `ledger-io` check: already in `bug_index` (duplicate → link
 to existing ID, don't re-report)? in `dismissed` (drop)? matches a `suppression_pattern` (drop, note which)?
-otherwise NEW. "Same area" is not "same bug" — only collapse true duplicates. **Collision guard (v3.2):**
+otherwise NEW (v3.7: superseded by decision attachment — Prompt 25, Integration Contract §6.5 — the
+match is attached to the finding, not used to drop it). "Same area" is not "same bug" — only collapse
+true duplicates. **Collision guard (v3.2):**
 the signature is deliberately coarse (two distinct same-type defects in one symbol — e.g. two different
 null-derefs in one function — share a signature), so a signature match is a **candidate duplicate, never
 an auto-collapse**: compare the hypotheses/lines/trigger conditions and only link when they describe the
@@ -639,6 +642,15 @@ is empty until Phase 4 populates it; this skill already honors it, so no change 
 **Dependencies:** `ledger-io`. **Tests:** (a) is this a duplicate of anything in the ledger; (b) matches a
 dismissed signature → drop; (c) same line as BUG-0007 but a different defect → NEW; (d) same symbol, same
 bug type, but a *different* null-deref than BUG-0007 → NEW despite the matching signature (v3.2).
+
+**Extends (v3.7).** Lineage beats merging. A finding that reappears at a site an earlier fix touched
+is **NEW**, not a duplicate: record it with `residual-of: <earlier id>`, the `seed_round` that
+produced it, and its `area`, so a later round's seed rate can be computed straight from the ledger
+(Prompt 26). Mark `hinted` any agreement between findings that shared context could have planted —
+it earns no convergence credit. When the evidence for "same defect" is thin, **split**: an
+over-merge silently deletes a real defect and no later pass can undo it, while a split costs one
+`related` link. Before this skill is trusted, score it against a hand-labelled ground-truth set and
+require zero over-merges — the engine passed that gate on 2026-07-27 over 50 hand-labelled problems.
 
 ## Prompt 4 — Skill: `report-rendering`
 
@@ -666,6 +678,16 @@ added later as an optional extension — not now.) **Output:** the run's Markdow
 Low lands in the appendix; (b) render a zero-new-bugs run correctly; (c) confirm a second run writes a new
 file rather than appending.
 
+**Extends (v3.7).** Render a second artifact beside the run report: the **owner summary**, at most
+60 lines, in four sections — what needs your decision (each with a suggested action), reasons to
+doubt this pass (computed from the pass's own data: which hunters ran, what was capped, what went
+unread), what was filed automatically, and the state of the target. Every claim carries a link to
+something checkable, a file or a record, because the summary is the only part most owners read and
+an unlinked claim cannot be audited. **Records pass their own gate before they count:** a
+deterministic lint (required sections, id shapes, dead links) and then a model judge reading for
+meaning. Grade record quality separately from review truth and say so out loud — a wrong report that
+follows every template passes the lint.
+
 ## Prompt 5 — Skill: `triage-intake` (NEW in v3)
 
 Create a skill called `triage-intake`. **Enables:** the human's front door to the system — a defined,
@@ -687,6 +709,14 @@ can't silently starve. **Output:** applied decisions + an updated queue of anyth
 person. **Dependencies:** `ledger-io`. **Tests:** (a) dismiss BUG-0004 with a reason → recorded with
 provenance; (b) approve a proposed suppression pattern → activated; (c) a dismissal with no reason →
 rejected; (d) intake while a run is active → queued, not racing the merge (v3.2).
+
+**Extends (v3.7).** A decision may be **parked**. On an unattended run, take the written default for
+the decision, record the item as `gate-parked` with the default that was taken, and carry it into a
+list the owner clears in one batched sitting — a run that halts at every question is a run nobody
+finishes. And a dismissal is never turned into a filter: the ruling is kept so it can be
+**attached** to the finding when it is re-found and re-argued by a fresh skeptic (Prompt 25,
+`docs/agent-systems/integration-contract.md` §6.5), which makes the reason a person gives context
+for the next pass rather than a mute button.
 
 ## Prompt 6 — Agent: `general-hunter` (build as a skill defining its procedure)
 
@@ -756,6 +786,16 @@ never drop a plausible one. **Output:** a completed run (Markdown report + updat
 all Phase 1 components. **Tests:** (a) run a first pass on a small repo and confirm the report is labeled
 unverified; (b) run again, surfacing only new findings; (c) run where nothing new is found and produce the
 empty report correctly.
+
+**Extends (v3.7).** Three additions at seams that already exist. (1) **Blinding auditor at launch:**
+before dispatching a hunter for a discovery pass, inspect the inputs it would receive and refuse to
+launch it if they carry prior records, finding ids or repository history for the target — blinding
+is enforced at dispatch, not requested in a prompt (`docs/agent-systems/integration-contract.md` §6;
+verification and re-argument of a decided finding are anchored on purpose and are exempt). (2)
+**Records gate before Close:** a run does not close until its records pass the lint and the model
+judge from `report-rendering`. (3) **The system is a target of its own hunters:** schedule periodic
+runs over the inspector's own skills and scripts — the engine raised 47 findings against its own
+machinery and fixed 18 of them that way.
 
 ---
 
@@ -830,6 +870,18 @@ code in the sandbox but never edits app source; its only writes are the sandbox,
 (a) verify a candidate null-deref by writing a failing test, run it twice, set confidence accordingly;
 (b) a candidate that's actually guarded → disprove and drop; (c) a sandbox that won't build the current
 commit → mark "could not verify" and flag the environment, not Low-confidence-static.
+
+**Extends (v3.7).** Two rules the first implementation paid for. (1) **Proof before a Critical:**
+under the owner's 2026-09 ruling on execution proof, a Critical finding enters the ledger as
+Critical only with a **failing test written by a non-fixer** — a "prover" agent that is not the
+agent that will fix it; without that test the finding is recorded one level lower and tagged
+`unproven-high` (`docs/agent-systems/integration-contract.md` §4). The test is not extra work: it is
+the same proving test `fix-verification` needs later, so the proof is paid for once. (2) **The
+verifier is never the fixer** (same contract, §6), and a fix's regression test is audited by someone
+who did not write it, against the three ways such a test lies: it asserts the literal value the code
+now produces instead of the behaviour that was required; it reads as proof only to someone who
+already knows the fix (the audit is a fresh-context read); or it drives an asynchronous path through
+a fake that resolves on its own, so the timing the test claims to cover never happens.
 
 ## Prompt 11 — Skill: `git-revision-tracking`
 
