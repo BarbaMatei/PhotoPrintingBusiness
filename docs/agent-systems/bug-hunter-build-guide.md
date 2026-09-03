@@ -9,7 +9,8 @@ build order, and every construction prompt ("brief") for skill-creator.*
 > rulings D1–D7 in `docs/agent-systems/reconciliation-plan-2026-09.md`): an **Implementation
 > status** section mapping every brief to the review loop that exists under `reviews/`; the
 > pre-merge run redefined as the engine's first **mode** (stateful gate) beside the scheduled
-> **standing sweep** (this guide's original posture); lessons from three months of runs written
+> **standing sweep** (this guide's original posture) — this reverses v3.4's read-only advisory
+> pre-merge run; lessons from three months of runs written
 > into the briefs as extensions (Part I "Lessons from the first implementation"); Prompt 25
 > replaced by decision attachment; the proof rule for high-severity findings (D3). Nothing is
 > removed; every brief keeps its number.

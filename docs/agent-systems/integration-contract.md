@@ -8,7 +8,8 @@ versioned (v1, v1.1, v2, …) and require checking every consumer listed in §8.
 > `docs/agent-systems/reconciliation-plan-2026-09.md`).** The Inspector — the bug-hunter, the system
 > that finds defects — exists as the review loop (`reviews/**`), running in pre-merge mode (D1: one
 > engine, two modes — the pre-merge gate that exists and the scheduled standing sweep that does not).
-> §1 gains the `reviews/**` store row and the id-reservation rule for parallel worktrees (D2). §4
+> §1 gains the `reviews/**` store row and the id-reservation rule for parallel worktrees (D2). This
+> reverses v1.3's read-only advisory pre-merge run: the pre-merge mode is stateful. §4
 > gains the mapping between the loop's fix verdicts and `fix_status`, and the proof rule for
 > high-severity findings (D3). §6 gains the blinding rule for judgment agents and the "verifier is
 > never the fixer" rule inside a system. New §6.5 states the never-suppress rule. §7 is re-ordered per
@@ -306,7 +307,7 @@ single-writer serialization, and the commit lands writes on the one history. Nam
 active CommitPolicy, so the same skills port across contexts unchanged. The hook script, the CI job,
 and the branch/PR mechanics are thin deployment-side adapters around the skills, not part of them.
 
-## §6 — Twin-name discipline
+## §6 — Twin-name discipline and rules for judgment agents
 
 The systems share one skill namespace. Every skill description names its system and disowns its
 sibling:
@@ -339,7 +340,8 @@ three were overturned.
 
 ## §7 — Cross-system build interleave
 
-Bug-hunter steps are named by bolt (its inception has run: bolts 085–094); knowledge-builder steps
+Bug-hunter steps are named by bolt (its inception has run: bolts 085–094, of which 085 and 086 are
+retired as satisfied by the review loop (2026-09)); knowledge-builder steps
 are named by phase **until its own inception assigns bolt numbers** — update this section when it
 does.
 

@@ -162,7 +162,9 @@ or extend at planned seams — never restructure.
 
 ---
 
-## 5. Cross-system build interleave (Integration Contract §7)
+## 5. Cross-system build interleave — June 2026 order, superseded (see §0 and Integration Contract §7)
+
+Superseded order (2026-09): see the future README's sequencing and contract §7.
 
 ```mermaid
 flowchart TB
@@ -176,8 +178,7 @@ flowchart TB
 ```
 
 KB **Phase 5 (Measure) may precede Phase 4 (Loop Integration)** — the eval doesn't exercise the fix
-loop, so the oracle's accuracy is proven before anything trusts it in a loop. Superseded order
-(2026-09): see the future README's sequencing and contract §7.
+loop, so the oracle's accuracy is proven before anything trusts it in a loop.
 
 ---
 

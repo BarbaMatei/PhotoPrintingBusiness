@@ -34,7 +34,7 @@ See [conductor-system.md](conductor-system.md) for the pipeline and the planner-
 |---|---|---|---|
 | **AI-DLC / specsmd** | Builder — specs + code from intent | **built / installed** | — |
 | **bug-hunter** | Inspector — finds defects | **partially built** — the review loop under `reviews/` is this engine running in pre-merge mode: Phase 1 complete, Phases 2/4/5 half built, Phase 3 (map, breadth) missing; 12 of 43 briefs built, 15 partial, 16 missing | [guide](../bug-hunter-build-guide.md) · [status table](../bug-hunter-build-guide.md#implementation-status-2026-09) · [cross analysis](../theory-vs-practice-2026-09.md) |
-| **knowledge-builder** | Librarian / oracle — distils intent → contracts | **specced, ready to build** | [guide](../knowledge-builder-build-guide.md) |
+| **knowledge-builder** | Librarian / oracle — distils intent → contracts | **specced, not started** — built after the Inspector's cheapest gaps and Map slot, and only if intent-drift findings appear (see Sequencing) | [guide](../knowledge-builder-build-guide.md) |
 | **code-review** | Reviewer — pre-merge, diff-scoped gate | **partial, unplanned** — three of five dimensions run as lenses of the review loop (`requirements`, `quality`, `tests-coverage`); verdict synthesis and contract fidelity not built | [concept](code-review-system.md) |
 | **analyst** | Architectural review — scans the system, detects gaps, proposes ranked improvements (feeds the Conductor) | **partial** — `architect-analyst` agent exists | [concept](analyst-system.md) |
 | **conductor** | Planning conductor — aggregates all signals → proposes ranked next-work queue | **planned (deferred)** | [concept](conductor-system.md) |

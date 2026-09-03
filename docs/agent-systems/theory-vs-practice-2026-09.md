@@ -500,7 +500,7 @@ first shakedown of the skill evals.
 The owner answered the six questions of §12 on 2 September 2026 — ruling D6 was corrected the
 same day — and the plan that follows from them
 ([reconciliation-plan-2026-09.md](reconciliation-plan-2026-09.md)) was executed on this branch
-in six phases and 42 commits. In one sentence: there is one inspection engine, not two — the
+in six phases and 42 commits before this section's own. In one sentence: there is one inspection engine, not two — the
 review loop that already exists — and the blueprint was rewritten to say so. Its roster,
 architecture summary, build guides and integration contract now describe the loop as the
 engine's **pre-merge mode** and name a scheduled **standing sweep** over `main` as the second
@@ -550,8 +550,8 @@ overturned.
   ruling recorded in the plan (`2ff0c78`).
 - **Phase 1 — hygiene** (8 commits): the eight citations of deleted review files became
   git-history pointers, the links broken by the May-analysis rename were repaired, the SQLite
-  claims in the June planning documents were corrected to Postgres-only, and four small stale
-  facts (proposal count, brief count, stale-branch note, inception checkbox) were fixed.
+  claims in the June planning documents were corrected to Postgres-only, and three small stale
+  facts (proposal count, brief count, stale-branch note) were fixed.
   `73b978f`, `d6ac571`, `736c1b8`, `fcf37dc`, `05905c8`, `b2c18d5`, `73d73f8`, `86006e7`.
 - **Phase 2 — the blueprint re-baselined to reality** (14): the future roster and the
   architecture summary gained a "what exists today" account; the code-review concept note went
@@ -579,7 +579,8 @@ overturned.
 - **Phase 6 — thesis wording**: no commit. The edits are proposed as a patch and await the
   owner's approval (S8).
 - **Phase 7 — bridge, verification, hand-back**: this section is its first commit; a
-  whole-branch verification and an independent review follow.
+  whole-branch verification and an independent review follow. The companion artifact page was
+  republished with the rulings after the final review.
 
 ### 13.4 Known residue
 
@@ -587,8 +588,10 @@ Left deliberately for the final review or for the owner, one line each:
 
 - The thesis proposal's M3 and §2 still read as if the Inspector does not exist — part of the
   Phase 6 patch that awaits approval.
-- Thirty story acceptance criteria under intent 035 still say "created via skill-creator"; the
+- 34 story acceptance criteria under intent 035 still say "created via skill-creator"; the
   construction box on each bolt governs instead.
+- The inception log's `Human review complete` checkbox is still unticked — an owner action, not
+  an agent's.
 - `ARCHITECTURE.md` §5's mermaid diagram still draws the June build interleave; it is labelled
   superseded rather than redrawn.
 - The contract's §6 heading, "Twin-name discipline", under-describes the judgment-agent rules
