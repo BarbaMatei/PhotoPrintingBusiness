@@ -17,10 +17,10 @@ automation:
 |---|---|---|
 | **Decide** | what to build, what matters | **the human (owner)** — irreducible |
 | **Coordinate** | analyse → prioritise → schedule → run the work | **Analyst** → **Conductor** → **Planner** → **Wave-orchestrator** (half already built — see below) |
-| **Do** | build · review · inspect · know · test | Builder · Reviewer\* · Inspector · Librarian · Test-Quality\* |
+| **Do** | build · review · inspect · know · test | Builder · Reviewer (partial) · Inspector (partial) · Librarian · Test-Quality\* |
 | **Operate** | watch the running product, feed incidents back | **Observability** *(roadmap-gated)* |
 
-\* planned/deferred.
+\* planned/deferred. Partial = exists inside the review loop, see the roster.
 
 The **coordinate layer is a pipeline, and it's half-built today**:
 `Analyst → Conductor → (human ratifies) → AI-DLC inception → Planner → Wave-orchestrator → Builder`.
@@ -33,9 +33,9 @@ See [conductor-system.md](conductor-system.md) for the pipeline and the planner-
 | System | Role | Status | Note |
 |---|---|---|---|
 | **AI-DLC / specsmd** | Builder — specs + code from intent | **built / installed** | — |
-| **bug-hunter** | Inspector — finds defects in standing code | **specced, ready to build** | [guide](../bug-hunter-build-guide.md) |
+| **bug-hunter** | Inspector — finds defects | **partially built** — the review loop under `reviews/` is this engine running in pre-merge mode: Phase 1 complete, Phases 2/4/5 half built, Phase 3 (map, breadth) missing; 12 of 43 briefs built, 15 partial, 16 missing | [guide](../bug-hunter-build-guide.md) · [status table](../bug-hunter-build-guide.md#implementation-status-2026-09) · [cross analysis](../theory-vs-practice-2026-09.md) |
 | **knowledge-builder** | Librarian / oracle — distils intent → contracts | **specced, ready to build** | [guide](../knowledge-builder-build-guide.md) |
-| **code-review** | Reviewer — pre-merge, diff-scoped gate | **planned (deferred)** | [concept](code-review-system.md) |
+| **code-review** | Reviewer — pre-merge, diff-scoped gate | **partial, unplanned** — three of five dimensions run as lenses of the review loop (`requirements`, `quality`, `tests-coverage`); verdict synthesis and contract fidelity not built | [concept](code-review-system.md) |
 | **analyst** | Architectural review — scans the system, detects gaps, proposes ranked improvements (feeds the Conductor) | **partial** — `architect-analyst` agent exists | [concept](analyst-system.md) |
 | **conductor** | Planning conductor — aggregates all signals → proposes ranked next-work queue | **planned (deferred)** | [concept](conductor-system.md) |
 | **planner** | Execution planner — decided bolts → conflict-safe wave schedule + kickoff prompts | **built** — `bolt-parallel-planner` agent | [concept](planner-system.md) |
@@ -45,6 +45,10 @@ See [conductor-system.md](conductor-system.md) for the pipeline and the planner-
 
 ## How the future pieces connect to what exists
 
+- **The review loop is the Inspector's engine in pre-merge mode.** It gates every bolt today (all
+  eleven lenses) and holds the ledger, the fix verification and the certification record. The
+  scheduled whole-codebase posture the guide describes is the same engine's second mode, not built
+  yet (D1, 2026-09).
 - **Conductor** sits *above* all the doing-systems: it reads their outputs (the bug ledger, the
   oracle's drift flags, the fix-request mailbox, the feature backlog, tech debt) and *proposes* what
   AI-DLC should work on next. It sits above the existing **execution** planners
@@ -58,8 +62,10 @@ See [conductor-system.md](conductor-system.md) for the pipeline and the planner-
 
 ## Sequencing (capture now, build in order)
 
-Per the pre-deployment roadmap (bolts → AI infra → e2e/regression → 3-env → EU readiness → deploy):
-build the **specced** systems first (bug-hunter, knowledge-builder), then the **Reviewer**; the
-**Conductor** only becomes meaningful once ≥2 of the systems it conducts exist; **Test-Quality**
-aligns with the e2e/regression phase; **Observability** is strictly post-deployment. These notes
-exist so that when each phase arrives, the design is already on paper — not re-derived from memory.
+Per the pre-deployment roadmap (bolts → AI infra → e2e/regression → 3-env → EU readiness → deploy)
+and the 2026-09 reconciliation: first the cheapest Inspector gaps (a run budget with metered fix
+rounds, the proof rule for high-severity findings, deterministic scanner ingest), then the Map slot
+and the standing-sweep mode, then the knowledge-builder only if intent-drift findings appear; the
+Reviewer's remaining dimensions and the Conductor follow; Test-Quality aligns with the
+e2e/regression phase; Observability is strictly post-deployment. These notes exist so that when each
+phase arrives, the design is already on paper — not re-derived from memory.
