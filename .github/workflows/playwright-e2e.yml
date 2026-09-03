@@ -6,7 +6,7 @@ name: e2e
 # skip it. Keep this list narrow: anything that can change behaviour must still trigger a run.
 on:
   pull_request:
-    paths-ignore: &docs
+    paths-ignore:
       - 'memory-bank/**'
       - 'reviews/**'
       - 'docs/**'
@@ -15,7 +15,12 @@ on:
   push:
     branches-ignore:
       - main
-    paths-ignore: *docs
+    paths-ignore:
+      - 'memory-bank/**'
+      - 'reviews/**'
+      - 'docs/**'
+      - 'thesis/**'
+      - '**/*.md'
 
 jobs:
   playwright:
