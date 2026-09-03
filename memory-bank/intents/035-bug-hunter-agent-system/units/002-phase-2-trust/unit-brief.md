@@ -70,7 +70,7 @@ If skill-creator is unavailable, **STOP and report**.
 ### Depends On
 | Unit | Reason |
 |------|--------|
-| 001-phase-1-skeleton | Verifier writes via bug-documentation/ledger-io; orchestrator extension re-opens the P1 skill |
+| 001-phase-1-skeleton | depends on the review loop's Phase 1 equivalents (see the bug-hunter guide's Implementation status table) |
 
 ### Depended By
 | Unit | Reason |

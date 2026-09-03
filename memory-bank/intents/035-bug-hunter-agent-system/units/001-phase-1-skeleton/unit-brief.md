@@ -2,7 +2,7 @@
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
 phase: inception
-status: ready
+status: satisfied
 unit_type: tooling
 default_bolt_type: simple-construction-bolt
 created: 2026-06-10T10:40:14Z
@@ -116,3 +116,6 @@ is unavailable, **STOP the bolt and report**. Hand-rolled skills violate FR-1.
 |------|------|---------|-----------|
 | 085-phase-1-skeleton-core | simple-construction-bolt | 001–005 | Foundation skills |
 | 086-phase-1-skeleton-agents | simple-construction-bolt | 006–007 | Hunter + Orchestrator; first end-to-end run |
+
+085/086 — satisfied by the review loop (`reviews/`), bolts retired 2026-09; the stories carry
+their Status lines.
