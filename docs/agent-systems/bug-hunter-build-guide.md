@@ -5,6 +5,15 @@ working system rather than rebuilding it: you start with the smallest complete s
 parts into stable seams. Includes the tutorial, the system architecture, shared conventions, the full
 build order, and every construction prompt ("brief") for skill-creator.*
 
+> **What v3.7 adds (changelog).** Reconciliation with the first implementation (2026-09, owner
+> rulings D1–D7 in `docs/agent-systems/reconciliation-plan-2026-09.md`): an **Implementation
+> status** section mapping every brief to the review loop that exists under `reviews/`; the
+> pre-merge run redefined as the engine's first **mode** (stateful gate) beside the scheduled
+> **standing sweep** (this guide's original posture); lessons from three months of runs written
+> into the briefs as extensions (Part I "Lessons from the first implementation"); Prompt 25
+> replaced by decision attachment; the proof rule for high-severity findings (D3). Nothing is
+> removed; every brief keeps its number.
+
 > **What v3.6 adds (changelog).** Operating model factored into pluggable **profiles** (owner design,
 > Integration Contract §5.5 v1.5): how a run is *triggered* (`TriggerPolicy`) and how its findings are
 > *committed* (`CommitPolicy`) are now configuration, not hard-wiring — so the system ports across
@@ -109,6 +118,58 @@ build order, and every construction prompt ("brief") for skill-creator.*
 >   `correlation_id`.
 > - **Phase 1 output is labeled "unverified candidates"** so a stop-at-Phase-1 setup isn't mistaken for a
 >   trustworthy bug report.
+
+---
+
+## Implementation status (2026-09)
+
+The review loop under `reviews/` is this system's engine, built June–September 2026 in pre-merge
+mode. ✓ built in spirit · ◐ partial · ✗ missing. Totals: 12 · 15 · 16. Phase 1 is done; Phase 3 is
+the hole. The 16 missing briefs are the honest scope of the re-planned intent 035.
+
+A **lens** in the table below is one reviewing agent with a single job — the review loop's name for
+what this guide calls a hunter.
+
+| Phase | Brief | Workbench equivalent | State |
+|---|---|---|---|
+| 1 | `ledger-io` | `records/ledger.mjs`, `mint-id.mjs`, `render-records.mjs` | ✓ |
+| 1 | `bug-documentation` | ledger row + fix brief (no three-audience record) | ◐ |
+| 1 | `deduplication` | `reconcile-findings` skill, ground-truth scored | ✓ |
+| 1 | `report-rendering` | `review-v<n>.md`, `summary-v<n>.md`, doc gate | ✓ |
+| 1 | `triage-intake` | owner gates, parked decisions, decisions attached to re-finds | ✓ |
+| 1 | `general-hunter` | the core six lenses | ✓ |
+| 1 | `orchestrator` | `loop-driver` + router + `discovery-review.wf.js` | ✓ |
+| 2 | `severity-scoring` | four levels + convergence weight; no reachability, no risk score | ◐ |
+| 2 | `tool-ingest` | — | ✗ |
+| 2 | `bug-verifier` | skeptics (argument only, no execution) | ◐ |
+| 2 | `git-revision-tracking` | affirmed sha, `verify/git.mjs`; no moved/fixed detection across runs | ◐ |
+| 2 | orchestrator wiring (11b) | router rows | ✓ |
+| 3 | `app-mapping` | — | ✗ |
+| 3 | `code-index` | — | ✗ |
+| 3 | `reachability` (+14b) | — | ✗ ✗ |
+| 3 | `flow-tracing` | lens prompts trace flows by hand | ◐ |
+| 3 | `taint-analysis` | — | ✗ |
+| 3 | `flow-tracer-agent` | lenses | ◐ |
+| 3 | `file-sweeper-agent` | lenses (no tools-first) | ◐ |
+| 3 | `security-auditor-agent` | `security` lens | ✓ |
+| 3 | `dependency-audit-agent` | — | ✗ |
+| 3 | `config-auditor-agent` | — | ✗ |
+| 3 | `concurrency-auditor-agent` | `race` lens | ✓ |
+| 3 | `root-cause-clustering` | fixer clusters, reconciler lineage | ◐ |
+| 3 | `intent-lookup` | `requirements` lens reads bolt docs directly (no oracle) | ✗ |
+| 3 | oracle/scale extensions (24b, 24c) | — | ✗ ✗ |
+| 3 | orchestrator scale ext (24d) | delta cap, lens selection by touched area; no budget unit | ◐ |
+| 4 | `suppression-learning` | replaced by decision attachment (by design) | ✗ |
+| 4 | `bug-lifecycle` | statuses, reopen, lineage | ✓ |
+| 4 | `eval-corpus` | seeded run 1 protocol; no standing corpus, no poison fixture | ◐ |
+| 4 | `eval-metrics` | `metrics.jsonl`, track record; recall unproven | ◐ |
+| 4 | `curator-agent` (+29b) | system self-review, speed report (manual) | ◐ ◐ |
+| 5 | `regression-harvest` | fixer's red-first tests + test-meaning audit | ◐ |
+| 5 | `fix-verification` | `verify-fixes.mjs` | ✓ |
+| 5 | mailbox scan (31b) | router's verification row | ✓ |
+| 5 | `fix-proposal` | fixer applies directly (blueprint: never apply) | ◐ |
+| 5 | `fix-request-emit` | — (fixer is in-loop) | ✗ |
+| opt | SARIF, `issue-sync`, `ci-gate` | — | ✗ ✗ ✗ |
 
 ---
 
@@ -320,9 +381,14 @@ worth stealing.
   Contract §5.5), not hard-wired here. This repo's profile is **`solo-local`**: a `local-hook`
   (`post-merge` on `main`) fires the run on your machine, serialized by the run lock; the `manual`
   "refresh" command is the fallback trigger. (A cadence policy with no mechanism is how the loop
-  starves — the TriggerPolicy *is* the mechanism; the §4 mailbox is only checked at run open.) A
-  **pre-merge run is read-only advisory (v3.4):** on a feature-branch worktree it writes no ledger,
-  coverage, or mailbox state — findings go to the PR comment alone.
+  starves — the TriggerPolicy *is* the mechanism; the §4 mailbox is only checked at run open.) The
+  engine has **two modes (v3.7, ruling D1 — the owner's 2026-09 decision that both postures are one
+  engine).** **Pre-merge mode** — the mode built first, as the review loop: it runs on one feature
+  branch before merge, over the branch diff plus the unchanged code it touches, with every lens; it
+  is stateful (ledger rows, fix verification, certification) and its records travel with the branch
+  (Integration Contract §1, `reviews/**`). **Standing-sweep mode** — this guide's original posture:
+  scheduled, over `main`, whole codebase, Map slot first, draining the backlog; not built yet. A
+  pre-merge run never writes standing-sweep state, and a sweep never edits a branch's records.
 - **Where runs happen:** only in the designated integration worktree on **`main`** (Integration Contract
   §1 — the stores are single-history; other worktrees treat `bug-hunting/**` as read-only). Runs
   resume from a **bookmark** (last processed commit) and catch up to current `main` in one pass, so
