@@ -2,11 +2,20 @@ name: e2e
 
 # The three real-money smoke paths (bolt 066): guest checkout, admin login, admin real-time
 # order updates. Runs beside ci.yml, which keeps the unit suites and the bundle-size budget.
+# A run costs several minutes, most of it building the API image, so documentation-only pushes
+# skip it. Keep this list narrow: anything that can change behaviour must still trigger a run.
 on:
   pull_request:
+    paths-ignore: &docs
+      - 'memory-bank/**'
+      - 'reviews/**'
+      - 'docs/**'
+      - 'thesis/**'
+      - '**/*.md'
   push:
     branches-ignore:
       - main
+    paths-ignore: *docs
 
 jobs:
   playwright:
