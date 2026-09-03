@@ -10,6 +10,15 @@ stories:
   - 003-bug-verifier
   - 004-git-revision-tracking
   - 005-orchestrator-verify-wiring
+  - 002-bug-documentation
+  - 008-id-reservation-parallel-worktrees
+  - 009-reconciler-trust-gate-rescore
+  - 010-confidence-axis-reporting-floor
+  - 011-owner-queue-age-escalation
+  - 012-atomic-record-publish
+  - 013-flow-trace-hunting
+  - 014-hunter-input-hygiene
+  - 015-blinding-auditor-and-scheduled-self-review
 created: 2026-06-10T10:40:14Z
 started: null
 completed: null
@@ -59,6 +68,37 @@ piece's behaviour.
 4. **004-git-revision-tracking** (Prompt 11, Must)
 5. ~~**005-orchestrator-verify-wiring** (Prompt 11b)~~ — **satisfied** by the pass router's
    rows (`reviews/lib/drive/rows.mjs`); no work in this bolt
+
+### Added 2026-09-04 by the Phase 1 verification bolts (085 / 086)
+
+Nine stories, six from bolt 085 and three from bolt 086. Bolts 085 and 086 checked the claim that the review loop already satisfies unit 001 and confirmed
+it story by story, with named gaps. Those gaps land here. They belong to **unit
+001-phase-1-skeleton**, not unit 002 — the cross-unit assignment is intended, because each one
+extends a component this bolt is already opening:
+
+6. **002-bug-documentation** (unit 001, Prompt 2) — re-assigned, not a new story: the loop has no
+   three-audience record. ⚠️ Two stories in this list now begin `002-`; they are different files
+   in different units (`002-tool-ingest` is unit 002's). Any tooling that resolves a story by its
+   numeric prefix will pick the wrong one — resolve by the full id.
+7. **008-id-reservation-parallel-worktrees** (unit 001) — two worktrees mint the same `PPW-<n>`.
+   Sequence this alone, not beside a wave of parallel worktrees: it edits `reviews/state/id-counter`.
+8. **009-reconciler-trust-gate-rescore** (unit 001) — the reconciler's ground-truth score is two
+   material rule-changes old.
+9. **010-confidence-axis-reporting-floor** (unit 001) — confidence never reaches a record; also
+   carries the injection flag, the redaction rule and the Observations section.
+10. **011-owner-queue-age-escalation** (unit 001) — the parked-decision queue never ages, records
+    no actor, and checks no status transition.
+11. **012-atomic-record-publish** (unit 001) — records are published with a plain overwrite.
+12. **013-flow-trace-hunting** (unit 001) — the hunt is diff-scoped; nothing walks a flow from
+    its entry point downward as a way of hunting.
+13. **014-hunter-input-hygiene** (unit 001) — source text is not treated as data, and a secret in
+    the code is not fingerprinted before it reaches a record. Pair it with 010, which opens the
+    record contract for the same two carriers.
+14. **015-blinding-auditor-and-scheduled-self-review** (unit 001) — blinding is asked for in a
+    prompt and enforced by nothing, which inflates the convergence count the stop rule reads; and
+    the system's review of its own machinery is not scheduled.
+Evidence for all nine: `memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md` and
+`memory-bank/bolts/086-phase-1-skeleton-agents/test-walkthrough.md`.
 
 ## Bolt Type
 

@@ -2,16 +2,16 @@
 id: 005-triage-intake
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
-status: ready
+status: complete
 priority: must
 created: 2026-06-10T10:40:14Z
 assigned_bolt: 085-phase-1-skeleton-core
-implemented: false
+implemented: true
 ---
 
 # Story: 005-triage-intake (guide Prompt 5, NEW in v3)
 
-**Status:** claimed satisfied by `reviews/lib/drive/gates.mjs` — the owner gates, parked decisions, and decisions attached to re-found findings (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
+**Status:** **satisfied with a gap** — verified by bolt 085-phase-1-skeleton-core (2026-09-03). The seam named here was wrong: `reviews/lib/drive/gates.mjs` is the shared gate vocabulary and reads nothing. The channel is the owner-gate protocol in `.claude/skills/loop-driver/SKILL.md`, the `gate-open`/`gate-closed`/`gate-parked` worklog events, `reviews/lib/drive/autonomy-policy.mjs`, and the doc gate's rule that every non-fixed status carries its rationale. Gaps — no ageing on the awaiting-owner queue, no actor field — carried forward as story [011-owner-queue-age-escalation](011-owner-queue-age-escalation.md), assigned to bolt 087. Evidence: `memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md`.
 
 ## User Story
 
