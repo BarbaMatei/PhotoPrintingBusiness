@@ -162,7 +162,7 @@ recorded decision.
 | 3 | `intent-lookup` | `requirements` lens reads bolt docs directly (no oracle) | ✗ |
 | 3 | oracle/scale extensions (24b, 24c) | — | ✗ ✗ |
 | 3 | orchestrator scale ext (24d) | delta cap, lens selection by touched area; no budget unit | ◐ |
-| 4 | `suppression-learning` | replaced by decision attachment (by design) | ✗ |
+| 4 | `suppression-learning` (v3.7: now `decision-attachment`, Prompt 25) | replaced by decision attachment (by design) | ✗ |
 | 4 | `bug-lifecycle` | statuses, reopen, lineage | ✓ |
 | 4 | `eval-corpus` | seeded run 1 protocol; no standing corpus, no poison fixture | ◐ |
 | 4 | `eval-metrics` | `metrics.jsonl`, track record; recall unproven | ◐ |
@@ -300,11 +300,11 @@ PHASE 3 — Breadth & Scale (mapping, specialists, more bug classes, cost contro
         root-cause into triage; run-budget + incremental scan + cheap-first; oracle lookup; reporting floor
 
 PHASE 4 — Learn & Measure
-  25. suppression-learning ............. (ledger-io)                     [consumes triage-intake dismissals]
+  25. suppression-learning ............. (ledger-io)                     [consumes triage-intake dismissals; v3.7: now decision-attachment, Prompt 25]
   26. bug-lifecycle .................... (ledger-io, git-revision-tracking)
   27. eval-corpus ...................... (ledger-io)
   28. eval-metrics ..................... (eval-corpus)
-  29. Curator (agent) .................. (suppression-learning, bug-lifecycle, eval-corpus, eval-metrics)  [fills Learn]
+  29. Curator (agent) .................. (suppression-learning, bug-lifecycle, eval-corpus, eval-metrics)  [fills Learn; v3.7: suppression-learning is now decision-attachment, Prompt 25]
       → orchestrator (extends): fill the Learn slot
 
 PHASE 5 — Remediation & Regression Safety
@@ -508,7 +508,7 @@ flowchart TB
 | **Verify** | `Verifier` + sandbox — confirms a bug by running a failing test; checks sandbox-vs-commit, defeats flakiness; raises confidence on a contract contradiction | P2 |
 | **Triage** | `deduplication`, `root-cause-clustering`, `severity-scoring` *(+ reachability)* | P1 → P3 |
 | **Report** | `report-rendering` — Markdown, floored *(+ SARIF optional)* | P1 |
-| **Learn** | `Curator`: `suppression-learning` *(fed by `triage-intake`)*, `bug-lifecycle`, `eval-corpus`, `eval-metrics` | P4 |
+| **Learn** | `Curator`: `suppression-learning` (v3.7: now `decision-attachment`, Prompt 25) *(fed by `triage-intake`)*, `bug-lifecycle`, `eval-corpus`, `eval-metrics` | P4 |
 | **Remediate** | `regression-harvest`, `fix-verification` *(the gate)*, `fix-proposal`, `fix-request-emit` | P5 |
 
 The **Ledger** (P1) is the shared memory every stage reads and writes. The **knowledge ledger** (external,
@@ -527,7 +527,7 @@ keeps, and `fix-request-emit` hands confirmed bugs to AI-DLC.
 - **Phase 3 — Breadth & Scale:** add mapping/indexing, specialist hunters, new bug classes, reachability,
   root-cause grouping, cost controls, and **oracle grounding** against the knowledge ledger.
 - **Phase 4 — Learn & Measure:** add the Curator and an eval harness; the suppression loop now feeds off a
-  real dismissal channel.
+  real dismissal channel (v3.7: the suppression loop is now `decision-attachment`, Prompt 25).
 - **Phase 5 — Remediation & Regression Safety:** keep the proving test, verify fixes by re-running it,
   propose patches (validated against the surrounding suite, never applied), and hand confirmed bugs to
   AI-DLC.
@@ -698,7 +698,7 @@ human decisions to apply — at run start or after a report — pushy. **Method:
 form is lowest-friction (a decisions field in the report, a small decisions file, or answering the agent's
 questions at run start); validate each (does this bug ID exist, is this status change legal); attach
 who / when / against-which-commit, and — crucially — the **reason** on a dismissal, since that reason is
-the signal `suppression-learning` later generalizes from; then apply via `ledger-io`
+the signal `suppression-learning` (v3.7: now `decision-attachment`, Prompt 25) later generalizes from; then apply via `ledger-io`
 (`record_dismissal`, `set_status`, `add_suppression_pattern`). A bare "dismissed" with no reason is
 rejected. **Write safety (v3.2):** intake acquires the same single-writer role as a run's close-merge —
 if a run is mid-flight (run-open lockfile present), queue the decisions and apply them at the next safe
@@ -1208,8 +1208,9 @@ contract-contradiction finding is reported with its contract cited.
 # Phase 4 — Learn & Measure
 
 *Goal: make the system improve itself. The Curator fills the Learn slot — learning suppression patterns
-from your dismissals and self-closing fixed bugs — and an eval harness measures whether changes actually
-help. The dismissals it learns from now arrive through the `triage-intake` channel built in Phase 1.*
+(v3.7: now `decision-attachment`, Prompt 25) from your dismissals and self-closing fixed bugs — and an
+eval harness measures whether changes actually help. The dismissals it learns from now arrive through
+the `triage-intake` channel built in Phase 1.*
 
 ## Prompt 25 — Skill: `decision-attachment` (replaces `suppression-learning`, v3.7)
 
@@ -1350,7 +1351,8 @@ easy way.
 Create a skill called `curator-agent`. **Enables:** after each run (or on a schedule), learning from your
 feedback, keeping the ledger honest, and measuring quality. **Triggers:** at run-close after reporting, or
 on a schedule — pushy. **Method:** (1) **Learn:** pull new dismissals (captured by `triage-intake`); run
-`suppression-learning`; present proposed patterns for approval (each validated against the Confirmed set);
+`suppression-learning` (v3.7: now `decision-attachment`, Prompt 25); present proposed patterns for
+approval (each validated against the Confirmed set);
 activate approved ones so future runs stop re-reporting those classes. (2) **Reconcile:** run
 `bug-lifecycle` — self-close fixed bugs with evidence, update moved locations, flag regressions.
 (3) **Measure:** run `eval-corpus` + `eval-metrics`; record this run's precision/recall/FP-rate and trend;
@@ -1359,7 +1361,8 @@ and recall trends, open-bug counts by severity, new patterns activated, regressi
 growth since last run with a threshold callout (the compaction watcher — v3.3)**, a **model-changed
 flag** that schedules an eval (v3.3), and any
 recommendation. Read-only on source; writes the ledger + summary. **Output:** a curation summary + updated
-ledger. **Dependencies:** `suppression-learning`, `bug-lifecycle`, `eval-corpus`, `eval-metrics`,
+ledger. **Dependencies:** `suppression-learning` (v3.7: now `decision-attachment`, Prompt 25),
+`bug-lifecycle`, `eval-corpus`, `eval-metrics`,
 `ledger-io`. **Tests:** (a) curate after a run (learn dismissals + reconcile fixed bugs); (b) record metrics
 and say if quality is trending down; (c) produce the health summary.
 
