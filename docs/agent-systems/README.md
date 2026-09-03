@@ -11,9 +11,11 @@ closed loop, the storage map, and the build order, at a glance.
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **Visual summary** — the org, the closed loop, sole-writer map, pipelines, build interleave, plugin/worker layer. The map; the guides are the territory. |
 | [integration-contract.md](integration-contract.md) | **The normative cross-system interface.** Storage layout + sole-writer map, the `ledger-query` envelope, flow identity, loop-signal mailboxes, freshness/staleness, twin-name discipline, build interleave, consumer table. Wins over any brief in either guide. |
-| [bug-hunter-build-guide.md](bug-hunter-build-guide.md) | **Bug-hunter spec of record.** Complete additive build guide: 6-slot pipeline (Map → Hunt → Verify → Triage → Report → Learn), all construction briefs, phases 1–5 + optional integrations. Inception has run: bolts 085–094 (intent 035). |
-| [knowledge-builder-build-guide.md](knowledge-builder-build-guide.md) | **Knowledge-builder spec of record.** Complete additive build guide: 7-stage pipeline (Ingest → … → Publish), the three-way firewall, all construction briefs, phases 1–5. Inception pending — §7 of the contract is updated when it assigns bolt numbers. |
+| [bug-hunter-build-guide.md](bug-hunter-build-guide.md) | **Bug-hunter spec of record.** Complete additive build guide: 6-slot pipeline (Map → Hunt → Verify → Triage → Report → Learn), all construction briefs, phases 1–5 + optional integrations. Inception ran 2026-06-10; re-scoped 2026-09 — bolts 087–094 remain, 085–086 are satisfied by the review loop. **Implementation status 2026-09: partially built as the review loop (`reviews/`); see the guide's status table.** |
+| [knowledge-builder-build-guide.md](knowledge-builder-build-guide.md) | **Knowledge-builder spec of record.** Complete additive build guide: 7-stage pipeline (Ingest → … → Publish), the three-way firewall, all construction briefs, phases 1–5. Inception pending — §7 of the contract is updated when it assigns bolt numbers. **Not started (2026-09).** |
 | [operating-profiles.md](operating-profiles.md) | **Operator & deployment guide (non-normative).** How to choose, switch, and wire an operating profile (`TriggerPolicy` × `CommitPolicy`); home for the deployment artifacts (hook script, CI template) once built. Defers to contract §5.5 for the rules. |
+| [theory-vs-practice-2026-09.md](theory-vs-practice-2026-09.md) | **The bridge.** Cross analysis of these specs against the review machinery built on main, June–September 2026: concept map, contradictions and rulings, the 43-brief status, next steps. Read it before extending either side. |
+| [reconciliation-plan-2026-09.md](reconciliation-plan-2026-09.md) | **The plan that applied the bridge.** Task by task, which document each of the owner's rulings changes, in what order, and the check that proves it landed. Read it to see why a status sentence here says what it says. |
 
 ## Future / planned systems (captured, not built)
 
@@ -31,6 +33,18 @@ map.
 | [future/test-quality-system.md](future/test-quality-system.md) | **Test-Quality** — builds & *judges* the safety net (coverage, mutation, e2e); maps to the roadmap's e2e/regression phase. |
 | [future/observability-system.md](future/observability-system.md) | **Observability / SRE** — watches the running product, turns incidents into fix-requests. Roadmap-gated (post-deployment). |
 
+## Relationship to the review loop (`reviews/`)
+
+The review loop is this blueprint's Inspector engine, built first and by hand while reviewing the
+bolt branches, running in the guide's "pre-merge" mode on one feature at a time. It keeps the ledger
+(`reviews/<target>/ledger.md`, `reviews/state/backlog.md`), verifies fixes by reverting them
+(`reviews/lib/verify/verify-fixes.mjs`), reconciles findings (`reconcile-findings` skill), and
+records every pass (`reviews/state/index.md`). Its operating rules live in
+[`reviews/README.md`](../../reviews/README.md); its design notes in
+[`reviews/notes/self-driving-loop-design.md`](../../reviews/notes/self-driving-loop-design.md).
+The two vocabularies are mapped in the bridge document's Appendix A. Rule of thumb: the guides say
+what the Inspector should become; `reviews/` says what it is.
+
 ## Design history
 
 These specs converged over four cross-system review rounds (findings **F1–F23 → G1–G16 → H1–H35 →
@@ -47,3 +61,5 @@ every intermediate spec version were removed — they remain fully recoverable i
   `docs/agent-systems/<file>`.
 - The integration contract is the **normative** interface: if a brief and the contract disagree, the
   contract wins; changing it requires checking every consumer in its §8.
+- **Two sides, one truth.** A change to a status, a rule or a build order in these specs is mirrored
+  in `reviews/README.md`'s pointer section when it affects the running loop, and vice versa.
