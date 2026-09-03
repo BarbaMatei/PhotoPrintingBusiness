@@ -3,17 +3,20 @@ id: 054-dependency-and-boot-hardening
 unit: 001-dependency-and-boot-hardening
 intent: 025-security-dependency-hygiene
 type: simple-construction-bolt
-status: planned
+status: in-progress
 stories:
   - 001-patch-otel-cve
   - 002-central-package-management
   - 003-renovate-config
   - 004-forwarded-headers-metrics
 created: 2026-06-05T09:30:00Z
-started: null
+started: 2026-09-03T20:42:35Z
 completed: null
-current_stage: null
-stages_completed: []
+current_stage: implement
+stages_completed:
+  - name: plan
+    completed: 2026-09-03T21:45:00Z
+    artifact: implementation-plan.md
 
 requires_bolts: []
 enables_bolts: [063-access-hardening]
@@ -51,7 +54,7 @@ Eliminate the known CVE and the silent multi-version Stripe.net load, automate f
 
 ## Stages
 
-- [ ] **1. plan**: Pending → implementation-plan.md
+- [x] **1. plan**: Complete → implementation-plan.md
 - [ ] **2. implement**: Pending → csproj/props/renovate.json/Program.cs changes
 - [ ] **3. test**: Pending → test-report (vulnerable-scan clean, webhook suite, metrics X-Forwarded-For)
 
