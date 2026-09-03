@@ -17,7 +17,7 @@
 LLM-based coding agents can now build and fix software autonomously, but running *several* of them against one codebase raises a problem that is more systems-engineering than AI: how do independent agents coordinate without corrupting shared state, and how do we trust that a reported fix is *actually* present? This thesis studies that coordination problem and proposes an architecture that makes both **safety** (no conflicting writes) and **soundness** (no fix accepted on an agent's word alone) explicit, enforceable properties.
 
 ## 2. Objective and research question
-Design, implement, and evaluate a multi-agent system in which an autonomous **Inspector** agent finds defects in a real codebase and drives them through a **closed verification loop**, governed by an **integration contract** with a single-writer storage discipline.
+Formalize, extend and evaluate a multi-agent system in which an autonomous **Inspector** agent finds defects in a real codebase and drives them through a **closed verification loop**, governed by an **integration contract** with a single-writer storage discipline. The Inspector's engine exists: the review loop built June–September 2026 (`reviews/`), running in pre-merge mode; the thesis formalizes it, extends it toward the full pipeline and measures it.
 
 *Research question:* Can a sole-writer ledger plus a correlation-id-keyed verification loop guarantee conflict-free coordination and sound fix-confirmation, while detecting real defects at a useful rate?
 
@@ -34,7 +34,7 @@ Design-science methodology: **formalize → build → measure.** Stack: .NET / C
 
 - **M1 (weeks 1–3):** State of the art; formalize the invariants and the loop state machine.
 - **M2 (weeks 4–8):** Extend and formalize the existing Inspector pipeline (Map → Hunt → Verify → Triage → Report → Learn): add the Map slot and the contract enforcement (mutex, sole-writer checks, id reservation); document the pre-merge mode that exists.
-- **M3 (weeks 9–11):** Build the evaluation harness; seed known defects.
+- **M3 (weeks 9–11):** Extend the existing evaluation harness (the seeded-defect protocol and its first run, the certification track record); design and seed the second, harder run.
 - **M4 (weeks 12–14):** Run experiments, analyze, write up. Future-work chapter: the full agent organization (Conductor, Analyst, Reviewer, Test-Quality, Observability).
 
 ## 6. Evaluation plan
