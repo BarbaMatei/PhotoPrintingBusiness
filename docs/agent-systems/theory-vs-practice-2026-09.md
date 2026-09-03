@@ -519,7 +519,7 @@ of it.
 | **D2 — Where records live** | **c — working copy on the branch, canonical store on `main`.** A target's folder on the feature branch is the working copy; the records become the canonical ones under `reviews/` once the branch merges. Each open target reserves a range of finding ids at open, so two worktrees running in parallel cannot hand out the same id. | P2.7, P5.1 |
 | **D3 — Execution proof before a 🔴 counts** | **b — a failing test, written by someone who is not the fixer.** Without that test the finding is recorded one severity lower and tagged `unproven-high`. | P2.7, P3.2 |
 | **D4 — Build order** | **c — cheapest gaps first.** Run budget and metered fix rounds → the proof rule of D3 → scanner ingest (dependency and static-analysis tools feeding the loop) → the Map slot (code index and reachability) → standing-sweep mode → the knowledge-builder only if findings start showing the code drifting from its stated intent. | P2.1, P2.6, P2.7, P4.* |
-| **D5 — Shape of the intent 035 re-scope** | **b — rewritten in place.** Intent 035 keeps its number and is re-scoped; bolts 085 and 086 are retired as already satisfied by the loop; bolts 087–094 remain, re-briefed around the 31 missing or partial pieces of §8. | P4.1–P4.4 |
+| **D5 — Shape of the intent 035 re-scope** | **b — rewritten in place.** Intent 035 keeps its number and is re-scoped; bolts 085 and 086 are retired as already satisfied by the loop; bolts 087–094 remain, re-briefed around the 31 missing or partial pieces of §8. (Amended 2026-09-03 at the owner's direction: bolts 085/086 restored as verification bolts, not deleted.) | P4.1–P4.4 |
 | **D6 — The Reviewer's missing parts** | **d — build deferred, open decision settled.** The Reviewer's remaining dimensions stay deferred; the open decision in the concept note is closed: reviewing error handling and silent failures belongs to the Inspector, in its `observability` lens. | P2.3 |
 | **D7 — Seeded-bug run 2** | **a — after the merge, scheduled by the owner.** | P5.2 (open item 6) |
 
@@ -571,7 +571,8 @@ overturned.
   units re-cut around them, bolts 085–086 retired and 087–094 re-briefed at the loop's seams in
   `reviews/lib`, and the story index, maintenance log, pinned decisions and inception record
   brought in line. `963133b`, `adf1444`, `1238c9b`, `f37c609`, `5004d54`, `b415e40`, `e35d989`,
-  `1b6d92c`.
+  `1b6d92c`. (Amended 2026-09-03 at the owner's direction: bolts 085/086 restored as verification
+  bolts, not deleted.)
 - **Phase 5 — the workbench points back** (4): `reviews/README.md` now names the blueprint it
   implements, the design notes and open items record the reconciliation (seeded run 2 is open
   item 6), and the contract's sections are named by the rules they hold, including the
@@ -586,6 +587,8 @@ overturned.
 
 Left deliberately for the final review or for the owner, one line each:
 
+- Bolts 085/086 (verification) are planned, not run: the equivalence claims on 12 stories are
+  unverified until they run.
 - The thesis proposal's M3 and §2 still read as if the Inspector does not exist — outside the
   four places the approved Phase 6 patch changed; the owner's call.
 - 34 story acceptance criteria under intent 035 still say "created via skill-creator"; the

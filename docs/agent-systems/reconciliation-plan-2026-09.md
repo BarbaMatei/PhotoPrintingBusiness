@@ -63,6 +63,10 @@ D7 **a**. Consequence of D6 d: the Reviewer's remaining dimensions stay deferred
 note's open decision is resolved — error-handling / silent-failure review belongs to the defect side
 (the `observability` lens) — and the note records the three reviewer lenses that already run.
 
+**Amendment (owner, 2026-09-03):** D5 b's "bolts 085–086 removed" is replaced by "restored as
+verification bolts" — deletion left a hole in the record; verification bolts let the equivalence
+claim be checked and completed through the normal process.
+
 Seven decisions I could not settle at very high confidence. Each has three or more options,
 scored 1–5 per dimension (5 = best), a total, my recommendation and my confidence in it. Below
 them, the decisions I took myself, each with a one-line opt-out.

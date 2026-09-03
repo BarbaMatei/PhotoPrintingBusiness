@@ -341,14 +341,15 @@ three were overturned.
 ## §7 — Cross-system build interleave
 
 Bug-hunter steps are named by bolt (its inception has run: bolts 085–094, of which 085 and 086 are
-retired as satisfied by the review loop (2026-09)); knowledge-builder steps
+verification bolts: they confirm the review loop satisfies Phase 1 and build nothing; they run
+first); knowledge-builder steps
 are named by phase **until its own inception assigns bolt numbers** — update this section when it
 does.
 
 **Build order (v1.6 — re-ordered by the owner's September 2026 ruling on build order).** One step per
 numbered line, each naming the bolt it corresponds to so bolt-numbered gates elsewhere still resolve.
-Bolts 085 and 086 (the Phase 1 skeleton, core and agents) are **satisfied by the review loop** and are
-retired by the re-scope of intent 035.
+Bolts 085 and 086 (the Phase 1 skeleton, core and agents) are **verification bolts**: they confirm
+that the review loop satisfies Phase 1 and build nothing, and they run first — before step 1 below.
 
 1. **The Inspector's cheapest gaps** — a run budget with metered fix rounds. (Bolt 087, the trust
    upgrades, re-scoped.)
