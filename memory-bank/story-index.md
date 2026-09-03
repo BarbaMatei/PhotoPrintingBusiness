@@ -1743,7 +1743,9 @@
 > phases + an optional tier (31b added in v3.3, review H1) — a permanent 6-slot pipeline
 > (Map→Hunt→Verify→Triage→
 > Report→Learn), agents-as-skills, **read-only on application source**, outputs under
-> `bug-hunting/`. ⚠️ **Construction mandate: every component MUST be built with the
+> `bug-hunting/` (amended 2026-09: the pre-merge mode's outputs live under `reviews/**`;
+> `bug-hunting/**` is reserved for the standing-sweep mode — requirements D3).
+> ⚠️ **Construction mandate: every component MUST be built with the
 > skill-creator skill** (`Skill` tool → `skill-creator:skill-creator`) — paste the
 > story's Prompt N, build, run its test prompts, fix, then next, in master order.
 > Order: 087→088→(089 ∥ 090)→092→093→091 ⛔(needs knowledge-ledger `ledger-query`; last); 094 ⏸ on adoption.

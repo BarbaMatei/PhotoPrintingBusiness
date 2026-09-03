@@ -142,14 +142,19 @@ loop's fixer applies patches directly, by design; plus one missing brief the des
 ## Functional Requirements
 
 ### FR-1: skill-creator build loop (cross-cutting)
-- **Description**: Every component is built by pasting its brief (Prompt N) from the
+- **Description**: **Amended 2026-09:** components that extend the review loop are scripts or
+  skill edits under `reviews/lib` and `.claude/skills`, built and tested in that tree (see the
+  header note and units.md); skill-creator is mandatory only for a new standalone skill (the
+  oracle tier's `intent-lookup`). Every component is built by pasting its brief (Prompt N) from the
   guide into the **skill-creator skill** and following the guide's build loop: build →
   run the brief's three test prompts → confirm/fix → only then take the next component
   in the master build order (dependency-ordered, top to bottom).
-- **Acceptance Criteria**: Each skill exists under `.claude/skills/{name}/` with the
-  guide's exact component name; construction log records skill-creator invocation +
-  the three test-prompt results per component; build order respected (a component's
-  dependencies were built first); if skill-creator is unavailable, the bolt STOPS.
+- **Acceptance Criteria**: Each component lands where its brief places it — a script or skill edit
+  under `reviews/lib` / `.claude/skills` for a loop extension, a skill under
+  `.claude/skills/{name}/` with the guide's exact component name for a new standalone skill;
+  construction log records the build route + the three test-prompt results per component; build
+  order respected (a component's dependencies were built first); for a new standalone skill only,
+  if skill-creator is unavailable, the bolt STOPS.
 - **Priority**: Must (applies to every story)
 
 ### FR-2: Shared conventions (cross-cutting)
