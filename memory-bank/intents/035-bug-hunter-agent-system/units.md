@@ -21,8 +21,9 @@ updated: 2026-06-10T10:40:14Z
 > (integration contract §7): trust upgrades → Map slot → specialists → learn & measure →
 > remediation hand-off → the oracle tier (unit 003's last bolt, gated on the knowledge-builder)
 > → optional integration (after the oracle in §7's list, and adoption-gated).
-> Bolts 085 and 086 are retired; story files never move, so a story's folder still names
-> the phase it was decomposed under.
+> Bolts 085 and 086 are **verification bolts** — planned, and run first: they confirm that the
+> review loop really satisfies Phase 1 before the construction bolts extend it. Story files never
+> move, so a story's folder still names the phase it was decomposed under.
 >
 > ⚠️ **Cross-cutting (FR-1, FR-2), binding for every unit:** every component is built
 > by pasting its brief (Prompt N from `docs/agent-systems/bug-hunter-build-guide.md`) into the
@@ -40,7 +41,7 @@ This intent decomposes into **6 units** (43 stories: 12 satisfied by the review 
 not how many there are: the oracle tier is the **last bolt of unit 003** (bolt 091, gated on the
 knowledge builder), not a unit of its own.
 
-### Unit 1: 001-phase-1-skeleton — satisfied by the review loop (2026-09), no bolt
+### Unit 1: 001-phase-1-skeleton — claimed satisfied by the review loop (2026-09), verified by bolts 085/086
 
 **Description**: The smallest complete end-to-end system: concurrency-safe ledger
 (`ledger-io`), canonical bug records (`bug-documentation`), `deduplication`, floored
@@ -48,13 +49,15 @@ Markdown `report-rendering`, the human-decision channel (`triage-intake`), one
 `general-hunter`, and the `orchestrator` defining all six permanent slots. **All of it runs
 today** as the review loop's records tree, `reconcile-findings`, review/summary documents with
 their doc gate, the owner gates, the core six lenses and `loop-driver` + the pass router. Its
-two bolts (085, 086) are retired — the work is done, so there is nothing to schedule.
+two bolts (085, 086) are **verification bolts**: they run first, confirm the claim story by story,
+record the verdict, and then complete through the normal process. They build nothing.
 
 **Stories** (7, Prompts 1–7): 001-ledger-io, 002-bug-documentation,
 003-deduplication, 004-report-rendering, 005-triage-intake, 006-general-hunter,
-007-orchestrator-skeleton. Six carry a `**Status:** satisfied by …` line naming the file that
-satisfies them. The one gap is **002-bug-documentation** (Prompt 2): the loop writes a ledger
-row plus a fix brief, not the three-audience record. No bolt work is planned for it.
+007-orchestrator-skeleton. Six carry a `**Status:** claimed satisfied by …` line naming the file that
+is said to satisfy them. The one known gap is **002-bug-documentation** (Prompt 2): the loop
+writes a ledger row plus a fix brief, not the three-audience record. Bolt 085 records that gap;
+closing it would be a new story for a construction bolt.
 
 **Dependencies**: Depends on — none. Depended by — nothing any more (later units extend the
 review loop directly, at the seam each story names).
@@ -184,7 +187,8 @@ Depended by — none.
 
 - **FR-1** (skill-creator build loop) → cross-cutting, every story
 - **FR-2** (shared conventions) → cross-cutting, every story
-- **FR-3** (Phase 1 skeleton) → `001-phase-1-skeleton` — satisfied by the review loop
+- **FR-3** (Phase 1 skeleton) → `001-phase-1-skeleton` — claimed satisfied by the review loop,
+  verified by bolts 085/086
 - **FR-4** (Phase 2 trust) → `002-phase-2-trust`
 - **FR-5** (Phase 3 breadth/scale + oracle) → `003-phase-3-breadth-and-scale` (3a map,
   3b specialists, then the oracle tier as its last bolt — 091, gated)
@@ -207,31 +211,35 @@ Depended by — none.
                        (within Unit 3b, bolts 089 ∥ 090 are the one wave-parallel pair)
 ```
 
-## Execution Order (bolts 087–094)
+## Execution Order (bolts 085–094)
 
-**Eight bolts remain.** The order is the one the owner ruled in 2026-09, written out in the
-integration contract §7; it replaces the guide's original top-to-bottom master order. Bolts 085
-and 086 are gone — the review loop satisfied them, and a bolt is never marked `complete` without
-a discovery pass, so a satisfied bolt is removed rather than closed.
+**Ten bolts: 2 verification (085, 086) + 8 construction (087–094).** The order for the
+construction bolts is the one the owner ruled in 2026-09, written out in the integration contract
+§7; it replaces the guide's original top-to-bottom master order. The two verification bolts come
+before all of it.
 
-1. **087** (Unit 2): trust upgrades — risk score + reachability weight, `tool-ingest`,
-   execution proof, moved/fixed detection. First, because it is the cheapest and every later
-   finding leans on it.
-2. **088** (Unit 3a): the Map slot — `app-mapping`, `code-index` (shared with the knowledge
+1. **085 → 086** (Unit 1): **verification, first.** They confirm, story by story, that the review
+   loop satisfies Phase 1 and record the verdict; they build nothing. Cheap, and they check the
+   premise every construction bolt below is built on — a gap they find becomes a new story for a
+   construction bolt, never work inside them.
+2. **087** (Unit 2): trust upgrades — risk score + reachability weight, `tool-ingest`,
+   execution proof, moved/fixed detection. First of the construction bolts, because it is the
+   cheapest and every later finding leans on it.
+3. **088** (Unit 3a): the Map slot — `app-mapping`, `code-index` (shared with the knowledge
    builder), `reachability`, the scoring extension, and the budget unit.
-3. **089 ∥ 090** (Unit 3b): specialists — **089** builds `taint-analysis` (16), the one gap of
+4. **089 ∥ 090** (Unit 3b): specialists — **089** builds `taint-analysis` (16), the one gap of
    its four stories, since the security lens (19) is satisfied and the flow-tracer (17) and
    file-sweeper (18) stories stay as they are; **090** builds `dependency-audit-agent` (20),
    `config-auditor-agent` (21) and `root-cause-clustering` (23), the concurrency story (22) being
    satisfied by the race lens. Both wait for **088**, not for 087's `tool-ingest` alone, because
    they read the map; disjoint files, so they are the one safe parallel pair.
-4. **092** (Unit 4): learn & measure — standing corpus, recall/escape metrics, curator
+5. **092** (Unit 4): learn & measure — standing corpus, recall/escape metrics, curator
    automation.
-5. **093** (Unit 5): remediation hand-off — non-fixer regression harvest, `fix-request-emit`.
-6. **091** (Unit 3, its last bolt): oracle tier — **last**, and ⛔ blocked until the knowledge
+6. **093** (Unit 5): remediation hand-off — non-fixer regression harvest, `fix-request-emit`.
+7. **091** (Unit 3, its last bolt): oracle tier — **last**, and ⛔ blocked until the knowledge
    builder's `ledger-query` exists (requirements D6, contract §7). It re-opens pieces from
    088–090, so it never runs in parallel with anything.
-7. **094** (Unit 6): optional integration — listed after 091 in the §7 order and **⏸
+8. **094** (Unit 6): optional integration — listed after 091 in the §7 order and **⏸
    adoption-gated**; its only bolt dependency is 092, so it may be built any time after that
    once the owner adopts a tracker or a CI gate.
 

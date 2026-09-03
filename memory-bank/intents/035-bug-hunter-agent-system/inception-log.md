@@ -147,3 +147,12 @@ in September 2026; `requirements.md` and `units.md` carry the current scope.
 - Construction method: a piece that extends the review loop is built as a script or skill in that
   tree at the seam its story names, with a test under `reviews/lib/tests`; skill-creator remains
   the builder for a new standalone skill (`intent-lookup`, `issue-sync`, `ci-gate`).
+- **2026-09-03 (later): 085/086 restored as verification bolts at the owner's direction.** The
+  "Bolts 085 and 086 are retired" bullet above stays as the record of what was decided earlier
+  that day. The owner then ruled that deleting them was wrong: it left a hole in the record, and
+  the equivalence claim over 12 briefs was never checked. Both bolts come back with the same ids
+  and the same stories, `status: planned`, as **verification bolts** — they confirm the claim
+  story by story, record the verdict in a `ddd-03-test-report.md`, and complete through the
+  normal process. They build nothing; a gap they find becomes a new story for a construction
+  bolt. Ten bolts are therefore scheduled, not eight: 085 → 086 first, then 087–094 in the order
+  above.

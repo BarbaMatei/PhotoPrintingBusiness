@@ -5,13 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: null
+assigned_bolt: 086-phase-1-skeleton-agents
 implemented: false
 ---
 
 # Story: 006-general-hunter (guide Prompt 6 — agent-as-skill)
 
-**Status:** satisfied by the core six lenses — `reviews/lib/records/schema.mjs` (`CORE_LENSES`) and their prompts (2026-09)
+**Status:** claimed satisfied by the core six lenses — `reviews/lib/records/schema.mjs` (`CORE_LENSES`) and their prompts (2026-09) — to be verified by bolt 086-phase-1-skeleton-agents; complete only after that verdict.
 
 ## User Story
 

@@ -2,15 +2,15 @@
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
 phase: inception
-status: complete
+status: ready
 unit_type: tooling
 default_bolt_type: simple-construction-bolt
 created: 2026-06-10T10:40:14Z
 updated: 2026-06-10T10:40:14Z
 ---
 
-Complete by equivalence: satisfied by the review loop (`reviews/`), not by building bolts
-085/086 (retired 2026-09).
+Claimed complete by equivalence — the review loop (`reviews/`) supplies these components;
+verification bolts 085/086 confirm it story by story and complete the unit.
 
 # Unit Brief: Phase 1 — Skeleton
 
@@ -45,7 +45,7 @@ false-positive rate until Phase 2."**
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — MUST follow)
 
-**Historical (2026-09):** this unit is complete by equivalence — the review loop (`reviews/`) supplies these components and bolts 085/086 are retired; the mandate below described the June plan and is superseded by FR-1 as amended (skill-creator only for a new standalone skill).
+**Verification (2026-09):** bolts 085/086 verify that the review loop satisfies this unit; the mandate below described the June construction plan and does not apply to them.
 
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste the component's brief (Prompt N) from
@@ -125,5 +125,5 @@ meets them with its own components (see each story's Status line).
 | 085-phase-1-skeleton-core | simple-construction-bolt | 001–005 | Foundation skills |
 | 086-phase-1-skeleton-agents | simple-construction-bolt | 006–007 | Hunter + Orchestrator; first end-to-end run |
 
-085/086 — satisfied by the review loop (`reviews/`), bolts retired 2026-09; the stories carry
-their Status lines.
+085/086 — restored 2026-09-03 as verification bolts (planned): they confirm the review loop
+satisfies these stories and build nothing.

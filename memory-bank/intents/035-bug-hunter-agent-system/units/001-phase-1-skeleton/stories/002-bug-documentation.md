@@ -5,13 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: null
+assigned_bolt: 085-phase-1-skeleton-core
 implemented: false
 ---
 
 # Story: 002-bug-documentation (guide Prompt 2)
 
-**Workbench seam:** `reviews/lib/records/render-records.mjs` — partial: the loop writes a ledger row plus a fix brief, not the three-audience record. No bolt work planned.
+**Workbench seam:** `reviews/lib/records/render-records.mjs` — partial: the loop writes a ledger row plus a fix brief, not the three-audience record. Bolt 085-phase-1-skeleton-core verifies this story and records that gap; closing it would be a new story, not work inside that bolt.
 
 ## User Story
 

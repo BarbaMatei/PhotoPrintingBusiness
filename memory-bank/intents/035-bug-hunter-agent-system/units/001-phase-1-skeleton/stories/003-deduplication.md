@@ -5,13 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: null
+assigned_bolt: 085-phase-1-skeleton-core
 implemented: false
 ---
 
 # Story: 003-deduplication (guide Prompt 3)
 
-**Status:** satisfied by `.claude/skills/reconcile-findings/SKILL.md`, scored against ground truth (2026-09)
+**Status:** claimed satisfied by `.claude/skills/reconcile-findings/SKILL.md`, scored against ground truth (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
 
 ## User Story
 

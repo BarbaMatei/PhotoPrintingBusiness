@@ -5,13 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: null
+assigned_bolt: 085-phase-1-skeleton-core
 implemented: false
 ---
 
 # Story: 005-triage-intake (guide Prompt 5, NEW in v3)
 
-**Status:** satisfied by `reviews/lib/drive/gates.mjs` — the owner gates, parked decisions, and decisions attached to re-found findings (2026-09)
+**Status:** claimed satisfied by `reviews/lib/drive/gates.mjs` — the owner gates, parked decisions, and decisions attached to re-found findings (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
 
 ## User Story
 

@@ -5,13 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: null
+assigned_bolt: 085-phase-1-skeleton-core
 implemented: false
 ---
 
 # Story: 001-ledger-io (guide Prompt 1)
 
-**Status:** satisfied by `reviews/lib/records/ledger.mjs`, `reviews/lib/review/mint-id.mjs` and `reviews/lib/records/render-records.mjs` (2026-09)
+**Status:** claimed satisfied by `reviews/lib/records/ledger.mjs`, `reviews/lib/review/mint-id.mjs` and `reviews/lib/records/render-records.mjs` (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
 
 ## User Story
 

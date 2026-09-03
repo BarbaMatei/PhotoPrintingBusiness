@@ -131,3 +131,50 @@ dependency is 092.
   reconciliation only.
 
 ---
+
+## 2026-09-03T12:09:13Z - Correction — bolts 085/086 restored as verification bolts
+
+**Triggered by**: the owner's ruling that the deletion of bolts 085 and 086 recorded in the entry
+above was wrong. That entry stays as written; this one records the correction.
+
+**What was wrong.** The reconciliation deleted the two Phase 1 skeleton bolts because the review
+loop was judged to satisfy their seven stories, and `standards/bolt-process.md` allows
+`status: complete` only after a review pass. Deleting them left a hole in the record: twelve
+briefs carried an equivalence claim that nothing had ever checked, and no bolt was scheduled to
+check it. That rule is a reason to run a pass over the claim, not a reason to remove the bolt.
+
+**What they are now.** `memory-bank/bolts/085-phase-1-skeleton-core/bolt.md` and
+`memory-bank/bolts/086-phase-1-skeleton-agents/bolt.md` are back with the same ids, the same
+seven stories and `status: planned`, rewritten as **verification bolts**. They run first and
+cheaply: for each story they open the seam its `**Status:**` line names, check — by reading, and
+by running where the behaviour can be run — that the brief's test prompts describe behaviour that
+is present, and write a per-story verdict (satisfied · satisfied with a gap · not satisfied) into
+`ddd-03-test-report.md`. Then stage 6 of the bolt process at the docs tier, then `complete` for
+each satisfied story and for the bolt; unit 001's brief completes when both bolts are done.
+
+**They build nothing.** A gap found becomes a new story under the unit, assigned to a construction
+bolt (`087-phase-2-trust`, or a proposal for a new bolt) — never work done inside the verification
+bolt, and never a change under `reviews/**`.
+
+### What changed
+
+| Artifact | Change |
+|----------|--------|
+| bolts 085, 086 (`bolt.md`) | Restored from `1238c9b^` and rewritten as verification bolts: `status: planned`, `time_box: 2h`, no bolt dependencies, a `notes:` line naming them verification bolts; body is Overview / Stories verified / five stages (plan, verify, record, review, complete) / Bolt Type / what the bolt must not do |
+| intents/035 unit-001 stories (7 files) | `assigned_bolt:` back to 085 (stories 001–005) and 086 (006–007); each `**Status:** satisfied by …` line now reads `claimed satisfied by … — to be verified by bolt …; complete only after that verdict`; story 002's workbench-seam line says bolt 085 records its gap |
+| intents/035 unit-001 `unit-brief.md` | `status: complete` → `ready`; the equivalence note and the construction-method box now describe verification; the line under the bolt-suggestions table records the restore |
+| intents/035 `units.md` | Unit 1's heading and description, the FR-3 mapping row and the execution order: ten bolts — 2 verification (085, 086) first, then the 8 construction bolts (087–094) in the unchanged order |
+| intents/035 `requirements.md` | Header note: the two skeleton bolts are verification bolts, not retired; the arithmetic paragraph adds that the 12 satisfied briefs are verified, not rebuilt |
+| intents/035 `inception-log.md` | A new dated bullet, `2026-09-03 (later)`; the earlier bullet is left exactly as written |
+| story-index.md | Overview planned-bolt list back to 085–094 (10 bolts); the 035 re-scope note and the seven unit-001 `**Bolt**:` rows name 085/086 as verification bolts; the last-index-change bullet carries the amendment |
+| docs/agent-systems (4 files) | Integration contract §7, the theory-vs-practice bridge (D5 row, Phase 4 line, §13.4 residue), the reconciliation plan's Phase 0 rulings, and the guide row in `README.md` all record the amendment |
+
+### Notes
+
+- **Remaining `planned` bolts now (44, was 42):** 046 (parked), 047, 048 (coupons), 054–069
+  (architect-review), 070–075 (roadmap Phase 3–4), 076–084 (intent 034 research), 085–094
+  (intent 035 — 085/086 verification, 091 ⛔ gated, 094 ⏸ adoption-gated).
+- The equivalence claims over the 12 satisfied briefs stay **unverified** until 085 and 086 run.
+- No production code, tests or `reviews/**` files were touched.
+
+---

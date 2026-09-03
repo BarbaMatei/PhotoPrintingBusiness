@@ -22,8 +22,9 @@ updated: 2026-06-10T10:40:14Z
 > "Implementation status (2026-09)" table — 43 briefs: 12 satisfied, 31 remaining. Three owner
 > rulings shape this re-scope: **one engine, two modes** (the pre-merge review that exists plus
 > a standing sweep over `main` that does not); **the contract §7 build order**; and **rewrite
-> this intent in place** — the two Phase 1 skeleton bolts (085, 086) are satisfied by the
-> review loop and are retired, not marked complete.
+> this intent in place** — the two Phase 1 skeleton bolts (085, 086) are **verification bolts**:
+> they confirm, story by story, that the review loop really satisfies Phase 1, record the verdict,
+> and complete through the normal process. They build nothing.
 >
 > ⚠️ **CONSTRUCTION METHOD (owner mandate + guide Part I):** every component **MUST be
 > created with the `skill-creator` skill** (invoke via the `Skill` tool, name
@@ -119,7 +120,8 @@ above schedule 25 of the 31. The other six get no bolt work — five partials th
 another way: `bug-documentation` (2), `flow-tracing` (15), `flow-tracer-agent` (17) and
 `file-sweeper-agent` (18), which the lenses do by prompt, and `fix-proposal` (32), because the
 loop's fixer applies patches directly, by design; plus one missing brief the design replaces:
-`suppression-learning` (25) → decision attachment (guide Prompt 25, contract §6.5).
+`suppression-learning` (25) → decision attachment (guide Prompt 25, contract §6.5). The 12
+satisfied briefs are verified, not rebuilt, by bolts 085/086.
 
 ### Out of Scope (hard constraints)
 - ❌ **No application code changes — ever.** The system is read-only on app source
