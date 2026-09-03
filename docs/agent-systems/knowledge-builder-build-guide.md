@@ -9,6 +9,16 @@ build order, and every construction prompt ("brief") for skill-creator. The cros
 lives in the standalone, normative **`docs/agent-systems/integration-contract.md`** — both systems build against
 it, and it wins over any brief.*
 
+> **What v3.6 adds (changelog).** Reconciliation with the first Inspector implementation (2026-09;
+> the Inspector is the bug-hunter, the sibling system that finds defects): the build order across
+> systems now follows the owner's ruling D4 of 2026-09, recorded in
+> `docs/agent-systems/reconciliation-plan-2026-09.md` — the librarian is built after the Inspector's
+> cheapest gaps and its Map slot, and only if intent-drift findings appear (findings that the code
+> has drifted from its written intent); until then the review loop's `requirements` lens (one
+> reviewing agent with a single job) reads bolt documents directly and is recorded as the interim
+> oracle consumer (Integration Contract §8). No stage, brief or firewall rule changes.
+> Spec-of-record refs: the contract is **v1.6**, the bug-hunter guide **v3.7**.
+
 > **What v3.5 adds (changelog).** Operating model factored into pluggable **profiles** (owner design,
 > Integration Contract §5.5 v1.5): the run *trigger* (`TriggerPolicy`) and the *commit path*
 > (`CommitPolicy`) are configuration, not hard-wiring. The orchestrator's incremental trigger and its
@@ -185,12 +195,20 @@ planned seam.
 
 Two tools are **shared deterministic tools** with no home system: `code-index` and
 `git-revision-tracking`. They are built once, on the bug-hunter track, and reused here as
-judgment-free tools. The resulting cross-system order is normative in **Integration Contract §7**:
-bug-hunter bolts 085–088 first → this guide's Phases 1–2 (parallel with bug-hunter 089/090) → the
-bug-hunter's oracle tier (bolt 091; recommended after this guide's Phase 2) → this guide's **Phase 3
-and Phase 5** in parallel with bug-hunter bolts 092–093 (Phase 5's eval doesn't depend on the loop, so
-it may precede Phase 4 — review J4) → this guide's **Phase 4 only after bug-hunter bolt 093** (it
-consumes the fix-request store and `fix_status`).
+judgment-free tools. The resulting cross-system order is normative in **Integration Contract §7**,
+and it was re-ordered in September 2026 by the owner's ruling D4 (recorded in
+`docs/agent-systems/reconciliation-plan-2026-09.md`), which builds this system only when the
+evidence asks for it. The order is now: the bug-hunter's (the Inspector's) cheapest gaps first →
+the proof rule for high-severity findings — a high-severity finding counts only with a failing test
+written by someone other than the person who fixes it → ingest of existing scanner tools (dependency
+audit, static analysis) → the **Map slot** (code index, application map, reachability) → the
+bug-hunter's **standing-sweep mode** (a scheduled pass over the whole codebase on `main`) → this
+guide's **Phases 1–2**, and only if intent-drift findings appear (findings that the code has drifted
+from its written intent) → this guide's **Phase 4** (loop integration) after the bug-hunter's
+remediation phase, because it consumes the fix-request store and `fix_status`. Phase 5 (Measure) may
+still precede Phase 4, since its eval doesn't depend on the fix loop — review J4. Until this guide's
+Phase 1 exists there is no oracle: the review loop's `requirements` lens reads bolt documents
+directly, and is recorded as the interim oracle consumer in **Integration Contract §8**.
 
 ## Build only as far as your bottleneck demands
 
