@@ -1,9 +1,12 @@
 # Future System — Code-Review Agentic System (concept note)
 
-> **Status: PROPOSED / DEFERRED (captured 2026-06-15).** This is an idea record so it isn't lost —
-> **not** a build guide and **not** inception. Build order: **after** AI-DLC + bug-hunter +
-> knowledge-builder are actually implemented (skills built, not just specced). Revisit and extend
-> then. No skill-creator construction, no bolts, no integration-contract edits until that point.
+> **Status: PARTIALLY BUILT, UNPLANNED (2026-09).** Three of the five dimensions below run today as
+> lenses of the review loop (`reviews/`): intent fidelity as `requirements` (against the bolt's own
+> documents, not an oracle), design quality as `quality` (report-only), test adequacy as
+> `tests-coverage`. The verdict exists (`request-changes` / `approve-with-followups` / `approved`)
+> but is a loop outcome, not the accept / block / revise synthesis described here. Comment/doc
+> accuracy and contract fidelity are not built. The rest of this note stands as the design for the
+> remainder.
 
 ---
 
@@ -35,9 +38,19 @@ never shared"). The reviewer must be **dimension-disjoint** from the bug-hunter:
   (type design, encapsulation, API surface, simplification, naming, pattern consistency), standards
   adherence (`memory-bank/standards/`), test adequacy, comment/doc accuracy.
 - **Reviewer defers to the bug-hunter:** finding latent defects anywhere in the corpus.
-- **⚠️ OPEN DECISION (resolve when picked up):** error-handling / silent-failure review sits on the
-  border between the two. Assign it to **exactly one** owner in the integration contract before
-  building, or it becomes the next "twin" confusion.
+- **Resolved (2026-09): error-handling / silent-failure review belongs to the Inspector.** The
+  review loop's `observability` lens (swallowed exceptions, indistinguishable incident types,
+  partial-state failures) already owns it, and it is defect-hunting by nature. The Reviewer does not
+  look for it.
+
+## What exists today (2026-09)
+
+On the two features whose records carry per-finding lens data (152 serious findings), the three
+reviewer lenses alone caught 21%, the defect lenses alone 56%, both kinds 12.5%. The reviewer
+dimensions earn their place pre-merge; they do not need a separate system to run. What this note
+still adds: the two missing dimensions, the accept / block / revise synthesis on top of the loop's
+verdict, and reading intent from a contract rather than from the bolt's own text. Source:
+[theory-vs-practice-2026-09.md §3](../theory-vs-practice-2026-09.md).
 
 ## Why it's the cheapest system to add: compose, don't build
 
