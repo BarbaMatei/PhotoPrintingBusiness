@@ -1,0 +1,73 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <!-- NU1603 = a requested version does not exist and a higher one was substituted. Left as a
+         warning it hides a phantom pin: both projects asked for Stripe.net 46.3.0, which was never
+         published, and silently ran 47.0.0. NU1008/NU1010 (inline or missing version under CPM)
+         and NU1605 (downgrade) are already errors; NU1608 is left as a warning because transitive
+         pinning raises it whenever an upstream constraint moves. -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1603</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="AWSSDK.S3" Version="3.7.406" />
+    <PackageVersion Include="FluentValidation.AspNetCore" Version="11.3.1" />
+    <PackageVersion Include="MailKit" Version="4.16.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity" Version="2.3.1" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <!-- No stable line has ever been published for these two; beta is the newest build there is. -->
+    <PackageVersion Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.15.3-beta.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.1-beta.1" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageVersion Include="Polly" Version="8.5.0" />
+    <PackageVersion Include="Polly.RateLimiting" Version="8.5.0" />
+    <PackageVersion Include="QuestPDF" Version="2024.12.3" />
+    <PackageVersion Include="RazorLight" Version="2.3.1" />
+    <PackageVersion Include="SendGrid" Version="9.29.3" />
+    <PackageVersion Include="Sentry.AspNetCore" Version="4.13.0" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageVersion Include="Stripe.net" Version="47.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Test-only">
+    <PackageVersion Include="coverlet.collector" Version="10.0.0" />
+    <PackageVersion Include="FluentAssertions" Version="8.9.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.11" />
+    <!-- 10.0.0, not the 10.0.8 the test project asked for: transitive pinning makes one version
+         govern both projects, and the API already resolves 10.0.0 through Serilog. Pinning the
+         API's version keeps the shipped closure unchanged. -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="xunit" Version="2.5.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.3" />
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
+  </ItemGroup>
+
+  <ItemGroup Label="Transitive pins — advisories in packages no direct reference controls">
+    <!-- Ships: reaches the API through the Microsoft.AspNetCore.Identity 2.x shim. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="8.0.4" />
+    <!-- Test-only, and inert: netstandard1.x shims that xunit 2.5.3 drags in via
+         NETStandard.Library 1.6.1. They never load on net8.0 and are absent from the API graph;
+         pinned so the audit output has no rows to explain. The durable fix is a xunit upgrade. -->
+    <PackageVersion Include="System.Net.Http" Version="4.3.4" />
+    <PackageVersion Include="System.Text.RegularExpressions" Version="4.3.1" />
+  </ItemGroup>
+
+</Project>

@@ -34,7 +34,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
           restore-keys: ${{ runner.os }}-nuget-
       # MinIO — S3-compatible backend for bolt-043 storage tests (ADR-008).
       # Run as a step rather than a `services:` container because GitHub Actions'
