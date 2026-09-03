@@ -92,9 +92,10 @@ brief → build → run its three test prompts → fix → next, in master-build
 - [x] Units decomposed
 - [x] Stories created for all units
 - [x] Bolts planned
-- [ ] Human review complete — ⏳ pending: this inception ran autonomously per the
+- [x] Human review complete — owner review 2026-09-03, after the re-scope (see the
+      2026-09-03 sections below) (was: this inception ran autonomously per the
       owner's 2026-06-10 instruction (the instruction + guide = Checkpoint 1); owner
-      review of the generated specs stands in for Checkpoints 2–3 before construction
+      review of the generated specs stands in for Checkpoints 2–3 before construction)
 
 ## Next Steps
 
