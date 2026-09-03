@@ -110,8 +110,9 @@ is unavailable, **STOP the bolt and report**. Hand-rolled skills violate FR-1.
 
 ## Success Criteria
 
-Satisfied by equivalence (2026-09): the criteria below describe the June plan; the review loop
-meets them with its own components (see each story's Status line).
+Claimed satisfied by equivalence (2026-09), verified by bolts 085/086: the criteria below
+describe the June plan; the review loop is claimed to meet them with its own components (see each
+story's Status line).
 
 - [ ] All 7 skills exist under `.claude/skills/`, built via skill-creator, each
       brief's three test prompts passing.

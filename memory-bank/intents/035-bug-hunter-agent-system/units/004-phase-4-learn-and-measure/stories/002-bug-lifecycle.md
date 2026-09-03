@@ -11,7 +11,7 @@ implemented: false
 
 # Story: 002-bug-lifecycle (guide Prompt 26)
 
-**Status:** satisfied by `reviews/lib/records/schema.mjs` and `reviews/lib/records/ledger.mjs` — statuses, reopen and lineage (2026-09)
+**Status:** claimed satisfied by `reviews/lib/records/schema.mjs` and `reviews/lib/records/ledger.mjs` — statuses, reopen and lineage (2026-09) — verified in bolt 092-phase-4-learn-and-measure's plan stage before that bolt builds around it.
 
 ## User Story
 

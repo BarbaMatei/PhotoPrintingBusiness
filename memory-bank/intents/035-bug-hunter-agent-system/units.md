@@ -36,7 +36,7 @@ updated: 2026-06-10T10:40:14Z
 
 ## Units Overview
 
-This intent decomposes into **6 units** (43 stories: 12 satisfied by the review loop,
+This intent decomposes into **6 units** (43 stories: 12 claimed satisfied by the review loop,
 31 remaining) — the same six as at inception. The 2026-09 re-cut changed what each unit covers,
 not how many there are: the oracle tier is the **last bolt of unit 003** (bolt 091, gated on the
 knowledge builder), not a unit of its own.
@@ -62,7 +62,8 @@ closing it would be a new story for a construction bolt.
 **Dependencies**: Depends on — none. Depended by — nothing any more (later units extend the
 review loop directly, at the seam each story names).
 
-**Estimated Complexity**: — (built) · **Assigned Requirements**: FR-3 (+ FR-1/FR-2).
+**Estimated Complexity**: — (claimed built; verification bolts 085/086) · **Assigned
+Requirements**: FR-3 (+ FR-1/FR-2).
 
 ### Unit 2: 002-phase-2-trust — trust upgrades (bolt 087, first in the order)
 
@@ -199,7 +200,7 @@ Depended by — none.
 ## Unit Dependency Graph
 
 ```text
-[001-skeleton: BUILT — the review loop]
+[001-skeleton: CLAIMED BUILT by the review loop — verified by 085/086]
         │
         ▼
 [002-trust] ─► [003a-map] ─► [003b-specialists] ─► [004-learn-and-measure] ─► [005-remediation]

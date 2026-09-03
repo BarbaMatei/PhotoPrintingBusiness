@@ -11,7 +11,7 @@ implemented: false
 
 # Story: 009-security-auditor-agent (guide Prompt 19 — agent-as-skill)
 
-**Status:** satisfied by the security lens — `reviews/lib/records/schema.mjs` plus its prompt (2026-09)
+**Status:** claimed satisfied by the security lens — `reviews/lib/records/schema.mjs` plus its prompt (2026-09) — verified in bolt 089-phase-3-specialists-a's plan stage before that bolt builds around it.
 
 ## User Story
 

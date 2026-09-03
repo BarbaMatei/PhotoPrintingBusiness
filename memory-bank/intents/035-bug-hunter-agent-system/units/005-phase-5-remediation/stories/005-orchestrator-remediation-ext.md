@@ -11,7 +11,7 @@ implemented: false
 
 # Story: 005-orchestrator-remediation-ext (guide Prompt 31b, NEW in v3.3 — review H1)
 
-**Status:** satisfied by `reviews/lib/drive/rows.mjs` — the router’s verification row (2026-09)
+**Status:** claimed satisfied by `reviews/lib/drive/rows.mjs` — the router’s verification row (2026-09) — verified in bolt 093-phase-5-remediation's plan stage before that bolt builds around it.
 
 ## User Story
 

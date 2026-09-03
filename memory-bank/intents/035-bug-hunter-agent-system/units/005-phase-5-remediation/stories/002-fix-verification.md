@@ -11,7 +11,7 @@ implemented: false
 
 # Story: 002-fix-verification (guide Prompt 31 — the loop's verification GATE; extends bug-lifecycle)
 
-**Status:** satisfied by `reviews/lib/verify/verify-fixes.mjs` (2026-09)
+**Status:** claimed satisfied by `reviews/lib/verify/verify-fixes.mjs` (2026-09) — verified in bolt 093-phase-5-remediation's plan stage before that bolt builds around it.
 
 ## User Story
 

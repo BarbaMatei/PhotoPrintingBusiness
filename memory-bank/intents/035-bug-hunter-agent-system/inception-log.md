@@ -150,9 +150,12 @@ in September 2026; `requirements.md` and `units.md` carry the current scope.
 - **2026-09-03 (later): 085/086 restored as verification bolts at the owner's direction.** The
   "Bolts 085 and 086 are retired" bullet above stays as the record of what was decided earlier
   that day. The owner then ruled that deleting them was wrong: it left a hole in the record, and
-  the equivalence claim over 12 briefs was never checked. Both bolts come back with the same ids
-  and the same stories, `status: planned`, as **verification bolts** — they confirm the claim
-  story by story, record the verdict in a `ddd-03-test-report.md`, and complete through the
-  normal process. They build nothing; a gap they find becomes a new story for a construction
-  bolt. Ten bolts are therefore scheduled, not eight: 085 → 086 first, then 087–094 in the order
-  above.
+  the equivalence claim was never checked. Both bolts come back with the same ids and the same
+  stories, `status: planned`, as **verification bolts** — they confirm the claim story by story,
+  record the verdict in a `test-walkthrough.md`, and complete through the normal process. They
+  build nothing; a gap they find becomes a new story for a construction bolt. Bolts 085/086
+  verify the seven Phase 1 stories — six of the twelve satisfied briefs; the other six
+  (orchestrator wiring 11b, security-auditor, concurrency-auditor, bug-lifecycle,
+  fix-verification, mailbox scan 31b) are verified in the plan stage of the construction bolt
+  that carries them. Ten bolts are therefore scheduled, not eight: 085 → 086 first, then 087–094
+  in the order above.

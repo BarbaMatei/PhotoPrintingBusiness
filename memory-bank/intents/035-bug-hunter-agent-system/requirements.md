@@ -120,8 +120,12 @@ above schedule 25 of the 31. The other six get no bolt work — five partials th
 another way: `bug-documentation` (2), `flow-tracing` (15), `flow-tracer-agent` (17) and
 `file-sweeper-agent` (18), which the lenses do by prompt, and `fix-proposal` (32), because the
 loop's fixer applies patches directly, by design; plus one missing brief the design replaces:
-`suppression-learning` (25) → decision attachment (guide Prompt 25, contract §6.5). The 12
-satisfied briefs are verified, not rebuilt, by bolts 085/086.
+`suppression-learning` (25) → decision attachment (guide Prompt 25, contract §6.5). Nothing
+satisfied is rebuilt, and every satisfied brief is verified before something is built on it:
+bolts 085/086 verify the seven Phase 1 stories — six of the twelve satisfied briefs; the other
+six (orchestrator wiring 11b, security-auditor, concurrency-auditor, bug-lifecycle,
+fix-verification, mailbox scan 31b) are verified in the plan stage of the construction bolt that
+carries them.
 
 ### Out of Scope (hard constraints)
 - ❌ **No application code changes — ever.** The system is read-only on app source

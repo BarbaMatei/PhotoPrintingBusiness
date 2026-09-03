@@ -11,7 +11,7 @@ implemented: false
 
 # Story: 005-orchestrator-verify-wiring (guide Prompt 11b — EXTENSION)
 
-**Status:** satisfied by `reviews/lib/drive/rows.mjs` — the pass router’s rows (2026-09)
+**Status:** claimed satisfied by `reviews/lib/drive/rows.mjs` — the pass router’s rows (2026-09) — verified in bolt 087-phase-2-trust's plan stage before that bolt builds around it.
 
 ## User Story
 

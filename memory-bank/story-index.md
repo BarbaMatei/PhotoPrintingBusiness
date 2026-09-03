@@ -9,7 +9,7 @@
 - **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 + roadmap Phase 3–4 intents 032–033 + research intent 034 (EU expansion study) + tooling intent 035 (bug-hunter agent system — re-scoped 2026-09: its engine is claimed built, 10 bolts remain — 2 verification + 8 construction) (see below)
 - **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03), 070–075 (roadmap Phase 3–4), 076–084 (intent 034 EU-expansion research), 085–094 (intent 035 bug-hunter agent system — 10 bolts; 085/086 are verification bolts restored 2026-09-03 — they confirm the review loop satisfies Phase 1 and build nothing — then 087–094 construction; 091 ⛔ knowledge-ledger gate and last in the order, 094 ⏸ adoption-gated). Bolt 050 remains unallocated by design (no directory exists).
 - **Last updated**: 2026-09-03
-- **Last index change**: 2026-09-03 (reconciliation of intent 035 with the review loop) — intent 035 re-scoped in place — the bug-hunting engine exists as the review loop under `reviews/`, so of its 43 briefs 12 are satisfied (marked below), 31 remain (16 missing + 15 partial). Bolts 085/086 removed (satisfied, and a bolt is never marked `complete` without a discovery pass); 8 bolts remain, 087–094, re-ordered per the owner ruling written up in `docs/agent-systems/integration-contract.md` §7. No story listings added, removed or renumbered. (Amended 2026-09-03: 085/086 restored as verification bolts — planned, run first, they confirm the equivalence claim and build nothing.)
+- **Last index change**: 2026-09-03 (reconciliation of intent 035 with the review loop) — intent 035 re-scoped in place — the bug-hunting engine exists as the review loop under `reviews/`, so of its 43 briefs 12 are satisfied (marked below), 31 remain (16 missing + 15 partial). Bolts 085/086 removed (satisfied, and a bolt is never marked `complete` without a discovery pass); 8 bolts remain, 087–094, re-ordered per the owner ruling written up in `docs/agent-systems/integration-contract.md` §7. No story listings added, removed or renumbered. (Amended 2026-09-03: 085/086 restored as verification bolts — planned, run first, they confirm the equivalence claim over the seven Phase 1 stories and build nothing; ten bolts are scheduled, not eight — 085/086 plus 087–094.)
 - **Last index change (prior)**: 2026-06-10 (added tooling intent 035 bug-hunter-agent-system → 6 units, 42 stories, bolts 085–094 — all status PLANNED / ✅ GENERATED. Builds the bug-hunting agent system from `docs/agent-systems/bug-hunter-build-guide.md`: 5 additive phases + optional tier, 6-slot pipeline (Map→Hunt→Verify→Triage→Report→Learn), read-only on app source. ⚠️ Construction mandate: every component built with the **skill-creator** skill per the guide's build loop. Order: 085→086→087→088→(089 ∥ 090)→091 ⛔(knowledge-ledger gate)→092→093; 094 ⏸ adoption-gated. Note: an earlier same-day inception misread the subject (specsmd-skills port, bolts 085–087) — deleted and replaced by this intent.) **(superseded by the 2026-09-03 re-scope above.)**
 - **Last index change (prior 2)**: 2026-06-05 (added research-only intent 034 EU-expansion-architecture-study → 3 units, 10 stories, bolts 076–084 — all status PLANNED / ✅ GENERATED. Spike-bolts; zero production code. Source: eu-expansion-research-brief-2026-06-05. Owner Checkpoint-1 decisions: compare both tiers · one brand EU-wide · ship from Romania · local currencies.)
 - **Last index change (prior 3)**: 2026-06-05 (added roadmap Phase 3–4 intents 032–033 → 6 units, 25 stories, bolts 070–075 — all status PLANNED / ✅ GENERATED. Source: ai-workflow-review-2026-06-05 §6. 032 builds on bolts 066+062; 033 is infrastructure-readiness only, NOT deployment.)
@@ -1752,17 +1752,20 @@
 >
 > **Re-scoped 2026-09 (reconciliation).** The engine described above is built — it is the
 > review loop under `reviews/` (pre-merge mode). Of the 43 briefs, **12 are satisfied** by it
-> (marked below), **31 remain**: 16 missing + 15 partial. The satisfied briefs are **verified by
-> bolts 085/086** — verification bolts, `planned`, run first: they confirm the claim story by
-> story, record the verdict and build nothing. **8 construction bolts (087–094) follow**, in the
-> order ruled by the owner (`docs/agent-systems/integration-contract.md` §7). Status of every brief: the guide's
+> (marked below), **31 remain**: 16 missing + 15 partial. Bolts 085/086 verify the seven Phase 1
+> stories — six of the twelve satisfied briefs; the other six (orchestrator wiring 11b,
+> security-auditor, concurrency-auditor, bug-lifecycle, fix-verification, mailbox scan 31b) are
+> verified in the plan stage of the construction bolt that carries them. 085/086 are
+> **verification bolts**, `planned`, run first, and build nothing. **8 construction bolts
+> (087–094) follow**, in the order ruled by the owner
+> (`docs/agent-systems/integration-contract.md` §7). Status of every brief: the guide's
 > "Implementation status (2026-09)" table. The construction mandate now reads: a piece that
 > extends the review loop is built as a script or skill in that tree at the seam its story
 > names; skill-creator stays for a new standalone skill.
 
 #### Unit: 001-phase-1-skeleton (7 stories) — Bolts: 085, 086 (verification — confirm the review loop satisfies these stories)
 
-### 001-ledger-io.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 001-ledger-io.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `ledger-io` — concurrency-safe shared ledger R/W, correlation_id (Prompt 1)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/001-ledger-io.md`
@@ -1774,31 +1777,31 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/002-bug-documentation.md`
 **Bolt**: 085-phase-1-skeleton-core (verification)
 
-### 003-deduplication.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 003-deduplication.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `deduplication` — new/duplicate/dismissed/suppressed verdicts (Prompt 3)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/003-deduplication.md`
 **Bolt**: 085-phase-1-skeleton-core (verification)
 
-### 004-report-rendering.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 004-report-rendering.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `report-rendering` — per-run Markdown report with reporting floor (Prompt 4)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/004-report-rendering.md`
 **Bolt**: 085-phase-1-skeleton-core (verification)
 
-### 005-triage-intake.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 005-triage-intake.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `triage-intake` — human decisions front door, reason-required dismissals (Prompt 5)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/005-triage-intake.md`
 **Bolt**: 085-phase-1-skeleton-core (verification)
 
-### 006-general-hunter.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 006-general-hunter.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `general-hunter` — combined top-down + file-sweep hunting agent (Prompt 6)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/006-general-hunter.md`
 **Bolt**: 086-phase-1-skeleton-agents (verification)
 
-### 007-orchestrator-skeleton.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 007-orchestrator-skeleton.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `orchestrator` — 6-slot coordinator; Phase-1 output labeled unverified (Prompt 7)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/007-orchestrator-skeleton.md`
@@ -1830,7 +1833,7 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/004-git-revision-tracking.md`
 **Bolt**: 087
 
-### 005-orchestrator-verify-wiring.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 005-orchestrator-verify-wiring.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: orchestrator extension — Verify→Verifier, Triage→scoring, SHA open/close (Prompt 11b)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/005-orchestrator-verify-wiring.md`
@@ -1886,7 +1889,7 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/008-file-sweeper-agent.md`
 **Bolt**: 089
 
-### 009-security-auditor-agent.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 009-security-auditor-agent.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `security-auditor-agent` — taint + authn/authz + secrets + vuln classes (Prompt 19)
 **Priority**: Must
 **Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/009-security-auditor-agent.md`
@@ -1904,7 +1907,7 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/011-config-auditor-agent.md`
 **Bolt**: 090
 
-### 012-concurrency-auditor-agent.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 012-concurrency-auditor-agent.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `concurrency-auditor-agent` — races/deadlocks/TOCTOU (conditional; async-heavy stack) (Prompt 22)
 **Priority**: Should
 **Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/012-concurrency-auditor-agent.md`
@@ -1948,7 +1951,7 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/001-suppression-learning.md`
 **Bolt**: 092
 
-### 002-bug-lifecycle.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 002-bug-lifecycle.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `bug-lifecycle` — status machine, evidence-based self-close, regression flags (Prompt 26)
 **Priority**: Should
 **Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/002-bug-lifecycle.md`
@@ -1986,7 +1989,7 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/001-regression-harvest.md`
 **Bolt**: 093
 
-### 002-fix-verification.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 002-fix-verification.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: `fix-verification` — the closure GATE; verified-fixed by correlation_id (extends bug-lifecycle) (Prompt 31)
 **Priority**: Should
 **Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/002-fix-verification.md`
@@ -2004,7 +2007,7 @@
 **Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/004-fix-request-emit.md`
 **Bolt**: 093
 
-### 005-orchestrator-remediation-ext.md ✅ GENERATED · satisfied by the review loop (2026-09)
+### 005-orchestrator-remediation-ext.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
 **Title**: orchestrator extension — run-open fix-request mailbox scan (Prompt 31b, NEW in guide v3.3 / review H1)
 **Priority**: Should
 **Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/005-orchestrator-remediation-ext.md`

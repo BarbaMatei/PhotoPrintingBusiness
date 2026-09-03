@@ -11,7 +11,7 @@ implemented: false
 
 # Story: 012-concurrency-auditor-agent (guide Prompt 22 — agent-as-skill, CONDITIONAL)
 
-**Status:** satisfied by the race lens — `reviews/lib/records/schema.mjs` plus its prompt (2026-09)
+**Status:** claimed satisfied by the race lens — `reviews/lib/records/schema.mjs` plus its prompt (2026-09) — verified in bolt 090-phase-3-specialists-b's plan stage before that bolt builds around it.
 
 ## User Story
 
