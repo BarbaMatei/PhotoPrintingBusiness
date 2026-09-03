@@ -1,6 +1,6 @@
 ---
 type: cross-analysis
-status: draft for owner decision
+status: resolved — rulings applied on the branch 2026-09-03; thesis wording pending owner approval
 created: 2026-09-02
 owner: Matei Barba
 scope: docs/agent-systems + thesis (this branch) versus reviews/ + .claude/skills (main)
@@ -492,6 +492,124 @@ first shakedown of the skill evals.
 6. **Knowledge-builder priority.** Direct reading of bolt docs found 23 serious findings on two
    targets without an oracle; the Map slot is the bigger practical hole. Does the KB stay
    ahead of the Map in the build order?
+
+---
+
+## 13. Rulings and outcome (2026-09)
+
+The owner answered the six questions of §12 on 2 September 2026 — ruling D6 was corrected the
+same day — and the plan that follows from them
+([reconciliation-plan-2026-09.md](reconciliation-plan-2026-09.md)) was executed on this branch
+in six phases and 42 commits. In one sentence: there is one inspection engine, not two — the
+review loop that already exists — and the blueprint was rewritten to say so. Its roster,
+architecture summary, build guides and integration contract now describe the loop as the
+engine's **pre-merge mode** and name a scheduled **standing sweep** over `main` as the second
+mode, still to be built. The ten lessons the loop paid for are written into the bug-hunter
+guide; intent 035 was re-scoped from a build-from-scratch plan into the 31 pieces the loop is
+missing; and each side now links to the other through this document. Nothing was built and
+nothing was run: the whole change set is documents. Sections 1–12 above are left exactly as
+they were written on 2 September — they are the analysis as it stood; this section is what came
+of it.
+
+### 13.1 The rulings
+
+| Decision | Ruling | Applied by |
+|---|---|---|
+| **D1 — Posture: what is the engine?** | **a — one engine, two modes.** The review loop is the one Inspector engine. Pre-merge mode (what runs today on a branch before it merges) is built; standing-sweep mode (a scheduled sweep of the whole codebase on `main`) is not. | P2.1, P2.2, P2.5, P2.7 |
+| **D2 — Where records live** | **c — working copy on the branch, canonical store on `main`.** A target's folder on the feature branch is the working copy; the records become the canonical ones under `reviews/` once the branch merges. Each open target reserves a range of finding ids at open, so two worktrees running in parallel cannot hand out the same id. | P2.7, P5.1 |
+| **D3 — Execution proof before a 🔴 counts** | **b — a failing test, written by someone who is not the fixer.** Without that test the finding is recorded one severity lower and tagged `unproven-high`. | P2.7, P3.2 |
+| **D4 — Build order** | **c — cheapest gaps first.** Run budget and metered fix rounds → the proof rule of D3 → scanner ingest (dependency and static-analysis tools feeding the loop) → the Map slot (code index and reachability) → standing-sweep mode → the knowledge-builder only if findings start showing the code drifting from its stated intent. | P2.1, P2.6, P2.7, P4.* |
+| **D5 — Shape of the intent 035 re-scope** | **b — rewritten in place.** Intent 035 keeps its number and is re-scoped; bolts 085 and 086 are retired as already satisfied by the loop; bolts 087–094 remain, re-briefed around the 31 missing or partial pieces of §8. | P4.1–P4.4 |
+| **D6 — The Reviewer's missing parts** | **d — build deferred, open decision settled.** The Reviewer's remaining dimensions stay deferred; the open decision in the concept note is closed: reviewing error handling and silent failures belongs to the Inspector, in its `observability` lens. | P2.3 |
+| **D7 — Seeded-bug run 2** | **a — after the merge, scheduled by the owner.** | P5.2 (open item 6) |
+
+### 13.2 The smaller calls the plan took itself (S1–S8)
+
+Phase 0 of the plan lists eight decisions it settled without asking; each stays open to being
+overturned.
+
+- **S1** — `suppression-learning` (the blueprint's idea of teaching the system to stop raising a
+  finding) is replaced by attaching the decision to the finding: never suppress a hunter. Three
+  of the first five re-raised findings were later overturned.
+- **S2** — Lessons enter the guides as additive "extends" top-ups under new changelog blocks
+  (bug-hunter v3.7, knowledge-builder v3.6, contract v1.6); nothing is thrown away.
+- **S3** — Both vocabularies stay; the Rosetta table (Appendix A) is placed in both READMEs; no
+  renames on either side.
+- **S4** — Historical analyses get a dated "snapshot" note rather than a rewrite; planning
+  documents still marked `planned` are corrected to the Postgres-only reality.
+- **S5** — The one old link inside `reviews/archive/038-039-invoicing/resolution-v9.md` stays;
+  archived records are historical.
+- **S6** — This document is the bridge both READMEs link to, and it gains this closing section.
+- **S7** — The contract gains a `reviews/**` store row and the review loop as a consumer, rather
+  than a second contract being written.
+- **S8** — Thesis edits are proposed as a diff the owner approves before anything is committed.
+
+### 13.3 What changed, by phase
+
+- **Before the phases** — this analysis and the plan itself (`1c69cd1`), then the corrected D6
+  ruling recorded in the plan (`2ff0c78`).
+- **Phase 1 — hygiene** (8 commits): the eight citations of deleted review files became
+  git-history pointers, the links broken by the May-analysis rename were repaired, the SQLite
+  claims in the June planning documents were corrected to Postgres-only, and four small stale
+  facts (proposal count, brief count, stale-branch note, inception checkbox) were fixed.
+  `73b978f`, `d6ac571`, `736c1b8`, `fcf37dc`, `05905c8`, `b2c18d5`, `73d73f8`, `86006e7`.
+- **Phase 2 — the blueprint re-baselined to reality** (14): the future roster and the
+  architecture summary gained a "what exists today" account; the code-review concept note went
+  to partial with its open decision closed; the specs index and the READMEs link to the loop;
+  the bug-hunter guide maps its 43 briefs onto what the loop already does and defines the two
+  modes; the knowledge-builder moved behind the Inspector gaps in the build order; and the
+  integration contract reached v1.6 with the records rule (D2), the proof rule (D3), the build
+  order (D4) and the loop as a named consumer. `996bfd5`, `fca6f9a`, `e874289`, `cb512b0`,
+  `3569f7f`, `49b33bc`, `397ad59`, `4eac711`, `ce74b73`, `ce02a87`, `d6bc2a0`, `3238757`,
+  `60ce803`, `9768bc0`.
+- **Phase 3 — the loop's lessons into the blueprint** (6): the ten lessons of §6 written into
+  the bug-hunter guide, brief extensions for Phases 1–2 and 4–5 (dedup, records, triage,
+  verifier, seed rate, escapes, the fix round as a mini-bolt), every suppression-learning
+  mention marked superseded, and tests added to the new extensions. `d1f20ea`, `ae103ea`,
+  `92d1e75`, `caec8c6`, `60ca72d`, `36af383`.
+- **Phase 4 — intent 035 re-scoped** (8): requirements re-scoped to the gaps the loop leaves,
+  units re-cut around them, bolts 085–086 retired and 087–094 re-briefed at the loop's seams in
+  `reviews/lib`, and the story index, maintenance log, pinned decisions and inception record
+  brought in line. `963133b`, `adf1444`, `1238c9b`, `f37c609`, `5004d54`, `b415e40`, `e35d989`,
+  `1b6d92c`.
+- **Phase 5 — the workbench points back** (4): `reviews/README.md` now names the blueprint it
+  implements, the design notes and open items record the reconciliation (seeded run 2 is open
+  item 6), and the contract's sections are named by the rules they hold, including the
+  standing-sweep mode. `7afcecd`, `0428314`, `7b7ff40`, `3ac17f8`.
+- **Phase 6 — thesis wording**: no commit. The edits are proposed as a patch and await the
+  owner's approval (S8).
+- **Phase 7 — bridge, verification, hand-back**: this section is its first commit; a
+  whole-branch verification and an independent review follow.
+
+### 13.4 Known residue
+
+Left deliberately for the final review or for the owner, one line each:
+
+- The thesis proposal's M3 and §2 still read as if the Inspector does not exist — part of the
+  Phase 6 patch that awaits approval.
+- Thirty story acceptance criteria under intent 035 still say "created via skill-creator"; the
+  construction box on each bolt governs instead.
+- `ARCHITECTURE.md` §5's mermaid diagram still draws the June build interleave; it is labelled
+  superseded rather than redrawn.
+- The contract's §6 heading, "Twin-name discipline", under-describes the judgment-agent rules
+  the section now holds.
+- A dead `DatabaseProvider` environment variable lingers in `docker-compose.yml` and
+  `docker-compose.prod.yml` — outside this docs-only plan.
+- `docs/prevention-sweep-idea.md` says "not scheduled" in its frontmatter and "adopted into the
+  blueprint" in its body; which one is true is the owner's call.
+- The seeded-bug run 2 is still the one measurement both sides rest on.
+
+### 13.5 What this means for §11 and §12
+
+Of §11's steps, 0, 1, 2 and 5 were done here — the hygiene before the merge rather than after
+it, the re-baseline in Phases 2 and 4, the posture written into the contract, the lessons in
+Phase 3. Step 6 (the thesis) is written but waits on the owner's approval. Steps 3 (seeded run
+2) and 4 (feeding the workbench: budget, proof rule, scanner ingest, the Map slot, the fix round
+as a mini-bolt) are post-merge work, in the order D4 sets.
+
+§12's six questions are answered above: posture by D1, records home by D2, execution proof by
+D3, seeded run 2 by D7, intent 035 by D5, and the knowledge-builder's place in the build order
+by D4.
 
 ---
 

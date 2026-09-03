@@ -1,6 +1,6 @@
 ---
 type: implementation-plan
-status: in execution — Phase 0 ruled 2026-09-02 (D1 a · D2 c · D3 b · D4 c · D5 b · D6 d · D7 a)
+status: executed 2026-09-03 — final review pending; thesis wording (P6.1) awaits owner approval
 created: 2026-09-02
 owner: Matei Barba
 spec: docs/agent-systems/theory-vs-practice-2026-09.md
