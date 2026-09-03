@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Rotate the dev RSA key out of source control and add guardrails preventing recurrence.
 **Type**: ops / brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #6 (priority score 22)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #6 (priority score 22)
 **Created**: 2026-05-25T10:25:00Z
 
 ## Artifacts Created

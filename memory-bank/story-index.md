@@ -1,14 +1,24 @@
 # Global Story Index
 
 ## Overview
-- **Total story listings**: 155 (+ 6 intents documented inline without per-story listings)
-- **Story files on disk**: 142
+- **Total story listings**: 233 (+ 6 intents documented inline without per-story listings)
+- **Story files on disk**: 220
 - **Implemented**: 80 listings (across 44 shipped bolts) + 8 COMPLETE (intent 024) + 46 GENERATED-but-actually-shipped (early intents 001–003, 005)
-- **Intents complete**: 001, 002, 003, 004, 005, 006, 007, 008, 009, 010, 012, 013, 014, 015, 017, 018, 019, 023, 024
-- **Intents planned**: 016 (VAT/e-Factura), 020 (observability), 021 (Redis), 022 (coupons)
-- **Bolts planned**: 038, 039, 044, 045, 046, 047, 048 (7 bolts → 20 stories)
-- **Last updated**: 2026-06-02
-- **Last index change**: 2026-06-02 (drift repair — see notes below)
+- **Intents complete (shipped)**: 001–010, 012–020, 023, 024 (016 VAT/e-Factura + 020 observability shipped via bolts 038/039/044/045; 011 is a non-standard design-review intent)
+- **Intents parked**: 021 (Redis multi-replica — deprioritized until deployed + real scaling pressure; bolt 046)
+- **Intents planned (inception done, not built)**: 022 (coupons → bolts 047/048) + architect-review 2026-06-03 intents 025–031 + roadmap Phase 3–4 intents 032–033 + research intent 034 (EU expansion study) + tooling intent 035 (bug-hunter agent system — re-scoped 2026-09: its engine is claimed built, 10 bolts remain — 2 verification + 8 construction) (see below)
+- **Bolts planned (not built)**: 046 (parked), 047, 048 (coupons), 054–069 (architect-review 2026-06-03), 070–075 (roadmap Phase 3–4), 076–084 (intent 034 EU-expansion research), 085–094 (intent 035 bug-hunter agent system — 10 bolts; 085/086 are verification bolts restored 2026-09-03 — they confirm the review loop satisfies Phase 1 and build nothing — then 087–094 construction; 091 ⛔ knowledge-ledger gate and last in the order, 094 ⏸ adoption-gated). Bolt 050 remains unallocated by design (no directory exists).
+- **Last updated**: 2026-09-03
+- **Last index change**: 2026-09-03 (reconciliation of intent 035 with the review loop) — intent 035 re-scoped in place — the bug-hunting engine exists as the review loop under `reviews/`, so of its 43 briefs 12 are satisfied (marked below), 31 remain (16 missing + 15 partial). Bolts 085/086 removed (satisfied, and a bolt is never marked `complete` without a discovery pass); 8 bolts remain, 087–094, re-ordered per the owner ruling written up in `docs/agent-systems/integration-contract.md` §7. No story listings added, removed or renumbered. (Amended 2026-09-03: 085/086 restored as verification bolts — planned, run first, they confirm the equivalence claim over the seven Phase 1 stories and build nothing; ten bolts are scheduled, not eight — 085/086 plus 087–094.)
+- **Last index change (prior)**: 2026-06-10 (added tooling intent 035 bug-hunter-agent-system → 6 units, 42 stories, bolts 085–094 — all status PLANNED / ✅ GENERATED. Builds the bug-hunting agent system from `docs/agent-systems/bug-hunter-build-guide.md`: 5 additive phases + optional tier, 6-slot pipeline (Map→Hunt→Verify→Triage→Report→Learn), read-only on app source. ⚠️ Construction mandate: every component built with the **skill-creator** skill per the guide's build loop. Order: 085→086→087→088→(089 ∥ 090)→091 ⛔(knowledge-ledger gate)→092→093; 094 ⏸ adoption-gated. Note: an earlier same-day inception misread the subject (specsmd-skills port, bolts 085–087) — deleted and replaced by this intent.) **(superseded by the 2026-09-03 re-scope above.)**
+- **Last index change (prior 2)**: 2026-06-05 (added research-only intent 034 EU-expansion-architecture-study → 3 units, 10 stories, bolts 076–084 — all status PLANNED / ✅ GENERATED. Spike-bolts; zero production code. Source: eu-expansion-research-brief-2026-06-05. Owner Checkpoint-1 decisions: compare both tiers · one brand EU-wide · ship from Romania · local currencies.)
+- **Last index change (prior 3)**: 2026-06-05 (added roadmap Phase 3–4 intents 032–033 → 6 units, 25 stories, bolts 070–075 — all status PLANNED / ✅ GENERATED. Source: ai-workflow-review-2026-06-05 §6. 032 builds on bolts 066+062; 033 is infrastructure-readiness only, NOT deployment.)
+- **Roadmap Phase 3–4 intents planned**: 032 (regression + comprehensive e2e — Phase 3 stabilize; builds on bolts 066 + 062), 033 (environment triad — Phase 4 infrastructure readiness only, NOT deployment).
+- **Roadmap Phase 3–4 bolts planned**: 070–075 (6 bolts → 25 stories).
+- **Architect-review (2026-06-03) intents planned**: 025 (security/dependency hygiene), 026 (observability/manifest), 027 (architectural layering), 028 (test architecture), 029 (decomposition/hardening), 030 (UI scaling/e2e), 031 (refund/return). P20 coupon → existing 022 (not re-added).
+- **Architect-review bolts planned**: 054–069 (16 bolts → 44 stories)
+- **Last index change (prior 4)**: 2026-06-05 (added architect-review-2026-06-03 intents 025–031 → 16 units, 44 stories, bolts 054–069 — all status PLANNED / ✅ GENERATED)
+- **Last index change (prior 5)**: 2026-06-02 (drift repair — see notes below)
 - **Note**: intent 024 (order-photo archive) shipped 2026-05-30 → 2026-06-01 (bolts 051, 052, 053). Intent 015 (Sameday shipping integration) shipped 2026-06-02 (bolts 036, 037). Story 019-003 superseded → backfill done via intent 024 bolt 051. Bolt 050 is unallocated (no directory exists).
 - **Drift-repair note (2026-06-02)**: prior to this edit, the index undercounted ~51 stories. Flipped from `⬜ NOT STARTED` to `✅ IMPLEMENTED`: all stories under intents 004, 010, 012, 015, 023. Added sections for intents 005–009 + 011 which were missing from the index entirely.
 
@@ -670,7 +680,7 @@
 
 ---
 
-> Intents 013–022 generated from `docs/architecture-analysis-2026-05-25.md`.
+> Intents 013–022 generated from `docs/analysis/architect-review-2026-05-25.md`.
 > Total new stories: 51 · New bolts: 033–048 · Last updated: 2026-05-25T10:50:00Z
 
 ### 013-upload-cleanup-fix
@@ -1142,3 +1152,883 @@
 **Priority**: Must
 **Path**: `intents/024-order-photo-archive/units/003-order-history-photos/stories/002-order-detail-photo-grid.md`
 **Bolt**: 053
+
+---
+
+## Architect Review 2026-06-03 — Improvement Intents (025–031)
+
+> Source: `docs/analysis/architect-review-2026-06-03.md`. All PLANNED / ✅ GENERATED (inception artifacts created; not yet implemented). P20 (coupon) → existing intent 022.
+
+### 025-security-dependency-hygiene
+
+#### Unit: 001-dependency-and-boot-hardening (4 stories) — Bolt: 054
+
+### 001-patch-otel-cve.md ✅ GENERATED
+**Title**: Patch OpenTelemetry CVE (GHSA-4625-4j76-fww9) — P01
+**Priority**: Must
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/001-patch-otel-cve.md`
+**Bolt**: 054
+
+### 002-central-package-management.md ✅ GENERATED
+**Title**: Stripe.net unify + Central Package Management — P02
+**Priority**: Must
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/002-central-package-management.md`
+**Bolt**: 054
+
+### 003-renovate-config.md ✅ GENERATED
+**Title**: Renovate grouped upgrade PRs — P03
+**Priority**: Should
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/003-renovate-config.md`
+**Bolt**: 054
+
+### 004-forwarded-headers-metrics.md ✅ GENERATED
+**Title**: ForwardedHeadersMiddleware for /metrics allow-list — P05
+**Priority**: Must
+**Path**: `intents/025-security-dependency-hygiene/units/001-dependency-and-boot-hardening/stories/004-forwarded-headers-metrics.md`
+**Bolt**: 054
+
+---
+
+### 026-observability-boot-manifest
+
+#### Unit: 001-boot-composition-and-flags (2 stories) — Bolt: 055
+
+### 001-program-subsystem-extensions.md ✅ GENERATED
+**Title**: Program.cs subsystem extension methods — P07
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/001-boot-composition-and-flags/stories/001-program-subsystem-extensions.md`
+**Bolt**: 055
+
+### 002-typed-feature-gate.md ✅ GENERATED
+**Title**: Typed IFeatureGate registry — P10
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/001-boot-composition-and-flags/stories/002-typed-feature-gate.md`
+**Bolt**: 055
+
+#### Unit: 002-system-manifest-and-liveness (3 stories) — Bolt: 056
+
+### 001-system-info-endpoint.md ✅ GENERATED
+**Title**: /api/admin/system-info manifest — P04
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/002-system-manifest-and-liveness/stories/001-system-info-endpoint.md`
+**Bolt**: 056
+
+### 002-background-job-liveness-check.md ✅ GENERATED
+**Title**: Heartbeat + background-job liveness health check — P17
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/002-system-manifest-and-liveness/stories/002-background-job-liveness-check.md`
+**Bolt**: 056
+
+### 003-anaf-invoice-metrics-and-slo.md ✅ GENERATED
+**Title**: invoice_upload metrics + ANAF SLO — P17
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/002-system-manifest-and-liveness/stories/003-anaf-invoice-metrics-and-slo.md`
+**Bolt**: 056
+
+#### Unit: 003-architecture-and-standards-docs (3 stories) — Bolt: 057
+
+### 001-multi-replica-readiness-doc.md ✅ GENERATED
+**Title**: Multi-replica-readiness consolidation doc — P12
+**Priority**: Could
+**Path**: `intents/026-observability-boot-manifest/units/003-architecture-and-standards-docs/stories/001-multi-replica-readiness-doc.md`
+**Bolt**: 057
+
+### 002-refresh-tech-stack-and-known-failures.md ✅ GENERATED
+**Title**: Refresh tech-stack.md + KNOWN_FAILURES.md — P19
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/003-architecture-and-standards-docs/stories/002-refresh-tech-stack-and-known-failures.md`
+**Bolt**: 057
+
+### 003-architecture-audit-checklist.md ✅ GENERATED
+**Title**: Quarterly architecture audit checklist — P19
+**Priority**: Must
+**Path**: `intents/026-observability-boot-manifest/units/003-architecture-and-standards-docs/stories/003-architecture-audit-checklist.md`
+**Bolt**: 057
+
+#### Unit: 004-observability-boot-manifest-ui (1 story) — Bolt: 058
+
+### 001-admin-system-info-tab.md ✅ GENERATED
+**Title**: Admin System tab rendering the manifest — P04 (UI)
+**Priority**: Should
+**Path**: `intents/026-observability-boot-manifest/units/004-observability-boot-manifest-ui/stories/001-admin-system-info-tab.md`
+**Bolt**: 058
+
+---
+
+### 027-architectural-layering
+
+#### Unit: 001-layering-foundation (5 stories) — Bolt: 059
+
+### 001-no-split-adr.md ✅ GENERATED
+**Title**: No four-project clean-arch split ADR — P22
+**Priority**: Could
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/001-no-split-adr.md`
+**Bolt**: 059
+
+### 002-domain-layer-extraction.md ✅ GENERATED
+**Title**: Domain/ layer extraction — P21 (folds P16)
+**Priority**: Could
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/002-domain-layer-extraction.md`
+**Bolt**: 059
+
+### 003-infrastructure-layer.md ✅ GENERATED
+**Title**: Infrastructure/ layer — P21
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/003-infrastructure-layer.md`
+**Bolt**: 059
+
+### 004-web-layer.md ✅ GENERATED
+**Title**: Web/ presentation layer — P21
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/004-web-layer.md`
+**Bolt**: 059
+
+### 005-application-feature-promotion.md ✅ GENERATED
+**Title**: Application/<Feature>/ promotion — P21 (folds P06)
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/001-layering-foundation/stories/005-application-feature-promotion.md`
+**Bolt**: 059
+
+#### Unit: 002-conventions-and-policy (2 stories) — Bolt: 060
+
+### 001-abstractions-subfolders.md ✅ GENERATED
+**Title**: Abstractions/ subfolder per feature — P23
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/002-conventions-and-policy/stories/001-abstractions-subfolders.md`
+**Bolt**: 060
+
+### 002-no-repository-policy-and-analyzer.md ✅ GENERATED
+**Title**: No-repository policy + IQueryable analyzer — P24
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/002-conventions-and-policy/stories/002-no-repository-policy-and-analyzer.md`
+**Bolt**: 060
+
+#### Unit: 003-handler-pattern (4 stories) — Bolt: 061
+
+### 001-command-handler-abstractions.md ✅ GENERATED
+**Title**: ICommandHandler/IEventDispatcher abstractions — P25
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/001-command-handler-abstractions.md`
+**Bolt**: 061
+
+### 002-create-order-handler.md ✅ GENERATED
+**Title**: CreateOrderHandler (extract CreateFromCartAsync) — P25
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/002-create-order-handler.md`
+**Bolt**: 061
+
+### 003-order-paid-event-dispatcher.md ✅ GENERATED
+**Title**: OrderPaidEventDispatcher — P25 (folds P11)
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/003-order-paid-event-dispatcher.md`
+**Bolt**: 061
+
+### 004-retry-and-promote-handlers.md ✅ GENERATED
+**Title**: Retry-invoice + promote-photos handlers — P25
+**Priority**: Should
+**Path**: `intents/027-architectural-layering/units/003-handler-pattern/stories/004-retry-and-promote-handlers.md`
+**Bolt**: 061
+
+---
+
+### 028-test-architecture
+
+#### Unit: 001-test-infrastructure (4 stories) — Bolt: 062
+
+### 001-timeprovider-adoption.md ✅ GENERATED
+**Title**: Adopt TimeProvider across older services — P28
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/001-timeprovider-adoption.md`
+**Bolt**: 062
+
+### 002-shared-test-application-factory.md ✅ GENERATED
+**Title**: Shared PhotoPrintTestApplicationFactory base — P27
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/002-shared-test-application-factory.md`
+**Bolt**: 062
+
+### 003-test-builders.md ✅ GENERATED
+**Title**: Fluent test data Builders — P27
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/003-test-builders.md`
+**Bolt**: 062
+
+### 004-reclassify-misnamed-unit-tests.md ✅ GENERATED
+**Title**: Reclassify DbContext "unit" tests to Integration — P27
+**Priority**: Should
+**Path**: `intents/028-test-architecture/units/001-test-infrastructure/stories/004-reclassify-misnamed-unit-tests.md`
+**Bolt**: 062
+
+---
+
+### 029-decomposition-and-hardening
+
+#### Unit: 001-access-hardening (2 stories) — Bolt: 063
+
+### 001-global-rate-limit.md ✅ GENERATED
+**Title**: Global per-IP rate limit — P08
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/001-access-hardening/stories/001-global-rate-limit.md`
+**Bolt**: 063
+
+### 002-admin-policy-constant.md ✅ GENERATED
+**Title**: Policies.Admin constant — P08
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/001-access-hardening/stories/002-admin-policy-constant.md`
+**Bolt**: 063
+
+#### Unit: 002-service-decomposition (2 stories) — Bolt: 064
+
+### 001-decompose-auth-service.md ✅ GENERATED
+**Title**: Split AuthService into 3 services — P13
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/002-service-decomposition/stories/001-decompose-auth-service.md`
+**Bolt**: 064
+
+### 002-thin-webhooks-and-order-photo-query.md ✅ GENERATED
+**Title**: OrderPhotoQueryService + thin WebhooksController — P14
+**Priority**: Should
+**Path**: `intents/029-decomposition-and-hardening/units/002-service-decomposition/stories/002-thin-webhooks-and-order-photo-query.md`
+**Bolt**: 064
+
+#### Unit: 003-persistence-config (1 story) — Bolt: 065
+
+### 001-per-entity-configurations.md ✅ GENERATED
+**Title**: Per-entity IEntityTypeConfiguration<T> — P15
+**Priority**: Could
+**Path**: `intents/029-decomposition-and-hardening/units/003-persistence-config/stories/001-per-entity-configurations.md`
+**Bolt**: 065
+
+---
+
+### 030-ui-scaling-and-e2e
+
+#### Unit: 001-ci-quality-gates (2 stories) — Bolt: 066
+
+### 001-bundle-size-budget.md ✅ GENERATED
+**Title**: CI bundle-size budget — P18
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/001-ci-quality-gates/stories/001-bundle-size-budget.md`
+**Bolt**: 066
+
+### 002-playwright-e2e-smoke-tests.md ✅ GENERATED
+**Title**: 3 Playwright e2e smoke tests — P18
+**Priority**: Must
+**Path**: `intents/030-ui-scaling-and-e2e/units/001-ci-quality-gates/stories/002-playwright-e2e-smoke-tests.md`
+**Bolt**: 066
+
+#### Unit: 002-ui-scaling-and-e2e-ui (4 stories) — Bolt: 067
+
+### 001-base-api-service.md ✅ GENERATED
+**Title**: Shared BaseApiService — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/001-base-api-service.md`
+**Bolt**: 067
+
+### 002-home-page-breakup.md ✅ GENERATED
+**Title**: Break up home-page.ts (951 LOC) — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/002-home-page-breakup.md`
+**Bolt**: 067
+
+### 003-account-pages-breakup.md ✅ GENERATED
+**Title**: Break up saved-addresses + profile pages — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/003-account-pages-breakup.md`
+**Bolt**: 067
+
+### 004-delivery-step-locker-selector.md ✅ GENERATED
+**Title**: Extract locker-selector from delivery-step — P26
+**Priority**: Should
+**Path**: `intents/030-ui-scaling-and-e2e/units/002-ui-scaling-and-e2e-ui/stories/004-delivery-step-locker-selector.md`
+**Bolt**: 067
+
+---
+
+### 031-refund-return-flow
+
+#### Unit: 001-refund-domain-and-api (4 stories) — Bolt: 068
+
+### 001-refund-schema-and-status.md ✅ GENERATED
+**Title**: Refund schema + OrderStatus.Refunded — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/001-refund-schema-and-status.md`
+**Bolt**: 068
+
+### 002-refund-service-stripe-euplatesc.md ✅ GENERATED
+**Title**: Refund service (full/partial, Stripe + EuPlatesc) — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/002-refund-service-stripe-euplatesc.md`
+**Bolt**: 068
+
+### 003-anaf-credit-note.md ✅ GENERATED
+**Title**: ANAF credit-note (UBL type 381) — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/003-anaf-credit-note.md`
+**Bolt**: 068
+
+### 004-admin-refund-endpoint.md ✅ GENERATED
+**Title**: Admin refund endpoint — P09
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/001-refund-domain-and-api/stories/004-admin-refund-endpoint.md`
+**Bolt**: 068
+
+#### Unit: 002-refund-return-flow-ui (1 story) — Bolt: 069
+
+### 001-admin-refund-action.md ✅ GENERATED
+**Title**: Admin refund action + modal — P09 (UI)
+**Priority**: Must
+**Path**: `intents/031-refund-return-flow/units/002-refund-return-flow-ui/stories/001-admin-refund-action.md`
+**Bolt**: 069
+
+---
+
+## Roadmap Phase 3–4 — Stabilization & Environment Triad Intents (032–033)
+
+> Source: `docs/analysis/ai-workflow-review-2026-06-05.md` §6 (owner's roadmap). All PLANNED / ✅ GENERATED (inception artifacts created; not yet implemented). New bolts: 070–075 (bolt 050 remains unallocated by design). Intent 032 = Phase 3 (stabilize); intent 033 = Phase 4 (environment triad — infrastructure readiness only, NOT deployment).
+
+### 032-regression-and-e2e-stabilization
+
+> Phase 3. Builds on bolt 066 (Playwright foundation) + bolt 062 (Builders) — extends, does not re-plan. Coupon (047/048) and refund (068/069) e2e journeys authored but gated (`test.fixme`) until those features ship.
+
+#### Unit: 001-e2e-data-strategy (4 stories) — Bolt: 070
+
+### 001-e2e-data-contract.md ✅ GENERATED
+**Title**: Documented deterministic e2e data contract
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/001-e2e-data-contract.md`
+**Bolt**: 070
+
+### 002-builder-backed-fixtures.md ✅ GENERATED
+**Title**: Builder-backed Playwright fixtures (guest/user/admin)
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/002-builder-backed-fixtures.md`
+**Bolt**: 070
+
+### 003-payment-testmode-fixtures.md ✅ GENERATED
+**Title**: Stripe + EuPlatesc test-mode fixtures
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/003-payment-testmode-fixtures.md`
+**Bolt**: 070
+
+### 004-real-postgres-e2e-boot.md ✅ GENERATED
+**Title**: Real-Postgres docker-compose e2e boot
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/001-e2e-data-strategy/stories/004-real-postgres-e2e-boot.md`
+**Bolt**: 070
+
+#### Unit: 002-e2e-journey-coverage (8 stories) — Bolt: 071
+
+### 001-guest-and-registered-checkout.md ✅ GENERATED
+**Title**: Guest + registered checkout journeys (+ decline branch)
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/001-guest-and-registered-checkout.md`
+**Bolt**: 071
+
+### 002-authentication-journeys.md ✅ GENERATED
+**Title**: Email / Google (mocked) / guest-claim auth journeys
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/002-authentication-journeys.md`
+**Bolt**: 071
+
+### 003-uploads-cart-and-merge.md ✅ GENERATED
+**Title**: Uploads, cart edits, guest→user cart merge
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/003-uploads-cart-and-merge.md`
+**Bolt**: 071
+
+### 004-payments-journeys.md ✅ GENERATED
+**Title**: Stripe + EuPlatesc test-mode payment journeys
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/004-payments-journeys.md`
+**Bolt**: 071
+
+### 005-orders-and-account-journeys.md ✅ GENERATED
+**Title**: Order history/detail (+ ownership) + account management
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/005-orders-and-account-journeys.md`
+**Bolt**: 071
+
+### 006-admin-journeys.md ✅ GENERATED
+**Title**: Admin order/product/invoice journeys
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/006-admin-journeys.md`
+**Bolt**: 071
+
+### 007-gated-coupon-refund-journeys.md ✅ GENERATED
+**Title**: Gated coupon + refund journeys (requires 047/048 + 068/069)
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/007-gated-coupon-refund-journeys.md`
+**Bolt**: 071
+
+### 008-e2e-ci-tiers-and-stability.md ✅ GENERATED
+**Title**: CI fast/full tiers, retries, artifacts, flake controls
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/002-e2e-journey-coverage/stories/008-e2e-ci-tiers-and-stability.md`
+**Bolt**: 071
+
+#### Unit: 003-regression-methodology (3 stories) — Bolt: 072
+
+### 001-regression-checklist.md ✅ GENERATED
+**Title**: Regression checklist mapped to shipped intents
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/003-regression-methodology/stories/001-regression-checklist.md`
+**Bolt**: 072
+
+### 002-execute-regression-baseline.md ✅ GENERATED
+**Title**: Execute + record one dated regression baseline
+**Priority**: Must
+**Path**: `intents/032-regression-and-e2e-stabilization/units/003-regression-methodology/stories/002-execute-regression-baseline.md`
+**Bolt**: 072
+
+### 003-triage-findings-to-backlog.md ✅ GENERATED
+**Title**: Triage findings into backlog / KNOWN_FAILURES
+**Priority**: Should
+**Path**: `intents/032-regression-and-e2e-stabilization/units/003-regression-methodology/stories/003-triage-findings-to-backlog.md`
+**Bolt**: 072
+
+---
+
+### 033-environment-triad
+
+> Phase 4 — **infrastructure readiness only, NOT deployment** (deployment is roadmap Phase 6). Adds a third deployable-dev tier alongside the existing local + prod compose/appsettings assets; builds from them, leaving prod behaviour unchanged. No external bolt dependencies.
+
+#### Unit: 001-config-tiers-and-compose (4 stories) — Bolt: 073
+
+### 001-define-dev-env-tier.md ✅ GENERATED
+**Title**: Define the dev-env ASPNETCORE_ENVIRONMENT + layered appsettings
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/001-define-dev-env-tier.md`
+**Bolt**: 073
+
+### 002-dev-env-compose-file.md ✅ GENERATED
+**Title**: docker-compose.dev-env.yml (standalone; prod untouched)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/002-dev-env-compose-file.md`
+**Bolt**: 073
+
+### 003-three-tier-config-map.md ✅ GENERATED
+**Title**: Per-setting config map across local / dev-env / prod
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/003-three-tier-config-map.md`
+**Bolt**: 073
+
+### 004-boot-validation-parity.md ✅ GENERATED
+**Title**: ValidateOnStart parity for the dev-env tier (loud-fail, no fallback)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/001-config-tiers-and-compose/stories/004-boot-validation-parity.md`
+**Bolt**: 073
+
+#### Unit: 002-secrets-and-seeding (4 stories) — Bolt: 074
+
+### 001-secrets-tier-matrix.md ✅ GENERATED
+**Title**: Secrets × tier matrix (test vs live, storage location)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/001-secrets-tier-matrix.md`
+**Bolt**: 074
+
+### 002-dev-env-secrets-template.md ✅ GENERATED
+**Title**: .env.dev-env.example template (test-mode placeholders)
+**Priority**: Must
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/002-dev-env-secrets-template.md`
+**Bolt**: 074
+
+### 003-seeding-policy-and-selector.md ✅ GENERATED
+**Title**: Per-environment seeding policy + selector (reuse existing seeders)
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/003-seeding-policy-and-selector.md`
+**Bolt**: 074
+
+### 004-prod-demo-data-guard.md ✅ GENERATED
+**Title**: Guard — DevDataSeed cannot run in Production
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/002-secrets-and-seeding/stories/004-prod-demo-data-guard.md`
+**Bolt**: 074
+
+#### Unit: 003-promotion-readiness (2 stories) — Bolt: 075
+
+### 001-promotion-path-runbook.md ✅ GENERATED
+**Title**: dev→prod promotion runbook (readiness documentation)
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/003-promotion-readiness/stories/001-promotion-path-runbook.md`
+**Bolt**: 075
+
+### 002-deployment-deferral-note.md ✅ GENERATED
+**Title**: Explicit Phase-6 deployment-deferral note
+**Priority**: Should
+**Path**: `intents/033-environment-triad/units/003-promotion-readiness/stories/002-deployment-deferral-note.md`
+**Bolt**: 075
+
+---
+
+### 034-eu-expansion-architecture-study
+
+> **Research-only intent (roadmap Phase 5 prep).** Spike-bolts; zero production code, no
+> translations, no deployment. Source feed: `docs/planning/eu-expansion-research-brief-2026-06-05.md`.
+> Owner decisions (Checkpoint 1, 2026-06-05): compare both market tiers · one brand EU-wide ·
+> ship from Romania · local currencies.
+
+#### Unit: 001-research-tracks (7 stories) — Bolts: 076–082
+
+### 001-t1-fulfillment-logistics.md ✅ GENERATED
+**Title**: T1 — Fulfillment & logistics (RO-ship validation, per-corridor cost/time)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/001-t1-fulfillment-logistics.md`
+**Bolt**: 076
+
+### 002-t2-site-url-architecture.md ✅ GENERATED
+**Title**: T2 — Site & URL architecture (one brand; tied to intent 033 triad)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/002-t2-site-url-architecture.md`
+**Bolt**: 077
+
+### 003-t3-frontend-i18n.md ✅ GENERATED
+**Title**: T3 — Frontend i18n (Angular 21: built-in vs runtime)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/003-t3-frontend-i18n.md`
+**Bolt**: 078
+
+### 004-t4-backend-localization.md ✅ GENERATED
+**Title**: T4 — Backend localization (.NET; deferred-culture trap)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/004-t4-backend-localization.md`
+**Bolt**: 079
+
+### 005-t5-tax-invoicing-compliance.md ✅ GENERATED
+**Title**: T5 — Tax, invoicing & compliance (OSS VAT, multi-currency, both tiers)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/005-t5-tax-invoicing-compliance.md`
+**Bolt**: 080
+
+### 006-t6-payments-checkout.md ✅ GENERATED
+**Title**: T6 — Payments & checkout (Stripe local methods, multi-currency)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/006-t6-payments-checkout.md`
+**Bolt**: 081
+
+### 007-t7-codebase-seam-audit.md ✅ GENERATED
+**Title**: T7 — Codebase seam audit (repo-bound; counts + top-10)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/001-research-tracks/stories/007-t7-codebase-seam-audit.md`
+**Bolt**: 082
+
+#### Unit: 002-synthesis-and-decision (2 stories) — Bolt: 083
+
+### 001-synthesis-options-paper.md ✅ GENERATED
+**Title**: Synthesize findings → options paper (D2)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/002-synthesis-and-decision/stories/001-synthesis-options-paper.md`
+**Bolt**: 083
+
+### 002-owner-decision-adr.md ✅ GENERATED
+**Title**: ⛔ Owner decision → ADR (D3)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/002-synthesis-and-decision/stories/002-owner-decision-adr.md`
+**Bolt**: 083
+
+#### Unit: 003-implementation-briefs (1 story) — Bolt: 084
+
+### 001-author-implementation-briefs.md ✅ GENERATED
+**Title**: Author implementation brief(s) from the ADR (D4)
+**Priority**: Must
+**Path**: `intents/034-eu-expansion-architecture-study/units/003-implementation-briefs/stories/001-author-implementation-briefs.md`
+**Bolt**: 084
+
+---
+
+### 035-bug-hunter-agent-system
+
+> **Tooling-only intent.** Builds the bug-hunting agent system from
+> `docs/agent-systems/bug-hunter-build-guide.md` (spec of record): 43 briefs across 5 additive
+> phases + an optional tier (31b added in v3.3, review H1) — a permanent 6-slot pipeline
+> (Map→Hunt→Verify→Triage→
+> Report→Learn), agents-as-skills, **read-only on application source**, outputs under
+> `bug-hunting/` (amended 2026-09: the pre-merge mode's outputs live under `reviews/**`;
+> `bug-hunting/**` is reserved for the standing-sweep mode — requirements D3).
+> ⚠️ **Construction mandate: every component MUST be built with the
+> skill-creator skill** (`Skill` tool → `skill-creator:skill-creator`) — paste the
+> story's Prompt N, build, run its test prompts, fix, then next, in master order.
+> Order: 087→088→(089 ∥ 090)→092→093→091 ⛔(needs knowledge-ledger `ledger-query`; last); 094 ⏸ on adoption.
+>
+> **Re-scoped 2026-09 (reconciliation).** The engine described above is built — it is the
+> review loop under `reviews/` (pre-merge mode). Of the 43 briefs, **12 are satisfied** by it
+> (marked below), **31 remain**: 16 missing + 15 partial. Bolts 085/086 verify the seven Phase 1
+> stories — six of the twelve satisfied briefs; the other six (orchestrator wiring 11b,
+> security-auditor, concurrency-auditor, bug-lifecycle, fix-verification, mailbox scan 31b) are
+> verified in the plan stage of the construction bolt that carries them. 085/086 are
+> **verification bolts**, `planned`, run first, and build nothing. **8 construction bolts
+> (087–094) follow**, in the order ruled by the owner
+> (`docs/agent-systems/integration-contract.md` §7). Status of every brief: the guide's
+> "Implementation status (2026-09)" table. The construction mandate now reads: a piece that
+> extends the review loop is built as a script or skill in that tree at the seam its story
+> names; skill-creator stays for a new standalone skill.
+
+#### Unit: 001-phase-1-skeleton (7 stories) — Bolts: 085, 086 (verification — confirm the review loop satisfies these stories)
+
+### 001-ledger-io.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `ledger-io` — concurrency-safe shared ledger R/W, correlation_id (Prompt 1)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/001-ledger-io.md`
+**Bolt**: 085-phase-1-skeleton-core (verification)
+
+### 002-bug-documentation.md ✅ GENERATED
+**Title**: `bug-documentation` — canonical 3-audience bug record, contract-sourced expected_behavior (Prompt 2)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/002-bug-documentation.md`
+**Bolt**: 085-phase-1-skeleton-core (verification)
+
+### 003-deduplication.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `deduplication` — new/duplicate/dismissed/suppressed verdicts (Prompt 3)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/003-deduplication.md`
+**Bolt**: 085-phase-1-skeleton-core (verification)
+
+### 004-report-rendering.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `report-rendering` — per-run Markdown report with reporting floor (Prompt 4)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/004-report-rendering.md`
+**Bolt**: 085-phase-1-skeleton-core (verification)
+
+### 005-triage-intake.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `triage-intake` — human decisions front door, reason-required dismissals (Prompt 5)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/005-triage-intake.md`
+**Bolt**: 085-phase-1-skeleton-core (verification)
+
+### 006-general-hunter.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `general-hunter` — combined top-down + file-sweep hunting agent (Prompt 6)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/006-general-hunter.md`
+**Bolt**: 086-phase-1-skeleton-agents (verification)
+
+### 007-orchestrator-skeleton.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `orchestrator` — 6-slot coordinator; Phase-1 output labeled unverified (Prompt 7)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/001-phase-1-skeleton/stories/007-orchestrator-skeleton.md`
+**Bolt**: 086-phase-1-skeleton-agents (verification)
+
+#### Unit: 002-phase-2-trust (5 stories) — Bolt: 087
+
+### 001-severity-scoring.md ✅ GENERATED
+**Title**: `severity-scoring` — severity × confidence → 0–100 risk (Prompt 8)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/001-severity-scoring.md`
+**Bolt**: 087
+
+### 002-tool-ingest.md ✅ GENERATED
+**Title**: `tool-ingest` — deterministic tool findings → normalized candidates (Prompt 9)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/002-tool-ingest.md`
+**Bolt**: 087
+
+### 003-bug-verifier.md ✅ GENERATED
+**Title**: `bug-verifier` — hardened Verify gate: disprove-first, sandbox+commit check, flaky double-run (Prompt 10)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/003-bug-verifier.md`
+**Bolt**: 087
+
+### 004-git-revision-tracking.md ✅ GENERATED
+**Title**: `git-revision-tracking` — commit pinning + fixed/moved reconciliation (Prompt 11)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/004-git-revision-tracking.md`
+**Bolt**: 087
+
+### 005-orchestrator-verify-wiring.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: orchestrator extension — Verify→Verifier, Triage→scoring, SHA open/close (Prompt 11b)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/002-phase-2-trust/stories/005-orchestrator-verify-wiring.md`
+**Bolt**: 087
+
+#### Unit: 003-phase-3-breadth-and-scale (17 stories) — Bolts: 088, 089 ∥ 090, 091 ⛔ (oracle, last)
+
+### 001-app-mapping.md ✅ GENERATED
+**Title**: `app-mapping` — entry points, flows, risk classes; diff on refresh (Prompt 12)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/001-app-mapping.md`
+**Bolt**: 088
+
+### 002-code-index.md ✅ GENERATED
+**Title**: `code-index` — symbol/reference index + slice retrieval, incremental (Prompt 13)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/002-code-index.md`
+**Bolt**: 088
+
+### 003-reachability.md ✅ GENERATED
+**Title**: `reachability` — entry-point tracing; framework-aware unknown weight (Prompt 14)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/003-reachability.md`
+**Bolt**: 088
+
+### 004-severity-scoring-reachability-ext.md ✅ GENERATED
+**Title**: severity-scoring extension — risk = severity × confidence × reachability (Prompt 14b)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/004-severity-scoring-reachability-ext.md`
+**Bolt**: 088
+
+### 005-flow-tracing.md ✅ GENERATED
+**Title**: `flow-tracing` — walk one flow, inspect every handoff (Prompt 15)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/005-flow-tracing.md`
+**Bolt**: 088
+
+### 006-taint-analysis.md ✅ GENERATED
+**Title**: `taint-analysis` — source→sink tracking with sanitizer awareness (Prompt 16)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/006-taint-analysis.md`
+**Bolt**: 089
+
+### 007-flow-tracer-agent.md ✅ GENERATED
+**Title**: `flow-tracer-agent` — top-down hunt over priority flows (Prompt 17)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/007-flow-tracer-agent.md`
+**Bolt**: 089
+
+### 008-file-sweeper-agent.md ✅ GENERATED
+**Title**: `file-sweeper-agent` — bottom-up sweep, deterministic tools first (Prompt 18)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/008-file-sweeper-agent.md`
+**Bolt**: 089
+
+### 009-security-auditor-agent.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `security-auditor-agent` — taint + authn/authz + secrets + vuln classes (Prompt 19)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/009-security-auditor-agent.md`
+**Bolt**: 089
+
+### 010-dependency-audit-agent.md ✅ GENERATED
+**Title**: `dependency-audit-agent` — manifests/lockfiles vs live advisories, CVEs (Prompt 20)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/010-dependency-audit-agent.md`
+**Bolt**: 090
+
+### 011-config-auditor-agent.md ✅ GENERATED
+**Title**: `config-auditor-agent` — config/infra bug class (compose, CI, env, IaC) (Prompt 21)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/011-config-auditor-agent.md`
+**Bolt**: 090
+
+### 012-concurrency-auditor-agent.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `concurrency-auditor-agent` — races/deadlocks/TOCTOU (conditional; async-heavy stack) (Prompt 22)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/012-concurrency-auditor-agent.md`
+**Bolt**: 090
+
+### 013-root-cause-clustering.md ✅ GENERATED
+**Title**: `root-cause-clustering` — N symptoms → 1 multi-location bug, conservative (Prompt 23)
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/013-root-cause-clustering.md`
+**Bolt**: 090
+
+### 014-intent-lookup.md ✅ GENERATED
+**Title**: `intent-lookup` — oracle read of knowledge-ledger contracts (Prompt 24) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/014-intent-lookup.md`
+**Bolt**: 091
+
+### 015-hunters-contract-ext.md ✅ GENERATED
+**Title**: hunters extension — surface contract-contradiction candidates (Prompt 24b) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/015-hunters-contract-ext.md`
+**Bolt**: 091
+
+### 016-verifier-scoring-contract-ext.md ✅ GENERATED
+**Title**: verifier+scoring extension — contract-corroborated confidence, intent-unconfirmed tag (Prompt 24c) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/016-verifier-scoring-contract-ext.md`
+**Bolt**: 091
+
+### 017-orchestrator-scale-ext.md ✅ GENERATED
+**Title**: orchestrator extension — specialists dispatch, budget, incremental, cheap-first, oracle (Prompt 24d) ⛔ ext-dep
+**Priority**: Must
+**Path**: `intents/035-bug-hunter-agent-system/units/003-phase-3-breadth-and-scale/stories/017-orchestrator-scale-ext.md`
+**Bolt**: 091
+
+#### Unit: 004-phase-4-learn-and-measure (6 stories) — Bolt: 092
+
+### 001-suppression-learning.md ✅ GENERATED · superseded 2026-09 (decision attachment)
+**Title**: `suppression-learning` — dismissal reasons → validated, proposed-only patterns (Prompt 25)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/001-suppression-learning.md`
+**Bolt**: 092
+
+### 002-bug-lifecycle.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `bug-lifecycle` — status machine, evidence-based self-close, regression flags (Prompt 26)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/002-bug-lifecycle.md`
+**Bolt**: 092
+
+### 003-eval-corpus.md ✅ GENERATED
+**Title**: `eval-corpus` — labeled real + seeded synthetic ground truth, hit matcher (Prompt 27)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/003-eval-corpus.md`
+**Bolt**: 092
+
+### 004-eval-metrics.md ✅ GENERATED
+**Title**: `eval-metrics` — recall vs seeded corpus, precision via dismissals, trends (Prompt 28)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/004-eval-metrics.md`
+**Bolt**: 092
+
+### 005-curator-agent.md ✅ GENERATED
+**Title**: `curator-agent` — Learn/Reconcile/Measure/Summarize, fills the Learn slot (Prompt 29)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/005-curator-agent.md`
+**Bolt**: 092
+
+### 006-orchestrator-learn-ext.md ✅ GENERATED
+**Title**: orchestrator extension — Learn slot → Curator at run close (Prompt 29b)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/004-phase-4-learn-and-measure/stories/006-orchestrator-learn-ext.md`
+**Bolt**: 092
+
+#### Unit: 005-phase-5-remediation (5 stories) — Bolt: 093
+
+### 001-regression-harvest.md ✅ GENERATED
+**Title**: `regression-harvest` — keep the proving test as a tripwire (owner-approved write) (Prompt 30)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/001-regression-harvest.md`
+**Bolt**: 093
+
+### 002-fix-verification.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: `fix-verification` — the closure GATE; verified-fixed by correlation_id (extends bug-lifecycle) (Prompt 31)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/002-fix-verification.md`
+**Bolt**: 093
+
+### 003-fix-proposal.md ✅ GENERATED
+**Title**: `fix-proposal` — suite-validated draft diffs, never applied (Prompt 32)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/003-fix-proposal.md`
+**Bolt**: 093
+
+### 004-fix-request-emit.md ✅ GENERATED
+**Title**: `fix-request-emit` — idempotent AI-DLC hand-off store, correlation_id-keyed (Prompt 33)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/004-fix-request-emit.md`
+**Bolt**: 093
+
+### 005-orchestrator-remediation-ext.md ✅ GENERATED · claimed satisfied by the review loop (2026-09)
+**Title**: orchestrator extension — run-open fix-request mailbox scan (Prompt 31b, NEW in guide v3.3 / review H1)
+**Priority**: Should
+**Path**: `intents/035-bug-hunter-agent-system/units/005-phase-5-remediation/stories/005-orchestrator-remediation-ext.md`
+**Bolt**: 093
+
+#### Unit: 006-optional-integration (3 stories) — Bolt: 094 ⏸ adoption-gated
+
+### 001-report-rendering-sarif-ext.md ✅ GENERATED
+**Title**: report-rendering extension — SARIF twin with count parity (Optional A)
+**Priority**: Could
+**Path**: `intents/035-bug-hunter-agent-system/units/006-optional-integration/stories/001-report-rendering-sarif-ext.md`
+**Bolt**: 094
+
+### 002-issue-sync.md ✅ GENERATED
+**Title**: `issue-sync` — idempotent tracker tickets following the bug lifecycle (Optional B)
+**Priority**: Could
+**Path**: `intents/035-bug-hunter-agent-system/units/006-optional-integration/stories/002-issue-sync.md`
+**Bolt**: 094
+
+### 003-ci-gate.md ✅ GENERATED
+**Title**: `ci-gate` — baseline-aware pass/fail policy, fails only NEW Critical/High (Optional C)
+**Priority**: Could
+**Path**: `intents/035-bug-hunter-agent-system/units/006-optional-integration/stories/003-ci-gate.md`
+**Bolt**: 094

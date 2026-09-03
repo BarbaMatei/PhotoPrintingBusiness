@@ -3,7 +3,7 @@ id: 030-breadcrumb-component
 unit: 003-global-ui-primitives
 intent: 012-ui-polish
 type: simple-construction-bolt
-status: completed
+status: complete
 priority: P3
 stories:
   - 001-breadcrumb-standalone-component

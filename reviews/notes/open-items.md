@@ -38,3 +38,11 @@ design — depth lives in the archived notes each entry links into.
    holds warm on an idle machine (30–47 s) but not under load (82–103 s); nobody has asked
    for a loaded-machine budget. Context:
    [machinery-restructure-plan.md](archive/machinery-restructure-plan.md).
+
+6. **Post-merge follow-ups from the reconciliation.** Seeded run 2, the planted-bug recall
+   experiment (D7: post-merge, owner-scheduled); a decision record for the standing-sweep
+   mode — the scheduled pass over the whole codebase on `main` (D1); the id-reservation
+   mechanism that stops two passes minting the same `PPW-n` id (D2); the proof rule, under
+   which a 🔴 top-severity finding counts only with a failing test written by someone other
+   than the fixer (D3). Context:
+   [reconciliation-plan-2026-09.md](../../docs/agent-systems/reconciliation-plan-2026-09.md).

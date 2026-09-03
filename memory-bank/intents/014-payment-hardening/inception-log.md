@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Close two production-grade payment vulnerabilities — client-trusted shipping cost and missing payment-intent idempotency.
 **Type**: brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #2 (priority score 23)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #2 (priority score 23)
 **Created**: 2026-05-25T10:05:00Z
 
 ## Artifacts Created

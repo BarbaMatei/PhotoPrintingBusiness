@@ -3,7 +3,7 @@ id: 007-guest-sessions
 unit: 003-guest-sessions
 intent: 002-authentication
 type: ddd-construction-bolt
-status: done
+status: complete
 started: 2026-05-20T15:30:00Z
 completed: 2026-05-20T17:30:00Z
 current_stage: complete

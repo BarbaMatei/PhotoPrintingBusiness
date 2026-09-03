@@ -1,9 +1,9 @@
 ---
 intent: 024-order-photo-archive
 phase: inception
-status: draft
+status: complete
 created: 2026-05-27T13:00:00Z
-updated: 2026-05-27T13:00:00Z
+updated: 2026-06-05T10:30:00Z
 source: conversation 2026-05-27 (promote-on-payment lifecycle decision)
 depends_on: 019-thumbnail-cache-and-cloud-storage
 priority_score: 16

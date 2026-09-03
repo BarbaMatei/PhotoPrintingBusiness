@@ -76,6 +76,6 @@ The bolt nominally `requires_bolts: [040-containers-and-pipelines]` for a `ci.ym
 ### Risks / Notes
 
 - **Pre-commit portability**: `core.hooksPath` + POSIX `sh` hook works on Git for Windows (ships with bash). Avoids Husky (npm) and `pre-commit` (Python) toolchain additions. Documented as a one-time `git config` per clone.
-- **Gitleaks false-positives**: `TestKeys.cs`, `docs/architecture-analysis-2026-05-25.md`, and `memory-bank/intents/018-*/requirements.md` all contain the literal `BEGIN RSA PRIVATE KEY` marker for legitimate reasons. Without the allowlist, the very first scan would fail. The allowlist is essential, not optional.
+- **Gitleaks false-positives**: `TestKeys.cs`, `docs/analysis/architect-review-2026-05-25.md`, and `memory-bank/intents/018-*/requirements.md` all contain the literal `BEGIN RSA PRIVATE KEY` marker for legitimate reasons. Without the allowlist, the very first scan would fail. The allowlist is essential, not optional.
 - **History rewrite is out of automated scope** — decision + runbook only; execution needs separate explicit go-ahead.
 - No application-code behaviour changes beyond the fail-fast message; no tests should regress. Stage 3 verifies build + a hook smoke test + (if network allows) a gitleaks dry run.

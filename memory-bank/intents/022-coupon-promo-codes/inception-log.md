@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Add a coupon / promo-code system: schema, validation, order-time atomic redemption, admin CRUD, and FE integration.
 **Type**: feature / brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #10 (priority score 15)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #10 (priority score 15)
 **Created**: 2026-05-25T10:45:00Z
 
 ## Artifacts Created

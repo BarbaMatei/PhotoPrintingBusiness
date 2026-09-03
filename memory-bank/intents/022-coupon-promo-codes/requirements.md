@@ -1,10 +1,10 @@
 ---
 intent: 022-coupon-promo-codes
 phase: inception
-status: complete
+status: inception-complete
 created: 2026-05-25T10:45:00Z
-updated: 2026-05-25T10:45:00Z
-source: docs/architecture-analysis-2026-05-25.md#10
+updated: 2026-06-05T10:30:00Z
+source: docs/analysis/architect-review-2026-05-25.md#10
 priority_score: 15
 ---
 
@@ -116,3 +116,4 @@ No discount mechanism exists. Marketing-led promotions (first-order discount, "F
 |----------|-------|----------|------------|
 | Q1: Combineable coupons or one-at-a-time? | Product | 2026-08-15 | Recommend one-at-a-time; multi-coupon is a separate intent |
 | Q2: Coupon code format (case-sensitive, length)? | Product | 2026-08-15 | Recommend `[A-Z0-9]{4,20}`, stored uppercase |
+| Q3: Reconcile schema with architect-review 2026-06-03 P20? | Dev/Architect | 2026-08-15 | This intent uses `Order.CouponCode`+`DiscountRon`; P20 proposes `Order.CouponId` FK + UBL `AllowanceCharge` (cbc:ChargeIndicator=false). Recommend keeping the simpler shipped shape; evaluate the UBL AllowanceCharge representation for ANAF correctness during construction. (Raised by 2026-06-03 review; see intent 031 log.) |

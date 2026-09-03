@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Fix `UploadCleanupJob` to skip uploads referenced by cart or order items, eliminating silent customer data loss.
 **Type**: brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #1 (priority score 23)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #1 (priority score 23)
 **Created**: 2026-05-25T10:00:00Z
 
 ## Artifacts Created

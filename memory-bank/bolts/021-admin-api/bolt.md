@@ -3,7 +3,7 @@ id: 021-admin-api
 unit: 001-admin-api
 intent: 007-admin-panel
 type: ddd-construction-bolt
-status: completed
+status: complete
 stories:
   - 001-admin-orders-api
   - 002-admin-stats-api

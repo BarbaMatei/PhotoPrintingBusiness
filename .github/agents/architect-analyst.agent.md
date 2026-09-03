@@ -3,7 +3,7 @@ name: architect-analyst
 description: >
   Senior software architect agent. Scans the entire codebase, infers business
   workflows, identifies missing capabilities and bottlenecks, then proposes
-  10 ranked improvements with concrete implementation plans.
+  20 ranked improvements with concrete implementation plans.
   Trigger this agent when you want a full architecture review or improvement proposals.
 tools:
   - read_file
@@ -57,7 +57,7 @@ Structure your final response exactly like this:
 ### Observability
 ### Missing capabilities
 
-## 10 Improvement proposals
+## 20 Improvement proposals
 [Ranked table + detail for each]
 
 ## Roadmap

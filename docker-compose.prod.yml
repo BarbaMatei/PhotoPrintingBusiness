@@ -31,7 +31,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080;http://+:9090
-      DatabaseProvider: Postgres
       # /metrics is served on 9090 only. Caddy proxies 8080 and refuses /metrics,
       # so the scrape path has no route from the internet. See DEPLOYMENT.md §14.
       Observability__Metrics__ScrapePort: "9090"

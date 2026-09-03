@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Replace the manual Sameday AWB stub with a real API integration: auth, AWB creation, retry, tracking, status transitions.
 **Type**: brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #3 (priority score 19)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #3 (priority score 19)
 **Created**: 2026-05-25T10:10:00Z
 
 ## Artifacts Created

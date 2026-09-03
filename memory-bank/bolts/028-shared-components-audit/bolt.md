@@ -3,7 +3,7 @@ id: 028-shared-components-audit
 unit: 002-shared-components-adoption
 intent: 012-ui-polish
 type: simple-construction-bolt
-status: completed
+status: complete
 priority: P2
 stories:
   - 001-audit-pages-for-inline-loading

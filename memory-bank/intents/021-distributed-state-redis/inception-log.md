@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Add Redis as the backplane for SignalR, two-level cache, and a distributed rate limiter; wire health checks and Compose configuration.
 **Type**: ops / brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #9 (priority score 17)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #9 (priority score 17)
 **Created**: 2026-05-25T10:40:00Z
 
 ## Artifacts Created

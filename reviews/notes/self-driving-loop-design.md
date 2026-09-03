@@ -2,7 +2,7 @@
 type: review-system-design
 status: research notes — v2, updated 2026-08-11
 created: 2026-07-04
-updated: 2026-08-28
+updated: 2026-09-03
 owner: Matei Barba
 extends: README.md
 ---
@@ -243,6 +243,10 @@ item.
    without recall proof swaps a bottleneck for blind trust — the order of work matters.
 4. **Building the remaining tools is small work.** The expensive item is the experiment,
    not code: items 2–5 above are each roughly an afternoon; run 2 is ~2M+ tokens.
+5. **The blueprint's Map slot (index, reachability) is the largest designed piece this loop
+   lacks.** Lens selection is by touched paths; nothing weighs a finding by whether its code
+   is reachable (the cross analysis lists the map, the index and reachability as missing —
+   Appendix A of theory-vs-practice-2026-09.md).
 
 ## Where this stands — completion audit (2026-08-11)
 
@@ -309,7 +313,8 @@ end state needs all three, and the second and third are the point of the word
 
 ## Directions — the decision menu
 
-Four argued options. Costs are tokens unless marked; build effort is sessions of work.
+Four argued options, then one record of what has since been done (E). Costs are tokens
+unless marked; build effort is sessions of work.
 
 **A — Prove recall first (trust).** Build: seeded run 2 (~2–2.5M, different implanter,
 harder seeds, per-severity recall, shared-miss analysis) + the blinding auditor's workspace
@@ -344,6 +349,9 @@ tokens. Proves: the system transfers; the product thesis gets its first artifact
 risk: extracting from a sample of one repo, while the design still churns (the contracts
 shape landed 2026-08-10; the twelve-area list, the folder layout, and the judge model all
 changed on 2026-08-11) — and the kit ships with "recall unproven" in its README.
+
+**E — Reconcile with the blueprint (done 2026-09).** Not a choice — already done; recorded in
+[theory-vs-practice-2026-09.md](../../docs/agent-systems/theory-vs-practice-2026-09.md).
 
 **Recommendation: A, then B.** A is the only option that adds truth; every other option
 inherits its result. B's pieces are afternoons and can start the moment A's run is queued.

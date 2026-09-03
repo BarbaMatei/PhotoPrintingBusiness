@@ -11,7 +11,7 @@ status: complete
 
 **Intent**: Persist generated thumbnails and ship a cloud-storage backend with pre-signed URL redirects.
 **Type**: brown-field
-**Source**: `docs/architecture-analysis-2026-05-25.md` proposal #7 (priority score 18)
+**Source**: `docs/analysis/architect-review-2026-05-25.md` proposal #7 (priority score 18)
 **Created**: 2026-05-25T10:30:00Z
 
 ## Artifacts Created
