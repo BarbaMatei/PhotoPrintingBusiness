@@ -399,6 +399,9 @@ instance launched **in that worktree**.
 Every product prompt ends at stage 5 by design — stage 6 (the review loop) runs centrally between
 waves (§4a Rule 2).
 
+Every prompt launches its bolts with `/specsmd-construction-agent --bolt-id="<bolt id>"` — one bolt at a
+time, in the order the prompt gives; the construction agent runs its `bolt-start` skill for that id.
+
 ### W1 — Instance A (P-A / 054)
 ```
 You are implementing bolt group dependency-hardening on branch feat/bolt-054-dependency-hardening in this worktree.
@@ -406,7 +409,7 @@ You are implementing bolt group dependency-hardening on branch feat/bolt-054-dep
 Bolts, in strict order:
 1. 054-dependency-and-boot-hardening — read memory-bank/bolts/054-dependency-and-boot-hardening/bolt.md first. Internal story order is STRICT: 001-patch-otel-cve -> 002-central-package-management -> 003-renovate-config -> 004-forwarded-headers-metrics.
 
-Implement it through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id. The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/simple-construction-bolt.md dictates the stages, activities and artifacts — follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle; memory-bank/standards/definition-of-done.md is the hand-back checklist. Update bolt.md frontmatter (status, current_stage, stages_completed) and the stage checkboxes as you go.
+Implement it by invoking /specsmd-construction-agent --bolt-id="054-dependency-and-boot-hardening" (the construction agent runs its bolt-start skill for that id). The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/simple-construction-bolt.md dictates the stages, activities and artifacts — follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle; memory-bank/standards/definition-of-done.md is the hand-back checklist. Update bolt.md frontmatter (status, current_stage, stages_completed) and the stage checkboxes as you go.
 
 Conflict rules for this wave (three other instances are working in parallel on coupons, UI scaling, and docs/verification):
 - Do NOT touch: any Angular/frontend file, any EF migration, any controller business logic.
@@ -429,7 +432,7 @@ Bolts, in strict order:
 1. 047-coupon-domain-and-api — read memory-bank/bolts/047-coupon-domain-and-api/bolt.md first. This is a ddd-construction-bolt: model -> design -> implement -> test.
 2. 048-coupon-frontend — read memory-bank/bolts/048-coupon-frontend/bolt.md. simple-construction-bolt: plan -> implement -> test.
 
-Implement both through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id in turn. The bolt type definitions under .specsmd/aidlc/templates/construction/bolt-types/ dictate the stages, activities and artifacts — follow them exactly. Read memory-bank/standards/data-stack.md before touching entities or migrations, and memory-bank/standards/bolt-process.md for the lifecycle gates (adversarial design check after stage 2, fresh-eyes micro-review after stage 4). Update bolt.md frontmatter and stage checkboxes as you go.
+Implement both by invoking /specsmd-construction-agent --bolt-id="047-coupon-domain-and-api", then --bolt-id="048-coupon-frontend" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id). The bolt type definitions under .specsmd/aidlc/templates/construction/bolt-types/ dictate the stages, activities and artifacts — follow them exactly. Read memory-bank/standards/data-stack.md before touching entities or migrations, and memory-bank/standards/bolt-process.md for the lifecycle gates (adversarial design check after stage 2, fresh-eyes micro-review after stage 4). Update bolt.md frontmatter and stage checkboxes as you go.
 
 Two things this bolt is gated on: the concurrent-redemption integration test (the single most important guarantee), and the discount-then-VAT ordering, which must be written into memory-bank/standards/decision-index.md because it is irreversible once invoices are issued.
 
@@ -454,7 +457,7 @@ Bolts, in strict order:
 1. 066-ci-quality-gates — read memory-bank/bolts/066-ci-quality-gates/bolt.md first (angular.json budgets, then 3 Playwright smoke specs + the CI workflow).
 2. 067-ui-scaling-and-e2e-ui — read memory-bank/bolts/067-ui-scaling-and-e2e-ui/bolt.md (BaseApiService, then home-page breakup, account pages, locker selector — one logical PR-sized change each).
 
-Implement both through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id. The simple-construction-bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates stages and artifacts — follow it exactly. Angular 21, standalone, zoneless, Vitest, Prettier, no ESLint, no NgModules (CLAUDE.md). Update bolt.md frontmatter and checkboxes as you go.
+Implement both by invoking /specsmd-construction-agent --bolt-id="066-ci-quality-gates", then --bolt-id="067-ui-scaling-and-e2e-ui" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id). The simple-construction-bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates stages and artifacts — follow it exactly. Angular 21, standalone, zoneless, Vitest, Prettier, no ESLint, no NgModules (CLAUDE.md). Update bolt.md frontmatter and checkboxes as you go.
 
 Conflict rules for this wave (others are on dependency hardening, coupons, docs/verification):
 - Do NOT touch: cart / checkout summary / review / confirmation / invoice PDF (Instance B owns those); any .csproj or Directory.Packages.props (Instance A owns CPM); any backend service or controller.
@@ -478,7 +481,7 @@ Bolts, in strict order:
 
 These are VERIFICATION bolts. They build NOTHING. They confirm, story by story, that the review loop under reviews/ already satisfies the seven Phase 1 stories of intent 035 — or name exactly where it does not.
 
-Implement them through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the simple-construction-bolt type definition gives the stages, used here as plan -> verify -> record.
+Implement them by invoking /specsmd-construction-agent --bolt-id="085-phase-1-skeleton-core", then --bolt-id="086-phase-1-skeleton-agents", then --bolt-id="087-phase-2-trust" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition gives the stages, used here as plan -> verify -> record.
 
 Required reading before you start, in this order:
 - docs/agent-systems/bug-hunter-build-guide.md, section "## Implementation status (2026-09)" — the claim table you are checking, and the v3.7 extension notes on each Prompt.
@@ -511,7 +514,7 @@ Bolts, in strict order:
 2. 056-system-manifest-and-liveness — /api/admin/system-info, background-job liveness heartbeat, ANAF invoice metrics + SLO.
 3. 058-observability-boot-manifest-ui — the Angular admin "System" tab.
 
-Implement all three through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id in turn; the simple-construction-bolt type definition dictates stages and artifacts. Read memory-bank/standards/system-architecture.md and api-conventions.md before designing the manifest endpoint. Update bolt.md frontmatter and checkboxes as you go.
+Implement all three by invoking /specsmd-construction-agent --bolt-id="055-boot-composition-and-flags" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition dictates stages and artifacts. Read memory-bank/standards/system-architecture.md and api-conventions.md before designing the manifest endpoint. Update bolt.md frontmatter and checkboxes as you go.
 
 Conflict rules for this wave (one other instance is working on the review-loop engine under reviews/lib — no overlap with you):
 - YOU OWN Program.cs THIS WAVE. It is a rewrite into Add* extension methods; nobody else edits it. It must stay behaviour-identical.
@@ -533,7 +536,7 @@ Bolt: 087-phase-2-trust — read memory-bank/bolts/087-phase-2-trust/bolt.md fir
 
 Note: bolt 085 (wave 1) may have appended gap stories to this bolt's stories: list. Read the list as it stands on main; those gap stories are yours too.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates the stages and artifacts.
+Implement by invoking /specsmd-construction-agent --bolt-id="087-phase-2-trust" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates the stages and artifacts.
 
 THE RULE FOR THIS FAMILY: extend the review loop at the seam named in each story — build each piece as a script or skill in that tree (reviews/lib/**, .claude/skills/**), with a test under reviews/lib/tests, following reviews/README.md's conventions. NEVER build the June skeleton beside the loop. Start from docs/agent-systems/bug-hunter-build-guide.md section "## Implementation status (2026-09)" and the v3.7 extensions; each guide Prompt stays the specification of the piece's behaviour. Read memory-bank/intents/035-bug-hunter-agent-system/units.md unit 002 before stage 1.
 
@@ -561,7 +564,7 @@ Bolts, in strict order:
 3. 061-handler-pattern — ICommandHandler/IEventDispatcher, CreateOrderHandler, OrderPaidEventDispatcher, retry-invoice and promote-photos handlers.
 4. 062-test-infrastructure — TimeProvider adoption, shared WebApplicationFactory base, fluent Builders, reclassification of misnamed unit tests. Both 059 and 062 say LOCKSTEP: interleave 062's test moves with the layering steps rather than doing them at the end.
 
-Implement all four through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the simple-construction-bolt type definition dictates the stages. Read memory-bank/standards/data-stack.md and coding-standards.md before you move persistence code.
+Implement all four by invoking /specsmd-construction-agent --bolt-id="059-layering-foundation" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition dictates the stages. Read memory-bank/standards/data-stack.md and coding-standards.md before you move persistence code.
 
 Hard gate, after EVERY internal step: build + the tests covering the moved area green, AND an Add-Migration NoOpVerify that comes out EMPTY (then delete it). Zero behaviour change, zero schema drift is the whole point of this group.
 
@@ -583,7 +586,7 @@ You are implementing bolt group map-and-reachability on branch feat/bolt-088-map
 
 Bolt: 088-phase-3-map-and-reachability — read memory-bank/bolts/088-phase-3-map-and-reachability/bolt.md first. Build order: 001-app-mapping -> 002-code-index -> 003-reachability -> 004-severity-scoring-reachability-ext, plus the budget-and-incremental half of 017-orchestrator-scale-ext. 005-flow-tracing is left as-is — no work.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates stages and artifacts.
+Implement by invoking /specsmd-construction-agent --bolt-id="088-phase-3-map-and-reachability" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates stages and artifacts.
 
 THE RULE FOR THIS FAMILY: extend the review loop at the seam named in each story — a script or skill in that tree (reviews/lib/**), a test under reviews/lib/tests, reviews/README.md's conventions. NEVER build the June skeleton beside the loop. Start from docs/agent-systems/bug-hunter-build-guide.md "## Implementation status (2026-09)" and the v3.7 extensions; read memory-bank/intents/035-bug-hunter-agent-system/units.md unit 003 (3a) before stage 1.
 
@@ -607,7 +610,7 @@ You are implementing bolt group access-hardening on branch feat/bolt-063-access-
 
 Bolt: 063-access-hardening — read memory-bank/bolts/063-access-hardening/bolt.md first. Stories: 001-global-rate-limit (per-IP sliding window) then 002-admin-policy-constant (Policies.Admin + migrate 6 controllers). It requires 054 (real client IP behind the proxy), which shipped in wave 1.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates the stages. Read memory-bank/standards/api-conventions.md (auth headers, error shapes) before designing.
+Implement by invoking /specsmd-construction-agent --bolt-id="063-access-hardening" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates the stages. Read memory-bank/standards/api-conventions.md (auth headers, error shapes) before designing.
 
 Conflict rules for this wave (one instance is decomposing AuthService and the persistence config; one is on the review-loop engine):
 - Register the limiter inside the security extension created by bolt 055 — do NOT restructure Program.cs further.
@@ -629,7 +632,7 @@ Bolts, in strict order:
 1. 064-service-decomposition — read memory-bank/bolts/064-service-decomposition/bolt.md first: split AuthService into three, thin WebhooksController, extract OrderPhotoQueryService.
 2. 065-persistence-config — 17 IEntityTypeConfiguration<T> files, OnModelCreating under 100 LOC.
 
-Implement both through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the simple-construction-bolt type definition dictates the stages. Read memory-bank/standards/data-stack.md before moving persistence configuration.
+Implement both by invoking /specsmd-construction-agent --bolt-id="064-service-decomposition" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition dictates the stages. Read memory-bank/standards/data-stack.md before moving persistence configuration.
 
 Zero behaviour change in both bolts. Bolt 065's proof is an Add-Migration NoOpVerify that comes out EMPTY (then delete it).
 
@@ -652,7 +655,7 @@ Bolts, in strict order (SERIAL on one branch — they both write to the lens man
 1. 089-phase-3-specialists-a — read memory-bank/bolts/089-phase-3-specialists-a/bolt.md first. Only 006-taint-analysis is a gap; 007/008 are partial by design and 009 is satisfied — no work on those.
 2. 090-phase-3-specialists-b — 010-dependency-audit-agent, 011-config-auditor-agent, 013-root-cause-clustering. 012 is satisfied by the race lens — no work.
 
-Implement both through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the simple-construction-bolt type definition dictates the stages.
+Implement both by invoking /specsmd-construction-agent --bolt-id="089-phase-3-specialists-a" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition dictates the stages.
 
 THE RULE FOR THIS FAMILY: extend the review loop at the seam named in each story — a script or skill in that tree (reviews/lib/**, .claude/skills/**), a test under reviews/lib/tests, reviews/README.md's conventions. NEVER build the June skeleton beside the loop. Start from docs/agent-systems/bug-hunter-build-guide.md "## Implementation status (2026-09)" and the v3.7 extensions; read memory-bank/intents/035-bug-hunter-agent-system/units.md unit 003 (3b) before stage 1.
 
@@ -675,7 +678,7 @@ You are implementing bolt group refund-domain on branch feat/bolt-068-refund-dom
 
 Bolt: 068-refund-domain-and-api — read memory-bank/bolts/068-refund-domain-and-api/bolt.md first. This is a ddd-construction-bolt: model -> design -> implement -> test. Stories in order: 001-refund-schema-and-status, 002-refund-service-stripe-euplatesc, 003-anaf-credit-note (UBL type 381), 004-admin-refund-endpoint. All four are Must.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the ddd-construction-bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates the stages, artifacts and checkpoints. Before stage 2 read memory-bank/standards/data-stack.md, system-architecture.md (payments) and api-conventions.md, and run the adversarial design check from memory-bank/standards/bolt-process.md.
+Implement by invoking /specsmd-construction-agent --bolt-id="068-refund-domain-and-api" (the construction agent runs its bolt-start skill for that id); the ddd-construction-bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates the stages, artifacts and checkpoints. Before stage 2 read memory-bank/standards/data-stack.md, system-architecture.md (payments) and api-conventions.md, and run the adversarial design check from memory-bank/standards/bolt-process.md.
 
 This is regulated, money-moving, fiscally-recorded work. The state machine, gateway idempotency and DB/gateway/ANAF consistency are the bolt's reason to exist — a refund that succeeds at the gateway and fails in the DB must be recoverable and must not double-refund. There is no optimistic concurrency in this repo (CLAUDE.md): use unique indexes and violation detection.
 
@@ -696,7 +699,7 @@ You are implementing bolt group learn-and-measure on branch feat/bolt-092-learn-
 
 Bolt: 092-phase-4-learn-and-measure — read memory-bank/bolts/092-phase-4-learn-and-measure/bolt.md first. The gaps are 003-eval-corpus (with a poison fixture), 004-eval-metrics (recall and escape), 005-curator-agent and 006-orchestrator-learn-ext. 002-bug-lifecycle is satisfied; 001-suppression-learning is SUPERSEDED — the loop never suppresses a finding, it attaches the prior decision to it (integration contract §6.5). Do not build suppression.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates the stages.
+Implement by invoking /specsmd-construction-agent --bolt-id="092-phase-4-learn-and-measure" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates the stages.
 
 THE RULE FOR THIS FAMILY: extend the review loop at the seam named in each story — a script or skill in that tree (reviews/lib/measure/**, the fixture builder, the speed report, the pass router's Learn row), a test under reviews/lib/tests, reviews/README.md's conventions. NEVER build the June skeleton beside the loop. Start from docs/agent-systems/bug-hunter-build-guide.md "## Implementation status (2026-09)" and the v3.7 extensions; read memory-bank/intents/035-bug-hunter-agent-system/units.md unit 004 before stage 1.
 
@@ -717,7 +720,7 @@ You are implementing bolt group refund-ui on branch feat/bolt-069-refund-ui in t
 
 Bolt: 069-refund-return-flow-ui — read memory-bank/bolts/069-refund-return-flow-ui/bolt.md first. One story: 001-admin-refund-action (full and partial refund with a reason, from the admin order-detail page).
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates the stages. Angular 21, standalone, zoneless, Vitest, Prettier only. UI strings are Romanian — every backend error code needs its Romanian message.
+Implement by invoking /specsmd-construction-agent --bolt-id="069-refund-return-flow-ui" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates the stages. Angular 21, standalone, zoneless, Vitest, Prettier only. UI strings are Romanian — every backend error code needs its Romanian message.
 
 It consumes the admin refund endpoint from bolt 068, which landed last wave, and should use the BaseApiService introduced by bolt 067.
 
@@ -737,7 +740,7 @@ You are implementing bolt group remediation-handoff on branch feat/bolt-093-reme
 
 Bolt: 093-phase-5-remediation — read memory-bank/bolts/093-phase-5-remediation/bolt.md first. Two gaps: 001-regression-harvest (the surviving tripwire must be written by someone who did NOT write the fix) and 004-fix-request-emit (an idempotent fix-request store keyed by correlation_id, with the fix_status lifecycle; bug-bolts carry the correlation_id in bolt.md frontmatter — integration contract §4). 002-fix-verification and 005-orchestrator-remediation-ext are satisfied; 003-fix-proposal is left as-is by design.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates the stages.
+Implement by invoking /specsmd-construction-agent --bolt-id="093-phase-5-remediation" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates the stages.
 
 THE RULE FOR THIS FAMILY: extend the review loop at the seam named in each story — here the hand-back gates at reviews/lib/fix/handback-gates.mjs and the records tree — with a test under reviews/lib/tests, following reviews/README.md's conventions. NEVER build the June skeleton beside the loop. Start from docs/agent-systems/bug-hunter-build-guide.md "## Implementation status (2026-09)" and the v3.7 extensions; read memory-bank/intents/035-bug-hunter-agent-system/units.md unit 005 and integration contract §4 before stage 1.
 
@@ -760,7 +763,7 @@ Bolts, in strict order:
 1. 070-e2e-data-strategy — read memory-bank/bolts/070-e2e-data-strategy/bolt.md first: the documented data contract, Builder-backed guest/user/admin fixtures, Stripe + EuPlatesc test-mode fixtures, and a real-Postgres compose boot.
 2. 071-e2e-journey-coverage — the eight journey story groups plus CI tiering (fast PR tier + scheduled full suite), bounded retries, failure artifacts, flake elimination.
 
-Implement both through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the simple-construction-bolt type definition dictates the stages.
+Implement both by invoking /specsmd-construction-agent --bolt-id="070-e2e-data-strategy" — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition dictates the stages.
 
 REUSE, DO NOT REBUILD: bolt 066 already shipped the Playwright module and playwright-e2e.yml; bolt 062 already shipped the fluent Builders and the shared factory base. If either looks unfit, report it — do not fork it. Read memory-bank/standards/data-stack.md for the Postgres and PostgresTestDatabase rules.
 
@@ -781,7 +784,7 @@ You are implementing bolt group regression-methodology on branch feat/bolt-072-r
 
 Bolt: 072-regression-methodology — read memory-bank/bolts/072-regression-methodology/bolt.md first. Stories in order: 001-regression-checklist (mapped to every shipped intent, each item tagged automated-by-e2e / automated-by-integration / manual), 002-execute-regression-baseline (one dated pass), 003-triage-findings-to-backlog (new bolt / existing bolt / KNOWN_FAILURES.md).
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with this bolt's id; the simple-construction-bolt type definition dictates the stages.
+Implement by invoking /specsmd-construction-agent --bolt-id="072-regression-methodology" (the construction agent runs its bolt-start skill for that id); the simple-construction-bolt type definition dictates the stages.
 
 The automated-by tags must be TRUE against the suite as it exists after bolt 071 — check each one, do not copy the intent list and assume coverage.
 
@@ -806,7 +809,7 @@ Bolts, in strict order:
 3. 075-promotion-readiness — the dev-to-prod promotion runbook and the deployment-deferral note cross-linked from DEPLOYMENT.md.
 Read each memory-bank/bolts/<id>/bolt.md before starting it.
 
-Implement all three through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the simple-construction-bolt type definition dictates the stages.
+Implement all three by invoking /specsmd-construction-agent --bolt-id="<bolt id>" for each bolt — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the simple-construction-bolt type definition dictates the stages.
 
 THIS IS READINESS ONLY. Nothing is deployed. No host is stood up, no real secret is provisioned, no image is pushed, no pipeline is triggered. Bolt 075 documents how a future promotion would go and explicitly defers the deployment itself. If a story looks like it asks you to deploy, re-read it and stop.
 
@@ -831,7 +834,7 @@ Bolts, in strict order (both are spike-bolts — time-boxed research, zero produ
 2. 080-research-tracks (story 005-t5-tax-invoicing-compliance, 8h box) -> docs/analysis/eu-expansion/track-5-tax-compliance.md
 Read each memory-bank/bolts/<id>/bolt.md first, and docs/planning/eu-expansion-research-brief-2026-06-05.md for the owner's Checkpoint-1 decisions (compare both tiers, one brand EU-wide, ship from Romania, local currencies) — those are settled inputs, not open questions.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the spike-bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates the stages and the time box. RESPECT THE TIME BOX — a spike that overruns reports what it has.
+Implement by invoking /specsmd-construction-agent --bolt-id="<bolt id>" for each bolt — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the spike-bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates the stages and the time box. RESPECT THE TIME BOX — a spike that overruns reports what it has.
 
 Track 5 is the highest-rigor track: every VAT rate, threshold and e-invoicing mandate needs a dated source and must be current to 2026, and its conclusions must be expressed as concrete impact on the existing VatCalculator (bolt 038) and the e-Factura path (bolt 039).
 
@@ -853,7 +856,7 @@ Bolts, in strict order (spike-bolts, time-boxed, zero production code):
 2. 078-research-tracks (story 003-t3-frontend-i18n, 6h box) -> docs/analysis/eu-expansion/track-3-frontend-i18n.md
 Read each memory-bank/bolts/<id>/bolt.md first, plus docs/planning/eu-expansion-research-brief-2026-06-05.md for the settled Checkpoint-1 decisions.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the spike-bolt type definition dictates the stages and the time box. RESPECT THE TIME BOX.
+Implement by invoking /specsmd-construction-agent --bolt-id="<bolt id>" for each bolt — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the spike-bolt type definition dictates the stages and the time box. RESPECT THE TIME BOX.
 
 Track 2 must state each option's environment-triad multiplier (referencing intent 033, which shipped as bolts 073-075). Track 3 is Angular 21 specifically — built-in compile-time i18n versus runtime libraries, with real bundle-impact numbers and the interaction with each track-2 option. RTL is not required.
 
@@ -876,7 +879,7 @@ Bolts, in strict order (spike-bolts, time-boxed, zero production code):
 3. 082-research-tracks (story 007-t7-codebase-seam-audit, 6h box) -> docs/analysis/eu-expansion/track-7-seam-audit.md
 Read each memory-bank/bolts/<id>/bolt.md first, plus docs/planning/eu-expansion-research-brief-2026-06-05.md.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the spike-bolt type definition dictates the stages and the time box. RESPECT THE TIME BOX.
+Implement by invoking /specsmd-construction-agent --bolt-id="<bolt id>" for each bolt — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the spike-bolt type definition dictates the stages and the time box. RESPECT THE TIME BOX.
 
 Track 4 must cover the deferred-culture trap: the culture belongs on the job or entity, not ambient at send time. Track 7 is REPO-BOUND AND READ-ONLY — no web research: count where RO / RON / ro-RO are hardcoded across Angular, backend messages, emails, invoice PDFs, legal pages and SEO/meta, size currency hardcoding as its own area, give file and occurrence counts per area plus the top ten heaviest spots, and note what bolts 058, 067 and 069 (all shipped by now) added to the bill.
 
@@ -898,7 +901,7 @@ Bolts, in strict order:
 2. 084-implementation-briefs (simple-construction-bolt, 4h box) — author docs/planning/i18n-readiness-brief-<date>.md from the ADR: ordered readiness requirements, seam prep only, no translations.
 Read each memory-bank/bolts/<id>/bolt.md first, and all seven track files under docs/analysis/eu-expansion/.
 
-Implement through the specsmd construction flow: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill with each bolt's id; the bolt type definitions dictate the stages, including 083's owner-decision checkpoint.
+Implement by invoking /specsmd-construction-agent --bolt-id="<bolt id>" for each bolt — one bolt at a time, in that order (the construction agent runs its bolt-start skill for each id); the bolt type definitions dictate the stages, including 083's owner-decision checkpoint.
 
 STOP at the owner-decision checkpoint and ask. Do not pick the bundle yourself, do not write the ADR before the owner has chosen, and do not start bolt 084 until the ADR exists. Bolt 084 is the inception feed for a future cycle — it plans readiness, it does not implement it.
 
@@ -1008,6 +1011,7 @@ next wave boundary, or take an owner ruling to record the engine bump on the ope
    the invoice line. **Do you want a fix bolt for those 11 rows before or beside Wave 1, or does
    coupons proceed and the backlog stay parked until deployment approaches?** This plan schedules
    coupons in W1 as written; say the word and it moves.
+   **Owner ruling 2026-09-03: coupons proceed in Wave 1; the 038-039 rows stay parked.**
 2. **Where does the 087 execution proof run** — on the host with the repo's own `dotnet test` /
    `npm test`, or in a throwaway container? Bolt 087 stage 1 says agree this with you before
    implementing.
@@ -1015,6 +1019,7 @@ next wave boundary, or take an owner ruling to record the engine bump on the ope
    (`SF<n>` ids, outside the `PPW-<n>` sequence, out of the doc contracts' scope), or a per-bolt
    `reviews/<bolt>/` target under the normal contracts? The first is cheaper and keeps ids separate;
    the second keeps `bolt-process.md` stage 6 literal.
+   **Recommendation 2026-09-03 (coordinator): per-bolt `reviews/<bolt>/` targets under the normal contracts — stage 6 stays literal and agentic defects enter the same records; the SF sequence stays for the machinery reviewing itself. Proceeds unless the owner objects.**
 4. **Engine merges when a product loop is still open** (§4a Rule 1): hold the engine PR a wave, or
    record the engine bump on the open target's ledger and continue?
 5. **Compressing the tail.** The EU research spikes (W10) are docs-only, run no tests and touch no
