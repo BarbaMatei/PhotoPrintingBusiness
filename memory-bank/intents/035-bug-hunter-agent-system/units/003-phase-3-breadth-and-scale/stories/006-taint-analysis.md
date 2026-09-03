@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 006-taint-analysis (guide Prompt 16)
 
+**Workbench seam:** the security lens — `reviews/lib/records/schema.mjs` plus its prompt.
+
 ## User Story
 
 **As** the security hunter's core procedure

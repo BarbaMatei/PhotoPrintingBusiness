@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 002-issue-sync (guide Optional B)
 
+**Workbench seam:** a new standalone tool, reading records from `reviews/lib/records/ledger.mjs`.
+
 ## User Story
 
 **As** the owner working from a tracker
@@ -36,7 +38,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- report-rendering (bolt 085), bug-lifecycle (bolt 092), ledger-io; a tracker connector
+- report-rendering (built — the review loop), bug-lifecycle (bolt 092), ledger-io; a tracker connector
 
 ### Enables
 - Tracker-driven workflow

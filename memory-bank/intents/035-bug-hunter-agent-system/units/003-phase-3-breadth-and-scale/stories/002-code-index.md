@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 002-code-index (guide Prompt 13)
 
+**Workbench seam:** a new tool under `reviews/lib/`, shared with the knowledge builder (contract §7) — missing entirely today.
+
 ## User Story
 
 **As** every agent working on a large codebase

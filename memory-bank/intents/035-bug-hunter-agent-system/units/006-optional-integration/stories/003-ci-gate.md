@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 003-ci-gate (guide Optional C)
 
+**Workbench seam:** `reviews/lib/drive/gates.mjs` plus a new tool, with the baseline read from `reviews/lib/records/ledger.mjs`.
+
 ## User Story
 
 **As** the CI pipeline
@@ -36,7 +38,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- report-rendering (bolt 085), severity-scoring (bolt 087); baseline via ledger-io
+- report-rendering (built — the review loop), severity-scoring (bolt 087); baseline via ledger-io
 
 ### Enables
 - Gated PR/CI workflow

@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 003-fix-proposal (guide Prompt 32)
 
+**Workbench seam:** `.claude/skills/fix-review/SKILL.md` — partial by design: the loop’s fixer applies patches directly, so the never-apply rule does not describe this engine. No bolt work planned.
+
 ## User Story
 
 **As** the owner deciding how to fix a confirmed bug

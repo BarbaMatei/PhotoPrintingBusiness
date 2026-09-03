@@ -5,11 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: 086-phase-1-skeleton-agents
+assigned_bolt: null
 implemented: false
 ---
 
 # Story: 007-orchestrator-skeleton (guide Prompt 7 — agent-as-skill)
+
+**Status:** satisfied by `.claude/skills/loop-driver/SKILL.md`, `reviews/lib/drive/route-next-pass.mjs` and `reviews/lib/discovery-review.wf.js` (2026-09)
 
 ## User Story
 

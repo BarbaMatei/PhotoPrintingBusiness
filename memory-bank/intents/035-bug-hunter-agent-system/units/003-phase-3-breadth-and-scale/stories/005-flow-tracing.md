@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 005-flow-tracing (guide Prompt 15)
 
+**Workbench seam:** `reviews/lib/discovery-review.wf.js` and the lens prompts — partial by design: the lenses trace flows by prompt. No bolt work planned.
+
 ## User Story
 
 **As** the shared procedure behind the flow and concurrency hunters

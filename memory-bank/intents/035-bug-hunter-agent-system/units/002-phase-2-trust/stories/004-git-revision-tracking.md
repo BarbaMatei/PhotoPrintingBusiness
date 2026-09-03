@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 004-git-revision-tracking (guide Prompt 11)
 
+**Workbench seam:** `reviews/lib/verify/git.mjs` — the affirmed SHA exists; moved/fixed detection across runs does not.
+
 ## User Story
 
 **As** the ledger's defense against code drift

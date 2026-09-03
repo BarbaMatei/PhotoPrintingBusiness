@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 003-bug-verifier (guide Prompt 10 — agent-as-skill, fills the Verify slot)
 
+**Workbench seam:** `reviews/lib/verify/verify-fixes.mjs` — the loop’s skeptics argue a finding; nothing runs code. The gap is execution proof: a failing test written by someone who did not fix it, naming the commit it was taken on.
+
 ## User Story
 
 **As** the quality gate of the whole system

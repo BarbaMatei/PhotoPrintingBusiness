@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 004-severity-scoring-reachability-ext (guide Prompt 14b — EXTENSION)
 
+**Workbench seam:** `reviews/lib/records/schema.mjs` — the same scoring code Prompt 8 touches.
+
 ## User Story
 
 **As** the risk formula

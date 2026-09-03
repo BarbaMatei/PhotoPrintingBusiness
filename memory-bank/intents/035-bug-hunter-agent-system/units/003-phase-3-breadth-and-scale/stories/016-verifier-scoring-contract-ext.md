@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 016-verifier-scoring-contract-ext (guide Prompt 24c — EXTENSION)
 
+**Workbench seam:** `reviews/lib/verify/verify-fixes.mjs` and `reviews/lib/records/schema.mjs`.
+
 ## User Story
 
 **As** the Verify stage

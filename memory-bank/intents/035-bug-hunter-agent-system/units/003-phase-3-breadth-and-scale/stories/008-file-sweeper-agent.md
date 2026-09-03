@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 008-file-sweeper-agent (guide Prompt 18 — agent-as-skill)
 
+**Workbench seam:** `reviews/lib/discovery-review.wf.js` — partial: the lenses sweep, but without a tools-first pass. No bolt work planned.
+
 ## User Story
 
 **As** the Hunt slot's bottom-up specialist
@@ -34,7 +36,7 @@ implemented: false
 
 ### Requires
 - 002-code-index; tool-ingest (bolt 087); deduplication, bug-documentation,
-  ledger-io (bolt 085)
+  ledger-io (built — the review loop)
 
 ### Enables
 - orchestrator specialist dispatch (24d); hunters-contract-ext (24b)

@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 005-curator-agent (guide Prompt 29 — agent-as-skill, fills the Learn slot)
 
+**Workbench seam:** `reviews/lib/measure/speed-report.mjs` and `reviews/lib/measure/gates.mjs` — the system self-review and the speed report are run by hand.
+
 ## User Story
 
 **As** the Learn slot
@@ -34,7 +36,7 @@ implemented: false
 
 ### Requires
 - 001-suppression-learning, 002-bug-lifecycle, 003-eval-corpus, 004-eval-metrics;
-  ledger-io (bolt 085)
+  ledger-io (built — the review loop)
 
 ### Enables
 - 006-orchestrator-learn-ext (29b)

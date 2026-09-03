@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 012-concurrency-auditor-agent (guide Prompt 22 — agent-as-skill, CONDITIONAL)
 
+**Status:** satisfied by the race lens — `reviews/lib/records/schema.mjs` plus its prompt (2026-09)
+
 ## User Story
 
 **As** the Hunt slot's concurrency specialist
@@ -40,7 +42,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- 005-flow-tracing, 002-code-index; deduplication, bug-documentation (bolt 085)
+- 005-flow-tracing, 002-code-index; deduplication, bug-documentation (built — the review loop)
 
 ### Enables
 - orchestrator specialist dispatch (24d)

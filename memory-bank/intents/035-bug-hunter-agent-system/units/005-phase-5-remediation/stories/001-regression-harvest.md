@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 001-regression-harvest (guide Prompt 30)
 
+**Workbench seam:** `reviews/lib/fix/handback-gates.mjs` — partial: the fixer writes its own red-first test and a test-meaning audit checks it; the gap is a tripwire harvested by someone who did not write the fix.
+
 ## User Story
 
 **As** the regression safety net

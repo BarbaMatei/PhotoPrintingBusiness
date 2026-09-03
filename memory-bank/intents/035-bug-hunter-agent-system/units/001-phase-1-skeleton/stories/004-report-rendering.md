@@ -5,11 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: 085-phase-1-skeleton-core
+assigned_bolt: null
 implemented: false
 ---
 
 # Story: 004-report-rendering (guide Prompt 4)
+
+**Status:** satisfied by `reviews/templates/review.md`, `reviews/templates/summary.md` and the doc gate `reviews/lib/records/doc-gate.mjs` (2026-09)
 
 ## User Story
 

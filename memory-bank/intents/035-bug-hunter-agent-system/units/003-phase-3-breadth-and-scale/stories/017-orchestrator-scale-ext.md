@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 017-orchestrator-scale-ext (guide Prompt 24d — EXTENSION)
 
+**Workbench seam:** `reviews/lib/discovery-review.wf.js` — partial: it caps delta passes and picks lenses by touched area, with no budget unit. Split by the 2026-09 re-cut: the budget-and-incremental half is scheduled with bolt 088, the oracle wiring stays with bolt 091.
+
 ## User Story
 
 **As** the six-slot pipeline at Phase 3 scale

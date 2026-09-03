@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 009-security-auditor-agent (guide Prompt 19 — agent-as-skill)
 
+**Status:** satisfied by the security lens — `reviews/lib/records/schema.mjs` plus its prompt (2026-09)
+
 ## User Story
 
 **As** the Hunt slot's security specialist
@@ -36,7 +38,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- 006-taint-analysis; deduplication, bug-documentation, ledger-io (bolt 085);
+- 006-taint-analysis; deduplication, bug-documentation, ledger-io (built — the review loop);
   002-code-index
 
 ### Enables

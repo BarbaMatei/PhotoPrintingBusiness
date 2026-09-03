@@ -18,9 +18,9 @@ current_stage: null
 stages_completed: []
 time_box: 5h
 
-requires_bolts: [091-phase-3-oracle-grounding]
+requires_bolts: [089-phase-3-specialists-a, 090-phase-3-specialists-b]
 enables_bolts: [093-phase-5-remediation, 094-optional-integration]
-requires_units: [001-phase-1-skeleton, 002-phase-2-trust, 003-phase-3-breadth-and-scale]
+requires_units: [002-phase-2-trust, 003-phase-3-breadth-and-scale]
 blocks: false
 
 complexity:
@@ -34,23 +34,31 @@ complexity:
 
 ## Overview
 
-Tooling-only bolt. Phase 4 in full — guide Prompts 25–29b: suppression learning from
-dismissal reasons, the bug lifecycle, the eval corpus + metrics, the Curator
-(fills the Learn slot), and the orchestrator's Learn-slot extension.
+Tooling-only bolt. **Re-scoped 2026-09:** make the engine measure itself. Three gaps of
+Prompts 25–29b — a **standing eval corpus with a poison fixture** (27; there is a seeded-run
+protocol, no standing corpus), **recall and escape metrics** (28; `metrics.jsonl` and a track
+record exist, recall is unproven), and **curator automation** (29, 29b; the system self-review
+and the speed report are run by hand). `bug-lifecycle` (26) is **satisfied**;
+`suppression-learning` (25) is **superseded** — the loop never suppresses a finding, it
+attaches the prior decision to it. Runs after the specialists and before the remediation
+hand-off; it no longer waits on the oracle tier.
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — read before Stage 1)
 
-**Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
-`skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's test prompts**, fix,
-then next — in order. Prompt 29b **re-opens** `orchestrator` (one-line slot fill;
-re-run prior orchestrator tests). If skill-creator is unavailable, **STOP and report**.
+Each component **extends the review loop** (`reviews/lib`, `.claude/skills`) at the seam named
+in its story; build it as a skill or script in that tree, with a test under
+`reviews/lib/tests`, following `reviews/README.md`'s conventions. Here that is the fixture
+builder, `reviews/lib/measure/` and the speed report; 29b wires the Learn step into the pass
+router, so re-run the router's tests. The guide's Prompt N stays the specification of each
+piece's behaviour.
 
 ## Stories Included (build in this order)
 
-1. **001-suppression-learning** (Prompt 25, Should) — proposed-never-auto-activated;
-   validated vs Confirmed set
-2. **002-bug-lifecycle** (Prompt 26, Should) — leave the "mark Fixed" seam open for P5
+1. ~~**001-suppression-learning** (Prompt 25)~~ — **superseded**: the loop attaches the prior
+   decision to a re-found finding instead of suppressing it (guide Prompt 25, contract §6.5);
+   no work in this bolt
+2. ~~**002-bug-lifecycle** (Prompt 26)~~ — **satisfied** by the loop's statuses, reopen and
+   lineage (`reviews/lib/records/schema.mjs`, `reviews/lib/records/ledger.mjs`); no work here
 3. **003-eval-corpus** (Prompt 27, Should) — fixtures under `bug-hunting/eval/`
 4. **004-eval-metrics** (Prompt 28, Should) — recall vs seeded; precision via dismissals
 5. **005-curator-agent** (Prompt 29, Should) — Learn/Reconcile/Measure/Summarize
@@ -64,7 +72,7 @@ re-run prior orchestrator tests). If skill-creator is unavailable, **STOP and re
 ## Stages
 
 - [ ] **1. plan**: Read stories + briefs + unit brief
-- [ ] **2. implement**: Build via skill-creator in order
+- [ ] **2. implement**: Close the three gaps in order at their seams
 - [ ] **3. test**: All test prompts green incl. orchestrator re-runs; a curation pass
       after a run with dismissals produces validated pattern proposals + metrics + the
       health summary
@@ -72,20 +80,20 @@ re-run prior orchestrator tests). If skill-creator is unavailable, **STOP and re
 ## Dependencies
 
 ### Requires
-- 091-phase-3-oracle-grounding (master order; 29b re-opens the orchestrator after
-  24d). **Replanning note:** if the owner descopes 091's oracle (its ⛔), this bolt
-  may instead require [090 + the split non-oracle orchestrator extension] — owner
-  decision at wave planning.
+- 089 + 090 (the specialists whose output the corpus scores). **Re-ordered 2026-09:** this
+  bolt no longer waits on the oracle tier (091), which is now last — measuring the engine does
+  not need contract grounding.
 
 ### Enables
 - 093 (fix-verification extends bug-lifecycle); 094 (issue-sync follows lifecycle)
 
 ## Success Criteria
 
-- [ ] 5 skills + 1 extension via skill-creator, all test prompts passing
-- [ ] Safety properties hold: patterns proposed-only and validated against Confirmed;
-      self-closes evidence-based and audited; regressions flagged; eval runs pinned
-      (model/temp)
+- [ ] The three gaps closed at their seams, each with a test under `reviews/lib/tests`
+- [ ] Recall measured against a standing corpus, not asserted; a poison fixture in it that a
+      pass must not "find"; escapes counted
+- [ ] Safety properties hold: self-closes evidence-based and audited; regressions flagged;
+      each eval run records the model it ran on
 
 ## Notes
 

@@ -18,7 +18,7 @@ time_box: 4h
 
 requires_bolts: [088-phase-3-map-and-reachability]
 enables_bolts: [091-phase-3-oracle-grounding]
-requires_units: [001-phase-1-skeleton, 002-phase-2-trust]
+requires_units: [002-phase-2-trust]
 blocks: false
 
 complexity:
@@ -32,21 +32,25 @@ complexity:
 
 ## Overview
 
-Tooling-only bolt. Specialist hunters, second half + triage — guide Prompts 20–23:
-`dependency-audit-agent` (CVEs from live advisories), `config-auditor-agent`
-(config/infra bug class), `concurrency-auditor-agent` (conditional — Should), and
-`root-cause-clustering`.
+Tooling-only bolt. **Re-scoped 2026-09:** three gaps of Prompts 20–23 —
+`dependency-audit-agent` (20, CVEs from live advisories) and `config-auditor-agent` (21,
+config/infra bug class) are two lenses the manifest lacks, both consumers of `tool-ingest`;
+`root-cause-clustering` (23) is partial — the fixer clusters and the reconciler tracks lineage,
+but one record covering many locations does not exist. `concurrency-auditor-agent` (22) is
+**satisfied** by the race lens.
 
-**Wave note:** runs **in parallel with bolt 089** — all-new disjoint skill
-directories, both depending only on 088. No extension briefs here.
+**Wave note:** runs **in parallel with bolt 089** — disjoint files, both waiting on the Map
+slot (088). No extension briefs here.
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — read before Stage 1)
 
-**Each skill MUST be created with the `skill-creator` skill** (`Skill` tool →
-`skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,
-fix, then next — in order 20 → 21 → 22 → 23. If skill-creator is unavailable,
-**STOP and report**.
+Each component **extends the review loop** (`reviews/lib`, `.claude/skills`) at the seam named
+in its story; build it as a skill or script in that tree, with a test under
+`reviews/lib/tests`, following `reviews/README.md`'s conventions. The two new lenses are a row
+each in the manifest's one machine home (`reviews/lib/records/schema.mjs`) plus their prompts —
+the runbook tables regenerate from that file, so never hand-edit them; clustering extends the
+records tree (`reviews/lib/records/ledger.mjs`). The guide's Prompt N stays the specification of
+each piece's behaviour.
 
 ## Stories Included (build in this order)
 
@@ -54,8 +58,8 @@ fix, then next — in order 20 → 21 → 22 → 23. If skill-creator is unavail
    queried live at run time
 2. **011-config-auditor-agent** (Prompt 21, Must) — compose/CI/appsettings/env;
    reuse the repo's gitleaks via tool-ingest
-3. **012-concurrency-auditor-agent** (Prompt 22, **Should** — conditional per D5;
-   this async-heavy stack qualifies, owner may still defer)
+3. ~~**012-concurrency-auditor-agent** (Prompt 22)~~ — **satisfied** by the race lens
+   (`reviews/lib/records/schema.mjs` + its prompt); no work in this bolt
 4. **013-root-cause-clustering** (Prompt 23, Must)
 
 ## Bolt Type
@@ -65,11 +69,11 @@ fix, then next — in order 20 → 21 → 22 → 23. If skill-creator is unavail
 
 ## Stages
 
-- [ ] **1. plan**: Read stories + briefs + unit brief; confirm with the owner whether
-      story 012 builds now or defers (Should)
-- [ ] **2. implement**: Build via skill-creator in order
-- [ ] **3. test**: All test prompts green; dependency hits carry CVE id + fixed
-      version; clustering stays conservative
+- [ ] **1. plan**: Read the three stories + their briefs + the unit brief, and the seam files
+      they name
+- [ ] **2. implement**: Add the two lens rows and their prompts, then clustering
+- [ ] **3. test**: A test per piece under `reviews/lib/tests`; dependency hits carry CVE id +
+      fixed version; clustering stays conservative
 
 ## Dependencies
 
@@ -81,7 +85,7 @@ fix, then next — in order 20 → 21 → 22 → 23. If skill-creator is unavail
 
 ## Success Criteria
 
-- [ ] 3–4 skills via skill-creator (012 per owner call), all test prompts passing
+- [ ] The three gaps closed at their seams, each with a test under `reviews/lib/tests`
 - [ ] Two new bug classes live (Dependency, Configuration); N-symptoms→1-bug
       clustering with multi-location records
 

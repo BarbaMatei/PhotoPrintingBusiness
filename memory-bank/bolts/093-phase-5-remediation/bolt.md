@@ -33,32 +33,35 @@ complexity:
 
 ## Overview
 
-Tooling-only bolt. Phase 5 in full — guide Prompts 30–33 **+ 31b (v3.3, review H1: the run-open
-fix-request mailbox scan — the mechanism by which "fix done" is noticed)**: keep proving tests as
-regression tripwires, gate bug closure on re-running them (**the loop's verification
-gate**, writing `fix_status: verified-fixed` onto the fix-request record, keyed by
-`correlation_id` — Integration Contract §4), draft suite-validated patch proposals
-(never applied), and hand confirmed bugs to AI-DLC through the idempotent fix-request
-store (records carry the `fix_status` lifecycle; bug-bolts carry the `correlation_id`
-in `bolt.md` frontmatter).
+Tooling-only bolt. **Re-scoped 2026-09:** two gaps of Prompts 30–33. **`regression-harvest` by
+a non-fixer** (30) — today the fixer writes its own red-first test and a test-meaning audit
+checks it; the tripwire that survives must come from someone who did not write the fix. And
+**`fix-request-emit`** (33) — missing, because today's fixer sits inside the loop; an
+out-of-loop fixer needs an idempotent fix-request store keyed by `correlation_id` (records carry
+the `fix_status` lifecycle; bug-bolts carry the `correlation_id` in `bolt.md` frontmatter —
+Integration Contract §4). `fix-verification` (31) and the run-open mailbox scan (31b) are
+**satisfied**; `fix-proposal` (32) is left as-is, since the loop's fixer applies patches
+directly, by design.
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — read before Stage 1)
 
-**Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
-`skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's test prompts**,
-fix, then next — in order. Prompt 31 also **re-opens** `bug-lifecycle` (re-run
-Prompt 26's tests after), and Prompt 31b **re-opens** the `orchestrator` at its Open
-seam. If skill-creator is unavailable, **STOP and report**.
+Each component **extends the review loop** (`reviews/lib`, `.claude/skills`) at the seam named
+in its story; build it as a skill or script in that tree, with a test under
+`reviews/lib/tests`, following `reviews/README.md`'s conventions. Here that is the hand-back
+gates (`reviews/lib/fix/handback-gates.mjs`) for the non-fixer harvest and the records tree for
+the fix-request store — do not rebuild the verification pass or the router's scan, which
+already exist. The guide's Prompt N stays the specification of each piece's behaviour.
 
 ## Stories Included (build in this order)
 
 1. **001-regression-harvest** (Prompt 30, Should) — the ONE allowed new-file write
    into the codebase (test code, owner-approved per test)
-2. **002-fix-verification** (Prompt 31, Should — GATE + bug-lifecycle EXTENSION)
-3. **005-orchestrator-remediation-ext** (Prompt 31b, Should — orchestrator EXTENSION,
-   NEW in v3.3) — the run-open mailbox scan; build right after 31
-4. **003-fix-proposal** (Prompt 32, Should) — sandbox-validated diffs, proposal only
+2. ~~**002-fix-verification** (Prompt 31)~~ — **satisfied** by the loop's verification pass
+   (`reviews/lib/verify/verify-fixes.mjs`); no work in this bolt
+3. ~~**005-orchestrator-remediation-ext** (Prompt 31b)~~ — **satisfied** by the router's
+   verification row (`reviews/lib/drive/rows.mjs`); no work in this bolt
+4. ~~**003-fix-proposal** (Prompt 32)~~ — partial by design: the loop's fixer applies patches
+   directly; no work in this bolt
 5. **004-fix-request-emit** (Prompt 33, Should) — idempotent store at
    `bug-hunting/fix-requests/` (D3)
 
@@ -72,23 +75,23 @@ seam. If skill-creator is unavailable, **STOP and report**.
 - [ ] **1. plan**: Read stories + briefs + unit brief; agree the AI-DLC consumption
       convention for `bug-hunting/fix-requests/` with the owner (how fix-bolts get
       created from records is the AI-DLC side; this bolt owns format + idempotency)
-- [ ] **2. implement**: Build via skill-creator in order
-- [ ] **3. test**: All test prompts green incl. Prompt 26 re-run; gate behavior
-      demonstrated both ways (pass → Fixed + verified-fixed; fail → Confirmed, no
-      signal); fix-requests update-not-duplicate
+- [ ] **2. implement**: Close the two gaps in order at their seams
+- [ ] **3. test**: A test per gap under `reviews/lib/tests` + the verification pass's own tests
+      re-run; gate behavior demonstrated both ways (pass → Fixed + verified-fixed; fail →
+      Confirmed, no signal); fix-requests update-not-duplicate
 
 ## Dependencies
 
 ### Requires
-- 092-phase-4-learn-and-measure (bug-lifecycle to extend)
-- bolt 087's Verifier + sandbox (proving tests + guards reused)
+- 092-phase-4-learn-and-measure (the metrics the gate reads)
+- bolt 087's execution proof (the proving test and its guards are reused here)
 
 ### Enables
 - The AI-DLC bug→fix→verified-fixed loop (consumed by the specsmd flow)
 
 ## Success Criteria
 
-- [ ] 5 components via skill-creator, all test prompts passing
+- [ ] The two gaps closed at their seams, each with a test under `reviews/lib/tests`
 - [ ] Discovery demonstrated: a completed bug-bolt is noticed by the 31b run-open scan
       (`open` → `fix-reported` → `verified-fixed`) with no manual prompt
 - [ ] Closure discipline: bugs close only via the gate (or explicitly "unverified"

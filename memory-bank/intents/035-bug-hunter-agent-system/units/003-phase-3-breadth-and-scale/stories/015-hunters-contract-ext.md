@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 015-hunters-contract-ext (guide Prompt 24b — EXTENSION across hunters)
 
+**Workbench seam:** `reviews/lib/records/schema.mjs` and the lens prompts it keys.
+
 ## User Story
 
 **As** every hunter
@@ -36,7 +38,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- 014-intent-lookup; all hunters from bolts 086, 089, 090
+- 014-intent-lookup; all hunters from the review loop’s lenses plus bolts 089 and 090
 
 ### Enables
 - Contract-grounded candidates feeding 24c's confidence rules

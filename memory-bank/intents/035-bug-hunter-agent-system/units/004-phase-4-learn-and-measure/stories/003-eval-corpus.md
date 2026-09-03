@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 003-eval-corpus (guide Prompt 27)
 
+**Workbench seam:** `reviews/lib/tests/fixture-builder.mjs` — there is a seeded-run protocol, no standing corpus and no poison fixture.
+
 ## User Story
 
 **As** the measurement foundation
@@ -38,7 +40,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- ledger-io (bolt 085)
+- ledger-io (built — the review loop)
 
 ### Enables
 - eval-metrics; curator-agent step (3)

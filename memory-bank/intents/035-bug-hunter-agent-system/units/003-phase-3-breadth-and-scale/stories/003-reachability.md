@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 003-reachability (guide Prompt 14)
 
+**Workbench seam:** a new tool under `reviews/lib/`, read by `reviews/lib/records/schema.mjs` for the risk weight — missing entirely today.
+
 ## User Story
 
 **As** the single biggest false-positive filter

@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 011-config-auditor-agent (guide Prompt 21 — agent-as-skill)
 
+**Workbench seam:** the lens manifest `reviews/lib/records/schema.mjs` (one new row plus its prompt) — this lens does not exist today.
+
 ## User Story
 
 **As** the Hunt slot's configuration/infrastructure specialist
@@ -36,7 +38,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- tool-ingest (bolt 087); deduplication, bug-documentation, ledger-io (bolt 085)
+- tool-ingest (bolt 087); deduplication, bug-documentation, ledger-io (built — the review loop)
 
 ### Enables
 - orchestrator specialist dispatch (24d)

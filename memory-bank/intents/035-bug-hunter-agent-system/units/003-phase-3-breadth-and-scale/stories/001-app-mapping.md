@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 001-app-mapping (guide Prompt 12)
 
+**Workbench seam:** a new tool under `reviews/lib/`, wired into `reviews/lib/discovery-review.wf.js` — the Map slot is empty today.
+
 ## User Story
 
 **As** the Map slot
@@ -41,7 +43,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- ledger-io (bolt 085)
+- ledger-io (built — the review loop)
 
 ### Enables
 - reachability, flow-tracing, orchestrator scale extension (24d)

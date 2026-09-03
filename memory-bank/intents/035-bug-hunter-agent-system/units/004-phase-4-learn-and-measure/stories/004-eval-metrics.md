@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 004-eval-metrics (guide Prompt 28)
 
+**Workbench seam:** `reviews/lib/measure/` and `reviews/lib/records/metrics.mjs` — `metrics.jsonl` and a track record exist; recall is unproven and escapes are uncounted.
+
 ## User Story
 
 **As** the quality dashboard

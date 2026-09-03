@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 004-fix-request-emit (guide Prompt 33, NEW in v3)
 
+**Workbench seam:** `reviews/lib/records/ledger.mjs` — missing, because today’s fixer sits inside the loop.
+
 ## User Story
 
 **As** the bridge to AI-DLC
@@ -41,7 +43,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- bug-documentation, ledger-io (bolt 085); the fix-request store location (D3)
+- bug-documentation, ledger-io (built — the review loop); the fix-request store location (D3)
 
 ### Enables
 - AI-DLC bug-bolts; the full bug→fix→verified-fixed loop

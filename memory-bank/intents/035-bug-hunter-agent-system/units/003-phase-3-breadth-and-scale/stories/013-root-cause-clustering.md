@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 013-root-cause-clustering (guide Prompt 23)
 
+**Workbench seam:** `reviews/lib/records/ledger.mjs` — the fixer clusters and the reconciler tracks lineage; one record covering many locations is the gap.
+
 ## User Story
 
 **As** the Triage stage
@@ -34,7 +36,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- bug-documentation (bolt 085)
+- bug-documentation (built — the review loop)
 
 ### Enables
 - orchestrator Triage wiring (24d)

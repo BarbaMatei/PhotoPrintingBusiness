@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 001-severity-scoring (guide Prompt 8)
 
+**Workbench seam:** `reviews/lib/records/schema.mjs` — four severity levels and a convergence weight exist; the risk score and the reachability weight do not.
+
 ## User Story
 
 **As** the Triage stage

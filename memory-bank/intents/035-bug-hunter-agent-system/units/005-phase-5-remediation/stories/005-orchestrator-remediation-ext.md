@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 005-orchestrator-remediation-ext (guide Prompt 31b, NEW in v3.3 — review H1)
 
+**Status:** satisfied by `reviews/lib/drive/rows.mjs` — the router’s verification row (2026-09)
+
 ## User Story
 
 **As** the fix loop's discovery mechanism
@@ -49,7 +51,7 @@ mailbox, `fix_status` parks at `open` forever, and the entire bug→fix→re-dis
 ## Dependencies
 
 ### Requires
-- 002-fix-verification (this story dispatches it); orchestrator (bolt 085); fix-request store (D3)
+- 002-fix-verification (this story dispatches it); orchestrator (built — the review loop); fix-request store (D3)
 
 ### Enables
 - The fix loop actually firing; KB Phase 4 re-distillation (both signals observable)

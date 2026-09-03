@@ -17,9 +17,10 @@ stages_completed: []
 time_box: 4h
 
 requires_bolts: [089-phase-3-specialists-a, 090-phase-3-specialists-b]
-enables_bolts: [092-phase-4-learn-and-measure]
-requires_units: [001-phase-1-skeleton, 002-phase-2-trust]
+enables_bolts: []
+requires_units: [002-phase-2-trust]
 blocks: true
+notes: gated on the knowledge-builder's ledger-query per the owner's 2026-09 build-order ruling; last in the order, so nothing waits on it
 
 complexity:
   avg_complexity: 2
@@ -32,32 +33,34 @@ complexity:
 
 ## Overview
 
-Tooling-only bolt. The v3 oracle tier — guide Prompts 24–24d: `intent-lookup` (read
-the knowledge ledger's contracts) plus three cross-cutting extensions: hunters
-surface contract contradictions (24b), Verifier/scoring weight contract corroboration
-(24c), and the orchestrator gains specialists-dispatch + cost control + oracle wiring
-(24d). Completes Phase 3.
+Tooling-only bolt. The oracle tier — guide Prompts 24–24d, all missing: `intent-lookup` (24,
+read the knowledge ledger's contracts) plus three cross-cutting extensions: lenses surface
+contract contradictions (24b), verification/scoring weight contract corroboration (24c), and
+the orchestrator's oracle wiring (24d — its budget-and-incremental half belongs to bolt 088).
+**Re-scoped 2026-09: this bolt is now LAST in the order** (integration contract §7), because it
+is the only piece that cannot start until the knowledge builder exists. Nothing else waits on
+it — learn & measure (092) and the remediation hand-off (093) run before it.
 
 ## ⛔ GATED — cross-system prerequisite (requirements D6 — now a schedule)
 
 `intent-lookup` consumes the **knowledge builder's `ledger-query` interface**, now
 fully specified in `docs/agent-systems/integration-contract.md` (§2 envelope, §3 flow identity)
 and built per `docs/agent-systems/knowledge-builder-build-guide.md`. Sequencing is normative in
-the contract's §7: this bolt runs **after the knowledge builder's Phases 1–2** (which
-themselves require bolts 085–088 of this intent first). If the owner instead descopes
-the oracle for now, story 017's non-oracle parts (specialist dispatch, cost control,
-incremental scanning) may be split out at replanning. **Do not stub the oracle
-silently.**
+the contract's §7: this bolt runs **last**, after the knowledge builder's Phases 1–2 (which
+themselves want bolts 087–088 of this intent first). Story 017's non-oracle parts (cost
+control, incremental scanning, the budget unit) are scheduled with bolt 088 and can be built
+without the oracle. **Do not stub the oracle silently.**
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — read before Stage 1)
 
-**Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
-`skill-creator:skill-creator`): paste Prompt N from
-`docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's test prompts**, fix,
-then next — in order. 24b/24c/24d **re-open existing skills** (hunters, bug-verifier,
-orchestrator) — re-run each re-opened skill's original tests after. **This bolt must
-never run in parallel with anything** (it touches skills from bolts 086–090). If
-skill-creator is unavailable, **STOP and report**.
+Each component **extends the review loop** (`reviews/lib`, `.claude/skills`) at the seam named
+in its story; build it as a skill or script in that tree, with a test under
+`reviews/lib/tests`, following `reviews/README.md`'s conventions. `intent-lookup` is the one
+genuinely **new standalone skill** left in this intent — build that one with the
+`skill-creator` skill (`Skill` tool → `skill-creator:skill-creator`), paste Prompt 24, and run
+the brief's three test prompts; if skill-creator is unavailable, **STOP and report**.
+24b/24c/24d re-open pieces built in bolts 088–090 — re-run their tests after. **This bolt must
+never run in parallel with anything.**
 
 ## Stories Included (build in this order)
 
@@ -77,9 +80,10 @@ skill-creator is unavailable, **STOP and report**.
 
 - [ ] **1. plan**: Resolve the ⛔ above with the owner; read stories + briefs;
       inventory which hunters exist (for 24b's scope)
-- [ ] **2. implement**: Build/extend via skill-creator in order
-- [ ] **3. test**: New tests green + ALL re-opened skills' original test prompts
-      re-run green (NFR-2); a diff-only budgeted run demonstrates cost control
+- [ ] **2. implement**: Build `intent-lookup` with skill-creator, then the three extensions at
+      their seams
+- [ ] **3. test**: New tests under `reviews/lib/tests` green + every re-opened piece's own
+      tests re-run green (NFR-2)
 
 ## Dependencies
 
@@ -88,7 +92,7 @@ skill-creator is unavailable, **STOP and report**.
 - ⛔ External: knowledge ledger `ledger-query` interface (owner decision)
 
 ### Enables
-- 092-phase-4-learn-and-measure (29b re-opens the orchestrator after 24d)
+- (nothing — last in the order per the 2026-09 ruling; 092 and 093 no longer wait on it)
 
 ## Success Criteria
 

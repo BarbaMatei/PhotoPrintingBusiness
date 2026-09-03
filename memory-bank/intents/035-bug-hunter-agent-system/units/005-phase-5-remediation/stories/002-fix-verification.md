@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 002-fix-verification (guide Prompt 31 — the loop's verification GATE; extends bug-lifecycle)
 
+**Status:** satisfied by `reviews/lib/verify/verify-fixes.mjs` (2026-09)
+
 ## User Story
 
 **As** the authority on closing bugs

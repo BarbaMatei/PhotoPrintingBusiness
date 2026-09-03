@@ -17,7 +17,7 @@ time_box: 3h
 
 requires_bolts: [092-phase-4-learn-and-measure]
 enables_bolts: []
-requires_units: [001-phase-1-skeleton, 002-phase-2-trust, 004-phase-4-learn-and-measure]
+requires_units: [002-phase-2-trust, 004-phase-4-learn-and-measure]
 blocks: false
 
 complexity:
@@ -33,7 +33,8 @@ complexity:
 
 Tooling-only bolt, **parked until owner adoption** (guide: "build only if you adopt
 CI or an issue tracker"). Guide Prompts A–C: the SARIF twin, idempotent issue-sync,
-and the baseline-aware CI gate. All three stories are **Could** priority.
+and the baseline-aware CI gate. All three are still missing; all three are **Could**
+priority. Unchanged by the 2026-09 re-scope, except that it now hangs off bolt 092 alone.
 
 ## ⏸ Adoption gate (owner decision)
 
@@ -44,11 +45,13 @@ Partial builds are fine — the three stories are independent of each other.
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — read before Stage 1)
 
-**Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
-`skill-creator:skill-creator`): paste the brief from
-`docs/agent-systems/bug-hunter-build-guide.md`, build, **run its test prompts**, fix, then next.
-Brief A **re-opens** `report-rendering` (re-run Prompt 4's tests after). If
-skill-creator is unavailable, **STOP and report**.
+Each component **extends the review loop** (`reviews/lib`, `.claude/skills`) at the seam named
+in its story; build it as a skill or script in that tree, with a test under
+`reviews/lib/tests`, following `reviews/README.md`'s conventions. Brief A extends the record
+renderer (`reviews/lib/records/render-records.mjs`) — re-run its tests. `issue-sync` (B) and
+`ci-gate` (C) are **new standalone tools**: build each with the `skill-creator` skill (`Skill`
+tool → `skill-creator:skill-creator`), paste its brief, run its test prompts; if skill-creator
+is unavailable, **STOP and report**.
 
 ## Stories Included
 
@@ -65,7 +68,7 @@ skill-creator is unavailable, **STOP and report**.
 
 - [ ] **1. plan**: Confirm the adoption decision + which subset builds; read stories
       + briefs + unit brief
-- [ ] **2. implement**: Build the chosen subset via skill-creator
+- [ ] **2. implement**: Build the chosen subset at its seam (B and C via skill-creator)
 - [ ] **3. test**: Briefs' test prompts green (incl. Prompt 4 re-run if A built);
       SARIF/Markdown parity; tickets idempotent; gate fails only NEW Critical/High vs
       baseline
@@ -73,15 +76,15 @@ skill-creator is unavailable, **STOP and report**.
 ## Dependencies
 
 ### Requires
-- 092-phase-4-learn-and-measure (bug-lifecycle for issue-sync); report-rendering
-  (085) + severity-scoring (087) already in place
+- 092-phase-4-learn-and-measure (the lifecycle `issue-sync` follows); the record renderer
+  (built — the review loop) and the risk score (bolt 087) already in place
 
 ### Enables
 - (terminal tier)
 
 ## Success Criteria
 
-- [ ] Built subset created via skill-creator, all test prompts passing
+- [ ] Built subset live at its seam, each piece with a test under `reviews/lib/tests`
 - [ ] No behavior change for the non-adopted parts (Markdown reports unchanged if A
       skipped, etc.)
 

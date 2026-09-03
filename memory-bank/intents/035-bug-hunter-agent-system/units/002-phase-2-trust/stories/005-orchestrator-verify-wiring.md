@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 005-orchestrator-verify-wiring (guide Prompt 11b — EXTENSION)
 
+**Status:** satisfied by `reviews/lib/drive/rows.mjs` — the pass router’s rows (2026-09)
+
 ## User Story
 
 **As** the six-slot pipeline
@@ -37,7 +39,7 @@ implemented: false
 
 ### Requires
 - 003-bug-verifier, 001-severity-scoring, 004-git-revision-tracking (this unit);
-  the Phase 1 orchestrator (bolt 086)
+  the Phase 1 orchestrator (built — the review loop)
 
 ### Enables
 - The Phase 2 milestone: trustworthy end-to-end runs

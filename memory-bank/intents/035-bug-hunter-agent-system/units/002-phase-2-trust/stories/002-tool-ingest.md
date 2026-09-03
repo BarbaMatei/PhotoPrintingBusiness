@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 002-tool-ingest (guide Prompt 9)
 
+**Workbench seam:** a new script under `reviews/lib/`, wired into `reviews/lib/discovery-review.wf.js` — missing entirely today.
+
 ## User Story
 
 **As** the pipeline's cost discipline

@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 014-intent-lookup (guide Prompt 24, NEW in v3 — the oracle read)
 
+**Workbench seam:** a new standalone skill under `.claude/skills/`, read by the lenses via `reviews/lib/records/schema.mjs` — the `requirements` lens reads bolt docs directly today, with no oracle.
+
 ## User Story
 
 **As** the system's grounding in real intent

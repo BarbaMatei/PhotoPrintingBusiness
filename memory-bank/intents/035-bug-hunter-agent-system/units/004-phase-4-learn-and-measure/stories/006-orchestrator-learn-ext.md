@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 006-orchestrator-learn-ext (guide Prompt 29b — EXTENSION)
 
+**Workbench seam:** `reviews/lib/drive/route-next-pass.mjs` — the Learn step is not a router row yet.
+
 ## User Story
 
 **As** the six-slot pipeline
@@ -34,7 +36,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- 005-curator-agent; orchestrator (bolts 086/087/091 states)
+- 005-curator-agent; orchestrator (built — the review loop’s pass router; bolts 087 and 091 add to it)
 
 ### Enables
 - The Phase 4 milestone: self-improving runs

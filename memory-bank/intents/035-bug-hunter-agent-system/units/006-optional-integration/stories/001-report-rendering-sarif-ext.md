@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 001-report-rendering-sarif-ext (guide Optional A — EXTENSION)
 
+**Workbench seam:** `reviews/lib/records/render-records.mjs`.
+
 ## User Story
 
 **As** machine consumers of run results (CI, code-scanning UIs)
@@ -35,7 +37,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- report-rendering (bolt 085)
+- report-rendering (built — the review loop)
 
 ### Enables
 - ci-gate consumption; GitHub code-scanning upload

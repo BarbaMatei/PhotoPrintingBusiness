@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 007-flow-tracer-agent (guide Prompt 17 — agent-as-skill)
 
+**Workbench seam:** `reviews/lib/discovery-review.wf.js` — partial: the lenses hunt top-down already. No bolt work planned.
+
 ## User Story
 
 **As** the Hunt slot's top-down specialist
@@ -35,7 +37,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- 005-flow-tracing; deduplication, bug-documentation, ledger-io (bolt 085);
+- 005-flow-tracing; deduplication, bug-documentation, ledger-io (built — the review loop);
   002-code-index
 
 ### Enables

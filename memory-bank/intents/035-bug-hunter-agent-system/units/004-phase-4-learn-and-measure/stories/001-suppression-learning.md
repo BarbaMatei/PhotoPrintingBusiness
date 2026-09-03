@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 001-suppression-learning (guide Prompt 25)
 
+**Status:** superseded 2026-09 — replaced by decision attachment (guide Prompt 25, contract §6.5)
+
 ## User Story
 
 **As** the learning loop
@@ -35,7 +37,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- ledger-io + triage-intake (bolt 085) — dismissals-with-reasons are its input
+- ledger-io + triage-intake (built — the review loop) — dismissals-with-reasons are its input
 
 ### Enables
 - curator-agent step (1)

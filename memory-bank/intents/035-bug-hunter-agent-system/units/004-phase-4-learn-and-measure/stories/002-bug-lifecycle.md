@@ -11,6 +11,8 @@ implemented: false
 
 # Story: 002-bug-lifecycle (guide Prompt 26)
 
+**Status:** satisfied by `reviews/lib/records/schema.mjs` and `reviews/lib/records/ledger.mjs` — statuses, reopen and lineage (2026-09)
+
 ## User Story
 
 **As** the ledger's integrity over time
@@ -36,7 +38,7 @@ implemented: false
 ## Dependencies
 
 ### Requires
-- ledger-io (bolt 085), git-revision-tracking (bolt 087)
+- ledger-io (built — the review loop), git-revision-tracking (bolt 087)
 
 ### Enables
 - curator-agent step (2); fix-verification (P5); issue-sync (Optional B)
