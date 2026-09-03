@@ -2,16 +2,16 @@
 id: 003-deduplication
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
-status: ready
+status: complete
 priority: must
 created: 2026-06-10T10:40:14Z
 assigned_bolt: 085-phase-1-skeleton-core
-implemented: false
+implemented: true
 ---
 
 # Story: 003-deduplication (guide Prompt 3)
 
-**Status:** claimed satisfied by `.claude/skills/reconcile-findings/SKILL.md`, scored against ground truth (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
+**Status:** **satisfied with a gap** — verified by bolt 085-phase-1-skeleton-core (2026-09-03). `.claude/skills/reconcile-findings/SKILL.md` does the job and its lineage rules are in production use, but its own trust gate is out of date: the only recorded ground-truth score is 2026-07-27 and the matching rules changed materially on 2026-09-02. Gap carried forward as story [009-reconciler-trust-gate-rescore](009-reconciler-trust-gate-rescore.md), assigned to bolt 087. Evidence: `memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md`.
 
 ## User Story
 

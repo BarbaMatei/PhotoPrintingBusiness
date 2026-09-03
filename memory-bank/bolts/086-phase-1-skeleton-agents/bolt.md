@@ -3,14 +3,14 @@ id: 086-phase-1-skeleton-agents
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
 type: simple-construction-bolt
-status: planned
+status: in-progress
 stories:
   - 006-general-hunter
   - 007-orchestrator-skeleton
 created: 2026-06-10T10:40:14Z
-started: null
+started: 2026-09-03T21:30:00Z
 completed: null
-current_stage: null
+current_stage: plan
 stages_completed: []
 time_box: 2h
 
