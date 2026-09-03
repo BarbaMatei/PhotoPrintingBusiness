@@ -45,6 +45,8 @@ false-positive rate until Phase 2."**
 
 ## ⚠️ Construction Method (owner mandate + guide Part I — MUST follow)
 
+**Historical (2026-09):** this unit is complete by equivalence — the review loop (`reviews/`) supplies these components and bolts 085/086 are retired; the mandate below described the June plan and is superseded by FR-1 as amended (skill-creator only for a new standalone skill).
+
 **Each component MUST be created with the `skill-creator` skill** (`Skill` tool →
 `skill-creator:skill-creator`): paste the component's brief (Prompt N) from
 `docs/agent-systems/bug-hunter-build-guide.md`, build, **run the brief's three test prompts**,

@@ -594,8 +594,6 @@ Left deliberately for the final review or for the owner, one line each:
   an agent's.
 - `ARCHITECTURE.md` §5's mermaid diagram still draws the June build interleave; it is labelled
   superseded rather than redrawn.
-- The contract's §6 heading, "Twin-name discipline", under-describes the judgment-agent rules
-  the section now holds.
 - A dead `DatabaseProvider` environment variable lingers in `docker-compose.yml` and
   `docker-compose.prod.yml` — outside this docs-only plan.
 - `docs/prevention-sweep-idea.md` says "not scheduled" in its frontmatter and "adopted into the
