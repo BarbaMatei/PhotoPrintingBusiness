@@ -12,7 +12,8 @@ created: 2026-09-04T01:40:00Z
   `e2e/` folder is not collected by the unit runner.
 - **Production build with the new budgets**: passes; the same build fails on demand when the
   ceiling is set below the current bundle (negative proof below).
-- **Playwright smoke suite**: 3/3 — recorded per run below.
+- **Playwright smoke suite**: 3/3 passed in 16.7 s on CI run 33807570557 (four runs were needed;
+  what each one found is in Runs, below).
 - **Coverage**: not measured; this repo collects no coverage figure for the UI.
 
 ### Test Files
@@ -60,9 +61,9 @@ admin pages need a bolt of their own.
 | JWT signing key empty | Injected per run; otherwise every request 500s | CI steps `Boot API + PostgreSQL` + `Wait for API health` | ✅ green in CI |
 | API not ready when specs start | Bounded health wait fails loudly with logs | CI step `Wait for API health` | ✅ green in CI |
 | Seed did not run / catalog empty | Guest spec fails fast with a clear message | `guest-checkout.spec.ts` product assertion | ✅ green in CI |
-| SignalR broadcast never arrives | Bounded expectation fails instead of hanging | `realtime-order.spec.ts` | see run below |
-| Hub not yet connected when the broadcast fires | Spec waits for the long-poll connect first | `realtime-order.spec.ts` | see run below |
-| Chosen order has no legal next status | Spec skips with a message naming the fix | `realtime-order.spec.ts` | see run below |
+| SignalR broadcast never arrives | Bounded expectation fails instead of hanging | `realtime-order.spec.ts` | ✅ badge repainted in 1.2 s |
+| Hub not yet connected when the broadcast fires | Spec waits for the long-poll connect first | `realtime-order.spec.ts` | ✅ the wait resolves; no flake in four runs |
+| Chosen order has no legal next status | Spec skips with a message naming the fix | `realtime-order.spec.ts` | ⚠️ branch not exercised — CI always starts from a fresh volume |
 | Playwright browsers missing | Installed in the workflow | CI step `Install Playwright browser` | ✅ green in CI |
 | `ng serve` cold start over 60 s | `webServer.timeout` 180 s | Playwright config | ✅ green in CI |
 | A spec flakes | One retry in CI, trace kept | Playwright config | exercised on run 2 |
@@ -122,4 +123,8 @@ admin pages need a bolt of their own.
 |---|---|---|
 | 33806509289 | ❌ stack failed to build | Pre-existing `Dockerfile` break (observation 1). |
 | 33806693574 | ❌ 1 passed, 2 failed | Admin login green. Guest spec could not click a `display: none` radio; real-time spec hit the empty-Stripe-key 500 (observation 2). Also revealed the generated PEM being echoed into the run log by `$GITHUB_ENV`, now fixed. |
-| 33807234753 | — | Recorded on completion below. |
+| 33807234753 | ❌ 2 passed, 1 failed | Real-time spec green once the Stripe placeholder landed. Guest spec failed on a spec bug of mine: `filter({ has: … })` resolves its locator relative to the candidate element, so `.delivery-card input[value="Courier"]` matched nothing. |
+| **33807570557** | ✅ **3 passed (16.7 s)** | `Running 3 tests using 1 worker` → admin login 1.4 s, guest checkout 2.2 s, real-time order 1.2 s. Well inside the ~3 min criterion. |
+
+The whole job took about 4 minutes 40 seconds, of which the suite is 17 seconds and the rest is
+mostly the Docker image build (deviation 5).

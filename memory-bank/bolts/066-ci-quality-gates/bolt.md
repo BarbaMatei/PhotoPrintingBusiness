@@ -10,11 +10,14 @@ stories:
 created: 2026-06-05T09:30:00Z
 started: 2026-09-03T20:45:00Z
 completed: null
-current_stage: implement
+current_stage: test
 stages_completed:
   - name: plan
     completed: 2026-09-03T23:40:00Z
     artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-09-04T00:20:00Z
+    artifact: implementation-walkthrough.md
 
 requires_bolts: []
 enables_bolts: [067-ui-scaling-and-e2e-ui]
@@ -51,7 +54,7 @@ Add the pre-launch frontend quality gates: catch bundle bloat and automate guest
 ## Stages
 
 - [x] **1. plan**: ✅ Complete → implementation-plan.md
-- [ ] **2. implement**: Pending → angular.json budgets; e2e specs; playwright-e2e.yml
+- [x] **2. implement**: ✅ Complete → angular.json budgets; e2e specs; playwright-e2e.yml
 - [ ] **3. test**: Pending → CI runs budget + e2e green
 
 ## Dependencies
