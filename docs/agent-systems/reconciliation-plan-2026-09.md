@@ -1,6 +1,6 @@
 ---
 type: implementation-plan
-status: executed 2026-09-03 — final review pending; thesis wording (P6.1) awaits owner approval
+status: executed 2026-09-03 — all tasks complete, final review fixes applied; merge into main pending (owner)
 created: 2026-09-02
 owner: Matei Barba
 spec: docs/agent-systems/theory-vs-practice-2026-09.md

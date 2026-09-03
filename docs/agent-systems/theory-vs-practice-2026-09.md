@@ -1,6 +1,6 @@
 ---
 type: cross-analysis
-status: resolved — rulings applied on the branch 2026-09-03; thesis wording pending owner approval
+status: resolved — rulings applied on the branch 2026-09-03; thesis wording applied the same day after owner approval
 created: 2026-09-02
 owner: Matei Barba
 scope: docs/agent-systems + thesis (this branch) versus reviews/ + .claude/skills (main)
