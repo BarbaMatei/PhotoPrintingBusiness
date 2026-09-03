@@ -233,10 +233,10 @@ below as extensions; each line says which brief carries it.
 
 1. **One run is a sample.** Three blind passes over the same feature found 15, 15 and 18 problems,
    nearly disjoint. Design for repetition and breadth, and read "the hunter went quiet" as a fact
-   about the hunter, not about the code. → Prompts 6/7, 27
+   about the hunter, not about the code. → Prompts 3, 7
 2. **Fixes seed defects.** Between a quarter and all of a late round's new serious findings were
    caused by the fixes of earlier rounds. Remediation needs its own lineage, measurement and
-   gates. → Prompts 26, 30–33
+   gates. → Prompts 26, 30–32
 3. **Blinding is a mechanism, not a hope.** A hunter at discovery is given no prior records, finding
    ids or repository history, and agreement a shared hint could have planted is marked `hinted` and
    earns no convergence credit (`docs/agent-systems/integration-contract.md` §6). → Prompt 7
@@ -256,7 +256,7 @@ below as extensions; each line says which brief carries it.
    escapes so far, under a rule whose gating experiment — a second seeded run — never ran, and it
    records that as its own top open finding. → Prompts 27, 28
 9. **The system reviews itself.** 47 findings were raised against the machinery and 18 fixed, by the
-   machinery's own method. → Prompt 29
+   machinery's own method. → Prompts 7 and 29
 10. **Build by running.** Every part the engine trusts was shaped by a failure on a real target; the
     paths never exercised on one are the paths it distrusts. → Part I, The build loop
 
@@ -638,9 +638,13 @@ null-derefs in one function — share a signature), so a signature match is a **
 an auto-collapse**: compare the hypotheses/lines/trigger conditions and only link when they describe the
 same defect; otherwise NEW (the records stay related via `related`). (Note: `suppression_patterns`
 is empty until Phase 4 populates it; this skill already honors it, so no change is needed later.)
+(v3.7: superseded by decision attachment — Prompt 25, Integration Contract §6.5 — the match is
+attached, never used to drop.)
 **Output:** `{verdict: new|duplicate|dismissed|suppressed, matched_id_or_pattern, rationale}`.
 **Dependencies:** `ledger-io`. **Tests:** (a) is this a duplicate of anything in the ledger; (b) matches a
-dismissed signature → drop; (c) same line as BUG-0007 but a different defect → NEW; (d) same symbol, same
+dismissed signature → drop (v3.7: superseded by decision attachment — Prompt 25, Integration
+Contract §6.5 — the match is attached, never used to drop; expect: the candidate is reported with
+the prior decision attached); (c) same line as BUG-0007 but a different defect → NEW; (d) same symbol, same
 bug type, but a *different* null-deref than BUG-0007 → NEW despite the matching signature (v3.2).
 
 **Extends (v3.7).** Lineage beats merging. A finding that reappears at a site an earlier fix touched
@@ -651,6 +655,8 @@ it earns no convergence credit. When the evidence for "same defect" is thin, **s
 over-merge silently deletes a real defect and no later pass can undo it, while a split costs one
 `related` link. Before this skill is trusted, score it against a hand-labelled ground-truth set and
 require zero over-merges — the engine passed that gate on 2026-07-27 over 50 hand-labelled problems.
+**Tests (v3.7):** a problem re-found at a site an earlier fix touched yields a NEW record carrying
+`residual-of` (plus `seed_round` and `area`), never a link to the earlier id.
 
 ## Prompt 4 — Skill: `report-rendering`
 
@@ -687,6 +693,8 @@ an unlinked claim cannot be audited. **Records pass their own gate before they c
 deterministic lint (required sections, id shapes, dead links) and then a model judge reading for
 meaning. Grade record quality separately from review truth and say so out loud — a wrong report that
 follows every template passes the lint.
+**Tests (v3.7):** a summary longer than 60 lines is refused by the lint, and the run does not close
+until it passes.
 
 ## Prompt 5 — Skill: `triage-intake` (NEW in v3)
 
@@ -707,7 +715,9 @@ session (oldest-first beyond the cap, grouped into a digest by area/category) an
 items waiting longer than a configurable age are flagged at the top of the next report so the queue
 can't silently starve. **Output:** applied decisions + an updated queue of anything still awaiting a
 person. **Dependencies:** `ledger-io`. **Tests:** (a) dismiss BUG-0004 with a reason → recorded with
-provenance; (b) approve a proposed suppression pattern → activated; (c) a dismissal with no reason →
+provenance; (b) approve a proposed suppression pattern → activated (v3.7: superseded by decision
+attachment — Prompt 25, Integration Contract §6.5 — the match is attached, never used to drop);
+(c) a dismissal with no reason →
 rejected; (d) intake while a run is active → queued, not racing the merge (v3.2).
 
 **Extends (v3.7).** A decision may be **parked**. On an unattended run, take the written default for
@@ -717,6 +727,8 @@ finishes. And a dismissal is never turned into a filter: the ruling is kept so i
 **attached** to the finding when it is re-found and re-argued by a fresh skeptic (Prompt 25,
 `docs/agent-systems/integration-contract.md` §6.5), which makes the reason a person gives context
 for the next pass rather than a mute button.
+**Tests (v3.7):** a decision parked on an unattended run appears in the run-end report with the
+default that was taken.
 
 ## Prompt 6 — Agent: `general-hunter` (build as a skill defining its procedure)
 
@@ -796,6 +808,8 @@ verification and re-argument of a decided finding are anchored on purpose and ar
 judge from `report-rendering`. (3) **The system is a target of its own hunters:** schedule periodic
 runs over the inspector's own skills and scripts — the engine raised 47 findings against its own
 machinery and fixed 18 of them that way.
+**Tests (v3.7):** a hunter launched for a discovery pass with a prior record in its inputs is
+refused at dispatch.
 
 ---
 
@@ -882,6 +896,8 @@ who did not write it, against the three ways such a test lies: it asserts the li
 now produces instead of the behaviour that was required; it reads as proof only to someone who
 already knows the fix (the audit is a fresh-context read); or it drives an asynchronous path through
 a fake that resolves on its own, so the timing the test claims to cover never happens.
+**Tests (v3.7):** a Critical finding with no failing test from a non-fixer prover is stored one
+level lower and tagged `unproven-high`.
 
 ## Prompt 11 — Skill: `git-revision-tracking`
 
@@ -1233,8 +1249,8 @@ dismissed finding reaches the skeptic with the dismissal quoted, not dropped; (b
 overturns a ruling produces a live finding and moves the overturn rate; (c) confirm no candidate is
 ever removed from a run because of a prior decision.
 
-*Superseded (2026-09 owner ruling: attach the decision, do not learn a filter) — the original v3
-brief is kept below for history.*
+*Superseded (2026-09 owner ruling: attach the decision, do not learn a filter) — the original brief
+is kept below; see git history for the v3 form.*
 
 Create a skill called `suppression-learning`. **Enables:** turning one-off dismissals into reusable
 suppression patterns so whole classes of false positives stop recurring. **Triggers:** after a run with new
@@ -1269,14 +1285,16 @@ returns with the same defect → flag regression; (c) function moved → update 
 (d) a fixed signature returns but the defect is different → NEW linked via `related`, no false
 regression (v3.3).
 
-**Extends (v3.7).** Measure the **seed rate**. For a fix round `r`, `s(r)` is the share of that
-round's new serious findings whose lineage points at that round's own fixes — computable because
+**Extends (v3.7).** Measure the **seed rate**. For a fix round `r`, `s(r)` is the share of the next
+discovery pass's new serious findings whose lineage points at round `r`'s fixes — computable because
 `deduplication` stamps `residual-of` and `seed_round` on every residual (Prompt 3). Report it per
 round and per `area`. Two consecutive rounds seeding the same component at `s ≥ 0.3` are a stop
 signal: the next step is a design pass over that component — write its protocol down, then
 reimplement the part — not a third round of finding-by-finding fixes. On the engine's worst target,
 between a quarter and all of a late round's new serious findings were seeded by the verified fix
 rounds before it.
+**Tests (v3.7):** two consecutive rounds at `s ≥ 0.3` on one component route the next step to a
+design pass, not a third fix round.
 
 ## Prompt 27 — Skill: `eval-corpus`
 
@@ -1311,6 +1329,8 @@ what may be inferred from overlap — a capture–recapture population estimate 
 still in there") is valid only across parallel blinded passes on one frozen commit, never across
 sequential rounds and never across commits. Three such passes over one feature found 15, 15 and 18
 problems, nearly disjoint; that is the measurement this protocol exists to make repeatable.
+**Tests (v3.7):** a seeded run whose passes are not all on one frozen commit is refused as an eval
+and its recall number is not recorded.
 
 ## Prompt 28 — Skill: `eval-metrics`
 
@@ -1345,6 +1365,8 @@ Record it while it is still small: 2 certifications and 0 escapes so far is a tr
 proof. (2) **"A zero-serious pass has never been observed"** is a reportable fact about the system,
 printed with the trend rather than hidden — it says the stop rule has never yet been reached the
 easy way.
+**Tests (v3.7):** a serious defect whose mechanism existed at the certified commit increments the
+escape counter.
 
 ## Prompt 29 — Agent: `Curator` (build as a skill defining its procedure) — fills the Learn slot
 
@@ -1353,7 +1375,9 @@ feedback, keeping the ledger honest, and measuring quality. **Triggers:** at run
 on a schedule — pushy. **Method:** (1) **Learn:** pull new dismissals (captured by `triage-intake`); run
 `suppression-learning` (v3.7: now `decision-attachment`, Prompt 25); present proposed patterns for
 approval (each validated against the Confirmed set);
-activate approved ones so future runs stop re-reporting those classes. (2) **Reconcile:** run
+activate approved ones so future runs stop re-reporting those classes (v3.7: superseded by decision
+attachment — Prompt 25, Integration Contract §6.5 — the match is attached, never used to drop).
+(2) **Reconcile:** run
 `bug-lifecycle` — self-close fixed bugs with evidence, update moved locations, flag regressions.
 (3) **Measure:** run `eval-corpus` + `eval-metrics`; record this run's precision/recall/FP-rate and trend;
 if a recent change coincides with a drop, call it out. (4) **Summarize:** a short health report — FP-rate
@@ -1373,12 +1397,16 @@ checklist to run against its own change *before* it asks for a review, so the ch
 gone before a hunter is paid to find them. Rank by how often the class has recurred and how
 expensive it was to catch late, and retire an entry once it stops appearing. Sketch:
 `docs/prevention-sweep-idea.md`.
+**Tests (v3.7):** the prevention sweep lists defect classes ranked by recurrence, each carrying the
+ledger ids it was mined from.
 
 ## Prompt 29b — `orchestrator` (extends): fill the Learn slot
 
 Re-open the `orchestrator` and point its **Learn** slot (empty since Phase 1) at the `curator-agent`, run
 at the end of each run after reporting. No other change. **Tests:** (a) confirm a run ends by curating;
-(b) confirm activated suppression patterns reduce repeats on the next run.
+(b) confirm activated suppression patterns reduce repeats on the next run (v3.7: superseded by
+decision attachment — Prompt 25, Integration Contract §6.5 — the match is attached, never used to
+drop; expect: the candidate is reported with the prior decision attached).
 
 ---
 
@@ -1415,6 +1443,8 @@ finding. (2) Tests are **red first**: the test is seen failing on the unfixed co
 red is recorded, not asserted. (3) A **non-author audits** every proving test for the three ways a
 test lies (Prompt 10). (4) One **composition review** covers the round's whole diff, looking for
 what the individual fixes did to each other — no per-finding review can see that.
+**Tests (v3.7):** a fixer-authored test that asserts the literal value the code produces fails the
+test-meaning audit.
 
 ## Prompt 31 — Skill: `fix-verification` (extends `bug-lifecycle`) — the loop's verification GATE
 
@@ -1454,6 +1484,8 @@ revert did not build, so the check could not run. Only `held` maps to `verified-
 `test-never-red` and `no-test` map to `closed-unverified`, and `revert-broke-build` to `fix-failed`,
 re-checked at the next pass (`docs/agent-systems/integration-contract.md` §4). A fix is never
 counted on the fixer's word — 234 fixes were verified this way, 6 of them later reopened.
+**Tests (v3.7):** a `revert-broke-build` result is recorded as `fix-failed` and re-checked at the
+next pass, never as `verified-fixed`.
 
 ## Prompt 31b — `orchestrator` (extends): the run-open fix-request mailbox scan (NEW in v3.3)
 
@@ -1491,12 +1523,16 @@ for a confirmed off-by-one and validate it against the harvested test plus the m
 an unvalidated proposal when no test exists; (c) a patch that fixes its own test but breaks a sibling test
 → not labeled validated.
 
-**Extends (v3.7).** `fix-proposal` stays **never-applied**: it drafts, the Builder decides, and the
-fix comes back as a reviewed change through `fix-request-emit`. The one exception is the **pre-merge
-mode**, where the inspector guards a single pull request and a fixer works inside the loop — the
-mode the engine was actually built in. That exception is priced, not free: an in-loop fixer may only
-run a round under the mini-bolt gates (Prompt 30) and the verdict vocabulary (Prompt 31), and it is
-never the agent that verifies its own fix. In the standing-sweep mode the separation stays absolute.
+**Extends (v3.7).** `fix-proposal` stays **never-applied** in both modes — it drafts, the Builder
+decides, and that patch rule is unchanged. The **pre-merge mode**'s in-loop fixer is the one
+exception to a different rule, the separation of inspector and fixer: there the inspector guards a
+single pull request and the fixer works inside the loop, which is the mode the engine was actually
+built in. The exception is priced, not free: such a round runs only under the mini-bolt gates
+(Prompt 30) and the verdict vocabulary (Prompt 31), and the fixer is never the agent that verifies
+its own fix. In the standing-sweep mode inspector and fixer stay fully separate and the fix leaves
+through `fix-request-emit`.
+**Tests (v3.7):** a fix round with no protocol block for a cluster sharing one stateful surface is
+refused at hand-back.
 
 ## Prompt 33 — Skill: `fix-request-emit` (NEW in v3)
 
