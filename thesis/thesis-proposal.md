@@ -8,6 +8,8 @@
 **Academic year:** 2025–2026
 
 > Companion reference: [`bibliography-relevant-passages.md`](bibliography-relevant-passages.md) — annotated source passages mapped to the claims and chapters below.
+>
+> Reconciliation of the design with the implementation: [`docs/agent-systems/theory-vs-practice-2026-09.md`](../docs/agent-systems/theory-vs-practice-2026-09.md).
 
 ---
 
@@ -22,7 +24,7 @@ Design, implement, and evaluate a multi-agent system in which an autonomous **In
 ## 3. Expected contributions
 1. A formal model of the coordination invariants — the **sole-writer storage map**, the cross-system mutex / single-history rule — stated as concurrency-safety properties with a correctness argument.
 2. The **bug → fix → re-verify** loop modeled as a state machine (`open → fix-reported → verified-fixed | fix-failed | closed-unverified`), with the "never closed on the Builder's word alone" rule as a soundness guarantee.
-3. A working implementation grounded in a real .NET + Angular application, plus an empirical evaluation against a baseline.
+3. A working implementation grounded in a real .NET + Angular application — the review loop built June–September 2026 (`reviews/`), extended toward the full Inspector and formalized against the contract — plus an empirical evaluation against a baseline.
 
 ## 4. Methodology and technologies
 Design-science methodology: **formalize → build → measure.** Stack: .NET / C# and Angular (the application under test), LLM agents orchestrated as skills, a git-backed append-only ledger, integration-worktree isolation. Concepts: event-sourcing / ledger patterns, single-writer concurrency, automated program repair.
@@ -31,12 +33,13 @@ Design-science methodology: **formalize → build → measure.** Stack: .NET / C
 > Weeks are illustrative — align to the faculty's actual *licență* calendar.
 
 - **M1 (weeks 1–3):** State of the art; formalize the invariants and the loop state machine.
-- **M2 (weeks 4–8):** Implement the Inspector pipeline (Map → Hunt → Verify → Triage → Report → Learn) and the contract enforcement (mutex, sole-writer checks).
+- **M2 (weeks 4–8):** Extend and formalize the existing Inspector pipeline (Map → Hunt → Verify → Triage → Report → Learn): add the Map slot and the contract enforcement (mutex, sole-writer checks, id reservation); document the pre-merge mode that exists.
 - **M3 (weeks 9–11):** Build the evaluation harness; seed known defects.
 - **M4 (weeks 12–14):** Run experiments, analyze, write up. Future-work chapter: the full agent organization (Conductor, Analyst, Reviewer, Test-Quality, Observability).
 
 ## 6. Evaluation plan
 **Quantitative:** defect detection rate, false-positive rate, loop-closure correctness (fraction of "verified-fixed" claims that hold at HEAD), time-to-verify — compared to a baseline (static analyzer + git hooks).
+**Data already on disk (2026-09):** 234 fixes verified by revert-and-rerun with 6 reopened (loop-closure correctness ≈ 97%); two certifications with zero post-certification escapes so far; skeptic `refuted` verdicts on every pass as a false-positive proxy; one seeded-defect run (10/10, uninformative — the second, harder run is the thesis's key experiment); median 25 minutes per fixed finding and ≈ 293k tokens per serious finding.
 **Qualitative:** a worked end-to-end case study of one defect through the full loop.
 
 ## 7. Selected bibliography
