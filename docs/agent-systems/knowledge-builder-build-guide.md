@@ -198,17 +198,33 @@ Two tools are **shared deterministic tools** with no home system: `code-index` a
 judgment-free tools. The resulting cross-system order is normative in **Integration Contract §7**,
 and it was re-ordered in September 2026 by the owner's ruling D4 (recorded in
 `docs/agent-systems/reconciliation-plan-2026-09.md`), which builds this system only when the
-evidence asks for it. The order is now: the bug-hunter's (the Inspector's) cheapest gaps first →
-the proof rule for high-severity findings — a high-severity finding counts only with a failing test
-written by someone other than the person who fixes it → ingest of existing scanner tools (dependency
-audit, static analysis) → the **Map slot** (code index, application map, reachability) → the
-bug-hunter's **standing-sweep mode** (a scheduled pass over the whole codebase on `main`) → this
-guide's **Phases 1–2**, and only if intent-drift findings appear (findings that the code has drifted
-from its written intent) → this guide's **Phase 4** (loop integration) after the bug-hunter's
-remediation phase, because it consumes the fix-request store and `fix_status`. Phase 5 (Measure) may
-still precede Phase 4, since its eval doesn't depend on the fix loop — review J4. Until this guide's
-Phase 1 exists there is no oracle: the review loop's `requirements` lens reads bolt documents
-directly, and is recorded as the interim oracle consumer in **Integration Contract §8**.
+evidence asks for it. The order is now, one step per bullet:
+
+- **The bug-hunter's cheapest gaps.** The bug-hunter is also called the Inspector, the sibling
+  system that finds defects. The gaps are the ones listed in the bug-hunter guide's section
+  "Implementation status (2026-09)" — a run budget with metered fix rounds first.
+- **The proof rule for high-severity findings.** A high-severity finding counts only with a failing
+  test written by someone other than the person who fixes it. One of the two shared tools,
+  `git-revision-tracking`, is built here on the bug-hunter track: a proof has to name the commit it
+  was taken on.
+- **Ingest of existing scanner tools** — dependency audit and static analysis, read into the
+  findings instead of re-derived by hand.
+- **The bug-hunter's Map slot** — application map and reachability. The other shared tool,
+  `code-index`, is built here. This guide reuses both shared tools as judgment-free tools and never
+  rebuilds them.
+- **The bug-hunter's standing-sweep mode** — a scheduled pass over the whole codebase on `main`,
+  as against the pre-merge pass over one branch that exists today.
+- **This guide's Phases 1–2**, and only if intent-drift findings appear — findings that the code has
+  drifted from its written intent.
+- **This guide's Phase 3** (keeping the ledger honest over time: drift, incremental runs, approval,
+  learning from rejections, the health report) — straight after Phase 2, as before.
+- **This guide's Phase 4** (loop integration) — after the bug-hunter's remediation phase, because it
+  consumes the fix-request store and `fix_status`. Phase 5 (Measure) may still precede Phase 4,
+  since its eval doesn't depend on the fix loop — review J4.
+
+Until this guide's Phase 1 exists there is no oracle: the review loop's `requirements` lens reads
+bolt documents directly, and is recorded as the interim oracle consumer in
+**Integration Contract §8**.
 
 ## Build only as far as your bottleneck demands
 
