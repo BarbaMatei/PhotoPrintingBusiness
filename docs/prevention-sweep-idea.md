@@ -7,6 +7,9 @@ owner: Matei Barba
 
 # Prevention sweep — stop repeat defect classes before they enter the review pipeline
 
+Adopted into the blueprint as the Curator's second output (bug-hunter guide, Prompt 29
+extension, 2026-09).
+
 **The idea in one sentence:** mine the review ledgers for the defect classes that keep
 recurring, and hand the builder that ranked list as a mandatory self-sweep **before** a bolt
 requests review — so known classes get caught at construction time instead of being
