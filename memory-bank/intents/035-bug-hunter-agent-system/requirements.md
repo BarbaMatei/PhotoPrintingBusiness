@@ -205,15 +205,21 @@ loop's fixer applies patches directly, by design; plus one missing brief the des
   relevant, but the guide marks it optional)
 
 ### FR-6: Phase 4 — Learn & Measure (Prompts 25–29b)
-- **Description**: The Curator fills the Learn slot: dismissal reasons →
-  validated suppression patterns (proposed, never auto-activated; checked against the
-  Confirmed set); bug lifecycle with evidence-based self-closing and regression
-  flagging; eval corpus (labeled real + seeded synthetic bugs) and metrics
-  (recall vs seeded corpus; precision proxied by dismissal rate; pinned model/temp
-  for eval runs).
-- **Acceptance Criteria**: After a run with dismissals, proposed patterns arrive with
-  blast radius + no-true-bug-suppressed confirmation; metrics trend over runs; a
-  fixed signature reappearing is flagged as a regression.
+- **Description**: **Rewritten 2026-09 around decision attachment** (guide Prompt 25,
+  integration contract §6.5), which replaces suppression learning. A dismissal never
+  becomes a filter: when a finding is found again, the owner's prior decision is
+  **attached to it** and the finding is **re-argued** on the new evidence — the loop
+  never suppresses a hunter, so nothing can silently stop being looked for. What is
+  still missing is the measurement around it: a standing eval corpus (labeled real +
+  seeded synthetic bugs, plus a **poison fixture** a pass must not "find"), recall and
+  escape metrics, and the curator work — the system self-review and the speed report —
+  run automatically instead of by hand. The bug lifecycle (evidence-based self-closing,
+  regression flagging) already exists.
+- **Acceptance Criteria**: A re-found finding arrives carrying its prior decision and a
+  fresh argument, never as a hidden suppression; the **overturn rate** — how often an
+  attached decision is reversed on re-argument — is measured and trended; recall is
+  measured against the standing corpus rather than asserted; escapes (a bug that
+  reached `main` unfound) are counted; each eval run records the model it ran on.
 - **Priority**: Should
 
 ### FR-7: Phase 5 — Remediation & Regression Safety (Prompts 30–33)
@@ -275,9 +281,9 @@ loop's fixer applies patches directly, by design; plus one missing brief the des
 |---|----------|-----------|
 | D1 | Component names = the guide's names, verbatim (`ledger-io` … `ci-gate`) | Briefs cross-reference each other by these names; renaming breaks the dependency web |
 | D2 | Skills live at `.claude/skills/{name}/` (skill-creator default, project level) | Native Claude Code loading; consistent with the construction mandate |
-| D3 | System outputs root: `bug-hunting/` — `bug-hunting/bug-ledger.json` + `bug-ledger.md`, `bug-hunting/reports/bug-report-run-NN-<ts>.md`, `bug-hunting/eval/` (corpus + fixtures), `bug-hunting/fix-requests/` (the AI-DLC store) | One audited write-root outside app source and outside `memory-bank/` (AI-DLC's tree); single seam — only `ledger-io`/`report-rendering`/`fix-request-emit` know paths, so relocating later is cheap |
-| D4 | Sandbox recipe = the repo's existing `docker-compose` assets (API + Postgres), adapted once by the owner as the fixed asset the Verifier reads | Guide: "you provide the recipe once"; the repo already ships compose files (bolt 040) |
-| D5 | `concurrency-auditor-agent` is in scope at Should priority | Guide-optional, but this stack is async/await + BackgroundServices + EF transactions — exactly its territory |
+| D3 | **Amended 2026-09.** Outputs of the **pre-merge mode** live under `reviews/**`, in the review loop's own layout (records tree, per-pass review/summary documents, `metrics.jsonl`, state). `bug-hunting/**` stays **reserved for the standing-sweep mode** — the ledger, run reports, eval corpus and fix-request store of a scheduled whole-repo pass, when that mode is built | Two modes, one engine: the mode that exists already has a write-root, and inventing a second one for it would fork the records. Reserving `bug-hunting/**` keeps the sweep's store out of both app source and `memory-bank/` (AI-DLC's tree), and keeps path knowledge behind the same few files |
+| D4 | **Amended 2026-09: the sandbox recipe is not a gate.** The execution proof runs the repo's own test commands, so bolt 087 can start without one. A recipe (the repo's `docker-compose` assets, API + Postgres, adapted once by the owner) is needed only if the owner picks the **containerised variant of Prompt 10's proof** | The gap the re-scope asks for is "a failing test written by a non-fixer, naming the commit it was taken on" — satisfiable on the host. Container isolation is an option on top, not a precondition; keeping it as a gate would have stalled the cheapest bolt |
+| D5 | **Amended 2026-09: satisfied.** `concurrency-auditor-agent` (Prompt 22) is the review loop's **`race` lens** — ✓ in the guide's status table; no bolt work | The decision to have it at all was right for this async/await + BackgroundServices + EF stack; it simply already exists |
 | D6 | Oracle stories (Prompts 24–24d) carry a cross-system gate | `intent-lookup` reads the knowledge builder's `ledger-query` interface — now specified in `docs/agent-systems/integration-contract.md` (§2/§3) and built per `docs/agent-systems/knowledge-builder-build-guide.md`; bolt 091 runs after the knowledge builder's Phases 1–2 (contract §7), unless the owner descopes the oracle |
 | D7 | Story files do not duplicate brief content | The guide is the spec of record; stories carry tracking + acceptance criteria + the skill-creator mandate, and point at Prompt N |
 

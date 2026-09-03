@@ -54,8 +54,9 @@ brief → build → run its three test prompts → fix → next, in master-build
 ## Decision Log
 
 > **Note (2026-06-15):** rows below reference the four cross-system review files
-> (the `cross-system-review-v1`…`v4` files under `docs/agent-systems/reviews/`, removed in
-> `b4329a8`; recoverable with `git show`) and intermediate spec versions (v3.1–v3.6,
+> (`docs/agent-systems/reviews/cross-system-review-v<N>-<date>.md`, v1–v4 — read any of them with
+> `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v<N>-<date>.md`) and
+> intermediate spec versions (v3.1–v3.6,
 > v1.1–v1.5). Once the specs reached final form, those review files and versioned copies were removed;
 > the specs are now versionless (`bug-hunter-build-guide.md`, `integration-contract.md`,
 > `knowledge-builder-build-guide.md`). All of it remains recoverable in **git history** — the rows are
@@ -113,3 +114,36 @@ brief → build → run its three test prompts → fix → next, in master-build
 085 → 086 → 087 → 088 → {089, 090} → 091 → 092 → 093; 094 hangs off 092 (adoption-
 gated). External: sandbox recipe (087+), knowledge ledger `ledger-query` (091),
 tracker/CI adoption (094). No dependencies on application bolts; zero production code.
+
+## 2026-09-03 — Re-scope after the review loop (see requirements.md)
+
+The rows above are the June 2026 record and stay as written. This section records what changed
+in September 2026; `requirements.md` and `units.md` carry the current scope.
+
+- **43 briefs, unchanged** as the definition of the system. What changed is who satisfies them.
+- **12 are satisfied by the review loop** under `reviews/` — the engine was built June–September
+  2026 while reviewing, in pre-merge mode. Per-brief status: the guide's
+  "Implementation status (2026-09)" table (`docs/agent-systems/bug-hunter-build-guide.md`).
+  **31 remain**: 16 missing, 15 partial.
+- **Bolts 085 and 086 are retired** — satisfied by that engine, and removed rather than marked
+  `complete`, because `standards/bolt-process.md` allows `complete` only after a bolt's first
+  discovery pass. Their stories stay under `units/001-phase-1-skeleton/`, each carrying the file
+  that satisfies it; unit 001 is complete by equivalence.
+- **8 bolts remain, 087–094**, in the order ruled by the owner and written up in
+  `docs/agent-systems/integration-contract.md` §7:
+
+  **087** (trust upgrades: `tool-ingest`, the risk score + reachability weight, execution proof,
+  moved/fixed detection) → **088** (the Map slot: `app-mapping`, `code-index`, `reachability`,
+  the budget unit) → **089 ∥ 090** (specialists, both waiting on the Map slot) → **092** (learn &
+  measure) → **093** (remediation hand-off) → **091** (oracle tier, last, ⛔ gated on the
+  knowledge builder's `ledger-query`); **094** (optional integration) hangs off 092 and is
+  listed after 091 in §7, adoption-gated.
+
+- **The oracle tier is the last bolt of unit 003**, not a unit of its own: bolt 091 keeps
+  `unit: 003-phase-3-breadth-and-scale`, runs after 089/090, and is the only piece of this intent
+  that cannot start until the knowledge builder exists. Nothing waits on it.
+- Standing-sweep mode — the second of the engine's two modes, a scheduled pass over all of
+  `main` — has no bolt of its own yet (§7, step 5).
+- Construction method: a piece that extends the review loop is built as a script or skill in that
+  tree at the seam its story names, with a test under `reviews/lib/tests`; skill-creator remains
+  the builder for a new standalone skill (`intent-lookup`, `issue-sync`, `ci-gate`).
