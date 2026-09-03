@@ -29,9 +29,11 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 # curl for HEALTHCHECK; non-root runtime user. icu-libs + icu-data-full because this base
 # image ships no ICU and the invoice PDF renders in ro-RO; icu-libs alone pulls the
 # English-only data set, which carries no Romanian locale data.
+# Recent aspnet:8.0-alpine tags already ship an `app` user and group at 1001, and creating
+# them again fails the build, so create only what is missing.
 RUN apk add --no-cache curl icu-libs icu-data-full \
- && addgroup -g 1001 app \
- && adduser -D -u 1001 -G app app
+ && (getent group app > /dev/null || addgroup -g 1001 app) \
+ && (id -u app > /dev/null 2>&1 || adduser -D -u 1001 -G app app)
 WORKDIR /app
 COPY --from=api-build /app/publish ./
 COPY --from=ui-build  /ui/dist/PhotoPrint.UI/browser ./wwwroot
