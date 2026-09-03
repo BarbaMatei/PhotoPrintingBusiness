@@ -557,10 +557,10 @@
 
 (counts from the per-story listing lines)
 
-- **✅ IMPLEMENTED**: 80
+- **✅ IMPLEMENTED**: 91
 - **✅ COMPLETE** (intent 024 specifically): 8
 - **✅ GENERATED**: 46 — these are intent 001/002/003 stories that *are* implemented but the index was authored before that and never reclassified; treat as IMPLEMENTED
-- **⬜ NOT STARTED**: 20 (intents 016, 020, 021, 022 — 7 planned bolts)
+- **⬜ NOT STARTED**: 9 (intents 021, 022 — 3 planned bolts: 046 parked, 047, 048)
 - **♻️ SUPERSEDED**: 1 (story 019-003 → folded into intent 024 bolt 051)
 
 ---
