@@ -115,12 +115,15 @@ fix, then move on — in order. Briefs 14b/24b/24c/24d **re-open existing skills
 ## Constraints
 
 - Read-only on app source. Extensions only at the briefs' named seams (NFR-2).
-- Bolts 089 ∥ 090 are the only parallel pair (disjoint new skills); 091 re-opens
-  skills from 086–090 and must run alone.
+- Bolts 089 ∥ 090 are the only parallel pair (disjoint files); 091 re-opens pieces
+  from 087–090 and must run alone.
 
 ## Success Criteria
 
-- [ ] All 17 briefs built via skill-creator; three test prompts each, passing.
+- [ ] The unit's remaining briefs are built as review-loop extensions at the seams their
+      stories name, each with a test under `reviews/lib/tests`; skill-creator is used only for a
+      new standalone skill (`intent-lookup`). The satisfied briefs — `security-auditor-agent`
+      (19) and `concurrency-auditor-agent` (22) — carry their Status lines and are not rebuilt.
 - [ ] A run dispatches specialists by risk class, scans incrementally under a budget,
       and (oracle available) reports a contract-contradiction with the contract cited.
 

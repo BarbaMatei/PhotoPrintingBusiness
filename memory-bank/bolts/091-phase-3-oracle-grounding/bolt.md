@@ -18,7 +18,7 @@ time_box: 4h
 
 requires_bolts: [089-phase-3-specialists-a, 090-phase-3-specialists-b]
 enables_bolts: []
-requires_units: [002-phase-2-trust]
+requires_units: [002-phase-2-trust, 003-phase-3-breadth-and-scale]
 blocks: true
 notes: gated on the knowledge-builder's ledger-query per the owner's 2026-09 build-order ruling; last in the order, so nothing waits on it
 

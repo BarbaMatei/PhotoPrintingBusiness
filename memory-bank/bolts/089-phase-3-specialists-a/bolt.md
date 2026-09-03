@@ -17,7 +17,7 @@ stages_completed: []
 time_box: 4h
 
 requires_bolts: [088-phase-3-map-and-reachability]
-enables_bolts: [091-phase-3-oracle-grounding]
+enables_bolts: [091-phase-3-oracle-grounding, 092-phase-4-learn-and-measure]
 requires_units: [002-phase-2-trust]
 blocks: false
 
@@ -81,7 +81,8 @@ the specification of each piece's behaviour.
 - 088-phase-3-map-and-reachability (code-index, app-mapping, flow-tracing)
 
 ### Enables
-- 091-phase-3-oracle-grounding (24b re-opens these hunters)
+- 091-phase-3-oracle-grounding (24b re-opens the lenses this bolt touches) and
+  092-phase-4-learn-and-measure (the corpus scores what these lenses produce)
 
 ## Success Criteria
 

@@ -2,12 +2,15 @@
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
 phase: inception
-status: satisfied
+status: complete
 unit_type: tooling
 default_bolt_type: simple-construction-bolt
 created: 2026-06-10T10:40:14Z
 updated: 2026-06-10T10:40:14Z
 ---
+
+Complete by equivalence: satisfied by the review loop (`reviews/`), not by building bolts
+085/086 (retired 2026-09).
 
 # Unit Brief: Phase 1 — Skeleton
 

@@ -79,10 +79,12 @@ If skill-creator is unavailable, **STOP and report**.
 
 ## Technical Context
 
-- **Sandbox (external prerequisite, requirements D4)**: owner provides the recipe
-  once — adapt the repo's compose assets (API + Postgres; .NET test runner). The
-  Verifier builds/destroys a fresh container per run; outbound network locked;
-  time/CPU/memory capped; never real production data (NFR-3).
+- **Sandbox (not a gate — requirements D4)**: the execution proof runs the repo's own test
+  commands, so this unit needs no sandbox recipe to start. A recipe is needed only if the owner
+  picks the containerised variant of Prompt 10's proof (bolt 087 and `units.md` say the same):
+  adapt the repo's compose assets (API + Postgres; .NET test runner), build/destroy a fresh
+  container per run, outbound network locked, time/CPU/memory capped, never real production
+  data (NFR-3).
 - **v3 hardening (binding)**: before trusting any sandbox result, confirm the
   container builds the **commit under analysis** — stale recipe ⇒ "could not verify
   in sandbox" + report the broken environment (never silent static fallback); proof
