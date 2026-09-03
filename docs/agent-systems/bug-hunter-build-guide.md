@@ -1211,7 +1211,29 @@ contract-contradiction finding is reported with its contract cited.
 from your dismissals and self-closing fixed bugs — and an eval harness measures whether changes actually
 help. The dismissals it learns from now arrive through the `triage-intake` channel built in Phase 1.*
 
-## Prompt 25 — Skill: `suppression-learning`
+## Prompt 25 — Skill: `decision-attachment` (replaces `suppression-learning`, v3.7)
+
+Create a skill called `decision-attachment`. **Enables:** carrying an owner's earlier ruling forward
+onto the finding it was about, so a problem the system re-finds is argued again with that ruling in
+hand instead of being filtered out of the run. **Triggers:** whenever a run re-finds something
+already ruled on — pushy. **Method:** never filter. When a candidate matches a finding that carries
+a recorded dismissal or decision, attach that ruling **verbatim** — its text, who made it, when, and
+the commit it was made against — to the new finding, then route the pair to a **fresh skeptic**: an
+agent that did not raise the finding and has not read this pass's other records, whose job is to
+argue the finding again with the ruling as context and reach its own verdict — the ruling still
+holds, or it is overturned and the finding stands. Record which, with the skeptic's reasoning.
+Report the **overturn rate** (rulings overturned ÷ rulings re-argued) per run and as a trend: it is
+the direct measure of whether attaching decisions beats suppressing them — of the first five
+re-raised findings on the engine, three were overturned. Suppression patterns are not built, and
+`deduplication` never drops a candidate on one (`docs/agent-systems/integration-contract.md` §6.5).
+**Output:** each re-found finding with its prior ruling attached, the skeptic's verdict, and the
+run's overturn rate. **Dependencies:** `ledger-io`, `triage-intake`. **Tests:** (a) a re-found
+dismissed finding reaches the skeptic with the dismissal quoted, not dropped; (b) a skeptic that
+overturns a ruling produces a live finding and moves the overturn rate; (c) confirm no candidate is
+ever removed from a run because of a prior decision.
+
+*Superseded (2026-09 owner ruling: attach the decision, do not learn a filter) — the original v3
+brief is kept below for history.*
 
 Create a skill called `suppression-learning`. **Enables:** turning one-off dismissals into reusable
 suppression patterns so whole classes of false positives stop recurring. **Triggers:** after a run with new
@@ -1246,6 +1268,15 @@ returns with the same defect → flag regression; (c) function moved → update 
 (d) a fixed signature returns but the defect is different → NEW linked via `related`, no false
 regression (v3.3).
 
+**Extends (v3.7).** Measure the **seed rate**. For a fix round `r`, `s(r)` is the share of that
+round's new serious findings whose lineage points at that round's own fixes — computable because
+`deduplication` stamps `residual-of` and `seed_round` on every residual (Prompt 3). Report it per
+round and per `area`. Two consecutive rounds seeding the same component at `s ≥ 0.3` are a stop
+signal: the next step is a design pass over that component — write its protocol down, then
+reimplement the part — not a third round of finding-by-finding fixes. On the engine's worst target,
+between a quarter and all of a late round's new serious findings were seeded by the verified fix
+rounds before it.
+
 ## Prompt 27 — Skill: `eval-corpus`
 
 Create a skill called `eval-corpus`. **Enables:** maintaining a ground-truth set of known bugs — the answer
@@ -1270,6 +1301,15 @@ seeded bugs can't pollute real coverage, dedup state, or lifecycle history. **Ou
 hit-matcher. **Dependencies:** `ledger-io`.
 **Tests:** (a) build a corpus from ten historical confirmed bugs; (b) add three seeded SQL-injection bugs
 in the fixture; (c) retire an obsolete entry; (d) an eval run leaves the real ledger untouched (v3.2).
+
+**Extends (v3.7).** Write the **seeded-run protocol** down beside the corpus, because a recall
+number is only as good as the run that produced it: freeze one commit; run the passes in parallel
+and blinded, no pass seeing another's findings; have a different agent implant the seeds than the
+one that hunts them; score recall per severity rather than as one number. The protocol also bounds
+what may be inferred from overlap — a capture–recapture population estimate ("how many problems are
+still in there") is valid only across parallel blinded passes on one frozen commit, never across
+sequential rounds and never across commits. Three such passes over one feature found 15, 15 and 18
+problems, nearly disjoint; that is the measurement this protocol exists to make repeatable.
 
 ## Prompt 28 — Skill: `eval-metrics`
 
@@ -1297,6 +1337,14 @@ rate; a run that locates the seeded bug but *obeys* the suppression comment scor
 the corpus; (b) compute FP rate from dismissals and explain why corpus-misses aren't counted as FPs;
 (c) show the precision/recall trend over five runs.
 
+**Extends (v3.7).** Add two live counters that need no corpus. (1) The **escape counter**: a serious
+defect found in a target after it was certified is an escape, and escapes ÷ certifications is the
+live false-certification rate — the only number that grades the stop rule outside an experiment.
+Record it while it is still small: 2 certifications and 0 escapes so far is a track record, not a
+proof. (2) **"A zero-serious pass has never been observed"** is a reportable fact about the system,
+printed with the trend rather than hidden — it says the stop rule has never yet been reached the
+easy way.
+
 ## Prompt 29 — Agent: `Curator` (build as a skill defining its procedure) — fills the Learn slot
 
 Create a skill called `curator-agent`. **Enables:** after each run (or on a schedule), learning from your
@@ -1314,6 +1362,14 @@ recommendation. Read-only on source; writes the ledger + summary. **Output:** a 
 ledger. **Dependencies:** `suppression-learning`, `bug-lifecycle`, `eval-corpus`, `eval-metrics`,
 `ledger-io`. **Tests:** (a) curate after a run (learn dismissals + reconcile fixed bugs); (b) record metrics
 and say if quality is trending down; (c) produce the health summary.
+
+**Extends (v3.7).** The Learn slot gets a second output, aimed at the Builder rather than at the
+inspector: the **prevention sweep**. Mine the ledger for defect classes that keep recurring — the
+same category in the same kind of place, across targets — and hand the Builder a short ranked
+checklist to run against its own change *before* it asks for a review, so the cheapest defects are
+gone before a hunter is paid to find them. Rank by how often the class has recurred and how
+expensive it was to catch late, and retire an entry once it stops appearing. Sketch:
+`docs/prevention-sweep-idea.md`.
 
 ## Prompt 29b — `orchestrator` (extends): fill the Learn slot
 
@@ -1348,6 +1404,15 @@ statically (no runnable test), record that no regression test exists.
 **Tests:** (a) harvest the failing test for a confirmed null-deref and link it to the bug; (b) handle a
 statically-only-confirmed bug (note: no test); (c) confirm it never edits application source.
 
+**Extends (v3.7).** A fix round is a **mini-bolt**, not a list of patches, and it gets a bolt's
+gates. (1) Before any cluster of fixes touching one stateful surface, write that surface's protocol
+down — the states, who may change them, what each caller may assume — and fix against the written
+protocol; the engine's most expensive rounds were the ones that patched such a cluster finding by
+finding. (2) Tests are **red first**: the test is seen failing on the unfixed code, and that it went
+red is recorded, not asserted. (3) A **non-author audits** every proving test for the three ways a
+test lies (Prompt 10). (4) One **composition review** covers the round's whole diff, looking for
+what the individual fixes did to each other — no per-finding review can see that.
+
 ## Prompt 31 — Skill: `fix-verification` (extends `bug-lifecycle`) — the loop's verification GATE
 
 Create a skill called `fix-verification`, and extend `bug-lifecycle` to use it. **Enables:** closing bugs on
@@ -1376,6 +1441,16 @@ first. **Output:** a verified Fixed/Confirmed status with the test result as evi
 verified-fixed signal. **Dependencies:** `regression-harvest`, `bug-lifecycle`, sandbox. **Tests:** (a) a
 fix that makes the test pass → confirm Fixed and emit verified-fixed; (b) a "fix" that doesn't → stay
 Confirmed, no signal; (c) no test → fall back and mark unverified + `closed-unverified`.
+
+**Extends (v3.7).** Adopt the engine's verdict vocabulary, which is richer than pass/fail because it
+names the ways a "verified" fix can be hollow. Verify by revert-and-rerun: revert the fix, run the
+proving test, watch it go red, restore. `held` — the test passed with the fix and went red without
+it, the only verdict that closes a bug. `test-never-red` — the test still passes with the fix
+reverted, so it proves nothing. `no-test` — there is no proving test. `revert-broke-build` — the
+revert did not build, so the check could not run. Only `held` maps to `verified-fixed`;
+`test-never-red` and `no-test` map to `closed-unverified`, and `revert-broke-build` to `fix-failed`,
+re-checked at the next pass (`docs/agent-systems/integration-contract.md` §4). A fix is never
+counted on the fixer's word — 234 fixes were verified this way, 6 of them later reopened.
 
 ## Prompt 31b — `orchestrator` (extends): the run-open fix-request mailbox scan (NEW in v3.3)
 
@@ -1412,6 +1487,13 @@ apply the patch to the real repository** — attach it to the bug record / repor
 for a confirmed off-by-one and validate it against the harvested test plus the module's suite; (b) present
 an unvalidated proposal when no test exists; (c) a patch that fixes its own test but breaks a sibling test
 → not labeled validated.
+
+**Extends (v3.7).** `fix-proposal` stays **never-applied**: it drafts, the Builder decides, and the
+fix comes back as a reviewed change through `fix-request-emit`. The one exception is the **pre-merge
+mode**, where the inspector guards a single pull request and a fixer works inside the loop — the
+mode the engine was actually built in. That exception is priced, not free: an in-loop fixer may only
+run a round under the mini-bolt gates (Prompt 30) and the verdict vocabulary (Prompt 31), and it is
+never the agent that verifies its own fix. In the standing-sweep mode the separation stays absolute.
 
 ## Prompt 33 — Skill: `fix-request-emit` (NEW in v3)
 
