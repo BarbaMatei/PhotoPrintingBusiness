@@ -48,15 +48,12 @@ test.describe('Checkout ca vizitator', () => {
     await page.getByRole('link', { name: /Finalizează comanda/ }).click();
     await expect(page).toHaveURL(/\/checkout\/livrare$/);
 
-    const courier = page.locator('.delivery-card input[value="Courier"]');
+    const courierCard = page
+      .locator('.delivery-card')
+      .filter({ has: page.locator('input[value="Courier"]') });
+    const courier = courierCard.locator('input[value="Courier"]');
     await expect(courier, 'costurile de livrare nu s-au încărcat').toBeEnabled();
-    const shipping = parseAmount(
-      await page
-        .locator('.delivery-card')
-        .filter({ has: courier })
-        .locator('.card-price')
-        .innerText(),
-    );
+    const shipping = parseAmount(await courierCard.locator('.card-price').innerText());
     await courier.check();
 
     await page.locator('#street').fill('Strada Memorandumului');
