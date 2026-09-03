@@ -24,7 +24,9 @@ test.describe('Checkout ca vizitator', () => {
     await expect(page.locator('.photo-strip__item')).toHaveCount(1);
     await expect(page.locator('app-quantity-stepper')).toHaveCount(1);
 
-    await page.locator('.size-option input[type="radio"]').first().check();
+    const firstSize = page.locator('label.size-option').first();
+    await firstSize.click();
+    await expect(firstSize).toHaveClass(/size-option--selected/);
 
     const summaryTotal = page.locator('.summary__total');
     await expect(summaryTotal).toContainText('lei');

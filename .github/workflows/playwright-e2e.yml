@@ -24,21 +24,18 @@ jobs:
           cache: npm
           cache-dependency-path: src/PhotoPrint.UI/package-lock.json
 
-      # .env is gitignored, so a fresh checkout has none and compose refuses to start.
-      # The JWT key is generated per run and handed to compose through the environment:
-      # a multi-line PEM cannot survive an .env file.
+      # .env is gitignored, so a fresh checkout has none and compose refuses to start. The JWT key
+      # is generated per run and read from the (gitignored) file by every compose step: putting a
+      # multi-line PEM in $GITHUB_ENV would print it in each later step's env block.
       - name: Prepare stack configuration
         run: |
           cp .env.example .env
           sh scripts/gen-dev-keys.sh
-          {
-            echo 'E2E_JWT_PRIVATE_KEY_PEM<<PEM_EOF'
-            cat secrets/dev-jwt-private.pem
-            echo 'PEM_EOF'
-          } >> "$GITHUB_ENV"
 
       - name: Boot API + PostgreSQL
-        run: docker compose $COMPOSE_FILES up -d --build
+        run: |
+          export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem)"
+          docker compose $COMPOSE_FILES up -d --build
 
       - name: Wait for API health
         run: |
@@ -50,11 +47,14 @@ jobs:
             sleep 2
           done
           echo "API did not become healthy in 120s. Logs:"
+          export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem)"
           docker compose $COMPOSE_FILES logs api
           exit 1
 
       - name: Seed catalog, admin user and demo orders
-        run: docker compose $COMPOSE_FILES run --rm api --seed-dev
+        run: |
+          export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem)"
+          docker compose $COMPOSE_FILES run --rm api --seed-dev
 
       - name: Install UI dependencies
         working-directory: src/PhotoPrint.UI
@@ -70,7 +70,9 @@ jobs:
 
       - name: Collect API logs on failure
         if: failure()
-        run: docker compose $COMPOSE_FILES logs --no-color api > api-e2e.log
+        run: |
+          export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem 2>/dev/null || echo unused)"
+          docker compose $COMPOSE_FILES logs --no-color api > api-e2e.log
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -84,4 +86,6 @@ jobs:
 
       - name: Tear down stack
         if: always()
-        run: docker compose $COMPOSE_FILES down -v
+        run: |
+          export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem 2>/dev/null || echo unused)"
+          docker compose $COMPOSE_FILES down -v
