@@ -4,6 +4,17 @@
 restates it. **If a brief and this contract disagree, this contract wins.** Changes here are
 versioned (v1, v1.1, v2, …) and require checking every consumer listed in §8.*
 
+> **v1.6 (2026-09) — reconciliation with the review loop (owner rulings D1–D4, recorded in
+> `docs/agent-systems/reconciliation-plan-2026-09.md`).** The Inspector — the bug-hunter, the system
+> that finds defects — exists as the review loop (`reviews/**`), running in pre-merge mode (D1: one
+> engine, two modes — the pre-merge gate that exists and the scheduled standing sweep that does not).
+> §1 gains the `reviews/**` store row and the id-reservation rule for parallel worktrees (D2). §4
+> gains the mapping between the loop's fix verdicts and `fix_status`, and the proof rule for
+> high-severity findings (D3). §6 gains the blinding rule for judgment agents and the "verifier is
+> never the fixer" rule inside a system. New §6.5 states the never-suppress rule. §7 is re-ordered per
+> D4. §8 lists the review loop's components as consumers. Every rule below that names a brief still
+> holds for that brief.
+
 > **v1.5 (2026-06-15) — operating model factored into pluggable profiles (owner design).** The
 > systems are a portable product: the core is invariant; the *operating context* is two independent
 > policies — **TriggerPolicy** (when a run fires + how runs serialize) and **CommitPolicy** (how
@@ -66,6 +77,7 @@ versioned (v1, v1.1, v2, …) and require checking every consumer listed in §8.
 |---|---|---|
 | `memory-bank/**` (intents, bolts, standards, operations, story-index, maintenance-log) | AI-DLC | knowledge builder, bug-hunter, humans |
 | `bug-hunting/**` (bug ledger, reports, eval, `fix-requests/`) | bug-hunter | knowledge builder, AI-DLC, humans |
+| `reviews/**` — per-target review records; the target folder on the feature branch is the working copy, `main` (`state/`, `archive/`) is the canonical store once the branch merges (v1.6) | the review loop — rows flipped only by `render-records.mjs`, events only by `wl.mjs`, ids only by `mint-id.mjs` | everyone |
 | `knowledge/**` (knowledge ledger, views, index, eval fixtures/runs) | knowledge builder | bug-hunter, AI-DLC, humans |
 | application source + test projects | humans + AI-DLC bolts (and the bug-hunter's **approved** regression tests only) | everyone |
 | `bug-hunting/code-index/` (symbol/reference index) | the shared `code-index` tool — derived, regenerable; either system's run may refresh it (the one sanctioned dual-writer; conflicts resolved by regeneration, never merge) (v1.2). **Refresh is atomic — published via pointer swap, never in-place; readers always see a complete index; stamped `built_at_commit`** (v1.3). **Untracked build artifact (v1.4): gitignored — never committed by either system, never part of a publish-commit, and not subject to the close audit; on rollback it is regenerated against the restored commit, not restored from git.** | both systems |
@@ -89,6 +101,14 @@ rule) and refuses/queues while it is present and fresh; the two locks together a
 operating profile (§5.5): the `.run-lock` mutex described here is the mechanism for the `local-hook` /
 `manual` triggers; a `ci-pipeline` profile uses the runner's concurrency group instead and needs no
 lock.
+
+**Id reservation (v1.6 — from the ruling on where review records live):** a target reserves a range
+of `PPW` finding numbers in `reviews/state/id-counter` when it opens; two worktrees never mint from
+the same range. Until the reservation is implemented, the duplicate-mint alarm (`mint-id.mjs` refuses
+an id already in use) is the guard. The single-history rule above governs `bug-hunting/**` and
+`knowledge/**`; `reviews/**` is deliberately different — its records are part of the change under
+review, so they ride the feature branch as the working copy and become canonical on `main` when the
+branch merges.
 
 Cross-store reads are always allowed; cross-store **writes never are** — and **each orchestrator
 audits its own run's writes at close** (v1.2). The audit has **two parts (v1.4):** (1) a
@@ -198,6 +218,17 @@ If the map is absent or stale, flow queries return empty with
 - **Re-distillation (knowledge builder):** requires BOTH signals for the same `correlation_id`;
   idempotent — one re-distillation per verified fix. Never on AI-DLC's word alone.
 
+**Mapping to the review loop's verdicts (v1.6).** `verify-fixes.mjs` verdicts are the pre-merge
+mode's `fix_status`: `held` ≡ `verified-fixed`; `test-never-red`, `no-test` ≡ `closed-unverified`
+(no oracle entry, the fix is not counted); `revert-broke-build` ≡ `fix-failed` (re-checked at the
+next pass). A fix is never counted on the fixer's word — the same rule, both modes.
+
+**Proof rule for high-severity findings (v1.6 — from the ruling on execution proof).** A 🔴 /
+Critical finding enters the ledger as such only with a failing test written by a non-fixer — an agent
+other than the one that fixes it; otherwise it is recorded one level lower with the tag
+`unproven-high`. That failing test is the proving test the fix verifier already needs, so the proof is
+paid for once. The rule holds in both modes.
+
 ## §5 — Freshness, integrity, cadence
 
 - Every knowledge-ledger publish: atomic swap, `ledger_version` bump, `as_of_commit` stamp, content
@@ -284,19 +315,57 @@ sibling:
 | `current-state-description` | `app-mapping` | "behavioral observations for drift/firewall — NOT the code map; the map is `app-mapping`" |
 | `eval-fixtures` / `distillation-eval` | `eval-corpus` / `eval-metrics` | "grades DISTILLATION accuracy — NOT bug-detection recall" |
 
+**Rules for judgment agents (v1.6).** These two bind every judgment agent in both systems, not only
+the twin-named skills above:
+
+- **Blinding (v1.6):** a judgment agent (hunter, lens, skeptic, verifier) is given no prior records,
+  finding ids or repository history for the target it judges; agreement planted by a shared hint is
+  flagged (`hinted`) and earns no convergence credit.
+- **Verifier ≠ fixer (v1.6):** inside a system as between systems — the agent that verifies a fix or
+  audits a test is never the agent that wrote it.
+
+## §6.5 — Never suppress a hunter (v1.6)
+
+A finding the owner dismissed is not filtered out of later runs. It is re-found, the earlier
+decision is attached to it verbatim, and a fresh skeptic re-argues it. Suppression patterns (bug-hunter
+Prompt 25, original form) are not built: of the first five re-raised findings on the review loop,
+three were overturned.
+
 ## §7 — Cross-system build interleave
 
 Bug-hunter steps are named by bolt (its inception has run: bolts 085–094); knowledge-builder steps
 are named by phase **until its own inception assigns bolt numbers** — update this section when it
 does.
 
-```
-1. Bug-hunter bolts 085–088      (foundation; produces the SHARED TOOLS: git-revision-tracking, code-index)
-2. KB Phases 1–2                 (may run parallel with bug-hunter bolts 089/090)
-3. Bug-hunter bolt 091           (oracle tier / intent-lookup — needs KB ledger-query; recommended after KB Phase 2)
-4. Bug-hunter bolts 092–093      (parallel with KB Phases 3 and 5)
-5. KB Phase 4                    (after bug-hunter bolt 093 — needs the fix-request store + fix_status)
-```
+**Build order (v1.6 — re-ordered by the owner's September 2026 ruling on build order).** One step per
+numbered line, each naming the bolt it corresponds to so bolt-numbered gates elsewhere still resolve.
+Bolts 085 and 086 (the Phase 1 skeleton, core and agents) are **satisfied by the review loop** and are
+retired by the re-scope of intent 035.
+
+1. **The Inspector's cheapest gaps** — a run budget with metered fix rounds. (Bolt 087, the trust
+   upgrades, re-scoped.)
+2. **The proof rule for high-severity findings** (§4), with the shared `git-revision-tracking` tool —
+   a proof has to name the commit it was taken on. (Bolt 087 as well; `git-revision-tracking` is one
+   of its stories.)
+3. **Ingest of existing scanner tools** — dependency audit and static analysis, read in as untrusted
+   data instead of re-derived by hand. (Bolts 089 and 090, the specialist auditors; the `tool-ingest`
+   skill itself sits in bolt 087.)
+4. **The Inspector's Map slot** — application map and reachability, which builds the shared
+   `code-index` tool. (Bolt 088.)
+5. **Standing-sweep mode** — a scheduled pass over the whole codebase on `main`, as against the
+   pre-merge pass over one branch that exists today. (No bolt of its own yet; it arrives with the
+   re-scope of intent 035.)
+6. **Knowledge-builder Phases 1–2** — only if intent-drift findings appear, meaning findings that the
+   code has drifted from its written intent.
+7. **Knowledge-builder Phase 3** — keeping the ledger honest over time; straight after Phase 2.
+8. **The Inspector's learn-and-measure work** (bolt 092 — its `suppression-learning` story is
+   replaced by decision attachment, §6.5), then its **remediation hand-off** (bolt 093).
+9. **Knowledge-builder Phase 5 (Measure), then Phase 4 (loop integration)** — Phase 4 only after bolt
+   093, because it consumes the fix-request store and `fix_status`; Phase 5 may run in
+   parallel with bolts 092 and 093, since it depends on neither.
+10. **The Inspector's oracle tier / `intent-lookup`** — last, gated on the knowledge-builder's
+    `ledger-query`. (Bolt 091.)
+11. **Optional integrations** — SARIF output, issue sync, a CI gate. (Bolt 094.)
 
 **Phase 5 may precede Phase 4 (v1.4, review J4 — intentional, not an accident).** The schedule places
 KB Phase 5 (Measure / `distillation-eval`) before Phase 4 (Loop Integration) deliberately:
@@ -325,3 +394,7 @@ orchestrators) are never shared — the separation of powers depends on it.
 | shared `code-index` | §1 atomic pointer-swap refresh + `built_at_commit` stamp (v1.3); gitignored, never committed/audited (v1.4) |
 | BH `app-mapping` (Prompt 12) | §3 flow identity + `built_at_commit` freshness stamp (v1.1) |
 | AI-DLC bug-bolt convention | §4 `correlation_id` in `bolt.md` frontmatter |
+| review loop `discovery-review.wf.js` (lenses, skeptics, synthesis) | §6 blinding; §6.5 never-suppress; §4 proof rule for high-severity findings (v1.6) |
+| review loop `verify-fixes.mjs` + `render-records.mjs` | §4 `fix_status` mapping; §1 sole writer of `reviews/**` flips (v1.6) |
+| review loop `reconcile-findings` skill + `mint-id.mjs` | §1 id reservation / duplicate-mint guard (v1.6) |
+| review loop `requirements` lens | interim oracle consumer until the knowledge-builder exists (§7 build order, v1.6) |
