@@ -139,7 +139,7 @@ carries them.
   record; construction follows it verbatim (deviations are owner decisions).
 - ❌ **No deployment implications.** This is tooling; roadmap Phase 6 (deployment)
   is untouched.
-- ❌ **Re-building what the review loop already does.** The 12 satisfied briefs —
+- ❌ **Re-building what the review loop already does.** The 12 claimed-satisfied briefs —
   Prompts 1, 3–7 (Phase 1 bar the three-audience record of Prompt 2), 11b, 19, 22, 26, 31,
   31b — are not re-implemented; the guide's status table is the record of who satisfies them.
 

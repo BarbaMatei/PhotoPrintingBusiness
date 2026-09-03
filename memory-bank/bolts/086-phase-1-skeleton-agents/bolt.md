@@ -18,7 +18,7 @@ requires_bolts: []
 enables_bolts: []
 requires_units: []
 blocks: false
-notes: verification bolt — confirms the review loop satisfies these stories; builds nothing new; run 085 then 086 (edges left empty on purpose: nothing gates on them)
+notes: verification bolt — confirms the review loop satisfies these stories; builds nothing new; run 085 then 086 (edges left empty on purpose because nothing gates on them)
 
 complexity:
   avg_complexity: 1
