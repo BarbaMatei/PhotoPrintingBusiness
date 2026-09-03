@@ -244,7 +244,9 @@ No commit (scratchpad file).
 - [ ] **Step 1: Replace each path with a git-history pointer**
 
 For every occurrence of `` `docs/agent-systems/reviews/cross-system-review-v<N>-<date>.md` ``
-substitute `` cross-system review v<N> (<date>; the review files were removed in `b4329a8`, read them with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v<N>-<date>.md`) ``.
+substitute `` the review file deleted by `b4329a8` — read it with `git show b4329a8^:docs/agent-systems/reviews/cross-system-review-v<N>-<date>.md` ``, so that each
+citation reads as one clean sentence: the surrounding prose already names the review and its date, so name
+neither again, and close the parenthetical with a single `)`.
 Keep the finding ids (G1–G16, H1–H35, J1, J3) exactly as they are.
 
 - [ ] **Step 2: Check**
