@@ -286,12 +286,22 @@ seeing the proxy instead of the client.
 The decision above is unchanged, and is now enforced structurally rather than by
 convention. A **third invariant** joins the list:
 
-- The scrape listener MUST be excluded from `ForwardedHeadersMiddleware`. The middleware
-  is registered through `UseWhen`, whose predicate skips any request whose
-  `Connection.LocalPort` equals `Observability:Metrics:ScrapePort`. The predicate is keyed
-  on the **listener**, never on the configured metrics path: `PathString.StartsWithSegments`
-  matches everything against `"/"` or `""`, both of which the path setting accepts, so a
-  path-keyed predicate could silently disable forwarded headers for the entire site.
+- A scrape request MUST be excluded from `ForwardedHeadersMiddleware`. The middleware is
+  registered through `UseWhen`, whose predicate skips a request only when **both** hold:
+  `Connection.LocalPort` equals `Observability:Metrics:ScrapePort` (non-zero), **and** the
+  path matches `Observability:Metrics:PrometheusEndpoint`.
+
+  Both conjuncts are load-bearing, in opposite directions:
+
+  - **The port alone is not enough.** If an operator sets `ScrapePort` to the port the API
+    actually serves — which the boot-time validator below can steer them towards, since it
+    demands *some* scrape port — a port-only predicate would exclude every request on that
+    listener, and forwarded headers would be dead site-wide while the boot log still said
+    `forwarded_headers.enabled`.
+  - **The path alone is not enough.** `PathString.StartsWithSegments` matches everything
+    against `"/"` or `""`, both of which the path setting accepts, so a path-only predicate
+    could silently disable forwarded headers for the entire site. The port conjunct bounds
+    that blast radius to the scrape listener, where it is harmless.
 
 Two supports make that invariant hold:
 

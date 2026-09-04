@@ -1629,7 +1629,7 @@ because of it:
 | What reads it | What being wrong costs |
 |---|---|
 | The global rate limiter's partition key | "100 requests/minute per IP" is 100/minute for the *entire internet*. One client at ~2 requests/second can 429 the whole site. |
-| The security-audit log on login and token refresh | Every audit row names Caddy, so an action cannot be attributed to a caller. |
+| The IP handed to the login / token-refresh services | They are given Caddy's address. **Nothing records it yet** — `AuthService` and `SocialAuthService` accept the argument and never use it — so this is a latent input, not a working audit trail. |
 | `Request.IsHttps`, via `X-Forwarded-Proto` | Caddy terminates TLS and forwards plain HTTP, so the API thinks the connection is insecure and ships the refresh-token cookie **without** its `Secure` flag. |
 
 `ForwardedHeaders:TrustedProxies` fixes all three by naming the proxies whose `X-Forwarded-*`
@@ -1647,8 +1647,9 @@ must have all host bits zero, no leading-zero forms, no IPv4-mapped IPv6 ranges.
 aborts startup naming it.
 
 **Empty is the default and means the feature is off** — the middleware is never registered and
-the client identity stays the TCP peer, exactly as before this bolt. A Production boot with an
-empty list logs `forwarded_headers.disabled` at Warning.
+the client identity stays the TCP peer, exactly as before this bolt. The shipped `.env.example`
+leaves it commented out for that reason: read 16.3 first. Any non-Development boot with an empty
+list logs `forwarded_headers.disabled` at Warning, so "off" is never silent.
 
 > **Indexed env vars merge with the array, they do not replace it** — the same trap as §14.5.
 > Set every index you intend to keep.
@@ -1671,6 +1672,13 @@ If the host already routes `172.28.0.0/24`, `docker compose up` fails immediatel
 overlap error. Pick another range in `docker-compose.prod.yml` (`networks.default.ipam`), move
 Caddy's `ipv4_address` with it, and update `ForwardedHeaders__TrustedProxies__0` to match.
 
+> **Upgrading a stack that is already running.** The subnet is new, and Docker will not apply an
+> `ipam` block to a network it already created. `docker compose -f docker-compose.prod.yml up -d`
+> refuses with a "network needs to be recreated" error until you `docker compose -f
+> docker-compose.prod.yml down` first. That is a downtime step, and every container's address
+> changes with it — so re-check `Observability__Metrics__AllowedScrapeIps` (§14.5) at the same
+> time if it names addresses rather than a range.
+
 ### 16.3 Read this before you switch it on
 
 Turning this on is the moment three behaviours change. Two are strict improvements. The first
@@ -1684,7 +1692,9 @@ needs a decision from you.
    count the requests, and set the budget above that with room to spare** before you set
    `TrustedProxies`. The boot log tells you the number in force:
    `forwarded_headers.enabled trusted_proxies=… public_permit_limit=…`.
-2. **The audit trail starts naming the caller.** No action needed.
+2. **The IP handed to the auth services becomes the real client.** No action needed, and no
+   visible effect: nothing records that argument today, so no audit trail appears. This change
+   makes the input correct for whoever wires one up.
 3. **The refresh-token cookie starts carrying `Secure`.** No action needed *if your edge
    terminates TLS*, which the shipped Caddy does. If you put this API behind a proxy that
    forwards `X-Forwarded-Proto: https` while actually serving plain HTTP to the browser, the
@@ -1712,6 +1722,15 @@ needs a decision from you.
 |---|---|---|
 | `OptionsValidationException` naming an entry of `ForwardedHeaders:TrustedProxies` | A typo, host bits set on a CIDR, a leading-zero form | Correct the entry; the message states the accepted form |
 | `ForwardedHeaders:TrustedProxies is set while Observability:Metrics:ScrapePort is 0` | A trusted proxy is declared but the scrape path is still served on every listener | Set `Observability__Metrics__ScrapePort` (§14.3), or clear `TrustedProxies` |
+| `InvalidOperationException: ForwardedHeaders:TrustedProxies has N invalid entries` | Same cause as row 1, reached through the options builder rather than the validator. In practice the validator fires first; this is the backstop if anything ever resolves the middleware options without it | Correct the entry |
+
+And one line to watch for *after* boot, which is not a failure but the most likely way this
+silently stops working:
+
+| Log line | Meaning | Fix |
+|---|---|---|
+| `forwarded_headers.untrusted_peer ip=…` | That peer sent `X-Forwarded-For` but is not in `TrustedProxies`, so the header was ignored and the client identity fell back to the peer itself. If the address shown is the reverse proxy, its address has drifted from the configured one — the feature is off in all but name | Reconcile `ForwardedHeaders__TrustedProxies__0` with the proxy's real address (§16.2) |
+| `forwarded_headers.untrusted_peer.log_cap_reached distinct_ips=512` | Too many distinct untrusted sources to keep logging; further ones are silent until restart | Expect this under a scan; investigate if it appears in normal traffic |
 
 ### 16.6 Verification after deploy
 
@@ -1722,8 +1741,9 @@ docker compose -f docker-compose.prod.yml logs api | grep forwarded_headers
 # 2. Caddy is where you said it is.
 docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' fototipar-caddy-1
 
-# 3. The audit log records real client addresses, not 172.28.0.2.
-docker compose -f docker-compose.prod.yml logs api | grep -i 'login' | tail
+# 3. No peer is being ignored. Any line here means something sent X-Forwarded-For from an
+#    address that is NOT in TrustedProxies — usually Caddy's address having drifted.
+docker compose -f docker-compose.prod.yml logs api | grep forwarded_headers.untrusted_peer
 
 # 4. The refresh cookie is Secure (log in from a browser, check DevTools → Application → Cookies).
 

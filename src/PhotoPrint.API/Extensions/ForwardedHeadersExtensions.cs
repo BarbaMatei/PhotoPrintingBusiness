@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
+using PhotoPrint.API.Middleware;
 using PhotoPrint.API.Observability;
 using PhotoPrint.API.Validators;
 
@@ -22,6 +23,8 @@ public static class ForwardedHeadersExtensions
             .GetSection($"{ForwardedHeadersSettings.SectionName}:{nameof(ForwardedHeadersSettings.TrustedProxies)}")
             .Get<string[]>() ?? [];
 
+        services.AddSingleton<UntrustedForwardedPeerMiddleware>();
+
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -29,7 +32,14 @@ public static class ForwardedHeadersExtensions
             options.KnownNetworks.Clear();
             options.KnownProxies.Clear();
 
-            var parsed = ScrapeIpAllowList.Parse(trustedProxies, out _);
+            var parsed = ScrapeIpAllowList.Parse(trustedProxies, out var errors);
+            if (errors.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"ForwardedHeaders:TrustedProxies has {errors.Count} invalid entr"
+                    + (errors.Count == 1 ? "y: " : "ies: ") + string.Join(" ", errors));
+            }
+
             foreach (var address in parsed.Addresses)
                 options.KnownProxies.Add(address);
             foreach (var network in parsed.Networks)
@@ -46,35 +56,46 @@ public static class ForwardedHeadersExtensions
 
         if (trustedProxies.Length == 0)
         {
-            if (app.Environment.IsProduction())
+            if (!app.Environment.IsDevelopment())
             {
                 app.Logger.LogWarning(
                     "forwarded_headers.disabled — ForwardedHeaders:TrustedProxies is empty, so every "
                     + "request's client identity is its TCP peer. Behind a reverse proxy that is the "
                     + "proxy's own address for all traffic: one rate-limit partition for the whole "
-                    + "internet, and an audit trail that names the proxy. See DEPLOYMENT.md §16.");
+                    + "internet, an audit trail that names the proxy, and a refresh cookie without "
+                    + "Secure. See DEPLOYMENT.md §16.");
             }
 
             return app;
         }
 
-        var permitLimit = app.Configuration
-            .GetSection("RateLimit").Get<RateLimitSettings>()?.Public.PermitLimit ?? 0;
+        var rateLimit = app.Configuration.GetSection("RateLimit").Get<RateLimitSettings>()
+            ?? new RateLimitSettings();
 
         app.Logger.LogInformation(
             "forwarded_headers.enabled trusted_proxies={TrustedProxies} public_permit_limit={PermitLimit} "
             + "— the client identity now comes from X-Forwarded-For, so the public rate-limit budget "
             + "applies per client for the first time",
-            string.Join(", ", trustedProxies), permitLimit);
+            string.Join(", ", trustedProxies), rateLimit.Public.PermitLimit);
 
-        var scrapePort = ScrapeListenerPort(app);
+        var scrapePort  = ScrapeListenerPort(app);
+        var metricsPath = MetricsPath(app);
 
         app.UseWhen(
-            context => scrapePort == 0 || context.Connection.LocalPort != scrapePort,
-            branch => branch.UseForwardedHeaders());
+            context => !IsMetricsScrape(context, scrapePort, metricsPath),
+            branch =>
+            {
+                branch.UseMiddleware<UntrustedForwardedPeerMiddleware>();
+                branch.UseForwardedHeaders();
+            });
 
         return app;
     }
+
+    private static bool IsMetricsScrape(HttpContext context, int scrapePort, PathString metricsPath) =>
+        scrapePort != 0
+        && context.Connection.LocalPort == scrapePort
+        && context.Request.Path.StartsWithSegments(metricsPath, StringComparison.OrdinalIgnoreCase);
 
     private static int ScrapeListenerPort(WebApplication app)
     {
@@ -82,5 +103,16 @@ public static class ForwardedHeadersExtensions
             .GetRequiredService<IOptions<ObservabilitySettings>>().Value;
 
         return observability.Enabled ? observability.Metrics.ScrapePort : 0;
+    }
+
+    private static PathString MetricsPath(WebApplication app)
+    {
+        var configured = app.Services
+            .GetRequiredService<IOptions<ObservabilitySettings>>()
+            .Value.Metrics.PrometheusEndpoint;
+
+        return string.IsNullOrWhiteSpace(configured) || !configured.StartsWith('/')
+            ? "/metrics"
+            : configured;
     }
 }

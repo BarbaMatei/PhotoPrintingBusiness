@@ -55,7 +55,7 @@ public sealed class ScrapeIpAllowList
 
     public IReadOnlyCollection<IPAddress> Addresses => _addresses;
 
-    public IReadOnlyList<IPNetwork> Networks => _networks;
+    public IReadOnlyList<IPNetwork> Networks => Array.AsReadOnly(_networks);
 
     public bool Contains(IPAddress? address)
     {

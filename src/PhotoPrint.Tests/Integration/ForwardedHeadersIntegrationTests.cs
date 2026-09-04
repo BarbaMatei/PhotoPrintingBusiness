@@ -84,6 +84,31 @@ public class ForwardedHeadersIntegrationTests
 
         resolved.IsHttps.Should().BeFalse();
     }
+
+    [Fact]
+    public void An_unparseable_trusted_proxy_aborts_boot()
+    {
+        using var factory = new TrustedProxyFactory("not.an.ip");
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<Exception>()
+            .Which.ToString().Should().Contain("TrustedProxies").And.Contain("not.an.ip");
+    }
+}
+
+[Collection(ObservabilityHostCollection.Name)]
+public class ForwardedHeadersWithObservabilityTests
+{
+    [Fact]
+    public async Task A_request_on_the_public_listener_still_resolves_its_client()
+    {
+        using var factory = new TrustedProxyWithScrapeListenerFactory();
+
+        var resolved = await factory.ResolveAsync(peer: "172.28.0.2", forwardedFor: "203.0.113.9");
+
+        resolved.ClientIp.Should().Be("203.0.113.9");
+    }
 }
 
 internal sealed record ResolvedRequest(string? ClientIp, string Scheme, bool IsHttps);
@@ -116,7 +141,23 @@ internal sealed class ClientIdentityProbeStartupFilter : IStartupFilter
     };
 }
 
-internal sealed class TrustedProxyFactory : ObservabilityFactoryBase
+internal sealed class TrustedProxyWithScrapeListenerFactory : TrustedProxyFactory
+{
+    public TrustedProxyWithScrapeListenerFactory() : base("172.28.0.2") { }
+
+    protected override Dictionary<string, string?> ExtraConfig()
+    {
+        var config = base.ExtraConfig();
+        config["Observability:Enabled"]                    = "true";
+        config["Observability:Metrics:ScrapePort"]         = "9090";
+        config["Observability:Metrics:AllowedScrapeIps:0"] = "10.42.0.5";
+        return config;
+    }
+
+    protected override int SimulatedLocalPort() => 8080;
+}
+
+internal class TrustedProxyFactory : ObservabilityFactoryBase
 {
     private readonly string[] _trustedProxies;
     private readonly ClientIdentityProbe _probe = new();
