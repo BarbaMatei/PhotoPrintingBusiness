@@ -59,3 +59,9 @@ last_updated: 2026-09-04T11:35:00Z
 - Decisions: allowlist regexes rather than `.gitleaksignore` fingerprints, because fingerprints pin commit hashes and break on the next rebase · placeholder values kept in the `sk_test_` shape, since nothing in `src/PhotoPrint.API` validates a Stripe key prefix (`Program.cs` only requires a non-empty `Stripe:SecretKey` in Production) · `.githooks/pre-commit` carries no secret allowlist to mirror (it is the comment/doc gate only), so `.gitleaks.toml`'s "keep in sync with hooks/pre-commit" note is stale and was left untouched as out of scope.
 - Dead ends: no local verification was possible — neither `gitleaks` nor `docker` is installed on this machine, so the two findings are proven gone only by the next scan; the push scan covers only the pushed range, the PR scan covers every commit.
 - Next: bolt complete (the secret-scan fix; the branch stays at `review-pending` for the coordinator's stage 6).
+
+## Session cost
+
+| Date | Bolt | Stage | Turns | Tools | Fresh | Cache read | Output | Misses |
+|---|---|---|---|---|---|---|---|---|
+| 2026-09-04T12:50:26Z | 066-ci-quality-gates | fix-secret-scan | 26 | 13 | 0.1M | 1.5M | 0.0M | 0 |
