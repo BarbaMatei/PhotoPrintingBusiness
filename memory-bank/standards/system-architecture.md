@@ -28,7 +28,9 @@ Shipping is currently **`StaticShippingService`** (server-side static costs) + a
 
 ## Request pipeline (order matters)
 
-`CorrelationId` → `ExceptionHandler` → Serilog request logging → security baselines
+Forwarded headers (registered only when `ForwardedHeaders:TrustedProxies` is non-empty, and
+never on the metrics scrape listener) → `CorrelationId` → `ExceptionHandler` → Serilog request
+logging → security baselines
 (prod-only HSTS/HTTPS-redirect, security headers, CORS `AllowAngularApp`, rate limiter) →
 response caching → static files → routing → authn → authz → controllers +
 `/hubs/admin-orders` + `/health`.
@@ -48,7 +50,9 @@ response caching → static files → routing → authn → authz → controller
   sessionStorage, the guest session in localStorage; **there is no refresh/silent-renew flow
   in the SPA** (401 → logout or clear-guest-token).
 - Rate limits: global 100/min/IP; `auth` 10/min; register 5/h; resend-confirmation and
-  forgot-password 3/h.
+  forgot-password 3/h. The IP is the TCP peer unless `ForwardedHeaders:TrustedProxies` names
+  the reverse proxy, in which case it is the client address the proxy forwards — without that
+  setting a proxied deployment shares one partition across the whole internet.
 
 ## Storage architecture (two-tier — ADR-007/008/009/011/012)
 

@@ -12,11 +12,14 @@ stories:
 created: 2026-06-05T09:30:00Z
 started: 2026-09-03T20:42:35Z
 completed: null
-current_stage: implement
+current_stage: test
 stages_completed:
   - name: plan
     completed: 2026-09-03T21:45:00Z
     artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-09-04T12:13:50Z
+    artifact: implementation-walkthrough.md
 
 requires_bolts: []
 enables_bolts: [063-access-hardening]
@@ -55,7 +58,7 @@ Eliminate the known CVE and the silent multi-version Stripe.net load, automate f
 ## Stages
 
 - [x] **1. plan**: Complete → implementation-plan.md
-- [ ] **2. implement**: Pending → csproj/props/renovate.json/Program.cs changes
+- [x] **2. implement**: Complete → implementation-walkthrough.md
 - [ ] **3. test**: Pending → test-report (vulnerable-scan clean, webhook suite, metrics X-Forwarded-For)
 
 ## Dependencies
@@ -71,7 +74,7 @@ Eliminate the known CVE and the silent multi-version Stripe.net load, automate f
 - [ ] `dotnet list package --vulnerable` clean
 - [ ] One resolved version per package; restore fails on conflict
 - [ ] Renovate dashboard + grouped PRs configured
-- [ ] `/metrics` allow-list correct behind proxy (integration test)
+- [ ] Real client IP resolved behind a trusted proxy, and `X-Forwarded-For` cannot open the `/metrics` scrape gate (integration test)
 - [ ] Existing suite green; DEPLOYMENT.md §14 updated
 
 ## Notes

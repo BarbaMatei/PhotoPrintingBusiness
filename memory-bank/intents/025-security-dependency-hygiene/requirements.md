@@ -21,7 +21,7 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 | Remove known CVEs from the shipped dependency tree | `dotnet list package --vulnerable` returns clean | Must |
 | Single source of truth for "what we depend on" | Every package version declared once in `Directory.Packages.props` | Must |
 | Sustainable, low-noise dependency upkeep | Grouped upgrade PRs land automatically; CVE alerts within 24h | Should |
-| `/metrics` allow-list enforces correctly in production | Allow-list keys on the real client IP, not the proxy IP | Must |
+| `/metrics` allow-list enforces correctly in production | The scrape gate keys on the connecting peer, and `X-Forwarded-For` cannot open it | Must |
 
 ---
 
@@ -56,10 +56,10 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 - **Related Stories**: TBD
 
 ### FR-4 (P05): Register `ForwardedHeadersMiddleware` so the `/metrics` allow-list works behind Caddy
-- **Description**: Add `app.UseForwardedHeaders()` early in the pipeline (before `UseCorrelationId`) with `ForwardedHeadersOptions` trusting only the reverse-proxy CIDR, so `MetricsEndpointIpAllowListMiddleware` evaluates the real scraper IP (`X-Forwarded-For`) rather than the proxy's connection IP.
+- **Description**: Register forwarded headers before `UseCorrelationId`, trusting only the reverse proxy's own address, so every request's client identity is the real client — **except on the metrics scrape listener**, which is excluded so `MetricsEndpointIpAllowListMiddleware` keeps judging the address the request actually came from. ADR-018 closed the proxied-`/metrics` hole topologically and rejects trusting `X-Forwarded-For` on that gate.
 - **Acceptance Criteria**:
-  - `XForwardedFor | XForwardedProto` enabled; `KnownNetworks`/`KnownProxies` cleared then anchored to the Caddyfile upstream CIDR (no open trust).
-  - `MetricsEndpointIntegrationTests` gains an `X-Forwarded-For` case proving allow vs deny by client IP.
+  - `XForwardedFor | XForwardedProto` enabled; `KnownNetworks`/`KnownProxies` cleared then anchored to the proxy's fixed address (no open trust, and never the container subnet).
+  - `MetricsEndpointIntegrationTests` gains a case proving `X-Forwarded-For` **cannot** open the scrape gate.
   - DEPLOYMENT.md §14 updated with the proxy-trust note.
 - **Priority**: Must
 - **Related Stories**: TBD
@@ -72,7 +72,7 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 | Requirement | Standard | Notes |
 |-------------|----------|-------|
 | No known vulnerable packages | `dotnet list package --vulnerable` clean | Verified in CI |
-| No IP spoofing via forwarded headers | Trusted-proxy CIDR only | Misconfigured `KnownNetworks` = spoofing risk (P05 risk) |
+| No IP spoofing via forwarded headers | The proxy's own address only, never the container subnet | Any container on a trusted range could name the client (P05 risk) |
 | Single resolved version per package | Central Package Management | Eliminates silent multi-version load |
 
 ### Reliability

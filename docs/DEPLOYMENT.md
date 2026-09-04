@@ -71,8 +71,8 @@ are on you**.
 |------|------|
 | `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. The runtime stage installs `icu-libs` + `icu-data-full` and sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, because the invoice PDF is rendered in `ro-RO` (§15.1) and the Alpine base ships no ICU at all. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
-| `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
-| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
+| `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. The bridge network declares an explicit subnet and Caddy a fixed address, so the trusted-proxy value in `.env` can be a single address rather than a range (§16). |
+| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3), and **replaces** `X-Forwarded-For` rather than appending to it, so a client cannot prepend its own hop (§16). |
 | `.env.example` | Every environment variable, documented. Copy to `.env`. |
 | `Directory.Packages.props` | Central Package Management: one pinned version per NuGet package, for every project. The `Dockerfile` copies it before restoring. |
 | `.github/renovate.json` | Grouped, scheduled dependency-upgrade PRs plus a dependency dashboard; security advisories are labelled and never auto-merged. |
