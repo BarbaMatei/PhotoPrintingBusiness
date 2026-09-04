@@ -1,0 +1,14 @@
+<div class="format-strip" aria-hidden="true">
+  <div class="format-strip__track">
+    @for (label of formatLabels; track label; let i = $index) {
+      <div class="format-strip__item">{{ label }}</div>
+      @if (i < formatLabels.length - 1) {
+        <span class="format-strip__sep">·</span>
+      }
+    }
+    @for (label of formatLabels; track label + '_dup') {
+      <div class="format-strip__item">{{ label }}</div>
+      <span class="format-strip__sep">·</span>
+    }
+  </div>
+</div>

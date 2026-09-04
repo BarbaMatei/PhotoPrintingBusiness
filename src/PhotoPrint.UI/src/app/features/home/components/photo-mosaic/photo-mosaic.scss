@@ -1,0 +1,163 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+:host {
+  display: contents;
+}
+
+.photo-mosaic {
+  position: relative;
+  width: 380px;
+  height: 380px;
+}
+
+.photo-mosaic__frame {
+  position: absolute;
+  background: $color-white;
+  border: 2px solid $color-neutral-300;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-lg;
+  overflow: hidden;
+  transition: transform $transition-slow;
+
+  &:hover {
+    transform: scale(1.03) rotate(0deg) !important;
+  }
+
+  &--a {
+    width: 200px;
+    height: 170px;
+    top: 0;
+    left: 40px;
+    transform: rotate(-3deg);
+    animation: float-a 7s ease-in-out infinite;
+    z-index: 3;
+  }
+
+  &--b {
+    width: 170px;
+    height: 150px;
+    top: 20px;
+    right: 0;
+    transform: rotate(4deg);
+    animation: float-b 9s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  &--c {
+    width: 180px;
+    height: 190px;
+    bottom: 30px;
+    left: 0;
+    transform: rotate(2deg);
+    animation: float-c 8s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  &--d {
+    width: 160px;
+    height: 160px;
+    bottom: 10px;
+    right: 20px;
+    transform: rotate(-2deg);
+    animation: float-d 10s ease-in-out infinite;
+    z-index: 3;
+  }
+}
+
+.photo-mosaic__inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-mosaic__img {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+
+  &--warm {
+    background: linear-gradient(135deg, #fce4b8, #f5cba7);
+  }
+  &--cool {
+    background: linear-gradient(135deg, #b8d4f5, #a0c4f0);
+  }
+  &--rose {
+    background: linear-gradient(135deg, #f5b8c4, #f0a0b4);
+  }
+  &--green {
+    background: linear-gradient(135deg, #b8f5c4, #a0f0b0);
+  }
+}
+
+.photo-mosaic__badge {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: $color-white;
+  border: 1.5px solid $color-neutral-300;
+  border-radius: $radius-full;
+  padding: $space-2 $space-4;
+  box-shadow: $shadow-md;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.photo-mosaic__badge-num {
+  font-size: $font-size-xl;
+  font-weight: 800;
+  color: $color-accent;
+  line-height: 1;
+}
+
+.photo-mosaic__badge-label {
+  font-size: $font-size-xs;
+  color: $color-neutral-500;
+  font-weight: $font-weight-medium;
+}
+
+@keyframes float-a {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-8px);
+  }
+}
+@keyframes float-b {
+  0%,
+  100% {
+    transform: rotate(4deg) translateY(0);
+  }
+  50% {
+    transform: rotate(4deg) translateY(-6px);
+  }
+}
+@keyframes float-c {
+  0%,
+  100% {
+    transform: rotate(2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(2deg) translateY(-10px);
+  }
+}
+@keyframes float-d {
+  0%,
+  100% {
+    transform: rotate(-2deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-2deg) translateY(-7px);
+  }
+}
