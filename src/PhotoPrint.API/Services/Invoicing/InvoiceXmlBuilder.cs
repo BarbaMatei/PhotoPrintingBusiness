@@ -174,14 +174,14 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                     FormatMoney(invoice.VatRon)),
                 new XElement(Cac + "TaxCategory",
                     new XElement(Cbc + "ID",      VatCategoryStandard),
-                    new XElement(Cbc + "Percent", FormatPercent(VatRateFromInvoice(invoice))),
+                    new XElement(Cbc + "Percent", FormatPercent(InvoiceDiscountMath.VatRateFromInvoice(invoice))),
                     new XElement(Cac + "TaxScheme",
                         new XElement(Cbc + "ID", TaxSchemeIdVat)))));
     }
 
     private static XElement BuildLegalMonetaryTotal(Order order, Invoice invoice)
     {
-        var lineNetTotal = LineNetTotal(order, invoice);
+        var lineNetTotal = InvoiceDiscountMath.LineNetTotal(order, invoice);
         var allowanceNet = lineNetTotal - invoice.NetTotalRon;
 
         var total = new XElement(Cac + "LegalMonetaryTotal",
@@ -212,13 +212,12 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
 
     private static XElement? BuildAllowance(Order order, Invoice invoice)
     {
-        var allowanceNet = LineNetTotal(order, invoice) - invoice.NetTotalRon;
+        var allowanceNet = InvoiceDiscountMath.AllowanceNet(order, invoice);
         if (allowanceNet <= 0m) return null;
 
-        var rate = VatRateFromInvoice(invoice);
-        var reason = string.IsNullOrWhiteSpace(order.CouponCode)
-            ? "Reducere comercială"
-            : $"Reducere {InvoiceAddressFormatter.StripXmlInvalid(order.CouponCode)}";
+        var rate = InvoiceDiscountMath.VatRateFromInvoice(invoice);
+        var reason = InvoiceDiscountMath.AllowanceReason(
+            InvoiceAddressFormatter.StripXmlInvalid(order.CouponCode));
 
         return new XElement(Cac + "AllowanceCharge",
             new XElement(Cbc + "ChargeIndicator", "false"),
@@ -233,18 +232,9 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                     new XElement(Cbc + "ID", TaxSchemeIdVat))));
     }
 
-    private static decimal LineNetTotal(Order order, Invoice invoice)
-    {
-        if (order.DiscountRon <= 0m) return invoice.NetTotalRon;
-
-        var rate = VatRateFromInvoice(invoice);
-        var grossBeforeDiscount = order.SubtotalRon + order.ShippingCostRon;
-        return VatCalculator.ExtractBreakdown(grossBeforeDiscount, rate).NetTotalRon;
-    }
-
     private static IEnumerable<XElement> BuildInvoiceLines(Order order, Invoice invoice)
     {
-        var rate = VatRateFromInvoice(invoice);
+        var rate = InvoiceDiscountMath.VatRateFromInvoice(invoice);
 
         var lines = order.Items
             .Select(item => (
@@ -256,7 +246,7 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
             lines.Add(("Transport", 1, order.ShippingCostRon));
 
         var netTotals = lines.Select(l => VatCalculator.ExtractBreakdown(l.GrossTotal, rate).NetTotalRon).ToList();
-        var residual = LineNetTotal(order, invoice) - netTotals.Sum();
+        var residual = InvoiceDiscountMath.LineNetTotal(order, invoice) - netTotals.Sum();
         if (residual != 0m)
             netTotals[^1] += residual;
 
@@ -306,19 +296,4 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
     private static string FormatPercent(decimal rate)
         => (rate * 100m).ToString("F2", CultureInfo.InvariantCulture);
 
-    /// <summary>
-    /// Derives the VAT rate that produced the invoice's breakdown. Reads
-    /// from the order's snapshot via <see cref="Invoice.Order"/> if loaded;
-    /// otherwise re-derives from <c>VatRon / NetTotalRon</c> with a guard.
-    /// </summary>
-    private static decimal VatRateFromInvoice(Invoice invoice)
-    {
-        if (invoice.Order is not null)
-            return invoice.Order.VatRate;
-        if (invoice.NetTotalRon == 0m)
-            return 0m;
-        // Round to 4 dp to match the storage shape (numeric(5,4)).
-        var derived = invoice.VatRon / invoice.NetTotalRon;
-        return decimal.Round(derived, 4, MidpointRounding.AwayFromZero);
-    }
 }

@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable, tap, debounceTime } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import {
+  ApplyCouponRequest,
   CartRequest,
   CartMergeRequest,
   CartResponseDto,
@@ -73,6 +74,24 @@ export class CartService {
     );
   }
 
+  /**
+   * Applies a promo code to the current cart. Returns the recalculated cart.
+   * For guest sessions, the result is also persisted to localStorage.
+   */
+  applyCoupon(code: string): Observable<CartResponseDto> {
+    const body: ApplyCouponRequest = { code };
+    return this.http.post<CartResponseDto>(`${this.base}/coupon`, body).pipe(
+      tap(cart => this.acceptCart(cart)),
+    );
+  }
+
+  /** Detaches the promo code from the current cart. Returns the recalculated cart. */
+  clearCoupon(): Observable<CartResponseDto> {
+    return this.http.delete<CartResponseDto>(`${this.base}/coupon`).pipe(
+      tap(cart => this.acceptCart(cart)),
+    );
+  }
+
   /** Removes all cart items. */
   clearCart(): Observable<void> {
     return this.http.delete<void>(this.base).pipe(
@@ -99,12 +118,22 @@ export class CartService {
 
   // ── Private helpers ──────────────────────────────────────────────────────────
 
+  private acceptCart(cart: CartResponseDto): void {
+    this.cart$$.next(cart);
+    if (!this.authService.isAuthenticated()) {
+      this.saveToLocalStorage(cart);
+    }
+  }
+
   private loadFromLocalStorage(): void {
     try {
       const raw = localStorage.getItem(CART_STORAGE_KEY);
       if (raw) {
         const cart = JSON.parse(raw) as CartResponseDto;
         this.cart$$.next(cart);
+        if (cart?.couponCode) {
+          this.loadFromServer();
+        }
       }
     } catch {
       // Corrupted storage — ignore

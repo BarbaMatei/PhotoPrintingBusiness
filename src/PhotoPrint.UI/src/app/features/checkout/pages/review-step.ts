@@ -7,10 +7,18 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CartService } from '../../../core/services/cart.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
-import { CartResponseDto } from '../../../core/models/cart.model';
+import {
+  CartResponseDto,
+  cartDiscount,
+  cartTotal,
+  hasFreeShippingCoupon,
+  isCouponStale,
+} from '../../../core/models/cart.model';
+import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupon-messages';
 
 @Component({
   selector: 'app-review-step',
@@ -55,15 +63,41 @@ import { CartResponseDto } from '../../../core/models/cart.model';
         </div>
       </div>
 
+      @if (couponStale()) {
+        <div class="coupon-warning">
+          <span>{{ staleMessage() }}</span>
+          <button
+            type="button"
+            class="coupon-warning__remove"
+            [disabled]="couponPending()"
+            (click)="removeCoupon()"
+          >Elimină codul</button>
+        </div>
+      }
+      @if (couponError()) {
+        <p class="coupon-error">{{ couponError() }}</p>
+      }
+
       <!-- Totals -->
       <div class="totals">
         <div class="total-row">
           <span>Subtotal:</span>
           <span>{{ cart()?.subtotal | number:'1.2-2' }} RON</span>
         </div>
+        @if (discountRon() > 0) {
+          <div class="total-row total-row--discount">
+            <span>Reducere{{ cart()?.couponCode ? ' (' + cart()!.couponCode + ')' : '' }}:</span>
+            <span>-{{ discountRon() | number:'1.2-2' }} RON</span>
+          </div>
+        }
         <div class="total-row">
           <span>Transport:</span>
-          <span>{{ deliveryState().shippingCostRon | number:'1.2-2' }} RON</span>
+          <span>
+            {{ shippingCost() | number:'1.2-2' }} RON
+            @if (freeShipping()) {
+              <span class="free-shipping-note">transport gratuit cu codul {{ cart()!.couponCode }}</span>
+            }
+          </span>
         </div>
         <div class="total-row total-row--grand">
           <span>Total:</span>
@@ -159,6 +193,37 @@ import { CartResponseDto } from '../../../core/models/cart.model';
       }
     }
 
+    .total-row--discount { color: #188038; font-weight: 600; }
+
+    .free-shipping-note { font-size: 0.8rem; color: #188038; }
+
+    .coupon-warning {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      background: #fef7e0;
+      border: 1px solid #f9d67a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      color: #b06000;
+    }
+
+    .coupon-warning__remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #b06000;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-decoration: underline;
+
+      &:disabled { color: #9aa0a6; cursor: default; text-decoration: none; }
+    }
+
+    .coupon-error { margin: 0; font-size: 0.9rem; color: #d93025; }
+
     .terms-row {
       display: flex;
       align-items: center;
@@ -190,11 +255,32 @@ export class ReviewStep implements OnInit {
 
   readonly termsCtrl = this.fb.control(false, Validators.requiredTrue);
 
-  readonly grandTotal = () => {
-    const sub = this.cart()?.subtotal ?? 0;
-    const ship = this.deliveryState().shippingCostRon;
-    return sub + ship;
-  };
+  readonly couponPending = signal(false);
+  readonly couponError = signal<string | null>(null);
+
+  readonly discountRon = () => cartDiscount(this.cart());
+  readonly freeShipping = () => hasFreeShippingCoupon(this.cart());
+  readonly couponStale = () => isCouponStale(this.cart());
+  readonly staleMessage = () => couponMessageFor(this.cart()?.couponReason);
+
+  readonly shippingCost = () =>
+    this.freeShipping() ? 0 : this.deliveryState().shippingCostRon;
+
+  readonly grandTotal = () => cartTotal(this.cart()) + this.shippingCost();
+
+  removeCoupon(): void {
+    if (this.couponPending()) return;
+
+    this.couponPending.set(true);
+    this.couponError.set(null);
+    this.cartService.clearCoupon().subscribe({
+      next: () => this.couponPending.set(false),
+      error: (err: HttpErrorResponse) => {
+        this.couponPending.set(false);
+        this.couponError.set(couponErrorMessage(err));
+      },
+    });
+  }
 
   ngOnInit(): void {
     this.cartService.cart$.subscribe(c => this.cart.set(c));
