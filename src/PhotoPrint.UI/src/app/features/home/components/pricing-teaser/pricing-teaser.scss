@@ -1,0 +1,113 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+:host {
+  display: block;
+}
+
+.pricing-tease__title {
+  @include section-title;
+  margin-bottom: $space-2;
+}
+
+.pricing-tease__sub {
+  font-size: $font-size-base;
+  color: $color-neutral-500;
+  text-align: center;
+  margin-bottom: $space-10;
+}
+
+.pricing-tease__cards {
+  display: flex;
+  justify-content: center;
+  gap: $space-4;
+  flex-wrap: wrap;
+  max-width: 720px;
+  margin: 0 auto;
+  padding-top: $space-5;
+}
+
+.pricing-tease__card {
+  @include card;
+  overflow: visible;
+  flex: 1;
+  min-width: 180px;
+  max-width: 220px;
+  padding: $space-6 $space-5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: $space-2;
+  position: relative;
+
+  &--popular {
+    border-color: $color-accent;
+    box-shadow: $shadow-glow-accent;
+    transform: scale(1.04);
+  }
+}
+
+.pricing-tease__badge {
+  position: absolute;
+  top: -$space-3;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, $color-accent, #ff9100);
+  color: $color-white;
+  border-radius: $radius-full;
+  padding: 0.2rem $space-3;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-bold;
+  white-space: nowrap;
+}
+
+.pricing-tease__range {
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+  font-weight: $font-weight-medium;
+}
+
+.pricing-tease__price {
+  font-size: $font-size-3xl;
+  font-weight: 800;
+  color: $color-neutral-900;
+  line-height: 1;
+
+  span {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-neutral-500;
+    margin-left: 2px;
+  }
+}
+
+.pricing-tease__name {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $color-neutral-500;
+}
+
+.pricing-tease__source {
+  text-align: center;
+  margin-top: $space-6;
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+}
+
+.pricing-tease__note {
+  text-align: center;
+  margin-top: $space-3;
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+
+  a {
+    color: $color-primary;
+    font-weight: $font-weight-medium;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

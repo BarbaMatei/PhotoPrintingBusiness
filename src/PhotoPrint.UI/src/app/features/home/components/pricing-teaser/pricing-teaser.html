@@ -1,0 +1,50 @@
+<section class="pricing-tease section section--soft">
+  <div class="container">
+    <h2 class="pricing-tease__title">Prețuri avantajoase cu cât tipăreşti mai mult</h2>
+    <p class="pricing-tease__sub">
+      Cu cât e mai mare comanda, cu atât scade prețul per fotografie.
+    </p>
+    <div class="pricing-tease__cards">
+      @for (card of cards(); track card.tierLabel; let i = $index) {
+        <div class="pricing-tease__card" [class.pricing-tease__card--popular]="i === 1">
+          @if (i === 1) {
+            <div class="pricing-tease__badge">Cel mai ales</div>
+          }
+          <div class="pricing-tease__range">{{ card.range }}</div>
+          <div class="pricing-tease__price">
+            {{ card.unitPrice | number: '1.2-2' }}<span>lei/buc</span>
+          </div>
+          <div class="pricing-tease__name">{{ card.tierLabel }}</div>
+        </div>
+      }
+      @if (cards().length === 0) {
+        <div class="pricing-tease__card">
+          <div class="pricing-tease__range">1–9 buc</div>
+          <div class="pricing-tease__price">1.20<span>lei/buc</span></div>
+          <div class="pricing-tease__name">Standard</div>
+        </div>
+        <div class="pricing-tease__card pricing-tease__card--popular">
+          <div class="pricing-tease__badge">Cel mai ales</div>
+          <div class="pricing-tease__range">10–49 buc</div>
+          <div class="pricing-tease__price">0.99<span>lei/buc</span></div>
+          <div class="pricing-tease__name">Popular</div>
+        </div>
+        <div class="pricing-tease__card">
+          <div class="pricing-tease__range">50+ buc</div>
+          <div class="pricing-tease__price">0.89<span>lei/buc</span></div>
+          <div class="pricing-tease__name">Volum</div>
+        </div>
+      }
+    </div>
+    @if (productName()) {
+      <p class="pricing-tease__source">
+        Prețuri pentru <strong>{{ productName() }}</strong
+        >.
+      </p>
+    }
+    <p class="pricing-tease__note">
+      Prețurile variază în funcție de format. Calculul se face automat.
+      <a routerLink="/preturi">Vezi toate formatele →</a>
+    </p>
+  </div>
+</section>

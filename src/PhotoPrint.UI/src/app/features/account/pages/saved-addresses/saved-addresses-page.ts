@@ -1,4 +1,3 @@
-import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -16,6 +15,8 @@ import { ToastService } from '../../../../shared/services/toast.service';
 import { SavedAddressDto, SavedAddressRequest } from '../../../../core/models/account.model';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
+import { AddressForm } from './components/address-form/address-form';
+import { AddressListItem } from './components/address-list-item/address-list-item';
 
 const MAX_ADDRESSES = 5;
 const PHONE_PATTERN = /^07[0-9]{8}$/;
@@ -25,7 +26,13 @@ const POSTAL_PATTERN = /^\d{6}$/;
   selector: 'app-saved-addresses-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, NgTemplateOutlet, SpinnerComponent, EmptyStateComponent],
+  imports: [
+    ReactiveFormsModule,
+    SpinnerComponent,
+    EmptyStateComponent,
+    AddressForm,
+    AddressListItem,
+  ],
   template: `
     <div class="addresses-page">
       <div class="page-header">
@@ -52,37 +59,27 @@ const POSTAL_PATTERN = /^\d{6}$/;
           @for (addr of addresses(); track addr.id) {
             <div class="address-card" [class.address-card--default]="addr.isDefault">
               @if (editingId() !== addr.id) {
-                <div class="address-card__header">
-                  <span class="address-label">{{ addr.label }}</span>
-                  @if (addr.isDefault) {
-                    <span class="badge-default">Implicită</span>
-                  }
-                </div>
-                <div class="address-card__body">
-                  <p>{{ addr.fullName }}</p>
-                  <p>{{ addr.phone }}</p>
-                  <p>{{ addr.addressLine }}</p>
-                  <p>{{ addr.city }}, {{ addr.county }}, {{ addr.postalCode }}</p>
-                </div>
-                <div class="address-card__actions">
-                  <button class="btn btn--sm btn--ghost" (click)="openEditForm(addr)">Editează</button>
-                  <button
-                    class="btn btn--sm btn--danger-ghost"
-                    [disabled]="deletingId() === addr.id"
-                    (click)="deleteAddress(addr.id)"
-                  >
-                    {{ deletingId() === addr.id ? 'Se șterge...' : 'Șterge' }}
-                  </button>
-                </div>
+                <app-address-list-item
+                  [address]="addr"
+                  [deleting]="deletingId() === addr.id"
+                  (edit)="openEditForm($event)"
+                  (remove)="deleteAddress($event)"
+                />
               } @else {
-                <!-- Inline edit form -->
-                <form [formGroup]="addressForm" (ngSubmit)="saveEdit(addr.id)" novalidate class="address-form">
-                  <ng-container *ngTemplateOutlet="formFields" />
+                <form
+                  [formGroup]="addressForm"
+                  (ngSubmit)="saveEdit(addr.id)"
+                  novalidate
+                  class="address-form"
+                >
+                  <app-address-form />
                   <div class="form-actions">
                     <button type="submit" class="btn btn--primary btn--sm" [disabled]="saving()">
                       {{ saving() ? 'Se salvează...' : 'Salvează' }}
                     </button>
-                    <button type="button" class="btn btn--ghost btn--sm" (click)="cancelForm()">Anulează</button>
+                    <button type="button" class="btn btn--ghost btn--sm" (click)="cancelForm()">
+                      Anulează
+                    </button>
                   </div>
                 </form>
               }
@@ -90,240 +87,83 @@ const POSTAL_PATTERN = /^\d{6}$/;
           }
         </div>
 
-        <!-- Add new address form -->
         @if (showForm() && editingId() === null) {
           <div class="address-card">
             <h3 class="card-section-title">Adresă nouă</h3>
             <form [formGroup]="addressForm" (ngSubmit)="saveNew()" novalidate class="address-form">
-              <ng-container *ngTemplateOutlet="formFields" />
+              <app-address-form />
               <div class="form-actions">
                 <button type="submit" class="btn btn--primary btn--sm" [disabled]="saving()">
                   {{ saving() ? 'Se salvează...' : 'Adaugă adresa' }}
                 </button>
-                <button type="button" class="btn btn--ghost btn--sm" (click)="cancelForm()">Anulează</button>
+                <button type="button" class="btn btn--ghost btn--sm" (click)="cancelForm()">
+                  Anulează
+                </button>
               </div>
             </form>
           </div>
         }
       }
-
-      <!-- Shared form fields template -->
-      <ng-template #formFields>
-        <div class="form-group">
-          <label>Etichetă (ex: Acasă, Birou)</label>
-          <input type="text" formControlName="label" class="form-control"
-            [class.is-invalid]="fi('label')" />
-          @if (fi('label')) { <span class="field-error">Eticheta este obligatorie.</span> }
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Nume complet</label>
-            <input type="text" formControlName="fullName" class="form-control"
-              [class.is-invalid]="fi('fullName')" />
-            @if (fi('fullName')) { <span class="field-error">Numele complet este obligatoriu.</span> }
-          </div>
-          <div class="form-group">
-            <label>Telefon</label>
-            <input type="tel" formControlName="phone" class="form-control"
-              [class.is-invalid]="fi('phone')" placeholder="07XXXXXXXX" />
-            @if (fi('phone')) { <span class="field-error">Introdu un număr de mobil valid (07XXXXXXXX).</span> }
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Adresă</label>
-          <input type="text" formControlName="addressLine" class="form-control"
-            [class.is-invalid]="fi('addressLine')" placeholder="Str. Exemplu, nr. 1, bl. A, ap. 5" />
-          @if (fi('addressLine')) { <span class="field-error">Adresa este obligatorie.</span> }
-        </div>
-        <div class="form-row form-row--3">
-          <div class="form-group">
-            <label>Oraș</label>
-            <input type="text" formControlName="city" class="form-control"
-              [class.is-invalid]="fi('city')" />
-            @if (fi('city')) { <span class="field-error">Orașul este obligatoriu.</span> }
-          </div>
-          <div class="form-group">
-            <label>Județ</label>
-            <input type="text" formControlName="county" class="form-control"
-              [class.is-invalid]="fi('county')" />
-            @if (fi('county')) { <span class="field-error">Județul este obligatoriu.</span> }
-          </div>
-          <div class="form-group">
-            <label>Cod poștal</label>
-            <input type="text" formControlName="postalCode" class="form-control"
-              [class.is-invalid]="fi('postalCode')" placeholder="XXXXXX" />
-            @if (fi('postalCode')) { <span class="field-error">Cod poștal invalid (6 cifre).</span> }
-          </div>
-        </div>
-        <div class="form-group form-group--checkbox">
-          <label class="checkbox-label">
-            <input type="checkbox" formControlName="isDefault" />
-            Setează ca adresă implicită
-          </label>
-        </div>
-      </ng-template>
     </div>
   `,
-  styles: [`
-    .addresses-page {
-      padding-bottom: 3rem;
-    }
-
-    .page-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
-
-    .page-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin: 0;
-    }
-
-    // .state-loading and .empty-state removed — replaced by <app-spinner> and <app-empty-state>
-
-    .address-list {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .address-card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-
-      &--default {
-        border-color: #86efac;
-        background: #f0fdf4;
-      }
-    }
-
-    .address-card__header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .address-label {
-      font-weight: 600;
-      font-size: 0.9375rem;
-    }
-
-    .badge-default {
-      font-size: 0.75rem;
-      font-weight: 600;
-      background: #16a34a;
-      color: #fff;
-      padding: 0.125rem 0.5rem;
-      border-radius: 999px;
-    }
-
-    .address-card__body {
-      font-size: 0.9rem;
-      color: #374151;
-      line-height: 1.6;
-
-      p { margin: 0; }
-    }
-
-    .address-card__actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-
-    .card-section-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-
-    .address-form {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-
-      &--3 {
-        grid-template-columns: 1fr 1fr 1fr;
+  styles: [
+    `
+      .addresses-page {
+        padding-bottom: 3rem;
       }
 
-      @media (max-width: 480px) {
-        grid-template-columns: 1fr;
+      .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
 
-        &--3 {
-          grid-template-columns: 1fr;
+      .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+      }
+
+
+      .address-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .address-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+
+        &--default {
+          border-color: #86efac;
+          background: #f0fdf4;
         }
       }
-    }
 
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-      margin-bottom: 0.875rem;
-
-      label {
-        font-size: 0.8125rem;
-        font-weight: 500;
-        color: #374151;
+      .card-section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
       }
 
-      &--checkbox {
-        flex-direction: row;
-        align-items: center;
-      }
-    }
-
-    .checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-
-    .form-control {
-      padding: 0.4375rem 0.75rem;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 0.9375rem;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-
-      &:focus {
-        border-color: #16a34a;
-        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+      .address-form {
+        display: flex;
+        flex-direction: column;
       }
 
-      &.is-invalid {
-        border-color: #dc2626;
+      .form-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
       }
-    }
-
-    .field-error {
-      font-size: 0.8125rem;
-      color: #dc2626;
-    }
-
-    .form-actions {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
-    }
-
-  `],
+    `,
+  ],
 })
 export class SavedAddressesPage implements OnInit {
   private readonly accountService = inject(AccountService);
@@ -355,12 +195,6 @@ export class SavedAddressesPage implements OnInit {
     this.loadAddresses();
   }
 
-  /** Shorthand: is field invalid and touched? */
-  fi(field: string): boolean {
-    const ctrl = this.addressForm.get(field);
-    return !!(ctrl?.invalid && ctrl.touched);
-  }
-
   openAddForm(): void {
     this.addressForm.reset({ isDefault: false });
     this.editingId.set(null);
@@ -390,7 +224,7 @@ export class SavedAddressesPage implements OnInit {
       .subscribe({
         next: (addr) => {
           this.applyDefaultFlag(addr);
-          this.addresses.update(list => [...list, addr]);
+          this.addresses.update((list) => [...list, addr]);
           this.cancelForm();
           this.saving.set(false);
           this.toast.show('Adresa a fost adăugată.', 'success');
@@ -419,8 +253,10 @@ export class SavedAddressesPage implements OnInit {
       .subscribe({
         next: (updated) => {
           this.applyDefaultFlag(updated);
-          this.addresses.update(list =>
-            list.map(a => a.id === id ? updated : req.isDefault ? { ...a, isDefault: false } : a)
+          this.addresses.update((list) =>
+            list.map((a) =>
+              a.id === id ? updated : req.isDefault ? { ...a, isDefault: false } : a,
+            ),
           );
           this.cancelForm();
           this.saving.set(false);
@@ -444,7 +280,7 @@ export class SavedAddressesPage implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
-          this.addresses.update(list => list.filter(a => a.id !== id));
+          this.addresses.update((list) => list.filter((a) => a.id !== id));
           this.deletingId.set(null);
           this.toast.show('Adresa a fost ștearsă.', 'success');
           this.cdr.markForCheck();
@@ -492,7 +328,7 @@ export class SavedAddressesPage implements OnInit {
   /** When saving a default address, clear isDefault on all others in the signal. */
   private applyDefaultFlag(saved: SavedAddressDto): void {
     if (saved.isDefault) {
-      this.addresses.update(list => list.map(a => ({ ...a, isDefault: false })));
+      this.addresses.update((list) => list.map((a) => ({ ...a, isDefault: false })));
     }
   }
 }

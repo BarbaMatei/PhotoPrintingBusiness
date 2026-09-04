@@ -1,0 +1,45 @@
+<div class="easybox-section">
+  <input
+    type="text"
+    class="city-search"
+    placeholder="Caută după oraș (ex: Cluj-Napoca)"
+    [formControl]="searchControl()"
+  />
+
+  @if (lockers().length > 0) {
+    <div class="locker-list">
+      @for (locker of lockers(); track locker.id) {
+        <button
+          type="button"
+          class="locker-item"
+          [class.selected]="selectedLockerId() === locker.id"
+          (click)="lockerSelected.emit(locker)"
+        >
+          <strong>{{ locker.name }}</strong>
+          <span>{{ locker.address }}</span>
+        </button>
+      }
+    </div>
+  }
+
+  @if (searchValue() && lockers().length === 0 && !searchFailed()) {
+    <div class="no-lockers">Niciun easybox găsit pentru acest oraș.</div>
+  }
+
+  @if (searchFailed()) {
+    <div class="search-error">
+      Căutarea a eșuat.
+      <button type="button" class="retry-link" (click)="retry.emit()">Reîncearcă</button>
+    </div>
+  }
+
+  <app-locker-map
+    [lockers]="lockers()"
+    [selectedLockerId]="selectedLockerId()"
+    (lockerSelected)="lockerSelected.emit($event)"
+  />
+
+  @if (showError()) {
+    <div class="field-error">Selectează un easybox pentru a continua.</div>
+  }
+</div>

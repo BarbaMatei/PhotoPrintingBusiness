@@ -1,0 +1,30 @@
+# ──────────────────────────────────────────────────────────────────────────────
+#  E2E overlay for the Playwright smoke suite (bolt 066).
+#    docker compose -f docker-compose.yml -f docker-compose.e2e.yml -p fototipar-e2e up -d --build
+#    docker compose -f docker-compose.yml -f docker-compose.e2e.yml -p fototipar-e2e run --rm api --seed-dev
+#
+#  Needs Compose >= 2.24 for the `!override` tag used below.
+#
+#  Own project name and own volumes: an e2e teardown (`down -v`) must never touch the
+#  fototipar-dev database or uploads. The API is published on 5052 because that is the
+#  port src/PhotoPrint.UI/src/environments/environment.ts already calls, so `ng serve`
+#  needs no rebuild for e2e. E2E_JWT_PRIVATE_KEY_PEM must hold a real RSA private key —
+#  with an empty one the API returns 500 for every request, /health included.
+# ──────────────────────────────────────────────────────────────────────────────
+name: fototipar-e2e
+
+services:
+  db:
+    ports: !override []
+
+  mailhog:
+    ports: !override []
+
+  api:
+    ports: !override
+      - "5052:8080"
+    environment:
+      JwtSettings__PrivateKeyPem: ${E2E_JWT_PRIVATE_KEY_PEM:?generate one with scripts/gen-dev-keys.sh and export it}
+      # An empty key makes the Stripe client throw where it is constructed, so e2e needs a placeholder.
+      Stripe__SecretKey: sk_test_e2e_placeholder
+      Stripe__WebhookSecret: whsec_e2e_placeholder

@@ -3,17 +3,26 @@ id: 067-ui-scaling-and-e2e-ui
 unit: 002-ui-scaling-and-e2e-ui
 intent: 030-ui-scaling-and-e2e
 type: simple-construction-bolt
-status: planned
+status: review-pending
 stories:
   - 001-base-api-service
   - 002-home-page-breakup
   - 003-account-pages-breakup
   - 004-delivery-step-locker-selector
 created: 2026-06-05T09:30:00Z
-started: null
-completed: null
+started: 2026-09-04T00:55:00Z
+completed: 2026-09-04T14:00:00Z
 current_stage: null
-stages_completed: []
+stages_completed:
+  - name: plan
+    completed: 2026-09-04T11:20:00Z
+    artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-09-04T13:10:00Z
+    artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-09-04T14:00:00Z
+    artifact: test-walkthrough.md
 
 requires_bolts: [066-ci-quality-gates]
 enables_bolts: []
@@ -51,9 +60,9 @@ Make the UI component layer maintainable and DRY up HTTP plumbing — verified b
 
 ## Stages
 
-- [ ] **1. plan**: Pending → implementation-plan.md
-- [ ] **2. implement**: Pending → base-api.service.ts; per-page component breakups (one PR each)
-- [ ] **3. test**: Pending → Vitest + e2e green; home screenshot diff acceptable
+- [x] **1. plan**: ✅ Complete → implementation-plan.md
+- [x] **2. implement**: ✅ Complete → implementation-walkthrough.md (BaseApiService + four page breakups)
+- [x] **3. test**: ✅ Complete → test-walkthrough.md (126/126 Vitest green, build 330.13 kB; e2e not runnable locally)
 
 ## Dependencies
 
@@ -65,8 +74,9 @@ Make the UI component layer maintainable and DRY up HTTP plumbing — verified b
 
 ## Success Criteria
 
-- [ ] No page > ~200 LOC; all services route through BaseApiService
-- [ ] Within bundle budget; no home visual regression
+- [ ] No page > ~200 LOC — home 951→66 and profile 473→217, but saved-addresses is 334 and delivery-step 574 (see test-walkthrough.md)
+- [x] All services route through BaseApiService (the six data services; auth/guest-auth deliberately excluded)
+- [x] Within bundle budget; no home visual regression (no screenshot baseline exists — checked by eye)
 
 ## Notes
 
