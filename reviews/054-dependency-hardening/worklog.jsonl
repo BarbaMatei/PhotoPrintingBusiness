@@ -1,0 +1,7 @@
+{"t":"2026-09-04T20:49:37+03:00","ev":"run-start","reason":"unattended review loop for 054-dependency-hardening"}
+{"t":"2026-09-04T20:50:41+03:00","ev":"test-run","kind":"baseline","passed":28,"failed":0,"duration_s":20.928,"filter":"Forwarded","skipped":0}
+{"t":"2026-09-04T20:50:49+03:00","ev":"test-run","kind":"baseline","passed":28,"failed":0,"duration_s":7.158,"filter":"MetricsEndpoint","skipped":0}
+{"t":"2026-09-04T20:51:02+03:00","ev":"pass-launch","pass":1,"type":"full-discovery"}
+{"t":"2026-09-04T20:51:30+03:00","ev":"note","reason":"discovery v1 workflow runId wf_4bf8943b-81c (8 lenses)"}
+{"t":"2026-09-04T21:55:09+03:00","ev":"pass-records-done","pass":1}
+{"t":"2026-09-04T22:06:00+03:00","ev":"doc-gate","pass":1,"verdict":"approve","reason":"lint clean; judge disapproved twice (requirements.md line number, coined verdict label), both replacements applied verbatim"}
