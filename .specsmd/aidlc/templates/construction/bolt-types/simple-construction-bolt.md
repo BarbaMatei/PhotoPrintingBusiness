@@ -97,9 +97,10 @@ This bolt type provides a lightweight construction process for work that doesn't
 3 - **Identify dependencies**: External APIs, other units, libraries
 4 - **Define acceptance criteria**: How will we know it's done?
 5 - **Note technical approach**: High-level implementation notes
+6 - **List the failure modes as data**: Write `failure-modes.jsonl` (one JSON row per failure mode: `id`, `source` bolt|class|invariant|attack, `fails`, `expected`, `test` as the exact `--filter`/`--include` fragment, `log`; a docs-only bolt writes `{"none":true,"reason":"..."}`), run the adversarial design check against the plan and the file, append its rows with a disposition (accepted + test, or rejected + reason), and render the plan's failure-mode table from the file. `node .specsmd/aidlc/scripts/check-stage-exit.mjs {bolt-id} plan` must exit 0 before the stage is marked complete (the pre-commit hook enforces it; see `memory-bank/standards/bolt-process.md`, "Stage exit conditions").
 
-**Artifact**: `implementation-plan.md`
-**Location**: `memory-bank/bolts/{bolt-id}/implementation-plan.md`
+**Artifact**: `implementation-plan.md` + `failure-modes.jsonl`
+**Location**: `memory-bank/bolts/{bolt-id}/implementation-plan.md` and `memory-bank/bolts/{bolt-id}/failure-modes.jsonl`
 
 **Template Structure**:
 
@@ -155,11 +156,13 @@ created: {YYYY-MM-DDTHH:MM:SSZ}
 4 - **Add documentation**: Code comments, JSDoc/docstrings
 5 - **Run linting**: Ensure code style compliance
 6 - **Document implementation**: Create implementation walkthrough
+7 - **Prove every failure-mode test**: For each accepted row in `failure-modes.jsonl`, through `node reviews/lib/run-scoped-tests.mjs {bolt-id} ... --log memory-bank/bolts/{bolt-id}/test-stamps.jsonl`: `--kind red` before the code (runner exit non-zero), `--kind green` after it, `--kind revert-and-rerun --mutate <production file>:<line>` (the wrapper breaks the line, runs, restores; must be red), then `--kind green` again. `node .specsmd/aidlc/scripts/check-stage-exit.mjs {bolt-id} implement` must exit 0 before the stage is marked complete (the pre-commit hook enforces it). Every bullet under the walkthrough's Completed Work heading names a path, a `file:line` or a command (`node .specsmd/aidlc/scripts/lint-claims.mjs <walkthrough>`).
 
 **Artifacts**:
 
 - Source code - As defined in project structure (e.g., `src/`, `app/`, `pages/`)
 - `implementation-walkthrough.md` - `memory-bank/bolts/{bolt-id}/implementation-walkthrough.md`
+- `test-stamps.jsonl` - `memory-bank/bolts/{bolt-id}/test-stamps.jsonl`, written by the test wrapper, never by hand
 
 **Implementation Walkthrough Guidelines**:
 
@@ -250,6 +253,7 @@ created: {YYYY-MM-DDTHH:MM:SSZ}
 3 - **Run test suite**: Execute all tests
 4 - **Verify acceptance criteria**: Check against plan
 5 - **Document results**: Create test report
+6 - **Record both gates with evidence**: The report carries an `Adversarial design check` heading and a `Fresh-eyes micro-review` heading stating what each gate ran and found, and the failure-mode table rendered from `failure-modes.jsonl` with the real test names. Every bullet under its Summary, Test Files, Acceptance Criteria Validation and Issues Found headings names a path, a `file:line` or the command that shows it (`node .specsmd/aidlc/scripts/lint-claims.mjs <report>`); `node .specsmd/aidlc/scripts/check-stage-exit.mjs {bolt-id} test` must exit 0 before the stage is marked complete.
 
 **Artifact**: `test-walkthrough.md`
 **Location**: `memory-bank/bolts/{bolt-id}/test-walkthrough.md`

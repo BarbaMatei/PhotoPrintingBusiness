@@ -177,11 +177,12 @@ created: {YYYY-MM-DDTHH:MM:SSZ}
 5 - **Apply security patterns**: Document security approach
 6 - **Design for NFRs**: Plan performance and scalability approach
 7 - **Plan integrations**: Document integration points
+8 - **List the failure modes as data**: Write `failure-modes.jsonl` (one JSON row per failure mode: `id`, `source` bolt|class|invariant|attack, `fails`, `expected`, `test` as the exact `--filter`/`--include` fragment, `log`), then run the adversarial design check against the design and the file, append its rows with a disposition (accepted + test, or rejected + reason), and render the design's failure-mode table from the file. `node .specsmd/aidlc/scripts/check-stage-exit.mjs {bolt-id} technical-design` must exit 0 before the stage is marked complete (the pre-commit hook enforces it; see `memory-bank/standards/bolt-process.md`, "Stage exit conditions").
 
-**Artifact**: `ddd-02-technical-design.md`
+**Artifact**: `ddd-02-technical-design.md` + `failure-modes.jsonl`
 **Template**: `.specsmd/aidlc/templates/construction/bolt-types/ddd-construction-bolt/ddd-02-technical-design-template.md`
 **Location**: Path defined by `schema.bolts` in `.specsmd/aidlc/memory-bank.yaml`
-*(Default: `memory-bank/bolts/{bolt-id}/ddd-02-technical-design.md`)*
+*(Default: `memory-bank/bolts/{bolt-id}/ddd-02-technical-design.md` and `memory-bank/bolts/{bolt-id}/failure-modes.jsonl`)*
 
 **Template Structure**:
 
@@ -388,8 +389,9 @@ Implement CQRS pattern with separate read models for task queries.
 6 - **Implement presentation layer**: Create API endpoints
 7 - **Add validation and error handling**: Implement guards and handlers
 8 - **Add logging and instrumentation**: Add observability code
+9 - **Prove every failure-mode test**: For each accepted row in `failure-modes.jsonl`, through `node reviews/lib/run-scoped-tests.mjs {bolt-id} ... --log memory-bank/bolts/{bolt-id}/test-stamps.jsonl`: `--kind red` before the code (runner exit non-zero), `--kind green` after it, `--kind revert-and-rerun --mutate <production file>:<line>` (the wrapper breaks the line, runs, restores; must be red), then `--kind green` again. `node .specsmd/aidlc/scripts/check-stage-exit.mjs {bolt-id} implement` must exit 0 before the stage is marked complete (the pre-commit hook enforces it).
 
-**Artifact**: Source code in unit directory
+**Artifact**: Source code in unit directory + `memory-bank/bolts/{bolt-id}/test-stamps.jsonl` (written by the wrapper, never by hand)
 **Location**: `src/{unit}/` or as defined in project structure
 
 **Project Structure**:
@@ -447,6 +449,7 @@ src/{unit}/
 5 - **Run all tests**: Execute test suite
 6 - **Measure coverage**: Generate coverage report
 7 - **Verify acceptance criteria**: Validate against stories
+8 - **Record both gates with evidence**: The report carries an `Adversarial design check` heading and a `Fresh-eyes micro-review` heading stating what each gate ran and found, and the failure-mode table rendered from `failure-modes.jsonl` with the real test names. Every bullet under its Summary, Acceptance Criteria Validation, Test Files and Issues Found headings names a path, a `file:line` or the command that shows it (`node .specsmd/aidlc/scripts/lint-claims.mjs <report>`); `node .specsmd/aidlc/scripts/check-stage-exit.mjs {bolt-id} test` must exit 0 before the stage is marked complete.
 
 **Artifact**: `ddd-03-test-report.md`
 **Template**: `.specsmd/aidlc/templates/construction/bolt-types/ddd-construction-bolt/ddd-03-test-report-template.md`
