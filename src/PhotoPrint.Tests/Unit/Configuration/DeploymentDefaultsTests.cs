@@ -86,6 +86,37 @@ public class DeploymentDefaultsTests
         IPNetwork.Parse(PinnedSubnet).Contains(caddy).Should().BeTrue();
     }
 
+    [Fact]
+    public void DirectoryPackagesProps_PromotesAuditWarningsToErrors()
+    {
+        var props = RepoFiles.ReadAllText("Directory.Packages.props");
+
+        props.Should().Contain("<NuGetAuditMode>all</NuGetAuditMode>",
+            "the SDK audits only direct packages by default, so transitive pins go unscanned");
+        props.Should().Contain("<NuGetAuditLevel>low</NuGetAuditLevel>");
+
+        var promotion = props
+            .Split('\n')
+            .Single(line => line.Contains("<WarningsAsErrors") && line.Contains("FailOnAudit"));
+
+        foreach (var code in new[] { "NU1901", "NU1902", "NU1903", "NU1904", "NU1905" })
+        {
+            promotion.Should().Contain(code);
+        }
+    }
+
+    [Fact]
+    public void CiRestore_HardFailsOnAuditWarnings()
+    {
+        var ci = RepoFiles.ReadAllText(".github", "workflows", "ci.yml");
+
+        ci.Should().Contain("dotnet restore PhotoPrint.sln -p:FailOnAudit=true",
+            "the props promote audit warnings only when that switch is passed, so without it "
+            + "on the CI restore a new advisory reaches main as a warning nobody reads");
+        ci.Should().NotContain("dotnet list package --vulnerable",
+            "that command exits 0 on findings, so it cannot be the gate");
+    }
+
     private static string CaddyStaticAddress()
     {
         var block = ComposeServiceBlock("caddy");

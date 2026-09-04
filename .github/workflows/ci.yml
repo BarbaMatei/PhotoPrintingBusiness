@@ -49,7 +49,8 @@ jobs:
             -e MINIO_ROOT_PASSWORD=minioadmin \
             minio/minio:RELEASE.2024-12-18T13-15-44Z \
             server /data
-      - run: dotnet restore PhotoPrint.sln
+      - name: Restore (NuGet audit hard-fails here)
+        run: dotnet restore PhotoPrint.sln -p:FailOnAudit=true
       - run: dotnet build PhotoPrint.sln --no-restore -c Release
       - name: Wait for MinIO
         run: |

@@ -9,6 +9,13 @@
          and NU1605 (downgrade) are already errors; NU1608 is left as a warning because transitive
          pinning raises it whenever an upstream constraint moves. -->
     <WarningsAsErrors>$(WarningsAsErrors);NU1603</WarningsAsErrors>
+    <!-- The SDK audits only direct packages by default, which cannot see a transitive pin. NU1905
+         (audit source has no data) must be promoted too, or a source outage yields a green build.
+         The promotion is opt-in via FailOnAudit so a fresh advisory fails CI without blocking the
+         Docker publish or a hotfix deploy; the warnings themselves are always emitted. -->
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors Condition="'$(FailOnAudit)' == 'true'">$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904;NU1905</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

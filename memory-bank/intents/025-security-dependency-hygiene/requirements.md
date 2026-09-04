@@ -71,8 +71,8 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 ### Security
 | Requirement | Standard | Notes |
 |-------------|----------|-------|
-| No known vulnerable packages | `dotnet list package --vulnerable` clean | Verified in CI |
-| No IP spoofing via forwarded headers | The proxy's own address only, never the container subnet | Any container on a trusted range could name the client (P05 risk) |
+| No known vulnerable packages | Restore-time NuGet audit over direct **and** transitive packages at advisory level `low` (`NuGetAuditMode=all`, `NuGetAuditLevel=low`) | Enforced in CI: the restore step runs `-p:FailOnAudit=true`, which promotes NU1901–NU1905 to errors. `dotnet list package --vulnerable` is not the gate — it exits 0 on findings |
+| No IP spoofing via forwarded headers | The proxy's own address only, never the container subnet; a range wider than a single address pair is refused at boot | Any container on a trusted range could name the client (P05 risk) |
 | Single resolved version per package | Central Package Management | Eliminates silent multi-version load |
 
 ### Reliability
@@ -111,4 +111,4 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 |----------|-------|----------|------------|
 | Q1: Who installs the Renovate GitHub App (repo-admin action)? | Maintainer | 2026-06-12 | Pending |
 | Q2: Pin Stripe.net to 46 or 47? | Dev | 2026-06-12 | Recommend 47 (the already-resolved Tests version) after webhook-suite verification |
-| Q3: Exact reverse-proxy CIDR for `KnownNetworks`? | Ops | 2026-06-12 | Derive from docker-compose.prod.yml bridge network |
+| Q3: Exact reverse-proxy CIDR for `KnownNetworks`? | Ops | 2026-06-12 | No CIDR: trust Caddy's own address alone (`172.28.0.2`, pinned in docker-compose.prod.yml). The bridge CIDR is refused at boot — the API's ports are exposed on that network, so any container in the range could forge a client IP. See DEPLOYMENT.md §16.2. |
