@@ -38,6 +38,8 @@ public sealed class OrderEmailService : IOrderEmailService
         var shipAddr = isEasybox ? null : order.ShippingAddress;
         var subtotal = order.SubtotalRon;
         var shipping = order.ShippingCostRon;
+        var discount = order.DiscountRon;
+        var couponCode = order.CouponCode;
         var total = order.TotalRon;
         var orderUrl = $"{_baseUrl}/comenzile-mele/{orderId}";
 
@@ -60,7 +62,7 @@ public sealed class OrderEmailService : IOrderEmailService
                     new OrderConfirmedEmailModel(
                         firstName, orderNumber, items, isEasybox,
                         lockerName, lockerCity, lockerAddress,
-                        shipAddr, subtotal, shipping, total, orderUrl),
+                        shipAddr, subtotal, shipping, discount, couponCode, total, orderUrl),
                     CancellationToken.None);
             }
             catch (Exception ex)
@@ -201,6 +203,8 @@ public sealed record OrderConfirmedEmailModel(
     ShippingAddressSnapshot? ShippingAddress,
     decimal SubtotalRon,
     decimal ShippingCostRon,
+    decimal DiscountRon,
+    string? CouponCode,
     decimal TotalRon,
     string OrderUrl);
 
