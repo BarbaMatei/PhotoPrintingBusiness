@@ -50,11 +50,11 @@ public class ForwardedHeadersOptionsTests
     [Fact]
     public void A_cidr_entry_becomes_a_known_network_that_matches_its_members()
     {
-        var options = BuildOptions("172.28.0.0/24");
+        var options = BuildOptions("172.28.0.2/31");
 
         options.KnownNetworks.Should().ContainSingle();
-        options.KnownNetworks[0].Contains(IPAddress.Parse("172.28.0.7")).Should().BeTrue();
-        options.KnownNetworks[0].Contains(IPAddress.Parse("172.29.0.7")).Should().BeFalse();
+        options.KnownNetworks[0].Contains(IPAddress.Parse("172.28.0.3")).Should().BeTrue();
+        options.KnownNetworks[0].Contains(IPAddress.Parse("172.28.0.7")).Should().BeFalse();
     }
 
     private static ForwardedHeadersOptions BuildOptions(params string[] trustedProxies)

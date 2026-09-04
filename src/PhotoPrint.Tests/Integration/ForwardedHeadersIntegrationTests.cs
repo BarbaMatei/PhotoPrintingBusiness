@@ -3,13 +3,17 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Integration;
 
 public class ForwardedHeadersIntegrationTests
 {
-    private const string ProxyAddress  = "172.28.0.2";
-    private const string ClientAddress = "203.0.113.9";
+    private const string ProxyAddress    = "172.28.0.2";
+    private const string ClientAddress   = "203.0.113.9";
+    private const string UntrustedPeer   = "10.9.9.9";
+    private const string UntrustedPrefix = "forwarded_headers.untrusted_peer ip=";
 
     [Fact]
     public async Task A_trusted_proxy_resolves_the_client_from_x_forwarded_for()
@@ -26,13 +30,14 @@ public class ForwardedHeadersIntegrationTests
     {
         using var factory = new TrustedProxyFactory(ProxyAddress);
 
-        var resolved = await factory.ResolveAsync(peer: "10.9.9.9", forwardedFor: ClientAddress);
+        var resolved = await factory.ResolveAsync(peer: UntrustedPeer, forwardedFor: ClientAddress);
 
-        resolved.ClientIp.Should().Be("10.9.9.9");
+        resolved.ClientIp.Should().Be(UntrustedPeer);
+        factory.Warnings(UntrustedPrefix).Should().Be(1);
     }
 
     [Fact]
-    public async Task Only_the_rightmost_entry_the_proxy_appended_is_honoured()
+    public async Task Trusted_proxy_with_multi_entry_forwarded_for_emits_no_untrusted_warning()
     {
         using var factory = new TrustedProxyFactory(ProxyAddress);
 
@@ -40,16 +45,18 @@ public class ForwardedHeadersIntegrationTests
             peer: ProxyAddress, forwardedFor: $"198.51.100.1, {ClientAddress}");
 
         resolved.ClientIp.Should().Be(ClientAddress);
+        factory.Warnings(UntrustedPrefix).Should().Be(0);
     }
 
     [Fact]
-    public async Task A_cidr_entry_trusts_every_proxy_in_the_range()
+    public async Task A_single_pair_cidr_entry_trusts_both_of_its_addresses()
     {
-        using var factory = new TrustedProxyFactory("172.28.0.0/24");
+        using var factory = new TrustedProxyFactory("172.28.0.2/31");
 
-        var resolved = await factory.ResolveAsync(peer: "172.28.0.7", forwardedFor: ClientAddress);
+        var resolved = await factory.ResolveAsync(peer: "172.28.0.3", forwardedFor: ClientAddress);
 
         resolved.ClientIp.Should().Be(ClientAddress);
+        factory.Warnings(UntrustedPrefix).Should().Be(0);
     }
 
     [Fact]
@@ -109,6 +116,38 @@ public class ForwardedHeadersWithObservabilityTests
 
         resolved.ClientIp.Should().Be("203.0.113.9");
     }
+
+    [Fact]
+    public async Task A_non_metrics_path_on_the_scrape_port_still_resolves_its_client()
+    {
+        using var factory = new TrustedProxyOnScrapeListenerFactory();
+
+        var resolved = await factory.ResolveAsync(peer: "172.28.0.2", forwardedFor: "203.0.113.9");
+
+        resolved.ClientIp.Should().Be("203.0.113.9");
+    }
+
+    [Fact]
+    public async Task The_metrics_path_on_the_public_port_still_resolves_its_client()
+    {
+        using var factory = new TrustedProxyWithScrapeListenerFactory();
+
+        var resolved = await factory.ResolveAsync(
+            peer: "172.28.0.2", forwardedFor: "203.0.113.9", path: "/metrics");
+
+        resolved.ClientIp.Should().Be("203.0.113.9");
+    }
+
+    [Fact]
+    public void Trusted_proxies_with_observability_on_and_no_scrape_listener_aborts_boot()
+    {
+        using var factory = new TrustedProxyWithoutScrapeListenerFactory();
+
+        var act = () => factory.CreateClient();
+
+        act.Should().Throw<Exception>()
+            .Which.ToString().Should().Contain("Observability:Metrics:ScrapePort");
+    }
 }
 
 internal sealed record ResolvedRequest(string? ClientIp, string Scheme, bool IsHttps);
@@ -141,7 +180,7 @@ internal sealed class ClientIdentityProbeStartupFilter : IStartupFilter
     };
 }
 
-internal sealed class TrustedProxyWithScrapeListenerFactory : TrustedProxyFactory
+internal class TrustedProxyWithScrapeListenerFactory : TrustedProxyFactory
 {
     public TrustedProxyWithScrapeListenerFactory() : base("172.28.0.2") { }
 
@@ -157,12 +196,33 @@ internal sealed class TrustedProxyWithScrapeListenerFactory : TrustedProxyFactor
     protected override int SimulatedLocalPort() => 8080;
 }
 
+internal sealed class TrustedProxyOnScrapeListenerFactory : TrustedProxyWithScrapeListenerFactory
+{
+    protected override int SimulatedLocalPort() => 9090;
+}
+
+internal sealed class TrustedProxyWithoutScrapeListenerFactory : TrustedProxyFactory
+{
+    public TrustedProxyWithoutScrapeListenerFactory() : base("172.28.0.2") { }
+
+    protected override Dictionary<string, string?> ExtraConfig()
+    {
+        var config = base.ExtraConfig();
+        config["Observability:Enabled"]            = "true";
+        config["Observability:Metrics:ScrapePort"] = "0";
+        return config;
+    }
+}
+
 internal class TrustedProxyFactory : ObservabilityFactoryBase
 {
     private readonly string[] _trustedProxies;
     private readonly ClientIdentityProbe _probe = new();
+    private readonly LogCapture _logs = new();
 
     public TrustedProxyFactory(params string[] trustedProxies) => _trustedProxies = trustedProxies;
+
+    public int Warnings(string prefix) => _logs.CountStartingWith(prefix, LogLevel.Warning);
 
     protected override Dictionary<string, string?> ExtraConfig()
     {
@@ -178,17 +238,23 @@ internal class TrustedProxyFactory : ObservabilityFactoryBase
     {
         base.ConfigureWebHost(builder);
         builder.ConfigureServices(services =>
-            services.AddSingleton<IStartupFilter>(new ClientIdentityProbeStartupFilter(_probe)));
+        {
+            services.AddSingleton<IStartupFilter>(new ClientIdentityProbeStartupFilter(_probe));
+            _logs.OutRegisterTheHostsSerilogLoggerFactory(services);
+        });
     }
 
     public async Task<ResolvedRequest> ResolveAsync(
-        string peer, string forwardedFor, string? forwardedProto = null)
+        string peer,
+        string forwardedFor,
+        string? forwardedProto = null,
+        string path = "/__probe/client-identity")
     {
         _probe.Peer     = IPAddress.Parse(peer);
         _probe.Resolved = null;
         using var client = CreateClient();
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/__probe/client-identity");
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Add("X-Forwarded-For", forwardedFor);
         if (forwardedProto is not null)
             request.Headers.Add("X-Forwarded-Proto", forwardedProto);

@@ -20,7 +20,7 @@ implemented: false
 ## Acceptance Criteria
 
 - [ ] **Given** `app.UseForwardedHeaders()` registered before `UseCorrelationId`, **When** a request arrives via Caddy, **Then** `Connection.RemoteIpAddress` reflects `X-Forwarded-For`, not the proxy IP
-- [ ] **Given** `ForwardedHeadersOptions`, **When** configured, **Then** `KnownNetworks`/`KnownProxies` are cleared and anchored to the reverse-proxy CIDR only
+- [ ] **Given** `ForwardedHeadersOptions`, **When** configured, **Then** `KnownNetworks`/`KnownProxies` are cleared and anchored to the proxy's own address only — never the bridge CIDR, which boot refuses
 - [~] **SUPERSEDED** — ~~**Given** `MetricsEndpointIntegrationTests`, **When** an `X-Forwarded-For` case runs, **Then** an allow-listed IP gets 200 and a non-listed IP gets 403~~
   This criterion was written on 2026-06-05, before the ADR-018 amendment of 2026-07-31 closed
   the proxied-`/metrics` hole topologically (a scrape listener the edge does not route, plus a

@@ -16,14 +16,67 @@ public class ForwardedHeadersSettingsValidatorTests
     }
 
     [Fact]
-    public void A_plain_address_and_a_cidr_range_are_valid()
+    public void A_plain_address_and_a_single_pair_range_are_valid()
     {
         var result = Validate(new ForwardedHeadersSettings
         {
-            TrustedProxies = ["172.28.0.2", "10.0.0.0/8", "::1"],
+            TrustedProxies = ["172.28.0.2", "10.0.0.0/31", "::1"],
         });
 
         result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_single_pinned_proxy_address_is_valid()
+    {
+        var result = Validate(new ForwardedHeadersSettings { TrustedProxies = ["172.28.0.2"] });
+
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_subnet_wide_range_fails_validation()
+    {
+        var result = Validate(new ForwardedHeadersSettings { TrustedProxies = ["172.28.0.0/24"] });
+
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("ForwardedHeaders:TrustedProxies")
+            .And.Contain("172.28.0.0/24");
+    }
+
+    [Fact]
+    public void The_whole_internet_fails_validation()
+    {
+        var result = Validate(new ForwardedHeadersSettings { TrustedProxies = ["0.0.0.0/0"] });
+
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("0.0.0.0/0");
+    }
+
+    [Fact]
+    public void An_ipv6_range_wider_than_one_pair_fails_validation()
+    {
+        var result = Validate(new ForwardedHeadersSettings { TrustedProxies = ["2001:db8::/64"] });
+
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("2001:db8::/64");
+    }
+
+    [Fact]
+    public void An_ipv6_single_pair_range_is_valid()
+    {
+        var result = Validate(new ForwardedHeadersSettings { TrustedProxies = ["2001:db8::/127"] });
+
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void An_ipv6_link_local_entry_fails_validation()
+    {
+        var result = Validate(new ForwardedHeadersSettings { TrustedProxies = ["fe80::1"] });
+
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("fe80::1");
     }
 
     [Fact]

@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Middleware;
-using PhotoPrint.API.Observability;
 using PhotoPrint.API.Validators;
 
 namespace PhotoPrint.API.Extensions;
@@ -19,30 +18,19 @@ public static class ForwardedHeadersExtensions
             .Bind(configuration.GetSection(ForwardedHeadersSettings.SectionName))
             .ValidateOnStart();
 
-        var trustedProxies = configuration
-            .GetSection($"{ForwardedHeadersSettings.SectionName}:{nameof(ForwardedHeadersSettings.TrustedProxies)}")
-            .Get<string[]>() ?? [];
-
+        services.AddSingleton<TrustedProxyList>();
         services.AddSingleton<UntrustedForwardedPeerMiddleware>();
 
-        services.Configure<ForwardedHeadersOptions>(options =>
+        services.AddOptions<ForwardedHeadersOptions>().Configure<TrustedProxyList>((options, trusted) =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             options.ForwardLimit = 1;
             options.KnownNetworks.Clear();
             options.KnownProxies.Clear();
 
-            var parsed = ScrapeIpAllowList.Parse(trustedProxies, out var errors);
-            if (errors.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"ForwardedHeaders:TrustedProxies has {errors.Count} invalid entr"
-                    + (errors.Count == 1 ? "y: " : "ies: ") + string.Join(" ", errors));
-            }
-
-            foreach (var address in parsed.Addresses)
+            foreach (var address in trusted.Addresses)
                 options.KnownProxies.Add(address);
-            foreach (var network in parsed.Networks)
+            foreach (var network in trusted.Networks)
                 options.KnownNetworks.Add(new IPNetwork(network.BaseAddress, network.PrefixLength));
         });
 

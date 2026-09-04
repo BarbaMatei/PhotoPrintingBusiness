@@ -1641,9 +1641,11 @@ headers may be believed.
 ForwardedHeaders__TrustedProxies__0=172.28.0.2
 ```
 
-Plain IPv4/IPv6 addresses **and** CIDR ranges, parsed and validated at boot by the same rules as
-`Observability__Metrics__AllowedScrapeIps` (§14.5): every entry must parse, CIDR base addresses
-must have all host bits zero, no leading-zero forms, no IPv4-mapped IPv6 ranges. One bad entry
+Plain IPv4/IPv6 addresses **and** narrow CIDR ranges, parsed and validated at boot by the same
+rules as `Observability__Metrics__AllowedScrapeIps` (§14.5) — every entry must parse, CIDR base
+addresses must have all host bits zero, no leading-zero forms, no IPv4-mapped IPv6 ranges — plus
+two rules this setting alone enforces: a range may be no wider than a single address pair (IPv4
+`/31`, IPv6 `/127`), and IPv6 link-local entries are refused. §16.2 explains why. One bad entry
 aborts startup naming it.
 
 **Empty is the `appsettings.json` default and means the feature is off** — the middleware is
@@ -1670,6 +1672,12 @@ do exactly that for the scrape allow-list. The two settings answer different que
   directly. Trust the subnet and any one of them can set `X-Forwarded-For` to whatever it likes:
   an unlimited rate-limit budget for itself, a targeted denial of service against one real
   customer's partition, and forged addresses written into your audit trail.
+
+**Boot refuses the mistake rather than trusting you not to make it.** A proxy is one host, so
+the list takes a bare address or a CIDR no wider than a single address pair — IPv4 `/31`, IPv6
+`/127`. Anything wider (`172.28.0.0/24`, `0.0.0.0/0`) aborts startup naming the entry, and so
+does an IPv6 link-local entry, whose zone is dropped when a peer is compared and which would
+therefore trust that address on every interface. Name the proxy's routable address.
 
 The `ipam` block also carries `ip_range: 172.28.0.128/25`, which confines Docker's dynamic
 allocations to the upper half of the subnet. Caddy's pinned `.2` sits outside that pool on
@@ -1722,6 +1730,9 @@ strict improvements. The first needs a number from you.
   will be recorded as the CDN edge.
 - The framework's default trust of loopback is **cleared**; only your configured entries are
   trusted.
+- A trusted proxy whose rightmost entry is not an address (`unknown`, an empty value) buys
+  nothing: the header is ignored, the identity stays the proxy's own address, and the API logs
+  `forwarded_headers.unparseable_forwarded_for` once per proxy (§16.5).
 - Only `X-Forwarded-For` and `X-Forwarded-Proto` are honoured. `X-Forwarded-Host` is not: every
   absolute URL the API emits comes from `App__BaseUrl`, and honouring a forwarded host would add
   an attack surface with no consumer.
@@ -1732,9 +1743,8 @@ strict improvements. The first needs a number from you.
 
 | Message | Cause | Fix |
 |---|---|---|
-| `OptionsValidationException` naming an entry of `ForwardedHeaders:TrustedProxies` | A typo, host bits set on a CIDR, a leading-zero form | Correct the entry; the message states the accepted form |
+| `OptionsValidationException` naming an entry of `ForwardedHeaders:TrustedProxies` | A typo, host bits set on a CIDR, a leading-zero form, a range wider than one address pair (IPv4 `/31`, IPv6 `/127`), or an IPv6 link-local entry | Correct the entry; the message states the accepted form and why the entry was refused (§16.2) |
 | `ForwardedHeaders:TrustedProxies is set while Observability:Metrics:ScrapePort is 0` | A trusted proxy is declared but the scrape path is still served on every listener | Set `Observability__Metrics__ScrapePort` (§14.3), or clear `TrustedProxies` |
-| `InvalidOperationException: ForwardedHeaders:TrustedProxies has N invalid entries` | Same cause as row 1, reached through the options builder rather than the validator. In practice the validator fires first; this is the backstop if anything ever resolves the middleware options without it | Correct the entry |
 
 And one line to watch for *after* boot, which is not a failure but the most likely way this
 silently stops working:
@@ -1743,6 +1753,8 @@ silently stops working:
 |---|---|---|
 | `forwarded_headers.untrusted_peer ip=…` | That peer sent `X-Forwarded-For` but is not in `TrustedProxies`, so the header was ignored and the client identity fell back to the peer itself. If the address shown is the reverse proxy, its address has drifted from the configured one — the feature is off in all but name | Reconcile `ForwardedHeaders__TrustedProxies__0` with the proxy's real address (§16.2) |
 | `forwarded_headers.untrusted_peer.log_cap_reached distinct_ips=512` | Too many distinct untrusted sources to keep logging; further ones are silent until restart | Expect this under a scan; investigate if it appears in normal traffic |
+| `forwarded_headers.unparseable_forwarded_for ip=…` | The peer *is* trusted, but the rightmost `X-Forwarded-For` entry it sent is not an address (`unknown`, an empty value), so the header was ignored and the client identity is the proxy itself — the same silent breakage as the row above, from the other direction | Fix the proxy's header configuration; the shipped `Caddyfile` sets `{remote_host}`, which always parses |
+| `forwarded_headers.unparseable_forwarded_for.log_cap_reached distinct_ips=512` | Too many distinct trusted proxies sending unusable values to keep logging | Investigate: with one proxy this line should be unreachable |
 
 ### 16.6 Verification after deploy
 

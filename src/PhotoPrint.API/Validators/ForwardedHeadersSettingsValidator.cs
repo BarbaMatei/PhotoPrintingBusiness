@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Microsoft.Extensions.Options;
 using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Observability;
@@ -19,9 +20,31 @@ public sealed class ForwardedHeadersSettingsValidator : IValidateOptions<Forward
 
         var failures = new List<string>();
 
-        ScrapeIpAllowList.Parse(trusted, out var entryErrors);
+        var parsed = ScrapeIpAllowList.Parse(trusted, out var entryErrors);
         foreach (var error in entryErrors)
             failures.Add($"ForwardedHeaders:TrustedProxies: {error}");
+
+        foreach (var network in parsed.Networks)
+        {
+            var pairPrefix = network.BaseAddress.AddressFamily == AddressFamily.InterNetwork ? 31 : 127;
+            if (network.PrefixLength < pairPrefix)
+            {
+                failures.Add(
+                    $"ForwardedHeaders:TrustedProxies: '{network}' is wider than a single address "
+                    + $"pair (/{pairPrefix}). Every host in it can reach the API's exposed ports "
+                    + "directly and would be believed about who the client is — name the proxy's "
+                    + "own address instead.");
+            }
+
+            if (network.BaseAddress.IsIPv6LinkLocal)
+                failures.Add(LinkLocalFailure(network.ToString()));
+        }
+
+        foreach (var address in parsed.Addresses)
+        {
+            if (address.IsIPv6LinkLocal)
+                failures.Add(LinkLocalFailure(address.ToString()));
+        }
 
         var observability = _configuration
             .GetSection(ObservabilitySettings.SectionName)
@@ -40,4 +63,9 @@ public sealed class ForwardedHeadersSettingsValidator : IValidateOptions<Forward
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);
     }
+
+    private static string LinkLocalFailure(string entry) =>
+        $"ForwardedHeaders:TrustedProxies: '{entry}' is IPv6 link-local, which names no single host: "
+        + "the zone is dropped when a peer is compared, so this would trust the same address on "
+        + "every interface — name the proxy's routable address instead.";
 }
