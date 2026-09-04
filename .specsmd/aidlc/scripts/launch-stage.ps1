@@ -36,7 +36,7 @@ function Get-Frontmatter([string]$Text) {
 function Get-FrontmatterValue([string]$Frontmatter, [string]$Key) {
     $m = [regex]::Match($Frontmatter, '(?m)^' + [regex]::Escape($Key) + ':[ \t]*(.*?)[ \t]*$')
     if (-not $m.Success) { return '' }
-    return $m.Groups[1].Value.Trim('"', "'")
+    return $m.Groups[1].Value.Trim().Trim('"', "'")
 }
 
 function Get-CompletedStages([string]$Frontmatter) {
