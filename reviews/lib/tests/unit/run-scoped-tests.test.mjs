@@ -3,7 +3,7 @@
 // --cmd with a `node -e` stand-in — never dotnet or npm.
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only run-scoped
-import { check, run } from '../lib.mjs'
+import { check, run, firstLine } from '../lib.mjs'
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -193,6 +193,47 @@ const target = '960-run-scoped-target'
   const ev = lastEvent(T, target)
   check('--cluster, --round and --note pass through to the stamped event',
     r.code === 0 && !!ev && ev.cluster === 'c3' && ev.round === 2 && ev.note === 'triage note', JSON.stringify(ev))
+}
+{
+  const before = lastEvent(T, target)
+  const redDotnet = "node -e \"console.log('  Determining projects to restore...'); console.log('  Failed PhotoPrint.Tests.Unit.Foo.Bar_Fails [12 ms]'); console.log('  Error Message:'); console.log('   Assert.Equal() Failure'); console.log('  Failed PhotoPrint.Tests.Unit.Foo.Baz_Fails(n: 2) [3 ms]'); console.log('  Passed PhotoPrint.Tests.Unit.Foo.Qux [1 ms]'); console.log('Failed!  - Failed:     2, Passed:     3, Skipped:     1, Total:     6, Duration: 1 s'); process.exit(1)\""
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', T, target, '--kind', 'red', '--filter', 'Foo.Summary', '--cmd', redDotnet, '--summary', '--no-events'])
+  const lines = r.out.trim().split('\n')
+  check('--summary keeps the runner\'s own exit code', r.code === 1, `exit ${r.code}: ${r.out.trim()}`)
+  check('--summary prints the dotnet totals line first', firstLine(r.out) === 'passed 3, failed 2, skipped 1', r.out.trim())
+  check('--summary lists each failing dotnet test by name, once, and nothing else',
+    lines.length === 3 && lines[1] === '  PhotoPrint.Tests.Unit.Foo.Bar_Fails' && lines[2] === '  PhotoPrint.Tests.Unit.Foo.Baz_Fails(n: 2)', r.out.trim())
+  check('--summary drops the runner\'s own lines (restore chatter, error detail, passes, the summary banner)',
+    !/Determining|Error Message|Passed PhotoPrint|Failed!/.test(r.out), r.out.trim())
+  check('--summary together with --no-events stamps nothing', JSON.stringify(lastEvent(T, target)) === JSON.stringify(before), 'a new event was appended despite --no-events')
+}
+{
+  const redVitest = "node -e \"console.log(' RUN  v3.2.0 D:/repo/src/PhotoPrint.UI'); console.log(' \\u276f src/app/widget/widget.component.spec.ts (3 tests | 1 failed) 40ms'); console.log('   \\u00d7 WidgetComponent > renders the title 5ms'); console.log('     \\u2192 expected a to be b'); console.log(' FAIL  src/app/widget/widget.component.spec.ts > WidgetComponent > renders the title'); console.log('AssertionError: expected a to be b'); console.log(' Test Files  1 failed (1)'); console.log('      Tests  1 failed | 2 passed (3)'); process.exit(1)\""
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', T, target, '--kind', 'red', '--ui', '--include', 'WidgetComponent', '--cmd', redVitest, '--summary', '--no-events'])
+  const lines = r.out.trim().split('\n')
+  check('--summary prints the vitest totals line first', r.code === 1 && firstLine(r.out) === 'passed 2, failed 1', `exit ${r.code}: ${r.out.trim()}`)
+  check('--summary names the failing vitest test once, from its FAIL line, and nothing else',
+    lines.length === 2 && lines[1] === '  src/app/widget/widget.component.spec.ts > WidgetComponent > renders the title', r.out.trim())
+  check('--summary drops the vitest banner and assertion detail', !/RUN|AssertionError|expected a to be b/.test(r.out), r.out.trim())
+
+  const xOnlyVitest = "node -e \"console.log('   \\u00d7 WidgetComponent > saves the draft 7ms'); console.log(' Tests  1 failed | 1 passed (2)'); process.exit(1)\""
+  const r2 = run('fix/run-scoped-tests.mjs',
+    ['--root', T, target, '--kind', 'red', '--ui', '--include', 'WidgetComponent', '--cmd', xOnlyVitest, '--summary', '--no-events'])
+  check('--summary falls back to the × lines when vitest prints no FAIL line',
+    r2.out.trim() === 'passed 1, failed 1\n  WidgetComponent > saves the draft', r2.out.trim())
+}
+{
+  const unparsable = "node -e \"console.log('nothing of note here')\""
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', T, target, '--kind', 'green', '--filter', 'Foo.SummaryUnparsed', '--cmd', unparsable, '--summary', '--no-events'])
+  check('--summary on unparsable output says so with the runner\'s exit code', r.code === 0 && r.out.trim() === 'totals unparsed (runner exit 0)', `exit ${r.code}: ${r.out.trim()}`)
+
+  const passDotnet = "node -e \"console.log('Passed! - Failed: 0, Passed: 4')\""
+  const r2 = run('fix/run-scoped-tests.mjs',
+    ['--root', T, target, '--kind', 'green', '--filter', 'Foo.Passthrough', '--cmd', passDotnet, '--no-events'])
+  check('without --summary the runner output still passes through', r2.code === 0 && r2.out.includes('Passed! - Failed: 0, Passed: 4'), r2.out.trim())
 }
 {
   let r = run('fix/run-scoped-tests.mjs', ['--root', T, '--kind', 'green', '--filter', 'x'])

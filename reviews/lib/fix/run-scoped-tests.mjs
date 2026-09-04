@@ -7,7 +7,7 @@
 // Usage: node reviews/lib/run-scoped-tests.mjs [--root <repoRoot>] <target> --kind
 //   <red|green|final|baseline|revert-and-rerun> (--filter "<FQN fragment>" | --ui --include
 //   "<name>") [--cluster <c>] [--round <n>] [--note "<text>"]
-//   [--cmd "<template with {filter}/{name}>"] [--dry-run] [--no-events]
+//   [--cmd "<template with {filter}/{name}>"] [--dry-run] [--no-events] [--summary]
 // Commands: API `dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"`;
 // UI `npm --prefix src/PhotoPrint.UI test -- --watch=false --include=**/{name}*.spec.ts`
 // (unquoted — spawnSync's shell on Windows is cmd.exe, which does not strip single quotes,
@@ -28,6 +28,9 @@
 // vitest's `Tests (n failed )?n passed`; either half falls back to `node --test`'s TAP
 // totals (`# pass n` / `# fail n`, plus `# skipped n` when present). Unparsable output stamps
 // passed/failed as null with a note, but the process still exits with the runner's own exit code.
+// --summary replaces the runner's output with one totals line (passed/failed/skipped) plus the
+// failing test names: dotnet's `Failed <Name>` and `<Name> [FAIL]` lines, vitest's `FAIL <spec >
+// test>` lines (its `×` lines when no FAIL line is printed), TAP's `not ok` lines.
 // Exit: N the runner's own exit code (0 on a green run, non-zero on red) · 2 usage error ·
 // 3 another test process already holds the lock.
 import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
@@ -45,6 +48,11 @@ const VITEST_RE = /Tests\s+(?:(\d+) failed[^\d]*)?(\d+) passed/
 const TAP_PASS_RE = /^# pass (\d+)\s*$/m
 const TAP_FAIL_RE = /^# fail (\d+)\s*$/m
 const TAP_SKIP_RE = /^# skipped (\d+)\s*$/m
+const DOTNET_FAILED_RE = /^\s*Failed\s+(\S.*?)(?:\s+\[[^\]]*\])?\s*$/gm
+const XUNIT_FAIL_RE = /^\s*(\S.*?)\s+\[FAIL\]\s*$/gm
+const VITEST_FAIL_RE = /^\s*FAIL\s+(\S.*?)\s*$/gm
+const VITEST_X_RE = /^\s*[×✗]\s+(\S.*?)(?:\s+\d+(?:\.\d+)?ms)?\s*$/gm
+const TAP_NOT_OK_RE = /^\s*not ok\s+\d+\s*-?\s*(\S.*?)\s*$/gm
 
 function usageError(message) {
   console.error(`usage: ${message}`)
@@ -67,6 +75,7 @@ function parseArgs(rawArgv) {
     else if (a === '--cmd') args.cmd = argv[++i]
     else if (a === '--dry-run') args.dryRun = true
     else if (a === '--no-events') args.noEvents = true
+    else if (a === '--summary') args.summary = true
     else positional.push(a)
   }
   args.target = positional[0]
@@ -124,6 +133,25 @@ function parseOutput(mode, text) {
   return out
 }
 
+function failingTests(mode, text) {
+  const names = (...patterns) => {
+    const found = new Set()
+    for (const re of patterns) for (const m of text.matchAll(re)) found.add(m[1])
+    return [...found]
+  }
+  if (mode === 'ui') {
+    const fromFailLines = names(VITEST_FAIL_RE)
+    return fromFailLines.length ? fromFailLines : names(VITEST_X_RE, TAP_NOT_OK_RE)
+  }
+  return [...names(DOTNET_FAILED_RE).filter(name => name.includes('.')), ...names(XUNIT_FAIL_RE, TAP_NOT_OK_RE)]
+}
+
+function printSummary(parsed, failing, exitCode) {
+  if (parsed.passed === null) console.log(`totals unparsed (runner exit ${exitCode})`)
+  else console.log(`passed ${parsed.passed}, failed ${parsed.failed}${parsed.skipped !== undefined ? `, skipped ${parsed.skipped}` : ''}`)
+  for (const name of failing) console.log(`  ${name}`)
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2))
   const REPO = repoRoot(import.meta.url, args.root)
@@ -161,11 +189,15 @@ function main() {
     const started = Date.now()
     const result = spawnSync(cmd, { cwd: REPO, shell: true, encoding: 'utf8', timeout: 600000 })
     const duration_s = Math.round(Date.now() - started) / 1000
-    if (result.stdout) process.stdout.write(result.stdout)
-    if (result.stderr) process.stderr.write(result.stderr)
     exitCode = result.status ?? 1
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
+    const parsed = parseOutput(mode, output)
+    if (args.summary) printSummary(parsed, failingTests(mode, output), exitCode)
+    else {
+      if (result.stdout) process.stdout.write(result.stdout)
+      if (result.stderr) process.stderr.write(result.stderr)
+    }
 
-    const parsed = parseOutput(mode, `${result.stdout ?? ''}${result.stderr ?? ''}`)
     const event = { kind: args.kind, passed: parsed.passed, failed: parsed.failed, duration_s }
     if (mode === 'api' && args.filter != null) event.filter = args.filter
     if (mode === 'ui' && args.include != null) event.include = args.include

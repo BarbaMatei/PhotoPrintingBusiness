@@ -82,6 +82,15 @@ whole suite by default.**
   folder via `--include` — one batch at a time, never both suites at once, never batches in
   parallel.
 
+## Working cheaply (every session)
+
+- Batch every independent read or check into one turn; several shell commands go in one call.
+- Read line ranges, never whole files; search with narrow context.
+- Run tests through `node reviews/lib/run-scoped-tests.mjs <bolt-id> --kind green --filter "<FQN fragment>" --summary --no-events` (UI: `--ui --include "<name>"` instead of `--filter`) — counts and failing names only.
+- For TypeScript symbol questions (who calls X, where is X defined) use the LSP tool, not grep.
+- One session per bolt stage: at a stage boundary write the stage-exit block into the unit's `construction-log.md` and end the turn; never resume a finished stage with `--continue`.
+- Schedule long runs (tests, review subagents, builds) as the last act of a stage.
+
 ## The map (read-when routing)
 
 | Working on… | Read first |
