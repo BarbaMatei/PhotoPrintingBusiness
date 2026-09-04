@@ -84,6 +84,7 @@ public class AdminOrderServiceTests
             _hub.Object,
             _awbNotifier.Object,
             _invoiceCreator.Object,
+            PhotoPrint.Tests.Helpers.TestCoupons.ServiceFor(db),
             NullLogger<AdminOrderService>.Instance);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -421,7 +422,8 @@ public class AdminOrderServiceTests
     private AdminOrderService BuildSutWithArchive(ArchiveSettings archive)
         => new(_db, _emailSvc.Object, _stripeClient.Object,
             _router.Object, _purger.Object, Options.Create(archive),
-            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object,
+            PhotoPrint.Tests.Helpers.TestCoupons.ServiceFor(_db), NullLogger<AdminOrderService>.Instance);
 
     [Fact]
     public async Task UpdateStatusAsync_PrintingToShipped_TriggersOriginalPurge()
@@ -449,7 +451,8 @@ public class AdminOrderServiceTests
         var sut = new AdminOrderService(
             _db, _emailSvc.Object, _stripeClient.Object,
             cloudOffRouter.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object,
+            PhotoPrint.Tests.Helpers.TestCoupons.ServiceFor(_db), NullLogger<AdminOrderService>.Instance);
         var order = await SeedOrderAsync(OrderStatus.Printing);
 
         await sut.UpdateStatusAsync(order.Id, "Shipped", "AWB", null);
@@ -655,7 +658,8 @@ public class AdminOrderServiceTests
         var sut = new AdminOrderService(
             _db, _emailSvc.Object, _stripeClient.Object,
             router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object,
+            PhotoPrint.Tests.Helpers.TestCoupons.ServiceFor(_db), NullLogger<AdminOrderService>.Instance);
 
         var httpContext = new DefaultHttpContext();
         using var body = new MemoryStream();
@@ -745,7 +749,8 @@ public class AdminOrderServiceTests
         var sut = new AdminOrderService(
             _db, _emailSvc.Object, _stripeClient.Object,
             router.Object, _purger.Object, Options.Create(new ArchiveSettings()),
-            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object, NullLogger<AdminOrderService>.Instance);
+            _hub.Object, _awbNotifier.Object, _invoiceCreator.Object,
+            PhotoPrint.Tests.Helpers.TestCoupons.ServiceFor(_db), NullLogger<AdminOrderService>.Instance);
 
         var order = await SeedOrderAsync(OrderStatus.Paid);
 

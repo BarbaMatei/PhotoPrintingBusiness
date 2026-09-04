@@ -59,6 +59,7 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
             _hub.Object,
             _awb.Object,
             creator,
+            PhotoPrint.Tests.Helpers.TestCoupons.ServiceFor(db),
             logger ?? NullLogger<AdminOrderService>.Instance,
             sentry);
 

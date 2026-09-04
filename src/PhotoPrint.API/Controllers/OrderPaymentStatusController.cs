@@ -40,7 +40,8 @@ public sealed class OrderPaymentStatusController : ControllerBase
             .Select(o => new
             {
                 o.Id, o.UserId, o.GuestSessionId, o.OrderNumber,
-                o.Status, o.TotalRon, o.VatRon, o.VatRate, o.DeliveryType, o.CreatedAt, o.PaidAt,
+                o.Status, o.TotalRon, o.VatRon, o.VatRate, o.CouponCode, o.DiscountRon,
+                o.DeliveryType, o.CreatedAt, o.PaidAt,
             })
             .FirstOrDefaultAsync(ct);
 
@@ -64,6 +65,8 @@ public sealed class OrderPaymentStatusController : ControllerBase
             order.TotalRon,
             order.VatRon,
             order.VatRate,
+            order.CouponCode,
+            order.DiscountRon,
             order.DeliveryType.ToString(),
             order.CreatedAt,
             order.PaidAt));

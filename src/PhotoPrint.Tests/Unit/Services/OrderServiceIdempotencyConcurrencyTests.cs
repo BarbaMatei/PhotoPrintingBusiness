@@ -51,7 +51,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTes
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         return new OrderService(db, numberMock.Object, shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Mock.Of<IStorageRouter>(), TestCoupons.ServiceFor(db),
+            Options.Create(new StorageSettings()),
             Options.Create(new VatSettings()));
     }
 
@@ -63,7 +64,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTes
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         return new OrderService(db, new OrderNumberService(db), shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Mock.Of<IStorageRouter>(), TestCoupons.ServiceFor(db),
+            Options.Create(new StorageSettings()),
             Options.Create(new VatSettings()));
     }
 
@@ -82,7 +84,8 @@ public class OrderServiceIdempotencyConcurrencyTests : IClassFixture<PostgresTes
         shippingMock.Setup(s => s.GetShippingCostAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ShippingCostDto(20.00m));
         var svc = new OrderService(winnerDb, numberMock.Object, shippingMock.Object,
-            Mock.Of<IStorageRouter>(), Options.Create(new StorageSettings()),
+            Mock.Of<IStorageRouter>(), TestCoupons.ServiceFor(winnerDb),
+            Options.Create(new StorageSettings()),
             Options.Create(new VatSettings()));
 
         var result = await svc.CreateFromCartAsync(userId, null, MakeRequest(), key);

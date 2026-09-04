@@ -14,8 +14,15 @@ public record CartGroupDto(
 public record CartResponseDto(
     IReadOnlyList<CartGroupDto> Groups,
     decimal Subtotal,
-    int ItemCount)
+    int ItemCount,
+    string? CouponCode,
+    string? CouponType,
+    decimal DiscountRon,
+    decimal TotalRon,
+    decimal NetTotalRon,
+    decimal VatRon,
+    decimal VatRate)
 {
     public static CartResponseDto Empty { get; } =
-        new([], 0m, 0);
+        new([], 0m, 0, null, null, 0m, 0m, 0m, 0m, 0m);
 }

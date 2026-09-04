@@ -24,6 +24,42 @@ namespace PhotoPrint.API.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("PhotoPrint.API.Models.CartCoupon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GuestSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CouponId");
+
+                    b.HasIndex("GuestSessionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cart_coupons_guest");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cart_coupons_user");
+
+                    b.ToTable("CartCoupons", t =>
+                        {
+                            t.HasCheckConstraint("CK_CartCoupons_OneOwner", "(\"UserId\" IS NOT NULL AND \"GuestSessionId\" IS NULL) OR (\"UserId\" IS NULL AND \"GuestSessionId\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("PhotoPrint.API.Models.CartItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -80,6 +116,97 @@ namespace PhotoPrint.API.Migrations
                         {
                             t.HasCheckConstraint("CK_CartItems_OneOwner", "(\"UserId\" IS NOT NULL AND \"GuestSessionId\" IS NULL) OR (\"UserId\" IS NULL AND \"GuestSessionId\" IS NOT NULL)");
                         });
+                });
+
+            modelBuilder.Entity("PhotoPrint.API.Models.Coupon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("MinSubtotalRon")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("RedemptionsCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ValidFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ValidUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_coupons_code");
+
+                    b.HasIndex("IsActive", "ValidUntil")
+                        .HasDatabaseName("ix_coupons_is_active_valid_until");
+
+                    b.ToTable("Coupons");
+                });
+
+            modelBuilder.Entity("PhotoPrint.API.Models.CouponRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DiscountRon")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CouponId")
+                        .HasDatabaseName("ix_coupon_redemptions_coupon_id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_coupon_redemptions_order_id");
+
+                    b.HasIndex("UserId", "CouponId")
+                        .HasDatabaseName("ix_coupon_redemptions_user_coupon");
+
+                    b.ToTable("CouponRedemptions");
                 });
 
             modelBuilder.Entity("PhotoPrint.API.Models.EasyboxLocker", b =>
@@ -387,6 +514,10 @@ namespace PhotoPrint.API.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -396,6 +527,11 @@ namespace PhotoPrint.API.Migrations
                     b.Property<string>("DeliveryType")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<decimal>("DiscountRon")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(10,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<Guid?>("EasyboxLockerId")
                         .HasColumnType("uuid");
@@ -915,6 +1051,24 @@ namespace PhotoPrint.API.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("PhotoPrint.API.Models.CartCoupon", b =>
+                {
+                    b.HasOne("PhotoPrint.API.Models.Coupon", "Coupon")
+                        .WithMany()
+                        .HasForeignKey("CouponId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PhotoPrint.API.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Coupon");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PhotoPrint.API.Models.CartItem", b =>
                 {
                     b.HasOne("PhotoPrint.API.Models.Product", "Product")
@@ -947,6 +1101,30 @@ namespace PhotoPrint.API.Migrations
                     b.Navigation("Upload");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PhotoPrint.API.Models.CouponRedemption", b =>
+                {
+                    b.HasOne("PhotoPrint.API.Models.Coupon", "Coupon")
+                        .WithMany()
+                        .HasForeignKey("CouponId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PhotoPrint.API.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PhotoPrint.API.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Coupon");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("PhotoPrint.API.Models.ExternalLogin", b =>
