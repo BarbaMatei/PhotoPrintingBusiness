@@ -66,7 +66,11 @@ orphans (a named sweep, not hope). Check-then-act windows on shared state are na
 closed or accepted in writing. *(042 D5→D34/D35 chain; 043 F8 TOCTOU; ADR-011 is the model.)*
 
 **5. Failure modes have tests — "green ≠ proven".** For every failure mode the code can hit:
-which test goes red if this bug is injected? Mock only at system boundaries (network, external
+which test goes red if this bug is injected? The proof is not the author's word: each row of
+`memory-bank/bolts/<id>/failure-modes.jsonl` carries, in `test-stamps.jsonl`, a red stamp from
+before the code, a green one after it, and a red `revert-and-rerun` stamp where the wrapper itself
+broke the production line (`--mutate <file>:<line>`) and the test caught it
+(`bolt-process.md`, "Stage exit conditions"). Mock only at system boundaries (network, external
 APIs, clock) — the real component (real ImageSharp, a real PostgreSQL database) must run in at least one test
 of its guards. Each suite states what it *cannot* prove and where that gap is covered.
 *(042 D25: the real ImageProcessor was mocked in ALL tests — 490 greens proved nothing about
