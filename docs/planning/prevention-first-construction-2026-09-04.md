@@ -249,8 +249,9 @@ failure-mode row:
 - *implement*: all of the above, and for every accepted test: a `red` stamp with non-zero exit whose
   time is earlier than its first zero-exit `green` stamp; a `revert-and-rerun` stamp with non-zero exit
   and a `mutate` record naming a non-test file; a zero-exit `green` stamp later than that mutation.
-  A stamp matches a row when either name contains the other, so one class-level red run covers the
-  class's rows.
+  A stamp matches a row when either name contains the other and the stamp's filter is at least four
+  characters long, so one class-level red run covers the class's rows but a one-letter filter covers
+  nothing.
 - *test*: all of the above, and the test artifact records both gates under headings a reader can find
   (adversarial design check, fresh-eyes micro-review).
 

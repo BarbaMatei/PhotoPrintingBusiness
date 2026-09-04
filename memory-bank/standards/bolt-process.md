@@ -145,8 +145,9 @@ the check ran and found nothing to add.
 `reviews/lib/run-scoped-tests.mjs --log <that file>`: one line per run with the time, `kind`,
 `filter`/`include`, counts, the runner's `exit` code and, for `revert-and-rerun --mutate`, the
 `mutate` record (`file`, `line`, `original`, `mutated`). Red means non-zero exit. The wrapper
-refuses to mutate a test file. A stamp matches a row when either name contains the other, so one
-class-level red run covers the class's rows.
+refuses to mutate a test file. A stamp matches a row when either name contains the other and the
+stamp's filter is at least four characters long, so one class-level red run covers the class's
+rows but a one-letter filter covers nothing.
 
 **The check** is `node .specsmd/aidlc/scripts/check-stage-exit.mjs <bolt> <stage>`: design/plan
 — every accepted row names a test, every rejected row has a reason, every attack row has a

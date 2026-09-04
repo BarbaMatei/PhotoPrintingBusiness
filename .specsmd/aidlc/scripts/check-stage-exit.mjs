@@ -138,7 +138,7 @@ function checkImplement(boltDir, fm) {
   for (const { label, test } of tests) {
     const mine = sorted.filter(s => {
       const name = s.filter ?? s.include
-      return typeof name === 'string' && name && (test.includes(name) || name.includes(test))
+      return typeof name === 'string' && name.length >= 4 && (test.includes(name) || name.includes(test))
     })
     const first = condition => { unmet.push(`${label} (${test}): ${condition}`) }
     if (mine.length === 0) { first('no stamp matches this test'); continue }

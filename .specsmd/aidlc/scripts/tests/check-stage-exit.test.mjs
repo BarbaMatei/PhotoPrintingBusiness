@@ -137,6 +137,13 @@ test('a class-level stamp covers every row whose test name contains the filter',
   assert.equal(runCheck(root, '900-fixture', 'implement').code, 0)
 })
 
+test('a stamp whose filter is too short to name a test never matches a row', () => {
+  const root = bolt('ddd-construction-bolt', { 'failure-modes.jsonl': [row('FM-1'), attackNone], 'test-stamps.jsonl': fullStamps.map(s => ({ ...s, filter: 'e' })) })
+  const r = runCheck(root, '900-fixture', 'implement')
+  assert.equal(r.code, 1, r.out)
+  assert.match(unmet(r.out)[0], /no stamp/)
+})
+
 test('UI rows match stamps by their include field', () => {
   const uiRow = { ...row('FM-1'), ui: true, test: 'refund-dialog' }
   const uiStamps = fullStamps.map(s => ({ ...s, filter: undefined, include: 'refund-dialog' }))
