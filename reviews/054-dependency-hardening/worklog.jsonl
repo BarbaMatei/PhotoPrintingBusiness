@@ -51,3 +51,5 @@
 {"t":"2026-09-04T23:33:30+03:00","ev":"verify-result","id":"PPW-716","verdict":"revert-broke-build","commit":"23d99d3"}
 {"t":"2026-09-04T23:35:02+03:00","ev":"verify-result","id":"PPW-721","verdict":"revert-broke-build","commit":"23d99d3"}
 {"t":"2026-09-04T23:35:02+03:00","ev":"verify-result","id":"PPW-722","verdict":"revert-broke-build","commit":"23d99d3"}
+{"t":"2026-09-04T23:36:27+03:00","ev":"verify-result","id":"PPW-715","verdict":"revert-broke-build","commit":"23d99d3, 8ae0953"}
+{"t":"2026-09-04T23:36:27+03:00","ev":"verify-result","id":"PPW-720","verdict":"revert-broke-build","commit":"23d99d3, 8ae0953"}
