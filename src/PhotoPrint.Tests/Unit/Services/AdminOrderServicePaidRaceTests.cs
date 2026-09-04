@@ -339,6 +339,10 @@ public class AdminOrderServicePaidRaceTests : IClassFixture<PostgresTestDatabase
         services.AddSingleton(_awb.Object);
         services.AddSingleton(Mock.Of<IInvoiceCreationService>());
         services.AddSingleton<ILogger<AdminOrderService>>(NullLogger<AdminOrderService>.Instance);
+        services.AddSingleton<ILogger<PhotoPrint.API.Services.Coupons.CouponService>>(
+            NullLogger<PhotoPrint.API.Services.Coupons.CouponService>.Instance);
+        services.AddScoped<PhotoPrint.API.Services.Coupons.ICouponService,
+            PhotoPrint.API.Services.Coupons.CouponService>();
         services.AddScoped<IAdminOrderService, AdminOrderService>();
 
         using var provider = services.BuildServiceProvider(validateScopes: true);
