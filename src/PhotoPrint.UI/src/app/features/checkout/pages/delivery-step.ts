@@ -8,9 +8,23 @@ import {
   DestroyRef,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { debounceTime, distinctUntilChanged, switchMap, catchError, take, map, tap } from 'rxjs/operators';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  switchMap,
+  catchError,
+  take,
+  map,
+  tap,
+} from 'rxjs/operators';
 import { merge, of, Subject } from 'rxjs';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ShippingService } from '../../../core/services/shipping.service';
@@ -19,7 +33,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AccountService } from '../../../core/services/account.service';
 import { GuestAuthService } from '../../../core/services/guest-auth.service';
 import { SavedAddressDto } from '../../../core/models/account.model';
-import { LockerMapComponent } from '../components/locker-map';
+import { LockerSelector } from '../components/locker-selector';
 import {
   LockerDto,
   DeliveryType,
@@ -44,8 +58,8 @@ const STREET_LINE_MAX = 150;
 
 function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
   const parts = ['street', 'number', 'block']
-    .map(name => (group.get(name)?.value ?? '').toString().trim())
-    .filter(part => part.length > 0);
+    .map((name) => (group.get(name)?.value ?? '').toString().trim())
+    .filter((part) => part.length > 0);
   const combined = parts.join(' ');
   return combined.length > STREET_LINE_MAX ? { streetLineTooLong: true } : null;
 }
@@ -54,7 +68,7 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
   selector: 'app-delivery-step',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DecimalPipe, RouterLink, LockerMapComponent],
+  imports: [ReactiveFormsModule, DecimalPipe, RouterLink, LockerSelector],
   template: `
     <div class="delivery-step">
       <h2 class="step-title">Metoda de livrare</h2>
@@ -62,7 +76,9 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
       @if (shippingCostsFailed()) {
         <div class="cost-error" role="alert">
           <span>Nu am putut încărca costurile de livrare.</span>
-          <button type="button" class="btn-retry-costs" (click)="loadShippingCosts()">Reîncearcă</button>
+          <button type="button" class="btn-retry-costs" (click)="loadShippingCosts()">
+            Reîncearcă
+          </button>
         </div>
       }
 
@@ -80,7 +96,7 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
             <div class="card-title">📦 Easybox Sameday</div>
             <div class="card-price">
               @if (easyboxCostRon() !== null) {
-                {{ easyboxCostRon() | number:'1.2-2' }} RON
+                {{ easyboxCostRon() | number: '1.2-2' }} RON
               } @else {
                 <span class="card-price--pending">se încarcă…</span>
               }
@@ -101,7 +117,7 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
             <div class="card-title">🚚 Livrare la ușă</div>
             <div class="card-price">
               @if (courierCostRon() !== null) {
-                {{ courierCostRon() | number:'1.2-2' }} RON
+                {{ courierCostRon() | number: '1.2-2' }} RON
               } @else {
                 <span class="card-price--pending">se încarcă…</span>
               }
@@ -111,52 +127,16 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
         </label>
       </div>
 
-      <!-- Easybox locker selection -->
       @if (deliveryMethod() === 'Easybox') {
-        <div class="easybox-section">
-          <input
-            type="text"
-            class="city-search"
-            placeholder="Caută după oraș (ex: Cluj-Napoca)"
-            [formControl]="citySearch"
-          />
-
-          @if (lockers().length > 0) {
-            <div class="locker-list">
-              @for (locker of lockers(); track locker.id) {
-                <button
-                  type="button"
-                  class="locker-item"
-                  [class.selected]="selectedLockerId() === locker.id"
-                  (click)="selectLocker(locker)"
-                >
-                  <strong>{{ locker.name }}</strong>
-                  <span>{{ locker.address }}</span>
-                </button>
-              }
-            </div>
-          }
-
-          @if (citySearch.value && lockers().length === 0 && !lockerSearchError()) {
-            <div class="no-lockers">Niciun easybox găsit pentru acest oraș.</div>
-          }
-
-          @if (lockerSearchError()) {
-            <div class="search-error">
-              Căutarea a eșuat. <button type="button" class="retry-link" (click)="retrySearch()">Reîncearcă</button>
-            </div>
-          }
-
-          <app-locker-map
-            [lockers]="lockers()"
-            [selectedLockerId]="selectedLockerId()"
-            (lockerSelected)="selectLocker($event)"
-          />
-
-          @if (showLockerError()) {
-            <div class="field-error">Selectează un easybox pentru a continua.</div>
-          }
-        </div>
+        <app-locker-selector
+          [lockers]="lockers()"
+          [selectedLockerId]="selectedLockerId()"
+          [searchControl]="citySearch"
+          [searchFailed]="lockerSearchError()"
+          [showError]="showLockerError()"
+          (lockerSelected)="selectLocker($event)"
+          (retry)="retrySearch()"
+        />
       }
 
       <!-- One address form for both methods: the invoice needs a real buyer address either way -->
@@ -241,112 +221,129 @@ function combinedStreetLength(group: AbstractControl): ValidationErrors | null {
 
       @if (addressForm.errors?.['streetLineTooLong']) {
         <div class="field-error form-error" role="alert">
-          Strada, numărul și blocul depășesc împreună 150 de caractere, limita liniei de adresă de pe factură.
+          Strada, numărul și blocul depășesc împreună 150 de caractere, limita liniei de adresă de
+          pe factură.
         </div>
       }
 
       <div class="step-actions">
         <a routerLink="/cos" class="btn btn--ghost">← Înapoi la coș</a>
-        <button
-          class="btn btn--primary"
-          [disabled]="!canContinue()"
-          (click)="continue()"
-        >
+        <button class="btn btn--primary" [disabled]="!canContinue()" (click)="continue()">
           Continuă →
         </button>
       </div>
     </div>
   `,
-  styles: [`
-    .delivery-step { display: flex; flex-direction: column; gap: 1.5rem; }
-    .step-title { font-size: 1.4rem; font-weight: 600; margin: 0; }
+  styles: [
+    `
+      .delivery-step {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .step-title {
+        font-size: 1.4rem;
+        font-weight: 600;
+        margin: 0;
+      }
 
-    .delivery-cards {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
+      .delivery-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
 
-    .delivery-card {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
-      border: 2px solid #dee2e6;
-      border-radius: 8px;
-      padding: 1rem;
-      cursor: pointer;
-      transition: border-color 0.2s;
+      .delivery-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: border-color 0.2s;
 
-      input[type="radio"] { margin-top: 4px; }
+        input[type='radio'] {
+          margin-top: 4px;
+        }
 
-      &.selected { border-color: #1a73e8; background: #f0f6ff; }
-    }
+        &.selected {
+          border-color: #1a73e8;
+          background: #f0f6ff;
+        }
+      }
 
-    .card-title { font-weight: 600; font-size: 1rem; }
-    .card-price { color: #1a73e8; font-weight: 700; margin: 0.25rem 0; }
-    .card-desc { font-size: 0.85rem; color: #6c757d; }
+      .card-title {
+        font-weight: 600;
+        font-size: 1rem;
+      }
+      .card-price {
+        color: #1a73e8;
+        font-weight: 700;
+        margin: 0.25rem 0;
+      }
+      .card-desc {
+        font-size: 0.85rem;
+        color: #6c757d;
+      }
 
-    .city-search {
-      width: 100%;
-      padding: 0.6rem 0.8rem;
-      border: 1px solid #ced4da;
-      border-radius: 6px;
-      font-size: 1rem;
-    }
+      .form-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin: 0;
+      }
+      .form-hint {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin: -0.5rem 0 0;
+      }
 
-    .locker-list {
-      max-height: 200px;
-      overflow-y: auto;
-      border: 1px solid #dee2e6;
-      border-radius: 6px;
-    }
+      .address-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+      }
+      .form-group--sm {
+        max-width: 120px;
+      }
 
-    .locker-item {
-      width: 100%;
-      text-align: left;
-      padding: 0.6rem 0.8rem;
-      background: none;
-      border: none;
-      border-bottom: 1px solid #f0f0f0;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      transition: background 0.1s;
+      label {
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+      input,
+      select {
+        padding: 0.5rem 0.7rem;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        font-size: 0.95rem;
+      }
+      .field-error {
+        color: #dc3545;
+        font-size: 0.8rem;
+      }
+      .form-error {
+        margin: 0.5rem 0;
+      }
 
-      &:hover, &.selected { background: #f0f6ff; }
-      span { font-size: 0.85rem; color: #6c757d; }
-    }
-
-    .no-lockers { color: #6c757d; font-size: 0.9rem; }
-
-    .form-title { font-size: 1.05rem; font-weight: 600; margin: 0; }
-    .form-hint { font-size: 0.85rem; color: #6c757d; margin: -0.5rem 0 0; }
-
-    .address-form { display: flex; flex-direction: column; gap: 0.75rem; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
-    .form-group--sm { max-width: 120px; }
-
-    label { font-size: 0.9rem; font-weight: 500; }
-    input, select {
-      padding: 0.5rem 0.7rem;
-      border: 1px solid #ced4da;
-      border-radius: 6px;
-      font-size: 0.95rem;
-    }
-    .field-error { color: #dc3545; font-size: 0.8rem; }
-    .form-error { margin: 0.5rem 0; }
-
-    .step-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 0.5rem;
-    }
-
-
-  `],
+      .step-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 0.5rem;
+      }
+    `,
+  ],
 })
 export class DeliveryStep implements OnInit {
   private readonly router = inject(Router);
@@ -364,9 +361,7 @@ export class DeliveryStep implements OnInit {
 
   readonly counties = ROMANIAN_COUNTIES;
 
-  readonly deliveryMethod = signal<DeliveryType | null>(
-    this.checkoutState.snapshot.method,
-  );
+  readonly deliveryMethod = signal<DeliveryType | null>(this.checkoutState.snapshot.method);
   // Null until the server answers: a default that differs from the configured price is charged
   // and invoiced at the server value, so the customer would agree to a total nobody bills.
   readonly easyboxCostRon = signal<number | null>(null);
@@ -381,21 +376,24 @@ export class DeliveryStep implements OnInit {
 
   // Mirrors the server caps: a value the API rejects should be caught on the screen that asks
   // for it, not two screens later as a 400 on a field the customer can no longer see.
-  readonly addressForm = this.fb.group({
-    street: ['', [Validators.required, Validators.maxLength(255)]],
-    number: ['', [Validators.required, Validators.maxLength(50)]],
-    block: ['', Validators.maxLength(100)],
-    city: ['', [Validators.required, Validators.maxLength(CITY_MAX)]],
-    county: ['', [Validators.required, Validators.maxLength(100)]],
-    postalCode: ['', [Validators.required, Validators.maxLength(20)]],
-    recipientName: ['', [Validators.required, Validators.maxLength(RECIPIENT_MAX)]],
-    phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
-  }, { validators: combinedStreetLength });
+  readonly addressForm = this.fb.group(
+    {
+      street: ['', [Validators.required, Validators.maxLength(255)]],
+      number: ['', [Validators.required, Validators.maxLength(50)]],
+      block: ['', Validators.maxLength(100)],
+      city: ['', [Validators.required, Validators.maxLength(CITY_MAX)]],
+      county: ['', [Validators.required, Validators.maxLength(100)]],
+      postalCode: ['', [Validators.required, Validators.maxLength(20)]],
+      recipientName: ['', [Validators.required, Validators.maxLength(RECIPIENT_MAX)]],
+      phone: ['', [Validators.required, Validators.pattern(PHONE_PATTERN), phoneDigits]],
+    },
+    { validators: combinedStreetLength },
+  );
 
   // Form validity is not a signal, so mirror it into one — otherwise the computed
   // below memoizes a stale value and the button never re-enables after typing.
   private readonly addressValid = toSignal(
-    this.addressForm.statusChanges.pipe(map(s => s === 'VALID')),
+    this.addressForm.statusChanges.pipe(map((s) => s === 'VALID')),
     { initialValue: this.addressForm.valid },
   );
 
@@ -426,15 +424,20 @@ export class DeliveryStep implements OnInit {
     )
       .pipe(
         tap(() => this.lockerSearchError.set(false)), // clear a prior error as the new fetch starts
-        switchMap(city =>
+        switchMap((city) =>
           (city && city.trim().length >= 2
             ? this.shippingService.getLockers(city.trim())
             : this.shippingService.getLockers('')
-          ).pipe(catchError(() => { this.lockerSearchError.set(true); return of([] as LockerDto[]); })),
+          ).pipe(
+            catchError(() => {
+              this.lockerSearchError.set(true);
+              return of([] as LockerDto[]);
+            }),
+          ),
         ),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe(results => this.lockers.set(results));
+      .subscribe((results) => this.lockers.set(results));
 
     // Prime the list only when Easybox is the (restored) active method. Subscribe-then-next: this
     // runs AFTER the subscription above, so the emission is never dropped.
@@ -456,7 +459,7 @@ export class DeliveryStep implements OnInit {
     }
 
     // Signed-in display name (phone isn't exposed on the client-side user).
-    this.auth.currentUser$.pipe(take(1)).subscribe(user => {
+    this.auth.currentUser$.pipe(take(1)).subscribe((user) => {
       if (!user) return;
       if (user.displayName && !c.value.recipientName) {
         c.patchValue({ recipientName: user.displayName });
@@ -470,15 +473,19 @@ export class DeliveryStep implements OnInit {
     if (c.value.street && c.value.city && c.value.postalCode) return;
     this.accountService
       .getAddresses()
-      .pipe(take(1), catchError(() => of([] as SavedAddressDto[])))
-      .subscribe(addresses => {
-        const saved = addresses.find(a => a.isDefault) ?? addresses[0];
+      .pipe(
+        take(1),
+        catchError(() => of([] as SavedAddressDto[])),
+      )
+      .subscribe((addresses) => {
+        const saved = addresses.find((a) => a.isDefault) ?? addresses[0];
         if (!saved) return;
         // The saved shape has one addressLine and the form has three fields, so the street is left unguessed.
         if (!c.value.city && saved.city) c.patchValue({ city: saved.city });
         if (!c.value.county && saved.county) c.patchValue({ county: saved.county });
         if (!c.value.postalCode && saved.postalCode) c.patchValue({ postalCode: saved.postalCode });
-        if (!c.value.recipientName && saved.fullName) c.patchValue({ recipientName: saved.fullName });
+        if (!c.value.recipientName && saved.fullName)
+          c.patchValue({ recipientName: saved.fullName });
         if (!c.value.phone && saved.phone) c.patchValue({ phone: saved.phone });
       });
   }
@@ -486,11 +493,11 @@ export class DeliveryStep implements OnInit {
   loadShippingCosts(): void {
     this.shippingCostsFailed.set(false);
     this.shippingService.getShippingCost('Easybox').subscribe({
-      next: r => this.applyCost('Easybox', r.costRon),
+      next: (r) => this.applyCost('Easybox', r.costRon),
       error: () => this.shippingCostsFailed.set(true),
     });
     this.shippingService.getShippingCost('Courier').subscribe({
-      next: r => this.applyCost('Courier', r.costRon),
+      next: (r) => this.applyCost('Courier', r.costRon),
       error: () => this.shippingCostsFailed.set(true),
     });
   }
