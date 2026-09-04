@@ -10,19 +10,19 @@ updated: 2026-09-04
 
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
-| PPW-711 | 🟠 | v1 | UseRateLimiter() runs before UseRouting(), so every [EnableRateLimiting] endpoint policy is inert | `src/PhotoPrint.API/Extensions/SecurityExtensions.cs:122` | open | |
-| PPW-712 | 🟠 | v1 | Named auth rate-limit policies have no per-IP partition, so login/registration/password-reset share one global bucket | `src/PhotoPrint.API/Extensions/SecurityExtensions.cs:72` | open | |
-| PPW-713 | 🔴 | v1 | The forwarded-headers/trusted-proxy mechanism ships commented out, so it is inert in production despite the record saying it is on | `.env.example:62` | open | |
-| PPW-714 | 🔴 | v1 | Production log configuration keeps the new forwarded-header lines off stdout, blinding the documented verification greps | `src/PhotoPrint.API/appsettings.json:183` | open | |
-| PPW-715 | 🟠 | v1 | Boot validator accepts an over-broad trusted-proxy range (0.0.0.0/0, ::/0, whole subnets) with no refusal or warning | `src/PhotoPrint.API/Validators/ForwardedHeadersSettingsValidator.cs:22` | open | |
-| PPW-716 | 🟠 | v1 | Untrusted-peer warning infers trust from a before/after RemoteIpAddress comparison, mislabelling trusted proxies | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:27` | open | |
-| PPW-717 | 🟠 | v1 | AllowedScrapeIps examples name the stale 172.20.0.0/16 bridge subnet, which contains no container on the pinned network | `.env.example:71` | open | |
-| PPW-718 | 🟠 | v1 | No build or CI gate detects vulnerable resolved packages, so the intent's "verified in CI" NFR is unenforced | `.github/workflows/ci.yml:52` | open | |
-| PPW-719 | 🟠 | v1 | Intent open question Q3 still instructs Ops to trust the container bridge CIDR | `memory-bank/intents/025-security-dependency-hygiene/requirements.md:114` | open | |
-| PPW-720 | 🟠 | v1 | The ScrapePort=0 + TrustedProxies boot guard is only unit-tested, never exercised by a real boot | `src/PhotoPrint.Tests/Unit/Configuration/ForwardedHeadersSettingsValidatorTests.cs:58` | open | |
-| PPW-721 | 🟠 | v1 | No test pins the middleware branch order the untrusted-peer inference depends on | `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:88` | open | |
-| PPW-722 | 🟠 | v1 | Neither conjunct of the metrics-scrape exclusion predicate is individually pinned by a test | `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:95` | open | |
-| PPW-723 | 🟠 | v1 | Caddy's static 172.28.0.2 sits inside the dynamic IPAM pool while api starts first, risking address collision | `docker-compose.prod.yml:29` | open | |
+| PPW-711 | 🟠 | v1 | UseRateLimiter() runs before UseRouting(), so every [EnableRateLimiting] endpoint policy is inert | `src/PhotoPrint.API/Extensions/SecurityExtensions.cs:122` | deferred | |
+| PPW-712 | 🟠 | v1 | Named auth rate-limit policies have no per-IP partition, so login/registration/password-reset share one global bucket | `src/PhotoPrint.API/Extensions/SecurityExtensions.cs:72` | deferred | |
+| PPW-713 | 🔴 | v1 | The forwarded-headers/trusted-proxy mechanism ships commented out, so it is inert in production despite the record saying it is on | `.env.example:62` | verified | `b29fb2c` |
+| PPW-714 | 🔴 | v1 | Production log configuration keeps the new forwarded-header lines off stdout, blinding the documented verification greps | `src/PhotoPrint.API/appsettings.json:183` | verified | `b29fb2c`, `8ae0953` |
+| PPW-715 | 🟠 | v1 | Boot validator accepts an over-broad trusted-proxy range (0.0.0.0/0, ::/0, whole subnets) with no refusal or warning | `src/PhotoPrint.API/Validators/ForwardedHeadersSettingsValidator.cs:22` | verified | `23d99d3` |
+| PPW-716 | 🟠 | v1 | Untrusted-peer warning infers trust from a before/after RemoteIpAddress comparison, mislabelling trusted proxies | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:27` | verified | `23d99d3` |
+| PPW-717 | 🟠 | v1 | AllowedScrapeIps examples name the stale 172.20.0.0/16 bridge subnet, which contains no container on the pinned network | `.env.example:71` | verified | `b29fb2c`, `8ae0953` |
+| PPW-718 | 🟠 | v1 | No build or CI gate detects vulnerable resolved packages, so the intent's "verified in CI" NFR is unenforced | `.github/workflows/ci.yml:52` | verified | `0c0cc3b` |
+| PPW-719 | 🟠 | v1 | Intent open question Q3 still instructs Ops to trust the container bridge CIDR | `memory-bank/intents/025-security-dependency-hygiene/requirements.md:114` | verified | `bc4aa21` |
+| PPW-720 | 🟠 | v1 | The ScrapePort=0 + TrustedProxies boot guard is only unit-tested, never exercised by a real boot | `src/PhotoPrint.Tests/Unit/Configuration/ForwardedHeadersSettingsValidatorTests.cs:58` | verified | `23d99d3` |
+| PPW-721 | 🟠 | v1 | No test pins the middleware branch order the untrusted-peer inference depends on | `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:88` | verified | `23d99d3` |
+| PPW-722 | 🟠 | v1 | Neither conjunct of the metrics-scrape exclusion predicate is individually pinned by a test | `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:95` | verified | `23d99d3` |
+| PPW-723 | 🟠 | v1 | Caddy's static 172.28.0.2 sits inside the dynamic IPAM pool while api starts first, risking address collision | `docker-compose.prod.yml:29` | verified | `b29fb2c` |
 | PPW-724 | 🟡 | v1 | Untrusted-peer warning is computed after the pipeline returns, so a downstream throw loses it | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:35` | open | |
 | PPW-725 | 🟡 | v1 | The metrics scrape listener serves the whole API to any container on the compose network | `docker-compose.prod.yml:47` | open | |
 | PPW-726 | 🟡 | v1 | Test walkthrough credits a PR image build that would verify the Dockerfile change but does not exist | `memory-bank/bolts/054-dependency-and-boot-hardening/test-walkthrough.md:163` | open | |
@@ -61,6 +61,7 @@ updated: 2026-09-04
   - v1: found by correctness (convergence 1, not hinted), verdict confirmed by trace.
   - v1: severity re-judged high→medium — the bolt discloses this defect and defers it to intent 029 / bolt 063 in DEPLOYMENT.md §16.7 item 3; prior decision attached, the find is not suppressed.
   - v1: Approach pre-check: revised (put the call between `UseRouting()` and `UseAuthentication()`, keep `UseStaticFiles` ahead of routing, never register a second limiter, and set the public limit high in the test).
+  - v1: fix round — deferred
 
 ### PPW-712 — Named auth rate-limit policies have no per-IP partition, so login/registration/password-reset share one global bucket
 
@@ -74,6 +75,7 @@ updated: 2026-09-04
   - v1: found by security (convergence 1, not hinted), verdict confirmed by trace with a standalone net8.0 reproduction.
   - v1: severity re-judged high→medium — the policies never execute today because of PPW-711, so the impact is latent; it goes live the moment the ordering is fixed, which is why the two must ship together.
   - v1: Approach pre-check: revised (fixing this alone, with `TrustedProxies` empty, converts three inert hourly caps into a site-wide budget — 5 registrations/hour for the whole internet behind the proxy; hence the email co-key and the PPW-713 dependency).
+  - v1: fix round — deferred
 
 ### PPW-713 — The forwarded-headers/trusted-proxy mechanism ships commented out, so it is inert in production despite the record saying it is on
 
@@ -85,6 +87,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (a one-line deployment-default correction plus record alignment, no protocol or shared-surface change)
 - **History:** <append-only, one line per event>
   - v1: found by correctness, security, requirements and completeness-critic (convergence 4, not hinted), verdict confirmed on agreement; the four consequences were rechecked against the code by the synthesiser rather than taken from the lenses.
+  - v1: fix round — fixed at `b29fb2c`
+  - v2: verification — held
 
 ### PPW-714 — Production log configuration keeps the new forwarded-header lines off stdout, blinding the documented verification greps
 
@@ -96,6 +100,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (a logging-configuration addition; it changes no request path and no shared contract)
 - **History:** <append-only, one line per event>
   - v1: found by observability (convergence 1, not hinted), verdict confirmed by trace; kept at 🔴 because the mechanism this bolt shipped has no working verification path in production and the log record of a security control does not survive a redeploy.
+  - v1: fix round — fixed at `b29fb2c`, `8ae0953`
+  - v2: verification — held
 
 ### PPW-715 — Boot validator accepts an over-broad trusted-proxy range (0.0.0.0/0, ::/0, whole subnets) with no refusal or warning
 
@@ -107,6 +113,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (adds one boot-validation rule; no shared protocol, no pipeline ordering)
 - **History:** <append-only, one line per event>
   - v1: found by correctness, security, requirements and input-validation (convergence 4, not hinted), verdict confirmed on agreement.
+  - v1: fix round — fixed at `23d99d3`, `8ae0953`
+  - v2: verification — held
 
 ### PPW-716 — Untrusted-peer warning infers trust from a before/after RemoteIpAddress comparison, mislabelling trusted proxies
 
@@ -118,6 +126,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (a self-contained change to one middleware's decision rule)
 - **History:** <append-only, one line per event>
   - v1: found by correctness, input-validation, observability, tests-coverage and completeness-critic (convergence 5, not hinted), verdict confirmed on agreement — the highest convergence of the pass.
+  - v1: fix round — fixed at `23d99d3`
+  - v2: verification — held
 
 ### PPW-717 — AllowedScrapeIps examples name the stale 172.20.0.0/16 bridge subnet, which contains no container on the pinned network
 
@@ -129,6 +139,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (documentation and example-value alignment)
 - **History:** <append-only, one line per event>
   - v1: found by correctness, security and requirements (convergence 3, not hinted), verdict confirmed on agreement; the finders' claim that the stale range "would also include Caddy" is wrong and is corrected in the Evidence line above — the ranges are disjoint, which is why the failure is a silent 403 rather than an opened gate.
+  - v1: fix round — fixed at `b29fb2c`, `8ae0953`
+  - v2: verification — held
 
 ### PPW-718 — No build or CI gate detects vulnerable resolved packages, so the intent's "verified in CI" NFR is unenforced
 
@@ -141,6 +153,8 @@ updated: 2026-09-04
 - **History:** <append-only, one line per event>
   - v1: found by security, requirements and completeness-critic (convergence 3, not hinted), verdict confirmed on agreement.
   - v1: Approach pre-check: revised (the premise was half wrong — SDK 8 already audits direct packages at restore; what is missing is `NuGetAuditMode=all` plus warning promotion, and the proposed `dotnet list --vulnerable` gate fails open exactly when it matters). Also named four gaps to record separately: no `global.json`, so the SDK — and therefore the audit defaults — drifts with the runner image; `ci.yml:6-9` never runs on pushes to main, which makes `deploy.yml:7-10`'s `workflow_run` gate dead and leaves main unaudited; `renovate.json` needs `osvVulnerabilityAlerts`; and the web job has no `npm audit`.
+  - v1: fix round — fixed at `0c0cc3b`
+  - v2: verification — held
 
 ### PPW-719 — Intent open question Q3 still instructs Ops to trust the container bridge CIDR
 
@@ -152,6 +166,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (record correction in the intent and story files)
 - **History:** <append-only, one line per event>
   - v1: found by requirements (convergence 1, not hinted), verdict confirmed by trace.
+  - v1: fix round — fixed at `bc4aa21`
+  - v2: verification — held
 
 ### PPW-720 — The ScrapePort=0 + TrustedProxies boot guard is only unit-tested, never exercised by a real boot
 
@@ -163,6 +179,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (adds one integration test; no production code change beyond PPW-742's cleanup)
 - **History:** <append-only, one line per event>
   - v1: found by tests-coverage (convergence 1, not hinted), verdict confirmed by trace — the mutant was run and stayed green.
+  - v1: fix round — fixed at `23d99d3`, `8ae0953`
+  - v2: verification — held
 
 ### PPW-721 — No test pins the middleware branch order the untrusted-peer inference depends on
 
@@ -174,6 +192,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (test-only addition)
 - **History:** <append-only, one line per event>
   - v1: found by tests-coverage (convergence 1, not hinted), verdict confirmed by trace; the trace corrected the finder's "every proxied request" to multi-entry headers only.
+  - v1: fix round — fixed at `23d99d3`
+  - v2: verification — held
 
 ### PPW-722 — Neither conjunct of the metrics-scrape exclusion predicate is individually pinned by a test
 
@@ -185,6 +205,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (test-only addition)
 - **History:** <append-only, one line per event>
   - v1: found by tests-coverage and completeness-critic (convergence 2, not hinted), verdict confirmed by trace with both mutants executed.
+  - v1: fix round — fixed at `23d99d3`
+  - v2: verification — held
 
 ### PPW-723 — Caddy's static 172.28.0.2 sits inside the dynamic IPAM pool while api starts first, risking address collision
 
@@ -196,6 +218,8 @@ updated: 2026-09-04
   - Not trigger-list-shaped (a compose-file network declaration, verifiable by parsing the file)
 - **History:** <append-only, one line per event>
   - v1: found by completeness-critic (convergence 1, not hinted), verdict confirmed by trace.
+  - v1: fix round — fixed at `b29fb2c`
+  - v2: verification — held
 
 ### PPW-724 — Untrusted-peer warning is computed after the pipeline returns, so a downstream throw loses it
 

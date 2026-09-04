@@ -53,3 +53,22 @@
 {"t":"2026-09-04T23:35:02+03:00","ev":"verify-result","id":"PPW-722","verdict":"revert-broke-build","commit":"23d99d3"}
 {"t":"2026-09-04T23:36:27+03:00","ev":"verify-result","id":"PPW-715","verdict":"revert-broke-build","commit":"23d99d3, 8ae0953"}
 {"t":"2026-09-04T23:36:27+03:00","ev":"verify-result","id":"PPW-720","verdict":"revert-broke-build","commit":"23d99d3, 8ae0953"}
+{"t":"2026-09-04T23:38:37+03:00","ev":"test-run","kind":"red","passed":11,"failed":3,"duration_s":5.549,"filter":"ForwardedHeadersSettingsValidatorTests","skipped":0,"note":"PPW-715 hand proof: width check disabled"}
+{"t":"2026-09-04T23:38:53+03:00","ev":"test-run","kind":"red","passed":5,"failed":3,"duration_s":6.279,"filter":"UntrustedForwardedPeerMiddlewareTests","skipped":0,"note":"PPW-716 hand proof: trusted-peer parse-failure branch disabled"}
+{"t":"2026-09-04T23:39:11+03:00","ev":"test-run","kind":"red","passed":7,"failed":1,"duration_s":8.397,"filter":"ForwardedHeadersIntegrationTests","skipped":0,"note":"PPW-720 hand proof: IValidateOptions registration deleted"}
+{"t":"2026-09-04T23:39:34+03:00","ev":"test-run","kind":"red","passed":7,"failed":1,"duration_s":8.365,"filter":"ForwardedHeadersIntegrationTests","skipped":0,"note":"PPW-721 hand proof: middleware order swapped"}
+{"t":"2026-09-04T23:39:53+03:00","ev":"test-run","kind":"red","passed":8,"failed":0,"duration_s":8.53,"filter":"ForwardedHeadersIntegrationTests","skipped":0,"note":"PPW-722 hand proof: scrape-port conjunct replaced with a tautology"}
+{"t":"2026-09-04T23:40:38+03:00","ev":"test-run","kind":"red","passed":3,"failed":1,"duration_s":8.388,"filter":"ForwardedHeadersWithObservabilityTests","skipped":0,"note":"PPW-722 hand proof: scrape-port conjunct replaced with a tautology"}
+{"t":"2026-09-04T23:40:54+03:00","ev":"test-run","kind":"red","passed":3,"failed":1,"duration_s":7.673,"filter":"ForwardedHeadersWithObservabilityTests","skipped":0,"note":"PPW-720 hand proof, second half: registration deleted, observability class"}
+{"t":"2026-09-04T23:41:14+03:00","ev":"test-run","kind":"green","passed":31,"failed":0,"duration_s":4.677,"filter":"ForwardedHeaders","skipped":0,"note":"verification v2 green baseline at HEAD"}
+{"t":"2026-09-04T23:41:17+03:00","ev":"test-run","kind":"green","passed":8,"failed":0,"duration_s":2.581,"filter":"UntrustedForwardedPeer","skipped":0,"note":"verification v2 green baseline at HEAD"}
+{"t":"2026-09-04T23:41:39+03:00","ev":"verify-result","id":"PPW-715","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-716","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-720","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-721","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-722","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:42:12+03:00","ev":"verify-result","id":"PPW-719","verdict":"held","commit":"bc4aa21"}
+{"t":"2026-09-04T23:42:12+03:00","ev":"note","reason":"PPW-711 and PPW-712 stay deferred: SecurityExtensions.cs and DEPLOYMENT.md 16.7 unchanged since e4b9854, so the intent-029/bolt-063 deferral stands","ids":["PPW-711","PPW-712"]}
+{"t":"2026-09-04T23:42:12+03:00","ev":"note","reason":"records gap: the resolution's recorded test filters omit ForwardedHeadersWithObservabilityTests, the class that pins the scrape-exclusion conjuncts and the boot-abort case, so verify-fixes.mjs never ran it","ids":["PPW-720","PPW-722"]}
+{"t":"2026-09-04T23:42:13+03:00","ev":"pass-records-done","pass":2}
+{"t":"2026-09-04T23:42:49+03:00","ev":"note","reason":"corrected the v2 index row: the script held 5 rows (PPW-713, 714, 717, 718, 723), hand levers held 5 (PPW-715, 716, 720, 721, 722), PPW-719 held on docs"}
