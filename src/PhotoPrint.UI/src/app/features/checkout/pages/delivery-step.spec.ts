@@ -454,4 +454,29 @@ describe('DeliveryStep', () => {
     const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
+
+  it('keeps Continue disabled for a restored delivery method until both server prices arrive', () => {
+    TestBed.inject(CheckoutStateService).setMethod('Courier', 25);
+
+    const fixture = createFixture();
+    const comp = fixture.componentInstance;
+    const button = () =>
+      fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+
+    comp.addressForm.setValue(FISCAL_ADDRESS);
+    fixture.detectChanges();
+
+    expect(comp.deliveryMethod()).toBe('Courier');
+    expect(comp.shippingCostsReady()).toBe(false);
+    expect(button().disabled).toBe(true);
+
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    comp.continue();
+    expect(navigate).not.toHaveBeenCalled();
+
+    flushCosts();
+    fixture.detectChanges();
+
+    expect(button().disabled).toBe(false);
+  });
 });
