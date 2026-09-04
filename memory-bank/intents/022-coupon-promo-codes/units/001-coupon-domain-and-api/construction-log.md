@@ -29,6 +29,7 @@ last_updated: 2026-09-03T20:42:00Z
 | Date | Bolt | Stage | Turns | Tools | Fresh | Cache read | Output | Misses |
 |---|---|---|---|---|---|---|---|---|
 | 2026-09-04T13:28:34Z | 047-coupon-domain-and-api | test | 159 | 91 | 1.6M | 10.6M | 0.2M | 4 |
+| 2026-09-04T14:01:49Z | 047-coupon-domain-and-api | test | 282 | 181 | 0.7M | 32.1M | 0.2M | 0 |
 
 ## Stage exit — 047-coupon-domain-and-api — test — 2026-09-04T14:45:00Z
 
