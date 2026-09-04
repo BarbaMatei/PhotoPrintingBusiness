@@ -29,6 +29,7 @@ last_updated: 2026-09-04T15:40:00Z
 | Date | Bolt | Stage | Turns | Tools | Fresh | Cache read | Output | Misses |
 |---|---|---|---|---|---|---|---|---|
 | 2026-09-04T15:38:33Z | 048-coupon-frontend | plan | 98 | 62 | 0.5M | 8.1M | 0.1M | 0 |
+| 2026-09-04T15:53:58Z | 048-coupon-frontend | implement | 113 | 69 | 0.3M | 9.4M | 0.1M | 0 |
 
 ## Stage exit — 048-coupon-frontend — implement — 2026-09-04T15:56:00Z
 - Done: cart contract + coupon copy map + coupon calls in `cart.service.ts`; promo-code box and discount/free-shipping/total summary in `features/cart/pages/cart-page.ts`; discount row, free-shipping total and stale-code removal in `features/checkout/pages/review-step.ts`; discount row in `features/orders/pages/confirmation-page.ts` with the two new fields on `core/models/payment.model.ts` (fixture in `confirmation-page.spec.ts` updated); new shared `src/PhotoPrint.API/Services/Invoicing/InvoiceDiscountMath.cs` consumed by `InvoiceXmlBuilder.cs` (output unchanged) and by `InvoicePdfDocument.cs` (two new discount rows); walkthrough at `memory-bank/bolts/048-coupon-frontend/implementation-walkthrough.md`.
