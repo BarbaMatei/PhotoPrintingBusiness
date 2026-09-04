@@ -53,3 +53,9 @@ last_updated: 2026-09-04T11:35:00Z
   alongside bolt 067 (unit 002). specsmd human checkpoints are self-validated and recorded in the
   stage artifacts, per the wave-1 coordinator addendum; the two `bolt-process.md` gates
   (adversarial design check, fresh-eyes micro-review) run as fresh subagents.
+
+## Stage exit — 066-ci-quality-gates — fix-secret-scan — 2026-09-04T12:49:55Z
+- Done: added a `regexes` allowlist to `.gitleaks.toml` for the three compose placeholder literals (`sk_test_e2e_placeholder`, `sk_test_placeholder`, `whsec_placeholder`) with a one-line reason, and folded the three-line placeholder comments in `docker-compose.yml` and `docker-compose.e2e.yml` down to one line each; the Dockerfile's added comment was already one line.
+- Decisions: allowlist regexes rather than `.gitleaksignore` fingerprints, because fingerprints pin commit hashes and break on the next rebase · placeholder values kept in the `sk_test_` shape, since nothing in `src/PhotoPrint.API` validates a Stripe key prefix (`Program.cs` only requires a non-empty `Stripe:SecretKey` in Production) · `.githooks/pre-commit` carries no secret allowlist to mirror (it is the comment/doc gate only), so `.gitleaks.toml`'s "keep in sync with hooks/pre-commit" note is stale and was left untouched as out of scope.
+- Dead ends: no local verification was possible — neither `gitleaks` nor `docker` is installed on this machine, so the two findings are proven gone only by the next scan; the push scan covers only the pushed range, the PR scan covers every commit.
+- Next: bolt complete (the secret-scan fix; the branch stays at `review-pending` for the coordinator's stage 6).
