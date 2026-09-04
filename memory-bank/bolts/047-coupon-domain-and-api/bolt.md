@@ -12,7 +12,7 @@ stories:
 created: 2026-05-25T10:45:00Z
 started: 2026-09-03T20:42:00Z
 completed: null
-current_stage: implement
+current_stage: test
 stages_completed:
   - name: domain-model
     completed: 2026-09-03T20:50:00Z
@@ -23,6 +23,9 @@ stages_completed:
   - name: adr-analysis
     completed: 2026-09-04T00:55:00Z
     artifact: adr-025-coupon-redemption-cas-not-rowversion.md, adr-026-discount-before-vat-extraction.md
+  - name: implement
+    completed: 2026-09-04T01:40:00Z
+    artifact: src/PhotoPrint.API (coupon domain, endpoints, migration)
 
 requires_bolts: [038-vat-calculation, 015-shipping-and-order-core]
 enables_bolts: [048-coupon-frontend]
