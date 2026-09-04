@@ -9,11 +9,14 @@ stories:
 created: 2026-05-25T10:45:00Z
 started: 2026-09-04T15:05:00Z
 completed: null
-current_stage: implement
+current_stage: test
 stages_completed:
   - name: plan
     completed: 2026-09-04T15:40:00Z
     artifact: implementation-plan.md
+  - name: implement
+    completed: 2026-09-04T15:55:00Z
+    artifact: implementation-walkthrough.md
 
 requires_bolts: [047-coupon-domain-and-api, 014-upload-format-cart-ui, 039-efactura-anaf]
 enables_bolts: []

@@ -49,6 +49,12 @@ const MAX_SETTLE_POLLS = 10;
             <span>Total plătit:</span>
             <strong>{{ order()!.totalRon | number:'1.2-2' }} RON</strong>
           </div>
+          @if (order()!.discountRon > 0) {
+            <div class="summary-row summary-row--discount">
+              <span>Reducere{{ order()!.couponCode ? ' (' + order()!.couponCode + ')' : '' }}:</span>
+              <span>-{{ order()!.discountRon | number:'1.2-2' }} RON</span>
+            </div>
+          }
           <div class="summary-row">
             <span>din care TVA ({{ order()!.vatRate | percent:'1.0-2' }}):</span>
             <span>{{ order()!.vatRon | number:'1.2-2' }} RON</span>
@@ -190,6 +196,12 @@ const MAX_SETTLE_POLLS = 10;
       justify-content: space-between;
       font-size: 0.95rem;
       span:first-child { color: #6c757d; }
+    }
+
+    .summary-row--discount {
+      color: #188038;
+      font-weight: 600;
+      span:first-child { color: #188038; }
     }
 
     .status-stepper {
