@@ -8,8 +8,8 @@ created: 2026-09-04T01:10:00Z
 
 ### Summary
 
-- **New tests**: 24 (13 unit, 11 integration — 9 new forwarded-header cases plus 2 added to the
-  existing metrics-gate suite)
+- **New tests**: 28 (17 unit, 11 integration — 9 new forwarded-header cases, 4 untrusted-peer
+  middleware cases, plus 2 added to the existing metrics-gate suite)
 - **Scoped runs**: all green; the full `Integration` namespace passes 240/240 with 10 MinIO
   tests skipping, as they do without `STORAGE_TEST_*`
 - **Vulnerability scan**: clean on both projects, direct **and** transitive
@@ -31,6 +31,16 @@ created: 2026-09-04T01:10:00Z
 | `dotnet test … --filter "…~ForwardedHeaders\|…~Metrics\|…~Observability\|…~Unit.Controllers"` | 221/221 passed |
 | `dotnet test … --filter "FullyQualifiedName~PhotoPrint.Tests.Integration"` | 240 passed, 10 skipped, 0 failed |
 
+Re-run at the stage-3 gate on 2026-09-04, after the untrusted-peer middleware test and the
+doc sweep landed, through `reviews/lib/run-scoped-tests.mjs … --kind green --summary --no-events`:
+
+| Command | Result |
+|---|---|
+| `dotnet list package --vulnerable --include-transitive` | `PhotoPrint.API`: none. `PhotoPrint.Tests`: none |
+| `--filter "ForwardedHeaders\|…UntrustedForwardedPeer\|…Metrics\|…PhotoPrint.Tests.Unit.Controllers"` | 140 passed, 0 failed, 0 skipped |
+| `--filter "Stripe\|…Webhook\|…Payment"` | 74 passed, 0 failed, 0 skipped |
+| `--filter "UntrustedForwardedPeer"` | 4 passed, 0 failed (and 2 failed under the mutation below) |
+
 No `npm test`: no frontend file is touched. No full-suite run.
 
 ### Test Files
@@ -43,6 +53,11 @@ No `npm test`: no frontend file is touched. No full-suite run.
       two headers honoured, and a CIDR entry that really matches its members.
 - [x] `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs` — what the pipeline
       resolves for a real request, read after the whole pipeline has run.
+- [x] `src/PhotoPrint.Tests/Unit/Middleware/UntrustedForwardedPeerMiddlewareTests.cs` — the
+      drift warning: an untrusted peer sending `X-Forwarded-For` is warned exactly once, each
+      distinct peer gets its own warning, and neither a trusted peer nor a peer sending no
+      header is warned. Drives the real `ForwardedHeadersMiddleware` as its `next`, with
+      options built by the production `AddTrustedProxyForwardedHeaders` extension.
 - [x] `src/PhotoPrint.Tests/Integration/MetricsEndpointIntegrationTests.cs` — two cases added,
       pinning that forwarded headers cannot open the scrape gate and do not break the scraper.
 
@@ -70,7 +85,8 @@ Carried from `implementation-plan.md` with the real names filled in. No empty ce
 | Forwarded headers configured, real scraper allow-listed | `/metrics` still 200 | `…An_allow_listed_peer_still_scrapes_when_forwarded_headers_are_configured` | — |
 | The scrape port is set but the request is ordinary traffic on the public listener — the shape a real deployment runs in | Forwarded headers still apply; the exclusion is narrow | `ForwardedHeadersWithObservabilityTests.A_request_on_the_public_listener_still_resolves_its_client` | — |
 | A bad trusted-proxy entry reaches a real host rather than just the validator | Boot throws, naming the entry | `ForwardedHeadersIntegrationTests.An_unparseable_trusted_proxy_aborts_boot` | `OptionsValidationException` |
-| The trusted proxy's address drifts, so the header is silently ignored for every request | A capped, deduplicated Warning names the peer | **Untested** — the middleware ships without a test; recorded as a gap below | `forwarded_headers.untrusted_peer ip=…` |
+| The trusted proxy's address drifts, so the header is silently ignored for every request | A capped, deduplicated Warning names the peer | `UntrustedForwardedPeerMiddlewareTests.Untrusted_peer_sending_forwarded_for_is_warned_once` + `…Each_distinct_untrusted_peer_is_warned` | `forwarded_headers.untrusted_peer ip=…` |
+| A trusted peer, or a peer sending no header, is warned anyway — turning the signal into noise | Silence | `…Trusted_peer_sending_forwarded_for_is_not_warned`, `…Peer_sending_no_forwarded_for_is_not_warned` | — |
 | An inline `Version=` returns to a csproj under CPM | Restore fails | Build gate — probed deliberately: `error NU1008` | MSBuild error |
 | A requested package version does not exist | Restore fails, not warns | Build gate — probed deliberately: `error NU1603: Warning As Error` | MSBuild error |
 | A package version that exists nowhere | Restore fails | Build gate — probed deliberately: `error NU1102` | MSBuild error |
@@ -92,7 +108,13 @@ behaviours were reverted deliberately and the suite re-run:
    4 of the forwarded-header integration tests fail. The 3 that still pass are the ones
    asserting that nothing happens — correct, and a useful check that they are not vacuous.
 
-Both mutations were reverted and the suite re-run green.
+3. **The drift warning removed** (the `LogUntrusted(peer)` call replaced with a no-op):
+   `Untrusted_peer_sending_forwarded_for_is_warned_once` and `Each_distinct_untrusted_peer_is_warned`
+   fail; the two "is not warned" cases still pass, which is correct and shows they are not
+   vacuous in the other direction.
+
+All three mutations were reverted and the suites re-run green (`git diff` on the middleware is
+empty; 4/4 middleware cases pass).
 
 ### Package-closure evidence
 
@@ -121,16 +143,20 @@ Nothing else in the shipped closure moved, which is what decision D7 required.
 | `X-Forwarded-For` cannot open the `/metrics` gate; allow-listed peer still scrapes | ✅ and mutation-proven |
 | Trusted proxies + observability on + `ScrapePort = 0` fails boot | ✅ |
 | Refresh cookie carries `Secure` behind a TLS-terminating proxy | ⚠️ proven at its input (`Request.IsHttps`), not end-to-end — see gaps |
-| Scoped suites green | ✅ |
+| Scoped suites green | ✅ 140 + 74 + 4 cases, 0 failed, re-run at the stage-3 gate |
+| Every mechanism this bolt adds reddens when reverted | ✅ three mutations, all three proven |
+| Docs state the shipped behaviour, not the planned one | ✅ `system-architecture.md`, `requirements.md`, `system-context.md`, `docs/DEPLOYMENT.md` §2 corrected in stage 2 |
 | `DEPLOYMENT.md` §14.3 amended, §16 added; ADR-018 amended | ✅ |
 | **Story 004 AC3** — an `X-Forwarded-For` case makes an allow-listed IP return 200 on `/metrics` | ❌ **deliberately not met.** Superseded by ADR-018's amendment; recorded in the story file, the ADR, `decision-index.md` and §14.3, and replaced by its inverse, which ships and is mutation-proven. Approved by the wave coordinator |
 
 ### What this suite cannot prove
 
-0. **`UntrustedForwardedPeerMiddleware` has no test.** It was added late, in response to the
-   stage-4 gate, and the session was stopped before a test for it was written. Its dedup cap and
-   its "header present but address unchanged" condition are unproven. This is the one deliberate
-   coverage gap in the bolt and should be closed before review.
+The middleware gap listed here before stage 3 is closed:
+`src/PhotoPrint.Tests/Unit/Middleware/UntrustedForwardedPeerMiddlewareTests.cs` now covers the
+drift warning and its dedup, and the mutation above proves those cases redden. The 512-peer log
+cap itself is still untested — reaching it would mean driving 512 distinct addresses through the
+middleware, which buys little for the cost.
+
 1. **The Docker image build.** No Docker daemon is available here, so the `Dockerfile` change
    that copies the central manifest before restoring is verified by inspection only. It is the
    one change in this bolt that fails the *deploy* rather than the test suite if it is wrong.
