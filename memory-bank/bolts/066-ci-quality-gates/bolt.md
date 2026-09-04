@@ -3,14 +3,14 @@ id: 066-ci-quality-gates
 unit: 001-ci-quality-gates
 intent: 030-ui-scaling-and-e2e
 type: simple-construction-bolt
-status: in-progress
+status: review-pending
 stories:
   - 001-bundle-size-budget
   - 002-playwright-e2e-smoke-tests
 created: 2026-06-05T09:30:00Z
 started: 2026-09-03T20:45:00Z
 completed: null
-current_stage: test
+current_stage: null
 stages_completed:
   - name: plan
     completed: 2026-09-03T23:40:00Z
@@ -18,6 +18,9 @@ stages_completed:
   - name: implement
     completed: 2026-09-04T00:20:00Z
     artifact: implementation-walkthrough.md
+  - name: test
+    completed: 2026-09-04T11:30:00Z
+    artifact: test-walkthrough.md
 
 requires_bolts: []
 enables_bolts: [067-ui-scaling-and-e2e-ui]
@@ -55,7 +58,7 @@ Add the pre-launch frontend quality gates: catch bundle bloat and automate guest
 
 - [x] **1. plan**: ✅ Complete → implementation-plan.md
 - [x] **2. implement**: ✅ Complete → angular.json budgets; e2e specs; playwright-e2e.yml
-- [ ] **3. test**: Pending → CI runs budget + e2e green
+- [x] **3. test**: ✅ Complete → CI runs budget + e2e green
 
 ## Dependencies
 
@@ -67,8 +70,8 @@ Add the pre-launch frontend quality gates: catch bundle bloat and automate guest
 
 ## Success Criteria
 
-- [ ] Build fails over budget
-- [ ] 3 e2e pass in CI within ~3 min
+- [x] Build fails over budget
+- [x] 3 e2e pass in CI within ~3 min (16.7 s, three consecutive green runs)
 
 ## Notes
 

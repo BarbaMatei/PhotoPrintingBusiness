@@ -2,7 +2,7 @@
 unit: 001-ci-quality-gates
 intent: 030-ui-scaling-and-e2e
 created: 2026-09-03T20:45:00Z
-last_updated: 2026-09-03T20:50:00Z
+last_updated: 2026-09-04T11:35:00Z
 ---
 
 # Construction Log: 001-ci-quality-gates
@@ -27,7 +27,7 @@ last_updated: 2026-09-03T20:50:00Z
 
 | Bolt ID | Stories | Status | Changed |
 |---------|---------|--------|---------|
-| 066-ci-quality-gates | 2 | 🔄 in progress | - |
+| 066-ci-quality-gates | 2 | ⏳ review-pending | - |
 
 ## Execution History
 
@@ -36,6 +36,8 @@ last_updated: 2026-09-03T20:50:00Z
 | 2026-09-03T20:45:00Z | 066 | started | Stage 1: Plan |
 | 2026-09-03T23:40:00Z | 066 | stage-complete | Plan → Implement (adversarial design check run first; 14 findings folded into the plan) |
 | 2026-09-04T00:20:00Z | 066 | stage-complete | Implement → Test (budgets + 3 specs + workflow committed) |
+| 2026-09-04T11:30:00Z | 066 | stage-complete | Test — 3/3 e2e green in CI (run 33807570557, twice more since), UI unit suite 520/520, budget gate proven by injection |
+| 2026-09-04T11:35:00Z | 066 | review-pending | Fresh-eyes micro-review ran: 14 findings, 11 fixed, 3 recorded; bolt handed to stage 6 |
 
 ## Notes
 
