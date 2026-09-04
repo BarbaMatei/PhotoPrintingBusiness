@@ -60,6 +60,7 @@ export class HomePage implements OnInit {
           tiers: firstSize.pricingTiers,
         });
       },
+      error: () => this.catalogSignal.set(null),
     });
   }
 }

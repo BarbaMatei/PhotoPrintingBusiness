@@ -88,3 +88,15 @@ last_updated: 2026-09-04T13:10:00Z
   the results above, naming PPW-699's tested half by its test name and its per-field `maxlength` half as still
   open; then run the fresh-eyes micro-review as a fresh subagent per `memory-bank/standards/bolt-process.md`,
   flip `bolt.md` to `status: review-pending` with `completed` set, and push.
+
+## Stage exit — 067-ui-scaling-and-e2e-ui — test — 2026-09-04T14:00:00Z
+- Done: wrote memory-bank/bolts/067-ui-scaling-and-e2e-ui/test-walkthrough.md (126/126 Vitest green across four scoped batches; production build exit 0 at 330.13 kB raw / 92.83 kB transfer; npm run e2e:check exit 0). Ran the fresh-eyes micro-review as two fresh subagents and fixed all three findings: removed the duplicate .hero__visual wrapper in features/home/components/photo-mosaic/photo-mosaic.html, added error: () => this.catalogSignal.set(null) to features/home/home-page.ts, removed the orphaned showDeleteConfirm signal from features/account/pages/profile/profile-page.ts. Retest after the fixes: 29 passed, exit 0. bolt.md is now status: review-pending with the test stage recorded.
+- Decisions: the walkthrough line counts were wrong, so the report publishes the measured wc -l figures (home 66, profile 217, saved-addresses 334, delivery-step 574) and leaves the "no page > ~200 LOC" criterion unticked rather than claiming it — delivery-step actually grew 7 lines because commit d7b61b4 reflowed the whole file with Prettier. The three BaseApiService "unused surface" notes from the services review were recorded, not fixed: the headers escape hatch is an explicit plan acceptance criterion and touching the base at the test stage buys no behaviour change. completed is set to the construction-finish timestamp even though sibling bolt 066 left it null, because the stage instruction asked for it. PPW-699 is named by its test, "keeps Continue disabled for a restored delivery method until both server prices arrive"; its per-field maxlength half stays open and nothing under reviews/ was edited.
+- Dead ends: the Playwright suite cannot run here — docker is not on PATH, so docker-compose.e2e.yml cannot start the API; do not retry locally, the missing check is a CI e2e run on this branch. The zoneless-staleness failure mode is not reproducible in Vitest (the fixture detectChanges() refreshes OnPush children whether or not they are dirty) — do not write a spec for it. A bash heredoc for the report failed on quoting; the Write tool was used instead.
+- Next: bolt complete — 067 is at status: review-pending; the coordinator opens the PR for feat/bolts-066-067-ui-scaling (pushed with --force-with-lease, the remote head cb70a4f was the pre-rebase twin).
+
+## Session cost
+
+| Date | Bolt | Stage | Turns | Tools | Fresh | Cache read | Output | Misses |
+|---|---|---|---|---|---|---|---|---|
+| 2026-09-04T12:17:36Z | 067-ui-scaling-and-e2e-ui | implement | 77 | 44 | 0.3M | 5.2M | 0.1M | 0 |

@@ -69,7 +69,6 @@ import { AccountDeletionCard } from './components/account-deletion-card/account-
         font-weight: 700;
         margin-bottom: 1.5rem;
       }
-
     `,
   ],
 })
@@ -85,7 +84,6 @@ export class ProfilePage implements OnInit {
   readonly profileSaving = signal(false);
   readonly passwordSaving = signal(false);
   readonly deletionSaving = signal(false);
-  readonly showDeleteConfirm = signal(false);
   readonly account = signal<AccountDto | null>(null);
   readonly passwordError = signal<string | null>(null);
 
@@ -204,7 +202,6 @@ export class ProfilePage implements OnInit {
       .subscribe({
         next: () => {
           this.deletionSaving.set(false);
-          this.showDeleteConfirm.set(false);
           const current = this.account();
           if (current) this.account.set({ ...current, deletionRequested: true });
           this.toast.show('Cererea de ștergere a contului a fost înregistrată.', 'info');
