@@ -78,13 +78,18 @@ response caching → static files → routing → authn → authz → controller
 | `AccountDeletionJob` | daily | hard-delete accounts 30 days after deletion request |
 | `EmailRetryJob` | 10 s poll | drain `EmailQueue` (3 attempts, 1s/4s/16s backoff) |
 | `OrderPhotoPromotionWorker` | channel | move paid orders' photos to cloud (drains on shutdown) |
-| `PromotionRecoveryScanner` | boot only | re-derive lost promotion work from `StorageLocation` (ADR-010) |
+| `PromotionRecoveryScanner` | boot + every 6 h | re-derive lost promotion work from `StorageLocation` (ADR-010) |
 | `OriginalPurgeRecoveryScanner` | boot + every 6 h | purge missed originals (incl. Cancelled) |
 | `ArchiveRetentionJob` | every 6 h | delete cloud previews/thumbs past retention |
 | `S3BucketVerifier` | boot only | fail-fast bucket probe (cloud on only) |
 
 Queueing is **in-process** (`Channel<T>` + recovery scans, ADR-010) — no durable queue table;
 this blocks multi-VM scale-out by design until the Redis work (bolt 046, deliberately parked).
+Every job in the table above runs in **every** instance, and not one of them claims its rows
+before acting — the three workers that do (`AwbCreator`, `InvoiceUploadJob`,
+`ShipmentTrackingJob`) are Sameday and ANAF jobs this table has never been updated for. What
+breaks on a second replica, concern by concern, with what each ADR decided:
+[../../docs/architecture/multi-replica-readiness.md](../../docs/architecture/multi-replica-readiness.md).
 
 ## Payments
 
