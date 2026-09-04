@@ -89,7 +89,9 @@ describe('ProfilePage', () => {
   });
 
   it('saveProfile shows error toast on failure', () => {
-    accountSvc.updateAccount.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    accountSvc.updateAccount.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
     component.profileForm.patchValue({ firstName: 'Maria', lastName: 'Ion', phone: '' });
     component.saveProfile();
     expect(toast.show).toHaveBeenCalledWith('Eroare la salvarea profilului.', 'error');
@@ -116,7 +118,7 @@ describe('ProfilePage', () => {
 
   it('changePassword shows error message on 400', () => {
     accountSvc.changePassword.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 400 }))
+      throwError(() => new HttpErrorResponse({ status: 400 })),
     );
     component.passwordForm.patchValue({
       currentPassword: 'Wrong1!',
@@ -131,5 +133,61 @@ describe('ProfilePage', () => {
     component.requestDeletion();
     expect(accountSvc.requestDeletion).toHaveBeenCalled();
     expect(component.account()?.deletionRequested).toBe(true);
+  });
+  describe('rendering', () => {
+    const el = () => fixture.nativeElement as HTMLElement;
+
+    it('renders the three cards a password account gets', () => {
+      expect(el().querySelector('app-personal-info-form')).toBeTruthy();
+      expect(el().querySelector('app-password-change-form')).toBeTruthy();
+      expect(el().querySelector('app-account-deletion-card')).toBeTruthy();
+    });
+
+    it('fills the personal-info fields from the account and shows the email read-only', () => {
+      const firstName = el().querySelector('#firstName') as HTMLInputElement;
+      const email = el().querySelector('#email') as HTMLInputElement;
+
+      expect(firstName, 'câmpurile din componenta copil nu s-au randat').toBeTruthy();
+      expect(firstName.value).toBe(component.profileForm.get('firstName')!.value);
+      expect(email.disabled).toBe(true);
+    });
+
+    it('hides the password card for an account without a password', () => {
+      component.account.set({ ...component.account()!, hasPassword: false });
+      fixture.detectChanges();
+
+      expect(el().querySelector('app-password-change-form')).toBeNull();
+      expect(el().querySelector('app-personal-info-form')).toBeTruthy();
+    });
+
+    it('surfaces the password error the container holds', () => {
+      component.passwordError.set('Parola actuală este incorectă.');
+      fixture.detectChanges();
+
+      expect(el().textContent).toContain('Parola actuală este incorectă.');
+    });
+
+    it('asks for confirmation before requesting deletion, then calls the container', () => {
+      const trigger = Array.from(el().querySelectorAll('app-account-deletion-card button')).find(
+        (b) => (b.textContent ?? '').includes('Solicită ștergerea'),
+      ) as HTMLButtonElement;
+      trigger.click();
+      fixture.detectChanges();
+
+      expect(el().textContent).toContain('Ești sigur că vrei să soliciți ștergerea contului?');
+      const confirm = Array.from(el().querySelectorAll('app-account-deletion-card button')).find(
+        (b) => (b.textContent ?? '').includes('Confirm ștergerea'),
+      ) as HTMLButtonElement;
+      confirm.click();
+
+      expect(accountSvc.requestDeletion).toHaveBeenCalled();
+    });
+
+    it('submits the personal-info form through the container', () => {
+      const form = el().querySelector('app-personal-info-form form') as HTMLFormElement;
+      form.dispatchEvent(new Event('submit'));
+
+      expect(accountSvc.updateAccount).toHaveBeenCalled();
+    });
   });
 });
