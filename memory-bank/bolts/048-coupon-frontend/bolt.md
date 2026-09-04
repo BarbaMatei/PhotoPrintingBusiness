@@ -3,14 +3,17 @@ id: 048-coupon-frontend
 unit: 002-coupon-frontend
 intent: 022-coupon-promo-codes
 type: simple-construction-bolt
-status: planned
+status: in-progress
 stories:
   - 001-cart-coupon-ux
 created: 2026-05-25T10:45:00Z
-started: null
+started: 2026-09-04T15:05:00Z
 completed: null
-current_stage: null
-stages_completed: []
+current_stage: implement
+stages_completed:
+  - name: plan
+    completed: 2026-09-04T15:40:00Z
+    artifact: implementation-plan.md
 
 requires_bolts: [047-coupon-domain-and-api, 014-upload-format-cart-ui, 039-efactura-anaf]
 enables_bolts: []
