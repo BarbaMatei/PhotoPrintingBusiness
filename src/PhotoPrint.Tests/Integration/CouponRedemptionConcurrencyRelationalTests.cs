@@ -22,12 +22,19 @@ public class CouponRedemptionConcurrencyRelationalTests : IClassFixture<Postgres
     private const int Quantity = 5;
     private const decimal ShippingCost = 20.00m;
 
+    private const int MaxPoolSize = 20;
+
     private readonly PostgresTestDatabase _database;
+    private readonly DbContextOptions<PhotoPrintDbContext> _shopperOptions;
 
     public CouponRedemptionConcurrencyRelationalTests(PostgresTestDatabase database)
     {
         _database = database;
         database.ResetForTest();
+
+        _shopperOptions = new DbContextOptionsBuilder<PhotoPrintDbContext>()
+            .UseNpgsql($"{database.ConnectionString};Maximum Pool Size={MaxPoolSize}")
+            .Options;
     }
 
     [Fact]
@@ -56,7 +63,7 @@ public class CouponRedemptionConcurrencyRelationalTests : IClassFixture<Postgres
 
     private async Task<Outcome> CheckoutAsync(Guid userId)
     {
-        using var db = _database.NewContext();
+        using var db = new PhotoPrintDbContext(_shopperOptions);
         var service = BuildService(db);
 
         try
