@@ -37,9 +37,9 @@ behaviour: nothing proves the two promises §16 of `docs/DEPLOYMENT.md` makes ab
 
 ## Reasons to doubt
 
-- Ten of the eleven new rows were read by a lens and never handed to a skeptic — the delta
+- Six of the eleven new rows were read by a lens and never handed to a skeptic — the delta
   budget allows skeptics on serious candidates only ([metrics.jsonl](metrics.jsonl)). They are
-  recorded as reported, not proven. Six sub-claims were checked by hand during synthesis and
+  recorded as reported, not proven. Four sub-claims were checked by hand during synthesis and
   hold; they are marked as such on their ledger rows.
 - Eight of the eleven are defects inside the round's own fixes ([review-v3.md](review-v3.md)),
   so this pass measures the fix round as much as the bolt: a seed rate the router can now use,

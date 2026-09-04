@@ -75,3 +75,5 @@
 {"t":"2026-09-04T23:44:08+03:00","ev":"gate-parked","kind":"delta-worthiness","default":"delta discovery","reason":"the fix round fixed high-severity PPW-713 and PPW-714 — delta-worthy by the mechanical half of the rule"}
 {"t":"2026-09-04T23:45:37+03:00","ev":"pass-launch","pass":3,"type":"delta-discovery"}
 {"t":"2026-09-05T00:31:31+03:00","ev":"pass-records-done","pass":3}
+{"t":"2026-09-05T00:40:29+03:00","ev":"doc-gate","pass":3,"verdict":"disapprove","reason":"judge corrected two counts in summary-v3: six of eleven new rows are unverified-low (the metrics 10 includes four re-finds) and four sub-claims were hand-checked; replacement text applied verbatim, lint clean"}
+{"t":"2026-09-05T00:40:37+03:00","ev":"note","reason":"soft stop by owner after pass 3 records"}
