@@ -164,7 +164,7 @@ public class CouponServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveForCart_WhenCouponStopsQualifying_ReportsNothing_AndWritesNothing()
+    public async Task ResolveForCart_WhenCouponStopsQualifying_ReportsStale_AndWritesNothing()
     {
         await SeedAsync(TestCoupons.Make(code: "BIGONLY", minSubtotalRon: 200m));
         _db.CartCoupons.Add(new CartCoupon
@@ -174,16 +174,21 @@ public class CouponServiceTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var resolved = await _sut.ResolveForCartAsync(_userId, null, 100m, deleteWhenUnusable: false);
+        var resolved = await _sut.ResolveForCartAsync(_userId, null, 100m);
 
-        resolved.Should().BeNull();
+        resolved.Should().NotBeNull();
+        resolved!.IsStale.Should().BeTrue();
+        resolved.ReasonCode.Should().Be(CouponErrorCodes.MinSubtotalNotMet);
+        resolved.Code.Should().Be("BIGONLY");
+        resolved.DiscountRon.Should().Be(0m);
         _db.CartCoupons.Any(cc => cc.UserId == _userId).Should().BeTrue();
     }
 
     [Fact]
-    public async Task ResolveForCart_WhenAskedToDelete_RemovesTheUnusableRow()
+    public async Task ResolveForCart_BackAboveTheMinimum_ReportsValidAgain()
     {
-        await SeedAsync(TestCoupons.Make(code: "BIGONLY", minSubtotalRon: 200m));
+        await SeedAsync(TestCoupons.Make(
+            code: "BIGONLY", type: CouponType.Percent, value: 10m, minSubtotalRon: 200m));
         _db.CartCoupons.Add(new CartCoupon
         {
             UserId = _userId,
@@ -191,10 +196,14 @@ public class CouponServiceTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        var resolved = await _sut.ResolveForCartAsync(_userId, null, 100m, deleteWhenUnusable: true);
+        (await _sut.ResolveForCartAsync(_userId, null, 100m))!.IsStale.Should().BeTrue();
 
-        resolved.Should().BeNull();
-        _db.CartCoupons.Any(cc => cc.UserId == _userId).Should().BeFalse();
+        var recovered = await _sut.ResolveForCartAsync(_userId, null, 250m);
+
+        recovered.Should().NotBeNull();
+        recovered!.IsStale.Should().BeFalse();
+        recovered.ReasonCode.Should().BeNull();
+        recovered.DiscountRon.Should().Be(25m);
     }
 
     [Fact]

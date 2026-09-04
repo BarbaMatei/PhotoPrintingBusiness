@@ -17,6 +17,8 @@ public record CartResponseDto(
     int ItemCount,
     string? CouponCode,
     string? CouponType,
+    string? CouponStatus,
+    string? CouponReason,
     decimal DiscountRon,
     decimal TotalRon,
     decimal NetTotalRon,
@@ -24,5 +26,5 @@ public record CartResponseDto(
     decimal VatRate)
 {
     public static CartResponseDto Empty { get; } =
-        new([], 0m, 0, null, null, 0m, 0m, 0m, 0m, 0m);
+        new([], 0m, 0, null, null, null, null, 0m, 0m, 0m, 0m, 0m);
 }

@@ -192,9 +192,16 @@ public sealed class AdminCouponService : IAdminCouponService
 
         if (UsesRelationalProvider)
         {
-            affected = await _db.Coupons
-                .Where(c => c.Id == id && c.RedemptionsCount == 0)
-                .ExecuteUpdateAsync(s => s.SetProperty(c => c.Code, newCode), ct);
+            try
+            {
+                affected = await _db.Coupons
+                    .Where(c => c.Id == id && c.RedemptionsCount == 0)
+                    .ExecuteUpdateAsync(s => s.SetProperty(c => c.Code, newCode), ct);
+            }
+            catch (Npgsql.PostgresException pg) when (IsCodeViolation(pg))
+            {
+                throw DuplicateCode(newCode, adminUserId);
+            }
         }
         else
         {
@@ -226,8 +233,10 @@ public sealed class AdminCouponService : IAdminCouponService
     }
 
     private static bool IsCodeViolation(DbUpdateException ex)
-        => ex.InnerException is Npgsql.PostgresException pg
-            && pg.SqlState == "23505"
+        => ex.InnerException is Npgsql.PostgresException pg && IsCodeViolation(pg);
+
+    private static bool IsCodeViolation(Npgsql.PostgresException pg)
+        => pg.SqlState == "23505"
             && pg.ConstraintName == PhotoPrintDbContext.CouponCodeIndexName;
 
     private static (int Page, int Size) ClampPaging(int page, int size)

@@ -58,6 +58,15 @@ REST API conventions for FotoTipar's ASP.NET Core 8 backend, consumed by the Ang
 }
 ```
 
+**Re-validated state on a read (bolt 047):** where a stored selection can go bad on its own
+(a coupon expiring, running out, or being deactivated while it sits in a cart), the read model
+carries its state instead of the read silently repairing or dropping it. `GET /api/cart` and
+`POST /api/cart` both return `couponStatus` (`"valid"` | `"stale"`) and, when stale,
+`couponReason` — the **same** code the write path would return — with `discountRon` recomputed
+to `0`. Reads never write: the stored selection survives so the customer can see it and remove
+it themselves. The write path (checkout) stays the authority and still refuses with `409` and
+the same code.
+
 ### Status Code Usage
 
 | Code | Meaning | When |
@@ -113,6 +122,34 @@ excluded) → replays the cached client secret / redirect URL. Same key + diverg
   ]
 }
 ```
+
+### Machine-readable Error Codes (`code`)
+
+Two different 422 shapes exist and clients must handle both:
+
+- **DTO/model validation** → the field-level `errors[]` array above.
+- **A well-formed request the domain refuses** → ProblemDetails plus a `code` extension.
+
+Any exception implementing `IErrorCoded` (`CouponRejectedException` → 422,
+`CouponConflictException` → 409) surfaces its code as a `code` extension in both the
+production ProblemDetails and the Development diagnostic shape:
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc7807",
+  "title": "Unprocessable Entity",
+  "status": 422,
+  "detail": "Codul introdus nu este valid.",
+  "correlationId": "abc-123-def-456",
+  "code": "INVALID_COUPON"
+}
+```
+
+Clients branch on `code`, never on `detail` — `detail` is Romanian user-facing copy and may be
+reworded at any time. Codes are `SCREAMING_SNAKE_CASE` and live in one constants class per
+domain (`CouponErrorCodes`). Deliberately indistinguishable causes share a code: an unknown,
+inactive, expired or not-yet-started coupon all return `INVALID_COUPON`, so a code cannot be
+used to probe which codes exist.
 
 ### Error Conventions
 - All error `detail` messages in **Romanian** (user-facing)

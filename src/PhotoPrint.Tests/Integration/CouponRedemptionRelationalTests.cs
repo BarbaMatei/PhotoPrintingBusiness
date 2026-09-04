@@ -83,7 +83,7 @@ public class CouponRedemptionRelationalTests : IClassFixture<PostgresTestDatabas
     }
 
     [Fact]
-    public async Task PaymentFailedRetry_ReleasesTheAbandonedRedemption()
+    public async Task PaymentFailedRetry_TransfersTheRedemptionToTheReplacement()
     {
         var (userId, couponId) = await SeedAsync(maxRedemptions: 1);
         const string key = "relational-declined-card";
@@ -97,6 +97,8 @@ public class CouponRedemptionRelationalTests : IClassFixture<PostgresTestDatabas
         stored.Status = OrderStatus.PaymentFailed;
         await fail.SaveChangesAsync();
 
+        var heldRedemptionId = fail.CouponRedemptions.Single(r => r.OrderId == failed.Id).Id;
+
         using var retry = _database.NewContext();
         var replacement = (await BuildService(retry)
             .CreateFromCartAsync(userId, null, Request(), key)).Order;
@@ -104,12 +106,16 @@ public class CouponRedemptionRelationalTests : IClassFixture<PostgresTestDatabas
         replacement.Id.Should().NotBe(failed.Id);
 
         using var verify = _database.NewContext();
-        verify.CouponRedemptions.Single().OrderId.Should().Be(replacement.Id);
+        var survivor = verify.CouponRedemptions.Single();
+        survivor.Id.Should().Be(heldRedemptionId);
+        survivor.OrderId.Should().Be(replacement.Id);
+        survivor.DiscountRon.Should().Be(30.00m);
         verify.Coupons.Single(c => c.Id == couponId).RedemptionsCount.Should().Be(1);
+        verify.Orders.Single(o => o.Id == failed.Id).Status.Should().Be(OrderStatus.Cancelled);
     }
 
     [Fact]
-    public async Task StaleKeyReclamation_ReleasesTheAbandonedRedemption()
+    public async Task StaleKeyReclamation_TransfersTheRedemptionToTheReplacement()
     {
         var (userId, couponId) = await SeedAsync(maxRedemptions: 1);
         const string key = "relational-stale-key";
@@ -123,6 +129,8 @@ public class CouponRedemptionRelationalTests : IClassFixture<PostgresTestDatabas
         stored.CreatedAt = DateTimeOffset.UtcNow.AddHours(-25);
         await age.SaveChangesAsync();
 
+        var heldRedemptionId = age.CouponRedemptions.Single(r => r.OrderId == stale.Id).Id;
+
         using var reuse = _database.NewContext();
         var replacement = (await BuildService(reuse)
             .CreateFromCartAsync(userId, null, Request(), key)).Order;
@@ -130,6 +138,72 @@ public class CouponRedemptionRelationalTests : IClassFixture<PostgresTestDatabas
         replacement.Id.Should().NotBe(stale.Id);
 
         using var verify = _database.NewContext();
+        var survivor = verify.CouponRedemptions.Single();
+        survivor.Id.Should().Be(heldRedemptionId);
+        survivor.OrderId.Should().Be(replacement.Id);
+        verify.Coupons.Single(c => c.Id == couponId).RedemptionsCount.Should().Be(1);
+        verify.Orders.Single(o => o.Id == stale.Id).Status.Should().Be(OrderStatus.Cancelled);
+        verify.Orders.Single(o => o.Id == replacement.Id).IdempotencyKey.Should().Be(key);
+    }
+
+    [Fact]
+    public async Task ReplacementInsertFails_LeavesTheRedemptionOnTheAbandonedOrder()
+    {
+        var (userId, couponId) = await SeedAsync(maxRedemptions: 1);
+        const string key = "relational-transfer-rollback";
+
+        using var first = _database.NewContext();
+        var failed = (await BuildService(first)
+            .CreateFromCartAsync(userId, null, Request(), key)).Order;
+
+        using var fail = _database.NewContext();
+        var stored = fail.Orders.Single(o => o.Id == failed.Id);
+        stored.Status = OrderStatus.PaymentFailed;
+        await fail.SaveChangesAsync();
+
+        var heldRedemptionId = fail.CouponRedemptions.Single(r => r.OrderId == failed.Id).Id;
+
+        using var retry = _database.NewContext();
+        var unknownLocker = new CreateOrderRequest(DeliveryType.Easybox, Guid.NewGuid(), null);
+
+        var act = () => BuildService(retry).CreateFromCartAsync(userId, null, unknownLocker, key);
+
+        await act.Should().ThrowAsync<DbUpdateException>();
+
+        using var verify = _database.NewContext();
+        var survivor = verify.CouponRedemptions.Single();
+        survivor.Id.Should().Be(heldRedemptionId);
+        survivor.OrderId.Should().Be(failed.Id);
+        verify.Coupons.Single(c => c.Id == couponId).RedemptionsCount.Should().Be(1);
+        var holder = verify.Orders.Single();
+        holder.Id.Should().Be(failed.Id);
+        holder.Status.Should().Be(OrderStatus.PaymentFailed);
+        holder.IdempotencyKey.Should().Be(key);
+    }
+
+    [Fact]
+    public async Task LateSuccessForTheCancelledHolder_LeavesTheRedemptionOnTheReplacement()
+    {
+        var (userId, couponId) = await SeedAsync(maxRedemptions: 1);
+        const string key = "relational-late-success";
+
+        using var first = _database.NewContext();
+        var failed = (await BuildService(first)
+            .CreateFromCartAsync(userId, null, Request(), key)).Order;
+
+        using var fail = _database.NewContext();
+        fail.Orders.Single(o => o.Id == failed.Id).Status = OrderStatus.PaymentFailed;
+        await fail.SaveChangesAsync();
+
+        using var retry = _database.NewContext();
+        var replacement = (await BuildService(retry)
+            .CreateFromCartAsync(userId, null, Request(), key)).Order;
+
+        using var verify = _database.NewContext();
+        var abandoned = verify.Orders.Single(o => o.Id == failed.Id);
+        abandoned.Status.Should().Be(OrderStatus.Cancelled);
+        OrderStatusMachine.CanTransition(abandoned.Status, OrderStatus.Paid).Should().BeFalse();
+
         verify.CouponRedemptions.Single().OrderId.Should().Be(replacement.Id);
         verify.Coupons.Single(c => c.Id == couponId).RedemptionsCount.Should().Be(1);
     }

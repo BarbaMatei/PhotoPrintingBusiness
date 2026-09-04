@@ -261,7 +261,7 @@ flow has to be told about, so it is read before the coupon is resolved and it dr
 
 | # | Condition | What happens |
 |---|---|---|
-| 1 | read the holder's `CouponRedemptions` row (`AsNoTracking`) before resolving | yields `heldSlot` — the coupon id and row id, or null |
+| 1 | read the holder's `CouponRedemptions` row (`AsNoTracking`) before resolving, **only while the holder is `AwaitingPayment` or `PaymentFailed`** | yields `heldSlot` — the coupon id and row id, or null |
 | 2 | resolving the replacement's coupon | `ResolveForOrderAsync` is told `heldSlot?.CouponId` and validates that one coupon against `RedemptionsCount - 1`; without this the holder's own slot exhausts a `MaxRedemptions = 1` coupon and the retry 409s `COUPON_EXHAUSTED` after the intent is already dead — no order, no live intent, and the coupon locked to a dead order |
 | 3 | the resolved coupon **is** the held one | transfer: repoint the row, no insert, no CAS |
 | 4 | the resolved coupon is a **different** one (apply A, decline, apply B, retry) | release the held row and take a normal CAS redemption for B — a transfer here would leave the row on A while the order says B, and B's cap would never see the redemption |
@@ -273,6 +273,20 @@ slot free, which is the window this whole section exists to close. That widens t
 from "a coupon is applied" to "a coupon is applied **or** a held slot is being moved or released";
 `ReleaseForOrderAsync` already declines to open its own transaction when one is ambient, so it needs
 no change.
+
+*Only an unpaid holder's slot is in play.* Rows 1–5 run behind a status guard: the held row is read
+only while the holder is `AwaitingPayment` or `PaymentFailed`. A holder in any other status — most
+importantly a **paid** one whose key went stale past the 24 h window — keeps its redemption, and
+nothing is transferred, released or abandoned. The code this bolt found here released
+unconditionally, so a paid discounted order losing its key also lost its redemption and the
+coupon's count fell back below the truth; transfer-and-abandon on that path would have been worse
+still (a paid order marked `Cancelled`). The guard closes both.
+
+*A cart coupon whose row is gone reads as no coupon.* `ResolveForCartAsync` returns `null` when the
+`Coupons` row behind a stored `CartCoupon` no longer exists, which the DTO cannot distinguish from
+an empty cart-coupon slot: `CartCoupon` stores the id, not the code, so there is no code left to
+report `stale` against. Admin deletion is a soft delete (`IsActive = false`), which reports `stale`
+/ `INVALID_COUPON` normally, so this is reachable only by a hard `DELETE` outside the API.
 
 *Mechanism for the repoint, named because house style points the other way.* The rest of this bolt
 writes counters with `ExecuteUpdateAsync`, which executes immediately and outside EF's batch. Here
@@ -312,7 +326,9 @@ accept unpaid orders it refuses today, firing a cancellation email, a SignalR br
 Stripe refund and a cloud-original purge for an order nobody paid for. Cancelling unpaid orders may
 well be wanted, but it is a different story with its own copy and its own tests, and it is not this
 bolt's to ship. A named method keeps admin cancellation bit-identical, keeps the machine the only
-place that knows the lifecycle, and costs one line in its `///` transition table.
+place that knows the lifecycle, and adds no comment: the repo's comment rule (a pre-commit hook
+blocks added `//` and `///` lines) rules out annotating `ValidTransitions`, so the method's own name
+and its two legal source statuses are the documentation.
 
 *The one place `Cancelled` still bites, checked rather than assumed.* `Cancelled` is a cloud-original
 purge sweep status (`ArchiveSettings.OriginalPurgeSweepStatuses`), so `OriginalPurgeRecoveryScanner`
@@ -670,6 +686,9 @@ against real PostgreSQL because InMemory cannot exercise the mechanism.
 | Non-admin calls an admin coupon endpoint | 403 | `AdminCouponsIntegrationTests.AdminEndpoints_NonAdminUser_Return403` | — |
 | Discounted invoice reaches ANAF | `AllowanceCharge` emitted; `TaxExclusiveAmount = LineExtensionAmount − AllowanceTotalAmount`; no line goes negative | `InvoiceXmlBuilderTests.Build_OrderWithDiscountAndShipping_KeepsTransportLinePositive_AndReconcilesTotals` | — |
 | Undiscounted invoice regresses | XML unchanged from today | `InvoiceXmlBuilderTests.Build_OrderWithoutDiscount_EmitsNoAllowanceCharge` | — |
+| Confirmation email hides the discount | The model carries `DiscountRon` and `CouponCode`; the template renders the `Reducere` row only when the discount is positive, so undiscounted mail is byte-identical | `OrderEmailServiceTests.FireOrderConfirmedEmail_DiscountedOrder_CarriesTheDiscountAndCode` + `…_UndiscountedOrder_CarriesNoDiscountRow` | — |
+| Admin renames a code onto one that already exists | 409 `DUPLICATE_CODE`, both codes intact; case-insensitive by normalisation | `[PG] AdminCouponRelationalTests.RenameToAnExistingCode_Returns409DuplicateCode_AndChangesNothing` | `admin.coupon.create-rejected` |
+| Rename passes the duplicate pre-check and then loses the race to a concurrent insert | 409 `DUPLICATE_CODE`, not 500: the rename CAS is `ExecuteUpdateAsync`, which raises `PostgresException` **unwrapped**, so the duplicate catch has to match it directly as well as through `DbUpdateException` | **no test** — forcing the window between the pre-check and the CAS needs a command interceptor; the branch matches the same `SqlState`/constraint name as the tested create path | `admin.coupon.create-rejected` |
 | Guest session expires with a coupon applied | Row deleted with the session | `GuestSessionCleanupJobTests.Cleanup_ExpiredSessionWithCartCoupon_DeletesTheCoupon` | existing cleanup log |
 
 ### Test Plan
