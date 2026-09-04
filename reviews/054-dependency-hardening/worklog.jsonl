@@ -43,3 +43,5 @@
 {"t":"2026-09-04T23:14:49+03:00","ev":"test-run","kind":"final","passed":48,"failed":0,"duration_s":7.24,"filter":"ForwardedHeaders|UntrustedForwardedPeer|DeploymentDefaults","skipped":0,"cluster":"round-tip","round":1}
 {"t":"2026-09-04T23:16:11+03:00","ev":"round-end","round":1}
 {"t":"2026-09-04T23:17:39+03:00","ev":"pass-launch","pass":2,"type":"verification"}
+{"t":"2026-09-04T23:27:52+03:00","ev":"verify-result","id":"PPW-713","verdict":"held","commit":"b29fb2c"}
+{"t":"2026-09-04T23:27:52+03:00","ev":"verify-result","id":"PPW-723","verdict":"held","commit":"b29fb2c"}
