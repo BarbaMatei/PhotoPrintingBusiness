@@ -55,6 +55,12 @@ public class GuestSessionCleanupJob : BackgroundService
 
         if (expired.Count == 0) return 0;
 
+        var expiredIds = expired.Select(gs => gs.Id).ToList();
+        var strandedCoupons = await db.CartCoupons
+            .Where(cc => cc.GuestSessionId != null && expiredIds.Contains(cc.GuestSessionId.Value))
+            .ToListAsync(ct);
+
+        db.CartCoupons.RemoveRange(strandedCoupons);
         db.GuestSessions.RemoveRange(expired);
         await db.SaveChangesAsync(ct);
         return expired.Count;

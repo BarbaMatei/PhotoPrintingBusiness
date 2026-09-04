@@ -10,6 +10,8 @@ public record OrderDetailDto(
     decimal VatRate,
     decimal ShippingCostRon,
     decimal TotalRon,
+    string? CouponCode,
+    decimal DiscountRon,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
     string DeliveryType,

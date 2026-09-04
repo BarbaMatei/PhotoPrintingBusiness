@@ -58,8 +58,9 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                 BuildSupplierParty(seller),                                            // BG-4 / BT-31,32
                 BuildCustomerParty(order),                                             // BG-7 / BT-44+
                 BuildPaymentMeans(seller),                                             // BG-19
+                BuildAllowance(order, invoice),
                 BuildTaxTotal(invoice),                                                // BG-23
-                BuildLegalMonetaryTotal(invoice),                                      // BG-22
+                BuildLegalMonetaryTotal(order, invoice),
                 BuildInvoiceLines(order, invoice)                                      // BG-25
             ));
 
@@ -173,31 +174,67 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                     FormatMoney(invoice.VatRon)),
                 new XElement(Cac + "TaxCategory",
                     new XElement(Cbc + "ID",      VatCategoryStandard),
-                    new XElement(Cbc + "Percent", FormatPercent(VatRateFromInvoice(invoice))),
+                    new XElement(Cbc + "Percent", FormatPercent(InvoiceDiscountMath.VatRateFromInvoice(invoice))),
                     new XElement(Cac + "TaxScheme",
                         new XElement(Cbc + "ID", TaxSchemeIdVat)))));
     }
 
-    private static XElement BuildLegalMonetaryTotal(Invoice invoice)
+    private static XElement BuildLegalMonetaryTotal(Order order, Invoice invoice)
     {
-        return new XElement(Cac + "LegalMonetaryTotal",
+        var lineNetTotal = InvoiceDiscountMath.LineNetTotal(order, invoice);
+        var allowanceNet = lineNetTotal - invoice.NetTotalRon;
+
+        var total = new XElement(Cac + "LegalMonetaryTotal",
             new XElement(Cbc + "LineExtensionAmount",
                 new XAttribute("currencyID", CurrencyCode),
-                FormatMoney(invoice.NetTotalRon)),
+                FormatMoney(lineNetTotal)),
             new XElement(Cbc + "TaxExclusiveAmount",
                 new XAttribute("currencyID", CurrencyCode),
-                FormatMoney(invoice.NetTotalRon)),
-            new XElement(Cbc + "TaxInclusiveAmount",
+                FormatMoney(invoice.NetTotalRon)));
+
+        total.Add(new XElement(Cbc + "TaxInclusiveAmount",
+            new XAttribute("currencyID", CurrencyCode),
+            FormatMoney(invoice.TotalRon)));
+
+        if (allowanceNet > 0m)
+        {
+            total.Add(new XElement(Cbc + "AllowanceTotalAmount",
                 new XAttribute("currencyID", CurrencyCode),
-                FormatMoney(invoice.TotalRon)),
-            new XElement(Cbc + "PayableAmount",
+                FormatMoney(allowanceNet)));
+        }
+
+        total.Add(new XElement(Cbc + "PayableAmount",
+            new XAttribute("currencyID", CurrencyCode),
+            FormatMoney(invoice.TotalRon)));
+
+        return total;
+    }
+
+    private static XElement? BuildAllowance(Order order, Invoice invoice)
+    {
+        var allowanceNet = InvoiceDiscountMath.AllowanceNet(order, invoice);
+        if (allowanceNet <= 0m) return null;
+
+        var rate = InvoiceDiscountMath.VatRateFromInvoice(invoice);
+        var reason = InvoiceDiscountMath.AllowanceReason(
+            InvoiceAddressFormatter.StripXmlInvalid(order.CouponCode));
+
+        return new XElement(Cac + "AllowanceCharge",
+            new XElement(Cbc + "ChargeIndicator", "false"),
+            new XElement(Cbc + "AllowanceChargeReason", reason),
+            new XElement(Cbc + "Amount",
                 new XAttribute("currencyID", CurrencyCode),
-                FormatMoney(invoice.TotalRon)));
+                FormatMoney(allowanceNet)),
+            new XElement(Cac + "TaxCategory",
+                new XElement(Cbc + "ID", VatCategoryStandard),
+                new XElement(Cbc + "Percent", FormatPercent(rate)),
+                new XElement(Cac + "TaxScheme",
+                    new XElement(Cbc + "ID", TaxSchemeIdVat))));
     }
 
     private static IEnumerable<XElement> BuildInvoiceLines(Order order, Invoice invoice)
     {
-        var rate = VatRateFromInvoice(invoice);
+        var rate = InvoiceDiscountMath.VatRateFromInvoice(invoice);
 
         var lines = order.Items
             .Select(item => (
@@ -208,9 +245,8 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
         if (order.ShippingCostRon > 0)
             lines.Add(("Transport", 1, order.ShippingCostRon));
 
-        // Per-line vs. aggregate VAT extraction can drift by a cent from rounding — adjust the last line so Σ(line net) matches invoice.NetTotalRon exactly.
         var netTotals = lines.Select(l => VatCalculator.ExtractBreakdown(l.GrossTotal, rate).NetTotalRon).ToList();
-        var residual = invoice.NetTotalRon - netTotals.Sum();
+        var residual = InvoiceDiscountMath.LineNetTotal(order, invoice) - netTotals.Sum();
         if (residual != 0m)
             netTotals[^1] += residual;
 
@@ -260,19 +296,4 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
     private static string FormatPercent(decimal rate)
         => (rate * 100m).ToString("F2", CultureInfo.InvariantCulture);
 
-    /// <summary>
-    /// Derives the VAT rate that produced the invoice's breakdown. Reads
-    /// from the order's snapshot via <see cref="Invoice.Order"/> if loaded;
-    /// otherwise re-derives from <c>VatRon / NetTotalRon</c> with a guard.
-    /// </summary>
-    private static decimal VatRateFromInvoice(Invoice invoice)
-    {
-        if (invoice.Order is not null)
-            return invoice.Order.VatRate;
-        if (invoice.NetTotalRon == 0m)
-            return 0m;
-        // Round to 4 dp to match the storage shape (numeric(5,4)).
-        var derived = invoice.VatRon / invoice.NetTotalRon;
-        return decimal.Round(derived, 4, MidpointRounding.AwayFromZero);
-    }
 }

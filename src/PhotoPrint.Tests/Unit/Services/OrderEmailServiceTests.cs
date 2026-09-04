@@ -352,4 +352,55 @@ public class OrderEmailServiceTests
         capturedModel.LockerName.Should().Be("Locker Centru");
         capturedModel.ShippingAddress.Should().BeNull();
     }
+
+    private static (OrderEmailService Sut, Func<OrderConfirmedEmailModel?> Captured) CaptureConfirmed()
+    {
+        OrderConfirmedEmailModel? captured = null;
+
+        var emailMock = new Mock<IEmailService>();
+        emailMock
+            .Setup(e => e.SendTemplatedAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, object, CancellationToken>(
+                (_, _, _, model, _) => captured = model as OrderConfirmedEmailModel)
+            .Returns(Task.CompletedTask);
+
+        return (CreateSut(emailMock.Object), () => captured);
+    }
+
+    [Fact]
+    public async Task FireOrderConfirmedEmail_DiscountedOrder_CarriesTheDiscountAndCode()
+    {
+        var (sut, captured) = CaptureConfirmed();
+        var order = BuildGuestOrder();
+        order.DiscountRon = 5m;
+        order.CouponCode = "VARA30";
+        order.TotalRon = 20m;
+
+        sut.FireOrderConfirmedEmail(order);
+
+        await Task.Delay(200);
+
+        var model = captured();
+        model.Should().NotBeNull();
+        model!.DiscountRon.Should().Be(5m);
+        model.CouponCode.Should().Be("VARA30");
+        model.TotalRon.Should().Be(20m);
+    }
+
+    [Fact]
+    public async Task FireOrderConfirmedEmail_UndiscountedOrder_CarriesNoDiscountRow()
+    {
+        var (sut, captured) = CaptureConfirmed();
+
+        sut.FireOrderConfirmedEmail(BuildGuestOrder());
+
+        await Task.Delay(200);
+
+        var model = captured();
+        model.Should().NotBeNull();
+        model!.DiscountRon.Should().Be(0m);
+        model.CouponCode.Should().BeNull();
+    }
 }

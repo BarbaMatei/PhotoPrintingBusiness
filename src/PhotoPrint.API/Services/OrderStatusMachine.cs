@@ -55,4 +55,14 @@ public static class OrderStatusMachine
         order.Status = to;
         order.UpdatedAt = DateTimeOffset.UtcNow;
     }
+
+    public static void Abandon(Order order)
+    {
+        if (order.Status is not (OrderStatus.AwaitingPayment or OrderStatus.PaymentFailed))
+            throw new InvalidOrderTransitionException(
+                order.Status.ToString(), OrderStatus.Cancelled.ToString());
+
+        order.Status = OrderStatus.Cancelled;
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+    }
 }

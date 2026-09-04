@@ -49,6 +49,7 @@ public class OrderServiceTests : IDisposable
             _orderNumberServiceMock.Object,
             _shippingMock.Object,
             _storageRouterMock.Object,
+            TestCoupons.ServiceFor(_db),
             Options.Create(new StorageSettings()),
             Options.Create(new VatSettings()));
     }
@@ -472,7 +473,9 @@ public class OrderServiceTests : IDisposable
         var gateway = new RecordingGateway();
         var sut = new OrderService(
             _db, _orderNumberServiceMock.Object, _shippingMock.Object, _storageRouterMock.Object,
-            Options.Create(new StorageSettings()), Options.Create(new VatSettings()), gateway);
+            TestCoupons.ServiceFor(_db),
+            Options.Create(new StorageSettings()), Options.Create(new VatSettings()),
+            paymentGateway: gateway);
 
         var request = MakeRequest();
         var first = await sut.CreateFromCartAsync(userId, null, request, key);
@@ -591,6 +594,7 @@ public class OrderServiceTests : IDisposable
 
         var sut = new OrderService(
             _db, _orderNumberServiceMock.Object, _shippingMock.Object, router.Object,
+            TestCoupons.ServiceFor(_db),
             settings, Options.Create(new VatSettings()));
         return (sut, cloud);
     }

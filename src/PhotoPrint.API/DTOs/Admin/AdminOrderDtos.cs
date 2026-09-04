@@ -31,6 +31,8 @@ public record AdminOrderDetailDto(
     decimal SubtotalRon,
     decimal ShippingCostRon,
     decimal TotalRon,
+    string? CouponCode,
+    decimal DiscountRon,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt,
     string DeliveryType,

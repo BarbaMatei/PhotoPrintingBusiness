@@ -63,6 +63,30 @@ public class GuestSessionCleanupJobTests
     }
 
     [Fact]
+    public async Task ExpiredSession_WithAnAppliedCoupon_TakesTheCartCouponWithIt()
+    {
+        var db = CreateDb();
+        var expired = MakeSession(DateTimeOffset.UtcNow.AddHours(-1));
+        var active = MakeSession(DateTimeOffset.UtcNow.AddDays(1));
+        var coupon = Helpers.TestCoupons.Make(code: "VARA25");
+        await db.GuestSessions.AddRangeAsync(expired, active);
+        await db.Coupons.AddAsync(coupon);
+        await db.CartCoupons.AddRangeAsync(
+            new CartCoupon { GuestSessionId = expired.Id, CouponId = coupon.Id },
+            new CartCoupon { GuestSessionId = active.Id, CouponId = coupon.Id });
+        await db.SaveChangesAsync();
+
+        var job = new GuestSessionCleanupJob(BuildScopeFactory(db),
+            Mock.Of<ILogger<GuestSessionCleanupJob>>());
+
+        await InvokeCleanupAsync(job, CancellationToken.None);
+
+        var remaining = await db.CartCoupons.ToListAsync();
+        remaining.Should().ContainSingle();
+        remaining[0].GuestSessionId.Should().Be(active.Id);
+    }
+
+    [Fact]
     public async Task ActiveSession_IsNotDeleted()
     {
         var db = CreateDb();

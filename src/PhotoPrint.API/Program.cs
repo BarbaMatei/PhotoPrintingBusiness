@@ -307,6 +307,11 @@ builder.Services.AddScoped<PhotoPrint.API.Services.IAdminStatsService, PhotoPrin
 builder.Services.AddScoped<PhotoPrint.API.Services.IAccountService, PhotoPrint.API.Services.AccountService>();
 builder.Services.AddHostedService<PhotoPrint.API.BackgroundJobs.AccountDeletionJob>();
 
+builder.Services.AddScoped<PhotoPrint.API.Services.Coupons.ICouponService,
+    PhotoPrint.API.Services.Coupons.CouponService>();
+builder.Services.AddScoped<PhotoPrint.API.Services.Coupons.IAdminCouponService,
+    PhotoPrint.API.Services.Coupons.AdminCouponService>();
+
 // ── Response Caching ──────────────────────────────────────────────────────────
 builder.Services.AddResponseCaching();
 

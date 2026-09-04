@@ -161,6 +161,14 @@ public sealed class InvoicePdfDocument : IDocument
     {
         container.AlignRight().Column(col =>
         {
+            foreach (var (label, amount) in InvoiceDiscountMath.DiscountRows(_order, _invoice))
+            {
+                col.Item().Row(r =>
+                {
+                    r.RelativeItem().AlignRight().Text(label);
+                    r.ConstantItem(80).AlignRight().Text($"{amount.ToString("N2", Ro)} RON");
+                });
+            }
             col.Item().Row(r =>
             {
                 r.RelativeItem().AlignRight().Text("Total net:");

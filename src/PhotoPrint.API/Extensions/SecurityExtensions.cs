@@ -9,6 +9,18 @@ public static class SecurityExtensions
 {
     public const string CorsPolicyName = "AllowAngularApp";
     public const string AuthRateLimitPolicy = "auth";
+    public const string CouponRateLimitPolicy = "coupon";
+
+    private static string CouponRateLimitPartitionKey(HttpContext context)
+    {
+        var userId = context.User.GetUserIdOrNull();
+        if (userId is not null) return $"user:{userId}";
+
+        var guestSessionId = context.User.GetGuestSessionIdOrNull();
+        if (guestSessionId is not null) return $"guest:{guestSessionId}";
+
+        return $"ip:{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+    }
 
     public static IServiceCollection AddSecurityBaselines(
         this IServiceCollection services,
@@ -76,6 +88,17 @@ public static class SecurityExtensions
                 limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
                 limiterOptions.QueueLimit = 0;
             });
+
+            options.AddPolicy(CouponRateLimitPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: CouponRateLimitPartitionKey(context),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rateLimitSettings.Coupon.PermitLimit,
+                        Window = window,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0,
+                    }));
 
             options.AddAuthRateLimitPolicies();
 
