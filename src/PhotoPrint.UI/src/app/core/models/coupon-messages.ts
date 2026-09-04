@@ -16,6 +16,9 @@ const DEFAULT_MESSAGE = 'Codul introdus nu poate fi folosit.';
 const RATE_LIMITED_MESSAGE =
   'Prea multe încercări. Așteaptă un minut înainte de a încerca din nou.';
 
+const UNAVAILABLE_MESSAGE =
+  'Nu am putut verifica codul acum. Încearcă din nou în câteva momente.';
+
 const DETAIL_CARRIES_DATA = new Set([ 'MIN_SUBTOTAL_NOT_MET' ]);
 
 /** Romanian sentence for a coupon error code, ignoring any server text. */
@@ -27,10 +30,12 @@ export function couponMessageFor(code: string | null | undefined): string {
 /**
  * Romanian sentence for a failed coupon call. Resolution is map-first: the
  * server sentence is used only for the code whose text carries the RON
- * threshold, which no other response exposes.
+ * threshold, which no other response exposes. Server text is never shown for
+ * any other code — it is not guaranteed to be Romanian or customer-facing.
  */
 export function couponErrorMessage(error: HttpErrorResponse): string {
   if (error.status === 429) return RATE_LIMITED_MESSAGE;
+  if (error.status === 0 || error.status >= 500) return UNAVAILABLE_MESSAGE;
 
   const body = (error.error ?? {}) as { code?: unknown; detail?: unknown };
   const code = typeof body.code === 'string' ? body.code : null;
@@ -39,6 +44,5 @@ export function couponErrorMessage(error: HttpErrorResponse): string {
     : null;
 
   if (code && DETAIL_CARRIES_DATA.has(code) && detail) return detail;
-  if (code && MESSAGES[code]) return MESSAGES[code];
-  return detail ?? DEFAULT_MESSAGE;
+  return couponMessageFor(code);
 }

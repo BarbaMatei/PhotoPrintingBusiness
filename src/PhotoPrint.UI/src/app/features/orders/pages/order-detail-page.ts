@@ -95,6 +95,12 @@ interface StepDef {
               <span>Transport</span>
               <span>{{ order()!.shippingCostRon | number:'1.2-2' }} RON</span>
             </div>
+            @if (order()!.discountRon > 0) {
+              <div class="summary-row summary-row--discount">
+                <span>Reducere{{ order()!.couponCode ? ' (' + order()!.couponCode + ')' : '' }}</span>
+                <span>-{{ order()!.discountRon | number:'1.2-2' }} RON</span>
+              </div>
+            }
             <div class="summary-row">
               <span>din care TVA ({{ order()!.vatRate | percent:'1.0-2' }})</span>
               <span>{{ order()!.vatRon | number:'1.2-2' }} RON</span>

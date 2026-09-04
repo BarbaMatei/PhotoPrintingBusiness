@@ -198,4 +198,85 @@ public class InvoiceDiscountMathTests
 
         InvoiceDiscountMath.VatRateFromInvoice(invoice).Should().Be(0m);
     }
+
+    [Fact]
+    public void LegalMonetaryTotal_KeepsTheUblSequenceOrderWhenAnAllowanceIsPresent()
+    {
+        var (order, invoice) = Fixture(discount: 25.00m, couponCode: "VARA10");
+
+        var doc = XDocument.Parse(Encoding.UTF8.GetString(
+            new InvoiceXmlBuilder().Build(order, invoice, Seller())));
+        var names = doc.Root!.Element(Cac + "LegalMonetaryTotal")!
+            .Elements().Select(e => e.Name.LocalName).ToList();
+
+        names.Should().Equal(
+            "LineExtensionAmount",
+            "TaxExclusiveAmount",
+            "TaxInclusiveAmount",
+            "AllowanceTotalAmount",
+            "PayableAmount");
+    }
+
+    [Fact]
+    public void DiscountRows_FreeShippingCoupon_ReconcileWithTheInvoiceNet()
+    {
+        var (order, invoice) = Fixture(discount: 19.99m, couponCode: "TRANSPORT0");
+
+        var rows = InvoiceDiscountMath.DiscountRows(order, invoice);
+
+        rows.Should().HaveCount(2);
+        rows[1].Label.Should().Be("Reducere TRANSPORT0:");
+        rows.Sum(r => r.Amount).Should().Be(invoice.NetTotalRon);
+        rows[0].Amount.Should().BeGreaterThan(invoice.NetTotalRon);
+    }
+
+    [Fact]
+    public void DiscountRows_DiscountSwallowingTheWholePayable_StillReconcileToZero()
+    {
+        var (order, invoice) = Fixture(discount: 269.99m, couponCode: "TOTUL");
+
+        var rows = InvoiceDiscountMath.DiscountRows(order, invoice);
+
+        invoice.TotalRon.Should().Be(0m);
+        rows.Sum(r => r.Amount).Should().Be(0m);
+        rows[1].Amount.Should().Be(-rows[0].Amount);
+    }
+
+    [Fact]
+    public void DiscountRows_WithADiscountButNoCouponCode_UseTheGenericLabel()
+    {
+        var (order, invoice) = Fixture(discount: 25.00m, couponCode: null);
+
+        var rows = InvoiceDiscountMath.DiscountRows(order, invoice);
+
+        rows[1].Label.Should().Be($"{InvoiceDiscountMath.GenericAllowanceReason}:");
+    }
+
+    [Fact]
+    public void DiscountRows_DetachedInvoice_MatchTheAttachedOnesToTheCent()
+    {
+        var (attachedOrder, attachedInvoice) = Fixture(discount: 25.00m, couponCode: "VARA10");
+        var (detachedOrder, detachedInvoice) =
+            Fixture(discount: 25.00m, couponCode: "VARA10", attachOrderToInvoice: false);
+
+        InvoiceDiscountMath.DiscountRows(detachedOrder, detachedInvoice)
+            .Should().Equal(InvoiceDiscountMath.DiscountRows(attachedOrder, attachedInvoice));
+    }
+
+    [Fact]
+    public void VatRateFromInvoice_DerivedRateOnAHalfBasisPoint_RoundsAwayFromZero()
+    {
+        var invoice = new Invoice
+        {
+            OrderId = Guid.NewGuid(),
+            InvoiceNumber = "FT-2026-00003",
+            Series = "FT", Number = 3,
+            IssuedAt = DateTimeOffset.UtcNow,
+            NetTotalRon = 100000m, VatRon = 18985m, TotalRon = 118985m,
+            AnafStatus = InvoiceAnafStatus.Pending,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        InvoiceDiscountMath.VatRateFromInvoice(invoice).Should().Be(0.1899m);
+    }
 }

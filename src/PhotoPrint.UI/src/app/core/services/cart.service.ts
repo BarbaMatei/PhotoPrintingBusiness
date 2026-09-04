@@ -59,6 +59,12 @@ export class CartService {
     });
   }
 
+  private refreshRestoredCart(): void {
+    this.http.get<CartResponseDto>(this.base).subscribe({
+      next: cart => this.cart$$.next(cart),
+    });
+  }
+
   /**
    * Replaces all cart items. Returns the updated cart.
    * For guest sessions, the result is also persisted to localStorage.
@@ -132,7 +138,7 @@ export class CartService {
         const cart = JSON.parse(raw) as CartResponseDto;
         this.cart$$.next(cart);
         if (cart?.couponCode) {
-          this.loadFromServer();
+          this.refreshRestoredCart();
         }
       }
     } catch {
