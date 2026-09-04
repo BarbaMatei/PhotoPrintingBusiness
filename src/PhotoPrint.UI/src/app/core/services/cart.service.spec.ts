@@ -4,7 +4,7 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { of, BehaviorSubject } from 'rxjs';
 import { CartService } from './cart.service';
 import { AuthService } from './auth.service';
-import { CartResponseDto, EMPTY_CART, CART_STORAGE_KEY } from '../models/cart.model';
+import { CartResponseDto, EMPTY_CART, CART_STORAGE_KEY, cartTotal, cartDiscount } from '../models/cart.model';
 import { environment } from '../../../environments/environment';
 
 function makeCart(itemCount: number): CartResponseDto {
@@ -184,6 +184,99 @@ describe('CartService', () => {
     TestBed.inject(HttpTestingController).verify(); // No HTTP requests expected
 
     expect(freshService.itemCount()).toBe(4);
+    expect(cartTotal(freshService.snapshot)).toBe(8);
+    expect(cartDiscount(freshService.snapshot)).toBe(0);
+  });
+
+  function discountedCart(): CartResponseDto {
+    return {
+      ...makeCart(2),
+      couponCode: 'VARA10',
+      couponType: 'Percent',
+      couponStatus: 'valid',
+      couponReason: null,
+      discountRon: 0.4,
+      totalRon: 3.6,
+    };
+  }
+
+  it('applyCoupon POSTs the code to /cart/coupon and publishes the recalculated cart', () => {
+    service.applyCoupon('VARA10').subscribe();
+
+    const req = http.expectOne(`${BASE}/coupon`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ code: 'VARA10' });
+    req.flush(discountedCart());
+
+    expect(service.snapshot.couponCode).toBe('VARA10');
+    expect(service.snapshot.totalRon).toBe(3.6);
+  });
+
+  it('applyCoupon persists the discounted cart to localStorage for a guest', () => {
+    service.applyCoupon('VARA10').subscribe();
+    http.expectOne(`${BASE}/coupon`).flush(discountedCart());
+
+    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)!) as CartResponseDto;
+    expect(parsed.couponCode).toBe('VARA10');
+    expect(parsed.discountRon).toBe(0.4);
+  });
+
+  it('applyCoupon does NOT persist to localStorage when the user is authenticated', () => {
+    isAuthSubject.next(true);
+    http.expectOne(BASE).flush(EMPTY_CART);
+
+    service.applyCoupon('VARA10').subscribe();
+    http.expectOne(`${BASE}/coupon`).flush(discountedCart());
+
+    expect(localStorage.getItem(CART_STORAGE_KEY)).toBeNull();
+  });
+
+  it('clearCoupon DELETEs /cart/coupon and publishes the cart without the discount', () => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(discountedCart()));
+
+    service.clearCoupon().subscribe();
+
+    const req = http.expectOne(`${BASE}/coupon`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ ...makeCart(2), couponCode: null, discountRon: 0, totalRon: 4 });
+
+    expect(service.snapshot.couponCode).toBeNull();
+    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY)!) as CartResponseDto;
+    expect(parsed.couponCode).toBeNull();
+  });
+
+  it('re-reads the cart from the server when a restored guest snapshot carries a coupon', () => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(discountedCart()));
+
+    TestBed.resetTestingModule();
+    isAuthSubject = new BehaviorSubject<boolean>(false);
+    const mockAuth = {
+      isAuthenticated$: isAuthSubject.asObservable(),
+      isAuthenticated: () => false,
+      getAccessToken: () => null,
+      getGuestToken: () => 'guest',
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: mockAuth },
+      ],
+    });
+    const freshService = TestBed.inject(CartService);
+    const freshHttp = TestBed.inject(HttpTestingController);
+
+    const req = freshHttp.expectOne(BASE);
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      ...discountedCart(),
+      couponStatus: 'stale',
+      couponReason: 'COUPON_EXHAUSTED',
+      discountRon: 0,
+      totalRon: 4,
+    });
+
+    expect(freshService.snapshot.couponStatus).toBe('stale');
+    freshHttp.verify();
   });
 });
-

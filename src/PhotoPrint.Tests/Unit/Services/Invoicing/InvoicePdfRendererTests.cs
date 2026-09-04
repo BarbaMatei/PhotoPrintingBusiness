@@ -108,6 +108,25 @@ public class InvoicePdfRendererTests
     }
 
     [Fact]
+    public void Renders_a_discounted_order_whose_totals_block_gains_the_allowance_rows()
+    {
+        var (order, invoice) = Fixture();
+        order.DiscountRon = 5m;
+        order.CouponCode = "VARA10";
+        order.TotalRon = 21m;
+        order.NetTotalRon = 17.65m;
+        order.VatRon = 3.35m;
+        invoice.TotalRon = order.TotalRon;
+        invoice.NetTotalRon = order.NetTotalRon;
+        invoice.VatRon = order.VatRon;
+
+        var bytes = new InvoicePdfRenderer().Render(order, invoice, Seller());
+
+        Encoding.ASCII.GetString(bytes, 0, 5).Should().Be("%PDF-");
+        InvoiceDiscountMath.DiscountRows(order, invoice).Should().HaveCount(2);
+    }
+
+    [Fact]
     public void Throws_when_seller_is_null()
     {
         var (order, invoice) = Fixture();
