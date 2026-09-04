@@ -22,7 +22,7 @@ const ARTIFACT = [
   '---',                                                                                  // 1
   'stage: implement',                                                                     // 2
   '---',                                                                                  // 3
-  '## Summary',                                                                           // 4
+  '## Context',                                                                           // 4
   '- prose with no evidence is fine outside the checked headings, even with 42 numbers', // 5
   '',                                                                                     // 6
   '## Completed Work',                                                                    // 7
@@ -107,6 +107,14 @@ test('a clean artifact prints nothing and exits 0', () => {
   const r = lint('## Completed Work\n- Added `src/PhotoPrint.API/Orders/RefundService.cs`\n- Ran `dotnet test src/PhotoPrint.Tests --filter Orders`\n\n## Done\n- everything above, see docs/testing/invariants.md\n')
   assert.equal(r.code, 0, r.out)
   assert.equal(r.out, '')
+})
+
+test('the default heading list covers the shapes real test reports and walkthroughs use', () => {
+  const report = '## Test Report: x\n\n### Summary\n\n- **Scoped tests**: 48/48 passed (1s)\n\n### Acceptance Criteria Validation\n\n- ✅ the builder returns UTF-8 without BOM\n\n### Test Files\n\n- src/PhotoPrint.Tests/Unit/RefundTests.cs\n\n### Issues Found\n\n- none worth noting\n'
+  const r = lint(report)
+  assert.deepEqual(r.errors, [5, 9, 17], r.out)
+  assert.deepEqual(r.warnings, [5], r.out)
+  assert.match(r.out, /:5: warning: numbers without a source: 48 —/)
 })
 
 test('a checked heading ends at the next heading of the same or a higher level, not at a deeper one', () => {

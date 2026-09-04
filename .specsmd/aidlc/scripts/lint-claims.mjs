@@ -4,8 +4,11 @@ import { existsSync, readFileSync } from 'node:fs'
 const USAGE = `Usage: node .specsmd/aidlc/scripts/lint-claims.mjs <artifact.md> [--headings "A,B,C"] [--strict]
 
 Claims carry evidence. Under every heading whose text starts with one of the checked names
-(default: Done, What changed, Completed Work, Verification, Results — case-insensitive; a checked
-section runs to the next heading of the same or a higher level), every bullet or numbered item must
+(case-insensitive; a checked section runs to the next heading of the same or a higher level; the
+default list is the headings the bolt-type templates and real reports use: Done, What changed,
+Completed Work, Verification, Results, Summary, Test Summary, Test Results, Test Files, Files
+Created/Modified/Added/Changed, Acceptance Criteria Validation, Issues Found, Deviations from Plan,
+Coverage Report, Unit/Integration/Security/Performance Tests), every bullet or numbered item must
 contain at least one of: a repository path (something.cs, .ts, .md, .json, ...), a file:line, a
 markdown #L<n> anchor, or an inline command (\`dotnet ...\`, \`node ...\`, \`npm ...\`, \`git ...\`, ...).
 A bullet without one is an error.
@@ -17,7 +20,11 @@ zero-padded bolt ids, :<line>, #<n>, v<n> and dotted versions are not counted.
 Output: <file>:<line>: error|warning: <what is missing>
 Exit: 0 no errors · 1 errors (or warnings under --strict) · 2 usage.`
 
-const DEFAULT_HEADINGS = ['Done', 'What changed', 'Completed Work', 'Verification', 'Results']
+const DEFAULT_HEADINGS = [
+  'Done', 'What changed', 'Completed Work', 'Verification', 'Results', 'Summary', 'Test Summary', 'Test Results',
+  'Test Files', 'Files Created', 'Files Modified', 'Files Added', 'Files Changed', 'Acceptance Criteria Validation',
+  'Issues Found', 'Deviations from Plan', 'Coverage Report', 'Unit Tests', 'Integration Tests', 'Security Tests', 'Performance Tests',
+]
 const PATH_RE = /(?:^|[\s(`'"\[<])[\w.\\/-]*[\w-]+\.(?:cs|ts|tsx|js|mjs|cjs|md|json|jsonl|yml|yaml|ps1|cshtml|scss|css|html|csproj|props|sln|editorconfig|sql|xml|txt|razor)\b/i
 const PATH_RE_G = new RegExp(PATH_RE.source, 'gi')
 const FILE_LINE_RE = /\.\w+:\d+/
@@ -86,14 +93,14 @@ function hasEvidence(text) {
 function unsourcedNumbers(text) {
   let scrubbed = text.replace(CODE_SPAN_RE, m => ' '.repeat(m.length)).replace(PATH_RE_G, m => ' '.repeat(m.length))
   for (const re of NOT_NUMBERS) scrubbed = scrubbed.replace(re, m => ' '.repeat(m.length))
-  const found = []
+  const found = new Set()
   for (const m of scrubbed.matchAll(/\b\d+\b/g)) {
     if (Number(m[0]) <= 9) continue
     const after = text.slice(m.index + m[0].length)
     if (EVIDENCE_WORD_RE.test(after) || PATH_RE.test(after)) continue
-    found.push(m[0])
+    found.add(m[0])
   }
-  return found
+  return [...found]
 }
 
 function main() {
