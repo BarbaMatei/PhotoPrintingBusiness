@@ -36,7 +36,7 @@ function Get-Frontmatter([string]$Text) {
 function Get-FrontmatterValue([string]$Frontmatter, [string]$Key) {
     $m = [regex]::Match($Frontmatter, '(?m)^' + [regex]::Escape($Key) + ':[ \t]*(.*?)[ \t]*$')
     if (-not $m.Success) { return '' }
-    return $m.Groups[1].Value.Trim('"', "'")
+    return $m.Groups[1].Value.Trim().Trim('"', "'")
 }
 
 function Get-CompletedStages([string]$Frontmatter) {
@@ -100,8 +100,8 @@ Last stage exit recorded in the construction log:
 ${exitText}
 
 Do this and nothing more:
-1. Invoke /specsmd-construction-agent --bolt-id="${Bolt}" --stage="${Stage}" (the construction agent runs its bolt-start skill for that id at that stage). The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates this stage's activities and artifacts; follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle, memory-bank/standards/definition-of-done.md the hand-back checklist.
-2. Work only stage ${Stage}. When its artifacts are written: update the bolt.md frontmatter (current_stage, stages_completed), append the stage-exit block for ${Bolt} / ${Stage} to ${relLog} in the shape your working rules give, commit, and end the turn. Do not start the next stage.
+1. Read KICKOFF.md in this worktree first: it holds the group rules and the coordinator addendum. Then act as the construction agent: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill for bolt ${Bolt} at stage ${Stage} (/specsmd-construction-agent is not a command in this harness). The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates this stage's activities and artifacts; follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle, memory-bank/standards/definition-of-done.md the hand-back checklist.
+2. Work only stage ${Stage}. When its artifacts are written: update the bolt.md frontmatter (current_stage, stages_completed), append the stage-exit block for ${Bolt} / ${Stage} to ${relLog} in the shape your working rules give, commit, push the branch, and end the turn. Do not start the next stage. If this stage leaves the bolt at status review-pending, first send the hand-off report described in KICKOFF.md to the coordinator session photo-printing-website-68 by SendMessage.
 "@
 }
 
