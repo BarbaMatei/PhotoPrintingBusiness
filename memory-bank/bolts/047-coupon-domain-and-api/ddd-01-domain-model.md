@@ -127,14 +127,21 @@ query predicate over `ValidUntil`, not a column.
    `Idempotency-Key` returns the original order; it must not consume a second redemption.
 6. **One coupon per order, one redemption per coupon per order.** Enforced by the unique
    index on `CouponRedemptions.OrderId`.
-7. **A redemption held by an order that is provably abandoned is released.** *(Added after the
-   stage-2 design check.)* A redemption is taken when the amount to charge is fixed, so an
-   unpaid order holds a slot. Three paths already know an order is finished with: a
-   `PaymentFailed` order whose idempotency key is being reused for a retry, a stale (>24 h) key
-   being reclaimed, and an admin cancellation. Each deletes the redemption row and decrements
-   the count, never below zero. Without this, one declined card burns two slots for one
-   purchase. An order abandoned and never retried keeps its slot — a stated residual, not a
-   claim of completeness.
+7. **A redemption held by an order that is provably abandoned follows the purchase, or is
+   released.** *(Added after the stage-2 design check; reworked after the stage-4 review.)* A
+   redemption is taken when the amount to charge is fixed, so an unpaid order holds a slot. Where
+   a replacement order is created for the same purchase — a `PaymentFailed` order whose
+   idempotency key is being reused, a stale (>24 h) key being reclaimed — and the replacement
+   carries the same coupon, the redemption row is
+   **moved** to the replacement inside that replacement's own transaction and the abandoned order
+   is marked `Cancelled` in the same unit of work; the count does not change and there is never a
+   moment when the slot is free while a discounted order still stands. Where nothing replaces the
+   order — an admin cancellation — the row is deleted and the count decremented, never below zero.
+   Without this, one declined card burns two slots for one purchase. A `Cancelled` holder keeps
+   its `CouponCode` and `DiscountRon` snapshot for audit even though its redemption now belongs to
+   the replacement: the snapshot records what was quoted, and invariants 1, 2 and 6 are about the
+   redemption rows and the count, not about the historical fields of a cancelled order. An order
+   abandoned and never retried keeps its slot — a stated residual, not a claim of completeness.
 
 ### VAT order (irreversible once invoices are issued)
 

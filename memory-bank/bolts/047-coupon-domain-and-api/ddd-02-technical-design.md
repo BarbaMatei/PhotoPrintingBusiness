@@ -57,7 +57,7 @@ all admin endpoints are `[Authorize(Roles = "Admin")]`.
 |---|---|---|---|---|
 | `/api/cart/coupon` | POST | `{ "code": "VARA25" }` | 200 `CartResponseDto` with coupon fields | 422 `INVALID_COUPON`, 422 `MIN_SUBTOTAL_NOT_MET`, 422 `EMPTY_CART`, 429 |
 | `/api/cart/coupon` | DELETE | — | 200 `CartResponseDto`, coupon cleared | — (idempotent) |
-| `/api/cart` | GET | — | 200 `CartResponseDto`, coupon re-previewed **read-only** | unchanged |
+| `/api/cart` | GET | — | 200 `CartResponseDto`, coupon re-validated **read-only** with `couponStatus` / `couponReason` | unchanged |
 | `/api/admin/coupons` | GET | `?status=active\|inactive\|expired&page=1&size=20` | 200 `{ items, total, page, size }` | — (paging clamped, never 422) |
 | `/api/admin/coupons` | POST | `CouponCreateRequest` | 201 + `Location` | 422 validation, 409 `DUPLICATE_CODE` |
 | `/api/admin/coupons/{id}` | PUT | `CouponUpdateRequest` | 200 `CouponDto` | 404, 422, 409 `CODE_IMMUTABLE_AFTER_REDEMPTION` |
@@ -239,26 +239,107 @@ calls would flip a replay into a conflict. The comparison changes to the **undis
 (coupon-free) order the two expressions are equal, so no current behaviour changes; a regression
 test pins that.
 
-**Redemption release.** A redemption is taken at order creation, when the amount to charge is
-fixed, because a customer who has been quoted and charged a discounted price cannot afterwards
-be told the coupon was refused. That means an unpaid order holds a slot. Three paths already
-know an order is abandoned, and each now releases its redemption (delete the
-`CouponRedemption` row, then decrement only if a row was actually deleted, in one transaction):
+**Redemption release and transfer.** A redemption is taken at order creation, when the amount to
+charge is fixed, because a customer who has been quoted and charged a discounted price cannot
+afterwards be told the coupon was refused. That means an unpaid order holds a slot. What happens
+to that slot depends on whether a replacement order follows.
 
-1. `OrderService` — a fresh `PaymentFailed` holder whose `Idempotency-Key` is being reused: the
-   code already abandons that order's Stripe intent and builds a replacement order. Without a
-   release, a single declined card would burn two redemptions for one purchase (and, at
-   `MaxRedemptions = 1`, hand the customer their own 409).
-2. `OrderService` — stale-key (>24 h) reclamation: the old order is unpaid and out of its window.
-3. `AdminOrderService.CancelOrderAsync` — an admin cancelling an order returns its slot.
+*Transfer — a replacement order follows.* Two paths in `OrderService` build a replacement order
+for the same customer and the same cart: a fresh `PaymentFailed` holder whose `Idempotency-Key` is
+being reused (a declined card retried), and stale-key (>24 h) reclamation. Releasing the slot there
+and re-redeeming it would take two decisions in two units of work, and between them the redemption
+is free while a discounted order still stands — another caller can take the last slot and the
+paying customer gets their own 409. So where the replacement carries the same coupon the redemption
+is **moved, not re-taken**: the abandoned holder's `CouponRedemptions` row is repointed to the
+replacement inside the single transaction that creates it, and the holder is abandoned in the same
+unit of work. `RedemptionsCount` never changes, so `ConsumeOrThrowAsync` **must not run on this
+path** — running it would double-count an uncapped coupon and 409 a capped one, rolling back a
+replacement the customer is entitled to.
+
+*The five decisions the retry path takes, in order.* The holder's slot is a fact the rest of the
+flow has to be told about, so it is read before the coupon is resolved and it drives the branch:
+
+| # | Condition | What happens |
+|---|---|---|
+| 1 | read the holder's `CouponRedemptions` row (`AsNoTracking`) before resolving | yields `heldSlot` — the coupon id and row id, or null |
+| 2 | resolving the replacement's coupon | `ResolveForOrderAsync` is told `heldSlot?.CouponId` and validates that one coupon against `RedemptionsCount - 1`; without this the holder's own slot exhausts a `MaxRedemptions = 1` coupon and the retry 409s `COUPON_EXHAUSTED` after the intent is already dead — no order, no live intent, and the coupon locked to a dead order |
+| 3 | the resolved coupon **is** the held one | transfer: repoint the row, no insert, no CAS |
+| 4 | the resolved coupon is a **different** one (apply A, decline, apply B, retry) | release the held row and take a normal CAS redemption for B — a transfer here would leave the row on A while the order says B, and B's cap would never see the redemption |
+| 5 | no coupon resolves (code cleared, or `NO_DISCOUNT`) | release the held row; the replacement carries no discount |
+
+Rows 4 and 5 release inside the same transaction as the replacement's insert, never before it, so a
+failed insert rolls the release back with it — otherwise the discounted holder still stands with its
+slot free, which is the window this whole section exists to close. That widens the transaction gate
+from "a coupon is applied" to "a coupon is applied **or** a held slot is being moved or released";
+`ReleaseForOrderAsync` already declines to open its own transaction when one is ambient, so it needs
+no change.
+
+*Mechanism for the repoint, named because house style points the other way.* The rest of this bolt
+writes counters with `ExecuteUpdateAsync`, which executes immediately and outside EF's batch. Here
+that is wrong twice: PostgreSQL checks foreign keys per statement rather than at commit, so an
+`UPDATE` landing before the replacement's `INSERT` fails against a row that does not exist yet, and
+`ExecuteUpdateAsync` throws on the InMemory provider the integration suite defaults to. The repoint
+is therefore an ordinary tracked-entity write — load the row, assign `redemption.OrderId = order.Id`
+(order ids are client-generated, so the value exists before the insert) and let one
+`SaveChangesAsync` emit both statements, EF's batching ordering the dependent update after the
+principal insert. A `[PG]` test pins that ordering rather than trusting it.
+
+*The repoint replaces the insert; it does not join it.* `OrderService` today unconditionally adds a
+new `CouponRedemption` whenever a coupon applies. On the transfer path that insert must not happen
+at all: the row already exists, so insert-plus-repoint is a duplicate-key failure against the unique
+index on `CouponRedemptions.OrderId` (invariant 6) that the save loop does not recover — it
+recognises only the idempotency-key and order-number indexes — and it surfaces as an unhandled 500
+which InMemory cannot see. For the same reason `DetachFailedInsert` must detach only rows it
+created: detaching a pre-existing tracked row would silently abandon the repoint. It gains the
+holder for the opposite reason — the holder's abandoned status and nulled key are in-memory edits
+that must not survive a failed insert into some later `SaveChanges` on the request-scoped context.
+
+*Why `Cancelled`.* `OrderStatus` has no abandoned member, and the one status a late
+`payment_intent.succeeded` cannot walk out of is `Cancelled`: `PaymentFailed → Paid` is deliberately
+legal (a declined intent stays chargeable), so leaving the holder `PaymentFailed` would let a late
+success flip an order whose redemption now belongs to a different order. With the holder
+`Cancelled`, `WebhooksController.HandleStripePaymentSucceededAsync` falls to its else branch and
+logs *customer charged, order not Paid, manual reconciliation required* — the late charge is refused
+by order state and shouted about instead of quietly producing a second paid order. The payment-side
+half of that is the parked double-charge cluster PPW-687…PPW-690 (owner ruling 2026-09-03), so the
+tests here assert the coupon side only: where the row sits, and that `RedemptionsCount` did not move.
+
+*How the machine is asked, and why not two new transitions.* The abandon is a **named method**,
+`OrderStatusMachine.Abandon(order)`, legal from `AwaitingPayment` and `PaymentFailed` only — not two
+new rows in `ValidTransitions`. `ValidTransitions` is what `CanTransition` answers for every other
+caller, and `AwaitingPayment → Cancelled` there would make `AdminOrderService.CancelOrderAsync`
+accept unpaid orders it refuses today, firing a cancellation email, a SignalR broadcast, a doomed
+Stripe refund and a cloud-original purge for an order nobody paid for. Cancelling unpaid orders may
+well be wanted, but it is a different story with its own copy and its own tests, and it is not this
+bolt's to ship. A named method keeps admin cancellation bit-identical, keeps the machine the only
+place that knows the lifecycle, and costs one line in its `///` transition table.
+
+*The one place `Cancelled` still bites, checked rather than assumed.* `Cancelled` is a cloud-original
+purge sweep status (`ArchiveSettings.OriginalPurgeSweepStatuses`), so `OriginalPurgeRecoveryScanner`
+will pick up an abandoned holder — and `OriginalPurger` skips an upload only while a `Paid` or
+`Printing` sibling order holds it, not an `AwaitingPayment` one. The scanner nevertheless cannot
+touch this case: it selects only orders whose items point at an upload already in
+`StorageLocation.Cloud`, and promotion to cloud happens on payment, so an order that was never paid
+has no cloud original to sweep. Where an upload *is* cloud-resident it was promoted by an earlier
+paid order — which is itself the `Paid`/`Printing` sibling that makes the purger skip it. No change
+is needed here; the fact is written down because it stops being true the moment promotion moves
+earlier than payment.
+
+*Release — no replacement follows, or the replacement drops the coupon.* Deleting the
+`CouponRedemption` row and decrementing only if a row was actually deleted, in one transaction,
+stays for rows 4 and 5 above and for the cases where nothing takes the abandoned order's place: a
+`PaymentFailed` order that is never retried, a stale key that is never reused, and
+`AdminOrderService.CancelOrderAsync`. Of those, the admin cancellation and rows 4–5 have callers in
+this bolt; the other two have no trigger until a reclaim job exists, which is the residual below.
 
 **Accepted residual, stated rather than hidden:** an order abandoned and never retried holds its
 redemption indefinitely. There is no sweeper, because a periodic reclaimer is a new background
 mechanism at feature grade (definition-of-done rule 2 and class 12) and this bolt has no budget
 for one. The consequence is real and worth writing down: guest tokens are free, so a script can
 exhaust a capped promo by creating orders it never pays for. The levers that exist today are the
-admin raising `MaxRedemptions` and the per-identity rate limit above. A reclaim job for
-abandoned `AwaitingPayment` orders is the recommended follow-up and is named in ddd-03.
+admin raising `MaxRedemptions` and the per-identity rate limit above. A reclaim job for abandoned
+`AwaitingPayment` orders is the recommended follow-up and is named in ddd-03; `ReleaseForOrderAsync`
+is the function it would call, which is why the release path survives the move to transfer.
 
 **Payable-gross floor.** Stripe cannot charge zero and rejects amounts under its per-currency
 minimum; the resulting `StripeException` is not an `idempotency_error`, so it misses
@@ -288,19 +369,37 @@ prove".
 
 ### Cart-state lifecycle (`CartCoupon`)
 
-**Reads never write.** A `GET /api/cart` whose stored coupon no longer validates returns the cart
-with the coupon fields cleared and `couponCode: null`, and deletes nothing. Making the read
-mutate would have turned every cart poll on the checkout path into a write against the < 100 ms
-NFR, and a client disconnect mid-request is swallowed by `ExceptionHandlerMiddleware` — the row
-would have been deleted with no response and no log tying cause to effect.
+**Reads re-validate and report; reads never write.** A `GET /api/cart` re-validates the stored
+coupon on every read and puts the outcome in the body: `couponStatus` is `valid` or `stale`, and
+when it is `stale`, `couponReason` carries the same `CouponErrorCodes` value the checkout 409
+would carry (`INVALID_COUPON`, `COUPON_EXHAUSTED`, `MIN_SUBTOTAL_NOT_MET`), `discountRon` is `0`
+and the totals are the undiscounted ones. `couponCode` stays populated so the SPA can name the
+code it is refusing. The stored row is **not** deleted — not on reads, and no longer on writes
+either: server-side auto-clear is gone. Two reasons. A stale coupon can become valid again (a
+cart under `MinSubtotalRon` grows, a not-yet-active window opens), and deleting it destroys a
+state the customer never asked to lose. And silently emptying the field is exactly the
+invisible-failure shape that produced the original defect: a cart that looked clean on every read
+and then 409'd at checkout. Bolt 048 renders the stale state and offers "remove coupon", which
+calls the existing `DELETE /api/cart/coupon`.
+
+Making the read *write* stays refused for the reasons it was refused before: it would turn every
+cart poll on the checkout path into a write against the < 100 ms NFR, and a client disconnect
+mid-request is swallowed by `ExceptionHandlerMiddleware` — the row would have been deleted with
+no response and no log tying cause to effect. The read also stays silent in the log: it runs on
+every poll, so a stale coupon is reported in the body, not shouted once per second into the log.
+
+The checkout 409 stays as the last line of defence, with the same reason code in its body. A cart
+read is a preview, never a reservation (invariant 3); the order path re-validates from scratch
+under its own transaction and is the only authority. The cart state exists so the customer is
+never surprised by that 409, not to replace it.
 
 | Event | Effect |
 |---|---|
 | `POST /api/cart/coupon` valid | insert or replace the owner's single row |
 | `POST /api/cart/coupon` invalid | nothing written; 422 |
 | `DELETE /api/cart/coupon` | row deleted (no-op if absent) |
-| `GET /api/cart` | re-validated **read-only**; a coupon that no longer qualifies is simply not reported |
-| `POST /api/cart` (`SetCartAsync`) | re-validated; a coupon that no longer qualifies is deleted here, on a path that is already a write, and `coupon.auto-cleared` is logged |
+| `GET /api/cart` | re-validated **read-only**; a coupon that no longer qualifies comes back as `couponStatus: stale` with its reason code and a zero discount |
+| `POST /api/cart` (`SetCartAsync`) | re-validated exactly the same way; nothing is written and nothing is deleted |
 | `DELETE /api/cart` (`ClearCartAsync`) | row deleted in the same call |
 | `POST /api/cart/merge` | the guest row moves to the user when the user has none; otherwise the user's row wins and the guest row is deleted |
 | order created | row left in place — payment can still fail and the customer may retry with the same code |
@@ -308,9 +407,10 @@ would have been deleted with no response and no log tying cause to effect.
 
 Residuals, accepted and recorded:
 
-- An auto-clear is silent in the response body — the cart simply comes back without a coupon.
-  Reporting *why* would need a `couponRemovedReason` on every cart read; bolt 048 instead keeps
-  the last applied code in component state and shows the neutral empty input again.
+- A stale coupon row survives until the customer removes it, the cart is cleared, or the guest
+  session is swept. Nothing collects rows for coupons that expired months ago. They are harmless
+  (every read re-validates and every one of them reports `stale`), and one row per owner is the
+  ceiling, so a sweeper would buy nothing this bolt needs.
 - Nothing server-side clears the cart (or therefore the applied coupon) after a successful
   payment; today only `DELETE /api/cart` from the SPA does. A customer who closes the tab keeps
   both their cart items and their applied code. This is the pre-existing cart-clearing gap, not
@@ -339,13 +439,13 @@ it is recorded here and in the hand-off rather than attempted.
 
 Every existing consumer of a contract this bolt touches. No blank rows.
 
-**`CartResponseDto` (record gains 7 members)**
+**`CartResponseDto` (record gains 9 members)**
 
 | Consumer | Outcome |
 |---|---|
 | `Services/CartService.BuildResponse` | **updated** — computes and passes the coupon fields |
 | `Services/CartService.GetCartAsync` (`CartResponseDto.Empty`) | **updated** — `Empty` gains zeroed coupon fields |
-| `Services/CartService.SetCartAsync` / `MergeCartsAsync` | **updated** — both re-preview; `SetCartAsync` is where a dead coupon is deleted; merge moves the guest row |
+| `Services/CartService.SetCartAsync` / `MergeCartsAsync` | **updated** — both re-validate read-only, nothing is auto-deleted; merge moves the guest row |
 | `Services/ICartService` | **updated** — new `ApplyCouponAsync` / `ClearCouponAsync` members |
 | `Controllers/CartController` (3 `ProducesResponseType`) | **updated** — two new actions; existing attributes unchanged |
 | `Tests/Integration/CartControllerIntegrationTests` (5 deserialisation sites) | **unaffected** — added members deserialise without touching the assertions; coupon cases are new tests |
@@ -363,6 +463,45 @@ Every existing consumer of a contract this bolt touches. No blank rows.
 | `OrderService.DivergentFields` / `ItemsSignature` / the `total` local | **updated** — the divergence check moves to the pre-discount gross (see Concurrency). This is the row the first draft missed entirely |
 | `Tests/Unit/Services/OrderServiceTests` (24 call sites) | **unaffected** — no coupon applied → the untouched no-transaction path; one new test pins that a coupon-free order's divergence answer is unchanged |
 | `Tests/Unit/Services/OrderServiceIdempotencyConcurrencyTests` (6 call sites) | **unaffected** — same reason |
+
+**`ICouponService` (two members change shape)**
+
+`ResolveForCartAsync` stops returning `null` for "applied but unusable" — it returns a
+`CartCouponView(Guid CouponId, string Code, CouponType Type, decimal DiscountRon, bool IsStale,
+string? ReasonCode)` and is `null` only when the owner has no row at all, which is the single
+change that makes a stale coupon distinguishable from no coupon. Its `deleteWhenUnusable`
+parameter goes away with the auto-clear it existed to switch on. `ResolveForOrderAsync` gains an
+optional held-coupon id so the retry path can validate against `RedemptionsCount - 1`.
+
+| Consumer | Outcome |
+|---|---|
+| `Services/CartService.BuildResponseAsync` | **updated** — maps the view onto `couponStatus` / `couponReason`, zeroes the discount when stale |
+| `Services/CartService.AddItemAsync:150` (`deleteUnusableCoupon: true`) | **updated** — the only caller that passed `true`; the flag and the call argument both go |
+| `Services/CartService.SetCartAsync` / `ClearCartAsync` / `MergeCartsAsync` | **unaffected in behaviour** — they pass no flag today; clear and merge still delete rows deliberately, which is not auto-clear |
+| `Services/OrderService.CreateFromCartAsync` | **updated** — passes `heldSlot?.CouponId` into `ResolveForOrderAsync` |
+| `Services/AdminOrderService.CancelOrderAsync` (`ReleaseForOrderAsync`) | **unaffected** — that member's signature does not change |
+| `Program.cs` DI registration | **unaffected** — same interface, same lifetime |
+| `Tests/Unit/Services/AdminOrderServicePaidRaceTests` (DI composition) | **unaffected** — already registers `ICouponService` |
+| the `coupon.auto-cleared` log line | **deleted** — no code path can emit it once reads and writes both stop deleting |
+
+**`OrderStatusMachine` (+1 member, `ValidTransitions` byte-identical)**
+
+`Abandon(Order order)` is a named method, not two new `ValidTransitions` rows, so nothing that
+asks `CanTransition` sees a new answer. The sweep below is over consumers of
+`OrderStatus.Cancelled`, because an unpaid `Cancelled` order is a state the system has never held
+before.
+
+| Consumer | Outcome |
+|---|---|
+| `Services/OrderStatusMachine.ValidTransitions` / `CanTransition` / `Transition` | **unaffected** — untouched; `Abandon` is a separate entry point with its own legality check (`AwaitingPayment`, `PaymentFailed`) |
+| `Services/AdminOrderService.CancelOrderAsync:273` | **unaffected, deliberately** — still refuses unpaid orders, because the transition table did not widen; cancelling unpaid orders is a different story with its own copy, email and tests |
+| `Controllers/WebhooksController.HandleStripePaymentSucceededAsync` | **unaffected in code, newly reachable branch** — a `Cancelled` holder falls to the existing else and logs *customer charged, order not Paid, manual reconciliation required*; the payment-side remedy is the parked PPW-687…PPW-690 cluster |
+| `Configuration/ArchiveSettings.OriginalPurgeSweepStatuses:62` + `BackgroundJobs/OriginalPurgeRecoveryScanner` | **unaffected in practice, checked not assumed** — the scanner selects only orders whose items point at an upload already in `StorageLocation.Cloud`, and promotion happens on payment, so an order that was never paid has no cloud original to sweep; where one is cloud-resident it was promoted by a paid order, which is the `Paid`/`Printing` sibling `OriginalPurger:105` skips |
+| `Services/AdminStatsService` (6 sites) | **unaffected and correct** — excludes `Cancelled` from revenue and counts, which is what an abandoned unpaid holder should contribute |
+| `Services/OrderPhotoPromoter:88` | **unaffected** — skips `Cancelled`, so an abandoned holder promotes nothing |
+| `Services/Sameday/AwbCreator:230` | **unaffected** — skips `Cancelled`, so no AWB is cut for an abandoned holder |
+| `Data/Seed/DevDataSeed:261` | **unaffected** — seed data only |
+| UI order status labels / admin filters | **unaffected** — `Cancelled` already renders; bolt 048 adds no new status |
 
 **`Order` entity (+2 columns) / order money contract**
 
@@ -465,7 +604,7 @@ representation is adopted for ANAF correctness.
 | Redemption adds no cost to un-couponed orders | The transaction and the CAS exist only when a coupon is applied |
 | Redemption holds no lock longer than it must | The CAS is the last statement before COMMIT |
 | Invoice correctness | Discount reduces the gross before VAT extraction; `Invoice` snapshots the order, so the maths has exactly one implementation |
-| Observability | Structured events at Information: `coupon.applied`, `coupon.rejected`, `coupon.redeemed`, `coupon.released`, `coupon.exhausted`, `coupon.auto-cleared`, `admin.coupon.*` |
+| Observability | Structured events at Information: `coupon.applied`, `coupon.rejected`, `coupon.redeemed`, `coupon.released`, `coupon.exhausted`, `coupon.transferred`, `admin.coupon.*` |
 | New mechanisms at feature grade | Two: the CAS (ADR-025, ADR-016's pattern on a second table) and the per-identity rate limiter (config, stated default, 429 contract, test) |
 
 ### Backlog sweep (`reviews/state/backlog.md`)
@@ -475,7 +614,7 @@ edited by this bolt; the coordinator writes the re-deferral notes at merge time.
 
 | Row | Decision |
 |---|---|
-| PPW-687, PPW-688, PPW-689, PPW-690 (declined-card double-charge cluster) | **re-deferred: owner ruling 2026-09-03**. Noted: this bolt's redemption-release on the `PaymentFailed` retry path touches the same code region without changing its payment semantics |
+| PPW-687, PPW-688, PPW-689, PPW-690 (declined-card double-charge cluster) | **re-deferred: owner ruling 2026-09-03**. Noted: this bolt transfers the redemption on the `PaymentFailed` retry path and marks the abandoned holder `Cancelled`, which touches the same code region; the payment semantics of a late success are unchanged and its tests assert the coupon side only |
 | PPW-691, PPW-692, PPW-694 | **re-deferred: owner ruling 2026-09-03** |
 | PPW-698, PPW-702, PPW-703, PPW-704, PPW-705 | **re-deferred: owner ruling 2026-09-03** |
 | PPW-709, PPW-710 | **re-deferred: owner ruling 2026-09-03** |
@@ -503,8 +642,10 @@ against real PostgreSQL because InMemory cannot exercise the mechanism.
 | Order insert fails after validation | Transaction rolls back; count unchanged; no redemption row | `[PG] CouponRedemptionRelationalTests.Checkout_OrderInsertFails_LeavesNoRedemptionAndNoCountChange` | existing `DbUpdateException` warning |
 | Idempotent replay of a coupon order | Original order returned; count unchanged; exactly one redemption row | `[PG] CouponRedemptionRelationalTests.Checkout_IdempotentReplay_DoesNotRedeemTwice` | `payments.idempotency.replay` |
 | Replay of a **discounted** order is judged divergent | Replay succeeds; the divergence check uses the pre-discount gross | `OrderServiceCouponTests.Replay_OfDiscountedOrder_IsNotTreatedAsDivergent` and `OrderServiceTests.DivergenceCheck_ForCouponFreeOrder_IsUnchanged` | — |
-| Declined card retried with the same key | The failed order's redemption is released before the replacement redeems; net count 1 | `[PG] CouponRedemptionRelationalTests.PaymentFailedRetry_ReleasesTheAbandonedRedemption` | `coupon.released` |
-| Stale (>24 h) key reclaimed | The stale order's redemption is released | `[PG] CouponRedemptionRelationalTests.StaleKeyReclamation_ReleasesTheAbandonedRedemption` | `coupon.released` |
+| Declined card retried with the same key | The redemption **moves** to the replacement inside its transaction; count unchanged; one row, on the new order; the abandoned holder ends `Cancelled` | `[PG] CouponRedemptionRelationalTests.PaymentFailedRetry_TransfersTheRedemptionToTheReplacement` | `coupon.transferred` |
+| Stale (>24 h) key reclaimed | Same transfer; count unchanged | `[PG] CouponRedemptionRelationalTests.StaleKeyReclamation_TransfersTheRedemptionToTheReplacement` | `coupon.transferred` |
+| Replacement order fails to insert after the transfer statement | The whole transaction rolls back: the redemption is still on the abandoned order and `RedemptionsCount` is unchanged | `[PG] CouponRedemptionRelationalTests.ReplacementInsertFails_LeavesTheRedemptionOnTheAbandonedOrder` | — |
+| Late `payment_intent.succeeded` for an order whose redemption was transferred away | Refused by order state (`Cancelled` is terminal for payment), logged as needing manual reconciliation; the redemption stays on the replacement and the count does not move. Only the coupon side is asserted — the payment-side double-charge cluster PPW-687…PPW-690 is parked by owner ruling 2026-09-03 | `[PG] CouponRedemptionRelationalTests.LateSuccessForTheCancelledHolder_LeavesTheRedemptionOnTheReplacement` | — |
 | Admin cancels an order | Its redemption is released; count decrements once, never below zero | `AdminOrderServiceCouponTests.CancelOrder_ReleasesRedemption_AndIsIdempotent` | `coupon.released` |
 | Discount would leave an uncharageable total | 409 `ORDER_TOTAL_BELOW_MINIMUM` **before** any write; no order, no redemption | `OrderServiceCouponTests.Checkout_DiscountLeavesTotalBelowStripeMinimum_Returns409_AndWritesNothing` | `coupon.rejected reason=ORDER_TOTAL_BELOW_MINIMUM` |
 | Admin creates a 100 % coupon | 422 at validation | `AdminCouponValidatorTests.Create_PercentValueOf100_IsRejected` | — |
@@ -516,7 +657,11 @@ against real PostgreSQL because InMemory cannot exercise the mechanism.
 | Unknown / inactive / not-yet-valid code applied | 422 `INVALID_COUPON`, nothing stored, indistinguishable from one another | `CartCouponEndpointsIntegrationTests.ApplyCoupon_UnknownInactiveOrExpired_AllReturn422InvalidCoupon` | `coupon.rejected` |
 | Coupon applied to an empty cart | 422 `EMPTY_CART`, nothing stored | `CartCouponEndpointsIntegrationTests.ApplyCoupon_EmptyCart_Returns422EmptyCart` | `coupon.rejected` |
 | Second code applied over a first | Replaced, not stacked; one row per owner | `CartCouponEndpointsIntegrationTests.ApplyCoupon_Twice_ReplacesSilently` | `coupon.applied` |
-| Cart shrinks below the minimum after apply | The read reports no coupon **without writing**; the next cart write deletes the row | `CartServiceCouponTests.GetCart_SubtotalBelowMinimum_ReportsNoCoupon_AndWritesNothing` + `CartServiceCouponTests.SetCart_SubtotalBelowMinimum_DeletesTheStoredCoupon` | `coupon.auto-cleared` |
+| Cart shrinks below the minimum after apply | Every read reports `couponStatus: stale`, `couponReason: MIN_SUBTOTAL_NOT_MET`, zero discount, and writes nothing; adding items back makes the same row report `valid` again | `CartServiceCouponTests.GetCart_SubtotalBelowMinimum_ReportsStale_AndWritesNothing` + `CartServiceCouponTests.GetCart_BackAboveTheMinimum_ReportsValidAgain` | — |
+| Coupon expires between apply and the next cart read | The read reports `stale` / `INVALID_COUPON` with zero discount and deletes nothing | `CartServiceCouponTests.GetCart_CouponExpiredAfterApply_ReportsStaleInvalid` | — |
+| Coupon exhausted by other customers between apply and checkout | The cart read reports `stale` / `COUPON_EXHAUSTED`; checkout still refuses with 409 `COUPON_EXHAUSTED` — the read is a preview, the order path is the authority | `CartServiceCouponTests.GetCart_CouponExhaustedAfterApply_ReportsStaleExhausted` + `CouponCheckoutIntegrationTests.CreateOrder_ExhaustedCoupon_Returns409` | `coupon.rejected` |
+| Admin deactivates a coupon sitting in carts | Every affected cart read reports `stale` / `INVALID_COUPON` on its next poll, with the row untouched | `CartServiceCouponTests.GetCart_CouponDeactivatedByAdmin_ReportsStaleInvalid_AndWritesNothing` | — |
+| Cart contents replaced wholesale (`POST /api/cart`) while a stale coupon sits on it | The write path re-validates exactly like a read: it reports `couponStatus` / `couponReason` and deletes nothing, so saving a cart can never silently drop the coupon | `CartServiceCouponTests.SetCart_WithStaleCoupon_ReportsStale_AndDeletesNothing` | — |
 | Guest applies a code then logs in | The code survives the cart merge | `CartCouponEndpointsIntegrationTests.MergeCarts_GuestHadCoupon_TransfersToUser` | `coupon.applied` |
 | Code enumeration probing | 429 after the per-identity limit, `Retry-After` set | `CouponRateLimitIntegrationTests.ApplyCoupon_BeyondPerIdentityLimit_Returns429` | existing rejection handler |
 | Admin creates a duplicate code | 409 `DUPLICATE_CODE`, no row; normalisation means `vara25` collides with `VARA25` | `AdminCouponsIntegrationTests.CreateCoupon_DuplicateCodeDifferingOnlyInCase_Returns409` | `admin.coupon.create-rejected` |
@@ -533,7 +678,7 @@ against real PostgreSQL because InMemory cannot exercise the mechanism.
   payable-gross basis.
 - **Unit, InMemory** (`PhotoPrint.Tests.Unit.Services`) — only where the mechanism under test is
   not the CAS: `CouponServiceTests` (validation matrix, apply/replace/clear, normalisation),
-  `CartServiceCouponTests` (preview on read without writing, delete on write, merge transfer),
+  `CartServiceCouponTests` (preview on read and on write, deleting nothing, stale reporting, merge transfer),
   `AdminCouponServiceTests` (paging, filters, soft delete), `AdminCouponValidatorTests`,
   `OrderServiceCouponTests` (discount maths, VAT ordering, payable floor, divergence check).
 - **Integration, InMemory** (`PhotoPrint.Tests.Integration`): `CartCouponEndpointsIntegrationTests`
@@ -541,7 +686,7 @@ against real PostgreSQL because InMemory cannot exercise the mechanism.
   (role gate, CRUD, redemption stats), `CouponRateLimitIntegrationTests`.
 - **Integration, real PostgreSQL** — everything that depends on the CAS or on a real transaction:
   `CouponRedemptionConcurrencyRelationalTests` (**the gate**) and `CouponRedemptionRelationalTests`
-  (deactivation, expiry, rollback, replay, release paths), `AdminCouponRelationalTests`.
+  (deactivation, expiry, rollback, replay, transfer and release paths), `AdminCouponRelationalTests`.
   `PostgresCouponFactory`, a `PostgresPaymentFactory` sibling, backs the API with a real database.
   The gate asserts: N parallel checkouts against `MaxRedemptions = 5` produce exactly 5
   `CouponRedemption` rows, `RedemptionsCount = 5`, exactly 5 orders carrying the code, and 409
@@ -568,14 +713,16 @@ against real PostgreSQL because InMemory cannot exercise the mechanism.
 
 ## Adversarial design check — findings and disposition
 
+### Check 1 — the whole design (stage 2)
+
 One fresh agent, briefed to attack the design (races, missed callers, absent failure modes,
 second-path asymmetry, money correctness, resource bounds). 16 findings; every one is dispositioned.
 
 | # | Finding | Disposition |
 |---|---|---|
 | 1 | **Blocker.** `DivergentFields` compares `TotalRon`, so every retry of a discounted order 409s and the customer can never reach the order they created | **Fixed in design** — the comparison moves to the pre-discount gross; `DivergentFields` added to the caller sweep; two regression tests named |
-| 2 | **Blocker.** A declined-card retry with the same key builds a second order and redeems the coupon twice | **Fixed in design** — redemption release on the `PaymentFailed` retry path; failure-mode row + `[PG]` test |
-| 3 | **Blocker.** Unpaid orders consume redemptions forever; free guest tokens make a capped promo trivially exhaustible | **Partly fixed, partly accepted in writing** — released on the three paths that already know an order is abandoned; no sweeper (a new periodic mechanism, out of budget), so the abuse vector is stated with its levers and a reclaim job is recommended in ddd-03 |
+| 2 | **Blocker.** A declined-card retry with the same key builds a second order and redeems the coupon twice | **Fixed in design** — the redemption is transferred to the replacement inside one transaction on the `PaymentFailed` retry path (no release-and-re-redeem window); failure-mode rows + `[PG]` tests |
+| 3 | **Blocker.** Unpaid orders consume redemptions forever; free guest tokens make a capped promo trivially exhaustible | **Partly fixed, partly accepted in writing** — transferred on the two retry paths and released on admin cancellation; no sweeper (a new periodic mechanism, out of budget), so the abuse vector is stated with its levers and a reclaim job is recommended in ddd-03 |
 | 4 | **Blocker.** A fully or heavily discounted order cannot be charged; the Stripe rejection is unmapped → 500 *after* the redemption committed | **Fixed in design** — payable-gross floor checked before any write (409 `ORDER_TOTAL_BELOW_MINIMUM`), `Percent = 100` rejected at validation; ddd-01's "a fully discounted order is legal" is corrected |
 | 5 | **Blocker.** The existing residual loop in `InvoiceXmlBuilder` would dump the whole discount onto the last line — usually `Transport` — driving it negative, and double-count against `AllowanceCharge` | **Fixed in design** — the residual now reconciles to the undiscounted line-net target; `AllowanceCharge` carries the discount; two tests, one of which pins that an undiscounted invoice is unchanged |
 | 6 | **Blocker.** The tests named as proof of the redemption guarantees were placed in the InMemory suite, and the InMemory increment leaks onto the request-scoped context for `PaymentsController` to flush | **Fixed in design** — every redemption-semantics test moves to real PostgreSQL and is marked `[PG]`; moving the CAS after the order insert removes the leak |
@@ -586,6 +733,27 @@ second-path asymmetry, money correctness, resource bounds). 16 findings; every o
 | 11 | **Serious.** `MIN_SUBTOTAL_NOT_MET` makes the endpoint a code-existence oracle, contradicting the stated security design | **Fixed and honestly restated** — the story fixes the code and its copy, so the oracle stays; a per-identity rate limiter is the compensating control and the security table now says so instead of claiming no oracle exists |
 | 12 | **Serious.** `FreeShipping` contradicts the goods-subtotal cap, and zero shipping yields a zero discount whose redemption semantics were undefined | **Fixed in design** — the cap is the payable gross; a zero discount redeems nothing and writes no `CouponCode`; two tests |
 | 13 | **Minor.** Nothing server-side clears `CartCoupon` after payment; the claimed-session cleanup path misses it | **Accepted and documented** — the cart-clearing gap is pre-existing and its fix lives in the Paid transition, which the owner's 2026-09-03 ruling parks |
-| 14 | **Minor.** `GET /api/cart` would have become a write on every read | **Fixed in design** — reads never write; the delete moves to `SetCartAsync` |
+| 14 | **Minor.** `GET /api/cart` would have become a write on every read | **Fixed in design, then tightened** — reads never write; the delete first moved to `SetCartAsync`, and the F9 amendment removed server-side clearing altogether (check 2, finding 8) |
 | 15 | **Minor.** Two unrecorded contract divergences: paging shape vs the neighbouring admin controllers, and 422-vs-409 against the convention | **Fixed in design** — paging is clamped like its neighbours; the 422/409 split is recorded as an explicit second deviation with one status table for bolt 048 |
 | 16 | **Minor.** Case-insensitive matching would defeat the index and leave uniqueness per-exact-case | **Fixed in design** — normalise on write, compare exactly, one `CouponCode.Normalize` |
+
+### Check 2 — the F8 and F9 amendments (2026-09-04)
+
+A second fresh agent, briefed on the amended sections only (the transfer path and the cart-state
+lifecycle) and told to attack them the same way. 8 findings; every one is dispositioned, and the
+first three would each have shipped a defect.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **Blocker.** With the pre-resolve release gone, the abandoned holder's own row still counts, so `Validate` exhausts a `MaxRedemptions = 1` coupon and the retry 409s `COUPON_EXHAUSTED` with the intent already dead — no order, no live intent, coupon locked to a dead order | **Fixed in design** — `ResolveForOrderAsync` is told the held coupon id and validates that coupon against `RedemptionsCount - 1` (decision table row 2) |
+| 2 | **Blocker.** "The replacement has no redemption row yet" is false: `OrderService` inserts one unconditionally whenever a coupon applies, so repoint-plus-insert is a duplicate key on the unique `CouponRedemptions.OrderId` index — a 500 the save loop does not recover and InMemory cannot see | **Fixed in design** — the repoint **replaces** the insert on the transfer path; stated explicitly, with the detach rule that follows from it |
+| 3 | **Blocker.** `ConsumeOrThrowAsync` would still run on the transfer path, double-counting an uncapped coupon and 409ing a capped one — rolling back a replacement the customer is entitled to | **Fixed in design** — the transfer path skips the CAS entirely; the count never moves |
+| 4 | **Major.** Nothing pinned that the coupon resolved at retry is the coupon the held row carries (apply A, decline, apply B, retry) | **Fixed in design** — transfer only when the ids match; a different coupon releases the held row and takes a normal CAS (rows 3 and 4) |
+| 5 | **Major.** A retry that resolves no coupon at all had neither a transfer nor a release, orphaning the slot | **Fixed in design** — explicit release branch (row 5) |
+| 6 | **Major.** The repoint mechanism was unspecified, and house style (`ExecuteUpdateAsync`) is wrong here twice: it executes outside EF's batch, so the `UPDATE` can precede the replacement's `INSERT` and fail PostgreSQL's per-statement FK check, and it throws on the InMemory provider | **Fixed in design** — tracked-entity write flushed by one `SaveChangesAsync`, with a `[PG]` test pinning the statement order rather than trusting EF's batching |
+| 7 | **Major.** Two new `ValidTransitions` rows had no caller-impact entry and would silently widen `AdminOrderService.CancelOrderAsync` to unpaid orders (cancellation email, SignalR broadcast, doomed refund, cloud purge) | **Fixed in design** — a named `OrderStatusMachine.Abandon(order)` instead, `ValidTransitions` byte-identical, plus a sweep block over all nine `OrderStatus.Cancelled` consumers |
+| 8 | **Minor, several contract and doc gaps in F9.** `CouponResolution` carries no reason; `deleteWhenUnusable` becomes dead; `CouponCode = applied?.Code` makes stale indistinguishable from absent; no `ICouponService` sweep row; the Test Plan still said "delete on write"; `EMPTY_CART` is unreachable on the read path; no failure-mode row for the read-only re-validation on `POST /api/cart` | **Fixed in design** — `ResolveForCartAsync` returns a `CartCouponView` that is null only when no row exists, `deleteWhenUnusable` and the `coupon.auto-cleared` log are removed, `CouponCode` stays populated when stale, both sweep blocks are written, the Test Plan line is corrected, `EMPTY_CART` is deliberately excluded from the read-path reason set, and the `SetCartAsync` row is in the failure-mode table |
+
+The check also cleared one hazard it went looking for: an abandoned holder cannot have its
+originals purged from under a paid replacement, because `OriginalPurger` skips any upload a `Paid`
+or `Printing` sibling order still holds.
