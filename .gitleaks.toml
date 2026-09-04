@@ -16,3 +16,10 @@ paths = [
   '''hooks/.*''',                                      # the guard contains the detection pattern
   '''\.gitleaks\.toml''',                              # this file
 ]
+
+# The compose placeholders below are needed because an empty key makes the Stripe client throw where it is constructed.
+regexes = [
+  '''sk_test_e2e_placeholder''',
+  '''sk_test_placeholder''',
+  '''whsec_placeholder''',
+]
