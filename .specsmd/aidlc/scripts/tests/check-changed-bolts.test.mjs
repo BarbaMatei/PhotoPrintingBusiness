@@ -7,7 +7,10 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '..', 'check-changed-bolts.mjs')
-const GIT_ENV = { ...process.env, GIT_CONFIG_GLOBAL: join(tmpdir(), 'no-such-gitconfig'), GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: 'fixture@example.test', GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.test' }
+process.env.GIT_DIR = join(tmpdir(), 'bogus-inherited-git-dir')
+process.env.GIT_INDEX_FILE = join(tmpdir(), 'bogus-inherited-index')
+const GIT_ENV = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')))
+Object.assign(GIT_ENV, { GIT_CONFIG_GLOBAL: join(tmpdir(), 'no-such-gitconfig'), GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: 'fixture@example.test', GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.test' })
 
 function git(root, ...args) {
   const r = spawnSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', ...args], { cwd: root, encoding: 'utf8', env: GIT_ENV })

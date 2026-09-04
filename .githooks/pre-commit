@@ -61,6 +61,28 @@ if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'reviews/lib/*')"
     exit 1
   fi
 fi
+# The construction scripts (stage-exit check, claims lint, gate driver) have their own suite too.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- '.specsmd/aidlc/scripts/*')" ]; then
+  if ! node .specsmd/aidlc/scripts/tests/run-tests.mjs >&2; then
+    echo "" >&2
+    echo ".specsmd/aidlc/scripts test suite failed. Fix the script or the test and recommit." >&2
+    exit 1
+  fi
+fi
+# Construction gate: a commit that marks a bolt stage complete must satisfy that stage's exit
+# conditions (memory-bank/standards/bolt-process.md, "Stage exit conditions"), and a staged stage
+# artifact must pass the claims lint. CI runs the same driver against the PR base without an override.
+if [ -n "$(git diff --cached --name-only --diff-filter=ACMR -- 'memory-bank/bolts/*')" ]; then
+  if [ -n "$STAGE_GATE_OK" ]; then
+    log_override STAGE_GATE_OK "$(git diff --cached --name-only --diff-filter=ACMR -- 'memory-bank/bolts/*')"
+  elif ! node .specsmd/aidlc/scripts/check-changed-bolts.mjs --staged >&2; then
+    echo "" >&2
+    echo "Construction gate failed: the stage this commit completes has unmet exit conditions, or a" >&2
+    echo "stage artifact makes claims without evidence (see the lines above). Meet them and recommit." >&2
+    echo "Only for a genuine false positive, re-run the same commit with STAGE_GATE_OK=1 (never --no-verify)." >&2
+    exit 1
+  fi
+fi
 
 # Tables inside <!-- generated:... --> markers are rendered from the code, so a hand edit there is
 # drift. The full check — drift plus the link scan — runs here: reviews/ carries no broken link,
