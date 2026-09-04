@@ -23,10 +23,12 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
     const orders: AdminOrderRow[] = (await listResponse.json()).items;
 
     const target = orders.find((o) => o.status === 'Paid');
-    test.skip(
-      !target,
-      'nicio comandă în starea Paid — rulează seed-ul pe o bază curată (docker compose down -v)',
-    );
+    expect(
+      target,
+      'nicio comandă în starea Paid — rulează seed-ul pe o bază curată (docker compose down -v). ' +
+        'Acest test consumă singura tranziție Paid → Printing din seed, deci o a doua rulare pe ' +
+        'aceeași bază eșuează aici în loc să treacă în tăcere.',
+    ).toBeDefined();
 
     const hubConnected = page.waitForRequest(
       (req) => req.url().includes('/hubs/admin-orders') && req.url().includes('id='),
@@ -40,6 +42,9 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
     await expect(row.locator('.ord-badge')).toHaveText('Plătită');
 
     await hubConnected;
+    await page.evaluate(() => {
+      (window as Window & { __e2eSameDocument?: boolean }).__e2eSameDocument = true;
+    });
 
     const patch = await request.patch(`${API_URL}/admin/orders/${target!.id}/status`, {
       headers: auth,
@@ -48,6 +53,10 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
     expect(patch.ok(), `PATCH status a răspuns ${patch.status()}`).toBeTruthy();
 
     await expect(row.locator('.ord-badge')).toHaveText('În tipărire', { timeout: 20_000 });
-    expect(page.url()).toContain('/admin/comenzi');
+
+    const sameDocument = await page.evaluate(
+      () => (window as Window & { __e2eSameDocument?: boolean }).__e2eSameDocument === true,
+    );
+    expect(sameDocument, 'pagina s-a reîncărcat — actualizarea nu a venit prin SignalR').toBe(true);
   });
 });

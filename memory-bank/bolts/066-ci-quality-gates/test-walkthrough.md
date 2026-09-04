@@ -105,6 +105,36 @@ the evidence that nothing here touched the backend.
 4. **The size radios on the format page are `display: none`.** They are driven by their labels, so
    an automated check must click the label. Noted because it is a keyboard/assistive-tech smell.
 
+### Fresh-eyes micro-review (bolt-process.md stage-4 gate)
+
+Run 2026-09-04 as a fresh Explore subagent over the full branch diff, with the three mandated
+questions (class or instance · new-mechanism bar · anything adjacent broken). 14 findings; 11 fixed
+here, 3 recorded.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **The CI retry turned a real SignalR failure into a green skip**: if attempt 1 failed *after* the PATCH landed — the exact "broadcast never arrived" case — attempt 2 found no `Paid` order and `test.skip` passed the job. | **Fixed**: the missing target is now a hard `expect(...).toBeDefined()` with a message naming `down -v`. |
+| 2 | The empty-Stripe-key class was fixed for the e2e stack only; the README's own dev recipe (`cp .env.example .env` → `docker compose up`) still produced a stack whose admin endpoints 500. | **Fixed** (class sweep): `docker-compose.yml` now sets the same two placeholders for the dev stack. |
+| 3 | The `Dockerfile` comment asserted the base image ships `app` at UID 1001; .NET 8 images may use 1654, and a pre-existing `apidata` volume chowned to 1001 could become unwritable after a rebuild. | **Comment corrected** (it no longer claims a UID). The volume-ownership caveat needs a `docker run … id app` to confirm and a line in `docs/DEPLOYMENT.md`, which another session owns this wave — reported to the coordinator instead. |
+| 4 | Two descriptive docs became false: `tech-stack.md` said the project has "no e2e framework" and listed three workflows. | **Fixed** in `tech-stack.md` (e2e entry, budgets with the measured baseline, the new workflow, and that it is advisory). `docs/DEPLOYMENT.md`'s workflow list has the same gap — reported, not edited, for the same ownership reason. |
+| 5 | No way to run the new mechanism without reading the diff: no npm script, no README section, the `E2E_*` variables documented nowhere, and the `!override` tag's Compose ≥ 2.24 requirement undeclared. | **Fixed**: `npm run e2e` / `npm run e2e:check`, a README section, the variables commented into `.env.example`, and the Compose version noted in the overlay. |
+| 6 | Nothing type-checked the e2e sources — Playwright transpiles without checking, so a type error would ship silently. | **Fixed**: `e2e:check` script plus a workflow step before the run. |
+| 7 | The real-time spec's closing assertion (`page.url()` unchanged) cannot fail, since the URL is identical after a reload. | **Fixed**: a `window` sentinel set before the PATCH is asserted afterwards, which a reload would clear. |
+| 8 | A silently skipped seed (dirty database) still produced a green run. | **Fixed**: the workflow asserts both seeds' success lines. |
+| 9 | The workflow gates nothing, and `deploy.yml` chains off `ci` alone, so main can deploy without the smoke suite. | **Recorded** in `tech-stack.md` as advisory-not-a-gate; making it required would deadlock docs-only PRs, which `paths-ignore` suppresses entirely. Owner's call. |
+| 10 | The two `paths-ignore` lists are duplicated verbatim and will drift. | **Fixed**: a keep-in-sync comment naming why (Actions ignores YAML anchors). |
+| 11 | `parseAmount` is en-US-only; a future `ro-RO` locale would misparse silently, and the proportional assertion would still pass. | **Fixed**: it now asserts the en-US shape and fails loudly instead. |
+| 12 | Two `.gitignore` entries ignore paths nothing produces. | **Fixed**: removed. |
+| 13 | On a retry the trace records the admin bearer token and password into an artifact with 7-day retention; the e2e also hard-codes the seeded admin password, which `DEPLOYMENT.md` tells operators to use in production. | **Recorded, not fixed.** Making the seed password configuration-driven is a backend change this wave forbids. The credentials belong to an ephemeral container; the production coupling is pre-existing and reported to the coordinator. |
+| 14 | The budget rationale lived only in bolt files, and nothing recorded that the image build now fails on an over-budget bundle. | **Fixed**: both are in `tech-stack.md`. |
+
+Confirmed solid by the same review, so unchanged: node types cannot leak (`tsconfig.app.json` pins
+`types: []`, `tsconfig.spec.json` pins `vitest/globals`); the e2e specs are structurally outside the
+unit runner's root, not merely by luck; `npm ci` gained no browser download; every selector the
+specs use resolves to real markup and the two status labels match `order-status.constants.ts`; the
+hub wait is a real wait, not one that always resolves; and the compose overlay's isolation
+(own project name, own volumes, unpublished db/mail ports) is the right shape.
+
 ### Acceptance criteria validation
 
 - ✅ **Budgets set and enforced** — `initial` 400 kB warn / 500 kB error, `anyComponentStyle` 4 kB

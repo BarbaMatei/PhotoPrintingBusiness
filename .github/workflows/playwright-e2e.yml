@@ -6,6 +6,7 @@ name: e2e
 # skip it. Keep this list narrow: anything that can change behaviour must still trigger a run.
 on:
   pull_request:
+    # Keep this list identical to the push trigger below: Actions ignores YAML anchors.
     paths-ignore:
       - 'memory-bank/**'
       - 'reviews/**'
@@ -65,10 +66,14 @@ jobs:
           docker compose $COMPOSE_FILES logs api
           exit 1
 
+      # Both seeds print "already applied — skipping" and exit 0 on a dirty database, so assert
+      # the success line: a silently skipped seed would otherwise produce a green, empty run.
       - name: Seed catalog, admin user and demo orders
         run: |
           export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem)"
-          docker compose $COMPOSE_FILES run --rm api --seed-dev
+          docker compose $COMPOSE_FILES run --rm api --seed-dev | tee seed.log
+          grep -q "Seed applied successfully" seed.log
+          grep -q "Dev seed applied successfully" seed.log
 
       - name: Install UI dependencies
         working-directory: src/PhotoPrint.UI
@@ -78,9 +83,14 @@ jobs:
         working-directory: src/PhotoPrint.UI
         run: npx playwright install --with-deps chromium
 
+      # Playwright transpiles specs without type-checking, so a type error would ship silently.
+      - name: Type-check the e2e sources
+        working-directory: src/PhotoPrint.UI
+        run: npm run e2e:check
+
       - name: Run e2e smoke suite
         working-directory: src/PhotoPrint.UI
-        run: npx playwright test
+        run: npm run e2e
 
       - name: Collect API logs on failure
         if: failure()
