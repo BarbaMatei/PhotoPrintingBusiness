@@ -46,6 +46,17 @@ updated: 2026-09-04
 | PPW-744 | ⚪ | v1 | Third hand-rolled bind of the "RateLimit" section, only to log one number | `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:72` | open | |
 | PPW-745 | ⚪ | v1 | Scrape-named observability type ScrapeIpAllowList is now the shared IP-list parser for proxy trust | `src/PhotoPrint.API/Observability/ScrapeIpAllowList.cs:56` | open | |
 | PPW-746 | ⚪ | v1 | A whole ServiceProvider is built (and never disposed) per simulated request in the middleware tests | `src/PhotoPrint.Tests/Unit/Middleware/UntrustedForwardedPeerMiddlewareTests.cs:85` | open | |
+| PPW-747 | 🟠 | v3 | No test proves the rate limiter partitions per forwarded client, so a one-line reorder silently restores one bucket for the whole internet | `src/PhotoPrint.API/Program.cs:375` | open | |
+| PPW-748 | 🟠 | v3 | The metrics-scrape exclusion's excluded branch is untested in the changed test file; only an out-of-scope file guards it | `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:122` | open | |
+| PPW-749 | 🟡 | v3 | The 512-peer log budget never resets, so cheap in-network noise can permanently silence the proxy-drift warning | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:112` | open | |
+| PPW-750 | 🟡 | v3 | DEPLOYMENT.md §16.3 names three changed behaviours and omits the HSTS header the trusted-proxy switch now makes reachable | `docs/DEPLOYMENT.md:1702` | open | |
+| PPW-751 | 🟡 | v3 | Serilog WriteTo merges by array index, so the Development overlay collides with the base Console sink's formatter at WriteTo:0 | `src/PhotoPrint.API/appsettings.Development.json:51` | open | |
+| PPW-752 | 🟡 | v3 | TrustedProxyList re-parses the trusted-proxy list and discards parse errors, so the validator's caps do not guard the type that decides trust | `src/PhotoPrint.API/Configuration/TrustedProxyList.cs:12` | open | |
+| PPW-753 | 🟡 | v3 | Log assertions capture around Serilog, so no test executes the production logging configuration this round rewrote | `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:244` | open | |
+| PPW-754 | 🟡 | v3 | The new production rolling file sink writes into the container's ephemeral layer — no volume backs /app/logs | `src/PhotoPrint.API/appsettings.Production.json:13` | open | |
+| PPW-755 | 🟡 | v3 | The new production File sink can be dropped or fail to open with no diagnostic, because SelfLog is enabled nowhere and the package is transitive | `src/PhotoPrint.API/appsettings.Production.json:11` | open | |
+| PPW-756 | 🟡 | v3 | A null RemoteIpAddress returns before judging, on the one transport where ASP.NET honours X-Forwarded-For with no peer check | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:36` | open | |
+| PPW-757 | 🟡 | v3 | The NuGet audit gate is asserted as a command string and never executed, and the shipping image restores without it | `src/PhotoPrint.Tests/Unit/Configuration/DeploymentDefaultsTests.cs:121` | open | |
 
 ## Details
 
@@ -76,6 +87,7 @@ updated: 2026-09-04
   - v1: severity re-judged high→medium — the policies never execute today because of PPW-711, so the impact is latent; it goes live the moment the ordering is fixed, which is why the two must ship together.
   - v1: Approach pre-check: revised (fixing this alone, with `TrustedProxies` empty, converts three inert hourly caps into a site-wide budget — 5 registrations/hour for the whole internet behind the proxy; hence the email co-key and the PPW-713 dependency).
   - v1: fix round — deferred
+  - v3 delta: re-raised by security + correctness (convergence 2) at high severity, arguing the round’s per-client identity and `PermitLimit` 600 make the shared auth buckets live. Prior decision, carried verbatim: "parked: must land in the same change as PPW-711, or three hourly caps become site-wide budgets. Default taken: §16.7’s deferral stands." The escalation premise fails — `UseRateLimiter()` (`SecurityExtensions.cs:122`, via `Program.cs:380`) still runs before `UseRouting()` (`Program.cs:393`), so the named policies remain inert; severity stays 🟠, the deferral stands, still paired with PPW-711.
 
 ### PPW-713 — The forwarded-headers/trusted-proxy mechanism ships commented out, so it is inert in production despite the record saying it is on
 
@@ -284,6 +296,7 @@ updated: 2026-09-04
 - **Suggested fix:** Re-warn on an interval (hourly per peer) with an occurrence count, and add a Prometheus counter so the condition is alertable rather than grep-only.
 - **History:** <append-only, one line per event>
   - v1: found by observability (convergence 1, not hinted), verdict confirmed; the grep-only diagnosis compounds PPW-714, which keeps the line off stdout entirely.
+  - v3 delta: re-found by observability (convergence 1) with the operator consequence spelled out — `docs/DEPLOYMENT.md` §16.6 step 3 greps recent `docker compose logs`, so a weeks-old one-off warning reads as a healthy trust chain. Still open.
 
 ### PPW-732 — Singleton lifetime — the basis of "warned once" — is unverified in the real pipeline
 
@@ -292,6 +305,7 @@ updated: 2026-09-04
 - **Suggested fix:** In the booted-host log test of PPW-721, send three requests from one untrusted peer and assert exactly one warning — an assertion that needs the real DI lifetime to hold.
 - **History:** <append-only, one line per event>
   - v1: found by tests-coverage (convergence 1, not hinted), verdict confirmed.
+  - v3 delta: re-found by correctness (convergence 1) at `ForwardedHeadersExtensions.cs:22` — unchanged; switching the registration to scoped or transient still reddens no test. Still open.
 
 ### PPW-733 — An_unparseable_trusted_proxy_aborts_boot cannot fail for the reason it is credited with
 
@@ -348,6 +362,7 @@ updated: 2026-09-04
 - **Suggested fix:** Gate on the post-increment value — if `Interlocked.Increment` returns more than the cap, decrement and take the cap-warning path.
 - **History:** <append-only, one line per event>
   - v1: found by correctness (convergence 1, not hinted), verdict unverified-cleanup (cleanups get no skeptic by design).
+  - v3 delta: re-found by correctness (convergence 1) with one added sub-claim — past the cap, every request runs `Interlocked.Exchange` on `_capWarned`, a contended write during exactly the storm the cap exists to bound. Still open; the never-resets mechanism is PPW-749, a separate row.
 
 ### PPW-740 — Bolt notes still warn about a Stripe.net 46→47 break the bolt disproved
 
@@ -364,6 +379,7 @@ updated: 2026-09-04
 - **Suggested fix:** Resolve the metrics path once — a shared helper or a normalised property on the metrics settings — and pass it to both the pipeline and the exclusion predicate.
 - **History:** <append-only, one line per event>
   - v1: found by quality-altitude and completeness-critic (convergence 2, not hinted), verdict unverified-cleanup.
+  - v3 delta: re-found by security (convergence 1) at `ForwardedHeadersExtensions.cs:96`, with the blank-endpoint path spelled out: `Program.cs:82` keeps `""` so `PathString.Empty` matches every path and the gate owns the whole site, while `MetricsPath()` substitutes `/metrics` and guards a path the gate no longer owns. Still open.
 
 ### PPW-742 — Trusted-proxy list is read and validated twice, leaving a second unreachable failure path
 
@@ -404,3 +420,107 @@ updated: 2026-09-04
 - **Suggested fix:** Build the options once per test class (a readonly field or a shared helper used by both new test files) and dispose the provider.
 - **History:** <append-only, one line per event>
   - v1: found by quality-altitude (convergence 1, not hinted), verdict unverified-cleanup.
+
+### PPW-747 — No test proves the rate limiter partitions per forwarded client, so a one-line reorder silently restores one bucket for the whole internet
+
+- **What:** The bolt's headline promise — one rate-limit bucket per real visitor instead of one for the whole site — holds only because `app.UseTrustedProxyForwardedHeaders()` (`src/PhotoPrint.API/Program.cs:375`) runs before `app.UseSecurityBaselines()` (`:380`), which installs `UseRateLimiter()` (`src/PhotoPrint.API/Extensions/SecurityExtensions.cs:122`) whose global limiter partitions on `Connection.RemoteIpAddress` (`:59-61`). Swap those two lines and the limiter keys on the proxy's own address again. No test reddens, and §16 of `docs/DEPLOYMENT.md` still reads as if the promise held.
+- **Evidence:** Confirmed by mutation: moving `UseTrustedProxyForwardedHeaders()` below `UseSecurityBaselines()` leaves the whole scoped set green. `src/PhotoPrint.Tests/Integration/RateLimitIntegrationTests.cs:13` builds `SecurityBaselineFactory` with no `ForwardedHeaders:TrustedProxies` and TestServer reports a null peer, so every client already shares one partition there; `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:169` asserts only its own probe middleware's resolved IP and never a limiter response. `docs/DEPLOYMENT.md` §16.7 item 3 records an ordering defect of exactly this class (PPW-711), so the class is known to recur here.
+- **Suggested fix:** Add an integration test that drives the limiter through a trusted proxy with two distinct forwarded clients and asserts each gets its own budget.
+  - **Fix brief:** `src/PhotoPrint.Tests/Integration/RateLimitIntegrationTests.cs` · `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:109-141` (the `TrustedProxyFactory` + peer-stamping `IStartupFilter` pattern). Resolve the limits through `IOptionsMonitor` inside the factory, not at registration — `src/PhotoPrint.Tests/Integration/SecurityBaselineFactory.cs:67-69` records that registration captures config before test config applies. Do not touch `SecurityExtensions.cs` ordering as part of this row: that is PPW-711's deferred change.
+  - **testShape:** `RateLimit_PartitionsPerForwardedClient` — `TrustedProxyFactory("172.28.0.2")` with `RateLimit:Public:PermitLimit=3`, peer stamped as the proxy; spend 3 requests as `X-Forwarded-For: 203.0.113.1`, then one as `198.51.100.7`; assert 200, not 429. Reverting the Program.cs order must redden it.
+  - **Trigger-list-shaped:** yes (rate-limiter partitioning on the public surface)
+- **History:** <append-only, one line per event>
+  - v3 delta: found by completeness-critic (convergence 1, not hinted), verdict confirmed by mutation trace.
+
+### PPW-748 — The metrics-scrape exclusion's excluded branch is untested in the changed test file; only an out-of-scope file guards it
+
+- **What:** `IsMetricsScrape` exists for one combination — path `/metrics` **and** `LocalPort == scrapePort` — and that combination is asserted nowhere in the file the fix round changed. All three new observability tests assert the client **is** resolved: `/metrics` only on port 8080, port 9090 only on the probe path. Deleting the predicate, or making it return false, leaves `ForwardedHeadersIntegrationTests` fully green.
+- **Evidence:** Confirmed by mutation: with `IsMetricsScrape` forced false, `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:122`, `:132` and the boot test all still pass. The only test that reddens is `MetricsEndpointIntegrationTests.Forwarded_for_cannot_open_the_scrape_gate` (`src/PhotoPrint.Tests/Integration/MetricsEndpointIntegrationTests.cs:89`, 403 becomes 200) — an unchanged file that reached no lens, whose assertion never names forwarded headers, so a future edit can weaken it without any signal that this predicate lost its guard.
+- **Suggested fix:** Assert the excluded branch where the predicate lives, and put the scrape-gate test file in a lens's scope.
+  - **Fix brief:** `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:109-141` (add a `TrustedProxyOnScrapeListenerFactory` alongside the existing observability factories) · `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:72-86`. One test, in the `ForwardedHeadersWithObservabilityTests` class — the class the round's recorded test filters omitted.
+  - **testShape:** `The_metrics_path_on_the_scrape_port_keeps_its_peer` — `ResolveAsync(peer "172.28.0.2", forwardedFor "203.0.113.9", path "/metrics")` on the scrape listener; assert `ClientIp == "172.28.0.2"`. Forcing `IsMetricsScrape` false must redden it.
+  - **Trigger-list-shaped:** no
+- **History:** <append-only, one line per event>
+  - v3 delta: found by completeness-critic (convergence 1, not hinted), verdict confirmed by mutation trace.
+  - v3 delta: `residual-of: PPW-722` — the round's fix added the two non-excluded cases and left the excluded one uncovered (seed round 1, area forwarded-headers).
+
+### PPW-749 — The 512-peer log budget never resets, so cheap in-network noise can permanently silence the proxy-drift warning
+
+- **What:** `PeerBudget`'s 512-entry cap (`src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:110-120`) is process-lifetime and never resets, and the middleware is a singleton (`src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:22`). Once 512 distinct untrusted peers have been seen, one `log_cap_reached` line is written and every later untrusted peer is silent — including a genuinely drifted Caddy, whose requests then lose their forwarded identity (shared rate-limit bucket, refresh cookie without `Secure`) with nothing in the log to say so.
+- **Evidence:** `:110-120` (cap and warning) with `:46` showing the budget keys on the canonical TCP peer address, not on header contents — so the finder's "512 forwarded values from one container" route does not work; each peer costs one slot. Filling the cap needs 512 distinct source addresses able to reach the API port, which `docker-compose.prod.yml:43` does not publish in production, so it takes an in-network peer; that is why this is 🟡 and not 🟠.
+- **Suggested fix:** Never let cheap noise evict the drift signal — keep an uncapped counter or metric of untrusted-peer requests, or reserve budget slots for peers seen on a majority of requests.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by observability (convergence 1, not hinted), verdict confirmed by trace with the mechanism corrected; severity re-judged from the lens's medium to 🟡 because reaching the cap requires 512 distinct in-network source addresses.
+  - v3 delta: distinct from PPW-731 (once-per-peer dedupe) and PPW-739 (cap overshoot under concurrency) — same file, different mechanism; a fix that replaces the budget wholesale would settle all three.
+
+### PPW-750 — DEPLOYMENT.md §16.3 names three changed behaviours and omits the HSTS header the trusted-proxy switch now makes reachable
+
+- **What:** `HstsMiddleware` skips any request where `Request.IsHttps` is false, so with an empty trusted-proxy list the API never sent `Strict-Transport-Security`. Honouring `X-Forwarded-Proto` at `src/PhotoPrint.API/Program.cs:375` flips `IsHttps` to true before `UseHsts()` runs (`src/PhotoPrint.API/Extensions/SecurityExtensions.cs:117`, `MaxAge` 365 days, `IncludeSubDomains`), so the API emits that header for the first time. `docs/DEPLOYMENT.md:1702` still says three behaviours change, and no record or test mentions the fourth.
+- **Evidence:** Constructible at the API: a TLS request to Caddy, proxied as plain HTTP with `X-Forwarded-Proto: https` from a trusted peer, produces the header — impossible with an empty list. The consequence is masked: `Caddyfile:36` already sets the same header (plus `preload`) and its `header` directive replaces the upstream value, so no browser sees a change. Real omission, low visible impact — hence 🟡 rather than the lens's medium.
+- **Suggested fix:** Add HSTS as a fourth item in §16.3, and confirm in the same edit that Caddy's `header` directive replaces rather than appends `Strict-Transport-Security`, so responses cannot carry two values.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by completeness-critic (convergence 1, not hinted), verdict confirmed by trace; severity re-judged medium→🟡 because Caddy overwrites the header before any client sees it.
+  - v3 delta: `residual-of: PPW-713` — the round switching trust on is what made this behaviour reachable and the §16.3 list incomplete (seed round 1, area docs).
+
+### PPW-751 — Serilog WriteTo merges by array index, so the Development overlay collides with the base Console sink's formatter at WriteTo:0
+
+- **What:** Configuration merges per leaf key, not per array element. The round removed the File sink from the base `WriteTo` array (`src/PhotoPrint.API/appsettings.json:183`), which moved `Console` from index 1 to index 0 — where `src/PhotoPrint.API/appsettings.Development.json:51`'s own Console entry now merges into it. The merged sink carries both `Args:formatter` (base, compact JSON) and `Args:outputTemplate` (Development), and `Serilog.Settings.Configuration` has no Console overload taking both, so one is discarded by whichever overload it picks.
+- **Evidence:** Ran it: the merged configuration really does carry both leaves at `Serilog:WriteTo:0:Args`, and with the pinned `Serilog.AspNetCore` 10.0.0 (`Directory.Packages.props:44`) the `outputTemplate` overload wins — the dev console printed `[00:06:20 INF] : hello dev console 42`, not compact JSON. So the claimed harm does not occur today; what remains is a dev log format that depends on the library's overload choice, with the only test comparing sink names (`src/PhotoPrint.Tests/Unit/Configuration/DeploymentDefaultsTests.cs:132-152`) and no assertion anywhere on `Args`. Production (formatter only, no overlay) and Testing (no Serilog block) are unaffected.
+- **Suggested fix:** Assert on the merged `WriteTo:*:Args` keys rather than sink names alone, or give each overlay a complete sink array so no index is shared.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by completeness-critic (convergence 1, not hinted), verdict `plausible` — the merge is real, the claimed compact-JSON output is not; recorded 🟡, Development only.
+  - v3 delta: `residual-of: PPW-714` — the sink relocation moved Console onto the overlay's index (seed round 1, area logging).
+
+### PPW-752 — TrustedProxyList re-parses the trusted-proxy list and discards parse errors, so the validator's caps do not guard the type that decides trust
+
+- **What:** `src/PhotoPrint.API/Configuration/TrustedProxyList.cs:12` calls `Parse(…, out _)` and drops every error, so the type that actually decides whether a peer is trusted would accept `0.0.0.0/0` or `fe80::1` on its own. The width and link-local refusals live only in `src/PhotoPrint.API/Validators/ForwardedHeadersSettingsValidator.cs:29-48`. Today that validator always runs first through `IOptions.Value` with `ValidateOnStart`, so boot refuses such values; any later path that builds the list without it — a test host, a second registration — trusts the whole internet to set `X-Forwarded-For`.
+- **Evidence:** `TrustedProxyList.cs:12` and the validator's cap block; reported as read by two lenses, not proven by a trace (the delta's low rows had no skeptic).
+- **Suggested fix:** Enforce the pair-width and link-local rules inside `TrustedProxyList` itself — or in one parse routine it and the validator both call — and throw on any error instead of discarding it.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by security + completeness-critic (convergence 2, not hinted), reported as read, not proven — skeptics were not run on this pass's low rows.
+  - v3 delta: `residual-of: PPW-715` — the type is the round's own, added by the same fix that put the caps in the validator (seed round 1, area proxy-trust).
+
+### PPW-753 — Log assertions capture around Serilog, so no test executes the production logging configuration this round rewrote
+
+- **What:** `LogCapture` replaces `ILoggerFactory` wholesale and its `CaptureLogger` returns `IsEnabled` true for every level and drops the category, so every forwarded-header log assertion runs around Serilog rather than through it. Adding `"PhotoPrint.API.Middleware": "Error"` to `MinimumLevel.Override` — in the base file or the round's new `appsettings.Production.json` — removes every forwarded-header warning in production while all scoped tests, including the new Serilog sink assertions, stay green.
+- **Evidence:** `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:244`; the round recorded the same limit itself under "Known limits of this round's evidence" in [resolution-v1.md](resolution-v1.md). Reported as read, not proven by a trace.
+- **Suggested fix:** Assert that the merged Production configuration admits `Warning` for the `PhotoPrint.API.Middleware` category, or drive one case through a real `ReadFrom.Configuration` logger instead of the capture factory.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by observability + completeness-critic (convergence 2, not hinted), reported as read, not proven.
+  - v3 delta: `residual-of: PPW-714` — the round rewrote the production logging configuration and its tests assert around it (seed round 1, area logging).
+
+### PPW-754 — The new production rolling file sink writes into the container's ephemeral layer — no volume backs /app/logs
+
+- **What:** `src/PhotoPrint.API/appsettings.Production.json:13` writes `logs/log-.json` under the image's working directory, and `docker-compose.prod.yml` mounts only `apidata:/app/Storage`. The files therefore live in the api container's writable layer, so every redeploy or `docker compose up --force-recreate` destroys the 30-day retention the new `DeploymentDefaultsTests` asserts production keeps.
+- **Evidence:** `appsettings.Production.json:13` against the api service's volume list in `docker-compose.prod.yml`; reported as read, not proven. What the runbook's verification greps read is the console sink added for PPW-714, so what is lost here is the on-disk trail only.
+- **Suggested fix:** Add a named volume (for example `apilogs:/app/logs`) to the api service, or drop the File sink and rely on the console stream the runbook already greps.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by correctness (convergence 1, not hinted), reported as read, not proven.
+  - v3 delta: `residual-of: PPW-714` — re-opens the part of PPW-714's evidence its fix did not address, the missing `/app/logs` volume (seed round 1, area logging).
+
+### PPW-755 — The new production File sink can be dropped or fail to open with no diagnostic, because SelfLog is enabled nowhere and the package is transitive
+
+- **What:** `Serilog.Sinks.File` is only a transitive dependency of `Serilog.AspNetCore` and the sink is named by a configuration string, so if that transitive pin moves or an `Args` name stops binding, `Serilog.Settings.Configuration` writes to `SelfLog` and skips the sink. A read-only or root-owned `logs` mount fails the same way. `Serilog.Debugging.SelfLog` is enabled nowhere in `src`, so the audit trail is simply absent with no error.
+- **Evidence:** `src/PhotoPrint.API/appsettings.Production.json:11`; `Directory.Packages.props:44-47` pins `Serilog.AspNetCore`, `Serilog.Enrichers.*` and `Serilog.Formatting.Compact` but no `Serilog.Sinks.File`; a `SelfLog` search over `src` matches compiled assemblies only, no source. Reported as read, not proven by a trace.
+- **Suggested fix:** Enable `Serilog.Debugging.SelfLog` to stderr in `AddSerilogLogging`, and add a direct `Serilog.Sinks.File` package reference so the sink cannot silently vanish.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by observability (convergence 1, not hinted), reported as read; the two package facts were checked and hold.
+  - v3 delta: `residual-of: PPW-714` — the sink is the round's own (seed round 1, area logging).
+
+### PPW-756 — A null RemoteIpAddress returns before judging, on the one transport where ASP.NET honours X-Forwarded-For with no peer check
+
+- **What:** `JudgeForwardedValue` returns as soon as `context.Connection.RemoteIpAddress` is null (`src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:36`). That is exactly the case where `ForwardedHeadersMiddleware` skips its known-proxy check and honours `X-Forwarded-For` unconditionally — a transport with no remote IP, such as a Unix socket, a named pipe or TestServer. Any caller on such a transport sets its own client IP for rate limiting and audit, and no `untrusted_peer` warning is emitted for it.
+- **Evidence:** `:36` read against `ForwardedHeadersMiddleware`'s null-peer path; reported as read, not proven by a trace. The API is reached over TCP in every shipped configuration, which is why this is 🟡.
+- **Suggested fix:** Warn once, on its own budget, when `X-Forwarded-For` arrives with a null peer address — the header is being honoured with no peer check at all.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by correctness (convergence 1, not hinted), reported as read, not proven.
+  - v3 delta: NEW — possible remainder of PPW-716's rewrite: the guard line is the round's code, but the blind spot may predate it, so no lineage is recorded rather than a guessed one (`seed_round: null`).
+
+### PPW-757 — The NuGet audit gate is asserted as a command string and never executed, and the shipping image restores without it
+
+- **What:** `CiRestore_HardFailsOnAuditWarnings` matches the literal `dotnet restore PhotoPrint.sln -p:FailOnAudit=true`, so nothing proves NU1901–NU1905 actually become errors: a `NoWarn`, or the props not being imported before restore, leaves the gate inert with the test still green. `Dockerfile:15` restores `PhotoPrint.API.csproj` with no audit flag, and `deploy.yml`'s `workflow_dispatch` path publishes an image with no CI run at all (`if: github.event_name == 'workflow_dispatch' || …conclusion == 'success'`), so the shipping image's own restore is never audited.
+- **Evidence:** `src/PhotoPrint.Tests/Unit/Configuration/DeploymentDefaultsTests.cs:121` (string assertion), `Dockerfile:15`, `.github/workflows/deploy.yml:6-15` — the three claims were checked and hold. The round recorded the same limit itself: PPW-718 is proven by configuration assertions only ([resolution-v1.md](resolution-v1.md), "Known limits of this round's evidence").
+- **Suggested fix:** Pin a known-vulnerable package version once and confirm `dotnet restore PhotoPrint.sln -p:FailOnAudit=true` exits non-zero; give the Dockerfile the same flag, and put `Dockerfile` and `deploy.yml` in a lens's scope.
+- **History:** <append-only, one line per event>
+  - v3 delta: found by completeness-critic (convergence 1, not hinted), reported as read; the Dockerfile and deploy-trigger claims were verified.
+  - v3 delta: `residual-of: PPW-718` — the gate is the round's own, and its only proof is the string assertion the round disclosed as a limit (seed round 1, area ci).

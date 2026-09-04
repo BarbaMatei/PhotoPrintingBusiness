@@ -72,3 +72,6 @@
 {"t":"2026-09-04T23:42:12+03:00","ev":"note","reason":"records gap: the resolution's recorded test filters omit ForwardedHeadersWithObservabilityTests, the class that pins the scrape-exclusion conjuncts and the boot-abort case, so verify-fixes.mjs never ran it","ids":["PPW-720","PPW-722"]}
 {"t":"2026-09-04T23:42:13+03:00","ev":"pass-records-done","pass":2}
 {"t":"2026-09-04T23:42:49+03:00","ev":"note","reason":"corrected the v2 index row: the script held 5 rows (PPW-713, 714, 717, 718, 723), hand levers held 5 (PPW-715, 716, 720, 721, 722), PPW-719 held on docs"}
+{"t":"2026-09-04T23:44:08+03:00","ev":"gate-parked","kind":"delta-worthiness","default":"delta discovery","reason":"the fix round fixed high-severity PPW-713 and PPW-714 — delta-worthy by the mechanical half of the rule"}
+{"t":"2026-09-04T23:45:37+03:00","ev":"pass-launch","pass":3,"type":"delta-discovery"}
+{"t":"2026-09-05T00:31:31+03:00","ev":"pass-records-done","pass":3}
