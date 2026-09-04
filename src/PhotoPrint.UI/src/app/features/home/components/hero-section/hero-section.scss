@@ -1,0 +1,132 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+:host {
+  display: block;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: $space-12;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: clamp(3rem, 8vh, 6rem) $space-6;
+
+  @media (max-width: #{$breakpoint-md}) {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: $space-10 $space-4 $space-8;
+  }
+}
+
+.hero__content {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+  @media (max-width: #{$breakpoint-md}) {
+    align-items: center;
+  }
+}
+
+.hero__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semi;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: $color-primary;
+}
+
+.hero__eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: $radius-full;
+  background: $color-accent;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.6;
+  }
+}
+
+.hero__headline {
+  font-family: $font-family-display;
+  font-size: clamp(2.4rem, 5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.1;
+  color: $color-neutral-900;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.hero__headline-em {
+  font-style: italic;
+  background: linear-gradient(135deg, $color-primary 0%, $color-accent 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero__sub {
+  font-size: $font-size-lg;
+  color: $color-neutral-500;
+  line-height: $line-height-relaxed;
+  max-width: 500px;
+  margin: 0;
+  @media (max-width: #{$breakpoint-md}) {
+    max-width: 420px;
+  }
+}
+
+.hero__actions {
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  flex-wrap: wrap;
+  @media (max-width: #{$breakpoint-md}) {
+    justify-content: center;
+  }
+}
+
+.hero__trust {
+  display: flex;
+  gap: $space-5;
+  flex-wrap: wrap;
+  @media (max-width: #{$breakpoint-md}) {
+    justify-content: center;
+  }
+}
+
+.hero__trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1 + 0.125rem;
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+  font-weight: $font-weight-medium;
+
+  svg {
+    color: $color-success;
+    flex-shrink: 0;
+  }
+}
+
+.hero__visual {
+  display: flex;
+  justify-content: center;
+  @media (max-width: #{$breakpoint-md}) {
+    display: none;
+  }
+}
