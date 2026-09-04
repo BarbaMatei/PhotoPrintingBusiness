@@ -74,3 +74,9 @@ last_updated: 2026-09-04T00:50:00Z
 - Decisions: verified against `origin/main` = `f2e70ad` rather than waiting for 054 — `git merge-base --is-ancestor origin/feat/bolt-054-dependency-hardening origin/main` says it is not merged, so the docs state main as it is today and the re-verify table is the merge-time contract the kickoff asks for. Criterion 2 ticked with an explicit deviation instead of restating "7 failures": no run in this repo ever measured that number, so `docs/KNOWN_FAILURES.md` documents the real classes (MinIO-gated S3 skips, seventeen PostgreSQL-backed classes erroring) and retires the figure. Re-verify rows carry the check to redo, not just "update this", so the merge-time reader can confirm each line without re-deriving it. Every version claim re-read from `src/PhotoPrint.API/PhotoPrint.API.csproj` and the absence of `Directory.Packages.props` and `.github/renovate.json` confirmed on disk, not taken from prose.
 - Dead ends: patching `bolt.md` with a `python` heredoc — no Python on this machine (exit 49); use node. LF-anchored string matching — repo markdown is CRLF, so normalize on read and restore on write. Writing a node script through a nested `node -e` — the injected regex literal put real CR/LF bytes in the file and split the source line; use a quoted heredoc instead. Making the `docs/DEPLOYMENT.md` §12.6 edits and the `deploy.yml` trigger fix here — both files belong to other groups this wave, so they are coordinator pointers.
 - Next: bolt complete
+
+## Session cost
+
+| Date | Bolt | Stage | Turns | Tools | Fresh | Cache read | Output | Misses |
+|---|---|---|---|---|---|---|---|---|
+| 2026-09-04T12:15:07Z | 057-architecture-and-standards-docs | hand-off | 59 | 35 | 0.3M | 3.7M | 0.1M | 0 |
