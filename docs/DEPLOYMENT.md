@@ -1100,7 +1100,7 @@ Every entry is parsed at boot; a single unparseable entry aborts startup with an
 | Entry | Meaning |
 |---|---|
 | `127.0.0.1`, `::1` | The shipped default. Local dev and same-host scrapers only. |
-| `172.20.0.0/16` | A Compose network subnet — use this, because Compose assigns container IPs dynamically and a fixed address for the Prometheus container is not guaranteed. |
+| `172.28.0.0/24` | The Compose network subnet this stack pins (`docker-compose.prod.yml`, `networks.default.ipam`) — use this, because Compose assigns container IPs dynamically and a fixed address for the Prometheus container is not guaranteed. Change it here whenever you change it there, or every scrape gets 403. |
 | `10.244.0.0/16` | A k8s pod CIDR for the monitoring namespace. |
 
 Find your Compose network's subnet with:
@@ -1120,7 +1120,7 @@ firewalled elsewhere.
 Env-var syntax for arrays is indexed:
 
 ```sh
-Observability__Metrics__AllowedScrapeIps__0=172.20.0.0/16
+Observability__Metrics__AllowedScrapeIps__0=172.28.0.0/24
 Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
 ```
 
@@ -1646,10 +1646,13 @@ Plain IPv4/IPv6 addresses **and** CIDR ranges, parsed and validated at boot by t
 must have all host bits zero, no leading-zero forms, no IPv4-mapped IPv6 ranges. One bad entry
 aborts startup naming it.
 
-**Empty is the default and means the feature is off** — the middleware is never registered and
-the client identity stays the TCP peer, exactly as before this bolt. The shipped `.env.example`
-leaves it commented out for that reason: read 16.3 first. Any non-Development boot with an empty
-list logs `forwarded_headers.disabled` at Warning, so "off" is never silent.
+**Empty is the `appsettings.json` default and means the feature is off** — the middleware is
+never registered and the client identity stays the TCP peer, exactly as before this bolt. That
+is not a safe default behind a proxy, it is the broken state the table above describes, so the
+shipped `.env.example` sets this key **live** to Caddy's pinned address and sizes
+`RateLimit__Public__PermitLimit` alongside it. Read 16.3 before you deploy: item 1 is the one
+number you must check against your own site. Any non-Development boot with an empty list logs
+`forwarded_headers.disabled` at Warning, so "off" is never silent.
 
 > **Indexed env vars merge with the array, they do not replace it** — the same trap as §14.5.
 > Set every index you intend to keep.
@@ -1668,9 +1671,16 @@ do exactly that for the scrape allow-list. The two settings answer different que
   an unlimited rate-limit budget for itself, a targeted denial of service against one real
   customer's partition, and forged addresses written into your audit trail.
 
+The `ipam` block also carries `ip_range: 172.28.0.128/25`, which confines Docker's dynamic
+allocations to the upper half of the subnet. Caddy's pinned `.2` sits outside that pool on
+purpose: `caddy depends_on api`, so `api` starts first, and without the `ip_range` Docker would
+hand `.2` to `api` itself and Caddy would fail to start with an "address already in use" error.
+Any range you pick must keep the proxy's static address outside the dynamic pool.
+
 If the host already routes `172.28.0.0/24`, `docker compose up` fails immediately with a pool
 overlap error. Pick another range in `docker-compose.prod.yml` (`networks.default.ipam`), move
-Caddy's `ipv4_address` with it, and update `ForwardedHeaders__TrustedProxies__0` to match.
+Caddy's `ipv4_address` and the `ip_range` with it, and update
+`ForwardedHeaders__TrustedProxies__0` to match.
 
 > **Upgrading a stack that is already running.** The subnet is new, and Docker will not apply an
 > `ipam` block to a network it already created. `docker compose -f docker-compose.prod.yml up -d`
@@ -1679,19 +1689,21 @@ Caddy's `ipv4_address` with it, and update `ForwardedHeaders__TrustedProxies__0`
 > changes with it — so re-check `Observability__Metrics__AllowedScrapeIps` (§14.5) at the same
 > time if it names addresses rather than a range.
 
-### 16.3 Read this before you switch it on
+### 16.3 Read this before you deploy
 
-Turning this on is the moment three behaviours change. Two are strict improvements. The first
-needs a decision from you.
+The shipped `.env.example` has this on, and three behaviours differ from an empty list. Two are
+strict improvements. The first needs a number from you.
 
 1. **The public rate-limit budget starts applying per client, for the first time.** It has never
    done so in production, because it has always been one shared bucket. `RateLimit:Public:PermitLimit`
    is `100` per 60 seconds, and the limiter runs *before* static files are served, so every
    JavaScript chunk, stylesheet and image of a page load spends a permit — as does every
-   thumbnail request in a gallery. **Load the site once with the browser's network panel open,
-   count the requests, and set the budget above that with room to spare** before you set
-   `TrustedProxies`. The boot log tells you the number in force:
-   `forwarded_headers.enabled trusted_proxies=… public_permit_limit=…`.
+   thumbnail request in a gallery. The `appsettings.json` value is `100` per 60 seconds, which is
+   too low for a single page load; the shipped `.env.example` therefore overrides it to `600`,
+   which fits a first load plus a browse. That number is a starting point, not a measurement of
+   your site: **load the site once with the browser's network panel open, count the requests, and
+   raise `RateLimit__Public__PermitLimit` if it exceeds the shipped budget.** The boot log tells
+   you the number in force: `forwarded_headers.enabled trusted_proxies=… public_permit_limit=…`.
 2. **The IP handed to the auth services becomes the real client.** No action needed, and no
    visible effect: nothing records that argument today, so no audit trail appears. This change
    makes the input correct for whoever wires one up.
@@ -1733,6 +1745,11 @@ silently stops working:
 | `forwarded_headers.untrusted_peer.log_cap_reached distinct_ips=512` | Too many distinct untrusted sources to keep logging; further ones are silent until restart | Expect this under a scan; investigate if it appears in normal traffic |
 
 ### 16.6 Verification after deploy
+
+Steps 1 and 3 read the container's stdout, which works because `appsettings.json` ships a
+`Console` sink alongside the rolling `File` one. The file sink writes to `/app/logs` inside the
+container and no volume is mounted there, so those files vanish with the container — stdout (and
+whatever collects it) is the durable copy.
 
 ```sh
 # 1. The boot log says the feature is on and which proxies are trusted.

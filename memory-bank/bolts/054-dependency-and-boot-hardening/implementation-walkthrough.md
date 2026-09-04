@@ -25,9 +25,10 @@ Docker restore stage and the CI cache key).
 Story 004 adds one new mechanism, shaped like every other optional integration in this codebase:
 a settings class bound to a config section, an `IValidateOptions` implementation that fails boot
 on a bad value, and an extension pair — one call in the service registration, one in the
-pipeline. It is off by default: an empty trusted-proxy list means the middleware is never
-registered at all, so no existing environment changes behaviour until an operator opts in. The
-deployment side gives that operator a fixed address to trust rather than a whole container
+pipeline. An empty trusted-proxy list means the middleware is never registered at all, so no
+existing environment changes behaviour on upgrade; the shipped `.env.example`, however, carries
+the real value, because behind a proxy an empty list is the broken state, not the safe one. The
+deployment side gives the operator a fixed address to trust rather than a whole container
 subnet.
 
 ### Completed Work
@@ -90,8 +91,10 @@ subnet.
   network, so trusting the range would let any container on it name the client — an unlimited
   rate-limit budget for itself, a targeted denial of service against one customer's partition,
   and forged addresses in the audit trail. The compose file pins a subnet so a `/32` is knowable.
-- **Off by default, but shipped switched on.** An empty list registers nothing, so no existing
-  environment changes; `.env.example` carries the real value so a fresh deploy is correct.
+- **Shipped switched on, with the rate-limit budget sized to match.** An empty list registers
+  nothing, so an upgrade in place changes nothing; `.env.example` carries the real value plus
+  `RateLimit__Public__PermitLimit=600`, because trusting the proxy is what first makes that
+  budget per-client and the `100` default cannot survive one page load.
 - **Pin what the API already resolves.** Where the two projects disagreed on a shared package,
   the central version is the one the API was resolving, so the production closure does not move.
   Verified: the only change to the API's resolved packages is the intended security pin.

@@ -66,8 +66,11 @@ volumes:
 
 # Declared so the proxy's address is knowable; Docker would otherwise pick the range at `up`
 # time. If the host already routes 172.28.0.0/24, change it here and in .env — DEPLOYMENT.md §16.
+# ip_range keeps the dynamic pool clear of caddy's pinned .2: `caddy depends_on api`, so api
+# starts first and would otherwise be handed .2 itself, leaving caddy unable to bind.
 networks:
   default:
     ipam:
       config:
         - subnet: 172.28.0.0/24
+          ip_range: 172.28.0.128/25
