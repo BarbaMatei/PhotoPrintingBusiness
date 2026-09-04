@@ -19,7 +19,11 @@ public class CartServiceTests
             .UseInMemoryDatabase($"CartSvc_{Guid.NewGuid():N}")
             .Options;
         _db = new PhotoPrintDbContext(options);
-        _sut = new CartService(_db);
+        _sut = new CartService(
+            _db,
+            Helpers.TestCoupons.ServiceFor(_db),
+            Microsoft.Extensions.Options.Options.Create(
+                new PhotoPrint.API.Configuration.VatSettings()));
     }
 
     // ── Seed helpers ──────────────────────────────────────────────────────────

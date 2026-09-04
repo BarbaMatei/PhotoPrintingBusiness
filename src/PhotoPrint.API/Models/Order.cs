@@ -19,6 +19,10 @@ public class Order
     public decimal SubtotalRon { get; set; }
     public decimal TotalRon { get; set; }
 
+    public string? CouponCode { get; set; }
+
+    public decimal DiscountRon { get; set; }
+
     // ── VAT breakdown (bolt 038) ─────────────────────────────────────────────
     /// <summary>Net (VAT-exclusive) total in RON. Snapshot at order creation;
     /// not re-derived from a live config rate. Invariant:

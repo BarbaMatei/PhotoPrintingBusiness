@@ -8,6 +8,8 @@ public record OrderPaymentStatusDto(
     decimal TotalRon,
     decimal VatRon,
     decimal VatRate,
+    string? CouponCode,
+    decimal DiscountRon,
     string DeliveryType,
     DateTimeOffset CreatedAt,
     DateTimeOffset? PaidAt);

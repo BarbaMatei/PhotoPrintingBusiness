@@ -3,17 +3,26 @@ id: 047-coupon-domain-and-api
 unit: 001-coupon-domain-and-api
 intent: 022-coupon-promo-codes
 type: ddd-construction-bolt
-status: planned
+status: in-progress
 stories:
   - 001-coupon-schema
   - 002-cart-coupon-endpoints
   - 003-redemption-on-order-create
   - 004-admin-coupon-crud
 created: 2026-05-25T10:45:00Z
-started: null
+started: 2026-09-03T20:42:00Z
 completed: null
-current_stage: null
-stages_completed: []
+current_stage: implement
+stages_completed:
+  - name: domain-model
+    completed: 2026-09-03T20:50:00Z
+    artifact: ddd-01-domain-model.md
+  - name: technical-design
+    completed: 2026-09-04T00:30:00Z
+    artifact: ddd-02-technical-design.md
+  - name: adr-analysis
+    completed: 2026-09-04T00:55:00Z
+    artifact: adr-025-coupon-redemption-cas-not-rowversion.md, adr-026-discount-before-vat-extraction.md
 
 requires_bolts: [038-vat-calculation, 015-shipping-and-order-core]
 enables_bolts: [048-coupon-frontend]

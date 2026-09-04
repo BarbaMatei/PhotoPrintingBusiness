@@ -221,6 +221,8 @@ namespace PhotoPrint.API.Migrations
                     ShippingCostRon = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
                     SubtotalRon = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
                     TotalRon = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
+                    CouponCode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    DiscountRon = table.Column<decimal>(type: "numeric(10,2)", nullable: false, defaultValue: 0m),
                     NetTotalRon = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     VatRon = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     VatRate = table.Column<decimal>(type: "numeric(5,4)", nullable: false),
@@ -473,6 +475,134 @@ namespace PhotoPrint.API.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
+
+            migrationBuilder.CreateTable(
+                name: "Coupons",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Type = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Value = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
+                    MinSubtotalRon = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
+                    ValidFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ValidUntil = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    MaxRedemptions = table.Column<int>(type: "integer", nullable: true),
+                    RedemptionsCount = table.Column<int>(type: "integer", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Coupons", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CartCoupons",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    GuestSessionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CouponId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AppliedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CartCoupons", x => x.Id);
+                    table.CheckConstraint("CK_CartCoupons_OneOwner", "(\"UserId\" IS NOT NULL AND \"GuestSessionId\" IS NULL) OR (\"UserId\" IS NULL AND \"GuestSessionId\" IS NOT NULL)");
+                    table.ForeignKey(
+                        name: "FK_CartCoupons_Coupons_CouponId",
+                        column: x => x.CouponId,
+                        principalTable: "Coupons",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CartCoupons_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CouponRedemptions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CouponId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrderId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DiscountRon = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
+                    RedeemedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CouponRedemptions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_CouponRedemptions_Coupons_CouponId",
+                        column: x => x.CouponId,
+                        principalTable: "Coupons",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CouponRedemptions_Orders_OrderId",
+                        column: x => x.OrderId,
+                        principalTable: "Orders",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CouponRedemptions_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_cart_coupons_guest",
+                table: "CartCoupons",
+                column: "GuestSessionId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_cart_coupons_user",
+                table: "CartCoupons",
+                column: "UserId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CartCoupons_CouponId",
+                table: "CartCoupons",
+                column: "CouponId");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_coupon_redemptions_coupon_id",
+                table: "CouponRedemptions",
+                column: "CouponId");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_coupon_redemptions_order_id",
+                table: "CouponRedemptions",
+                column: "OrderId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_coupon_redemptions_user_coupon",
+                table: "CouponRedemptions",
+                columns: new[] { "UserId", "CouponId" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_coupons_code",
+                table: "Coupons",
+                column: "Code",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_coupons_is_active_valid_until",
+                table: "Coupons",
+                columns: new[] { "IsActive", "ValidUntil" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_cart_items_guest_added_at",
@@ -749,6 +879,15 @@ namespace PhotoPrint.API.Migrations
         {
             migrationBuilder.Sql(
                 "DROP SEQUENCE IF EXISTS \"invoice_seq_ft_2026\";");
+
+            migrationBuilder.DropTable(
+                name: "CartCoupons");
+
+            migrationBuilder.DropTable(
+                name: "CouponRedemptions");
+
+            migrationBuilder.DropTable(
+                name: "Coupons");
 
             migrationBuilder.DropTable(
                 name: "CartItems");
