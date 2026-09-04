@@ -1,0 +1,97 @@
+<div class="form-group">
+  <label>Etichetă (ex: Acasă, Birou)</label>
+  <input
+    type="text"
+    formControlName="label"
+    class="form-control"
+    [class.is-invalid]="fi('label')"
+  />
+  @if (fi('label')) {
+    <span class="field-error">Eticheta este obligatorie.</span>
+  }
+</div>
+<div class="form-row">
+  <div class="form-group">
+    <label>Nume complet</label>
+    <input
+      type="text"
+      formControlName="fullName"
+      class="form-control"
+      [class.is-invalid]="fi('fullName')"
+    />
+    @if (fi('fullName')) {
+      <span class="field-error">Numele complet este obligatoriu.</span>
+    }
+  </div>
+  <div class="form-group">
+    <label>Telefon</label>
+    <input
+      type="tel"
+      formControlName="phone"
+      class="form-control"
+      [class.is-invalid]="fi('phone')"
+      placeholder="07XXXXXXXX"
+    />
+    @if (fi('phone')) {
+      <span class="field-error">Introdu un număr de mobil valid (07XXXXXXXX).</span>
+    }
+  </div>
+</div>
+<div class="form-group">
+  <label>Adresă</label>
+  <input
+    type="text"
+    formControlName="addressLine"
+    class="form-control"
+    [class.is-invalid]="fi('addressLine')"
+    placeholder="Str. Exemplu, nr. 1, bl. A, ap. 5"
+  />
+  @if (fi('addressLine')) {
+    <span class="field-error">Adresa este obligatorie.</span>
+  }
+</div>
+<div class="form-row form-row--3">
+  <div class="form-group">
+    <label>Oraș</label>
+    <input
+      type="text"
+      formControlName="city"
+      class="form-control"
+      [class.is-invalid]="fi('city')"
+    />
+    @if (fi('city')) {
+      <span class="field-error">Orașul este obligatoriu.</span>
+    }
+  </div>
+  <div class="form-group">
+    <label>Județ</label>
+    <input
+      type="text"
+      formControlName="county"
+      class="form-control"
+      [class.is-invalid]="fi('county')"
+    />
+    @if (fi('county')) {
+      <span class="field-error">Județul este obligatoriu.</span>
+    }
+  </div>
+  <div class="form-group">
+    <label>Cod poștal</label>
+    <input
+      type="text"
+      formControlName="postalCode"
+      class="form-control"
+      [class.is-invalid]="fi('postalCode')"
+      placeholder="XXXXXX"
+    />
+    @if (fi('postalCode')) {
+      <span class="field-error">Cod poștal invalid (6 cifre).</span>
+    }
+  </div>
+</div>
+<div class="form-group form-group--checkbox">
+  <label class="checkbox-label">
+    <input type="checkbox" formControlName="isDefault" />
+    Setează ca adresă implicită
+  </label>
+</div>

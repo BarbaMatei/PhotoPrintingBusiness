@@ -8,6 +8,13 @@ import { Component } from '@angular/core';
       <p>Această secțiune este în curs de dezvoltare.</p>
     </div>
   `,
-  styles: [`.placeholder-page { padding: 2rem; text-align: center; }`],
+  styles: [
+    `
+      .placeholder-page {
+        padding: 2rem;
+        text-align: center;
+      }
+    `,
+  ],
 })
 export class AccountPage {}
