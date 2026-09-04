@@ -44,6 +44,7 @@ last_updated: 2026-09-04T12:13:50Z
 | Date | Bolt | Stage | Turns | Tools | Fresh | Cache read | Output | Misses |
 |---|---|---|---|---|---|---|---|---|
 | 2026-09-04T12:16:25Z | 054-dependency-and-boot-hardening | implement | 71 | 39 | 0.4M | 4.4M | 0.1M | 4 |
+| 2026-09-04T12:32:20Z | 054-dependency-and-boot-hardening | test | 69 | 42 | 0.3M | 4.6M | 0.0M | 0 |
 
 ## Stage exit — 054-dependency-and-boot-hardening — test — 2026-09-04T12:26:34Z
 - Done: stage 3 complete; the bolt is at `status: review-pending`, `current_stage: review`. Re-ran the bolt's scoped suites at the gate through `reviews/lib/run-scoped-tests.mjs --kind green --summary --no-events`: `dotnet list package --vulnerable --include-transitive` clean on both projects; `ForwardedHeaders|UntrustedForwardedPeer|Metrics|PhotoPrint.Tests.Unit.Controllers` 140 passed / 0 failed; `Stripe|Webhook|Payment` 74 passed / 0 failed; `UntrustedForwardedPeer` 4 passed / 0 failed. Updated `memory-bank/bolts/054-dependency-and-boot-hardening/test-walkthrough.md` (test count 24 → 28, the new middleware test file, the drift-warning rows of the failure-mode table filled with real test names, a third mutation check, the stage-3 command table, three added acceptance-criteria rows) and `bolt.md` (stage-3 checkbox, all five Success Criteria ticked with what proves each).
