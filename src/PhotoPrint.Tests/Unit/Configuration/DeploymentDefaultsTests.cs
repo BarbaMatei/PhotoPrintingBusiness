@@ -35,41 +35,53 @@ public class DeploymentDefaultsTests
     }
 
     [Fact]
-    public void ProductionSerilogConfig_HasConsoleSink()
+    public void ProductionSerilogConfig_ShipsConsoleAndFileSinks()
     {
-        using var document = JsonDocument.Parse(
-            RepoFiles.ReadAllText("src", "PhotoPrint.API", "appsettings.json"));
-
-        var sinks = document.RootElement
-            .GetProperty("Serilog").GetProperty("WriteTo").EnumerateArray()
-            .Select(sink => sink.GetProperty("Name").GetString())
-            .ToList();
+        var sinks = MergedSinkNames("appsettings.Production.json");
 
         sinks.Should().Contain(
             "Console",
             "the runbook verifies this bolt with `docker compose logs api | grep …`, which reads stdout");
+        sinks.Should().Contain("File", "production keeps the rolling audit trail on disk");
+    }
+
+    [Theory]
+    [InlineData("appsettings.Development.json")]
+    [InlineData("appsettings.Testing.json")]
+    public void NonProductionSerilogConfigs_WriteNoLogFiles(string overlay)
+    {
+        MergedSinkNames(overlay).Should().NotContain(
+            "File",
+            "configuration arrays merge by index and cannot be truncated, so a File sink left in "
+            + "the base opens logs/*.json in every dev run and every test host");
     }
 
     [Fact]
-    public void EnvExampleScrapeIpsMatchComposeSubnet()
+    public void EnvExampleScrapeIpsSitInsideComposeDynamicPool()
     {
-        var subnet   = ComposeIpamValue("subnet");
-        var declared = IPNetwork.Parse(subnet);
+        var pool     = IPNetwork.Parse(ComposeIpamValue("ip_range"));
+        var caddy    = IPAddress.Parse(CaddyStaticAddress());
         var examples = EnvExampleValues("Observability__Metrics__AllowedScrapeIps__", includeCommented: true)
             .Where(value => value.Contains('/'))
             .ToList();
 
-        subnet.Should().Be(PinnedSubnet);
+        ComposeIpamValue("subnet").Should().Be(PinnedSubnet);
         examples.Should().NotBeEmpty("§14.5 offers a range example for the Compose network");
         examples.Should().NotContain(StaleBridgeSubnet);
+        examples.Should().NotContain(
+            PinnedSubnet,
+            "the whole subnet spans the reverse proxy's pinned address, which the same file forbids allow-listing");
 
         foreach (var example in examples)
         {
             var range = IPNetwork.Parse(example);
-            declared.Contains(range.BaseAddress).Should().BeTrue(
-                "{0} must sit inside the pinned Compose subnet or the allow-list can never match",
+            pool.Contains(range.BaseAddress).Should().BeTrue(
+                "{0} must sit inside the pool Compose allocates from, or the allow-list can never match",
                 example);
-            range.PrefixLength.Should().BeGreaterThanOrEqualTo(declared.PrefixLength);
+            range.PrefixLength.Should().BeGreaterThanOrEqualTo(pool.PrefixLength);
+            range.Contains(caddy).Should().BeFalse(
+                "{0} covers the reverse proxy, whose address every proxied request carries",
+                example);
         }
     }
 
@@ -115,6 +127,28 @@ public class DeploymentDefaultsTests
             + "on the CI restore a new advisory reaches main as a warning nobody reads");
         ci.Should().NotContain("dotnet list package --vulnerable",
             "that command exits 0 on findings, so it cannot be the gate");
+    }
+
+    private static List<string?> MergedSinkNames(string overlay)
+    {
+        var shipped  = SinkNames("appsettings.json");
+        var overlaid = SinkNames(overlay);
+
+        return shipped
+            .Select((name, index) => index < overlaid.Count ? overlaid[index] : name)
+            .Concat(overlaid.Skip(shipped.Count))
+            .ToList();
+    }
+
+    private static List<string?> SinkNames(string file)
+    {
+        using var document = JsonDocument.Parse(
+            RepoFiles.ReadAllText("src", "PhotoPrint.API", file));
+
+        return document.RootElement.TryGetProperty("Serilog", out var serilog)
+            && serilog.TryGetProperty("WriteTo", out var sinks)
+                ? sinks.EnumerateArray().Select(sink => sink.GetProperty("Name").GetString()).ToList()
+                : [];
     }
 
     private static string CaddyStaticAddress()

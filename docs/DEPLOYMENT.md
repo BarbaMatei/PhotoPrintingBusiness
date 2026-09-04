@@ -1100,13 +1100,13 @@ Every entry is parsed at boot; a single unparseable entry aborts startup with an
 | Entry | Meaning |
 |---|---|
 | `127.0.0.1`, `::1` | The shipped default. Local dev and same-host scrapers only. |
-| `172.28.0.0/24` | The Compose network subnet this stack pins (`docker-compose.prod.yml`, `networks.default.ipam`) — use this, because Compose assigns container IPs dynamically and a fixed address for the Prometheus container is not guaranteed. Change it here whenever you change it there, or every scrape gets 403. |
+| `172.28.0.128/25` | The Compose network's **dynamic pool** (`docker-compose.prod.yml`, `networks.default.ipam.ip_range`) — use this, not the `172.28.0.0/24` subnet: Compose assigns scraper containers out of the pool, and the pool deliberately excludes Caddy's pinned `172.28.0.2`, which §14.3 forbids allow-listing. Change it here whenever you change it there, or every scrape gets 403. |
 | `10.244.0.0/16` | A k8s pod CIDR for the monitoring namespace. |
 
-Find your Compose network's subnet with:
+Find your Compose network's dynamic pool with:
 
 ```sh
-docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.IPRange}}{{end}}'
 ```
 
 Rules the validator enforces: at least one entry; every entry parses; CIDR base addresses have
@@ -1120,7 +1120,7 @@ firewalled elsewhere.
 Env-var syntax for arrays is indexed:
 
 ```sh
-Observability__Metrics__AllowedScrapeIps__0=172.28.0.0/24
+Observability__Metrics__AllowedScrapeIps__0=172.28.0.128/25
 Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
 ```
 
@@ -1759,9 +1759,10 @@ silently stops working:
 ### 16.6 Verification after deploy
 
 Steps 1 and 3 read the container's stdout, which works because `appsettings.json` ships a
-`Console` sink alongside the rolling `File` one. The file sink writes to `/app/logs` inside the
-container and no volume is mounted there, so those files vanish with the container — stdout (and
-whatever collects it) is the durable copy.
+`Console` sink and `appsettings.Production.json` adds the rolling `File` one — kept out of the
+base so Development and Testing, whose arrays merge by index, never open `logs/*.json`. The file
+sink writes to `/app/logs` inside the container and no volume is mounted there, so those files
+vanish with the container — stdout (and whatever collects it) is the durable copy.
 
 ```sh
 # 1. The boot log says the feature is on and which proxies are trusted.

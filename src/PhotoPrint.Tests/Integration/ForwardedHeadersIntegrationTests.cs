@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PhotoPrint.Tests.Helpers;
 
 namespace PhotoPrint.Tests.Integration;
@@ -99,7 +100,7 @@ public class ForwardedHeadersIntegrationTests
 
         var act = () => factory.CreateClient();
 
-        act.Should().Throw<Exception>()
+        act.Should().Throw<OptionsValidationException>()
             .Which.ToString().Should().Contain("TrustedProxies").And.Contain("not.an.ip");
     }
 }
@@ -145,7 +146,7 @@ public class ForwardedHeadersWithObservabilityTests
 
         var act = () => factory.CreateClient();
 
-        act.Should().Throw<Exception>()
+        act.Should().Throw<OptionsValidationException>()
             .Which.ToString().Should().Contain("Observability:Metrics:ScrapePort");
     }
 }

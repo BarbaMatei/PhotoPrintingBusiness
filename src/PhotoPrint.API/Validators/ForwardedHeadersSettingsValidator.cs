@@ -34,6 +34,7 @@ public sealed class ForwardedHeadersSettingsValidator : IValidateOptions<Forward
                     + $"pair (/{pairPrefix}). Every host in it can reach the API's exposed ports "
                     + "directly and would be believed about who the client is — name the proxy's "
                     + "own address instead.");
+                continue;
             }
 
             if (network.BaseAddress.IsIPv6LinkLocal)
