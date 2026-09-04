@@ -43,16 +43,30 @@ describe('couponErrorMessage', () => {
     );
   });
 
-  it('falls back to the server detail for an unknown code', () => {
+  it('never shows the server sentence for an unknown code', () => {
     const message = couponErrorMessage(problem(422, 'SOMETHING_NEW', 'Server explains itself.'));
 
-    expect(message).toBe('Server explains itself.');
+    expect(message).toBe('Codul introdus nu poate fi folosit.');
   });
 
   it('falls back to the default sentence when the body has neither code nor detail', () => {
-    const message = couponErrorMessage(new HttpErrorResponse({ status: 500 }));
+    const message = couponErrorMessage(problem(422, null));
 
     expect(message).toBe('Codul introdus nu poate fi folosit.');
+  });
+
+  it('blames the service, not the code, for a 500', () => {
+    const message = couponErrorMessage(new HttpErrorResponse({ status: 500 }));
+
+    expect(message).toBe('Nu am putut verifica codul acum. Încearcă din nou în câteva momente.');
+  });
+
+  it('blames the service, not the code, when the request never reached the server', () => {
+    const message = couponErrorMessage(
+      new HttpErrorResponse({ status: 0, error: new ProgressEvent('error') }),
+    );
+
+    expect(message).toBe('Nu am putut verifica codul acum. Încearcă din nou în câteva momente.');
   });
 });
 

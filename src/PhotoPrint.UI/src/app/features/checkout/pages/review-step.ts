@@ -64,7 +64,7 @@ import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupo
       </div>
 
       @if (couponStale()) {
-        <div class="coupon-warning">
+        <div class="coupon-warning" role="alert">
           <span>{{ staleMessage() }}</span>
           <button
             type="button"
@@ -75,7 +75,7 @@ import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupo
         </div>
       }
       @if (couponError()) {
-        <p class="coupon-error">{{ couponError() }}</p>
+        <p class="coupon-error" role="alert">{{ couponError() }}</p>
       }
 
       <!-- Totals -->
@@ -119,7 +119,7 @@ import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupo
         <button
           type="button"
           class="btn btn--primary"
-          [disabled]="!termsCtrl.value"
+          [disabled]="!termsCtrl.value || couponStale()"
           (click)="proceed()"
         >
           Plătește acum →
@@ -293,6 +293,7 @@ export class ReviewStep implements OnInit {
 
   proceed(): void {
     if (!this.termsCtrl.value) return;
+    if (this.couponStale()) return;
     this.router.navigate(['/checkout/plata']);
   }
 }

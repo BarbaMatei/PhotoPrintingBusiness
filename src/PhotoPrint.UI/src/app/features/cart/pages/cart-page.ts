@@ -105,7 +105,7 @@ import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupo
                   >Elimină</button>
                 </div>
                 @if (couponStale) {
-                  <p class="coupon-box__warning">{{ staleMessage }}</p>
+                  <p class="coupon-box__warning" role="alert">{{ staleMessage }}</p>
                 }
               } @else {
                 <label class="coupon-box__label" for="coupon-code">Cod promo</label>
@@ -127,7 +127,7 @@ import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupo
                 </div>
               }
               @if (couponError) {
-                <p class="coupon-box__error">{{ couponError }}</p>
+                <p class="coupon-box__error" role="alert">{{ couponError }}</p>
               }
             </div>
 

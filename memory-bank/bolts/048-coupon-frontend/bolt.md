@@ -20,6 +20,9 @@ stages_completed:
   - name: test
     completed: 2026-09-04T16:15:00Z
     artifact: test-walkthrough.md
+  - name: micro-review
+    completed: 2026-09-04T17:05:00Z
+    artifact: test-walkthrough.md
 
 requires_bolts: [047-coupon-domain-and-api, 014-upload-format-cart-ui, 039-efactura-anaf]
 enables_bolts: []

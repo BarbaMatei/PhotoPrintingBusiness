@@ -36,6 +36,8 @@ export interface OrderDetailDto extends OrderSummaryDto {
   vatRon: number;
   vatRate: number;
   shippingCostRon: number;
+  couponCode: string | null;
+  discountRon: number;
   paidAt: string | null;
   lockerId: string | null;
   lockerName: string | null;

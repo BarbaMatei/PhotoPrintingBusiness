@@ -1,9 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
-import { BehaviorSubject, of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, of, throwError } from 'rxjs';
+import { vi } from 'vitest';
 import { ReviewStep } from './review-step';
 import { CartService } from '../../../core/services/cart.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
@@ -215,5 +217,55 @@ describe('ReviewStep', () => {
     fixture.detectChanges();
 
     expect(fixture.debugElement.query(By.css('.coupon-warning'))).toBeNull();
+  });
+
+  it('will not send a stale coupon to payment, where the 409 it causes has no way out', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'TRANSPORT0',
+      couponType: 'FreeShipping',
+      couponStatus: 'stale',
+      couponReason: 'COUPON_EXHAUSTED',
+      discountRon: 0,
+      totalRon: 250,
+    }));
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const fixture = createFixture();
+    fixture.componentInstance.termsCtrl.setValue(true);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+
+    fixture.componentInstance.proceed();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('shows a Romanian sentence and stays usable when removing the coupon fails', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'VARA10',
+      couponType: 'Percent',
+      couponStatus: 'stale',
+      couponReason: 'COUPON_EXHAUSTED',
+      discountRon: 0,
+      totalRon: 250,
+    }));
+    TestBed.overrideProvider(CartService, {
+      useValue: {
+        cart$: cartSubject.asObservable(),
+        clearCoupon: () =>
+          throwError(() => new HttpErrorResponse({ status: 500 })),
+      },
+    });
+    const fixture = createFixture();
+    fixture.detectChanges();
+
+    (fixture.debugElement.query(By.css('.coupon-warning__remove')).nativeElement as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const error = fixture.debugElement.query(By.css('.coupon-error'));
+    expect(error.nativeElement.textContent).toContain('Nu am putut verifica codul acum.');
+    expect(fixture.componentInstance.couponPending()).toBe(false);
+    expect(fixture.debugElement.query(By.css('.coupon-warning'))).not.toBeNull();
   });
 });

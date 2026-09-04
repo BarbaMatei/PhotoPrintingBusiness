@@ -192,6 +192,10 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                 new XAttribute("currencyID", CurrencyCode),
                 FormatMoney(invoice.NetTotalRon)));
 
+        total.Add(new XElement(Cbc + "TaxInclusiveAmount",
+            new XAttribute("currencyID", CurrencyCode),
+            FormatMoney(invoice.TotalRon)));
+
         if (allowanceNet > 0m)
         {
             total.Add(new XElement(Cbc + "AllowanceTotalAmount",
@@ -199,13 +203,9 @@ public sealed class InvoiceXmlBuilder : IInvoiceXmlBuilder
                 FormatMoney(allowanceNet)));
         }
 
-        total.Add(
-            new XElement(Cbc + "TaxInclusiveAmount",
-                new XAttribute("currencyID", CurrencyCode),
-                FormatMoney(invoice.TotalRon)),
-            new XElement(Cbc + "PayableAmount",
-                new XAttribute("currencyID", CurrencyCode),
-                FormatMoney(invoice.TotalRon)));
+        total.Add(new XElement(Cbc + "PayableAmount",
+            new XAttribute("currencyID", CurrencyCode),
+            FormatMoney(invoice.TotalRon)));
 
         return total;
     }

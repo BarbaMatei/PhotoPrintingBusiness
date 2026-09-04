@@ -279,4 +279,32 @@ describe('CartService', () => {
     expect(freshService.snapshot.couponStatus).toBe('stale');
     freshHttp.verify();
   });
+
+  it('keeps the restored guest cart when that coupon re-read fails', () => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(discountedCart()));
+
+    TestBed.resetTestingModule();
+    isAuthSubject = new BehaviorSubject<boolean>(false);
+    const mockAuth = {
+      isAuthenticated$: isAuthSubject.asObservable(),
+      isAuthenticated: () => false,
+      getAccessToken: () => null,
+      getGuestToken: () => 'guest',
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: mockAuth },
+      ],
+    });
+    const freshService = TestBed.inject(CartService);
+    const freshHttp = TestBed.inject(HttpTestingController);
+
+    freshHttp.expectOne(BASE).error(new ProgressEvent('error'), { status: 0, statusText: '' });
+
+    expect(freshService.snapshot.itemCount).toBe(discountedCart().itemCount);
+    expect(freshService.snapshot.couponCode).toBe('VARA10');
+    freshHttp.verify();
+  });
 });
