@@ -3,7 +3,7 @@ id: 047-coupon-domain-and-api
 unit: 001-coupon-domain-and-api
 intent: 022-coupon-promo-codes
 type: ddd-construction-bolt
-status: in-progress
+status: review-pending
 stories:
   - 001-coupon-schema
   - 002-cart-coupon-endpoints
@@ -12,7 +12,7 @@ stories:
 created: 2026-05-25T10:45:00Z
 started: 2026-09-03T20:42:00Z
 completed: null
-current_stage: test
+current_stage: complete
 stages_completed:
   - name: domain-model
     completed: 2026-09-03T20:50:00Z
@@ -26,6 +26,9 @@ stages_completed:
   - name: implement
     completed: 2026-09-04T01:40:00Z
     artifact: src/PhotoPrint.API (coupon domain, endpoints, migration)
+  - name: test
+    completed: 2026-09-04T14:40:00Z
+    artifact: ddd-03-test-report.md
 
 requires_bolts: [038-vat-calculation, 015-shipping-and-order-core]
 enables_bolts: [048-coupon-frontend]
