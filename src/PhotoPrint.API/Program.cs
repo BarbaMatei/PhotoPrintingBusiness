@@ -119,6 +119,7 @@ builder.Services.AddHealthChecks()
 
 // ── Security Baselines ───────────────────────────────────────────────────────
 builder.Services.AddSecurityBaselines(builder.Configuration);
+builder.Services.AddTrustedProxyForwardedHeaders(builder.Configuration);
 
 // ── Email Infrastructure ──────────────────────────────────────────────────────
 builder.Services.AddEmailInfrastructure(builder.Configuration);
@@ -371,6 +372,7 @@ if (promoteIdx >= 0)
 }
 
 // ── Middleware Pipeline (ORDER MATTERS) ───────────────────────────────────────
+app.UseTrustedProxyForwardedHeaders();
 app.UseCorrelationId();          // 1st: stamp correlation ID on every request
 app.UseGlobalExceptionHandler(); // 2nd: catch all unhandled exceptions
 app.UseSerilogRequestLogging();  // 3rd: structured request log per request

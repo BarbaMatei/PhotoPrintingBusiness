@@ -88,6 +88,33 @@ public class MetricsEndpointIntegrationTests
     }
 
     [Fact]
+    public async Task Forwarded_for_cannot_open_the_scrape_gate()
+    {
+        using var factory = new ObservabilityEnabledForwardedHeadersFactory();
+        using var client  = factory.CreateClient();
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/metrics");
+        request.Headers.Add("X-Forwarded-For", "10.42.0.5");
+
+        var response = await client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await response.Content.ReadAsStringAsync()).Should().NotContain("# HELP");
+    }
+
+    [Fact]
+    public async Task An_allow_listed_peer_still_scrapes_when_forwarded_headers_are_configured()
+    {
+        using var factory = new ObservabilityEnabledForwardedHeadersScraperFactory();
+        using var client  = factory.CreateClient();
+
+        var response = await client.GetAsync("/metrics");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("# HELP");
+    }
+
+    [Fact]
     public async Task A_business_metric_reaches_the_exposition()
     {
         // # HELP / # TYPE alone are emitted by the runtime and ASP.NET instrumentation, so they
@@ -262,6 +289,32 @@ internal sealed class ObservabilityEnabledScrapeListenerFactory : ObservabilityF
         ["Observability:Enabled"]                     = "true",
         ["Observability:Metrics:ScrapePort"]          = "9090",
         ["Observability:Metrics:AllowedScrapeIps:0"]  = "10.42.0.5",
+    };
+    protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("10.42.0.5");
+    protected override int SimulatedLocalPort() => 9090;
+}
+
+internal sealed class ObservabilityEnabledForwardedHeadersFactory : ObservabilityFactoryBase
+{
+    protected override Dictionary<string, string?> ExtraConfig() => new()
+    {
+        ["Observability:Enabled"]                    = "true",
+        ["Observability:Metrics:ScrapePort"]         = "9090",
+        ["Observability:Metrics:AllowedScrapeIps:0"] = "10.42.0.5",
+        ["ForwardedHeaders:TrustedProxies:0"]        = "172.28.0.2",
+    };
+    protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("172.28.0.2");
+    protected override int SimulatedLocalPort() => 9090;
+}
+
+internal sealed class ObservabilityEnabledForwardedHeadersScraperFactory : ObservabilityFactoryBase
+{
+    protected override Dictionary<string, string?> ExtraConfig() => new()
+    {
+        ["Observability:Enabled"]                    = "true",
+        ["Observability:Metrics:ScrapePort"]         = "9090",
+        ["Observability:Metrics:AllowedScrapeIps:0"] = "10.42.0.5",
+        ["ForwardedHeaders:TrustedProxies:0"]        = "172.28.0.2",
     };
     protected override IPAddress? SimulatedRemoteIp() => IPAddress.Parse("10.42.0.5");
     protected override int SimulatedLocalPort() => 9090;

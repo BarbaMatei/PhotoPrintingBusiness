@@ -37,7 +37,7 @@ C4Context
 
 - **NuGet.org**: package source; Central Package Management pins one version per package at restore.
 - **GitHub + Renovate App**: grouped, scheduled upgrade PRs; vulnerability alerts labelled `security`.
-- **Caddy reverse proxy**: terminates TLS and sets `X-Forwarded-For`; the `/metrics` allow-list must trust only its CIDR.
+- **Caddy reverse proxy**: terminates TLS and replaces `X-Forwarded-For`; only its own address is trusted, and the `/metrics` scrape listener ignores the header entirely.
 - **OpenTelemetry collector / Stripe**: downstream consumers of the patched OTel pipeline and unified Stripe.net SDK.
 
 ## High-Level Constraints
@@ -50,4 +50,4 @@ C4Context
 
 - `dotnet list package --vulnerable` returns clean.
 - Exactly one resolved version per package solution-wide.
-- `/metrics` allow-list evaluates the real client IP (no spoofing via untrusted proxies).
+- `/metrics` allow-list evaluates the connecting peer; a forwarded address cannot open the scrape gate.

@@ -1,0 +1,79 @@
+{"t":"2026-09-04T20:49:37+03:00","ev":"run-start","reason":"unattended review loop for 054-dependency-hardening"}
+{"t":"2026-09-04T20:50:41+03:00","ev":"test-run","kind":"baseline","passed":28,"failed":0,"duration_s":20.928,"filter":"Forwarded","skipped":0}
+{"t":"2026-09-04T20:50:49+03:00","ev":"test-run","kind":"baseline","passed":28,"failed":0,"duration_s":7.158,"filter":"MetricsEndpoint","skipped":0}
+{"t":"2026-09-04T20:51:02+03:00","ev":"pass-launch","pass":1,"type":"full-discovery"}
+{"t":"2026-09-04T20:51:30+03:00","ev":"note","reason":"discovery v1 workflow runId wf_4bf8943b-81c (8 lenses)"}
+{"t":"2026-09-04T21:55:09+03:00","ev":"pass-records-done","pass":1}
+{"t":"2026-09-04T22:06:00+03:00","ev":"doc-gate","pass":1,"verdict":"approve","reason":"lint clean; judge disapproved twice (requirements.md line number, coined verdict label), both replacements applied verbatim"}
+{"t":"2026-09-04T22:08:09+03:00","ev":"round-start","round":1}
+{"t":"2026-09-04T22:12:38+03:00","ev":"triage-done","round":1,"clusters":4,"checks_needed":1,"pre_cleared":"PPW-711,PPW-712,PPW-718","gates":2}
+{"t":"2026-09-04T22:12:38+03:00","ev":"protocol-written","round":1,"cluster":"proxy-trust","ids":["PPW-715","PPW-716","PPW-719","PPW-720","PPW-721","PPW-722"]}
+{"t":"2026-09-04T22:12:39+03:00","ev":"gate-parked","round":1,"kind":"fixer-decision","default":"uphold the DEPLOYMENT.md §16.7 item 3 deferral; change no limiter code","reason":"PPW-711+PPW-712 are one change or neither; whether the bolt absorbs the limiter redesign is an owner ruling"}
+{"t":"2026-09-04T22:12:39+03:00","ev":"gate-parked","round":1,"kind":"fixer-decision","default":"recorded in the resolution Decisions only; no backlog rows minted, PPW-718 not widened","reason":"four CI gaps named by the PPW-718 pre-check sit outside the finding set; routing them is the owner ruling"}
+{"t":"2026-09-04T22:12:44+03:00","ev":"check-dispatched","round":1,"cluster":"proxy-trust","ids":["PPW-715","PPW-716","PPW-719","PPW-720","PPW-721","PPW-722"]}
+{"t":"2026-09-04T22:14:54+03:00","ev":"test-run","kind":"red","passed":0,"failed":5,"duration_s":19.711,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"deployment-defaults","round":1}
+{"t":"2026-09-04T22:22:36+03:00","ev":"test-run","kind":"green","passed":5,"failed":0,"duration_s":3.402,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"deployment-defaults","round":1}
+{"t":"2026-09-04T22:22:49+03:00","ev":"gate-parked","reason":"PPW-711 limiter ordering: is the DEPLOYMENT.md 16.7 deferral to intent 029 / bolt 063 upheld, or does the limiter redesign move into this bolt?","kind":"fixer-decision","default":"uphold the recorded deferral; change no limiter code","ids":["PPW-711"]}
+{"t":"2026-09-04T22:22:49+03:00","ev":"gate-parked","reason":"PPW-712 limiter partitioning: same decision as PPW-711 - the two must land in one change or neither, because fixing PPW-711 alone arms three un-partitioned hourly caps as site-wide budgets.","kind":"fixer-decision","default":"uphold the recorded deferral; change no limiter code","ids":["PPW-712"]}
+{"t":"2026-09-04T22:22:49+03:00","ev":"gate-parked","reason":"Four CI gaps found by the PPW-718 pre-check and covered by no finding: no global.json, ci.yml never runs on pushes to main, renovate.json lacks osvVulnerabilityAlerts, web job runs no npm audit. File as backlog rows or drop?","kind":"fixer-decision","default":"recorded in the resolution Decisions only; no backlog rows minted, PPW-718 not widened"}
+{"t":"2026-09-04T22:24:12+03:00","ev":"check-returned","round":1,"cluster":"proxy-trust","verdict":"revised","tokens":124517}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-713","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-714","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-717","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-723","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:27:40+03:00","ev":"test-run","kind":"red","passed":5,"failed":2,"duration_s":22.737,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"dependency-audit","round":1}
+{"t":"2026-09-04T22:28:14+03:00","ev":"test-run","kind":"green","passed":7,"failed":0,"duration_s":4.185,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"dependency-audit","round":1}
+{"t":"2026-09-04T22:29:13+03:00","ev":"finding","id":"PPW-718","status":"fixed","commit":"0c0cc3b"}
+{"t":"2026-09-04T22:43:17+03:00","ev":"test-run","kind":"red","passed":32,"failed":7,"duration_s":13.593,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:48:58+03:00","ev":"test-run","kind":"green","passed":39,"failed":0,"duration_s":6.151,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:52:48+03:00","ev":"finding","id":"PPW-711","status":"deferred","commit":"none"}
+{"t":"2026-09-04T22:52:49+03:00","ev":"finding","id":"PPW-712","status":"deferred","commit":"none"}
+{"t":"2026-09-04T22:52:49+03:00","ev":"finding","id":"PPW-719","status":"fixed","commit":"bc4aa21"}
+{"t":"2026-09-04T22:52:49+03:00","ev":"finding","id":"PPW-715","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:50+03:00","ev":"finding","id":"PPW-716","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:50+03:00","ev":"finding","id":"PPW-720","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:50+03:00","ev":"finding","id":"PPW-721","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:51+03:00","ev":"finding","id":"PPW-722","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:53:48+03:00","ev":"test-run","kind":"revert-and-rerun","passed":36,"failed":3,"duration_s":13.475,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:54:35+03:00","ev":"test-run","kind":"revert-and-rerun","passed":28,"failed":11,"duration_s":10.164,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:56:33+03:00","ev":"round-review-dispatched","round":1}
+{"t":"2026-09-04T22:56:33+03:00","ev":"test-audit-dispatched","round":1}
+{"t":"2026-09-04T23:03:07+03:00","ev":"test-audit-returned","round":1,"verdict":"2 tests suspect"}
+{"t":"2026-09-04T23:04:08+03:00","ev":"round-review-returned","round":1,"found":6}
+{"t":"2026-09-04T23:14:49+03:00","ev":"test-run","kind":"final","passed":48,"failed":0,"duration_s":7.24,"filter":"ForwardedHeaders|UntrustedForwardedPeer|DeploymentDefaults","skipped":0,"cluster":"round-tip","round":1}
+{"t":"2026-09-04T23:16:11+03:00","ev":"round-end","round":1}
+{"t":"2026-09-04T23:17:39+03:00","ev":"pass-launch","pass":2,"type":"verification"}
+{"t":"2026-09-04T23:27:52+03:00","ev":"verify-result","id":"PPW-713","verdict":"held","commit":"b29fb2c"}
+{"t":"2026-09-04T23:27:52+03:00","ev":"verify-result","id":"PPW-723","verdict":"held","commit":"b29fb2c"}
+{"t":"2026-09-04T23:31:33+03:00","ev":"verify-result","id":"PPW-714","verdict":"held","commit":"b29fb2c, 8ae0953"}
+{"t":"2026-09-04T23:32:24+03:00","ev":"verify-result","id":"PPW-717","verdict":"held","commit":"b29fb2c, 8ae0953"}
+{"t":"2026-09-04T23:32:55+03:00","ev":"verify-result","id":"PPW-718","verdict":"held","commit":"0c0cc3b"}
+{"t":"2026-09-04T23:33:30+03:00","ev":"verify-result","id":"PPW-716","verdict":"revert-broke-build","commit":"23d99d3"}
+{"t":"2026-09-04T23:35:02+03:00","ev":"verify-result","id":"PPW-721","verdict":"revert-broke-build","commit":"23d99d3"}
+{"t":"2026-09-04T23:35:02+03:00","ev":"verify-result","id":"PPW-722","verdict":"revert-broke-build","commit":"23d99d3"}
+{"t":"2026-09-04T23:36:27+03:00","ev":"verify-result","id":"PPW-715","verdict":"revert-broke-build","commit":"23d99d3, 8ae0953"}
+{"t":"2026-09-04T23:36:27+03:00","ev":"verify-result","id":"PPW-720","verdict":"revert-broke-build","commit":"23d99d3, 8ae0953"}
+{"t":"2026-09-04T23:38:37+03:00","ev":"test-run","kind":"red","passed":11,"failed":3,"duration_s":5.549,"filter":"ForwardedHeadersSettingsValidatorTests","skipped":0,"note":"PPW-715 hand proof: width check disabled"}
+{"t":"2026-09-04T23:38:53+03:00","ev":"test-run","kind":"red","passed":5,"failed":3,"duration_s":6.279,"filter":"UntrustedForwardedPeerMiddlewareTests","skipped":0,"note":"PPW-716 hand proof: trusted-peer parse-failure branch disabled"}
+{"t":"2026-09-04T23:39:11+03:00","ev":"test-run","kind":"red","passed":7,"failed":1,"duration_s":8.397,"filter":"ForwardedHeadersIntegrationTests","skipped":0,"note":"PPW-720 hand proof: IValidateOptions registration deleted"}
+{"t":"2026-09-04T23:39:34+03:00","ev":"test-run","kind":"red","passed":7,"failed":1,"duration_s":8.365,"filter":"ForwardedHeadersIntegrationTests","skipped":0,"note":"PPW-721 hand proof: middleware order swapped"}
+{"t":"2026-09-04T23:39:53+03:00","ev":"test-run","kind":"red","passed":8,"failed":0,"duration_s":8.53,"filter":"ForwardedHeadersIntegrationTests","skipped":0,"note":"PPW-722 hand proof: scrape-port conjunct replaced with a tautology"}
+{"t":"2026-09-04T23:40:38+03:00","ev":"test-run","kind":"red","passed":3,"failed":1,"duration_s":8.388,"filter":"ForwardedHeadersWithObservabilityTests","skipped":0,"note":"PPW-722 hand proof: scrape-port conjunct replaced with a tautology"}
+{"t":"2026-09-04T23:40:54+03:00","ev":"test-run","kind":"red","passed":3,"failed":1,"duration_s":7.673,"filter":"ForwardedHeadersWithObservabilityTests","skipped":0,"note":"PPW-720 hand proof, second half: registration deleted, observability class"}
+{"t":"2026-09-04T23:41:14+03:00","ev":"test-run","kind":"green","passed":31,"failed":0,"duration_s":4.677,"filter":"ForwardedHeaders","skipped":0,"note":"verification v2 green baseline at HEAD"}
+{"t":"2026-09-04T23:41:17+03:00","ev":"test-run","kind":"green","passed":8,"failed":0,"duration_s":2.581,"filter":"UntrustedForwardedPeer","skipped":0,"note":"verification v2 green baseline at HEAD"}
+{"t":"2026-09-04T23:41:39+03:00","ev":"verify-result","id":"PPW-715","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-716","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-720","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-721","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:41:40+03:00","ev":"verify-result","id":"PPW-722","verdict":"held","commit":"23d99d3"}
+{"t":"2026-09-04T23:42:12+03:00","ev":"verify-result","id":"PPW-719","verdict":"held","commit":"bc4aa21"}
+{"t":"2026-09-04T23:42:12+03:00","ev":"note","reason":"PPW-711 and PPW-712 stay deferred: SecurityExtensions.cs and DEPLOYMENT.md 16.7 unchanged since e4b9854, so the intent-029/bolt-063 deferral stands","ids":["PPW-711","PPW-712"]}
+{"t":"2026-09-04T23:42:12+03:00","ev":"note","reason":"records gap: the resolution's recorded test filters omit ForwardedHeadersWithObservabilityTests, the class that pins the scrape-exclusion conjuncts and the boot-abort case, so verify-fixes.mjs never ran it","ids":["PPW-720","PPW-722"]}
+{"t":"2026-09-04T23:42:13+03:00","ev":"pass-records-done","pass":2}
+{"t":"2026-09-04T23:42:49+03:00","ev":"note","reason":"corrected the v2 index row: the script held 5 rows (PPW-713, 714, 717, 718, 723), hand levers held 5 (PPW-715, 716, 720, 721, 722), PPW-719 held on docs"}
+{"t":"2026-09-04T23:44:08+03:00","ev":"gate-parked","kind":"delta-worthiness","default":"delta discovery","reason":"the fix round fixed high-severity PPW-713 and PPW-714 — delta-worthy by the mechanical half of the rule"}
+{"t":"2026-09-04T23:45:37+03:00","ev":"pass-launch","pass":3,"type":"delta-discovery"}
+{"t":"2026-09-05T00:31:31+03:00","ev":"pass-records-done","pass":3}
+{"t":"2026-09-05T00:40:29+03:00","ev":"doc-gate","pass":3,"verdict":"disapprove","reason":"judge corrected two counts in summary-v3: six of eleven new rows are unverified-low (the metrics 10 includes four re-finds) and four sub-claims were hand-checked; replacement text applied verbatim, lint clean"}
+{"t":"2026-09-05T00:40:37+03:00","ev":"note","reason":"soft stop by owner after pass 3 records"}

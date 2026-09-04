@@ -44,7 +44,7 @@ Make the dependency tree auditable and the boot pipeline production-correct: zer
 |--------|-------------|------------|
 | Directory.Packages.props | Central version manifest | `<PackageVersion>` per package |
 | renovate.json | Upgrade-automation config | package groups, schedule, dashboard |
-| ForwardedHeadersOptions | Trusted-proxy config | KnownNetworks/KnownProxies (CIDR) |
+| ForwardedHeadersOptions | Trusted-proxy config | KnownNetworks/KnownProxies (the proxy's own address) |
 
 ### Key Operations
 | Operation | Description | Inputs | Outputs |
