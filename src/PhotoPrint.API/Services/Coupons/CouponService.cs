@@ -86,11 +86,10 @@ public sealed class CouponService : ICouponService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task<CouponResolution?> ResolveForCartAsync(
+    public async Task<CartCouponView?> ResolveForCartAsync(
         Guid? userId,
         Guid? guestSessionId,
         decimal goodsGrossRon,
-        bool deleteWhenUnusable,
         CancellationToken ct = default)
     {
         if (userId is null && guestSessionId is null) return null;
@@ -98,27 +97,17 @@ public sealed class CouponService : ICouponService
         var applied = await FindCartCouponAsync(userId, guestSessionId, ct);
         if (applied is null) return null;
 
-        var coupon = await _db.Coupons.FirstOrDefaultAsync(c => c.Id == applied.CouponId, ct);
-        var failure = goodsGrossRon <= 0m
-            ? CouponErrorCodes.EmptyCart
-            : Validate(coupon, goodsGrossRon, DateTimeOffset.UtcNow);
+        var coupon = await _db.Coupons
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == applied.CouponId, ct);
+        if (coupon is null) return null;
 
+        var failure = Validate(coupon, goodsGrossRon, DateTimeOffset.UtcNow);
         if (failure is not null)
-        {
-            if (deleteWhenUnusable)
-            {
-                _db.CartCoupons.Remove(applied);
-                await _db.SaveChangesAsync(ct);
-                _logger.LogInformation(
-                    "coupon.auto-cleared code={Code} reason={Reason}",
-                    coupon?.Code ?? "unknown", failure);
-            }
+            return new CartCouponView(coupon.Id, coupon.Code, coupon.Type, 0m, true, failure);
 
-            return null;
-        }
-
-        var discount = CouponDiscountCalculator.Compute(coupon!.Type, coupon.Value, goodsGrossRon, 0m);
-        return new CouponResolution(coupon.Id, coupon.Code, coupon.Type, discount);
+        var discount = CouponDiscountCalculator.Compute(coupon.Type, coupon.Value, goodsGrossRon, 0m);
+        return new CartCouponView(coupon.Id, coupon.Code, coupon.Type, discount, false, null);
     }
 
     public async Task<CouponResolution?> ResolveForOrderAsync(
@@ -126,6 +115,7 @@ public sealed class CouponService : ICouponService
         Guid? guestSessionId,
         decimal goodsGrossRon,
         decimal shippingGrossRon,
+        Guid? heldCouponId = null,
         CancellationToken ct = default)
     {
         if (userId is null && guestSessionId is null) return null;
@@ -134,7 +124,8 @@ public sealed class CouponService : ICouponService
         if (applied is null) return null;
 
         var coupon = await _db.Coupons.FirstOrDefaultAsync(c => c.Id == applied.CouponId, ct);
-        var failure = Validate(coupon, goodsGrossRon, DateTimeOffset.UtcNow);
+        var heldSlotCredit = coupon is not null && coupon.Id == heldCouponId ? 1 : 0;
+        var failure = Validate(coupon, goodsGrossRon, DateTimeOffset.UtcNow, heldSlotCredit);
         if (failure is not null)
         {
             LogRejected(coupon?.Code ?? "unknown", failure);
@@ -279,11 +270,12 @@ public sealed class CouponService : ICouponService
             : CouponErrorCodes.CouponExhausted;
     }
 
-    private static string? Validate(Coupon? coupon, decimal goodsGrossRon, DateTimeOffset now)
+    private static string? Validate(
+        Coupon? coupon, decimal goodsGrossRon, DateTimeOffset now, int heldSlotCredit = 0)
     {
         if (coupon is null || !coupon.IsActive) return CouponErrorCodes.InvalidCoupon;
         if (coupon.ValidFrom > now || coupon.ValidUntil <= now) return CouponErrorCodes.InvalidCoupon;
-        if (coupon.MaxRedemptions is { } cap && coupon.RedemptionsCount >= cap)
+        if (coupon.MaxRedemptions is { } cap && coupon.RedemptionsCount - heldSlotCredit >= cap)
             return CouponErrorCodes.CouponExhausted;
         if (goodsGrossRon < coupon.MinSubtotalRon) return CouponErrorCodes.MinSubtotalNotMet;
         return null;

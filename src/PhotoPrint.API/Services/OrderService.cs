@@ -135,6 +135,8 @@ public class OrderService : IOrderService
         var grossBeforeDiscount = subtotal + shippingCostRon;
 
         // 2b. Idempotency resolution. Only when a key is supplied.
+        HeldRedemption? heldSlot = null;
+        Order? abandonedHolder = null;
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
             // Single round-trip for THIS caller's row holding the key — fresh or stale
@@ -155,7 +157,17 @@ public class OrderService : IOrderService
                 if (IsFresh(holder) && holder.Status == OrderStatus.PaymentFailed)
                     await AbandonPaymentIntentAsync(holder, ct);
 
-                await _coupons.ReleaseForOrderAsync(holder.Id, ct);
+                if (holder.Status is OrderStatus.AwaitingPayment or OrderStatus.PaymentFailed)
+                {
+                    var held = await _db.CouponRedemptions
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(r => r.OrderId == holder.Id, ct);
+                    if (held is not null)
+                    {
+                        heldSlot = new HeldRedemption(held.Id, held.CouponId, holder.Id);
+                        abandonedHolder = holder;
+                    }
+                }
 
                 // Stale (>24h) row this caller owns still holds the key. Null it on the
                 // in-memory entity WITHOUT an intermediate save, so
@@ -171,7 +183,7 @@ public class OrderService : IOrderService
         }
 
         var appliedCoupon = await _coupons.ResolveForOrderAsync(
-            userId, guestSessionId, subtotal, shippingCostRon, ct);
+            userId, guestSessionId, subtotal, shippingCostRon, heldSlot?.CouponId, ct);
         var discountRon = appliedCoupon?.DiscountRon ?? 0m;
         var total = grossBeforeDiscount - discountRon;
 
@@ -221,10 +233,34 @@ public class OrderService : IOrderService
             Items = orderItems,
         };
 
+        var transfersHeldSlot = heldSlot is not null && appliedCoupon?.CouponId == heldSlot.CouponId;
+
+        if (abandonedHolder is not null)
+            OrderStatusMachine.Abandon(abandonedHolder);
+
+        var useCouponTransaction = (appliedCoupon is not null || heldSlot is not null)
+            && _db.Database.ProviderName != DbProviders.InMemory
+            && _db.Database.CurrentTransaction is null;
+        var couponTx = useCouponTransaction
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+        await using var couponTxScope = couponTx;
+
+        if (heldSlot is not null && !transfersHeldSlot)
+            await _coupons.ReleaseForOrderAsync(heldSlot.OrderId, ct);
+
         _db.Orders.Add(order);
 
         CouponRedemption? redemption = null;
-        if (appliedCoupon is not null)
+        CouponRedemption? movedRedemption = null;
+        if (transfersHeldSlot)
+        {
+            movedRedemption = await _db.CouponRedemptions
+                .FirstAsync(r => r.Id == heldSlot!.RedemptionId, ct);
+            movedRedemption.OrderId = order.Id;
+            movedRedemption.DiscountRon = discountRon;
+        }
+        else if (appliedCoupon is not null)
         {
             redemption = new CouponRedemption
             {
@@ -235,14 +271,6 @@ public class OrderService : IOrderService
             };
             _db.CouponRedemptions.Add(redemption);
         }
-
-        var useCouponTransaction = appliedCoupon is not null
-            && _db.Database.ProviderName != DbProviders.InMemory
-            && _db.Database.CurrentTransaction is null;
-        var couponTx = useCouponTransaction
-            ? await _db.Database.BeginTransactionAsync(ct)
-            : null;
-        await using var couponTxScope = couponTx;
 
         var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
 
@@ -264,11 +292,15 @@ public class OrderService : IOrderService
             {
                 await _db.SaveChangesAsync(ct);
 
-                if (appliedCoupon is not null)
-                {
+                if (appliedCoupon is not null && !transfersHeldSlot)
                     await _coupons.ConsumeOrThrowAsync(appliedCoupon.CouponId, ct);
-                    if (couponTx is not null) await couponTx.CommitAsync(ct);
-                }
+
+                if (couponTx is not null) await couponTx.CommitAsync(ct);
+
+                if (transfersHeldSlot)
+                    _logger?.LogInformation(
+                        "coupon.transferred coupon_id={CouponId} from_order_id={FromOrderId} to_order_id={ToOrderId}",
+                        heldSlot!.CouponId, heldSlot.OrderId, order.Id);
 
                 // Observability: orders_created_total{processor,status}.
                 // Status is "created" — the order is in AwaitingPayment; the Paid
@@ -288,7 +320,7 @@ public class OrderService : IOrderService
                 // are the same reference, and EF fix-up empties the collection as each item
                 // is detached — which would otherwise make the divergence check see no items.
                 var candidateItems = order.Items.ToList();
-                DetachFailedInsert(order, redemption);
+                DetachFailedInsert(order, redemption, movedRedemption, abandonedHolder);
 
                 var winner = await FindKeyHolderAsync(idempotencyKey!, userId, guestSessionId, ct);
                 if (winner is not null && IsFresh(winner))
@@ -359,7 +391,11 @@ public class OrderService : IOrderService
     /// not later persist the orphaned graph on the next SaveChanges (e.g. the
     /// controller saving the gateway secret after an idempotent replay).
     /// </summary>
-    private void DetachFailedInsert(Order order, CouponRedemption? redemption)
+    private void DetachFailedInsert(
+        Order order,
+        CouponRedemption? redemption,
+        CouponRedemption? movedRedemption,
+        Order? abandonedHolder)
     {
         // Snapshot the collection: detaching an item triggers EF fix-up that removes it
         // from order.Items, which would otherwise mutate the collection mid-enumeration.
@@ -367,8 +403,14 @@ public class OrderService : IOrderService
             _db.Entry(item).State = EntityState.Detached;
         if (redemption is not null)
             _db.Entry(redemption).State = EntityState.Detached;
+        if (movedRedemption is not null)
+            _db.Entry(movedRedemption).State = EntityState.Detached;
+        if (abandonedHolder is not null)
+            _db.Entry(abandonedHolder).State = EntityState.Detached;
         _db.Entry(order).State = EntityState.Detached;
     }
+
+    private sealed record HeldRedemption(Guid RedemptionId, Guid CouponId, Guid OrderId);
 
     // ── Idempotency helpers ─────────────────────────────────────────
 

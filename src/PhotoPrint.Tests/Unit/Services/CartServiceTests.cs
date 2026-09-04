@@ -107,7 +107,7 @@ public class CartServiceTests
 
         var result = await _sut.GetCartAsync(userId, null);
 
-        result.Should().BeEquivalentTo(CartResponseDto.Empty);
+        result.Should().BeEquivalentTo(CartResponseDto.Empty with { VatRate = 0.19m });
     }
 
     [Fact]

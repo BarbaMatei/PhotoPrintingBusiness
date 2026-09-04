@@ -8,6 +8,14 @@ public sealed record CouponResolution(
     CouponType Type,
     decimal DiscountRon);
 
+public sealed record CartCouponView(
+    Guid CouponId,
+    string Code,
+    CouponType Type,
+    decimal DiscountRon,
+    bool IsStale,
+    string? ReasonCode);
+
 public interface ICouponService
 {
     Task<CouponResolution> ApplyToCartAsync(
@@ -16,13 +24,13 @@ public interface ICouponService
 
     Task ClearCartCouponAsync(Guid? userId, Guid? guestSessionId, CancellationToken ct = default);
 
-    Task<CouponResolution?> ResolveForCartAsync(
-        Guid? userId, Guid? guestSessionId, decimal goodsGrossRon, bool deleteWhenUnusable,
+    Task<CartCouponView?> ResolveForCartAsync(
+        Guid? userId, Guid? guestSessionId, decimal goodsGrossRon,
         CancellationToken ct = default);
 
     Task<CouponResolution?> ResolveForOrderAsync(
         Guid? userId, Guid? guestSessionId, decimal goodsGrossRon, decimal shippingGrossRon,
-        CancellationToken ct = default);
+        Guid? heldCouponId = null, CancellationToken ct = default);
 
     Task ConsumeOrThrowAsync(Guid couponId, CancellationToken ct = default);
 
