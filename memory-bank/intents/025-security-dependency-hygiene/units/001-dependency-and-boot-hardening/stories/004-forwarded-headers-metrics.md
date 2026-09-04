@@ -37,7 +37,7 @@ implemented: false
 
 ## Technical Notes
 
-- `XForwardedFor | XForwardedProto`. Misconfigured `KnownNetworks` enables spoofing — anchor to the actual `docker-compose.prod.yml` bridge CIDR.
+- `XForwardedFor | XForwardedProto`. Misconfigured `KnownNetworks` enables spoofing — anchor to the proxy's own address (`172.28.0.2`, pinned in `docker-compose.prod.yml`), never the bridge CIDR: the API's ports are exposed on that network, so any container in the range could forge a client IP.
 - Order: forwarded headers must run before middleware that reads the client IP.
 
 ## Dependencies
