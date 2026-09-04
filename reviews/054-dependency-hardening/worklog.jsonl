@@ -5,3 +5,40 @@
 {"t":"2026-09-04T20:51:30+03:00","ev":"note","reason":"discovery v1 workflow runId wf_4bf8943b-81c (8 lenses)"}
 {"t":"2026-09-04T21:55:09+03:00","ev":"pass-records-done","pass":1}
 {"t":"2026-09-04T22:06:00+03:00","ev":"doc-gate","pass":1,"verdict":"approve","reason":"lint clean; judge disapproved twice (requirements.md line number, coined verdict label), both replacements applied verbatim"}
+{"t":"2026-09-04T22:08:09+03:00","ev":"round-start","round":1}
+{"t":"2026-09-04T22:12:38+03:00","ev":"triage-done","round":1,"clusters":4,"checks_needed":1,"pre_cleared":"PPW-711,PPW-712,PPW-718","gates":2}
+{"t":"2026-09-04T22:12:38+03:00","ev":"protocol-written","round":1,"cluster":"proxy-trust","ids":["PPW-715","PPW-716","PPW-719","PPW-720","PPW-721","PPW-722"]}
+{"t":"2026-09-04T22:12:39+03:00","ev":"gate-parked","round":1,"kind":"fixer-decision","default":"uphold the DEPLOYMENT.md §16.7 item 3 deferral; change no limiter code","reason":"PPW-711+PPW-712 are one change or neither; whether the bolt absorbs the limiter redesign is an owner ruling"}
+{"t":"2026-09-04T22:12:39+03:00","ev":"gate-parked","round":1,"kind":"fixer-decision","default":"recorded in the resolution Decisions only; no backlog rows minted, PPW-718 not widened","reason":"four CI gaps named by the PPW-718 pre-check sit outside the finding set; routing them is the owner ruling"}
+{"t":"2026-09-04T22:12:44+03:00","ev":"check-dispatched","round":1,"cluster":"proxy-trust","ids":["PPW-715","PPW-716","PPW-719","PPW-720","PPW-721","PPW-722"]}
+{"t":"2026-09-04T22:14:54+03:00","ev":"test-run","kind":"red","passed":0,"failed":5,"duration_s":19.711,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"deployment-defaults","round":1}
+{"t":"2026-09-04T22:22:36+03:00","ev":"test-run","kind":"green","passed":5,"failed":0,"duration_s":3.402,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"deployment-defaults","round":1}
+{"t":"2026-09-04T22:22:49+03:00","ev":"gate-parked","reason":"PPW-711 limiter ordering: is the DEPLOYMENT.md 16.7 deferral to intent 029 / bolt 063 upheld, or does the limiter redesign move into this bolt?","kind":"fixer-decision","default":"uphold the recorded deferral; change no limiter code","ids":["PPW-711"]}
+{"t":"2026-09-04T22:22:49+03:00","ev":"gate-parked","reason":"PPW-712 limiter partitioning: same decision as PPW-711 - the two must land in one change or neither, because fixing PPW-711 alone arms three un-partitioned hourly caps as site-wide budgets.","kind":"fixer-decision","default":"uphold the recorded deferral; change no limiter code","ids":["PPW-712"]}
+{"t":"2026-09-04T22:22:49+03:00","ev":"gate-parked","reason":"Four CI gaps found by the PPW-718 pre-check and covered by no finding: no global.json, ci.yml never runs on pushes to main, renovate.json lacks osvVulnerabilityAlerts, web job runs no npm audit. File as backlog rows or drop?","kind":"fixer-decision","default":"recorded in the resolution Decisions only; no backlog rows minted, PPW-718 not widened"}
+{"t":"2026-09-04T22:24:12+03:00","ev":"check-returned","round":1,"cluster":"proxy-trust","verdict":"revised","tokens":124517}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-713","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-714","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-717","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:25:03+03:00","ev":"finding","id":"PPW-723","status":"fixed","commit":"b29fb2c"}
+{"t":"2026-09-04T22:27:40+03:00","ev":"test-run","kind":"red","passed":5,"failed":2,"duration_s":22.737,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"dependency-audit","round":1}
+{"t":"2026-09-04T22:28:14+03:00","ev":"test-run","kind":"green","passed":7,"failed":0,"duration_s":4.185,"filter":"PhotoPrint.Tests.Unit.Configuration.DeploymentDefaultsTests","skipped":0,"cluster":"dependency-audit","round":1}
+{"t":"2026-09-04T22:29:13+03:00","ev":"finding","id":"PPW-718","status":"fixed","commit":"0c0cc3b"}
+{"t":"2026-09-04T22:43:17+03:00","ev":"test-run","kind":"red","passed":32,"failed":7,"duration_s":13.593,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:48:58+03:00","ev":"test-run","kind":"green","passed":39,"failed":0,"duration_s":6.151,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:52:48+03:00","ev":"finding","id":"PPW-711","status":"deferred","commit":"none"}
+{"t":"2026-09-04T22:52:49+03:00","ev":"finding","id":"PPW-712","status":"deferred","commit":"none"}
+{"t":"2026-09-04T22:52:49+03:00","ev":"finding","id":"PPW-719","status":"fixed","commit":"bc4aa21"}
+{"t":"2026-09-04T22:52:49+03:00","ev":"finding","id":"PPW-715","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:50+03:00","ev":"finding","id":"PPW-716","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:50+03:00","ev":"finding","id":"PPW-720","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:50+03:00","ev":"finding","id":"PPW-721","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:52:51+03:00","ev":"finding","id":"PPW-722","status":"fixed","commit":"23d99d3"}
+{"t":"2026-09-04T22:53:48+03:00","ev":"test-run","kind":"revert-and-rerun","passed":36,"failed":3,"duration_s":13.475,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:54:35+03:00","ev":"test-run","kind":"revert-and-rerun","passed":28,"failed":11,"duration_s":10.164,"filter":"ForwardedHeaders|UntrustedForwardedPeer","skipped":0,"cluster":"proxy-trust","round":1}
+{"t":"2026-09-04T22:56:33+03:00","ev":"round-review-dispatched","round":1}
+{"t":"2026-09-04T22:56:33+03:00","ev":"test-audit-dispatched","round":1}
+{"t":"2026-09-04T23:03:07+03:00","ev":"test-audit-returned","round":1,"verdict":"2 tests suspect"}
+{"t":"2026-09-04T23:04:08+03:00","ev":"round-review-returned","round":1,"found":6}
+{"t":"2026-09-04T23:14:49+03:00","ev":"test-run","kind":"final","passed":48,"failed":0,"duration_s":7.24,"filter":"ForwardedHeaders|UntrustedForwardedPeer|DeploymentDefaults","skipped":0,"cluster":"round-tip","round":1}
+{"t":"2026-09-04T23:16:11+03:00","ev":"round-end","round":1}
