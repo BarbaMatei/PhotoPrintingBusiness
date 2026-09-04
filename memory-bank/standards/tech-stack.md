@@ -9,8 +9,18 @@
   RxJS 7.8.
 - **Testing: Vitest 4** via the Angular builder (`@angular/build:unit-test`, jsdom). Karma and
   Jasmine are not used.
-- **Tooling: Prettier only.** There is no ESLint (no config, no lint script, no CI step) and no
-  e2e framework — adding either is future work, not current reality.
+- **Tooling: Prettier only.** There is no ESLint (no config, no lint script, no CI step) —
+  adding it is future work, not current reality.
+- **E2e: Playwright 1.62** (`@playwright/test`, Chromium only), specs in `src/PhotoPrint.UI/e2e/`
+  — outside `src/`, so the Vitest builder never collects them; `npm run e2e` runs them,
+  `npm run e2e:check` type-checks them through `tsconfig.e2e.json`. Three smoke specs cover the
+  real-money paths (guest checkout to review, admin login, admin real-time order update). They
+  need a booted stack: `docker compose -f docker-compose.yml -f docker-compose.e2e.yml -p
+  fototipar-e2e up -d --build`, then the same invocation with `run --rm api --seed-dev`.
+- **Bundle budgets** (`angular.json`, production configuration): `initial` warns at 400 kB and
+  fails at 500 kB against a measured 331.99 kB (2026-09-04); `anyComponentStyle` warns at 4 kB
+  and fails at 16 kB. The 4 kB warning is a reduction target, not a gate — six built stylesheets
+  exceed it today. Reduction target for `initial`: under 300 kB.
 - Runtime libraries actually imported:
   - `@stripe/stripe-js` — lazy `import()` in the checkout payment step (Stripe Elements).
   - `leaflet` — lazy `import()` in the Easybox locker map (OpenStreetMap tiles).
@@ -47,6 +57,12 @@ SameSite=Strict cookie + Google OAuth (server-side id_token verification) + gues
   Vitest + production build; no lint step. `secret-scan.yml` — gitleaks on every push/PR.
   `deploy.yml` — on green main CI: build/push `ghcr.io/<owner>/fototipar/api` image, SSH
   `docker compose pull/up` (self-skips without a `DEPLOY_HOST` secret).
+  `playwright-e2e.yml` — on PRs and non-main pushes, skipping documentation-only changes: boots
+  API + PostgreSQL through `docker-compose.e2e.yml`, seeds, runs the three Playwright specs.
+  It is **advisory**, not a required check, and `deploy.yml` chains off `ci.yml` alone, so a
+  merge to main can deploy without the smoke suite having run on the merge commit.
+  Because the image build runs the SPA's production build, a bundle over budget fails this
+  workflow and `deploy.yml` too, not only `ci.yml`'s `web` job.
 - **Prod shape**: Docker Compose (`docker-compose.prod.yml`) + Caddy (`Caddyfile`) for TLS;
   PostgreSQL 16; cloud storage target recommendation is **Cloudflare R2** (ADR-009 — $0
   egress; S3/MinIO equally supported by config).

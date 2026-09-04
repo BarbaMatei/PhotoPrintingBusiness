@@ -3,6 +3,8 @@
 #    docker compose -f docker-compose.yml -f docker-compose.e2e.yml -p fototipar-e2e up -d --build
 #    docker compose -f docker-compose.yml -f docker-compose.e2e.yml -p fototipar-e2e run --rm api --seed-dev
 #
+#  Needs Compose >= 2.24 for the `!override` tag used below.
+#
 #  Own project name and own volumes: an e2e teardown (`down -v`) must never touch the
 #  fototipar-dev database or uploads. The API is published on 5052 because that is the
 #  port src/PhotoPrint.UI/src/environments/environment.ts already calls, so `ng serve`

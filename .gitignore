@@ -107,5 +107,3 @@ reviews/state/overrides.jsonl
 # -------------------------------------------------------------
 src/PhotoPrint.UI/test-results/
 src/PhotoPrint.UI/playwright-report/
-src/PhotoPrint.UI/blob-report/
-src/PhotoPrint.UI/.playwright/

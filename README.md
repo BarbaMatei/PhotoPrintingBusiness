@@ -81,6 +81,34 @@ docker compose up --build
 - Run the Angular dev server on the host (`npm start`, proxied to `:8080`), or rely on
   the SPA baked into the image for a prod-like check.
 
+---
+
+## Run the e2e smoke suite
+
+Three Playwright specs cover the real-money paths: guest checkout up to the review step, admin
+login, and an admin order status change arriving over SignalR. They drive `ng serve` (Playwright
+starts it) against an API in containers, published on `:5052` — the port the SPA's dev
+environment already calls. Needs Docker Compose ≥ 2.24.
+
+```sh
+# 1. one-time, as above: scripts/gen-dev-keys.sh  &&  cp .env.example .env
+export E2E_JWT_PRIVATE_KEY_PEM="$(cat secrets/dev-jwt-private.pem)"
+E2E="-f docker-compose.yml -f docker-compose.e2e.yml -p fototipar-e2e"
+
+# 2. boot and seed (its own project name and volumes — never touches the dev stack)
+docker compose $E2E up -d --build
+docker compose $E2E run --rm api --seed-dev
+
+# 3. run, from src/PhotoPrint.UI
+npm run e2e            # npm run e2e:check type-checks the specs
+```
+
+Tear down with `docker compose $E2E down -v`. The real-time spec consumes the seed's only
+`Paid → Printing` transition, so a second run needs that `down -v` first. `.github/workflows/playwright-e2e.yml`
+runs the same sequence on every pull request and non-main push.
+
+---
+
 The production image (Caddy + API, auto-TLS) and the full deploy procedure live in
 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — including hosting proposals, server
 provisioning, CI/CD secrets, the migrations note, and rollback.

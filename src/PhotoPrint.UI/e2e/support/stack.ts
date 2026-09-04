@@ -24,8 +24,13 @@ export async function adminAccessToken(page: Page): Promise<string> {
   return token as string;
 }
 
+/**
+ * Reads the first money amount out of rendered text. The app registers no LOCALE_ID, so
+ * `number:'1.2-2'` emits en-US (`1,234.56`); the shape assertion fails loudly if that ever
+ * changes, because a ro-RO `1.234,56` would otherwise parse to a wrong number silently.
+ */
 export function parseAmount(text: string): number {
-  const match = text.replace(/\s/g, '').match(/-?\d[\d,]*(\.\d+)?/);
-  expect(match, `nu am găsit o sumă în «${text}»`).not.toBeNull();
+  const match = text.replace(/\s/g, '').match(/-?\d[\d,]*\.\d{2}/);
+  expect(match, `nu am găsit o sumă în format en-US în «${text}»`).not.toBeNull();
   return parseFloat((match as RegExpMatchArray)[0].replace(/,/g, ''));
 }
