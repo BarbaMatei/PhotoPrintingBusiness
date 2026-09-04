@@ -17,6 +17,12 @@ Romanian photo-printing e-commerce platform — ASP.NET Core 8 API + Angular 21 
 - **Sentry rollout + monitoring**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §13
 - **Sameday courier rollout**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §12
 
+## Architecture & maintenance
+
+- **Multi-replica readiness**: [docs/architecture/multi-replica-readiness.md](docs/architecture/multi-replica-readiness.md) — what breaks if you run a second instance, and what was decided about each
+- **Known test failures**: [docs/KNOWN_FAILURES.md](docs/KNOWN_FAILURES.md) — read this before filing a bug about a red test
+- **Quarterly audit checklist**: [docs/ARCHITECTURE_AUDIT_CHECKLIST.md](docs/ARCHITECTURE_AUDIT_CHECKLIST.md) — CVEs, outdated packages, growth, decisions, doc rot
+
 ---
 
 ## First-time setup
