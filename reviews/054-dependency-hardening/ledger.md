@@ -1,7 +1,7 @@
 ---
 type: review-ledger
 target: 054-dependency-hardening
-updated: 2026-09-04
+updated: 2026-09-07
 ---
 
 # Ledger — 054-dependency-hardening
@@ -46,8 +46,8 @@ updated: 2026-09-04
 | PPW-744 | ⚪ | v1 | Third hand-rolled bind of the "RateLimit" section, only to log one number | `src/PhotoPrint.API/Extensions/ForwardedHeadersExtensions.cs:72` | open | |
 | PPW-745 | ⚪ | v1 | Scrape-named observability type ScrapeIpAllowList is now the shared IP-list parser for proxy trust | `src/PhotoPrint.API/Observability/ScrapeIpAllowList.cs:56` | open | |
 | PPW-746 | ⚪ | v1 | A whole ServiceProvider is built (and never disposed) per simulated request in the middleware tests | `src/PhotoPrint.Tests/Unit/Middleware/UntrustedForwardedPeerMiddlewareTests.cs:85` | open | |
-| PPW-747 | 🟠 | v3 | No test proves the rate limiter partitions per forwarded client, so a one-line reorder silently restores one bucket for the whole internet | `src/PhotoPrint.API/Program.cs:375` | open | |
-| PPW-748 | 🟠 | v3 | The metrics-scrape exclusion's excluded branch is untested in the changed test file; only an out-of-scope file guards it | `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:122` | open | |
+| PPW-747 | 🟠 | v3 | No test proves the rate limiter partitions per forwarded client, so a one-line reorder silently restores one bucket for the whole internet | `src/PhotoPrint.API/Program.cs:375` | verified | `734eec6` |
+| PPW-748 | 🟠 | v3 | The metrics-scrape exclusion's excluded branch is untested in the changed test file; only an out-of-scope file guards it | `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:122` | verified | `734eec6` |
 | PPW-749 | 🟡 | v3 | The 512-peer log budget never resets, so cheap in-network noise can permanently silence the proxy-drift warning | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:112` | open | |
 | PPW-750 | 🟡 | v3 | DEPLOYMENT.md §16.3 names three changed behaviours and omits the HSTS header the trusted-proxy switch now makes reachable | `docs/DEPLOYMENT.md:1702` | open | |
 | PPW-751 | 🟡 | v3 | Serilog WriteTo merges by array index, so the Development overlay collides with the base Console sink's formatter at WriteTo:0 | `src/PhotoPrint.API/appsettings.Development.json:51` | open | |
@@ -57,6 +57,10 @@ updated: 2026-09-04
 | PPW-755 | 🟡 | v3 | The new production File sink can be dropped or fail to open with no diagnostic, because SelfLog is enabled nowhere and the package is transitive | `src/PhotoPrint.API/appsettings.Production.json:11` | open | |
 | PPW-756 | 🟡 | v3 | A null RemoteIpAddress returns before judging, on the one transport where ASP.NET honours X-Forwarded-For with no peer check | `src/PhotoPrint.API/Middleware/UntrustedForwardedPeerMiddleware.cs:36` | open | |
 | PPW-757 | 🟡 | v3 | The NuGet audit gate is asserted as a command string and never executed, and the shipping image restores without it | `src/PhotoPrint.Tests/Unit/Configuration/DeploymentDefaultsTests.cs:121` | open | |
+| PPW-758 | 🟡 | v4 | The metrics allow-list gate's excluded branch is asserted by no test, and round 2 recorded that sibling gap as closed | `src/PhotoPrint.API/Program.cs:430` | open | |
+| PPW-759 | 🟡 | v4 | PPW-748's new test asserts an unchanged peer, which any world where the forwarded-headers branch never runs also satisfies | `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:143` | open | |
+| PPW-760 | 🟡 | v4 | The refresh cookie's Secure attribute rides the same forwarded IsHttps as HSTS and no test asserts it | `src/PhotoPrint.API/Services/AuthService.cs:354` | open | |
+| PPW-761 | ⚪ | v4 | UseCors runs before UseRateLimiter and no test asserts CORS headers survive a 429 | `src/PhotoPrint.API/Extensions/SecurityExtensions.cs:121` | open | |
 
 ## Details
 
@@ -431,6 +435,8 @@ updated: 2026-09-04
   - **Trigger-list-shaped:** yes (rate-limiter partitioning on the public surface)
 - **History:** <append-only, one line per event>
   - v3 delta: found by completeness-critic (convergence 1, not hinted), verdict confirmed by mutation trace.
+  - v2: fix round — fixed at `10cd81c`
+  - v4: verification — held
 
 ### PPW-748 — The metrics-scrape exclusion's excluded branch is untested in the changed test file; only an out-of-scope file guards it
 
@@ -443,6 +449,8 @@ updated: 2026-09-04
 - **History:** <append-only, one line per event>
   - v3 delta: found by completeness-critic (convergence 1, not hinted), verdict confirmed by mutation trace.
   - v3 delta: `residual-of: PPW-722` — the round's fix added the two non-excluded cases and left the excluded one uncovered (seed round 1, area forwarded-headers).
+  - v2: fix round — fixed at `afa1418`
+  - v4: verification — held
 
 ### PPW-749 — The 512-peer log budget never resets, so cheap in-network noise can permanently silence the proxy-drift warning
 
@@ -524,3 +532,36 @@ updated: 2026-09-04
 - **History:** <append-only, one line per event>
   - v3 delta: found by completeness-critic (convergence 1, not hinted), reported as read; the Dockerfile and deploy-trigger claims were verified.
   - v3 delta: `residual-of: PPW-718` — the gate is the round's own, and its only proof is the string assertion the round disclosed as a limit (seed round 1, area ci).
+
+### PPW-758 — The metrics allow-list gate's excluded branch is asserted by no test, and round 2 recorded that sibling gap as closed
+
+- **What:** `src/PhotoPrint.API/Program.cs:430` is the API's one other conjunctive `UseWhen`, gating `MetricsEndpointIpAllowListMiddleware` on the metrics path. Its *excluded* branch — "not a metrics path, so skip the allow list" — is asserted nowhere. Widen that predicate to all paths and every request from a non-allow-listed peer answers 403 with no test going red. Resolution v2's "Class sweep" block records the opposite: that both branches of this `UseWhen` are already asserted, and that there is therefore no sibling gap. That claim is wrong, so the class sweep of PPW-748 closed on a false negative.
+- **Evidence:** The middleware is registered only on observability-enabled hosts; the only such requests to a non-metrics path are `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:122` and `:126`, which assert `ClientIp` alone and survive a 403 short-circuit. `MetricsEndpointIntegrationTests` only ever GETs `/metrics`, and `MetricsScrapeGateRegistrationTests` invokes the middleware directly, outside any pipeline. Failure mode is loud in production (every request 403s), which is why this is 🟡 and not 🟠. The false record is `reviews/054-dependency-hardening/resolution-v2.md`, "Class sweep — the other conditional-branch middleware site (PPW-748)".
+- **Suggested fix:** Assert the excluded branch where the predicate lives — one observability-enabled request to a non-metrics path from a peer the scrape allow list rejects, asserting it is not a 403 — and correct the class-sweep claim when the row is answered.
+- **History:** <append-only, one line per event>
+  - v4: found by the verification's judgment-item pass (convergence 1, not hinted), verdict confirmed by reading; class-mate of PPW-748 at a different `UseWhen` site, so split rather than merged.
+
+### PPW-759 — PPW-748's new test asserts an unchanged peer, which any world where the forwarded-headers branch never runs also satisfies
+
+- **What:** `The_metrics_path_on_the_scrape_port_keeps_its_peer` asserts that the resolved client equals the TCP peer — a negative assertion. It passes both when `IsMetricsScrape` correctly excludes the request and when the forwarded-headers middleware never runs on it at all, so deleting `app.UseTrustedProxyForwardedHeaders()` or moving it below the metrics gate leaves this test green while the excluded branch goes unexercised.
+- **Evidence:** `src/PhotoPrint.Tests/Integration/ForwardedHeadersIntegrationTests.cs:143`. The sibling `The_metrics_path_on_the_public_port_still_resolves_its_client` is the positive assertion that catches deletion, and PPW-747's `RateLimit_PartitionsPerForwardedClient` now reddens on exactly the reorder class (measured in verification v4: 37 passed, 1 failed) — so today the hole is covered from outside this file, never by the test itself. That is what keeps it 🟡: the vacuity is latent, not live.
+- **Suggested fix:** Give the test a companion positive leg in the same case — assert the scrape-port request keeps its peer *and* that the same request on the public port resolves the forwarded client — so the test cannot pass while the branch it names is dead.
+- **History:** <append-only, one line per event>
+  - v4: found by the verification's judgment-item pass (convergence 1, not hinted), verdict confirmed by reading.
+  - v4: `residual-of: PPW-748` — the defect is the shape of that row's own fix (seed round 2, area tests).
+
+### PPW-760 — The refresh cookie's Secure attribute rides the same forwarded IsHttps as HSTS and no test asserts it
+
+- **What:** `Request.IsHttps` becomes true only because `app.UseTrustedProxyForwardedHeaders()` honours `X-Forwarded-Proto` before the rest of the pipeline. The refresh cookie's `Secure` flag is set from that value (`src/PhotoPrint.API/Services/AuthService.cs:354`, `src/PhotoPrint.API/Services/SocialAuthService.cs:122`), and no test asserts the attribute — so the same class of edit PPW-747 is about would drop `Secure` from an auth cookie silently, on the auth surface rather than the rate-limit one.
+- **Evidence:** Both call sites read the request's HTTPS state; searching the test tree for an assertion on the `Secure` attribute of the refresh cookie returns nothing. Mitigation, which is why this stays 🟡: after round 2 the ordering itself is pinned — any move of `app.UseTrustedProxyForwardedHeaders()` below `app.UseSecurityBaselines()` reddens `RateLimit_PartitionsPerForwardedClient`. What is unpinned is the cookie attribute's dependence on the flag, not the ordering.
+- **Suggested fix:** Assert `Secure` on the refresh cookie from a request forwarded as `X-Forwarded-Proto: https` through a trusted proxy, next to the existing forwarded-headers integration tests.
+- **History:** <append-only, one line per event>
+  - v4: found by the verification's judgment-item pass (convergence 1, not hinted), verdict confirmed by reading; class-mate of PPW-747 and of the HSTS gap PPW-750 records, at a third site, so split rather than merged.
+
+### PPW-761 — UseCors runs before UseRateLimiter and no test asserts CORS headers survive a 429
+
+- **What:** `src/PhotoPrint.API/Extensions/SecurityExtensions.cs:121` puts `UseCors()` immediately before `UseRateLimiter()`, which is what lets a browser read a 429 response cross-origin. Nothing asserts it: no test checks for CORS headers on a rate-limited response, so swapping the two lines would leave a throttled SPA seeing an opaque network error instead of a 429, with every test green.
+- **Evidence:** `:121-122` for the pair. The existing limiter tests (`src/PhotoPrint.Tests/Integration/RateLimitIntegrationTests.cs`) assert status codes only and send no `Origin` header. Distinct from PPW-711, which is about `UseRateLimiter()` running before `UseRouting()` and the endpoint policies that leaves inert.
+- **Suggested fix:** Add an `Origin` header to one existing 429 assertion and check `Access-Control-Allow-Origin` comes back with it.
+- **History:** <append-only, one line per event>
+  - v4: found by the verification's judgment-item pass (convergence 1, not hinted), verdict confirmed by reading.

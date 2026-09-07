@@ -99,3 +99,11 @@
 {"t":"2026-09-07T10:12:53+03:00","ev":"test-run","kind":"final","passed":38,"failed":0,"duration_s":19.403,"filter":"ForwardedHeaders|FullyQualifiedName~RateLimit","skipped":0,"cluster":"round-2-final","round":2}
 {"t":"2026-09-07T10:14:01+03:00","ev":"round-end","round":2}
 {"t":"2026-09-07T10:16:01+03:00","ev":"pass-launch","pass":4,"type":"verification","reason":"verification of fix round 2 (sweep of PPW-747, PPW-748)"}
+{"t":"2026-09-07T10:16:11+03:00","ev":"verify-result","id":"PPW-747","verdict":"test-only","commit":"10cd81c"}
+{"t":"2026-09-07T10:16:11+03:00","ev":"verify-result","id":"PPW-748","verdict":"test-only","commit":"afa1418"}
+{"t":"2026-09-07T10:18:12+03:00","ev":"test-run","kind":"revert-and-rerun","passed":37,"failed":1,"duration_s":36.101,"filter":"ForwardedHeaders|FullyQualifiedName~RateLimit","skipped":0,"note":"verification v4 red leg for PPW-748: IsMetricsScrape first conjunct forced false"}
+{"t":"2026-09-07T10:19:07+03:00","ev":"test-run","kind":"revert-and-rerun","passed":37,"failed":1,"duration_s":22.453,"filter":"ForwardedHeaders|FullyQualifiedName~RateLimit","skipped":0,"note":"verification v4 red leg for PPW-747: UseTrustedProxyForwardedHeaders moved below UseSecurityBaselines"}
+{"t":"2026-09-07T10:19:49+03:00","ev":"test-run","kind":"green","passed":38,"failed":0,"duration_s":32.681,"filter":"ForwardedHeaders|FullyQualifiedName~RateLimit","skipped":0,"note":"verification v4 green leg at the round tip after both hand levers were restored"}
+{"t":"2026-09-07T10:31:20+03:00","ev":"verify-result","id":"PPW-747","verdict":"held","commit":"734eec6","reason":"hand proof: UseTrustedProxyForwardedHeaders moved below UseSecurityBaselines reddened only RateLimit_PartitionsPerForwardedClient (37 passed, 1 failed), restored green 38/0; script verdict was test-only because the round changed no source"}
+{"t":"2026-09-07T10:31:20+03:00","ev":"verify-result","id":"PPW-748","verdict":"held","commit":"734eec6","reason":"hand proof: IsMetricsScrape first conjunct forced false reddened only The_metrics_path_on_the_scrape_port_keeps_its_peer (37 passed, 1 failed), restored green 38/0; script verdict was test-only because the round changed no source"}
+{"t":"2026-09-07T10:31:21+03:00","ev":"pass-records-done","pass":4}
