@@ -1,3 +1,4 @@
+using System.Net;
 using FluentAssertions;
 using Xunit;
 
@@ -45,5 +46,40 @@ public class RateLimitIntegrationTests
         rejected.Headers.TryGetValues("Retry-After", out var values).Should().BeTrue();
         int.TryParse(values!.First(), out var retryAfterSeconds).Should().BeTrue();
         retryAfterSeconds.Should().BePositive();
+    }
+}
+
+public class ForwardedClientRateLimitTests
+{
+    private const string ProxyAddress = "172.28.0.2";
+
+    [Fact]
+    public async Task RateLimit_PartitionsPerForwardedClient()
+    {
+        using var factory = new ForwardedClientRateLimitFactory();
+
+        for (var i = 0; i < 3; i++)
+            (await Send(factory, "203.0.113.1")).Should().Be(HttpStatusCode.OK);
+
+        var fourthFromTheSameClient = await Send(factory, "203.0.113.1");
+        var firstFromAnotherClient  = await Send(factory, "198.51.100.7");
+
+        fourthFromTheSameClient.Should().Be(HttpStatusCode.TooManyRequests);
+        firstFromAnotherClient.Should().Be(HttpStatusCode.OK);
+    }
+
+    private static Task<HttpStatusCode> Send(ForwardedClientRateLimitFactory factory, string client) =>
+        factory.SendForwardedAsync(peer: ProxyAddress, forwardedFor: client, path: "/health");
+}
+
+internal sealed class ForwardedClientRateLimitFactory : TrustedProxyFactory
+{
+    public ForwardedClientRateLimitFactory() : base("172.28.0.2") { }
+
+    protected override Dictionary<string, string?> ExtraConfig()
+    {
+        var config = base.ExtraConfig();
+        config["RateLimit:Public:PermitLimit"] = "3";
+        return config;
     }
 }

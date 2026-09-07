@@ -276,4 +276,16 @@ internal class TrustedProxyFactory : ObservabilityFactoryBase
         _probe.Resolved.Should().NotBeNull("the probe middleware runs on every request");
         return _probe.Resolved!;
     }
+
+    public async Task<HttpStatusCode> SendForwardedAsync(string peer, string forwardedFor, string path)
+    {
+        _probe.Peer = IPAddress.Parse(peer);
+        using var client = CreateClient();
+
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add("X-Forwarded-For", forwardedFor);
+
+        var response = await client.SendAsync(request);
+        return response.StatusCode;
+    }
 }
