@@ -2,11 +2,11 @@
 unit: 001-dependency-and-boot-hardening
 intent: 025-security-dependency-hygiene
 phase: inception
-status: draft
+status: complete
 unit_type: backend
 default_bolt_type: simple-construction-bolt
-created: 2026-06-05T09:30:00Z
-updated: 2026-06-05T09:30:00Z
+created: 2026-06-05T09:30:00.000Z
+updated: 2026-06-05T09:30:00.000Z
 ---
 
 # Unit Brief: Dependency & Boot Hardening

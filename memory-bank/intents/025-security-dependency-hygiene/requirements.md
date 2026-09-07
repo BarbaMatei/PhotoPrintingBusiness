@@ -1,9 +1,9 @@
 ---
 intent: 025-security-dependency-hygiene
 phase: inception
-status: inception-complete
-created: 2026-06-05T09:00:00Z
-updated: 2026-06-05T09:00:00Z
+status: complete
+created: 2026-06-05T09:00:00.000Z
+updated: 2026-06-05T09:00:00.000Z
 source: docs/analysis/architect-review-2026-06-03.md (Group 1 — P01, P02, P03, P05)
 priority_score: 22
 ---
