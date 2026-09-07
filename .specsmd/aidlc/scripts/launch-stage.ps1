@@ -118,6 +118,10 @@ Do this and nothing more:
 $promptPath = Join-Path $Worktree '.stage-prompt.md'
 $commandText = "claude -p (Get-Content .stage-prompt.md -Raw -Encoding UTF8) --model $Model --effort $Effort --permission-mode auto --autocompact $Autocompact --exclude-dynamic-system-prompt-sections --append-system-prompt-file `"$RulesPath`""
 $costText = "node `"$CostScript`" `"$Worktree`" --since <launch ISO> --bolt $Bolt --stage $Stage --append `"$logPath`""
+$boltNumber = [regex]::Match($Bolt, '^\d+').Value
+if (-not $boltNumber) { $boltNumber = $Bolt }
+$commitMessage = "docs(bolt-$boltNumber): record the $Stage stage session cost"
+$commitText = "git commit --only -m `"$commitMessage`" -- $relLog ; git push"
 
 if ($DryRun) {
     Write-Output "--- prompt (would be written to $promptPath) ---"
@@ -126,6 +130,7 @@ if ($DryRun) {
     Write-Output $commandText
     Write-Output '--- after claude exits ---'
     Write-Output $costText
+    Write-Output $commitText
     exit 0
 }
 
@@ -141,6 +146,18 @@ try {
     $claudeExit = $LASTEXITCODE
     Write-Host "[launch-stage] claude exited $claudeExit; measuring the session"
     & node $CostScript $Worktree --since $launched --bolt $Bolt --stage $Stage --append $logPath
+    $ErrorActionPreference = 'Continue'
+    if (git status --porcelain -- $relLog) {
+        git commit --only -m $commitMessage -- $relLog
+        if ($LASTEXITCODE -eq 0) {
+            git push
+            if ($LASTEXITCODE -ne 0) { Write-Host "[launch-stage] push rejected (git exited $LASTEXITCODE); continuing" }
+        } else {
+            Write-Host "[launch-stage] commit of $relLog failed (git exited $LASTEXITCODE); continuing"
+        }
+    } else {
+        Write-Host "[launch-stage] $relLog unchanged; no session-cost commit"
+    }
 } finally {
     Pop-Location
 }
