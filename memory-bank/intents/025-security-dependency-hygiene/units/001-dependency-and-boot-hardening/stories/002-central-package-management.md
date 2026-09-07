@@ -2,11 +2,11 @@
 id: 002-central-package-management
 unit: 001-dependency-and-boot-hardening
 intent: 025-security-dependency-hygiene
-status: draft
+status: complete
 priority: must
-created: 2026-06-05T09:30:00Z
+created: 2026-06-05T09:30:00.000Z
 assigned_bolt: 054-dependency-and-boot-hardening
-implemented: false
+implemented: true
 ---
 
 # Story: 002-central-package-management
