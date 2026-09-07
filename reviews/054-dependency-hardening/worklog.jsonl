@@ -98,3 +98,4 @@
 {"t":"2026-09-07T10:12:16+03:00","ev":"gate-parked","kind":"fixer-decision","default":"not fixed, not filed","reason":"round review noticed UseSentryScopeEnricher after-auth ordering is unpinned (only correlation_id asserted); outside the finding set, owner routes it"}
 {"t":"2026-09-07T10:12:53+03:00","ev":"test-run","kind":"final","passed":38,"failed":0,"duration_s":19.403,"filter":"ForwardedHeaders|FullyQualifiedName~RateLimit","skipped":0,"cluster":"round-2-final","round":2}
 {"t":"2026-09-07T10:14:01+03:00","ev":"round-end","round":2}
+{"t":"2026-09-07T10:16:01+03:00","ev":"pass-launch","pass":4,"type":"verification","reason":"verification of fix round 2 (sweep of PPW-747, PPW-748)"}
