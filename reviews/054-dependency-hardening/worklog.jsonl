@@ -77,3 +77,24 @@
 {"t":"2026-09-05T00:31:31+03:00","ev":"pass-records-done","pass":3}
 {"t":"2026-09-05T00:40:29+03:00","ev":"doc-gate","pass":3,"verdict":"disapprove","reason":"judge corrected two counts in summary-v3: six of eleven new rows are unverified-low (the metrics 10 includes four re-finds) and four sub-claims were hand-checked; replacement text applied verbatim, lint clean"}
 {"t":"2026-09-05T00:40:37+03:00","ev":"note","reason":"soft stop by owner after pass 3 records"}
+{"t":"2026-09-07T09:46:25+03:00","ev":"run-start","reason":"unattended run: drain queued mediums PPW-747, PPW-748 then verify; ordinary-feature tier, no certification wanted"}
+{"t":"2026-09-07T09:46:25+03:00","ev":"note","reason":"sweep basis","ids":["PPW-747","PPW-748"]}
+{"t":"2026-09-07T09:52:02+03:00","ev":"round-start","round":2}
+{"t":"2026-09-07T09:52:08+03:00","ev":"triage-done","round":2,"clusters":2,"checks_needed":1,"pre_cleared":0,"gates":0}
+{"t":"2026-09-07T09:52:57+03:00","ev":"check-dispatched","round":2,"cluster":"limiter-partitioning","ids":["PPW-747"]}
+{"t":"2026-09-07T09:54:32+03:00","ev":"test-run","kind":"green","passed":5,"failed":0,"duration_s":30.173,"filter":"PhotoPrint.Tests.Integration.ForwardedHeadersWithObservabilityTests","skipped":0,"cluster":"metrics-scrape-exclusion","round":2}
+{"t":"2026-09-07T09:55:13+03:00","ev":"test-run","kind":"revert-and-rerun","passed":4,"failed":1,"duration_s":11.902,"filter":"PhotoPrint.Tests.Integration.ForwardedHeadersWithObservabilityTests","skipped":0,"cluster":"metrics-scrape-exclusion","round":2,"note":"PPW-748 revert proof: IsMetricsScrape forced false"}
+{"t":"2026-09-07T09:55:45+03:00","ev":"finding","id":"PPW-748","status":"fixed","commit":"afa1418"}
+{"t":"2026-09-07T10:01:20+03:00","ev":"check-returned","round":2,"cluster":"limiter-partitioning","verdict":"cleared","tokens":101089}
+{"t":"2026-09-07T10:02:27+03:00","ev":"test-run","kind":"green","passed":1,"failed":0,"duration_s":36.483,"filter":"PhotoPrint.Tests.Integration.ForwardedClientRateLimitTests","skipped":0,"cluster":"limiter-partitioning","round":2}
+{"t":"2026-09-07T10:03:01+03:00","ev":"test-run","kind":"revert-and-rerun","passed":0,"failed":1,"duration_s":11.994,"filter":"PhotoPrint.Tests.Integration.ForwardedClientRateLimitTests","skipped":0,"cluster":"limiter-partitioning","round":2,"note":"PPW-747 revert proof: UseTrustedProxyForwardedHeaders moved below UseSecurityBaselines"}
+{"t":"2026-09-07T10:03:22+03:00","ev":"finding","id":"PPW-747","status":"fixed","commit":"10cd81c"}
+{"t":"2026-09-07T10:04:24+03:00","ev":"round-review-dispatched","round":2}
+{"t":"2026-09-07T10:04:24+03:00","ev":"test-audit-dispatched","round":2}
+{"t":"2026-09-07T10:08:43+03:00","ev":"test-audit-returned","round":2,"verdict":"pass"}
+{"t":"2026-09-07T10:08:55+03:00","ev":"note","reason":"test-meaning audit pass; PPW-747 extra 4th-request assertion kept as a strengthening"}
+{"t":"2026-09-07T10:12:15+03:00","ev":"round-review-returned","round":2,"found":0}
+{"t":"2026-09-07T10:12:15+03:00","ev":"gate-parked","kind":"fixer-decision","default":"not fixed, not filed","reason":"round review noticed HSTS emission depends on the same Program.cs ordering and no test asserts Strict-Transport-Security; outside the finding set, owner routes it"}
+{"t":"2026-09-07T10:12:16+03:00","ev":"gate-parked","kind":"fixer-decision","default":"not fixed, not filed","reason":"round review noticed UseSentryScopeEnricher after-auth ordering is unpinned (only correlation_id asserted); outside the finding set, owner routes it"}
+{"t":"2026-09-07T10:12:53+03:00","ev":"test-run","kind":"final","passed":38,"failed":0,"duration_s":19.403,"filter":"ForwardedHeaders|FullyQualifiedName~RateLimit","skipped":0,"cluster":"round-2-final","round":2}
+{"t":"2026-09-07T10:14:01+03:00","ev":"round-end","round":2}
