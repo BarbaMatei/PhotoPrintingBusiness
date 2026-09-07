@@ -19,7 +19,11 @@ public class CartServiceTests
             .UseInMemoryDatabase($"CartSvc_{Guid.NewGuid():N}")
             .Options;
         _db = new PhotoPrintDbContext(options);
-        _sut = new CartService(_db);
+        _sut = new CartService(
+            _db,
+            Helpers.TestCoupons.ServiceFor(_db),
+            Microsoft.Extensions.Options.Options.Create(
+                new PhotoPrint.API.Configuration.VatSettings()));
     }
 
     // ── Seed helpers ──────────────────────────────────────────────────────────
@@ -103,7 +107,7 @@ public class CartServiceTests
 
         var result = await _sut.GetCartAsync(userId, null);
 
-        result.Should().BeEquivalentTo(CartResponseDto.Empty);
+        result.Should().BeEquivalentTo(CartResponseDto.Empty with { VatRate = 0.19m });
     }
 
     [Fact]

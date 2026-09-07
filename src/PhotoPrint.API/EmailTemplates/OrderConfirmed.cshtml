@@ -42,6 +42,13 @@
     <td style="padding:4px 0;color:#616161;">Transport</td>
     <td style="padding:4px 0;text-align:right;color:#616161;">@Model.ShippingCostRon.ToString("F2") lei</td>
   </tr>
+  @if (Model.DiscountRon > 0m)
+  {
+  <tr>
+    <td style="padding:4px 0;color:#2E7D32;">Reducere@(string.IsNullOrWhiteSpace(Model.CouponCode) ? "" : " " + Model.CouponCode)</td>
+    <td style="padding:4px 0;text-align:right;color:#2E7D32;">-@Model.DiscountRon.ToString("F2") lei</td>
+  </tr>
+  }
   <tr style="font-weight:bold;font-size:16px;">
     <td style="padding:8px 0 4px;border-top:2px solid #e0e0e0;">Total</td>
     <td style="padding:8px 0 4px;text-align:right;border-top:2px solid #e0e0e0;color:#2E7D32;">

@@ -8,6 +8,7 @@ using PhotoPrint.API.DTOs.Payments;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
 using PhotoPrint.API.Observability;
+using PhotoPrint.API.Services.Coupons;
 
 namespace PhotoPrint.API.Services;
 
@@ -21,14 +22,18 @@ public class OrderService : IOrderService
     private readonly IStorageRouter _storageRouter;
     private readonly StorageSettings _storageSettings;
     private readonly VatSettings _vatSettings;
+    private readonly ICouponService _coupons;
+    private readonly StripeSettings _stripeSettings;
 
     public OrderService(
         PhotoPrintDbContext db,
         IOrderNumberService orderNumberService,
         IShippingService shipping,
         IStorageRouter storageRouter,
+        ICouponService coupons,
         IOptions<StorageSettings> storageSettings,
         IOptions<VatSettings> vatSettings,
+        IOptions<StripeSettings>? stripeSettings = null,
         IStripePaymentGateway? paymentGateway = null,
         ILogger<OrderService>? logger = null)
     {
@@ -36,8 +41,10 @@ public class OrderService : IOrderService
         _orderNumberService = orderNumberService;
         _shipping = shipping;
         _storageRouter = storageRouter;
+        _coupons = coupons;
         _storageSettings = storageSettings.Value;
         _vatSettings = vatSettings.Value;
+        _stripeSettings = stripeSettings?.Value ?? new StripeSettings();
         _paymentGateway = paymentGateway;
         _logger = logger;
     }
@@ -125,9 +132,11 @@ public class OrderService : IOrderService
         // See bolt 034 (intent 014 payment-hardening).
         var shipping = await _shipping.GetShippingCostAsync(request.DeliveryType.ToString(), ct);
         var shippingCostRon = shipping.CostRon;
-        var total = subtotal + shippingCostRon;
+        var grossBeforeDiscount = subtotal + shippingCostRon;
 
         // 2b. Idempotency resolution. Only when a key is supplied.
+        HeldRedemption? heldSlot = null;
+        Order? abandonedHolder = null;
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
         {
             // Single round-trip for THIS caller's row holding the key — fresh or stale
@@ -138,7 +147,7 @@ public class OrderService : IOrderService
             {
                 // A settled order must not hand back its client secret; a failed one frees the key.
                 if (IsFresh(holder) && holder.Status == OrderStatus.AwaitingPayment)
-                    return ReplayOrConflict(holder, request, total, orderItems);
+                    return ReplayOrConflict(holder, request, grossBeforeDiscount, orderItems);
 
                 if (IsFresh(holder) && holder.Status != OrderStatus.PaymentFailed)
                     throw new IdempotencyKeyConsumedException(holder.Id);
@@ -147,6 +156,18 @@ public class OrderService : IOrderService
                 // would leave one basket with two chargeable intents.
                 if (IsFresh(holder) && holder.Status == OrderStatus.PaymentFailed)
                     await AbandonPaymentIntentAsync(holder, ct);
+
+                if (holder.Status is OrderStatus.AwaitingPayment or OrderStatus.PaymentFailed)
+                {
+                    var held = await _db.CouponRedemptions
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(r => r.OrderId == holder.Id, ct);
+                    if (held is not null)
+                    {
+                        heldSlot = new HeldRedemption(held.Id, held.CouponId, holder.Id);
+                        abandonedHolder = holder;
+                    }
+                }
 
                 // Stale (>24h) row this caller owns still holds the key. Null it on the
                 // in-memory entity WITHOUT an intermediate save, so
@@ -159,6 +180,21 @@ public class OrderService : IOrderService
                 // (the orphaning the two-save version risked on a crash/mid-failure).
                 holder.IdempotencyKey = null;
             }
+        }
+
+        var appliedCoupon = await _coupons.ResolveForOrderAsync(
+            userId, guestSessionId, subtotal, shippingCostRon, heldSlot?.CouponId, ct);
+        var discountRon = appliedCoupon?.DiscountRon ?? 0m;
+        var total = grossBeforeDiscount - discountRon;
+
+        if (appliedCoupon is not null && total < _stripeSettings.MinimumChargeRon)
+        {
+            _logger?.LogInformation(
+                "coupon.rejected code={Code} reason={Reason}",
+                appliedCoupon.Code, Exceptions.CouponErrorCodes.OrderTotalBelowMinimum);
+            throw new CouponConflictException(
+                Exceptions.CouponErrorCodes.OrderTotalBelowMinimum,
+                Coupons.CouponMessages.For(Exceptions.CouponErrorCodes.OrderTotalBelowMinimum));
         }
 
         // Capture guest email before building the order
@@ -188,6 +224,8 @@ public class OrderService : IOrderService
             ShippingCostRon = shippingCostRon,
             SubtotalRon = subtotal,
             TotalRon = total,
+            CouponCode = appliedCoupon?.Code,
+            DiscountRon = discountRon,
             NetTotalRon = vat.NetTotalRon,
             VatRon = vat.VatRon,
             VatRate = vat.VatRate,
@@ -195,7 +233,44 @@ public class OrderService : IOrderService
             Items = orderItems,
         };
 
+        var transfersHeldSlot = heldSlot is not null && appliedCoupon?.CouponId == heldSlot.CouponId;
+
+        if (abandonedHolder is not null)
+            OrderStatusMachine.Abandon(abandonedHolder);
+
+        var useCouponTransaction = (appliedCoupon is not null || heldSlot is not null)
+            && _db.Database.ProviderName != DbProviders.InMemory
+            && _db.Database.CurrentTransaction is null;
+        var couponTx = useCouponTransaction
+            ? await _db.Database.BeginTransactionAsync(ct)
+            : null;
+        await using var couponTxScope = couponTx;
+
+        if (heldSlot is not null && !transfersHeldSlot)
+            await _coupons.ReleaseForOrderAsync(heldSlot.OrderId, ct);
+
         _db.Orders.Add(order);
+
+        CouponRedemption? redemption = null;
+        CouponRedemption? movedRedemption = null;
+        if (transfersHeldSlot)
+        {
+            movedRedemption = await _db.CouponRedemptions
+                .FirstAsync(r => r.Id == heldSlot!.RedemptionId, ct);
+            movedRedemption.OrderId = order.Id;
+            movedRedemption.DiscountRon = discountRon;
+        }
+        else if (appliedCoupon is not null)
+        {
+            redemption = new CouponRedemption
+            {
+                CouponId = appliedCoupon.CouponId,
+                Order = order,
+                UserId = userId,
+                DiscountRon = discountRon,
+            };
+            _db.CouponRedemptions.Add(redemption);
+        }
 
         var hasKey = !string.IsNullOrWhiteSpace(idempotencyKey);
 
@@ -217,6 +292,16 @@ public class OrderService : IOrderService
             {
                 await _db.SaveChangesAsync(ct);
 
+                if (appliedCoupon is not null && !transfersHeldSlot)
+                    await _coupons.ConsumeOrThrowAsync(appliedCoupon.CouponId, ct);
+
+                if (couponTx is not null) await couponTx.CommitAsync(ct);
+
+                if (transfersHeldSlot)
+                    _logger?.LogInformation(
+                        "coupon.transferred coupon_id={CouponId} from_order_id={FromOrderId} to_order_id={ToOrderId}",
+                        heldSlot!.CouponId, heldSlot.OrderId, order.Id);
+
                 // Observability: orders_created_total{processor,status}.
                 // Status is "created" — the order is in AwaitingPayment; the Paid
                 // transition is observed via payment_webhook_total at the webhook handlers.
@@ -235,13 +320,13 @@ public class OrderService : IOrderService
                 // are the same reference, and EF fix-up empties the collection as each item
                 // is detached — which would otherwise make the divergence check see no items.
                 var candidateItems = order.Items.ToList();
-                DetachFailedInsert(order);
+                DetachFailedInsert(order, redemption, movedRedemption, abandonedHolder);
 
                 var winner = await FindKeyHolderAsync(idempotencyKey!, userId, guestSessionId, ct);
                 if (winner is not null && IsFresh(winner))
                 {
                     if (winner.Status == OrderStatus.AwaitingPayment)
-                        return ReplayOrConflict(winner, request, total, candidateItems);
+                        return ReplayOrConflict(winner, request, grossBeforeDiscount, candidateItems);
 
                     if (winner.Status != OrderStatus.PaymentFailed)
                         throw new IdempotencyKeyConsumedException(winner.Id);
@@ -306,14 +391,26 @@ public class OrderService : IOrderService
     /// not later persist the orphaned graph on the next SaveChanges (e.g. the
     /// controller saving the gateway secret after an idempotent replay).
     /// </summary>
-    private void DetachFailedInsert(Order order)
+    private void DetachFailedInsert(
+        Order order,
+        CouponRedemption? redemption,
+        CouponRedemption? movedRedemption,
+        Order? abandonedHolder)
     {
         // Snapshot the collection: detaching an item triggers EF fix-up that removes it
         // from order.Items, which would otherwise mutate the collection mid-enumeration.
         foreach (var item in order.Items.ToList())
             _db.Entry(item).State = EntityState.Detached;
+        if (redemption is not null)
+            _db.Entry(redemption).State = EntityState.Detached;
+        if (movedRedemption is not null)
+            _db.Entry(movedRedemption).State = EntityState.Detached;
+        if (abandonedHolder is not null)
+            _db.Entry(abandonedHolder).State = EntityState.Detached;
         _db.Entry(order).State = EntityState.Detached;
     }
+
+    private sealed record HeldRedemption(Guid RedemptionId, Guid CouponId, Guid OrderId);
 
     // ── Idempotency helpers ─────────────────────────────────────────
 
@@ -329,10 +426,11 @@ public class OrderService : IOrderService
     /// sketched it as <c>ResolveFreshHolder</c>.)
     /// </summary>
     private OrderCreationResult ReplayOrConflict(
-        Order freshHolder, CreateOrderRequest request, decimal total,
+        Order freshHolder, CreateOrderRequest request, decimal candidateGrossBeforeDiscount,
         IReadOnlyList<OrderItem> candidateItems)
     {
-        var divergent = DivergentFields(freshHolder, request, total, candidateItems);
+        var divergent = DivergentFields(
+            freshHolder, request, candidateGrossBeforeDiscount, candidateItems);
         if (divergent.Count > 0)
             throw new IdempotencyConflictException(divergent);
 
@@ -374,13 +472,14 @@ public class OrderService : IOrderService
     /// photos would silently replay the wrong order's images.
     /// </summary>
     private static IReadOnlyList<string> DivergentFields(
-        Order existing, CreateOrderRequest request, decimal candidateTotal,
+        Order existing, CreateOrderRequest request, decimal candidateGrossBeforeDiscount,
         IReadOnlyList<OrderItem> candidateItems)
     {
         var fields = new List<string>();
         if (existing.DeliveryType != request.DeliveryType) fields.Add("deliveryType");
         if (existing.EasyboxLockerId != request.EasyboxLockerId) fields.Add("easyboxLockerId");
-        if (existing.TotalRon != candidateTotal) fields.Add("totalRon");
+        if (existing.SubtotalRon + existing.ShippingCostRon != candidateGrossBeforeDiscount)
+            fields.Add("totalRon");
         if (ItemsSignature(existing.Items) != ItemsSignature(candidateItems)) fields.Add("items");
         return fields;
     }
@@ -491,6 +590,8 @@ public class OrderService : IOrderService
             order.VatRate,
             order.ShippingCostRon,
             order.TotalRon,
+            order.CouponCode,
+            order.DiscountRon,
             order.CreatedAt,
             order.PaidAt,
             order.DeliveryType.ToString(),

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using PhotoPrint.API.Authentication;
 using PhotoPrint.API.DTOs.Cart;
 using PhotoPrint.API.Extensions;
@@ -58,6 +59,34 @@ public class CartController : ControllerBase
 
         await _cartService.ClearCartAsync(userId, guestSessionId, cancellationToken);
         return NoContent();
+    }
+
+    [HttpPost("coupon")]
+    [EnableRateLimiting(SecurityExtensions.CouponRateLimitPolicy)]
+    [ProducesResponseType(typeof(CartResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ApplyCouponAsync(
+        [FromBody] ApplyCouponRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserIdOrNull();
+        var guestSessionId = User.GetGuestSessionIdOrNull();
+
+        var result = await _cartService.ApplyCouponAsync(
+            userId, guestSessionId, request.Code, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpDelete("coupon")]
+    [ProducesResponseType(typeof(CartResponseDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ClearCouponAsync(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserIdOrNull();
+        var guestSessionId = User.GetGuestSessionIdOrNull();
+
+        var result = await _cartService.ClearCouponAsync(userId, guestSessionId, cancellationToken);
+        return Ok(result);
     }
 
     // POST /api/cart/merge  (JWT required — guests cannot merge carts)

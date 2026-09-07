@@ -6,16 +6,27 @@
   inject,
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CartService } from '../../../core/services/cart.service';
 import { UploadService } from '../../../core/services/upload.service';
-import { CartResponseDto, CartItemDto, CartGroupDto } from '../../../core/models/cart.model';
+import {
+  CartResponseDto,
+  CartItemDto,
+  CartGroupDto,
+  cartDiscount,
+  cartTotal,
+  hasFreeShippingCoupon,
+  isCouponStale,
+} from '../../../core/models/cart.model';
+import { couponErrorMessage, couponMessageFor } from '../../../core/models/coupon-messages';
 
 @Component({
   selector: 'app-cart-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, RouterLink],
+  imports: [DecimalPipe, ReactiveFormsModule, RouterLink],
   template: `
     <div class="cart-page">
       <h1 class="cart-page__title">Coșul tău 🛒</h1>
@@ -82,6 +93,44 @@ import { CartResponseDto, CartItemDto, CartGroupDto } from '../../../core/models
               </div>
             }
 
+            <div class="coupon-box">
+              @if (cart.couponCode) {
+                <div class="coupon-box__applied">
+                  <span class="coupon-box__code">Cod promo: {{ cart.couponCode }}</span>
+                  <button
+                    type="button"
+                    class="coupon-box__remove"
+                    [disabled]="couponPending"
+                    (click)="onRemoveCoupon()"
+                  >Elimină</button>
+                </div>
+                @if (couponStale) {
+                  <p class="coupon-box__warning" role="alert">{{ staleMessage }}</p>
+                }
+              } @else {
+                <label class="coupon-box__label" for="coupon-code">Cod promo</label>
+                <div class="coupon-box__row">
+                  <input
+                    id="coupon-code"
+                    type="text"
+                    class="coupon-box__input"
+                    placeholder="Introdu codul"
+                    [formControl]="couponCtrl"
+                    (keyup.enter)="onApplyCoupon()"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn--secondary coupon-box__apply"
+                    [disabled]="couponPending"
+                    (click)="onApplyCoupon()"
+                  >Aplică</button>
+                </div>
+              }
+              @if (couponError) {
+                <p class="coupon-box__error" role="alert">{{ couponError }}</p>
+              }
+            </div>
+
             <div class="cart-page__actions-bottom">
               <a routerLink="/tipareste" class="btn btn--secondary">
                 + Adaugă alt format
@@ -99,13 +148,27 @@ import { CartResponseDto, CartItemDto, CartGroupDto } from '../../../core/models
                   <span>{{ group.subtotal | number:'1.2-2' }} lei</span>
                 </div>
               }
+              <div class="cart-summary__row cart-summary__row--subtotal">
+                <span>Subtotal</span>
+                <span>{{ cart.subtotal | number:'1.2-2' }} lei</span>
+              </div>
+              @if (discountRon > 0) {
+                <div class="cart-summary__row cart-summary__row--discount">
+                  <span>Reducere{{ cart.couponCode ? ' (' + cart.couponCode + ')' : '' }}</span>
+                  <span>-{{ discountRon | number:'1.2-2' }} lei</span>
+                </div>
+              }
               <div class="cart-summary__row cart-summary__row--shipping">
                 <span>Livrare</span>
-                <span>Calculat la pasul următor</span>
+                @if (freeShipping) {
+                  <span>Transport gratuit cu codul {{ cart.couponCode }}</span>
+                } @else {
+                  <span>Calculat la pasul următor</span>
+                }
               </div>
               <div class="cart-summary__row cart-summary__row--total">
                 <strong>Total</strong>
-                <strong>{{ cart.subtotal | number:'1.2-2' }} lei</strong>
+                <strong>{{ totalRon | number:'1.2-2' }} lei</strong>
               </div>
               <div class="cart-summary__actions">
                 <a routerLink="/checkout" class="btn-checkout">
@@ -304,7 +367,62 @@ import { CartResponseDto, CartItemDto, CartGroupDto } from '../../../core/models
       strong { color: #1a73e8; }
     }
 
+    .cart-summary__row--discount { color: #188038; font-weight: 600; }
+
     .cart-summary__actions { margin-top: 1rem; }
+
+    .coupon-box {
+      border: 1px solid #e8eaed;
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.05);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .coupon-box__label { font-size: 0.85rem; font-weight: 600; color: #3c4043; }
+
+    .coupon-box__row { display: flex; gap: 0.5rem; align-items: center; }
+
+    .coupon-box__input {
+      flex: 1;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+
+      &:focus { outline: 2px solid #1a73e8; outline-offset: 1px; }
+    }
+
+    .coupon-box__applied {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .coupon-box__code { font-size: 0.9rem; font-weight: 600; color: #188038; }
+
+    .coupon-box__remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #d93025;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.25rem 0.35rem;
+      border-radius: 4px;
+
+      &:hover { background: #fce8e6; }
+      &:disabled { color: #9aa0a6; cursor: default; background: none; }
+    }
+
+    .coupon-box__error { margin: 0; font-size: 0.85rem; color: #d93025; }
+
+    .coupon-box__warning { margin: 0; font-size: 0.85rem; color: #b06000; }
 
     .btn-checkout {
       display: block;
@@ -337,6 +455,9 @@ export class CartPage implements OnInit {
 
   cart: CartResponseDto | null = null;
   loading = true;
+  couponError: string | null = null;
+  couponPending = false;
+  readonly couponCtrl = inject(FormBuilder).control('');
   /** Maps uploadId → blob object URL for authenticated preview display. */
   readonly blobUrls = new Map<string, string>();
 
@@ -360,6 +481,64 @@ export class CartPage implements OnInit {
           }
         }),
       );
+    });
+  }
+
+  get discountRon(): number {
+    return cartDiscount(this.cart);
+  }
+
+  get totalRon(): number {
+    return cartTotal(this.cart);
+  }
+
+  get freeShipping(): boolean {
+    return hasFreeShippingCoupon(this.cart);
+  }
+
+  get couponStale(): boolean {
+    return isCouponStale(this.cart);
+  }
+
+  get staleMessage(): string {
+    return couponMessageFor(this.cart?.couponReason);
+  }
+
+  onApplyCoupon(): void {
+    const code = (this.couponCtrl.value ?? '').trim();
+    if (!code || this.couponPending) return;
+
+    this.couponPending = true;
+    this.couponError = null;
+    this.cartService.applyCoupon(code).subscribe({
+      next: () => {
+        this.couponPending = false;
+        this.couponCtrl.setValue('');
+        this.cdr.markForCheck();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.couponPending = false;
+        this.couponError = couponErrorMessage(err);
+        this.cdr.markForCheck();
+      },
+    });
+  }
+
+  onRemoveCoupon(): void {
+    if (this.couponPending) return;
+
+    this.couponPending = true;
+    this.couponError = null;
+    this.cartService.clearCoupon().subscribe({
+      next: () => {
+        this.couponPending = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.couponPending = false;
+        this.couponError = couponErrorMessage(err);
+        this.cdr.markForCheck();
+      },
     });
   }
 

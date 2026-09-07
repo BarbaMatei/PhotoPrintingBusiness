@@ -16,6 +16,8 @@ const MOCK_DETAIL: OrderDetailDto = {
   vatRon: 19.16,
   vatRate: 0.19,
   shippingCostRon: 20,
+  couponCode: null,
+  discountRon: 0,
   createdAt: '2026-05-01T12:00:00Z',
   paidAt: '2026-05-01T12:05:00Z',
   deliveryType: 'Easybox',
@@ -122,6 +124,26 @@ describe('OrderDetailPage', () => {
     expect(el.textContent).toContain('TVA');
     expect(el.textContent).toContain('19.16 RON');
     expect(el.textContent).toContain('19%');
+  });
+
+  it('renders the coupon discount row, so the receipt explains why the total is lower', async () => {
+    await setup({
+      getOrderDetail: vi.fn().mockReturnValue(of({
+        ...MOCK_DETAIL,
+        couponCode: 'VARA10',
+        discountRon: 25,
+        totalRon: 95,
+      })),
+    });
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Reducere (VARA10)');
+    expect(el.textContent).toContain('-25.00 RON');
+  });
+
+  it('omits the discount row for an order without a coupon', async () => {
+    await setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Reducere');
   });
 
   it('shows locker name for Easybox orders', async () => {

@@ -30,6 +30,8 @@ public class PhotoPrintDbContext : DbContext
     /// <summary>Raw-SQL composite index from the migration, so it has no model-side declaration to name it.</summary>
     public const string InvoiceSeriesYearNumberIndexName = "uq_invoices_series_year_number";
 
+    public const string CouponCodeIndexName = "ix_coupons_code";
+
     public PhotoPrintDbContext(DbContextOptions<PhotoPrintDbContext> options)
         : base(options)
     {
@@ -53,6 +55,9 @@ public class PhotoPrintDbContext : DbContext
     public DbSet<OrderItem> OrderItems { get; set; } = null!;
     public DbSet<Invoice> Invoices { get; set; } = null!;
     public DbSet<SavedAddress> SavedAddresses { get; set; } = null!;
+    public DbSet<Coupon> Coupons { get; set; } = null!;
+    public DbSet<CouponRedemption> CouponRedemptions { get; set; } = null!;
+    public DbSet<CartCoupon> CartCoupons { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -333,6 +338,8 @@ public class PhotoPrintDbContext : DbContext
             entity.Property(o => o.NetTotalRon).HasColumnType("decimal(18,2)");
             entity.Property(o => o.VatRon).HasColumnType("decimal(18,2)");
             entity.Property(o => o.VatRate).HasColumnType("decimal(5,4)");
+            entity.Property(o => o.CouponCode).HasMaxLength(Coupon.MaxCodeLength);
+            entity.Property(o => o.DiscountRon).HasColumnType("decimal(10,2)").HasDefaultValue(0m);
 
             entity.Property(o => o.ShippingAddress)
                   .HasConversion(shippingConverter);
@@ -421,6 +428,80 @@ public class PhotoPrintDbContext : DbContext
                   .OnDelete(DeleteBehavior.Restrict)
                   .IsRequired();
         });
+
+        modelBuilder.Entity<Coupon>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Code).HasMaxLength(Coupon.MaxCodeLength).IsRequired();
+            entity.Property(c => c.Type).HasConversion<string>().HasMaxLength(20);
+            entity.Property(c => c.Value).HasColumnType("decimal(10,2)");
+            entity.Property(c => c.MinSubtotalRon).HasColumnType("decimal(10,2)");
+            entity.HasIndex(c => c.Code)
+                  .IsUnique()
+                  .HasDatabaseName(CouponCodeIndexName);
+            entity.HasIndex(c => new { c.IsActive, c.ValidUntil })
+                  .HasDatabaseName("ix_coupons_is_active_valid_until");
+        });
+
+        modelBuilder.Entity<CouponRedemption>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.DiscountRon).HasColumnType("decimal(10,2)");
+            entity.HasIndex(r => r.OrderId)
+                  .IsUnique()
+                  .HasDatabaseName("ix_coupon_redemptions_order_id");
+            entity.HasIndex(r => r.CouponId)
+                  .HasDatabaseName("ix_coupon_redemptions_coupon_id");
+            entity.HasIndex(r => new { r.UserId, r.CouponId })
+                  .HasDatabaseName("ix_coupon_redemptions_user_coupon");
+
+            entity.HasOne(r => r.Coupon)
+                  .WithMany()
+                  .HasForeignKey(r => r.CouponId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.Order)
+                  .WithMany()
+                  .HasForeignKey(r => r.OrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne<User>()
+                  .WithMany()
+                  .HasForeignKey(r => r.UserId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .IsRequired(false);
+        });
+
+        modelBuilder.Entity<CartCoupon>(entity =>
+        {
+            entity.HasKey(cc => cc.Id);
+            entity.HasIndex(cc => cc.UserId)
+                  .IsUnique()
+                  .HasDatabaseName("ix_cart_coupons_user");
+            entity.HasIndex(cc => cc.GuestSessionId)
+                  .IsUnique()
+                  .HasDatabaseName("ix_cart_coupons_guest");
+
+            entity.HasOne(cc => cc.User)
+                  .WithMany()
+                  .HasForeignKey(cc => cc.UserId)
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .IsRequired(false);
+
+            entity.HasOne(cc => cc.Coupon)
+                  .WithMany()
+                  .HasForeignKey(cc => cc.CouponId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        if (Database.ProviderName != DbProviders.InMemory)
+        {
+            modelBuilder.Entity<CartCoupon>()
+                .ToTable(t => t.HasCheckConstraint(
+                    "CK_CartCoupons_OneOwner",
+                    "(\"UserId\" IS NOT NULL AND \"GuestSessionId\" IS NULL) OR " +
+                    "(\"UserId\" IS NULL AND \"GuestSessionId\" IS NOT NULL)"));
+        }
 
         // ── SavedAddress ───────────────────────────────────────────────────────────
         modelBuilder.Entity<SavedAddress>(entity =>

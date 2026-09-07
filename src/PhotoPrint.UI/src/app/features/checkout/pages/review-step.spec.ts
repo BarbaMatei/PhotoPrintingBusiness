@@ -1,16 +1,18 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
-import { BehaviorSubject } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, of, throwError } from 'rxjs';
+import { vi } from 'vitest';
 import { ReviewStep } from './review-step';
 import { CartService } from '../../../core/services/cart.service';
 import { CheckoutStateService } from '../../../core/services/checkout-state.service';
 import { CartResponseDto } from '../../../core/models/cart.model';
 import { DeliveryState } from '../../../core/models/shipping.model';
 
-function makeCart(subtotal: number): CartResponseDto {
+function makeCart(subtotal: number, overrides: Partial<CartResponseDto> = {}): CartResponseDto {
   return {
     groups: [
       {
@@ -37,6 +39,13 @@ function makeCart(subtotal: number): CartResponseDto {
     ],
     subtotal,
     itemCount: 1,
+    couponCode: null,
+    couponType: null,
+    couponStatus: null,
+    couponReason: null,
+    discountRon: 0,
+    totalRon: subtotal,
+    ...overrides,
   };
 }
 
@@ -66,6 +75,11 @@ describe('ReviewStep', () => {
 
     const mockCart = {
       cart$: cartSubject.asObservable(),
+      clearCoupon: () => {
+        const cleared = makeCart(cartSubject.value.subtotal);
+        cartSubject.next(cleared);
+        return of(cleared);
+      },
     };
     const mockState = {
       snapshot: makeDeliveryState(20),
@@ -145,5 +159,113 @@ describe('ReviewStep', () => {
     expect(summary.textContent).toContain('Str. Fantoma');
     expect(summary.textContent).toContain('Timișoara');
     expect(summary.textContent).toContain('facturare');
+  });
+
+  it('charges subtotal minus discount plus shipping for a percentage coupon', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'VARA10',
+      couponType: 'Percent',
+      couponStatus: 'valid',
+      discountRon: 25,
+      totalRon: 225,
+    }));
+    const fixture = createFixture();
+    fixture.componentInstance.deliveryState.set(makeDeliveryState(19.99));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.grandTotal()).toBeCloseTo(244.99, 2);
+    const discount = fixture.debugElement.query(By.css('.total-row--discount'));
+    expect(discount.nativeElement.textContent).toContain('VARA10');
+    expect(discount.nativeElement.textContent).toContain('25.00');
+  });
+
+  it('drops the shipping cost for a free-shipping coupon, which the order will not charge', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'TRANSPORT0',
+      couponType: 'FreeShipping',
+      couponStatus: 'valid',
+      discountRon: 0,
+      totalRon: 250,
+    }));
+    const fixture = createFixture();
+    fixture.componentInstance.deliveryState.set(makeDeliveryState(19.99));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.shippingCost()).toBe(0);
+    expect(fixture.componentInstance.grandTotal()).toBeCloseTo(250, 2);
+    expect(fixture.debugElement.query(By.css('.free-shipping-note'))).not.toBeNull();
+  });
+
+  it('keeps charging shipping for a stale free-shipping coupon and offers to remove it', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'TRANSPORT0',
+      couponType: 'FreeShipping',
+      couponStatus: 'stale',
+      couponReason: 'COUPON_EXHAUSTED',
+      discountRon: 0,
+      totalRon: 250,
+    }));
+    const fixture = createFixture();
+    fixture.componentInstance.deliveryState.set(makeDeliveryState(19.99));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.shippingCost()).toBeCloseTo(19.99, 2);
+    const warning = fixture.debugElement.query(By.css('.coupon-warning'));
+    expect(warning.nativeElement.textContent).toContain('Codul a atins limita de utilizări.');
+
+    (fixture.debugElement.query(By.css('.coupon-warning__remove')).nativeElement as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css('.coupon-warning'))).toBeNull();
+  });
+
+  it('will not send a stale coupon to payment, where the 409 it causes has no way out', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'TRANSPORT0',
+      couponType: 'FreeShipping',
+      couponStatus: 'stale',
+      couponReason: 'COUPON_EXHAUSTED',
+      discountRon: 0,
+      totalRon: 250,
+    }));
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const fixture = createFixture();
+    fixture.componentInstance.termsCtrl.setValue(true);
+    fixture.detectChanges();
+
+    const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+
+    fixture.componentInstance.proceed();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('shows a Romanian sentence and stays usable when removing the coupon fails', () => {
+    cartSubject.next(makeCart(250, {
+      couponCode: 'VARA10',
+      couponType: 'Percent',
+      couponStatus: 'stale',
+      couponReason: 'COUPON_EXHAUSTED',
+      discountRon: 0,
+      totalRon: 250,
+    }));
+    TestBed.overrideProvider(CartService, {
+      useValue: {
+        cart$: cartSubject.asObservable(),
+        clearCoupon: () =>
+          throwError(() => new HttpErrorResponse({ status: 500 })),
+      },
+    });
+    const fixture = createFixture();
+    fixture.detectChanges();
+
+    (fixture.debugElement.query(By.css('.coupon-warning__remove')).nativeElement as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const error = fixture.debugElement.query(By.css('.coupon-error'));
+    expect(error.nativeElement.textContent).toContain('Nu am putut verifica codul acum.');
+    expect(fixture.componentInstance.couponPending()).toBe(false);
+    expect(fixture.debugElement.query(By.css('.coupon-warning'))).not.toBeNull();
   });
 });

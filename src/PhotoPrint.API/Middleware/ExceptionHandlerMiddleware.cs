@@ -21,6 +21,8 @@ public class ExceptionHandlerMiddleware : IMiddleware
         [typeof(BadRequestException)]           = (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(InvalidOrderTransitionException)]= (StatusCodes.Status400BadRequest, "Bad Request"),
         [typeof(UnprocessableEntityException)]  = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
+        [typeof(CouponRejectedException)]       = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
+        [typeof(CouponConflictException)]       = (StatusCodes.Status409Conflict, "Conflict"),
         [typeof(DecompressionBombException)]    = (StatusCodes.Status422UnprocessableEntity, "Unprocessable Entity"),
         // A decode that slips the pixel-area check but trips ImageSharp's allocation backstop
         // (Program.cs) throws this, not an ImageFormatException — map it to 422, not a raw 500.
@@ -207,6 +209,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
         // never values (no PII).
         var divergentFields = (exception as IdempotencyConflictException)?.DivergentFields;
         var consumedOrderId = (exception as IdempotencyKeyConsumedException)?.OrderId;
+        var errorCode = (exception as IErrorCoded)?.ErrorCode;
 
         object response;
 
@@ -224,6 +227,7 @@ public class ExceptionHandlerMiddleware : IMiddleware
                 detail,
                 correlationId,
                 divergentFields,
+                code = errorCode,
                 orderId = consumedOrderId,
                 exception = new
                 {
@@ -246,6 +250,9 @@ public class ExceptionHandlerMiddleware : IMiddleware
 
             if (divergentFields is not null)
                 problem.Extensions["divergentFields"] = divergentFields;
+
+            if (errorCode is not null)
+                problem.Extensions["code"] = errorCode;
 
             if (consumedOrderId is not null)
                 problem.Extensions["orderId"] = consumedOrderId.ToString();

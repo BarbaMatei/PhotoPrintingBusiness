@@ -1,19 +1,29 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Options;
+using PhotoPrint.API.Configuration;
 using PhotoPrint.API.Data;
 using PhotoPrint.API.DTOs.Cart;
 using PhotoPrint.API.Exceptions;
 using PhotoPrint.API.Models;
+using PhotoPrint.API.Services.Coupons;
 
 namespace PhotoPrint.API.Services;
 
 public class CartService : ICartService
 {
     private readonly PhotoPrintDbContext _db;
+    private readonly ICouponService _coupons;
+    private readonly VatSettings _vatSettings;
 
-    public CartService(PhotoPrintDbContext db)
+    public CartService(
+        PhotoPrintDbContext db,
+        ICouponService coupons,
+        IOptions<VatSettings> vatSettings)
     {
         _db = db;
+        _coupons = coupons;
+        _vatSettings = vatSettings.Value;
     }
 
     // ── GetCart ──────────────────────────────────────────────────────────────────
@@ -26,9 +36,37 @@ public class CartService : ICartService
         var items = await LoadCartItemsAsync(userId, guestSessionId, ct);
 
         if (items.Count == 0)
-            return CartResponseDto.Empty;
+            return EmptyCart();
 
-        return BuildResponse(items);
+        return await BuildResponseAsync(items, userId, guestSessionId, ct);
+    }
+
+    public async Task<CartResponseDto> ApplyCouponAsync(
+        Guid? userId,
+        Guid? guestSessionId,
+        string code,
+        CancellationToken ct = default)
+    {
+        var items = await LoadCartItemsAsync(userId, guestSessionId, ct);
+        var subtotal = SubtotalOf(items);
+
+        await _coupons.ApplyToCartAsync(userId, guestSessionId, code, subtotal, ct);
+
+        return await BuildResponseAsync(items, userId, guestSessionId, ct);
+    }
+
+    public async Task<CartResponseDto> ClearCouponAsync(
+        Guid? userId,
+        Guid? guestSessionId,
+        CancellationToken ct = default)
+    {
+        await _coupons.ClearCartCouponAsync(userId, guestSessionId, ct);
+
+        var items = await LoadCartItemsAsync(userId, guestSessionId, ct);
+        if (items.Count == 0)
+            return EmptyCart();
+
+        return await BuildResponseAsync(items, userId, guestSessionId, ct);
     }
 
     // ── SetCart ──────────────────────────────────────────────────────────────────
@@ -113,7 +151,7 @@ public class CartService : ICartService
         if (tx != null) await tx.CommitAsync(ct);
 
         var newItems = await LoadCartItemsAsync(userId, guestSessionId, ct);
-        return BuildResponse(newItems);
+        return await BuildResponseAsync(newItems, userId, guestSessionId, ct);
     }
 
     // ── ClearCart ────────────────────────────────────────────────────────────────
@@ -134,6 +172,8 @@ public class CartService : ICartService
             _db.CartItems.RemoveRange(items);
             await _db.SaveChangesAsync(ct);
         }
+
+        await _coupons.ClearCartCouponAsync(userId, guestSessionId, ct);
     }
 
     // ── MergeCart ────────────────────────────────────────────────────────────────
@@ -155,6 +195,7 @@ public class CartService : ICartService
 
         if (guestItems.Count == 0)
         {
+            await _coupons.TransferGuestCouponAsync(userId, guestSessionId, ct);
             if (tx != null) await tx.CommitAsync(ct);
             return await GetCartAsync(userId, null, ct);
         }
@@ -198,6 +239,7 @@ public class CartService : ICartService
         _db.CartItems.RemoveRange(guestItems);
 
         await _db.SaveChangesAsync(ct);
+        await _coupons.TransferGuestCouponAsync(userId, guestSessionId, ct);
         if (tx != null) await tx.CommitAsync(ct);
 
         return await GetCartAsync(userId, null, ct);
@@ -224,7 +266,46 @@ public class CartService : ICartService
             .ToListAsync(ct);
     }
 
-    private static CartResponseDto BuildResponse(List<CartItem> items)
+    private async Task<CartResponseDto> BuildResponseAsync(
+        List<CartItem> items,
+        Guid? userId,
+        Guid? guestSessionId,
+        CancellationToken ct)
+    {
+        var cart = BuildGroups(items);
+        if (cart.Groups.Count == 0)
+            return cart;
+
+        var applied = await _coupons.ResolveForCartAsync(
+            userId, guestSessionId, cart.Subtotal, ct);
+
+        var discount = applied is { IsStale: false } ? applied.DiscountRon : 0m;
+        var total = cart.Subtotal - discount;
+        var vat = VatCalculator.ExtractBreakdown(total, _vatSettings.Rate);
+
+        return cart with
+        {
+            CouponCode = applied?.Code,
+            CouponType = applied?.Type.ToString(),
+            CouponStatus = applied is null
+                ? null
+                : applied.IsStale ? CouponCartStatus.Stale : CouponCartStatus.Valid,
+            CouponReason = applied?.ReasonCode,
+            DiscountRon = discount,
+            TotalRon = total,
+            NetTotalRon = vat.NetTotalRon,
+            VatRon = vat.VatRon,
+            VatRate = vat.VatRate,
+        };
+    }
+
+    private CartResponseDto EmptyCart()
+        => CartResponseDto.Empty with { VatRate = _vatSettings.Rate };
+
+    private static decimal SubtotalOf(List<CartItem> items)
+        => BuildGroups(items).Subtotal;
+
+    private static CartResponseDto BuildGroups(List<CartItem> items)
     {
         if (items.Count == 0)
             return CartResponseDto.Empty;
@@ -270,7 +351,16 @@ public class CartService : ICartService
         return new CartResponseDto(
             Groups: groups,
             Subtotal: groups.Sum(g => g.Subtotal),
-            ItemCount: groups.Sum(g => g.Items.Count));
+            ItemCount: groups.Sum(g => g.Items.Count),
+            CouponCode: null,
+            CouponType: null,
+            CouponStatus: null,
+            CouponReason: null,
+            DiscountRon: 0m,
+            TotalRon: groups.Sum(g => g.Subtotal),
+            NetTotalRon: 0m,
+            VatRon: 0m,
+            VatRate: 0m);
     }
 
     /// <summary>

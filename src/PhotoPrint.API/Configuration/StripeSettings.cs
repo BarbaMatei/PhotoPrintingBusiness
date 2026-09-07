@@ -7,4 +7,6 @@ public class StripeSettings
     public string SecretKey { get; set; } = "";
     public string WebhookSecret { get; set; } = "";
     public string PublishableKey { get; set; } = "";
+
+    public decimal MinimumChargeRon { get; set; } = 2.00m;
 }

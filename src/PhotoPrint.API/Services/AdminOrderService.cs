@@ -28,6 +28,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly IHubContext<AdminOrderHub> _hub;
     private readonly IAwbCreationNotifier _awbNotifier;
     private readonly IInvoiceCreationService _invoiceCreator;
+    private readonly Coupons.ICouponService _coupons;
     private readonly ILogger<AdminOrderService> _logger;
     private readonly Sentry.IHub? _sentry;
 
@@ -41,6 +42,7 @@ public class AdminOrderService : IAdminOrderService
         IHubContext<AdminOrderHub> hub,
         IAwbCreationNotifier awbNotifier,
         IInvoiceCreationService invoiceCreator,
+        Coupons.ICouponService coupons,
         ILogger<AdminOrderService> logger,
         // No hub is registered unless Sentry:Enabled, so this cannot be a required dependency.
         Sentry.IHub? sentry = null)
@@ -54,6 +56,7 @@ public class AdminOrderService : IAdminOrderService
         _hub = hub;
         _awbNotifier = awbNotifier;
         _invoiceCreator = invoiceCreator;
+        _coupons = coupons;
         _logger = logger;
         _sentry = sentry;
     }
@@ -277,6 +280,8 @@ public class AdminOrderService : IAdminOrderService
 
         await _db.SaveChangesAsync(ct);
 
+        await _coupons.ReleaseForOrderAsync(order.Id, ct);
+
         try
         {
             if (!string.IsNullOrEmpty(order.PaymentIntentId))
@@ -395,6 +400,8 @@ public class AdminOrderService : IAdminOrderService
             order.SubtotalRon,
             order.ShippingCostRon,
             order.TotalRon,
+            order.CouponCode,
+            order.DiscountRon,
             order.CreatedAt,
             order.PaidAt,
             order.DeliveryType.ToString(),

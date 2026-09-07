@@ -16,7 +16,10 @@ import {
 } from '../../../core/services/checkout-attempt.service';
 import { OrderPaymentStatusDto } from '../../../core/models/payment.model';
 
-function makeOrder(status: string): OrderPaymentStatusDto {
+function makeOrder(
+  status: string,
+  overrides: Partial<OrderPaymentStatusDto> = {},
+): OrderPaymentStatusDto {
   return {
     id: 'order-1',
     orderNumber: 'FT-20260001',
@@ -24,9 +27,12 @@ function makeOrder(status: string): OrderPaymentStatusDto {
     totalRon: 45.5,
     vatRon: 7.27,
     vatRate: 0.19,
+    couponCode: null,
+    discountRon: 0,
     deliveryType: 'Easybox',
     createdAt: '2026-01-01T00:00:00Z',
     paidAt: status === 'AwaitingPayment' ? null : '2026-01-01T00:01:00Z',
+    ...overrides,
   };
 }
 
@@ -40,12 +46,14 @@ describe('ConfirmationPage', () => {
     orderError?: boolean;
     isAuthenticated?: boolean;
     submitted?: boolean;
+    order?: OrderPaymentStatusDto;
   } = {}) {
     const {
       orderStatus = 'Paid',
       orderError = false,
       isAuthenticated = false,
       submitted = false,
+      order,
     } = overrides;
 
     localStorage.clear();
@@ -57,7 +65,9 @@ describe('ConfirmationPage', () => {
     }
 
     getPaymentStatus = vi.fn().mockReturnValue(
-      orderError ? throwError(() => new HttpErrorResponse({ status: 404 })) : of(makeOrder(orderStatus)),
+      orderError
+        ? throwError(() => new HttpErrorResponse({ status: 404 }))
+        : of(order ?? makeOrder(orderStatus)),
     );
     downloadInvoice = vi.fn().mockReturnValue(of(new Blob(['%PDF-1.4'])));
 
@@ -325,5 +335,25 @@ describe('ConfirmationPage', () => {
     fixture.detectChanges();
 
     expect(fixture.componentInstance.invoiceMessage()).not.toBeNull();
+  });
+
+  it('shows the discount and the code on a discounted order', () => {
+    const fixture = setup({
+      submitted: true,
+      order: makeOrder('Paid', { couponCode: 'VARA10', discountRon: 25, totalRon: 244.99 }),
+    });
+    fixture.detectChanges();
+
+    const discount = fixture.debugElement.query(By.css('.summary-row--discount'));
+    expect(discount).not.toBeNull();
+    expect(discount.nativeElement.textContent).toContain('VARA10');
+    expect(discount.nativeElement.textContent).toContain('25.00');
+  });
+
+  it('shows no discount row on an order without a coupon', () => {
+    const fixture = setup({ orderStatus: 'Paid', submitted: true });
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css('.summary-row--discount'))).toBeNull();
   });
 });

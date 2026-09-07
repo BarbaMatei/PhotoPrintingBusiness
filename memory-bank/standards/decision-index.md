@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-06-03T12:30:00Z
-total_decisions: 24
+last_updated: 2026-09-04T00:55:00Z
+total_decisions: 26
 ---
 
 # Decision Index
@@ -17,6 +17,22 @@ Use this to find relevant prior decisions when working on related features.
 ---
 
 ## Decisions
+
+### ADR-026: A Discount Reduces the Gross Before VAT Is Extracted, Never the Net After
+- **Status**: accepted
+- **Date**: 2026-09-04
+- **Bolt**: 047-coupon-domain-and-api (coupon-domain-and-api)
+- **Path**: `bolts/047-coupon-domain-and-api/adr-026-discount-before-vat-extraction.md`
+- **Summary**: Prices in this system are VAT-inclusive and `VatCalculator` *extracts* VAT from a gross amount, so a discount must be subtracted from the gross **before** extraction: `payableGross = goods + shipping − discount`, then `vat = extract(payableGross)`. Extracting VAT first and subtracting the discount from the net overstates output VAT on every discounted order (at 19%, a 30 RON coupon on a 120 RON basket declares 19.16 instead of 14.37) — and both orderings still reconcile to the amount charged, which is why the error survives a casual check. It is irreversible in practice: the wrong figure is printed on a legal invoice and filed with ANAF, so correcting it needs a credit note per invoice plus an amended declaration. Order invariant: `TotalRon = SubtotalRon + ShippingCostRon − DiscountRon` and `NetTotalRon + VatRon = TotalRon` (±0.01). The discount must also appear as its own line — `Reducere` on the PDF, `cac:AllowanceCharge` with `ChargeIndicator=false` in the UBL, with invoice lines keeping their undiscounted amounts — never as adjusted unit prices. A second VAT rate is the point at which this ADR must be revisited rather than extended.
+- **Read when**: writing or reviewing ANY code that subtracts an amount from an order total — coupons, refunds, partial returns, loyalty credits, gift cards, price adjustments; touching `VatCalculator` or any of its call sites; changing `Order.DiscountRon`, `Order.NetTotalRon`, `Order.VatRon` or `Invoice`'s snapshot of them; building or modifying invoice XML/PDF output; adding a second VAT rate or a B2B net-price mode; debugging "why does the invoice's VAT disagree with what I expected"; tempted to pro-rate a discount across item lines or emit it as a negative invoice line (don't — both are rejected here with reasons).
+
+### ADR-025: Coupon Redemption Uses a Database Compare-and-Swap, Not a `RowVersion` Token
+- **Status**: accepted
+- **Date**: 2026-09-04
+- **Bolt**: 047-coupon-domain-and-api (coupon-domain-and-api)
+- **Path**: `bolts/047-coupon-domain-and-api/adr-025-coupon-redemption-cas-not-rowversion.md`
+- **Summary**: `Coupon.MaxRedemptions` is enforced by one `ExecuteUpdateAsync` statement whose `WHERE` carries the whole redeemability rule (id, `IsActive`, validity window, `RedemptionsCount < MaxRedemptions`); one affected row means redeemed, zero means refused, and a single follow-up read classifies the refusal so a deactivated coupon is not reported as a usage limit. Explicitly overrides stories 001/003, which specified a `RowVersion` concurrency token with retry-once: `data-stack.md` says this codebase has no concurrency tokens anywhere, ADR-016 already chose CAS for the same shape, and token-plus-retry is strictly weaker — it refuses valid coupons on scheduling luck. The statement runs as the **last** operation before COMMIT, after the order insert: CAS-first holds the coupon row lock across the whole order insert and creates a `40P01` deadlock with the idempotency index that escapes both `23505` filters as a raw 500. A mirror release (delete the redemption row, then decrement) runs on the three paths that already know an order is abandoned. On EF InMemory the branch is a read-check-increment and is not concurrency-safe; every guarantee here is proven only by PostgreSQL-backed tests.
+- **Read when**: touching `CouponService`, `Coupon.RedemptionsCount`, or the redemption path in `OrderService.CreateFromCartAsync`; adding any capped/quota'd resource (per-user coupon limits, stock counts, referral caps, seat limits) and choosing a concurrency mechanism; tempted to add a `RowVersion` column anywhere; adding a statement inside the order-creation transaction (the CAS must stay last); writing tests for redemption semantics (InMemory cannot prove them); debugging "why did this checkout get 409 when the coupon looks fine"; reasoning about lock ordering between `Coupons` and `ix_orders_idempotency_key`.
 
 ### ADR-024: Implicit Attempt Count from `(now - CreatedAt)`, No Persisted `RejectionCount` Column
 - **Status**: accepted

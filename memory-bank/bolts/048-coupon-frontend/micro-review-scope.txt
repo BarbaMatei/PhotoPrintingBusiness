@@ -1,0 +1,31 @@
+# Bolt 048-coupon-frontend - fresh-eyes micro-review scope
+# Diff range: f9f0e15^..HEAD (commits f9f0e15, 45482b7, d50952e, 0e5a667, ab4ddcd)
+# 22 files, +1698 / -54
+
+## Angular side (src/PhotoPrint.UI)
+src/PhotoPrint.UI/src/app/core/models/cart.model.ts                        (+48)
+src/PhotoPrint.UI/src/app/core/models/coupon-messages.ts                   (+44)
+src/PhotoPrint.UI/src/app/core/models/coupon-messages.spec.ts              (+67)
+src/PhotoPrint.UI/src/app/core/models/payment.model.ts                     (+2)
+src/PhotoPrint.UI/src/app/core/services/cart.service.ts                    (+29)
+src/PhotoPrint.UI/src/app/core/services/cart.service.spec.ts               (+97/-)
+src/PhotoPrint.UI/src/app/features/cart/pages/cart-page.ts                 (+187/-)
+src/PhotoPrint.UI/src/app/features/cart/pages/cart-page.spec.ts            (+256)
+src/PhotoPrint.UI/src/app/features/checkout/pages/review-step.ts           (+100/-)
+src/PhotoPrint.UI/src/app/features/checkout/pages/review-step.spec.ts      (+74/-)
+src/PhotoPrint.UI/src/app/features/orders/pages/confirmation-page.ts       (+12)
+src/PhotoPrint.UI/src/app/features/orders/pages/confirmation-page.spec.ts  (+34/-)
+
+## Invoice PDF side (src/PhotoPrint.API, src/PhotoPrint.Tests)
+src/PhotoPrint.API/Services/Invoicing/InvoiceDiscountMath.cs               (+48, new shared class)
+src/PhotoPrint.API/Services/Invoicing/InvoicePdfDocument.cs                (+8)
+src/PhotoPrint.API/Services/Invoicing/InvoiceXmlBuilder.cs                 (+41/-, math lifted out)
+src/PhotoPrint.Tests/Unit/Services/Invoicing/InvoiceDiscountMathTests.cs   (+201)
+src/PhotoPrint.Tests/Unit/Services/Invoicing/InvoicePdfRendererTests.cs    (+19)
+
+## Docs (not code, context only)
+memory-bank/bolts/048-coupon-frontend/bolt.md
+memory-bank/bolts/048-coupon-frontend/implementation-plan.md
+memory-bank/bolts/048-coupon-frontend/implementation-walkthrough.md
+memory-bank/bolts/048-coupon-frontend/test-walkthrough.md
+memory-bank/intents/022-coupon-promo-codes/units/002-coupon-frontend/construction-log.md

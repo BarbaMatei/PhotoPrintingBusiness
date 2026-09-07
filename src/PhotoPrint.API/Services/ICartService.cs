@@ -15,4 +15,8 @@ public interface ICartService
     /// Conflict resolution: user's existing items win; guest uploads are transferred to the user.
     /// </summary>
     Task<CartResponseDto> MergeCartsAsync(Guid userId, Guid guestSessionId, CancellationToken ct = default);
+
+    Task<CartResponseDto> ApplyCouponAsync(Guid? userId, Guid? guestSessionId, string code, CancellationToken ct = default);
+
+    Task<CartResponseDto> ClearCouponAsync(Guid? userId, Guid? guestSessionId, CancellationToken ct = default);
 }
