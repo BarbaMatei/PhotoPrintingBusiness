@@ -103,6 +103,9 @@ whole suite by default.**
 | API shapes, errors, auth headers | `memory-bank/standards/api-conventions.md` |
 | Naming, testing, logging rules | `memory-bank/standards/coding-standards.md` |
 | Reviewing / fixing review findings | `reviews/README.md` (the review loop — say "continue the review loop for `<target>`") |
+| A red or skipped test you didn't expect | `docs/KNOWN_FAILURES.md` — check here before calling it a bug |
+| Scaling out / running a second instance | `docs/architecture/multi-replica-readiness.md` |
+| The quarterly audit (CVEs, growth, doc rot) | `docs/ARCHITECTURE_AUDIT_CHECKLIST.md` |
 
 ## Hard rules (any entry point, not just bolts)
 
