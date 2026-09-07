@@ -6,6 +6,7 @@ param(
     [string]$Effort = 'xhigh',
     [int]$Autocompact = 120000,
     [string]$PromptFile,
+    [string]$Coordinator,
     [switch]$DryRun
 )
 
@@ -61,6 +62,15 @@ function Get-RelativePath([string]$Root, [string]$Path) {
 }
 
 $Worktree = (Resolve-Path $Worktree).Path
+if (-not $Coordinator) {
+    $kickoffPath = Join-Path $Worktree 'KICKOFF.md'
+    if (Test-Path $kickoffPath) {
+        $m = [regex]::Match((Read-Utf8 $kickoffPath), 'the Claude Code session `([^`]+)`')
+        if ($m.Success) { $Coordinator = $m.Groups[1].Value }
+    }
+}
+$coordinatorText = 'the coordinator session named in KICKOFF.md'
+if ($Coordinator) { $coordinatorText = 'the coordinator session `' + $Coordinator + '`' } else { $Coordinator = $coordinatorText }
 $boltDir = Find-Dir (Join-Path $Worktree 'memory-bank\bolts') $Bolt
 $Bolt = (Get-Item $boltDir).Name
 $boltMd = Join-Path $boltDir 'bolt.md'
@@ -101,7 +111,7 @@ ${exitText}
 
 Do this and nothing more:
 1. Read KICKOFF.md in this worktree first: it holds the group rules and the coordinator addendum. Then act as the construction agent: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill for bolt ${Bolt} at stage ${Stage} (/specsmd-construction-agent is not a command in this harness). The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates this stage's activities and artifacts; follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle, memory-bank/standards/definition-of-done.md the hand-back checklist.
-2. Work only stage ${Stage}. When its artifacts are written: update the bolt.md frontmatter (current_stage, stages_completed), append the stage-exit block for ${Bolt} / ${Stage} to ${relLog} in the shape your working rules give, commit, push the branch, and end the turn. Do not start the next stage. If this stage leaves the bolt at status review-pending, first send the hand-off report described in KICKOFF.md to the coordinator session photo-printing-website-68 by SendMessage.
+2. Work only stage ${Stage}. When its artifacts are written: update the bolt.md frontmatter (current_stage, stages_completed), append the stage-exit block for ${Bolt} / ${Stage} to ${relLog} in the shape your working rules give, commit, push the branch, and end the turn. Do not start the next stage. If this stage leaves the bolt at status review-pending, first send the hand-off report described in KICKOFF.md to ${coordinatorText} by SendMessage.
 "@
 }
 
@@ -124,7 +134,7 @@ Push-Location $Worktree
 try {
     $env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
     $launched = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-    Write-Host "[launch-stage] $launched  $Bolt / $Stage"
+    Write-Host "[launch-stage] $launched  $Bolt / $Stage  coordinator: $Coordinator"
     Write-Host "[launch-stage] $commandText"
     $promptArg = (Get-Content .stage-prompt.md -Raw -Encoding UTF8) -replace '"', '\"'
     & claude -p $promptArg --model $Model --effort $Effort --permission-mode auto --autocompact $Autocompact --exclude-dynamic-system-prompt-sections --append-system-prompt-file $RulesPath
