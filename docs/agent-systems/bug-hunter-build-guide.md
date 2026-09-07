@@ -125,8 +125,17 @@ build order, and every construction prompt ("brief") for skill-creator.*
 ## Implementation status (2026-09)
 
 The review loop under `reviews/` is this system's engine, built June–September 2026 in pre-merge
-mode. ✓ built in spirit · ◐ partial · ✗ missing. Totals: 12 · 15 · 16. Phase 1 is done; Phase 3 is
-the hole. The 16 missing briefs are the honest scope of the re-planned intent 035.
+mode. ✓ built in spirit · ◐ partial · ✗ missing. Totals: 12 · 15 · 16. Phase 3 is the hole. The 16
+missing briefs are the honest scope of the re-planned intent 035.
+
+**Phase 1 was verified brief by brief on 2026-09-03/04** — bolts 085 and 086, 40 acceptance
+criteria in all, verdicts and evidence in
+`memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md` and
+`memory-bank/bolts/086-phase-1-skeleton-agents/test-walkthrough.md`. It is **not "done"**: six of
+the seven briefs are satisfied **with a named gap**, and `bug-documentation` is **not satisfied** —
+the loop's record serves the developer, not the three audiences the brief requires. The nine
+successor stories those verdicts opened are assigned to bolt 087. A ✓ below means what the legend
+says, built in spirit; it does not mean a brief is finished.
 
 A **lens** in the table below is one reviewing agent with a single job — the review loop's name for
 what this guide calls a hunter. The **workbench** is the review loop itself; the cross analysis calls
@@ -136,9 +145,9 @@ recorded decision.
 
 | Phase | Brief | Workbench equivalent | State |
 |---|---|---|---|
-| 1 | `ledger-io` | `records/ledger.mjs`, `mint-id.mjs`, `render-records.mjs` | ✓ |
+| 1 | `ledger-io` | `mint-id.mjs`, `render-records.mjs` and the reconciler write; `records/ledger.mjs` only reads. No id reservation — two worktrees mint the same id — and no atomic publish | ✓ |
 | 1 | `bug-documentation` | ledger row + fix brief (no three-audience record) | ◐ |
-| 1 | `deduplication` | `reconcile-findings` skill, ground-truth scored | ✓ |
+| 1 | `deduplication` | `reconcile-findings` skill; ground-truth scored 2026-07-27, and the matching rules have changed twice since — the gate is owed a re-run | ✓ |
 | 1 | `report-rendering` | `review-v<n>.md`, `summary-v<n>.md`, doc gate | ✓ |
 | 1 | `triage-intake` | owner gates, parked decisions, decisions attached to re-finds | ✓ |
 | 1 | `general-hunter` | the core six lenses | ✓ |

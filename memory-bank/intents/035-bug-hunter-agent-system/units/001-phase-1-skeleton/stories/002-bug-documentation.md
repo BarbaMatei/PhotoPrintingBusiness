@@ -5,13 +5,13 @@ intent: 035-bug-hunter-agent-system
 status: ready
 priority: must
 created: 2026-06-10T10:40:14Z
-assigned_bolt: 085-phase-1-skeleton-core
+assigned_bolt: 087-phase-2-trust
 implemented: false
 ---
 
 # Story: 002-bug-documentation (guide Prompt 2)
 
-**Workbench seam:** `reviews/lib/records/render-records.mjs` — partial: the loop writes a ledger row plus a fix brief, not the three-audience record. Bolt 085-phase-1-skeleton-core verifies this story and records that gap; closing it would be a new story, not work inside that bolt.
+**Status:** **not satisfied** — verified by bolt 085-phase-1-skeleton-core (2026-09-03). The loop keeps one canonical describe-once record per defect (What · Evidence · Suggested fix · History), and the doc gate enforces its shape and size — but there is no three-audience record: no per-defect plain-language summary, no reproduction recipe for a tester, no validation of a required-field set, and no structured record at all. Three of five acceptance criteria are absent, so this story is **re-assigned to bolt 087-phase-2-trust** rather than closed here. Evidence: `memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md`.
 
 ## User Story
 

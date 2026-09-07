@@ -6,7 +6,7 @@ status: ready
 unit_type: tooling
 default_bolt_type: simple-construction-bolt
 created: 2026-06-10T10:40:14Z
-updated: 2026-06-10T10:40:14Z
+updated: 2026-09-04T01:30:00Z
 ---
 
 Claimed complete by equivalence — the review loop (`reviews/`) supplies these components;
@@ -64,16 +64,31 @@ is unavailable, **STOP the bolt and report**. Hand-rolled skills violate FR-1.
 
 ## Story Summary
 
-- **Total Stories**: 7 — **Must Have**: 7
+- **Total Stories**: 15 — **Must Have**: 14 — **Should Have**: 1
 
-### Stories
-- [ ] **001-ledger-io** — Must — Planned
-- [ ] **002-bug-documentation** — Must — Planned
-- [ ] **003-deduplication** — Must — Planned
-- [ ] **004-report-rendering** — Must — Planned
-- [ ] **005-triage-intake** — Must — Planned
-- [ ] **006-general-hunter** — Must — Planned
-- [ ] **007-orchestrator-skeleton** — Must — Planned
+Verified 2026-09-03/04 by bolts 085 and 086: the seven original stories were checked against the
+review loop criterion by criterion, and each gap they found became a story assigned to bolt
+087-phase-2-trust. The unit is **not complete**: story 002 is re-assigned, and eight successor
+stories are open.
+
+### Stories — the original seven
+- [x] **001-ledger-io** — Must — Complete (satisfied with a gap → 008, 012)
+- [ ] **002-bug-documentation** — Must — **Not satisfied**, re-assigned to bolt 087
+- [x] **003-deduplication** — Must — Complete (satisfied with a gap → 009)
+- [x] **004-report-rendering** — Must — Complete (satisfied with a gap → 010)
+- [x] **005-triage-intake** — Must — Complete (satisfied with a gap → 011)
+- [x] **006-general-hunter** — Must — Complete (satisfied with a gap → 013, 014)
+- [x] **007-orchestrator-skeleton** — Must — Complete (satisfied with a gap → 015)
+
+### Stories — the gaps those verdicts opened, all assigned to bolt 087
+- [ ] **008-id-reservation-parallel-worktrees** — Must — Planned
+- [ ] **009-reconciler-trust-gate-rescore** — Must — Planned
+- [ ] **010-confidence-axis-reporting-floor** — Must — Planned
+- [ ] **011-owner-queue-age-escalation** — Should — Planned
+- [ ] **012-atomic-record-publish** — Should — Planned
+- [ ] **013-flow-trace-hunting** — Must — Planned
+- [ ] **014-hunter-input-hygiene** — Must — Planned
+- [ ] **015-blinding-auditor-and-scheduled-self-review** — Must — Planned
 
 ## Dependencies
 

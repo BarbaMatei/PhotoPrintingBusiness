@@ -2,16 +2,16 @@
 id: 004-report-rendering
 unit: 001-phase-1-skeleton
 intent: 035-bug-hunter-agent-system
-status: ready
+status: complete
 priority: must
 created: 2026-06-10T10:40:14Z
 assigned_bolt: 085-phase-1-skeleton-core
-implemented: false
+implemented: true
 ---
 
 # Story: 004-report-rendering (guide Prompt 4)
 
-**Status:** claimed satisfied by `reviews/templates/review.md`, `reviews/templates/summary.md` and the doc gate `reviews/lib/records/doc-gate.mjs` (2026-09) — to be verified by bolt 085-phase-1-skeleton-core; complete only after that verdict.
+**Status:** **satisfied with a gap** — verified by bolt 085-phase-1-skeleton-core (2026-09-03). `reviews/templates/review.md`, `reviews/templates/summary.md` and `reviews/lib/records/doc-gate.mjs` render and gate the per-pass report, cap and all. What is missing is the brief's confidence axis: no confidence value survives into a published record, so the floor sorts on severity and there is no low-confidence appendix, no injection flag, no redaction rule and no Observations section. Gap carried forward as story [010-confidence-axis-reporting-floor](010-confidence-axis-reporting-floor.md), assigned to bolt 087. Evidence: `memory-bank/bolts/085-phase-1-skeleton-core/test-walkthrough.md`.
 
 ## User Story
 
