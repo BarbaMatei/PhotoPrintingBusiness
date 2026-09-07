@@ -140,6 +140,17 @@ public class ForwardedHeadersWithObservabilityTests
     }
 
     [Fact]
+    public async Task The_metrics_path_on_the_scrape_port_keeps_its_peer()
+    {
+        using var factory = new TrustedProxyOnScrapeListenerFactory();
+
+        var resolved = await factory.ResolveAsync(
+            peer: "172.28.0.2", forwardedFor: "203.0.113.9", path: "/metrics");
+
+        resolved.ClientIp.Should().Be("172.28.0.2");
+    }
+
+    [Fact]
     public void Trusted_proxies_with_observability_on_and_no_scrape_listener_aborts_boot()
     {
         using var factory = new TrustedProxyWithoutScrapeListenerFactory();
