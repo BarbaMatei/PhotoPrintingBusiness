@@ -72,7 +72,7 @@ public static class ObservabilityExtensions
                 t.AddProcessor(new ErrorOverrideProcessor());
                 t.AddAspNetCoreInstrumentation(o => o.RecordException = true);
                 t.AddHttpClientInstrumentation();
-                t.AddEntityFrameworkCoreInstrumentation(o => o.SetDbStatementForText = true);
+                t.AddEntityFrameworkCoreInstrumentation();
 
                 if (!string.IsNullOrWhiteSpace(settings.Otlp.Endpoint))
                 {

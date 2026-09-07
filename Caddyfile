@@ -25,6 +25,9 @@
 			# traceparent is deliberately kept: §14.7 documents it as the way to force a trace.
 			header_up -sentry-trace
 			header_up -baggage
+			# Replace, not append: the API reads the last entry, and this leaves a caller's own
+			# X-Forwarded-For no way to reach it. There is no proxy hop in front of this one.
+			header_up X-Forwarded-For {remote_host}
 		}
 	}
 

@@ -9,6 +9,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS api-build
 WORKDIR /src
 # Restore against just the API project first for Docker layer caching.
+# Under CPM the csproj carries no versions, so the central manifest must come too.
+COPY Directory.Packages.props ./
 COPY src/PhotoPrint.API/*.csproj ./PhotoPrint.API/
 RUN dotnet restore ./PhotoPrint.API/PhotoPrint.API.csproj
 COPY src/PhotoPrint.API/ ./PhotoPrint.API/

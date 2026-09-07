@@ -20,6 +20,8 @@ Contents:
 12. [Sameday courier integration](#12-sameday-courier-integration-intent-015--bolts-036--037)
 13. [Error tracking with Sentry](#13-error-tracking-with-sentry-intent-020--bolt-045)
 14. [Tracing and metrics](#14-tracing-and-metrics-intent-020--bolt-044)
+15. [Invoicing — VAT, e-Factura, ANAF SPV](#15-invoicing--vat-e-factura-xml-anaf-spv-submission-intent-016--bolts-038--039)
+16. [Reverse-proxy trust](#16-reverse-proxy-trust--who-the-api-thinks-the-client-is-intent-025--bolt-054)
 
 ---
 
@@ -69,9 +71,11 @@ are on you**.
 |------|------|
 | `Dockerfile` | Multi-stage; builds the API + Angular SPA into one non-root image serving on `:8080` with a `/health` HEALTHCHECK. The runtime stage installs `icu-libs` + `icu-data-full` and sets `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false`, because the invoice PDF is rendered in `ro-RO` (§15.1) and the Alpine base ships no ICU at all. |
 | `docker-compose.yml` | Local dev stack: API + Postgres + MailHog. |
-| `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. |
-| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3). |
+| `docker-compose.prod.yml` | Production stack: Caddy (auto-TLS) → API; managed Postgres by default. The bridge network declares an explicit subnet and Caddy a fixed address, so the trusted-proxy value in `.env` can be a single address rather than a range (§16). |
+| `Caddyfile` | TLS termination, HSTS, gzip/zstd, access logs; refuses `/metrics*` so the scrape path has no route from the internet (§14.3), and **replaces** `X-Forwarded-For` rather than appending to it, so a client cannot prepend its own hop (§16). |
 | `.env.example` | Every environment variable, documented. Copy to `.env`. |
+| `Directory.Packages.props` | Central Package Management: one pinned version per NuGet package, for every project. The `Dockerfile` copies it before restoring. |
+| `.github/renovate.json` | Grouped, scheduled dependency-upgrade PRs plus a dependency dashboard; security advisories are labelled and never auto-merged. |
 | `.github/workflows/ci.yml` | Build + test API and UI on every PR / non-main push. |
 | `.github/workflows/deploy.yml` | On green CI on `main`: build + push image to GHCR, then deploy (SSH step self-skips until a host is set). |
 | `.github/workflows/secret-scan.yml` | Independent gitleaks scan (from bolt 041). |
@@ -1032,8 +1036,12 @@ the edge as well. Three things that follow, in order of how badly they bite:
 > identical at that point. Allow-listing it is the one configuration that would make the metric
 > store public. The scrape-port gate is what stops it from working, and that is deliberate.
 
-> **`X-Forwarded-For` is not a fix.** It is a header any client can set. It is used nowhere in
-> this decision, and it must not be introduced here.
+> **`X-Forwarded-For` is not a fix *here*.** It is a header any client can set, so it is weaker
+> than a peer address, and it plays no part in this decision. The API does honour it elsewhere —
+> §16 explains where and why — but the scrape listener is deliberately excluded from that
+> middleware, so the allow-list keeps judging the address the request actually came from. A
+> regression test pins it: a request on the scrape listener carrying an allow-listed address in
+> `X-Forwarded-For` still gets `403`. Do not wire the two together.
 
 > **If you change `Observability__Metrics__PrometheusEndpoint`, update the `Caddyfile` matcher
 > to the new path** in the same change. The scrape-port gate still holds if you forget, but the
@@ -1092,13 +1100,13 @@ Every entry is parsed at boot; a single unparseable entry aborts startup with an
 | Entry | Meaning |
 |---|---|
 | `127.0.0.1`, `::1` | The shipped default. Local dev and same-host scrapers only. |
-| `172.20.0.0/16` | A Compose network subnet — use this, because Compose assigns container IPs dynamically and a fixed address for the Prometheus container is not guaranteed. |
+| `172.28.0.128/25` | The Compose network's **dynamic pool** (`docker-compose.prod.yml`, `networks.default.ipam.ip_range`) — use this, not the `172.28.0.0/24` subnet: Compose assigns scraper containers out of the pool, and the pool deliberately excludes Caddy's pinned `172.28.0.2`, which §14.3 forbids allow-listing. Change it here whenever you change it there, or every scrape gets 403. |
 | `10.244.0.0/16` | A k8s pod CIDR for the monitoring namespace. |
 
-Find your Compose network's subnet with:
+Find your Compose network's dynamic pool with:
 
 ```sh
-docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+docker network inspect fototipar_default -f '{{range .IPAM.Config}}{{.IPRange}}{{end}}'
 ```
 
 Rules the validator enforces: at least one entry; every entry parses; CIDR base addresses have
@@ -1112,7 +1120,7 @@ firewalled elsewhere.
 Env-var syntax for arrays is indexed:
 
 ```sh
-Observability__Metrics__AllowedScrapeIps__0=172.20.0.0/16
+Observability__Metrics__AllowedScrapeIps__0=172.28.0.128/25
 Observability__Metrics__AllowedScrapeIps__1=127.0.0.1
 ```
 
@@ -1608,3 +1616,183 @@ Set a calendar reminder 60 days before that date.
 5. **Frontend invoice viewer.** Today the customer hits `GET /api/orders/{id}/invoice` and gets a raw PDF. A dedicated Angular view (with download button + zoom + print) is a UX-team follow-up.
 6. **Cert rotation without restart.** The `AnafTokenProvider` loads the cert once at first use. To rotate, restart the API. A SIGHUP-driven reload pattern exists but adds complexity not justified by the ~annual rotation cadence.
 7. **Per-row attempt counter.** Per [ADR-024](../memory-bank/bolts/039-efactura-anaf/adr-024-implicit-attempt-count-from-updatedat-no-persisted-counter.md), the retry budget is derived from `(now - CreatedAt)` rather than a persisted column. If incidents make per-row retry history a frequent ops query, add the column under a new ADR.
+
+---
+
+## 16. Reverse-proxy trust — who the API thinks the client is (intent 025 / bolt 054)
+
+Every request in the shipped production stack arrives at the API from Caddy, so
+`HttpContext.Connection.RemoteIpAddress` is Caddy's container address — for an operator on the
+VPN and for an anonymous visitor alike. Three things read that address, and all three are wrong
+because of it:
+
+| What reads it | What being wrong costs |
+|---|---|
+| The global rate limiter's partition key | "100 requests/minute per IP" is 100/minute for the *entire internet*. One client at ~2 requests/second can 429 the whole site. |
+| The IP handed to the login / token-refresh services | They are given Caddy's address. **Nothing records it yet** — `AuthService` and `SocialAuthService` accept the argument and never use it — so this is a latent input, not a working audit trail. |
+| `Request.IsHttps`, via `X-Forwarded-Proto` | Caddy terminates TLS and forwards plain HTTP, so the API thinks the connection is insecure and ships the refresh-token cookie **without** its `Secure` flag. |
+
+`ForwardedHeaders:TrustedProxies` fixes all three by naming the proxies whose `X-Forwarded-*`
+headers may be believed.
+
+### 16.1 The setting
+
+```sh
+ForwardedHeaders__TrustedProxies__0=172.28.0.2
+```
+
+Plain IPv4/IPv6 addresses **and** narrow CIDR ranges, parsed and validated at boot by the same
+rules as `Observability__Metrics__AllowedScrapeIps` (§14.5) — every entry must parse, CIDR base
+addresses must have all host bits zero, no leading-zero forms, no IPv4-mapped IPv6 ranges — plus
+two rules this setting alone enforces: a range may be no wider than a single address pair (IPv4
+`/31`, IPv6 `/127`), and IPv6 link-local entries are refused. §16.2 explains why. One bad entry
+aborts startup naming it.
+
+**Empty is the `appsettings.json` default and means the feature is off** — the middleware is
+never registered and the client identity stays the TCP peer, exactly as before this bolt. That
+is not a safe default behind a proxy, it is the broken state the table above describes, so the
+shipped `.env.example` sets this key **live** to Caddy's pinned address and sizes
+`RateLimit__Public__PermitLimit` alongside it. Read 16.3 before you deploy: item 1 is the one
+number you must check against your own site. Any non-Development boot with an empty list logs
+`forwarded_headers.disabled` at Warning, so "off" is never silent.
+
+> **Indexed env vars merge with the array, they do not replace it** — the same trap as §14.5.
+> Set every index you intend to keep.
+
+### 16.2 Name the proxy, not the network
+
+`172.28.0.2` is Caddy's fixed address, pinned in `docker-compose.prod.yml` together with the
+network's `172.28.0.0/24` subnet. **Do not** put the subnet here, even though §14.5 tells you to
+do exactly that for the scrape allow-list. The two settings answer different questions:
+
+- `AllowedScrapeIps` asks *"may this container read the metrics?"* — a subnet is a reasonable
+  answer, because Compose assigns scraper IPs dynamically.
+- `TrustedProxies` asks *"may this container tell me who the client is?"* — and the API's
+  `8080`/`9090` ports are `expose`d on that same network, so **any** container on it can connect
+  directly. Trust the subnet and any one of them can set `X-Forwarded-For` to whatever it likes:
+  an unlimited rate-limit budget for itself, a targeted denial of service against one real
+  customer's partition, and forged addresses written into your audit trail.
+
+**Boot refuses the mistake rather than trusting you not to make it.** A proxy is one host, so
+the list takes a bare address or a CIDR no wider than a single address pair — IPv4 `/31`, IPv6
+`/127`. Anything wider (`172.28.0.0/24`, `0.0.0.0/0`) aborts startup naming the entry, and so
+does an IPv6 link-local entry, whose zone is dropped when a peer is compared and which would
+therefore trust that address on every interface. Name the proxy's routable address.
+
+The `ipam` block also carries `ip_range: 172.28.0.128/25`, which confines Docker's dynamic
+allocations to the upper half of the subnet. Caddy's pinned `.2` sits outside that pool on
+purpose: `caddy depends_on api`, so `api` starts first, and without the `ip_range` Docker would
+hand `.2` to `api` itself and Caddy would fail to start with an "address already in use" error.
+Any range you pick must keep the proxy's static address outside the dynamic pool.
+
+If the host already routes `172.28.0.0/24`, `docker compose up` fails immediately with a pool
+overlap error. Pick another range in `docker-compose.prod.yml` (`networks.default.ipam`), move
+Caddy's `ipv4_address` and the `ip_range` with it, and update
+`ForwardedHeaders__TrustedProxies__0` to match.
+
+> **Upgrading a stack that is already running.** The subnet is new, and Docker will not apply an
+> `ipam` block to a network it already created. `docker compose -f docker-compose.prod.yml up -d`
+> refuses with a "network needs to be recreated" error until you `docker compose -f
+> docker-compose.prod.yml down` first. That is a downtime step, and every container's address
+> changes with it — so re-check `Observability__Metrics__AllowedScrapeIps` (§14.5) at the same
+> time if it names addresses rather than a range.
+
+### 16.3 Read this before you deploy
+
+The shipped `.env.example` has this on, and three behaviours differ from an empty list. Two are
+strict improvements. The first needs a number from you.
+
+1. **The public rate-limit budget starts applying per client, for the first time.** It has never
+   done so in production, because it has always been one shared bucket. `RateLimit:Public:PermitLimit`
+   is `100` per 60 seconds, and the limiter runs *before* static files are served, so every
+   JavaScript chunk, stylesheet and image of a page load spends a permit — as does every
+   thumbnail request in a gallery. The `appsettings.json` value is `100` per 60 seconds, which is
+   too low for a single page load; the shipped `.env.example` therefore overrides it to `600`,
+   which fits a first load plus a browse. That number is a starting point, not a measurement of
+   your site: **load the site once with the browser's network panel open, count the requests, and
+   raise `RateLimit__Public__PermitLimit` if it exceeds the shipped budget.** The boot log tells
+   you the number in force: `forwarded_headers.enabled trusted_proxies=… public_permit_limit=…`.
+2. **The IP handed to the auth services becomes the real client.** No action needed, and no
+   visible effect: nothing records that argument today, so no audit trail appears. This change
+   makes the input correct for whoever wires one up.
+3. **The refresh-token cookie starts carrying `Secure`.** No action needed *if your edge
+   terminates TLS*, which the shipped Caddy does. If you put this API behind a proxy that
+   forwards `X-Forwarded-Proto: https` while actually serving plain HTTP to the browser, the
+   browser will drop the cookie and logins will stop working. Only trust a TLS-terminating edge.
+
+### 16.4 What the API will and will not believe
+
+- Only the **rightmost** `X-Forwarded-For` entry is read (`ForwardLimit = 1`) — the address the
+  trusted proxy itself observed. Entries a client injected sit to the left of it and are ignored.
+- The shipped `Caddyfile` additionally **replaces** rather than appends the header
+  (`header_up X-Forwarded-For {remote_host}`), so a client's own value never reaches the API at
+  all. If you ever put a CDN in front of Caddy, that line must change — otherwise every customer
+  will be recorded as the CDN edge.
+- The framework's default trust of loopback is **cleared**; only your configured entries are
+  trusted.
+- A trusted proxy whose rightmost entry is not an address (`unknown`, an empty value) buys
+  nothing: the header is ignored, the identity stays the proxy's own address, and the API logs
+  `forwarded_headers.unparseable_forwarded_for` once per proxy (§16.5).
+- Only `X-Forwarded-For` and `X-Forwarded-Proto` are honoured. `X-Forwarded-Host` is not: every
+  absolute URL the API emits comes from `App__BaseUrl`, and honouring a forwarded host would add
+  an attack surface with no consumer.
+- **The `/metrics` scrape listener is excluded from all of the above** — see §14.3. The metrics
+  allow-list judges the real peer and nothing else.
+
+### 16.5 Boot failures you may hit
+
+| Message | Cause | Fix |
+|---|---|---|
+| `OptionsValidationException` naming an entry of `ForwardedHeaders:TrustedProxies` | A typo, host bits set on a CIDR, a leading-zero form, a range wider than one address pair (IPv4 `/31`, IPv6 `/127`), or an IPv6 link-local entry | Correct the entry; the message states the accepted form and why the entry was refused (§16.2) |
+| `ForwardedHeaders:TrustedProxies is set while Observability:Metrics:ScrapePort is 0` | A trusted proxy is declared but the scrape path is still served on every listener | Set `Observability__Metrics__ScrapePort` (§14.3), or clear `TrustedProxies` |
+
+And one line to watch for *after* boot, which is not a failure but the most likely way this
+silently stops working:
+
+| Log line | Meaning | Fix |
+|---|---|---|
+| `forwarded_headers.untrusted_peer ip=…` | That peer sent `X-Forwarded-For` but is not in `TrustedProxies`, so the header was ignored and the client identity fell back to the peer itself. If the address shown is the reverse proxy, its address has drifted from the configured one — the feature is off in all but name | Reconcile `ForwardedHeaders__TrustedProxies__0` with the proxy's real address (§16.2) |
+| `forwarded_headers.untrusted_peer.log_cap_reached distinct_ips=512` | Too many distinct untrusted sources to keep logging; further ones are silent until restart | Expect this under a scan; investigate if it appears in normal traffic |
+| `forwarded_headers.unparseable_forwarded_for ip=…` | The peer *is* trusted, but the rightmost `X-Forwarded-For` entry it sent is not an address (`unknown`, an empty value), so the header was ignored and the client identity is the proxy itself — the same silent breakage as the row above, from the other direction | Fix the proxy's header configuration; the shipped `Caddyfile` sets `{remote_host}`, which always parses |
+| `forwarded_headers.unparseable_forwarded_for.log_cap_reached distinct_ips=512` | Too many distinct trusted proxies sending unusable values to keep logging | Investigate: with one proxy this line should be unreachable |
+
+### 16.6 Verification after deploy
+
+Steps 1 and 3 read the container's stdout, which works because `appsettings.json` ships a
+`Console` sink and `appsettings.Production.json` adds the rolling `File` one — kept out of the
+base so Development and Testing, whose arrays merge by index, never open `logs/*.json`. The file
+sink writes to `/app/logs` inside the container and no volume is mounted there, so those files
+vanish with the container — stdout (and whatever collects it) is the durable copy.
+
+```sh
+# 1. The boot log says the feature is on and which proxies are trusted.
+docker compose -f docker-compose.prod.yml logs api | grep forwarded_headers
+
+# 2. Caddy is where you said it is.
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' fototipar-caddy-1
+
+# 3. No peer is being ignored. Any line here means something sent X-Forwarded-For from an
+#    address that is NOT in TrustedProxies — usually Caddy's address having drifted.
+docker compose -f docker-compose.prod.yml logs api | grep forwarded_headers.untrusted_peer
+
+# 4. The refresh cookie is Secure (log in from a browser, check DevTools → Application → Cookies).
+
+# 5. The metrics gate is unchanged: from a container on the network, a spoofed header
+#    must NOT open it.
+docker run --rm --network fototipar_default curlimages/curl \
+  -s -o /dev/null -w '%{http_code}\n' -H 'X-Forwarded-For: 10.42.0.5' http://api:9090/metrics
+# expect 403 unless the calling container's own address is in AllowedScrapeIps
+```
+
+### 16.7 Not fixed here (intent 029 / bolt 063)
+
+This bolt makes the client identity correct. It does **not** redesign the rate limiter, and three
+known problems stay open:
+
+1. **The budget itself**, and the fact that static assets are inside it (§16.3, item 1).
+2. **IPv6 partitioning.** The partition key is the full address, so a client with a routed `/64`
+   can rotate addresses and evade the limit. The key should be truncated to a prefix.
+3. **The per-endpoint limits do not run at all.** `UseRateLimiter()` is registered before
+   `UseRouting()`, so no endpoint is resolved when it executes and every `[EnableRateLimiting]`
+   attribute is inert — registration, resend-confirmation, forgot-password and login have no
+   per-endpoint budget today, only the global one. Fixing it is a pipeline-ordering change.

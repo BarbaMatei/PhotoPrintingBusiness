@@ -21,7 +21,7 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 | Remove known CVEs from the shipped dependency tree | `dotnet list package --vulnerable` returns clean | Must |
 | Single source of truth for "what we depend on" | Every package version declared once in `Directory.Packages.props` | Must |
 | Sustainable, low-noise dependency upkeep | Grouped upgrade PRs land automatically; CVE alerts within 24h | Should |
-| `/metrics` allow-list enforces correctly in production | Allow-list keys on the real client IP, not the proxy IP | Must |
+| `/metrics` allow-list enforces correctly in production | The scrape gate keys on the connecting peer, and `X-Forwarded-For` cannot open it | Must |
 
 ---
 
@@ -56,10 +56,10 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 - **Related Stories**: TBD
 
 ### FR-4 (P05): Register `ForwardedHeadersMiddleware` so the `/metrics` allow-list works behind Caddy
-- **Description**: Add `app.UseForwardedHeaders()` early in the pipeline (before `UseCorrelationId`) with `ForwardedHeadersOptions` trusting only the reverse-proxy CIDR, so `MetricsEndpointIpAllowListMiddleware` evaluates the real scraper IP (`X-Forwarded-For`) rather than the proxy's connection IP.
+- **Description**: Register forwarded headers before `UseCorrelationId`, trusting only the reverse proxy's own address, so every request's client identity is the real client — **except on the metrics scrape listener**, which is excluded so `MetricsEndpointIpAllowListMiddleware` keeps judging the address the request actually came from. ADR-018 closed the proxied-`/metrics` hole topologically and rejects trusting `X-Forwarded-For` on that gate.
 - **Acceptance Criteria**:
-  - `XForwardedFor | XForwardedProto` enabled; `KnownNetworks`/`KnownProxies` cleared then anchored to the Caddyfile upstream CIDR (no open trust).
-  - `MetricsEndpointIntegrationTests` gains an `X-Forwarded-For` case proving allow vs deny by client IP.
+  - `XForwardedFor | XForwardedProto` enabled; `KnownNetworks`/`KnownProxies` cleared then anchored to the proxy's fixed address (no open trust, and never the container subnet).
+  - `MetricsEndpointIntegrationTests` gains a case proving `X-Forwarded-For` **cannot** open the scrape gate.
   - DEPLOYMENT.md §14 updated with the proxy-trust note.
 - **Priority**: Must
 - **Related Stories**: TBD
@@ -71,8 +71,8 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 ### Security
 | Requirement | Standard | Notes |
 |-------------|----------|-------|
-| No known vulnerable packages | `dotnet list package --vulnerable` clean | Verified in CI |
-| No IP spoofing via forwarded headers | Trusted-proxy CIDR only | Misconfigured `KnownNetworks` = spoofing risk (P05 risk) |
+| No known vulnerable packages | Restore-time NuGet audit over direct **and** transitive packages at advisory level `low` (`NuGetAuditMode=all`, `NuGetAuditLevel=low`) | Enforced in CI: the restore step runs `-p:FailOnAudit=true`, which promotes NU1901–NU1905 to errors. `dotnet list package --vulnerable` is not the gate — it exits 0 on findings |
+| No IP spoofing via forwarded headers | The proxy's own address only, never the container subnet; a range wider than a single address pair is refused at boot | Any container on a trusted range could name the client (P05 risk) |
 | Single resolved version per package | Central Package Management | Eliminates silent multi-version load |
 
 ### Reliability
@@ -111,4 +111,4 @@ The architect review surfaced a cluster of dependency-tree and ops-correctness d
 |----------|-------|----------|------------|
 | Q1: Who installs the Renovate GitHub App (repo-admin action)? | Maintainer | 2026-06-12 | Pending |
 | Q2: Pin Stripe.net to 46 or 47? | Dev | 2026-06-12 | Recommend 47 (the already-resolved Tests version) after webhook-suite verification |
-| Q3: Exact reverse-proxy CIDR for `KnownNetworks`? | Ops | 2026-06-12 | Derive from docker-compose.prod.yml bridge network |
+| Q3: Exact reverse-proxy CIDR for `KnownNetworks`? | Ops | 2026-06-12 | No CIDR: trust Caddy's own address alone (`172.28.0.2`, pinned in docker-compose.prod.yml). The bridge CIDR is refused at boot — the API's ports are exposed on that network, so any container in the range could forge a client IP. See DEPLOYMENT.md §16.2. |

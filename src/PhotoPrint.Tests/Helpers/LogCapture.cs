@@ -1,15 +1,11 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace PhotoPrint.Tests.Helpers;
 
 public sealed record LogRecord(LogLevel Level, string Message);
 
-/// <summary>
-/// Collects rendered log lines so a test can assert on what was logged, and how often.
-/// Use <see cref="LoggerFor{T}"/> to inject into a component directly, or
-/// <see cref="LogCaptureProvider"/> to attach to a real <c>ILoggerFactory</c>.
-/// </summary>
 public sealed class LogCapture
 {
     private readonly ConcurrentQueue<LogRecord> _records = new();
@@ -22,6 +18,13 @@ public sealed class LogCapture
     internal void Add(LogRecord record) => _records.Enqueue(record);
 
     public ILogger<T> LoggerFor<T>() => new CaptureLogger<T>(this);
+
+    public void OutRegisterTheHostsSerilogLoggerFactory(IServiceCollection services)
+    {
+        var factory = new LoggerFactory();
+        factory.AddProvider(new LogCaptureProvider(this));
+        services.AddSingleton<ILoggerFactory>(factory);
+    }
 }
 
 public sealed class LogCaptureProvider : ILoggerProvider
