@@ -6,6 +6,7 @@ param(
     [string]$Effort = 'xhigh',
     [int]$Autocompact = 120000,
     [string]$PromptFile,
+    [string]$Coordinator,
     [switch]$DryRun
 )
 
@@ -36,7 +37,7 @@ function Get-Frontmatter([string]$Text) {
 function Get-FrontmatterValue([string]$Frontmatter, [string]$Key) {
     $m = [regex]::Match($Frontmatter, '(?m)^' + [regex]::Escape($Key) + ':[ \t]*(.*?)[ \t]*$')
     if (-not $m.Success) { return '' }
-    return $m.Groups[1].Value.Trim('"', "'")
+    return $m.Groups[1].Value.Trim().Trim('"', "'")
 }
 
 function Get-CompletedStages([string]$Frontmatter) {
@@ -61,6 +62,15 @@ function Get-RelativePath([string]$Root, [string]$Path) {
 }
 
 $Worktree = (Resolve-Path $Worktree).Path
+if (-not $Coordinator) {
+    $kickoffPath = Join-Path $Worktree 'KICKOFF.md'
+    if (Test-Path $kickoffPath) {
+        $m = [regex]::Match((Read-Utf8 $kickoffPath), 'the Claude Code session `([^`]+)`')
+        if ($m.Success) { $Coordinator = $m.Groups[1].Value }
+    }
+}
+$coordinatorText = 'the coordinator session named in KICKOFF.md'
+if ($Coordinator) { $coordinatorText = 'the coordinator session `' + $Coordinator + '`' } else { $Coordinator = $coordinatorText }
 $boltDir = Find-Dir (Join-Path $Worktree 'memory-bank\bolts') $Bolt
 $Bolt = (Get-Item $boltDir).Name
 $boltMd = Join-Path $boltDir 'bolt.md'
@@ -100,14 +110,18 @@ Last stage exit recorded in the construction log:
 ${exitText}
 
 Do this and nothing more:
-1. Invoke /specsmd-construction-agent --bolt-id="${Bolt}" --stage="${Stage}" (the construction agent runs its bolt-start skill for that id at that stage). The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates this stage's activities and artifacts; follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle, memory-bank/standards/definition-of-done.md the hand-back checklist.
-2. Work only stage ${Stage}. When its artifacts are written: update the bolt.md frontmatter (current_stage, stages_completed), append the stage-exit block for ${Bolt} / ${Stage} to ${relLog} in the shape your working rules give, commit, and end the turn. Do not start the next stage.
+1. Read KICKOFF.md in this worktree first: it holds the group rules and the coordinator addendum. Then act as the construction agent: read .specsmd/aidlc/agents/construction-agent.md and execute its bolt-start skill for bolt ${Bolt} at stage ${Stage} (/specsmd-construction-agent is not a command in this harness). The bolt type definition under .specsmd/aidlc/templates/construction/bolt-types/ dictates this stage's activities and artifacts; follow it exactly. memory-bank/standards/bolt-process.md is the lifecycle, memory-bank/standards/definition-of-done.md the hand-back checklist.
+2. Work only stage ${Stage}. When its artifacts are written: update the bolt.md frontmatter (current_stage, stages_completed), append the stage-exit block for ${Bolt} / ${Stage} to ${relLog} in the shape your working rules give, commit, push the branch, and end the turn. Do not start the next stage. If this stage leaves the bolt at status review-pending, first send the hand-off report described in KICKOFF.md to ${coordinatorText} by SendMessage. If this stage leaves the bolt at status review-pending, the two bolt-process.md gates ${EmDash} the adversarial design check and the fresh-eyes micro-review ${EmDash} must already have run and be recorded in the bolt's artifacts; if either is missing, run it in the foreground now and record it before the stage-exit block.
 "@
 }
 
 $promptPath = Join-Path $Worktree '.stage-prompt.md'
 $commandText = "claude -p (Get-Content .stage-prompt.md -Raw -Encoding UTF8) --model $Model --effort $Effort --permission-mode auto --autocompact $Autocompact --exclude-dynamic-system-prompt-sections --append-system-prompt-file `"$RulesPath`""
 $costText = "node `"$CostScript`" `"$Worktree`" --since <launch ISO> --bolt $Bolt --stage $Stage --append `"$logPath`""
+$boltNumber = [regex]::Match($Bolt, '^\d+').Value
+if (-not $boltNumber) { $boltNumber = $Bolt }
+$commitMessage = "docs(bolt-$boltNumber): record the $Stage stage session cost"
+$commitText = "git commit --only -m `"$commitMessage`" -- $relLog ; git push"
 
 if ($DryRun) {
     Write-Output "--- prompt (would be written to $promptPath) ---"
@@ -116,6 +130,7 @@ if ($DryRun) {
     Write-Output $commandText
     Write-Output '--- after claude exits ---'
     Write-Output $costText
+    Write-Output $commitText
     exit 0
 }
 
@@ -124,13 +139,25 @@ Push-Location $Worktree
 try {
     $env:CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS = '0'
     $launched = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-    Write-Host "[launch-stage] $launched  $Bolt / $Stage"
+    Write-Host "[launch-stage] $launched  $Bolt / $Stage  coordinator: $Coordinator"
     Write-Host "[launch-stage] $commandText"
     $promptArg = (Get-Content .stage-prompt.md -Raw -Encoding UTF8) -replace '"', '\"'
     & claude -p $promptArg --model $Model --effort $Effort --permission-mode auto --autocompact $Autocompact --exclude-dynamic-system-prompt-sections --append-system-prompt-file $RulesPath
     $claudeExit = $LASTEXITCODE
     Write-Host "[launch-stage] claude exited $claudeExit; measuring the session"
     & node $CostScript $Worktree --since $launched --bolt $Bolt --stage $Stage --append $logPath
+    $ErrorActionPreference = 'Continue'
+    if (git status --porcelain -- $relLog) {
+        git commit --only -m $commitMessage -- $relLog
+        if ($LASTEXITCODE -eq 0) {
+            git push
+            if ($LASTEXITCODE -ne 0) { Write-Host "[launch-stage] push rejected (git exited $LASTEXITCODE); continuing" }
+        } else {
+            Write-Host "[launch-stage] commit of $relLog failed (git exited $LASTEXITCODE); continuing"
+        }
+    } else {
+        Write-Host "[launch-stage] $relLog unchanged; no session-cost commit"
+    }
 } finally {
     Pop-Location
 }

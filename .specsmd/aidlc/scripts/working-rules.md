@@ -7,6 +7,7 @@ You are one session for one stage of one bolt. Work that stage, write its artifa
 3. **Many questions per step.** Put every read, search or check that does not depend on another's result into the same turn; several shell commands go in one call.
 4. **Small answers.** Read line ranges, never whole files; search with narrow context. Run tests only through `node reviews/lib/run-scoped-tests.mjs <bolt-id> --kind green --filter "<FQN fragment>" --summary --no-events` (UI: `--ui --include "<name>"` instead of `--filter`). For TypeScript symbol questions (who calls X, where is X defined) use the LSP tool, not grep. Filter build output to errors.
 5. **Your cost is measured when you exit.** Do not re-read what you just wrote, do not recap, do not linger after the stage-exit block.
+6. **Never end a turn while one of your background tasks is still running.** In print mode a turn that ends with text only ends the whole session, and the background work is orphaned. Run long commands, tests and verification in the foreground and wait for them, or poll a background task until it is finished before you end the turn.
 
 ## The stage-exit block
 
