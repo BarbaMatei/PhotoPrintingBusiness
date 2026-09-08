@@ -4,11 +4,6 @@ using PhotoPrint.API.Models;
 
 namespace PhotoPrint.API.Data.Seed;
 
-/// <summary>
-/// Seeds realistic-looking development data: two regular users + six orders
-/// spanning every status. Idempotent — skips if already applied.
-/// Run with: dotnet run --seed-dev
-/// </summary>
 public static class DevDataSeed
 {
     // ── Fixed IDs ────────────────────────────────────────────────────────────
@@ -28,6 +23,7 @@ public static class DevDataSeed
     private static readonly Guid Order4Id = new("c2000000-0000-0000-0000-000000000004");
     private static readonly Guid Order5Id = new("c2000000-0000-0000-0000-000000000005");
     private static readonly Guid Order6Id = new("c2000000-0000-0000-0000-000000000006");
+    private static readonly Guid Order7Id = new("c2000000-0000-0000-0000-000000000007");
 
     public static async Task ApplyAsync(PhotoPrintDbContext db, CancellationToken ct = default)
     {
@@ -309,8 +305,36 @@ public static class DevDataSeed
         });
         db.Orders.Add(o6);
 
+        var o7 = new Order
+        {
+            Id               = Order7Id,
+            OrderNumber      = "FT-2026-0007",
+            UserId           = User2Id,
+            Status           = OrderStatus.Paid,
+            PaymentIntentId  = "pi_dev_0007",
+            ShippingAddress  = addr2,
+            DeliveryType     = DeliveryType.Easybox,
+            ShippingCostRon  = 20.00m,
+            SubtotalRon      = 84.00m,
+            TotalRon         = 104.00m,
+            PaidAt           = new DateTimeOffset(2026, 5, 23, 9, 0, 0, TimeSpan.Zero),
+            CreatedAt        = new DateTimeOffset(2026, 5, 23, 8, 55, 0, TimeSpan.Zero),
+        };
+        o7.Items.Add(new OrderItem
+        {
+            Id              = NewItemId(8),
+            OrderId         = Order7Id,
+            UploadId        = Upload6Id,
+            ProductId       = productId,
+            Quantity        = 30,
+            UnitPriceRon    = 2.80m,
+            LineTotalRon    = 84.00m,
+            ProductSnapshot = Snap("Poze foto", "20×30", "Lucioasă"),
+        });
+        db.Orders.Add(o7);
+
         await db.SaveChangesAsync(ct);
-        Console.WriteLine("Dev seed applied successfully — 2 users, 8 lockers, 6 uploads, 6 orders.");
+        Console.WriteLine("Dev seed applied successfully — 2 users, 8 lockers, 6 uploads, 7 orders.");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

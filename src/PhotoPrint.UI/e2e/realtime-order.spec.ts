@@ -7,6 +7,8 @@ interface AdminOrderRow {
   status: string;
 }
 
+const SEEDED_PAID_ORDERS = ['FT-2026-0006', 'FT-2026-0007'];
+
 test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
   test('schimbarea statusului unei comenzi ajunge în lista deschisă de admin fără reîncărcare', async ({
     page,
@@ -22,12 +24,22 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
     expect(listResponse.ok(), `GET /admin/orders a răspuns ${listResponse.status()}`).toBeTruthy();
     const orders: AdminOrderRow[] = (await listResponse.json()).items;
 
-    const target = orders.find((o) => o.status === 'Paid');
+    const seeded = SEEDED_PAID_ORDERS.map(
+      (orderNumber) =>
+        orders.find((o) => o.orderNumber === orderNumber) ?? {
+          id: '',
+          orderNumber,
+          status: 'lipsă',
+        },
+    );
+    const target = seeded.find((o) => o.status === 'Paid');
     expect(
       target,
-      'nicio comandă în starea Paid — rulează seed-ul pe o bază curată (docker compose down -v). ' +
-        'Acest test consumă singura tranziție Paid → Printing din seed, deci o a doua rulare pe ' +
-        'aceeași bază eșuează aici în loc să treacă în tăcere.',
+      'nicio comandă din seed în starea Paid — observat: ' +
+        seeded.map((o) => `${o.orderNumber}=${o.status}`).join(', ') +
+        '. Fiecare încercare consumă o tranziție Paid → Printing și nimic nu o readuce în Paid, ' +
+        'deci pe o bază deja folosită rulează seed-ul din nou pe o bază curată ' +
+        '(docker compose down -v).',
     ).toBeDefined();
 
     let hubFrames = 0;
