@@ -8,6 +8,12 @@
 //   <red|green|final|baseline|revert-and-rerun> (--filter "<FQN fragment>" | --ui --include
 //   "<name>") [--cluster <c>] [--round <n>] [--note "<text>"]
 //   [--cmd "<template with {filter}/{name}>"] [--dry-run] [--no-events] [--summary]
+//   [--log <stamps.jsonl>] [--mutate <file>:<line>]
+// --log appends the stamp (plus `t` and `exit`) as one JSON line to that file — a bolt's
+// memory-bank/bolts/<id>/test-stamps.jsonl — instead of the review worklog; every stamp carries the
+// runner's exit code either way. --mutate (revert-and-rerun only) flips the first spaced comparison
+// or boolean operator on that line of a non-test file (or removes the line when there is none),
+// runs, restores the file byte-for-byte in finally, and records {file, line, original, mutated}.
 // Commands: API `dotnet test src/PhotoPrint.Tests --filter "FullyQualifiedName~{filter}"`;
 // UI `npm --prefix src/PhotoPrint.UI test -- --watch=false --include=**/{name}*.spec.ts`
 // (unquoted — spawnSync's shell on Windows is cmd.exe, which does not strip single quotes,
@@ -33,9 +39,9 @@
 // test>` lines (its `×` lines when no FAIL line is printed), TAP's `not ok` lines.
 // Exit: N the runner's own exit code (0 on a green run, non-zero on red) · 2 usage error ·
 // 3 another test process already holds the lock.
-import { writeFileSync, readFileSync, unlinkSync } from 'node:fs'
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, appendFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { join } from 'node:path'
+import { join, dirname, isAbsolute } from 'node:path'
 import { tmpdir } from 'node:os'
 import { repoRoot, takeRoot } from '../cli/args.mjs'
 import { appendEvent } from '../records/wl.mjs'
@@ -53,19 +59,55 @@ const XUNIT_FAIL_RE = /^\s*(\S.*?)\s+\[FAIL\]\s*$/gm
 const VITEST_FAIL_RE = /^\s*FAIL\s+(\S.*?)\s*$/gm
 const VITEST_X_RE = /^\s*[×✗]\s+(\S.*?)(?:\s+\d+(?:\.\d+)?ms)?\s*$/gm
 const TAP_NOT_OK_RE = /^\s*not ok\s+\d+\s*-?\s*(\S.*?)\s*$/gm
+const TEST_PATH_RE = /(^|[\\/])PhotoPrint\.Tests[\\/]|\.spec\.ts$|(^|[\\/])tests?[\\/]/
+const FLIPS = [
+  [' <= ', ' > '], [' >= ', ' < '], [' === ', ' !== '], [' !== ', ' === '], [' == ', ' != '], [' != ', ' == '],
+  [' < ', ' >= '], [' > ', ' <= '], [' && ', ' || '], [' || ', ' && '],
+  [/\btrue\b/, 'false'], [/\bfalse\b/, 'true'],
+]
+const UNMUTABLE_LINE_RE = /^\s*([{}()\[\];,]*|namespace\b.*|using\b.*|import\b.*|export\b.*|(public|internal|private|protected|static|abstract|sealed|partial)?\s*(class|interface|record|enum|struct)\b.*)\s*$/
 
 function usageError(message) {
   console.error(`usage: ${message}`)
   process.exit(2)
 }
 
+function mutateLine(text) {
+  for (const [from, to] of FLIPS) {
+    if (typeof from === 'string' ? text.includes(from) : from.test(text)) return { mutated: text.replace(from, to), how: 'flip' }
+  }
+  return { mutated: '', how: 'remove' }
+}
+
+function prepareMutation(REPO, spec) {
+  const colon = spec.lastIndexOf(':')
+  if (colon <= 0) usageError('--mutate wants <file>:<line>')
+  const file = spec.slice(0, colon).replaceAll('\\', '/')
+  const line = Number(spec.slice(colon + 1))
+  if (!Number.isInteger(line) || line < 1) usageError('--mutate wants <file>:<line> with a positive line number')
+  if (TEST_PATH_RE.test(file)) usageError(`--mutate refuses a test file: ${file} — mutate the production line the test protects`)
+  const abs = isAbsolute(file) ? file : join(REPO, file)
+  if (!existsSync(abs)) usageError(`--mutate: no such file ${file}`)
+  const original = readFileSync(abs, 'utf8')
+  const lines = original.split(/(?<=\n)/)
+  if (line > lines.length) usageError(`--mutate: ${file} has ${lines.length} lines, not ${line}`)
+  const eol = /\r?\n$/.exec(lines[line - 1])?.[0] ?? ''
+  const body = lines[line - 1].slice(0, lines[line - 1].length - eol.length)
+  if (UNMUTABLE_LINE_RE.test(body)) usageError(`--mutate: line ${line} of ${file} has nothing to break (${body.trim() || 'blank'}) — pick the line with the behaviour`)
+  const { mutated, how } = mutateLine(body)
+  const rewritten = [...lines.slice(0, line - 1), mutated + eol, ...lines.slice(line)].join('')
+  return { abs, original, rewritten, record: { file, line, how, original: body, mutated } }
+}
+
 function parseArgs(rawArgv) {
   const { root, rest: argv } = takeRoot(rawArgv)
-  const args = { cluster: null, round: null, note: null, cmd: null, dryRun: false, noEvents: false, ui: false, root }
+  const args = { cluster: null, round: null, note: null, cmd: null, dryRun: false, noEvents: false, ui: false, log: null, mutate: null, root }
   const positional = []
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--kind') args.kind = argv[++i]
+    else if (a === '--log') args.log = argv[++i]
+    else if (a === '--mutate') args.mutate = argv[++i]
     else if (a === '--filter') args.filter = argv[++i]
     else if (a === '--include') args.include = argv[++i]
     else if (a === '--ui') args.ui = true
@@ -165,9 +207,12 @@ function main() {
   let cmd = args.cmd ?? (mode === 'ui' ? DEFAULT_UI_CMD : DEFAULT_API_CMD)
   if (args.filter != null) cmd = cmd.replaceAll('{filter}', args.filter)
   if (args.include != null) cmd = cmd.replaceAll('{name}', args.include)
+  if (args.mutate != null && args.kind !== 'revert-and-rerun') usageError('--mutate is only for --kind revert-and-rerun')
+  const mutation = args.mutate != null ? prepareMutation(REPO, args.mutate) : null
 
   if (args.dryRun) {
     console.log(cmd)
+    if (mutation) console.log(`would mutate ${mutation.record.file}:${mutation.record.line} (${mutation.record.how}): ${mutation.record.mutated || '(line removed)'}`)
     process.exit(0)
   }
 
@@ -181,11 +226,21 @@ function main() {
       if (existing?.pid === process.pid) unlinkSync(LOCK_PATH)
     } catch { /* nothing to release, or already gone */ }
   }
-  process.on('SIGINT', () => { releaseLock(); process.exit(130) })
-  process.on('SIGTERM', () => { releaseLock(); process.exit(143) })
+  let mutated = false
+  const restoreMutation = () => {
+    if (!mutated) return
+    mutated = false
+    writeFileSync(mutation.abs, mutation.original)
+  }
+  process.on('SIGINT', () => { restoreMutation(); releaseLock(); process.exit(130) })
+  process.on('SIGTERM', () => { restoreMutation(); releaseLock(); process.exit(143) })
 
   let exitCode = 1
   try {
+    if (mutation) {
+      writeFileSync(mutation.abs, mutation.rewritten)
+      mutated = true
+    }
     const started = Date.now()
     const result = spawnSync(cmd, { cwd: REPO, shell: true, encoding: 'utf8', timeout: 600000 })
     const duration_s = Math.round(Date.now() - started) / 1000
@@ -198,20 +253,30 @@ function main() {
       if (result.stderr) process.stderr.write(result.stderr)
     }
 
-    const event = { kind: args.kind, passed: parsed.passed, failed: parsed.failed, duration_s }
+    restoreMutation()
+
+    const event = { kind: args.kind, passed: parsed.passed, failed: parsed.failed, exit: exitCode, duration_s }
     if (mode === 'api' && args.filter != null) event.filter = args.filter
     if (mode === 'ui' && args.include != null) event.include = args.include
     if (parsed.skipped !== undefined) event.skipped = parsed.skipped
     if (args.cluster != null) event.cluster = args.cluster
     if (args.round != null && !Number.isNaN(args.round)) event.round = args.round
+    if (mutation) event.mutate = mutation.record
     const note = [args.note, parsed.note].filter(Boolean).join('; ')
     if (note) event.note = note
 
-    if (!args.noEvents) {
+    if (args.log != null) {
+      const logPath = isAbsolute(args.log) ? args.log : join(REPO, args.log)
+      try {
+        mkdirSync(dirname(logPath), { recursive: true })
+        appendFileSync(logPath, `${JSON.stringify({ t: new Date().toISOString(), ...event })}\n`)
+      } catch (e) { console.error(`note: stamp not written to ${args.log}: ${e.message}`) }
+    } else if (!args.noEvents) {
       try { appendEvent(REPO, args.target, { ev: 'test-run', ...event }) }
       catch (e) { console.error(`note: test-run not recorded: ${e.message}`) }
     }
   } finally {
+    restoreMutation()
     releaseLock()
   }
   process.exit(exitCode)

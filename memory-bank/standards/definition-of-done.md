@@ -44,6 +44,17 @@ the same reason they apply to fixes:
 For each class the diff touches: apply the rule, and name the test that would go red if the
 class were violated.
 
+### Ranked by what the reviews actually found
+
+Rendered by `node reviews/lib/ledger-miner.mjs rank --write` from `reviews/state/defect-classes.jsonl`
+(one line per canonical finding, fed by the `reconcile-findings` skill; weights 🔴 5 · 🟠 3 · 🟡 1
+· ⚪ 0.5). `rank --area <slug> --top 5 --as-rows` prints the same ranking for one area as
+`failure-modes.jsonl` rows for a bolt's design stage. Do not edit between the markers.
+
+<!-- miner:ranked-classes:start -->
+_No sidecar lines yet: the backfill has not run._
+<!-- miner:ranked-classes:end -->
+
 **1. Caller sweep on contract change.** Changing or adding a contract (interface, entity field,
 key scheme, status code) requires enumerating ALL existing consumers — grep, don't recall — and
 updating or explicitly clearing each. *(043 F1/F2 — the only High of the bolt; 035 OrderNumber
@@ -66,7 +77,11 @@ orphans (a named sweep, not hope). Check-then-act windows on shared state are na
 closed or accepted in writing. *(042 D5→D34/D35 chain; 043 F8 TOCTOU; ADR-011 is the model.)*
 
 **5. Failure modes have tests — "green ≠ proven".** For every failure mode the code can hit:
-which test goes red if this bug is injected? Mock only at system boundaries (network, external
+which test goes red if this bug is injected? The proof is not the author's word: each row of
+`memory-bank/bolts/<id>/failure-modes.jsonl` carries, in `test-stamps.jsonl`, a red stamp from
+before the code, a green one after it, and a red `revert-and-rerun` stamp where the wrapper itself
+broke the production line (`--mutate <file>:<line>`) and the test caught it
+(`bolt-process.md`, "Stage exit conditions"). Mock only at system boundaries (network, external
 APIs, clock) — the real component (real ImageSharp, a real PostgreSQL database) must run in at least one test
 of its guards. Each suite states what it *cannot* prove and where that gap is covered.
 *(042 D25: the real ImageProcessor was mocked in ALL tests — 490 greens proved nothing about

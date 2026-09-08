@@ -4,7 +4,7 @@
 //
 // Usage: node reviews/lib/tests/run-tests.mjs --only run-scoped
 import { check, run, firstLine } from '../lib.mjs'
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, unlinkSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -249,3 +249,100 @@ const target = '960-run-scoped-target'
 }
 
 rmSync(T, { recursive: true, force: true })
+
+// ---- construction stamps: --log, exit codes and --mutate (same file: both halves take the machine lock) ----
+const CT = mkdtempSync(join(tmpdir(), 'run-scoped-construction-'))
+const ctarget = '961-construction-ctarget'
+const LOG = join(CT, 'memory-bank', 'bolts', '961-construction-ctarget', 'test-stamps.jsonl')
+
+const stamps = () => existsSync(LOG)
+  ? readFileSync(LOG, 'utf8').split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l))
+  : []
+const worklogExists = () => existsSync(join(CT, 'reviews', ctarget, 'worklog.jsonl'))
+
+{
+  const green = "node -e \"console.log('Passed! - Failed: 0, Passed: 3, Skipped: 0, Total: 3')\""
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'green', '--filter', 'Orders.Refund', '--log', LOG, '--cmd', green])
+  check('--log: a green run exits 0', r.code === 0, `exit ${r.code}: ${r.out.trim()}`)
+  const s = stamps()
+  check('--log: creates the file (and its folders) and appends one JSON line', s.length === 1, `${s.length} stamps`)
+  check('--log: the stamp carries t, kind, filter, counts and the runner exit code',
+    !!s[0] && typeof s[0].t === 'string' && s[0].kind === 'green' && s[0].filter === 'Orders.Refund' &&
+    s[0].passed === 3 && s[0].failed === 0 && s[0].exit === 0, JSON.stringify(s[0]))
+  check('--log: nothing is written to the review worklog', !worklogExists(), 'reviews/<ctarget>/worklog.jsonl was created')
+}
+{
+  const compileFailure = "node -e \"console.log('error CS0246: The type or namespace name RefundService could not be found'); process.exit(1)\""
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'red', '--filter', 'Orders.Refund', '--log', LOG, '--cmd', compileFailure])
+  check('--log: a red run keeps the runner exit code', r.code === 1, `exit ${r.code}`)
+  const s = stamps().at(-1)
+  check('--log: a compile failure stamps null counts but a non-zero exit — red by exit code, not by failed count',
+    !!s && s.kind === 'red' && s.passed === null && s.failed === null && s.exit === 1, JSON.stringify(s))
+}
+{
+  const green = "node -e \"console.log('Passed! - Failed: 0, Passed: 1, Total: 1')\""
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'green', '--filter', 'Foo.Exit', '--cmd', green])
+  const wl = readFileSync(join(CT, 'reviews', ctarget, 'worklog.jsonl'), 'utf8').trim().split(/\r?\n/).map(l => JSON.parse(l)).at(-1)
+  check('the worklog event also carries the runner exit code', r.code === 0 && !!wl && wl.exit === 0, JSON.stringify(wl))
+}
+
+const featureDir = join(CT, 'src', 'PhotoPrint.API', 'Orders')
+mkdirSync(featureDir, { recursive: true })
+const featureRel = 'src/PhotoPrint.API/Orders/RefundService.cs'
+const featureAbs = join(CT, featureRel)
+const original = 'namespace Orders;\r\npublic class RefundService\r\n{\r\n    public bool CanRefund(int days) => days <= 14;\r\n    public void Log() { Console.WriteLine("x"); }\r\n}\r\n'
+writeFileSync(featureAbs, original)
+process.env.RST_MUT_FILE = featureAbs
+const probe = exitCode => `node -e "const c=require('fs').readFileSync(process.env.RST_MUT_FILE,'utf8'); console.log(c.includes('days > 14') ? 'MUTATED' : 'ORIGINAL'); console.log(c.includes('Console.WriteLine') ? 'LOG-PRESENT' : 'LOG-REMOVED'); process.exit(${exitCode})"`
+
+{
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'green', '--filter', 'Orders.Refund', '--log', LOG, '--mutate', `${featureRel}:4`, '--cmd', probe(0)])
+  check('--mutate without --kind revert-and-rerun is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
+  check('a refused --mutate never touches the file', readFileSync(featureAbs, 'utf8') === original, 'file content changed')
+}
+{
+  for (const bad of ['src/PhotoPrint.Tests/Unit/RefundTests.cs', 'src/PhotoPrint.UI/src/app/refund.spec.ts', 'reviews/lib/tests/unit/x.mjs']) {
+    const r = run('fix/run-scoped-tests.mjs',
+      ['--root', CT, ctarget, '--kind', 'revert-and-rerun', '--filter', 'Orders.Refund', '--log', LOG, '--mutate', `${bad}:1`, '--cmd', probe(0)])
+    check(`--mutate refuses a test path (${bad}) with exit 2`, r.code === 2 && /test/i.test(r.out), `exit ${r.code}: ${r.out.trim()}`)
+  }
+}
+{
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'revert-and-rerun', '--filter', 'Orders.Refund', '--log', LOG, '--mutate', `${featureRel}:99`, '--cmd', probe(0)])
+  check('--mutate with a line past the end of the file is a usage error (exit 2)', r.code === 2, `exit ${r.code}: ${r.out.trim()}`)
+}
+{
+  const before = stamps().length
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'revert-and-rerun', '--filter', 'Orders.Refund', '--log', LOG, '--mutate', `${featureRel}:4`, '--cmd', probe(1)])
+  check('--mutate: the command sees the flipped comparison (<= became >)', r.out.includes('MUTATED'), r.out.trim())
+  check('--mutate: the runner exit code is kept (red leg)', r.code === 1, `exit ${r.code}`)
+  check('--mutate: the file is restored byte-for-byte after the run (CRLF kept)', readFileSync(featureAbs, 'utf8') === original, JSON.stringify(readFileSync(featureAbs, 'utf8')))
+  const s = stamps()
+  const last = s.at(-1)
+  check('--mutate: exactly one stamp was appended', s.length === before + 1, `${s.length - before} stamps`)
+  check('--mutate: the stamp records file, line, original and mutated text',
+    !!last && last.kind === 'revert-and-rerun' && last.exit === 1 && !!last.mutate &&
+    last.mutate.file === featureRel && last.mutate.line === 4 &&
+    last.mutate.original.includes('days <= 14') && last.mutate.mutated.includes('days > 14'), JSON.stringify(last))
+}
+{
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'revert-and-rerun', '--filter', 'Orders.Refund', '--log', LOG, '--mutate', `${featureRel}:5`, '--cmd', probe(1)])
+  check('--mutate: a line with no operator to flip is removed instead', r.out.includes('LOG-REMOVED'), r.out.trim())
+  check('--mutate: the removed line is restored afterwards', readFileSync(featureAbs, 'utf8') === original, 'file content changed')
+  const last = stamps().at(-1)
+  check('--mutate: a removal stamps an empty mutated text', !!last && last.mutate && last.mutate.mutated === '' && last.mutate.original.includes('Console.WriteLine'), JSON.stringify(last))
+}
+{
+  const r = run('fix/run-scoped-tests.mjs',
+    ['--root', CT, ctarget, '--kind', 'revert-and-rerun', '--filter', 'Orders.Refund', '--log', LOG, '--mutate', `${featureRel}:4`, '--dry-run', '--cmd', probe(0)])
+  check('--mutate with --dry-run prints the command and touches nothing', r.code === 0 && readFileSync(featureAbs, 'utf8') === original, `exit ${r.code}: ${r.out.trim()}`)
+}
+
+rmSync(CT, { recursive: true, force: true })

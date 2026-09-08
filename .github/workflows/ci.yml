@@ -105,3 +105,21 @@ jobs:
       # No lint step: this project has no `lint` script / ESLint config yet.
       - run: npm test -- --watch=false
       - run: npm run build -- --configuration=production
+
+  construction-gates:
+    name: Construction — stage exit conditions & claims lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node .specsmd/aidlc/scripts/tests/run-tests.mjs
+      - run: node reviews/lib/tests/run-tests.mjs --only run-scoped
+      # Same driver the pre-commit hook runs with --staged; here against the PR base, and no
+      # STAGE_GATE_OK override exists: the local hook can be skipped, the merge cannot.
+      - name: Stage exit conditions and claims lint for every bolt this PR advances
+        if: github.event_name == 'pull_request'
+        run: node .specsmd/aidlc/scripts/check-changed-bolts.mjs --base "origin/${{ github.base_ref }}"
