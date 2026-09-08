@@ -11,7 +11,7 @@ updated: 2026-09-08
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
 | PPW-762 | 🔴 | v1 | Dockerfile non-root guard drifts the runtime uid off 1001, making the existing uploads/apidata volume unwritable | `Dockerfile:36` | verified | `7256cce`, `479de38`, `3dfa20c` |
-| PPW-763 | 🔴 | v1 | realtime-order.spec.ts waits on a SignalR request pattern the hub connection never produces, so the only real-time spec always times out | `src/PhotoPrint.UI/e2e/realtime-order.spec.ts:55` | open | `3dfa20c` |
+| PPW-763 | 🔴 | v1 | realtime-order.spec.ts waits on a SignalR request pattern the hub connection never produces, so the only real-time spec always times out | `src/PhotoPrint.UI/e2e/realtime-order.spec.ts:55` | verified | `52541d1` |
 | PPW-764 | 🔴 | v1 | E2E stack seeds an admin account whose password is a committed repo constant, usable on a first production deploy | `src/PhotoPrint.UI/e2e/support/stack.ts:7` | verified | `324c998`, `b1b363f`, `479de38` |
 | PPW-765 | 🟠 | v1 | Only about half the services route through BaseApiService (auth/guest/money/upload bypass it) yet the criterion is ticked | `src/PhotoPrint.UI/src/app/core/services/api/base-api.service.ts:14` | verified | `e6f4f42` |
 | PPW-766 | 🟠 | v1 | retries: 1 in CI re-runs the non-idempotent realtime spec, which consumed the seed's only Paid order and can never pass on retry | `src/PhotoPrint.UI/playwright.config.ts:10` | verified | `546bc44` |
@@ -88,6 +88,8 @@ updated: 2026-09-08
   - v1: found by 3-lens agreement (correctness, tests-coverage, completeness-critic), accepted without a skeptic; adversarial verdict `confirmed`, finder confidence 7/10
   - v1: fix round — fixed at `ecceaa2`, `d14b936`
   - v2: verification — reopened (no-guard-ci-only)
+  - v2: fix round — fixed at `52541d1`
+  - v3: verification — held
 
 ### PPW-764 — E2E stack seeds an admin account whose password is a committed repo constant, usable on a first production deploy
 
