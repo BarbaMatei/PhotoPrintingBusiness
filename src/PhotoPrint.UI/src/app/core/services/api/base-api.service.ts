@@ -11,8 +11,12 @@ export interface ApiOptions {
 }
 
 /**
- * Shared HTTP plumbing for the API services: absolute URLs off `environment.apiUrl`,
- * one place that turns an options object into HttpClient's shapes.
+ * Shared HTTP plumbing for the services that inject it — account, admin, order, product,
+ * product-admin and shipping: absolute URLs off `environment.apiUrl`, one place that turns an
+ * options object into HttpClient's shapes.
+ *
+ * NOT every caller: auth, guest-auth, cart, payment, upload and admin-hub still compose their
+ * own URLs from `environment.apiUrl`, so an apiUrl shape change has to be checked there too.
  *
  * Authentication and error handling are NOT here — `jwtInterceptor`/`guestInterceptor`
  * attach the credentials and `errorInterceptor` owns the user-facing messages.

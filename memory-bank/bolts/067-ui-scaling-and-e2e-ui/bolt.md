@@ -75,7 +75,7 @@ Make the UI component layer maintainable and DRY up HTTP plumbing — verified b
 ## Success Criteria
 
 - [ ] No page > ~200 LOC — home 951→66 and profile 473→217, but saved-addresses is 334 and delivery-step 574 (see test-walkthrough.md)
-- [x] All services route through BaseApiService (the six data services; auth/guest-auth deliberately excluded)
+- [x] The six data services route through BaseApiService (account, admin, order, product, product-admin, shipping); auth, guest-auth, cart, payment, upload and admin-hub still compose their own URLs
 - [x] Within bundle budget; no home visual regression (no screenshot baseline exists — checked by eye)
 
 ## Notes
