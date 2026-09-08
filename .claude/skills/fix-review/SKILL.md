@@ -153,7 +153,9 @@ one per row during the verification that follows, and the driver commits them.
    when one exists; judge it yourself when not.
 3. **Protocol-first clusters (audit R1).** When two or more in-scope findings sit on the
    same stateful surface — same entity, state machine, key, stored path, or schedule; the
-   auditor detects it mechanically as serious findings whose fix briefs overlap on files —
+   auditor detects it mechanically as serious findings whose fix briefs overlap on files,
+   composition roots (`Program.cs`, `main.ts` and their kin) excluded, since every wiring
+   brief names one —
    the cluster's **first artifact is a protocol block**: a `### Protocol — <label>` block
    under the resolution's `Decisions` stating the states, the invariant(s) — each with a
    quantifier ("never", "at most one", "exactly once") — and the ordered rules for who

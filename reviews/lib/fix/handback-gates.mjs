@@ -56,12 +56,16 @@ export function auditHandBackGates(t, tag, roundDates, events, err) {
         err(`${at}: ${row.id} is trigger-classified by its fix brief but no pre-check verdict was consumed and no check-dispatched event names it — "not needed" is not a writable value (audit R2)`)
     }
 
+    // Composition roots are named by almost every wiring brief, so an overlap on one is no evidence of shared state.
+    const ENTRY_POINTS = new Set(['program.cs', 'startup.cs', 'main.ts', 'app.config.ts', 'app.module.ts'])
     const briefFiles = id => {
       const set = new Set()
       for (const hit of (blocks.get(id) ?? '').matchAll(/[A-Za-z0-9_./\\-]+\.(?:cs|ts|tsx|mjs|js|html|scss|css)\b/g)) {
         const p = hit[0].replace(/\\/g, '/')
         if (/\.spec\.ts$/.test(p) || /PhotoPrint\.Tests/.test(p) || /Tests\.cs$/.test(p)) continue
-        set.add(p.split('/').pop().toLowerCase())
+        const base = p.split('/').pop().toLowerCase()
+        if (ENTRY_POINTS.has(base)) continue
+        set.add(base)
       }
       return set
     }
