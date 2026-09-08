@@ -9,8 +9,9 @@ created: 2026-09-04T00:20:00Z
 ### Summary
 
 The Angular production build now carries budgets that actually bite, and a new Playwright suite
-drives three real-money paths — guest checkout, admin login, and the admin real-time order feed —
-against a stack booted from docker compose. A new workflow runs that suite on every pull request
+drives three paths — guest checkout up to the review step, admin login, and the admin real-time
+order feed — against a stack booted from docker compose. No spec places an order, so payment,
+webhook, invoice and AWB are not covered end-to-end. A new workflow runs that suite on every pull request
 and on every push outside `main`; the budget gate rides the production build the existing `ci.yml`
 already runs, so no existing workflow was edited.
 

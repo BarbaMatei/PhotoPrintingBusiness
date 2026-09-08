@@ -72,6 +72,10 @@ Add the pre-launch frontend quality gates: catch bundle bloat and automate guest
 
 - [x] Build fails over budget
 - [x] 3 e2e pass in CI within ~3 min (16.7 s, three consecutive green runs)
+- [ ] Story 002's "guest → Stripe test mode → confirmation" leg is NOT covered: `guest-checkout.spec.ts`
+  stops at `/checkout/recapitulare`, so order creation, the Stripe intent and `/comanda/:id/confirmare`
+  stay untested (needs `STRIPE_TEST_*` keys in the e2e stack; gap recorded in
+  `reviews/066-067-ui-scaling/ledger.md`)
 
 ## Notes
 

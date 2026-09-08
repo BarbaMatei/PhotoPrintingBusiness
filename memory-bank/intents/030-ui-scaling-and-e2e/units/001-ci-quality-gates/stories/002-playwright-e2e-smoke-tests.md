@@ -20,6 +20,7 @@ implemented: false
 ## Acceptance Criteria
 
 - [ ] **Given** `@playwright/test`, **When** added, **Then** three specs exist: `guest-checkout.spec.ts` (guest → Stripe test mode → confirmation), `admin-login.spec.ts`, `realtime-order.spec.ts` (admin sees SignalR broadcast)
+  - **Partially delivered (bolt 066):** the three specs exist, but `guest-checkout.spec.ts` stops at the review step (`/checkout/recapitulare`). The Stripe-test-mode and confirmation half needs `STRIPE_TEST_*` keys in the e2e compose stack and is still open — see `reviews/066-067-ui-scaling/ledger.md`.
 - [ ] **Given** `playwright-e2e.yml`, **When** CI runs, **Then** it boots API+UI via docker-compose and runs the specs using the official Playwright action
 - [ ] **Given** the suite, **When** it runs, **Then** it completes within ~3 min and is stable (no flakes)
 
