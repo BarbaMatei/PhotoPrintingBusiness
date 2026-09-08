@@ -43,3 +43,5 @@
 {"t":"2026-09-08T15:17:16+03:00","ev":"test-run","kind":"final","passed":210,"failed":0,"duration_s":6.63,"filter":"PhotoPrint.Tests.Unit.Configuration|FullyQualifiedName~PhotoPrint.Tests.Unit.Data","skipped":0,"cluster":"followups","round":1}
 {"t":"2026-09-08T15:17:34+03:00","ev":"test-run","kind":"final","passed":60,"failed":0,"duration_s":12.645,"include":"{admin.service,order.service,product-admin.service,delivery-step}","cluster":"followups","round":1}
 {"t":"2026-09-08T15:24:42+03:00","ev":"round-end","round":1}
+{"t":"2026-09-08T15:28:36+03:00","ev":"finding","id":"PPW-771","status":"deferred","note":"parked: needs a second Playwright project over the production bundle plus a CI job to build it — follow-up bolt, no code this round"}
+{"t":"2026-09-08T15:28:36+03:00","ev":"finding","id":"PPW-772","status":"deferred","note":"parked: the suggested self-heal is refuted (the guest token IS the GuestSessions row id); an honest server-side re-issue sits outside this diff"}
