@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from './support/stack';
+import { adminEmail, adminPassword } from './support/stack';
 
 test.describe('Autentificare administrator', () => {
   test('un administrator neautentificat este trimis la login și revine în panoul de administrare', async ({
@@ -8,8 +8,8 @@ test.describe('Autentificare administrator', () => {
     await page.goto('/admin');
     await expect(page).toHaveURL(/\/auth\/login$/);
 
-    await page.locator('#email').fill(ADMIN_EMAIL);
-    await page.locator('#password').fill(ADMIN_PASSWORD);
+    await page.locator('#email').fill(adminEmail());
+    await page.locator('#password').fill(adminPassword());
     await page.getByRole('button', { name: 'Autentifică-te' }).click();
 
     await expect(page).toHaveURL(/\/admin$/);

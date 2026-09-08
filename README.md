@@ -99,7 +99,9 @@ E2E="-f docker-compose.yml -f docker-compose.e2e.yml -p fototipar-e2e"
 docker compose $E2E up -d --build
 docker compose $E2E run --rm api --seed-dev
 
-# 3. run, from src/PhotoPrint.UI
+# 3. run, from src/PhotoPrint.UI. The admin specs carry no built-in credentials: export the
+#    seeded admin's (src/PhotoPrint.API/Data/Seed/ProductCatalogSeed.cs) or the run throws.
+export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=...
 npm run e2e            # npm run e2e:check type-checks the specs
 ```
 
