@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { vi } from 'vitest';
 import { AdminService } from './admin.service';
 import { environment } from '../../../environments/environment';
 
@@ -152,6 +153,38 @@ describe('AdminService', () => {
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ notes: 'Fragil' });
       req.flush({ id: 'order-abc', internalNotes: 'Fragil' });
+    });
+  });
+
+  describe('downloadZip', () => {
+    it('asks GET /admin/orders/:id/download-zip for a blob and saves it under the order number', () => {
+      const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:zip');
+      const revoked = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      const realClick = HTMLAnchorElement.prototype.click;
+      let savedAs: string | null = null;
+      HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+        savedAs = this.download;
+      };
+
+      try {
+        let finished = false;
+        service.downloadZip('order-abc', 'FT-2026-0006').subscribe(() => (finished = true));
+
+        const req = http.expectOne(`${base}/orders/order-abc/download-zip`);
+        expect(req.request.method).toBe('GET');
+        expect(req.request.responseType).toBe('blob');
+
+        req.flush(new Blob(['PK'], { type: 'application/zip' }));
+
+        expect(finished).toBe(true);
+        expect(created).toHaveBeenCalledOnce();
+        expect(savedAs).toBe('comanda-FT-2026-0006.zip');
+        expect(revoked).toHaveBeenCalledWith('blob:zip');
+      } finally {
+        HTMLAnchorElement.prototype.click = realClick;
+        created.mockRestore();
+        revoked.mockRestore();
+      }
     });
   });
 });
