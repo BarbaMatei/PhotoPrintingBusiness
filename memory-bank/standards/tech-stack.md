@@ -14,7 +14,8 @@
 - **E2e: Playwright 1.62** (`@playwright/test`, Chromium only), specs in `src/PhotoPrint.UI/e2e/`
   — outside `src/`, so the Vitest builder never collects them; `npm run e2e` runs them,
   `npm run e2e:check` type-checks them through `tsconfig.e2e.json`. Three smoke specs cover the
-  real-money paths (guest checkout to review, admin login, admin real-time order update). They
+  pre-payment funnel and the admin paths (guest checkout to review, admin login, admin real-time
+  order update); no spec places an order, so payment, webhook, invoice and AWB stay uncovered. They
   need a booted stack: `docker compose -f docker-compose.yml -f docker-compose.e2e.yml -p
   fototipar-e2e up -d --build`, then the same invocation with `run --rm api --seed-dev`.
 - **Bundle budgets** (`angular.json`, production configuration): `initial` warns at 400 kB and

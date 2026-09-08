@@ -85,10 +85,13 @@ docker compose up --build
 
 ## Run the e2e smoke suite
 
-Three Playwright specs cover the real-money paths: guest checkout up to the review step, admin
-login, and an admin order status change arriving over SignalR. They drive `ng serve` (Playwright
-starts it) against an API in containers, published on `:5052` — the port the SPA's dev
-environment already calls. Needs Docker Compose ≥ 2.24.
+Three Playwright specs cover the pre-payment funnel and the admin paths: guest checkout up to the
+review step, admin login, and an admin order status change arriving over SignalR. **Nothing here
+places an order** — order creation, the Stripe intent, the webhook, the invoice and the AWB are
+not exercised end-to-end, and both compose files pin placeholder Stripe keys, so this stack
+cannot cover them. They drive `ng serve` (Playwright starts it) against an API in containers,
+published on `:5052` — the port the SPA's dev environment already calls. Needs Docker
+Compose ≥ 2.24.
 
 ```sh
 # 1. one-time, as above: scripts/gen-dev-keys.sh  &&  cp .env.example .env
@@ -105,9 +108,10 @@ export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=...
 npm run e2e            # npm run e2e:check type-checks the specs
 ```
 
-Tear down with `docker compose $E2E down -v`. The real-time spec consumes the seed's only
-`Paid → Printing` transition, so a second run needs that `down -v` first. `.github/workflows/playwright-e2e.yml`
-runs the same sequence on every pull request and non-main push.
+Tear down with `docker compose $E2E down -v`. The real-time spec consumes one seeded `Paid` order
+per attempt (the seed ships two, matching CI's one retry), so a third run needs that `down -v`
+first. `.github/workflows/playwright-e2e.yml` runs the same sequence on every pull request and
+non-main push.
 
 ---
 
