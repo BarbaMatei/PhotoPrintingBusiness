@@ -45,7 +45,7 @@ paths (guest checkout, admin login, admin real-time order updates), run by a new
 - **docker compose + the repo `Dockerfile`**: boots API + PostgreSQL 16 in CI. The API image also
   bakes the SPA, but e2e serves the SPA from `ng serve` so the app under test is the source tree.
 - **Seed data**: `ProductCatalogSeed` (catalog + admin `mateibarba@yahoo.com` / `Admin1234!`) and
-  `DevDataSeed` (6 orders spanning statuses) via `dotnet PhotoPrint.API.dll --seed-dev`.
+  `DevDataSeed` (7 orders spanning statuses, two of them `Paid`) via `dotnet PhotoPrint.API.dll --seed-dev`.
   Both are idempotent.
 - **Angular budgets**: enforced by the existing `ci.yml` `web` job, which already runs
   `npm run build -- --configuration=production` on every PR. No edit to `ci.yml` (another group

@@ -38,7 +38,8 @@ complexity:
 
 ## Overview
 
-CI bundle-size budget + 3 Playwright e2e smoke tests on the real-money paths (P18).
+CI bundle-size budget + 3 Playwright e2e smoke tests over the pre-payment funnel and the admin
+paths (P18); no spec places an order, so payment itself stays uncovered.
 
 ## Objective
 

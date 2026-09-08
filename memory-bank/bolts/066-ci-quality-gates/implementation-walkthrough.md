@@ -32,7 +32,7 @@ on that port under its own project name and its own volumes.
       16 kB error. The previous pair was inert and inverted (1 MB/2 MB, and a 20 kB warning above a
       16 kB error).
 - [x] `src/PhotoPrint.UI/playwright.config.ts` — one Chromium project, serial (`workers: 1`) because
-      the specs share server state, one retry in CI only, trace on the retry, and a `webServer` that
+      the specs share server state, one retry in CI only, a trace kept on any failed attempt, and a `webServer` that
       owns the dev server with a 180 s start budget.
 - [x] `src/PhotoPrint.UI/e2e/support/stack.ts` — the addresses, the seeded admin credentials, the
       admin login helper, the `sessionStorage` token lift, and a locale-tolerant amount parser.
