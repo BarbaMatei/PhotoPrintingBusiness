@@ -42,9 +42,13 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
         '(docker compose down -v).',
     ).toBeDefined();
 
-    let hubFrames = 0;
+    let hubSignals = 0;
+    page.on('request', (req) => {
+      const url = req.url();
+      if (url.includes('/hubs/admin-orders') && url.includes('id=')) hubSignals += 1;
+    });
     page.on('websocket', (ws) => {
-      if (ws.url().includes('/hubs/admin-orders')) ws.on('framereceived', () => (hubFrames += 1));
+      if (ws.url().includes('/hubs/admin-orders')) ws.on('framereceived', () => (hubSignals += 1));
     });
 
     await page.goto('/admin/comenzi');
@@ -55,10 +59,12 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
     await expect(row.locator('.ord-badge')).toHaveText('Plătită');
 
     await expect
-      .poll(() => hubFrames, {
+      .poll(() => hubSignals, {
         message:
-          'clientul nu a primit niciun cadru pe /hubs/admin-orders — conexiunea SignalR nu s-a ' +
-          'stabilit, deci actualizarea nu poate ajunge în pagina deschisă',
+          'clientul nu s-a conectat la /hubs/admin-orders — nici cadru WebSocket, nici cerere de ' +
+          'transport cu id=, deci actualizarea nu poate ajunge în pagina deschisă. Hub-ul cere ' +
+          'rolul Admin, iar API-ul nu citește token din query string, deci transportul real este ' +
+          'long polling; asta se numără aici la fel ca un cadru WebSocket.',
         timeout: 30_000,
       })
       .toBeGreaterThan(0);
