@@ -45,3 +45,4 @@
 {"t":"2026-09-08T15:24:42+03:00","ev":"round-end","round":1}
 {"t":"2026-09-08T15:28:36+03:00","ev":"finding","id":"PPW-771","status":"deferred","note":"parked: needs a second Playwright project over the production bundle plus a CI job to build it — follow-up bolt, no code this round"}
 {"t":"2026-09-08T15:28:36+03:00","ev":"finding","id":"PPW-772","status":"deferred","note":"parked: the suggested self-heal is refuted (the guest token IS the GuestSessions row id); an honest server-side re-issue sits outside this diff"}
+{"t":"2026-09-08T15:30:12+03:00","ev":"pass-launch","pass":2,"type":"verification"}
