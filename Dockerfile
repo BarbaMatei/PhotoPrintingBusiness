@@ -31,10 +31,15 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 # curl for HEALTHCHECK; non-root runtime user. icu-libs + icu-data-full because this base
 # image ships no ICU and the invoice PDF renders in ro-RO; icu-libs alone pulls the
 # English-only data set, which carries no Romanian locale data.
-# Recent aspnet:8.0-alpine tags already ship an `app` user, and creating it again fails the build.
+# `app` ships at a tag-dependent uid and the base sets ENV APP_UID (which would shadow an ARG of
+# that name); 1001 is the uid /app/Storage on an already-created apidata volume is owned by.
+ARG RUNTIME_UID=1001
 RUN apk add --no-cache curl icu-libs icu-data-full \
- && (getent group app > /dev/null || addgroup -g 1001 app) \
- && (id -u app > /dev/null 2>&1 || adduser -D -u 1001 -G app app)
+ && (deluser app 2>/dev/null || true) \
+ && (delgroup app 2>/dev/null || true) \
+ && addgroup -g ${RUNTIME_UID} app \
+ && adduser -D -u ${RUNTIME_UID} -G app app \
+ && chown -R app:app /home/app
 WORKDIR /app
 COPY --from=api-build /app/publish ./
 COPY --from=ui-build  /ui/dist/PhotoPrint.UI/browser ./wwwroot
