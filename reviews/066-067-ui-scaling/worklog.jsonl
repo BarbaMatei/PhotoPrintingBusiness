@@ -1,0 +1,5 @@
+{"t":"2026-09-08T13:07:21+03:00","ev":"run-start","reason":"unattended review loop run for 066-067-ui-scaling (PR #21)"}
+{"t":"2026-09-08T13:10:08+03:00","ev":"pass-launch","pass":1,"type":"discovery"}
+{"t":"2026-09-08T13:10:53+03:00","ev":"note","reason":"discovery v1 workflow runId wf_87c2e480-7ff (7 lenses: correctness security requirements quality tests-coverage frontend-ux completeness-critic)"}
+{"t":"2026-09-08T13:45:41+03:00","ev":"pass-records-done","pass":1}
+{"t":"2026-09-08T13:53:49+03:00","ev":"doc-gate","pass":1,"verdict":"disapprove","reason":"lint clean; Sonnet judge disapproved 3 missing evidence links in summary-v1.md Reasons to doubt, replacement text applied verbatim, lint re-run clean"}
