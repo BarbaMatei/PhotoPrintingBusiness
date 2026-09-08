@@ -88,9 +88,10 @@ docker compose up --build
 Three Playwright specs cover the pre-payment funnel and the admin paths: guest checkout up to the
 review step, admin login, and an admin order status change arriving over SignalR. **Nothing here
 places an order** — order creation, the Stripe intent, the webhook, the invoice and the AWB are
-not exercised end-to-end, and both compose files pin placeholder Stripe keys, so this stack
-cannot cover them. They drive `ng serve` (Playwright starts it) against an API in containers,
-published on `:5052` — the port the SPA's dev environment already calls. Needs Docker
+not exercised end-to-end: the e2e overlay pins placeholder Stripe keys, and the dev stack falls
+back to placeholders only when `.env` leaves them empty, so neither covers a real payment. They
+drive `ng serve` (Playwright starts it) against an API in containers, published on
+`:5052` — the port the SPA's dev environment already calls. Needs Docker
 Compose ≥ 2.24.
 
 ```sh
@@ -104,7 +105,7 @@ docker compose $E2E run --rm api --seed-dev
 
 # 3. run, from src/PhotoPrint.UI. The admin specs carry no built-in credentials: export the
 #    seeded admin's (src/PhotoPrint.API/Data/Seed/ProductCatalogSeed.cs) or the run throws.
-export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=...
+export E2E_ADMIN_EMAIL=... E2E_ADMIN_PASSWORD=...          # PowerShell: $env:E2E_ADMIN_EMAIL = '...'
 npm run e2e            # npm run e2e:check type-checks the specs
 ```
 
