@@ -8,7 +8,8 @@ import { environment } from '../../../environments/environment';
 describe('AdminService', () => {
   let service: AdminService;
   let http: HttpTestingController;
-  const base = `${environment.apiUrl}/admin`;
+  const API = 'http://localhost:5052/api';
+  const base = `${API}/admin`;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -19,6 +20,10 @@ describe('AdminService', () => {
   });
 
   afterEach(() => http.verify());
+
+  it('is written against the dev API root environment.ts pins', () => {
+    expect(environment.apiUrl).toBe(API);
+  });
 
   // ── Stats ────────────────────────────────────────────────────────────────
 
