@@ -44,6 +44,17 @@ the same reason they apply to fixes:
 For each class the diff touches: apply the rule, and name the test that would go red if the
 class were violated.
 
+### Ranked by what the reviews actually found
+
+Rendered by `node reviews/lib/ledger-miner.mjs rank --write` from `reviews/state/defect-classes.jsonl`
+(one line per canonical finding, fed by the `reconcile-findings` skill; weights 🔴 5 · 🟠 3 · 🟡 1
+· ⚪ 0.5). `rank --area <slug> --top 5 --as-rows` prints the same ranking for one area as
+`failure-modes.jsonl` rows for a bolt's design stage. Do not edit between the markers.
+
+<!-- miner:ranked-classes:start -->
+_No sidecar lines yet: the backfill has not run._
+<!-- miner:ranked-classes:end -->
+
 **1. Caller sweep on contract change.** Changing or adding a contract (interface, entity field,
 key scheme, status code) requires enumerating ALL existing consumers — grep, don't recall — and
 updating or explicitly clearing each. *(043 F1/F2 — the only High of the bolt; 035 OrderNumber

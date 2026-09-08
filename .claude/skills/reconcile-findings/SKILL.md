@@ -100,6 +100,19 @@ item. Then:
   Suggested-fix lines carry the fix brief (see the discovery runbook). For each **matched**
   row, append one History line (this pass, what changed) — never edit existing block text; a
   matched decided item's History line carries the prior decision verbatim.
+
+  Then feed the prevention sweep, one line per new id:
+
+  ```
+  node reviews/lib/ledger-miner.mjs feed <target> --id PPW-<n> --sev <high|medium|low|cleanup>
+    --class <definition-of-done class slug> --area <area slug> --title "<t>"
+  ```
+
+  appends the defect's class to `reviews/state/defect-classes.jsonl` (the miner's only input;
+  `node reviews/lib/ledger-miner.mjs --help` lists the slugs). A matched re-find whose severity
+  changed is fed again with the new severity — the later line wins. The class is one of
+  definition-of-done's twelve, or `other`; a new class needs three members across two targets
+  before it is proposed there.
 - **Overlap mode:** N_A / N_B / M per stratum (serious = 🔴+🟠, minor = 🟡+⚪); exclude
   `hinted` findings from independence claims; list unknown-provenance items honestly instead
   of guessing.
