@@ -30,10 +30,11 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
         'aceeași bază eșuează aici în loc să treacă în tăcere.',
     ).toBeDefined();
 
-    const hubConnected = page.waitForRequest(
-      (req) => req.url().includes('/hubs/admin-orders') && req.url().includes('id='),
-      { timeout: 30_000 },
-    );
+    let hubFrames = 0;
+    page.on('websocket', (ws) => {
+      if (ws.url().includes('/hubs/admin-orders')) ws.on('framereceived', () => (hubFrames += 1));
+    });
+
     await page.goto('/admin/comenzi');
     await expect(page.locator('.ord-table__row').first()).toBeVisible();
 
@@ -41,7 +42,15 @@ test.describe('Actualizare în timp real a comenzilor (SignalR)', () => {
     await expect(row).toHaveCount(1);
     await expect(row.locator('.ord-badge')).toHaveText('Plătită');
 
-    await hubConnected;
+    await expect
+      .poll(() => hubFrames, {
+        message:
+          'clientul nu a primit niciun cadru pe /hubs/admin-orders — conexiunea SignalR nu s-a ' +
+          'stabilit, deci actualizarea nu poate ajunge în pagina deschisă',
+        timeout: 30_000,
+      })
+      .toBeGreaterThan(0);
+
     await page.evaluate(() => {
       (window as Window & { __e2eSameDocument?: boolean }).__e2eSameDocument = true;
     });
