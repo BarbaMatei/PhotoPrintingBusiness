@@ -26,6 +26,10 @@ public class ContainerRuntimeTests
             VolumeOwnerUid,
             "the runtime user must own /app/Storage on an apidata volume created by an earlier "
             + "build, or every upload write fails with permission denied while /health stays 200");
+
+        dockerfile.Should().MatchRegex(
+            @"(?m)^USER app\s*$",
+            "creating the user at a pinned uid changes nothing unless the image actually runs as it");
     }
 
     [Fact]
