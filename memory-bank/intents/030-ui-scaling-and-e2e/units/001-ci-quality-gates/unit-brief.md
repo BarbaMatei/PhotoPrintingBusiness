@@ -2,11 +2,11 @@
 unit: 001-ci-quality-gates
 intent: 030-ui-scaling-and-e2e
 phase: inception
-status: draft
+status: complete
 unit_type: frontend
 default_bolt_type: simple-construction-bolt
-created: 2026-06-05T09:30:00Z
-updated: 2026-06-05T09:30:00Z
+created: 2026-06-05T09:30:00.000Z
+updated: 2026-06-05T09:30:00.000Z
 ---
 
 # Unit Brief: CI Quality Gates

@@ -2,11 +2,11 @@
 id: 002-playwright-e2e-smoke-tests
 unit: 001-ci-quality-gates
 intent: 030-ui-scaling-and-e2e
-status: draft
+status: complete
 priority: must
-created: 2026-06-05T09:30:00Z
+created: 2026-06-05T09:30:00.000Z
 assigned_bolt: 066-ci-quality-gates
-implemented: false
+implemented: true
 ---
 
 # Story: 002-playwright-e2e-smoke-tests

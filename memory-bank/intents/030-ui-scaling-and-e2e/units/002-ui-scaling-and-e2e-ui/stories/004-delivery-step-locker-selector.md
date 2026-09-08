@@ -2,11 +2,11 @@
 id: 004-delivery-step-locker-selector
 unit: 002-ui-scaling-and-e2e-ui
 intent: 030-ui-scaling-and-e2e
-status: draft
+status: complete
 priority: should
-created: 2026-06-05T09:30:00Z
+created: 2026-06-05T09:30:00.000Z
 assigned_bolt: 067-ui-scaling-and-e2e-ui
-implemented: false
+implemented: true
 ---
 
 # Story: 004-delivery-step-locker-selector

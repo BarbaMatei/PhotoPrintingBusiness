@@ -3,30 +3,29 @@ id: 066-ci-quality-gates
 unit: 001-ci-quality-gates
 intent: 030-ui-scaling-and-e2e
 type: simple-construction-bolt
-status: review-pending
+status: complete
 stories:
   - 001-bundle-size-budget
   - 002-playwright-e2e-smoke-tests
-created: 2026-06-05T09:30:00Z
-started: 2026-09-03T20:45:00Z
-completed: null
+created: 2026-06-05T09:30:00.000Z
+started: 2026-09-03T20:45:00.000Z
+completed: "2026-09-08T13:20:34Z"
 current_stage: null
 stages_completed:
   - name: plan
-    completed: 2026-09-03T23:40:00Z
+    completed: 2026-09-03T23:40:00.000Z
     artifact: implementation-plan.md
   - name: implement
-    completed: 2026-09-04T00:20:00Z
+    completed: 2026-09-04T00:20:00.000Z
     artifact: implementation-walkthrough.md
   - name: test
-    completed: 2026-09-04T11:30:00Z
+    completed: 2026-09-04T11:30:00.000Z
     artifact: test-walkthrough.md
-
 requires_bolts: []
-enables_bolts: [067-ui-scaling-and-e2e-ui]
+enables_bolts:
+  - 067-ui-scaling-and-e2e-ui
 requires_units: []
 blocks: false
-
 complexity:
   avg_complexity: 2
   avg_uncertainty: 1

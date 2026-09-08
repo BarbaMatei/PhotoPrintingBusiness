@@ -3,32 +3,32 @@ id: 067-ui-scaling-and-e2e-ui
 unit: 002-ui-scaling-and-e2e-ui
 intent: 030-ui-scaling-and-e2e
 type: simple-construction-bolt
-status: review-pending
+status: complete
 stories:
   - 001-base-api-service
   - 002-home-page-breakup
   - 003-account-pages-breakup
   - 004-delivery-step-locker-selector
-created: 2026-06-05T09:30:00Z
-started: 2026-09-04T00:55:00Z
-completed: 2026-09-04T14:00:00Z
+created: 2026-06-05T09:30:00.000Z
+started: 2026-09-04T00:55:00.000Z
+completed: "2026-09-08T13:20:38Z"
 current_stage: null
 stages_completed:
   - name: plan
-    completed: 2026-09-04T11:20:00Z
+    completed: 2026-09-04T11:20:00.000Z
     artifact: implementation-plan.md
   - name: implement
-    completed: 2026-09-04T13:10:00Z
+    completed: 2026-09-04T13:10:00.000Z
     artifact: implementation-walkthrough.md
   - name: test
-    completed: 2026-09-04T14:00:00Z
+    completed: 2026-09-04T14:00:00.000Z
     artifact: test-walkthrough.md
-
-requires_bolts: [066-ci-quality-gates]
+requires_bolts:
+  - 066-ci-quality-gates
 enables_bolts: []
-requires_units: [001-ci-quality-gates]
+requires_units:
+  - 001-ci-quality-gates
 blocks: false
-
 complexity:
   avg_complexity: 2
   avg_uncertainty: 1
