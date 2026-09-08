@@ -10,54 +10,54 @@ updated: 2026-09-08
 
 | ID | Sev | First seen | Title | File | Status | Affirmed |
 |---|---|---|---|---|---|---|
-| PPW-762 | 🔴 | v1 | Dockerfile non-root guard drifts the runtime uid off 1001, making the existing uploads/apidata volume unwritable | `Dockerfile:36` | open | |
-| PPW-763 | 🔴 | v1 | realtime-order.spec.ts waits on a SignalR request pattern the hub connection never produces, so the only real-time spec always times out | `src/PhotoPrint.UI/e2e/realtime-order.spec.ts:55` | open | |
-| PPW-764 | 🔴 | v1 | E2E stack seeds an admin account whose password is a committed repo constant, usable on a first production deploy | `src/PhotoPrint.UI/e2e/support/stack.ts:7` | open | |
-| PPW-765 | 🟠 | v1 | Only about half the services route through BaseApiService (auth/guest/money/upload bypass it) yet the criterion is ticked | `src/PhotoPrint.UI/src/app/core/services/api/base-api.service.ts:14` | open | |
-| PPW-766 | 🟠 | v1 | retries: 1 in CI re-runs the non-idempotent realtime spec, which consumed the seed's only Paid order and can never pass on retry | `src/PhotoPrint.UI/playwright.config.ts:10` | open | |
-| PPW-767 | 🟠 | v1 | Guest checkout e2e stops at the review step — the Stripe-to-confirmation leg is descoped while the story criterion is ticked | `src/PhotoPrint.UI/e2e/guest-checkout.spec.ts:64` | open | |
-| PPW-768 | 🟠 | v1 | Locker-selector output bindings in delivery-step left uncovered after the extraction | `src/PhotoPrint.UI/src/app/features/checkout/pages/delivery-step.ts:131` | open | |
-| PPW-769 | 🟠 | v1 | product-admin.service's 11 endpoints migrated to BaseApiService with zero tests | `src/PhotoPrint.UI/src/app/core/services/product-admin.service.ts:73` | open | |
-| PPW-770 | 🟠 | v1 | admin.service downloadZip and getOrderPhotos migrated but left untested | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:81` | open | |
-| PPW-771 | 🟠 | v1 | Playwright smoke-tests the dev bundle (npm start), never the production build | `src/PhotoPrint.UI/playwright.config.ts:25` | open | |
-| PPW-772 | 🟠 | v1 | Guest 401 in the error interceptor deletes the guest token and nothing re-issues it outside the upload page | `src/PhotoPrint.UI/src/app/core/interceptors/error.interceptor.ts:33` | open | |
-| PPW-773 | 🟠 | v1 | README's "real-money smoke paths" claim overstates what the three e2e specs cover | `README.md:88` | open | |
-| PPW-774 | 🟠 | v1 | New Stripe entries in docker-compose.yml silently override a developer's real keys from .env | `docker-compose.yml:51` | open | |
-| PPW-775 | 🟡 | v1 | gitleaks allowlist misses the whsec_e2e_placeholder literal and is hand-synced with hooks/pre-commit | `.gitleaks.toml:24` | open | |
-| PPW-776 | 🟡 | v1 | anyComponentStyle budget (4kB warning / 16kB error) matches neither the story's 4kB error criterion nor current stylesheet sizes | `src/PhotoPrint.UI/angular.json:57` | open | |
-| PPW-777 | 🟡 | v1 | webServer command hardcodes port 4200 while the wait URL is configurable, so E2E_BASE_URL cannot actually be changed | `src/PhotoPrint.UI/playwright.config.ts:25` | open | |
-| PPW-778 | 🟡 | v1 | Locker map popup interpolates locker name/address into raw HTML | `src/PhotoPrint.UI/src/app/features/checkout/components/locker-map.ts:135` | open | |
-| PPW-779 | 🟡 | v1 | bolt.md claims three consecutive green CI runs, contradicted by its own Runs table | `memory-bank/bolts/066-ci-quality-gates/bolt.md:74` | open | |
-| PPW-780 | 🟡 | v1 | Implementation walkthrough records inheritance plus a shared error path, but the code uses injection and has neither | `memory-bank/bolts/067-ui-scaling-and-e2e-ui/implementation-walkthrough.md:20` | open | |
-| PPW-781 | 🟡 | v1 | DEPLOYMENT.md file and workflow tables never mention the new e2e stack | `docs/DEPLOYMENT.md:79` | open | |
-| PPW-782 | 🟡 | v1 | E2E_* variables documented in .env.example, which no e2e code reads | `.env.example:84` | open | |
-| PPW-783 | 🟡 | v1 | playwright-e2e workflow has push and pull_request triggers but no concurrency group, doubling every PR run | `.github/workflows/playwright-e2e.yml:7` | open | |
-| PPW-784 | 🟡 | v1 | Descoped e2e remainder lives only in bolt docs with no tracked follow-up | `memory-bank/bolts/067-ui-scaling-and-e2e-ui/test-walkthrough.md:73` | open | |
-| PPW-785 | 🟡 | v1 | Profile page stylesheet copied verbatim into all three extracted child components, dead rules included | `src/PhotoPrint.UI/src/app/features/account/pages/profile/components/personal-info-form/personal-info-form.scss:1` | open | |
-| PPW-786 | 🟡 | v1 | Blob-to-file save logic duplicated between admin.service and a page, and the two copies disagree | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:82` | open | |
-| PPW-787 | 🟡 | v1 | reuseExistingServer outside CI silently tests whatever server is already on the port, e.g. another worktree's | `src/PhotoPrint.UI/playwright.config.ts:27` | open | |
-| PPW-788 | 🟡 | v1 | E2E workflow triggers leave the deploying commit as the one never smoke-tested | `.github/workflows/playwright-e2e.yml:1` | open | |
-| PPW-789 | 🟡 | v1 | No repaint/change-detection test for the two extracted profile forms | `src/PhotoPrint.UI/src/app/features/account/pages/profile/components/personal-info-form.ts:1` | open | |
-| PPW-790 | 🟡 | v1 | product.service getCatalog() caches the result but not the in-flight request, so concurrent callers duplicate the call | `src/PhotoPrint.UI/src/app/core/services/product.service.ts:22` | open | |
-| PPW-791 | 🟡 | v1 | delivery-step shipping-cost subscriptions are never torn down and write shared checkout state after destroy | `src/PhotoPrint.UI/src/app/features/checkout/pages/delivery-step.ts:495` | open | |
-| PPW-792 | 🟡 | v1 | HomePage.ngOnInit catalog subscription has no takeUntilDestroyed | `src/PhotoPrint.UI/src/app/features/home/home-page.ts:53` | open | |
-| PPW-793 | 🟡 | v1 | Pricing teaser advertises hardcoded prices when the catalog call fails | `src/PhotoPrint.UI/src/app/features/home/components/pricing-teaser/pricing-teaser.html:20` | open | |
-| PPW-794 | 🟡 | v1 | Order ZIP download revokes the blob URL in the same tick as the click, risking a lost download | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:89` | open | |
-| PPW-795 | 🟡 | v1 | New guest e2e never asserts guestSession survival, the repo's most re-found defect class | `src/PhotoPrint.UI/e2e/guest-checkout.spec.ts:40` | open | |
-| PPW-796 | 🟡 | v1 | README e2e run recipe is POSIX-only on a Windows-primary project | `README.md:95` | open | |
-| PPW-797 | ⚪ | v1 | Dead leftovers in profile-page after the component extraction (Router imported and injected but never used) | `src/PhotoPrint.UI/src/app/features/account/pages/profile/profile-page.ts:10` | open | |
-| PPW-798 | ⚪ | v1 | Prettier-only reflows recorded in the walkthrough as component split wiring | `memory-bank/bolts/067-ui-scaling-and-e2e-ui/implementation-walkthrough.md:51` | open | |
-| PPW-799 | ⚪ | v1 | BaseApiService dropped story 001's named payload and shipped one new option with no caller | `src/PhotoPrint.UI/src/app/core/services/api/base-api.service.ts:10` | open | |
-| PPW-800 | ⚪ | v1 | Fix-stage ruling dismissed the gitleaks sync note after checking the wrong hook | `memory-bank/intents/030-ui-scaling-and-e2e/units/001-ci-quality-gates/construction-log.md:59` | open | |
-| PPW-801 | ⚪ | v1 | Romanian mobile-phone regex copied into four files, with a fifth divergent rule | `src/PhotoPrint.UI/src/app/features/account/pages/profile/profile-page.ts:93` | open | |
-| PPW-802 | ⚪ | v1 | Tier range label formatted a third time in HomePage instead of reusing the shared util | `src/PhotoPrint.UI/src/app/features/home/home-page.ts:43` | open | |
-| PPW-803 | ⚪ | v1 | Third copy of the invalid-field helper, this one with a hand-rolled change-detection counter | `src/PhotoPrint.UI/src/app/features/account/pages/saved-addresses/components/address-form/address-form.ts:32` | open | |
-| PPW-804 | ⚪ | v1 | Address form wrapper and action buttons duplicated for the add and edit cases | `src/PhotoPrint.UI/src/app/features/account/pages/saved-addresses/saved-addresses-page.ts:90` | open | |
-| PPW-805 | ⚪ | v1 | Identity map in admin.service over a response that already has the target shape | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:58` | open | |
-| PPW-806 | ⚪ | v1 | Saved-addresses cap hardcoded in the toast text next to the constant that holds it | `src/PhotoPrint.UI/src/app/features/account/pages/saved-addresses/saved-addresses-page.ts:236` | open | |
-| PPW-807 | ⚪ | v1 | tech-stack.md's documented count of over-budget stylesheets does not match the recorded build | `memory-bank/standards/tech-stack.md:22` | open | |
-| PPW-808 | ⚪ | v1 | Dead account-page component reformatted instead of deleted | `src/PhotoPrint.UI/src/app/features/account/pages/account-page.ts:1` | open | |
-| PPW-809 | ⚪ | v1 | Large Prettier reformat lands with no format script or CI check to hold it | `src/PhotoPrint.UI/package.json:9` | open | |
+| PPW-762 | 🔴 | v1 | Dockerfile non-root guard drifts the runtime uid off 1001, making the existing uploads/apidata volume unwritable | `Dockerfile:36` | verified | `7256cce`, `479de38`, `3dfa20c` |
+| PPW-763 | 🔴 | v1 | realtime-order.spec.ts waits on a SignalR request pattern the hub connection never produces, so the only real-time spec always times out | `src/PhotoPrint.UI/e2e/realtime-order.spec.ts:55` | open | `3dfa20c` |
+| PPW-764 | 🔴 | v1 | E2E stack seeds an admin account whose password is a committed repo constant, usable on a first production deploy | `src/PhotoPrint.UI/e2e/support/stack.ts:7` | verified | `324c998`, `b1b363f`, `479de38` |
+| PPW-765 | 🟠 | v1 | Only about half the services route through BaseApiService (auth/guest/money/upload bypass it) yet the criterion is ticked | `src/PhotoPrint.UI/src/app/core/services/api/base-api.service.ts:14` | verified | `e6f4f42` |
+| PPW-766 | 🟠 | v1 | retries: 1 in CI re-runs the non-idempotent realtime spec, which consumed the seed's only Paid order and can never pass on retry | `src/PhotoPrint.UI/playwright.config.ts:10` | verified | `546bc44` |
+| PPW-767 | 🟠 | v1 | Guest checkout e2e stops at the review step — the Stripe-to-confirmation leg is descoped while the story criterion is ticked | `src/PhotoPrint.UI/e2e/guest-checkout.spec.ts:64` | verified | `9b1c123` |
+| PPW-768 | 🟠 | v1 | Locker-selector output bindings in delivery-step left uncovered after the extraction | `src/PhotoPrint.UI/src/app/features/checkout/pages/delivery-step.ts:131` | verified | `7ace250` |
+| PPW-769 | 🟠 | v1 | product-admin.service's 11 endpoints migrated to BaseApiService with zero tests | `src/PhotoPrint.UI/src/app/core/services/product-admin.service.ts:73` | verified | `5f4d434` |
+| PPW-770 | 🟠 | v1 | admin.service downloadZip and getOrderPhotos migrated but left untested | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:81` | verified | `6a8070a`, `eb6336e` |
+| PPW-771 | 🟠 | v1 | Playwright smoke-tests the dev bundle (npm start), never the production build | `src/PhotoPrint.UI/playwright.config.ts:25` | deferred | |
+| PPW-772 | 🟠 | v1 | Guest 401 in the error interceptor deletes the guest token and nothing re-issues it outside the upload page | `src/PhotoPrint.UI/src/app/core/interceptors/error.interceptor.ts:33` | deferred | |
+| PPW-773 | 🟠 | v1 | README's "real-money smoke paths" claim overstates what the three e2e specs cover | `README.md:88` | verified | `b9ecd80`, `b1b363f`, `3dfa20c` |
+| PPW-774 | 🟠 | v1 | New Stripe entries in docker-compose.yml silently override a developer's real keys from .env | `docker-compose.yml:51` | verified | `8588c62`, `b1b363f` |
+| PPW-775 | 🟡 | v1 | gitleaks allowlist misses the whsec_e2e_placeholder literal and is hand-synced with hooks/pre-commit | `.gitleaks.toml:24` | backlog | |
+| PPW-776 | 🟡 | v1 | anyComponentStyle budget (4kB warning / 16kB error) matches neither the story's 4kB error criterion nor current stylesheet sizes | `src/PhotoPrint.UI/angular.json:57` | backlog | |
+| PPW-777 | 🟡 | v1 | webServer command hardcodes port 4200 while the wait URL is configurable, so E2E_BASE_URL cannot actually be changed | `src/PhotoPrint.UI/playwright.config.ts:25` | backlog | |
+| PPW-778 | 🟡 | v1 | Locker map popup interpolates locker name/address into raw HTML | `src/PhotoPrint.UI/src/app/features/checkout/components/locker-map.ts:135` | backlog | |
+| PPW-779 | 🟡 | v1 | bolt.md claims three consecutive green CI runs, contradicted by its own Runs table | `memory-bank/bolts/066-ci-quality-gates/bolt.md:74` | backlog | |
+| PPW-780 | 🟡 | v1 | Implementation walkthrough records inheritance plus a shared error path, but the code uses injection and has neither | `memory-bank/bolts/067-ui-scaling-and-e2e-ui/implementation-walkthrough.md:20` | backlog | |
+| PPW-781 | 🟡 | v1 | DEPLOYMENT.md file and workflow tables never mention the new e2e stack | `docs/DEPLOYMENT.md:79` | backlog | |
+| PPW-782 | 🟡 | v1 | E2E_* variables documented in .env.example, which no e2e code reads | `.env.example:84` | backlog | |
+| PPW-783 | 🟡 | v1 | playwright-e2e workflow has push and pull_request triggers but no concurrency group, doubling every PR run | `.github/workflows/playwright-e2e.yml:7` | backlog | |
+| PPW-784 | 🟡 | v1 | Descoped e2e remainder lives only in bolt docs with no tracked follow-up | `memory-bank/bolts/067-ui-scaling-and-e2e-ui/test-walkthrough.md:73` | backlog | |
+| PPW-785 | 🟡 | v1 | Profile page stylesheet copied verbatim into all three extracted child components, dead rules included | `src/PhotoPrint.UI/src/app/features/account/pages/profile/components/personal-info-form/personal-info-form.scss:1` | backlog | |
+| PPW-786 | 🟡 | v1 | Blob-to-file save logic duplicated between admin.service and a page, and the two copies disagree | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:82` | backlog | |
+| PPW-787 | 🟡 | v1 | reuseExistingServer outside CI silently tests whatever server is already on the port, e.g. another worktree's | `src/PhotoPrint.UI/playwright.config.ts:27` | backlog | |
+| PPW-788 | 🟡 | v1 | E2E workflow triggers leave the deploying commit as the one never smoke-tested | `.github/workflows/playwright-e2e.yml:1` | backlog | |
+| PPW-789 | 🟡 | v1 | No repaint/change-detection test for the two extracted profile forms | `src/PhotoPrint.UI/src/app/features/account/pages/profile/components/personal-info-form.ts:1` | backlog | |
+| PPW-790 | 🟡 | v1 | product.service getCatalog() caches the result but not the in-flight request, so concurrent callers duplicate the call | `src/PhotoPrint.UI/src/app/core/services/product.service.ts:22` | backlog | |
+| PPW-791 | 🟡 | v1 | delivery-step shipping-cost subscriptions are never torn down and write shared checkout state after destroy | `src/PhotoPrint.UI/src/app/features/checkout/pages/delivery-step.ts:495` | backlog | |
+| PPW-792 | 🟡 | v1 | HomePage.ngOnInit catalog subscription has no takeUntilDestroyed | `src/PhotoPrint.UI/src/app/features/home/home-page.ts:53` | backlog | |
+| PPW-793 | 🟡 | v1 | Pricing teaser advertises hardcoded prices when the catalog call fails | `src/PhotoPrint.UI/src/app/features/home/components/pricing-teaser/pricing-teaser.html:20` | backlog | |
+| PPW-794 | 🟡 | v1 | Order ZIP download revokes the blob URL in the same tick as the click, risking a lost download | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:89` | backlog | |
+| PPW-795 | 🟡 | v1 | New guest e2e never asserts guestSession survival, the repo's most re-found defect class | `src/PhotoPrint.UI/e2e/guest-checkout.spec.ts:40` | backlog | |
+| PPW-796 | 🟡 | v1 | README e2e run recipe is POSIX-only on a Windows-primary project | `README.md:95` | backlog | |
+| PPW-797 | ⚪ | v1 | Dead leftovers in profile-page after the component extraction (Router imported and injected but never used) | `src/PhotoPrint.UI/src/app/features/account/pages/profile/profile-page.ts:10` | backlog | |
+| PPW-798 | ⚪ | v1 | Prettier-only reflows recorded in the walkthrough as component split wiring | `memory-bank/bolts/067-ui-scaling-and-e2e-ui/implementation-walkthrough.md:51` | backlog | |
+| PPW-799 | ⚪ | v1 | BaseApiService dropped story 001's named payload and shipped one new option with no caller | `src/PhotoPrint.UI/src/app/core/services/api/base-api.service.ts:10` | backlog | |
+| PPW-800 | ⚪ | v1 | Fix-stage ruling dismissed the gitleaks sync note after checking the wrong hook | `memory-bank/intents/030-ui-scaling-and-e2e/units/001-ci-quality-gates/construction-log.md:59` | backlog | |
+| PPW-801 | ⚪ | v1 | Romanian mobile-phone regex copied into four files, with a fifth divergent rule | `src/PhotoPrint.UI/src/app/features/account/pages/profile/profile-page.ts:93` | backlog | |
+| PPW-802 | ⚪ | v1 | Tier range label formatted a third time in HomePage instead of reusing the shared util | `src/PhotoPrint.UI/src/app/features/home/home-page.ts:43` | backlog | |
+| PPW-803 | ⚪ | v1 | Third copy of the invalid-field helper, this one with a hand-rolled change-detection counter | `src/PhotoPrint.UI/src/app/features/account/pages/saved-addresses/components/address-form/address-form.ts:32` | backlog | |
+| PPW-804 | ⚪ | v1 | Address form wrapper and action buttons duplicated for the add and edit cases | `src/PhotoPrint.UI/src/app/features/account/pages/saved-addresses/saved-addresses-page.ts:90` | backlog | |
+| PPW-805 | ⚪ | v1 | Identity map in admin.service over a response that already has the target shape | `src/PhotoPrint.UI/src/app/core/services/admin.service.ts:58` | backlog | |
+| PPW-806 | ⚪ | v1 | Saved-addresses cap hardcoded in the toast text next to the constant that holds it | `src/PhotoPrint.UI/src/app/features/account/pages/saved-addresses/saved-addresses-page.ts:236` | backlog | |
+| PPW-807 | ⚪ | v1 | tech-stack.md's documented count of over-budget stylesheets does not match the recorded build | `memory-bank/standards/tech-stack.md:22` | backlog | |
+| PPW-808 | ⚪ | v1 | Dead account-page component reformatted instead of deleted | `src/PhotoPrint.UI/src/app/features/account/pages/account-page.ts:1` | backlog | |
+| PPW-809 | ⚪ | v1 | Large Prettier reformat lands with no format script or CI check to hold it | `src/PhotoPrint.UI/package.json:9` | backlog | |
 
 ## Details
 
@@ -72,6 +72,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (pins an existing uid or chowns the mount at start; changes no key scheme, concurrency model, resource budget or retry semantics, and adds no job, cache, retry, event, limiter, mapping layer or UI state machine).
 - **History:**
   - v1: found by 3-lens agreement (correctness, security, completeness-critic), accepted without a skeptic; adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — fixed at `7256cce`, `479de38`, `3dfa20c`
+  - v2: verification — held
 
 ### PPW-763 — realtime-order.spec.ts waits on a SignalR request pattern the hub connection never produces, so the only real-time spec always times out
 
@@ -84,6 +86,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (swaps one Playwright wait predicate for another inside a test file; adds no production mechanism).
 - **History:**
   - v1: found by 3-lens agreement (correctness, tests-coverage, completeness-critic), accepted without a skeptic; adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — fixed at `ecceaa2`, `d14b936`
+  - v2: verification — reopened (no-guard-ci-only)
 
 ### PPW-764 — E2E stack seeds an admin account whose password is a committed repo constant, usable on a first production deploy
 
@@ -97,6 +101,8 @@ updated: 2026-09-08
 - **History:**
   - v1: found by 1 lens (security); adversarial verdict `confirmed`, finder confidence 8/10
   - v1: Approach pre-check: revised — fix only `e2e/support/stack.ts` here (drop both literal defaults, require `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`, set them in `playwright-e2e.yml` and `docker-compose.e2e.yml`); the seeder half is a backend change owned by intent 033 unit 002 stories 003/004, must pass credentials into `ApplyAsync` rather than read config statically (`ProductCatalogFactory.cs:78` calls it with a DbContext only), must sit inside the `if (!await db.Users.AnyAsync(...))` at line 85 and not in options validation, and cannot be a Production-only throw because `docker-compose.yml:42` pins Development in CI.
+  - v1: fix round — fixed at `324c998`, `b1b363f`, `479de38`
+  - v2: verification — held
 
 ### PPW-765 — Only about half the services route through BaseApiService (auth/guest/money/upload bypass it) yet the criterion is ticked
 
@@ -109,6 +115,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (a doc-comment correction plus new HttpTestingController specs; no mechanism added or scheme changed).
 - **History:**
   - v1: found by 3-lens agreement (requirements, quality, completeness-critic), accepted without a skeptic; adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — fixed at `e6f4f42`
+  - v2: verification — held
 
 ### PPW-766 — retries: 1 in CI re-runs the non-idempotent realtime spec, which consumed the seed's only Paid order and can never pass on retry
 
@@ -122,6 +130,8 @@ updated: 2026-09-08
 - **History:**
   - v1: found by 2 lens (correctness, tests-coverage); adversarial verdict `confirmed`, finder confidence 7/10
   - v1: Approach pre-check: revised — keep `retries: 1` and drop the teardown and re-seed ideas outright (`OrderStatusMachine.cs:18-29` has no `Printing → Paid` edge, and `DevDataSeed.cs:34-38` makes a second `--seed-dev` a no-op that breaks the workflow's own grep). Instead pin the spec to the seeded order (`Order6Id` / `FT-2026-0006`) and assert its status so a consumed run fails with a readable message, switch `trace` to `'retain-on-failure'` (line 19's `on-first-retry` is what actually loses the diagnostic), and add a second Paid order to `DevDataSeed` so the retry has a fresh target; per-spec `test.describe.configure({ retries: 0 })` is supported but alone trades away the retry's genuine rescue of the spec's pre-PATCH half.
+  - v1: fix round — fixed at `546bc44`
+  - v2: verification — held
 
 ### PPW-767 — Guest checkout e2e stops at the review step — the Stripe-to-confirmation leg is descoped while the story criterion is ticked
 
@@ -134,6 +144,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (extends an e2e spec and corrects a ticked criterion; no production mechanism).
 - **History:**
   - v1: found by 2 lens (requirements, tests-coverage); adversarial verdict `confirmed`, finder confidence 9/10
+  - v1: fix round — fixed at `9b1c123`
+  - v2: verification — held
 
 ### PPW-768 — Locker-selector output bindings in delivery-step left uncovered after the extraction
 
@@ -146,6 +158,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (test-only: drives the existing DOM instead of calling handlers).
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — fixed at `7ace250`
+  - v2: verification — held
 
 ### PPW-769 — product-admin.service's 11 endpoints migrated to BaseApiService with zero tests
 
@@ -158,6 +172,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (test-only, one new spec file).
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 9/10
+  - v1: fix round — fixed at `5f4d434`
+  - v2: verification — held
 
 ### PPW-770 — admin.service downloadZip and getOrderPhotos migrated but left untested
 
@@ -170,6 +186,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (test-only).
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — fixed at `6a8070a`, `eb6336e`
+  - v2: verification — held
 
 ### PPW-771 — Playwright smoke-tests the dev bundle (npm start), never the production build
 
@@ -182,6 +200,7 @@ updated: 2026-09-08
   - Not trigger-list-shaped (adds a CI job and a Playwright project; no application mechanism, retry, cache or limiter).
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — deferred
 
 ### PPW-772 — Guest 401 in the error interceptor deletes the guest token and nothing re-issues it outside the upload page
 
@@ -195,6 +214,7 @@ updated: 2026-09-08
 - **History:**
   - v1: found by 1 lens (frontend-ux), topic hinted by the shared prompt; adversarial verdict `confirmed`, finder confidence 7/10
   - v1: Approach pre-check: refuted as suggested — the guest token *is* the `GuestSessions` row id (`GuestAuthenticationHandler.cs:34`), so re-issuing mints a new identity: `OrderService.cs:87-100` then throws "Coșul este gol.", the uploads and cart rows keyed to the dead session are unreachable, `GuestEmail` (`OrderService.cs:166-170`) comes back empty, and `FindKeyHolderAsync` (`OrderService.cs:350-368`) scopes payment idempotency by session id, so the 409-with-orderId redirect at `payment-step.ts:155` stops firing. Take the bounce-only fix in the testShape instead: route a token-less guest to `/tipareste` and tell them the session expired and the photos must be re-uploaded. No interceptor-driven session minting on the money path.
+  - v1: fix round — deferred
 
 ### PPW-773 — README's "real-money smoke paths" claim overstates what the three e2e specs cover
 
@@ -207,6 +227,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (documentation wording).
 - **History:**
   - v1: found by 1 lens (completeness-critic); adversarial verdict `plausible`, finder confidence 8/10
+  - v1: fix round — fixed at `b9ecd80`, `b1b363f`, `3dfa20c`
+  - v2: verification — held
 
 ### PPW-774 — New Stripe entries in docker-compose.yml silently override a developer's real keys from .env
 
@@ -219,6 +241,8 @@ updated: 2026-09-08
   - Not trigger-list-shaped (a Compose interpolation default such as `${Stripe__SecretKey:-sk_test_placeholder}`; changes no scheme or semantics in code).
 - **History:**
   - v1: found by 1 lens (completeness-critic); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — fixed at `8588c62`, `b1b363f`
+  - v2: verification — held
 
 ### PPW-775 — gitleaks allowlist misses the whsec_e2e_placeholder literal and is hand-synced with hooks/pre-commit
 
@@ -227,6 +251,7 @@ updated: 2026-09-08
 - **Suggested fix:** Add `whsec_e2e_placeholder` to the allowlist regexes and mirror the same entry into hooks/pre-commit, as the file header requires.
 - **History:**
   - v1: found by 3-lens agreement (correctness, quality, completeness-critic), accepted without a skeptic; adversarial verdict `confirmed`, finder confidence 4/10
+  - v1: fix round — backlog
 
 ### PPW-776 — anyComponentStyle budget (4kB warning / 16kB error) matches neither the story's 4kB error criterion nor current stylesheet sizes
 
@@ -235,6 +260,7 @@ updated: 2026-09-08
 - **Suggested fix:** Record the 4 kB→16 kB substitution on the ticked criterion (not only in the plan's deviation list) and file the promotion to maximumError as follow-up.
 - **History:**
   - v1: found by 2 lens (requirements, quality); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-777 — webServer command hardcodes port 4200 while the wait URL is configurable, so E2E_BASE_URL cannot actually be changed
 
@@ -243,6 +269,7 @@ updated: 2026-09-08
 - **Suggested fix:** Derive the port from baseURL (`new URL(baseURL).port`) and pass it to `npm start -- --port`, or drop the env override and document 4200 as fixed.
 - **History:**
   - v1: found by 2 lens (quality, tests-coverage); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-778 — Locker map popup interpolates locker name/address into raw HTML
 
@@ -251,6 +278,7 @@ updated: 2026-09-08
 - **Suggested fix:** Build the popup from DOM nodes with textContent (or escape the two fields) instead of a template string, before locker data stops being developer-controlled.
 - **History:**
   - v1: found by 1 lens (security); adversarial verdict `plausible`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-779 — bolt.md claims three consecutive green CI runs, contradicted by its own Runs table
 
@@ -259,6 +287,7 @@ updated: 2026-09-08
 - **Suggested fix:** Correct the claim to one green e2e run, or get two more green e2e runs before ticking; note that retries:1 masks flakes in the same line.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `confirmed`, finder confidence 9/10
+  - v1: fix round — backlog
 
 ### PPW-780 — Implementation walkthrough records inheritance plus a shared error path, but the code uses injection and has neither
 
@@ -267,6 +296,7 @@ updated: 2026-09-08
 - **Suggested fix:** Rewrite the structure overview, key decision and test-walkthrough line to say composition via inject(), with errors left to errorInterceptor by design.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `confirmed`, finder confidence 9/10
+  - v1: fix round — backlog
 
 ### PPW-781 — DEPLOYMENT.md file and workflow tables never mention the new e2e stack
 
@@ -275,6 +305,7 @@ updated: 2026-09-08
 - **Suggested fix:** Add rows for docker-compose.e2e.yml and playwright-e2e.yml (marked advisory, not a merge gate) to the tables at docs/DEPLOYMENT.md:73-81.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-782 — E2E_* variables documented in .env.example, which no e2e code reads
 
@@ -283,6 +314,7 @@ updated: 2026-09-08
 - **Suggested fix:** State in the .env.example comment that these must be exported in the shell, or load .env from playwright.config.ts.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-783 — playwright-e2e workflow has push and pull_request triggers but no concurrency group, doubling every PR run
 
@@ -291,6 +323,7 @@ updated: 2026-09-08
 - **Suggested fix:** Add a concurrency group keyed on github.ref with cancel-in-progress: true; consider dropping the push trigger where pull_request already covers the branch.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-784 — Descoped e2e remainder lives only in bolt docs with no tracked follow-up
 
@@ -299,6 +332,7 @@ updated: 2026-09-08
 - **Suggested fix:** Before merge, file the named remainders as stories or backlog rows so each descope has an owner outside the bolt walkthroughs.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `confirmed`, finder confidence 6/10
+  - v1: fix round — backlog
 
 ### PPW-785 — Profile page stylesheet copied verbatim into all three extracted child components, dead rules included
 
@@ -307,6 +341,7 @@ updated: 2026-09-08
 - **Suggested fix:** Extract one `styles/_account-forms.scss` partial (the pattern `styles/_auth-forms.scss` already sets) and `@use 'styles/variables'` instead of re-hardcoding #dc2626/#d1d5db/#16a34a.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `plausible`, finder confidence 9/10
+  - v1: fix round — backlog
 
 ### PPW-786 — Blob-to-file save logic duplicated between admin.service and a page, and the two copies disagree
 
@@ -315,6 +350,7 @@ updated: 2026-09-08
 - **Suggested fix:** Extract one `saveBlob(blob, filename)` helper in shared/utils (keeping the deferred revoke) and call it from both; a core service should not touch document.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-787 — reuseExistingServer outside CI silently tests whatever server is already on the port, e.g. another worktree's
 
@@ -323,6 +359,7 @@ updated: 2026-09-08
 - **Suggested fix:** Fail fast when port 4200 is already serving, or derive the port per worktree, so a reused server is an explicit opt-in.
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-788 — E2E workflow triggers leave the deploying commit as the one never smoke-tested
 
@@ -331,6 +368,7 @@ updated: 2026-09-08
 - **Suggested fix:** Run the workflow on main too (or on the merge queue), and make deploy.yml depend on it once it has proven stable.
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-789 — No repaint/change-detection test for the two extracted profile forms
 
@@ -339,6 +377,7 @@ updated: 2026-09-08
 - **Suggested fix:** Mirror address-form's form.events signal in both profile forms and add the same container-marks-touched repaint spec for each.
 - **History:**
   - v1: found by 1 lens (tests-coverage); adversarial verdict `confirmed`, finder confidence 6/10
+  - v1: fix round — backlog
 
 ### PPW-790 — product.service getCatalog() caches the result but not the in-flight request, so concurrent callers duplicate the call
 
@@ -347,6 +386,7 @@ updated: 2026-09-08
 - **Suggested fix:** Cache the observable: keep this.api.get(...).pipe(tap(...), shareReplay({bufferSize:1, refCount:false})) in a field, return it while in flight, and clear that field in clearCache() and on error.
 - **History:**
   - v1: found by 1 lens (frontend-ux); adversarial verdict `confirmed`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-791 — delivery-step shipping-cost subscriptions are never torn down and write shared checkout state after destroy
 
@@ -355,6 +395,7 @@ updated: 2026-09-08
 - **Suggested fix:** Pipe both getShippingCost calls through takeUntilDestroyed(this.destroyRef), as every other subscription in this component already does.
 - **History:**
   - v1: found by 1 lens (frontend-ux); adversarial verdict `confirmed`, finder confidence 6/10
+  - v1: fix round — backlog
 
 ### PPW-792 — HomePage.ngOnInit catalog subscription has no takeUntilDestroyed
 
@@ -363,6 +404,7 @@ updated: 2026-09-08
 - **Suggested fix:** Inject DestroyRef and pipe getCatalog() through takeUntilDestroyed, matching profile-page.ts and saved-addresses-page.ts.
 - **History:**
   - v1: found by 1 lens (frontend-ux); adversarial verdict `plausible`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-793 — Pricing teaser advertises hardcoded prices when the catalog call fails
 
@@ -371,6 +413,7 @@ updated: 2026-09-08
 - **Suggested fix:** Render a neutral "Prețuri indisponibile momentan" state instead of fixed numbers, or source the fallback from the same data the pricing page uses.
 - **History:**
   - v1: found by 1 lens (frontend-ux); adversarial verdict `confirmed`, finder confidence 6/10
+  - v1: fix round — backlog
 
 ### PPW-794 — Order ZIP download revokes the blob URL in the same tick as the click, risking a lost download
 
@@ -379,6 +422,7 @@ updated: 2026-09-08
 - **Suggested fix:** Hold the URL in a const and revoke it on a later task: setTimeout(() => URL.revokeObjectURL(url), 0).
 - **History:**
   - v1: found by 1 lens (frontend-ux); adversarial verdict `confirmed`, finder confidence 5/10
+  - v1: fix round — backlog
 
 ### PPW-795 — New guest e2e never asserts guestSession survival, the repo's most re-found defect class
 
@@ -387,6 +431,7 @@ updated: 2026-09-08
 - **Suggested fix:** Read localStorage.guestSession after upload and after each navigation and assert the token plus prior fields survive; add a login-after-guest merge spec.
 - **History:**
   - v1: found by 1 lens (completeness-critic), topic hinted by the shared prompt; adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-796 — README e2e run recipe is POSIX-only on a Windows-primary project
 
@@ -395,6 +440,7 @@ updated: 2026-09-08
 - **Suggested fix:** Add a PowerShell variant: gen-dev-keys.ps1, `$env:E2E_JWT_PRIVATE_KEY_PEM = Get-Content -Raw secrets/dev-jwt-private.pem`, and the compose invocation spelled out.
 - **History:**
   - v1: found by 1 lens (completeness-critic); adversarial verdict `confirmed`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-797 — Dead leftovers in profile-page after the component extraction (Router imported and injected but never used)
 
@@ -403,6 +449,7 @@ updated: 2026-09-08
 - **Suggested fix:** Delete the ReactiveFormsModule import, and the unused router injection together with its Router import.
 - **History:**
   - v1: found by 2 lens (quality, frontend-ux); adversarial verdict `unverified-cleanup`, finder confidence 9/10
+  - v1: fix round — backlog
 
 ### PPW-798 — Prettier-only reflows recorded in the walkthrough as component split wiring
 
@@ -411,6 +458,7 @@ updated: 2026-09-08
 - **Suggested fix:** Label those three files formatting-only, and keep whole-file formatting passes out of refactor commits so LOC evidence stays meaningful.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `unverified-cleanup`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-799 — BaseApiService dropped story 001's named payload and shipped one new option with no caller
 
@@ -419,6 +467,7 @@ updated: 2026-09-08
 - **Suggested fix:** Drop the unused headers option or give it a caller, and correct the justification in test-walkthrough.md so the two rulings stop contradicting each other.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `unverified-cleanup`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-800 — Fix-stage ruling dismissed the gitleaks sync note after checking the wrong hook
 
@@ -427,6 +476,7 @@ updated: 2026-09-08
 - **Suggested fix:** Correct the construction-log decision to name hooks/pre-commit as the secret guard, and keep the two allowlists in sync as the note asks.
 - **History:**
   - v1: found by 1 lens (requirements); adversarial verdict `unverified-cleanup`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-801 — Romanian mobile-phone regex copied into four files, with a fifth divergent rule
 
@@ -435,6 +485,7 @@ updated: 2026-09-08
 - **Suggested fix:** Export one ROMANIAN_MOBILE_PATTERN (or a phone validator) from shared/validators and import it in all four; state which one mirrors the server.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `unverified-cleanup`, finder confidence 9/10
+  - v1: fix round — backlog
 
 ### PPW-802 — Tier range label formatted a third time in HomePage instead of reusing the shared util
 
@@ -443,6 +494,7 @@ updated: 2026-09-08
 - **Suggested fix:** Add `tierRangeLabel(tier)` to shared/utils/pricing.utils.ts and call it from home-page and pricing-page.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `unverified-cleanup`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-803 — Third copy of the invalid-field helper, this one with a hand-rolled change-detection counter
 
@@ -451,6 +503,7 @@ updated: 2026-09-08
 - **Suggested fix:** Use one shared helper (or a small directive) for all three; drop the formEvents subscription — Angular's own form event bindings already mark the child view dirty.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `unverified-cleanup`, finder confidence 7/10
+  - v1: fix round — backlog
 
 ### PPW-804 — Address form wrapper and action buttons duplicated for the add and edit cases
 
@@ -459,6 +512,7 @@ updated: 2026-09-08
 - **Suggested fix:** Render one block with `(ngSubmit)="save()"` dispatching on editingId(), and a computed submit label; or move the wrapper + footer into AddressForm behind inputs.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `unverified-cleanup`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-805 — Identity map in admin.service over a response that already has the target shape
 
@@ -467,6 +521,7 @@ updated: 2026-09-08
 - **Suggested fix:** Call `this.api.get<AdminOrdersPage>(...)` and delete the pipe and the inline anonymous generic.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `unverified-cleanup`, finder confidence 9/10
+  - v1: fix round — backlog
 
 ### PPW-806 — Saved-addresses cap hardcoded in the toast text next to the constant that holds it
 
@@ -475,6 +530,7 @@ updated: 2026-09-08
 - **Suggested fix:** Interpolate MAX_ADDRESSES into the message, or show the server's ConflictException text.
 - **History:**
   - v1: found by 1 lens (quality); adversarial verdict `unverified-cleanup`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-807 — tech-stack.md's documented count of over-budget stylesheets does not match the recorded build
 
@@ -483,6 +539,7 @@ updated: 2026-09-08
 - **Suggested fix:** Re-read the production build log, correct the count, and name the files so the reduction target has a checkable baseline.
 - **History:**
   - v1: found by 1 lens (completeness-critic); adversarial verdict `unverified-cleanup`, finder confidence 6/10
+  - v1: fix round — backlog
 
 ### PPW-808 — Dead account-page component reformatted instead of deleted
 
@@ -491,6 +548,7 @@ updated: 2026-09-08
 - **Suggested fix:** Delete account-page.ts (and its spec, if any) after confirming no route or template references app-account-page.
 - **History:**
   - v1: found by 1 lens (completeness-critic); adversarial verdict `unverified-cleanup`, finder confidence 8/10
+  - v1: fix round — backlog
 
 ### PPW-809 — Large Prettier reformat lands with no format script or CI check to hold it
 
@@ -499,3 +557,4 @@ updated: 2026-09-08
 - **Suggested fix:** Add `"format:check": "prettier --check ."` plus a ci.yml step, and re-read the reformatted pages with `git diff --ignore-all-space` before sign-off.
 - **History:**
   - v1: found by 1 lens (completeness-critic); adversarial verdict `unverified-cleanup`, finder confidence 7/10
+  - v1: fix round — backlog

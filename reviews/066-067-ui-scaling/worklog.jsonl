@@ -46,3 +46,28 @@
 {"t":"2026-09-08T15:28:36+03:00","ev":"finding","id":"PPW-771","status":"deferred","note":"parked: needs a second Playwright project over the production bundle plus a CI job to build it — follow-up bolt, no code this round"}
 {"t":"2026-09-08T15:28:36+03:00","ev":"finding","id":"PPW-772","status":"deferred","note":"parked: the suggested self-heal is refuted (the guest token IS the GuestSessions row id); an honest server-side re-issue sits outside this diff"}
 {"t":"2026-09-08T15:30:12+03:00","ev":"pass-launch","pass":2,"type":"verification"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-762","verdict":"held","commit":"7256cce, 479de38, 3dfa20c"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-763","verdict":"test-only","commit":"ecceaa2, d14b936"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-764","verdict":"green-failed","commit":"324c998, b1b363f, 479de38"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-765","verdict":"no-test","commit":"e6f4f42"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-766","verdict":"green-failed","commit":"546bc44"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-767","verdict":"no-test","commit":"9b1c123"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-768","verdict":"test-only","commit":"7ace250"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-769","verdict":"test-only","commit":"5f4d434"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-770","verdict":"test-only","commit":"6a8070a, eb6336e"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-773","verdict":"no-test","commit":"b9ecd80, b1b363f, 3dfa20c"}
+{"t":"2026-09-08T15:32:25+03:00","ev":"verify-result","id":"PPW-774","verdict":"held","commit":"8588c62, b1b363f"}
+{"t":"2026-09-08T15:36:08+03:00","ev":"test-run","kind":"revert-and-rerun","passed":null,"failed":null,"duration_s":13.575,"include":"{delivery-step,admin.service,product-admin.service}","note":"unparsed runner output"}
+{"t":"2026-09-08T15:36:59+03:00","ev":"test-run","kind":"revert-and-rerun","passed":51,"failed":4,"duration_s":24.554,"include":"{delivery-step,admin.service,product-admin.service}"}
+{"t":"2026-09-08T15:37:51+03:00","ev":"test-run","kind":"green","passed":55,"failed":0,"duration_s":24.29,"include":"{delivery-step,admin.service,product-admin.service}"}
+{"t":"2026-09-08T15:38:20+03:00","ev":"verify-result","id":"PPW-764","verdict":"held","commit":"324c998, b1b363f, 479de38"}
+{"t":"2026-09-08T15:38:21+03:00","ev":"verify-result","id":"PPW-766","verdict":"held","commit":"546bc44"}
+{"t":"2026-09-08T15:38:21+03:00","ev":"verify-result","id":"PPW-765","verdict":"held","commit":"e6f4f42"}
+{"t":"2026-09-08T15:38:21+03:00","ev":"verify-result","id":"PPW-767","verdict":"held","commit":"9b1c123"}
+{"t":"2026-09-08T15:38:22+03:00","ev":"verify-result","id":"PPW-773","verdict":"held","commit":"b9ecd80, b1b363f, 3dfa20c"}
+{"t":"2026-09-08T15:38:22+03:00","ev":"verify-result","id":"PPW-768","verdict":"held","commit":"7ace250"}
+{"t":"2026-09-08T15:38:22+03:00","ev":"verify-result","id":"PPW-769","verdict":"held","commit":"5f4d434"}
+{"t":"2026-09-08T15:38:23+03:00","ev":"verify-result","id":"PPW-770","verdict":"held","commit":"6a8070a, eb6336e"}
+{"t":"2026-09-08T15:38:23+03:00","ev":"verify-result","id":"PPW-763","verdict":"no-guard-ci-only","commit":"ecceaa2, d14b936"}
+{"t":"2026-09-08T15:38:23+03:00","ev":"note","reason":"verification v2 hand verdicts: PPW-764/766 held — their dotnet guards (E2eCredentialsTests, RealtimeE2eSeedTests) went red on revert and green on restore; the script's green-failed came from an empty Vitest scope (admin-login/realtime-order live only in e2e/, and the Angular builder includes src only). PPW-765/767/773 held as doc judgment items, cited files re-read. PPW-768/769/770 held by evidence audit: the resolution's own levers re-applied by the verifier reddened exactly the 4 predicted tests by name, 55/55 green after restore. PPW-763 reopened: no regression guard exists for the dual-signal wait and a Playwright assertion cannot execute here (no Docker)."}
+{"t":"2026-09-08T15:38:29+03:00","ev":"pass-records-done","pass":2}
