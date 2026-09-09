@@ -1,0 +1,29 @@
+<section class="card card--danger">
+  <h2 class="card__title card__title--danger">Ștergere cont</h2>
+  @if (deletionRequested()) {
+    <p class="danger-notice">
+      Cererea ta de ștergere a contului a fost înregistrată. Contul va fi șters în termen de 30 de
+      zile.
+    </p>
+  } @else {
+    <p class="danger-notice">
+      Dacă ștergi contul, toate datele tale vor fi eliminate definitiv după 30 de zile. Comenzile în
+      curs nu vor fi afectate.
+    </p>
+    @if (!showDeleteConfirm()) {
+      <button class="btn btn--danger" (click)="showDeleteConfirm.set(true)">
+        Solicită ștergerea contului
+      </button>
+    } @else {
+      <p class="danger-confirm-text">
+        Ești sigur că vrei să soliciți ștergerea contului? Această acțiune nu poate fi anulată.
+      </p>
+      <div class="btn-group">
+        <button class="btn btn--danger" [disabled]="saving()" (click)="confirmed.emit()">
+          {{ saving() ? 'Se procesează...' : 'Confirm ștergerea' }}
+        </button>
+        <button class="btn btn--ghost" (click)="showDeleteConfirm.set(false)">Anulează</button>
+      </div>
+    }
+  }
+</section>

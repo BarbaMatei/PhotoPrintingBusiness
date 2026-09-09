@@ -47,6 +47,10 @@ services:
       Email__Smtp__Port: "1025"
       Email__Smtp__UseSsl: "false"
       Cors__AllowedOrigins: http://localhost:4200
+      # An empty key makes the Stripe client throw where it is constructed, so dev needs a
+      # placeholder — but `environment:` outranks `env_file:`, so a real key in .env must win.
+      Stripe__SecretKey: ${Stripe__SecretKey:-sk_test_placeholder}
+      Stripe__WebhookSecret: ${Stripe__WebhookSecret:-whsec_placeholder}
     ports:
       - "8080:8080"
     volumes:

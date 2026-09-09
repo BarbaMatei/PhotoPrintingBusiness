@@ -1,0 +1,22 @@
+<div class="address-card__header">
+  <span class="address-label">{{ address().label }}</span>
+  @if (address().isDefault) {
+    <span class="badge-default">Implicită</span>
+  }
+</div>
+<div class="address-card__body">
+  <p>{{ address().fullName }}</p>
+  <p>{{ address().phone }}</p>
+  <p>{{ address().addressLine }}</p>
+  <p>{{ address().city }}, {{ address().county }}, {{ address().postalCode }}</p>
+</div>
+<div class="address-card__actions">
+  <button class="btn btn--sm btn--ghost" (click)="edit.emit(address())">Editează</button>
+  <button
+    class="btn btn--sm btn--danger-ghost"
+    [disabled]="deleting()"
+    (click)="remove.emit(address().id)"
+  >
+    {{ deleting() ? 'Se șterge...' : 'Șterge' }}
+  </button>
+</div>

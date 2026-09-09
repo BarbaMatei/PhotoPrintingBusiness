@@ -2,11 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { OrderService } from './order.service';
+import { OrderPhotosDto } from '../models/order.model';
 import { environment } from '../../../environments/environment';
 
 describe('OrderService', () => {
   let service: OrderService;
   let http: HttpTestingController;
+  const API = 'http://localhost:5052/api';
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -17,6 +19,10 @@ describe('OrderService', () => {
   });
 
   afterEach(() => http.verify());
+
+  it('is written against the dev API root environment.ts pins', () => {
+    expect(environment.apiUrl).toBe(API);
+  });
 
   describe('getOrders', () => {
     it('calls GET /api/orders with page and pageSize params', () => {
@@ -55,11 +61,33 @@ describe('OrderService', () => {
       let result: unknown;
       service.getOrderDetail('order-123').subscribe(r => (result = r));
 
-      const req = http.expectOne(`${environment.apiUrl}/orders/order-123`);
+      const req = http.expectOne(`${API}/orders/order-123`);
       expect(req.request.method).toBe('GET');
       req.flush({ id: 'order-123', orderNumber: 'FT-001', status: 'Paid' });
 
       expect((result as { id: string }).id).toBe('order-123');
+    });
+  });
+
+  describe('getOrderPhotos', () => {
+    it('calls GET /api/orders/:id/photos and passes the presigned urls through', () => {
+      let result: OrderPhotosDto | undefined;
+      service.getOrderPhotos('order-123').subscribe(r => (result = r));
+
+      const req = http.expectOne(`${API}/orders/order-123/photos`);
+      expect(req.request.method).toBe('GET');
+      req.flush({
+        photos: [
+          {
+            uploadId: 'u1',
+            fileName: 'poza.jpg',
+            thumbnailUrl: 'https://s3/thumb.jpg?sig=abc',
+            largeUrl: 'https://s3/large.jpg?sig=abc',
+          },
+        ],
+      });
+
+      expect(result!.photos[0].largeUrl).toBe('https://s3/large.jpg?sig=abc');
     });
   });
 });

@@ -1,0 +1,57 @@
+<section class="card">
+  <h2 class="card__title">Date personale</h2>
+  <form [formGroup]="form()" (ngSubmit)="submitted.emit()" novalidate>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="firstName">Prenume</label>
+        <input
+          id="firstName"
+          type="text"
+          formControlName="firstName"
+          class="form-control"
+          [class.is-invalid]="isInvalid('firstName')"
+        />
+        @if (isInvalid('firstName')) {
+          <span class="field-error">Prenumele este obligatoriu.</span>
+        }
+      </div>
+      <div class="form-group">
+        <label for="lastName">Nume de familie</label>
+        <input
+          id="lastName"
+          type="text"
+          formControlName="lastName"
+          class="form-control"
+          [class.is-invalid]="isInvalid('lastName')"
+        />
+        @if (isInvalid('lastName')) {
+          <span class="field-error">Numele este obligatoriu.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input id="email" type="email" [value]="email()" class="form-control" disabled />
+    </div>
+
+    <div class="form-group">
+      <label for="phone">Telefon (opțional)</label>
+      <input
+        id="phone"
+        type="tel"
+        formControlName="phone"
+        class="form-control"
+        [class.is-invalid]="isInvalid('phone')"
+        placeholder="07XXXXXXXX"
+      />
+      @if (isInvalid('phone')) {
+        <span class="field-error">Introdu un număr de mobil valid (07XXXXXXXX).</span>
+      }
+    </div>
+
+    <button type="submit" class="btn btn--primary" [disabled]="saving()">
+      {{ saving() ? 'Se salvează...' : 'Salvează modificările' }}
+    </button>
+  </form>
+</section>

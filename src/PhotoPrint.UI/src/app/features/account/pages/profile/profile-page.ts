@@ -16,13 +16,15 @@ import { ToastService } from '../../../../shared/services/toast.service';
 import { passwordStrengthValidator } from '../../../../shared/validators/password-strength.validator';
 import { AccountDto } from '../../../../core/models/account.model';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { PasswordChecklistComponent } from '../../../../shared/components/password-checklist/password-checklist.component';
+import { PersonalInfoForm } from './components/personal-info-form/personal-info-form';
+import { PasswordChangeForm } from './components/password-change-form/password-change-form';
+import { AccountDeletionCard } from './components/account-deletion-card/account-deletion-card';
 
 @Component({
   selector: 'app-profile-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, SpinnerComponent, PasswordChecklistComponent],
+  imports: [SpinnerComponent, PersonalInfoForm, PasswordChangeForm, AccountDeletionCard],
   template: `
     <div class="profile-page">
       <h1 class="page-title">Profilul meu</h1>
@@ -32,289 +34,43 @@ import { PasswordChecklistComponent } from '../../../../shared/components/passwo
       }
 
       @if (!loading() && account()) {
-        <!-- Profile form -->
-        <section class="card">
-          <h2 class="card__title">Date personale</h2>
-          <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" novalidate>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="firstName">Prenume</label>
-                <input
-                  id="firstName"
-                  type="text"
-                  formControlName="firstName"
-                  class="form-control"
-                  [class.is-invalid]="isInvalid('profileForm', 'firstName')"
-                />
-                @if (isInvalid('profileForm', 'firstName')) {
-                  <span class="field-error">Prenumele este obligatoriu.</span>
-                }
-              </div>
-              <div class="form-group">
-                <label for="lastName">Nume de familie</label>
-                <input
-                  id="lastName"
-                  type="text"
-                  formControlName="lastName"
-                  class="form-control"
-                  [class.is-invalid]="isInvalid('profileForm', 'lastName')"
-                />
-                @if (isInvalid('profileForm', 'lastName')) {
-                  <span class="field-error">Numele este obligatoriu.</span>
-                }
-              </div>
-            </div>
+        <app-personal-info-form
+          [form]="profileForm"
+          [email]="account()!.email"
+          [saving]="profileSaving()"
+          (submitted)="saveProfile()"
+        />
 
-            <div class="form-group">
-              <label for="email">Email</label>
-              <input id="email" type="email" [value]="account()!.email" class="form-control" disabled />
-            </div>
-
-            <div class="form-group">
-              <label for="phone">Telefon (opțional)</label>
-              <input
-                id="phone"
-                type="tel"
-                formControlName="phone"
-                class="form-control"
-                [class.is-invalid]="isInvalid('profileForm', 'phone')"
-                placeholder="07XXXXXXXX"
-              />
-              @if (isInvalid('profileForm', 'phone')) {
-                <span class="field-error">Introdu un număr de mobil valid (07XXXXXXXX).</span>
-              }
-            </div>
-
-            <button
-              type="submit"
-              class="btn btn--primary"
-              [disabled]="profileSaving()"
-            >
-              {{ profileSaving() ? 'Se salvează...' : 'Salvează modificările' }}
-            </button>
-          </form>
-        </section>
-
-        <!-- Change password -->
         @if (account()!.hasPassword) {
-          <section class="card">
-            <h2 class="card__title">Schimbă parola</h2>
-            <form [formGroup]="passwordForm" (ngSubmit)="changePassword()" novalidate>
-              <div class="form-group">
-                <label for="currentPassword">Parola actuală</label>
-                <input
-                  id="currentPassword"
-                  type="password"
-                  formControlName="currentPassword"
-                  class="form-control"
-                  [class.is-invalid]="isInvalid('passwordForm', 'currentPassword')"
-                />
-                @if (isInvalid('passwordForm', 'currentPassword')) {
-                  <span class="field-error">Parola actuală este obligatorie.</span>
-                }
-              </div>
-
-              <div class="form-group">
-                <label for="newPassword">Parola nouă</label>
-                <input
-                  id="newPassword"
-                  type="password"
-                  formControlName="newPassword"
-                  class="form-control"
-                  [class.is-invalid]="isInvalid('passwordForm', 'newPassword')"
-                />
-                @if (isInvalid('passwordForm', 'newPassword')) {
-                  <span class="field-error">Parola nouă este obligatorie.</span>
-                }
-                <app-password-checklist [password]="passwordForm.get('newPassword')?.value ?? ''" />
-              </div>
-
-              <div class="form-group">
-                <label for="confirmNewPassword">Confirmă parola nouă</label>
-                <input
-                  id="confirmNewPassword"
-                  type="password"
-                  formControlName="confirmNewPassword"
-                  class="form-control"
-                  [class.is-invalid]="isInvalid('passwordForm', 'confirmNewPassword') || passwordForm.errors?.['mismatch']"
-                />
-                @if (passwordForm.errors?.['mismatch'] && passwordForm.get('confirmNewPassword')?.touched) {
-                  <span class="field-error">Parolele nu coincid.</span>
-                }
-              </div>
-
-              @if (passwordError()) {
-                <p class="form-error">{{ passwordError() }}</p>
-              }
-
-              <button
-                type="submit"
-                class="btn btn--primary"
-                [disabled]="passwordSaving()"
-              >
-                {{ passwordSaving() ? 'Se salvează...' : 'Schimbă parola' }}
-              </button>
-            </form>
-          </section>
+          <app-password-change-form
+            [form]="passwordForm"
+            [saving]="passwordSaving()"
+            [errorMessage]="passwordError()"
+            (submitted)="changePassword()"
+          />
         }
 
-        <!-- Delete account -->
-        <section class="card card--danger">
-          <h2 class="card__title card__title--danger">Ștergere cont</h2>
-          @if (account()!.deletionRequested) {
-            <p class="danger-notice">
-              Cererea ta de ștergere a contului a fost înregistrată. Contul va fi șters în termen de 30 de zile.
-            </p>
-          } @else {
-            <p class="danger-notice">
-              Dacă ștergi contul, toate datele tale vor fi eliminate definitiv după 30 de zile.
-              Comenzile în curs nu vor fi afectate.
-            </p>
-            @if (!showDeleteConfirm()) {
-              <button class="btn btn--danger" (click)="showDeleteConfirm.set(true)">
-                Solicită ștergerea contului
-              </button>
-            } @else {
-              <p class="danger-confirm-text">
-                Ești sigur că vrei să soliciți ștergerea contului? Această acțiune nu poate fi anulată.
-              </p>
-              <div class="btn-group">
-                <button
-                  class="btn btn--danger"
-                  [disabled]="deletionSaving()"
-                  (click)="requestDeletion()"
-                >
-                  {{ deletionSaving() ? 'Se procesează...' : 'Confirm ștergerea' }}
-                </button>
-                <button class="btn btn--ghost" (click)="showDeleteConfirm.set(false)">Anulează</button>
-              </div>
-            }
-          }
-        </section>
+        <app-account-deletion-card
+          [deletionRequested]="account()!.deletionRequested"
+          [saving]="deletionSaving()"
+          (confirmed)="requestDeletion()"
+        />
       }
     </div>
   `,
-  styles: [`
-    .profile-page {
-      padding-bottom: 3rem;
-    }
-
-    .page-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 1.5rem;
-    }
-
-    // .state-loading removed — replaced by <app-spinner>
-
-    .card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1.5rem;
-
-      &--danger {
-        border-color: #fca5a5;
-        background: #fff5f5;
-      }
-    }
-
-    .card__title {
-      font-size: 1.0625rem;
-      font-weight: 600;
-      margin-bottom: 1.25rem;
-      color: #111827;
-
-      &--danger {
-        color: #dc2626;
-      }
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-
-      @media (max-width: 480px) {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.375rem;
-      margin-bottom: 1rem;
-
-      label {
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #374151;
-      }
-    }
-
-    .form-control {
-      padding: 0.5rem 0.75rem;
-      border: 1px solid #d1d5db;
-      border-radius: 8px;
-      font-size: 0.9375rem;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-
-      &:focus {
-        border-color: #16a34a;
-        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+  styles: [
+    `
+      .profile-page {
+        padding-bottom: 3rem;
       }
 
-      &.is-invalid {
-        border-color: #dc2626;
+      .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
       }
-
-      &:disabled {
-        background: #f9fafb;
-        color: #6b7280;
-        cursor: not-allowed;
-      }
-    }
-
-    .field-error {
-      font-size: 0.8125rem;
-      color: #dc2626;
-    }
-
-    .field-error-list {
-      font-size: 0.8125rem;
-      color: #dc2626;
-      margin: 0.25rem 0 0 1rem;
-      padding: 0;
-    }
-
-    .form-error {
-      font-size: 0.875rem;
-      color: #dc2626;
-      margin-bottom: 0.75rem;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-
-    .danger-notice {
-      font-size: 0.9375rem;
-      color: #374151;
-      margin-bottom: 1rem;
-    }
-
-    .danger-confirm-text {
-      font-size: 0.9375rem;
-      color: #dc2626;
-      font-weight: 500;
-      margin-bottom: 1rem;
-    }
-  `],
+    `,
+  ],
 })
 export class ProfilePage implements OnInit {
   private readonly account$ = inject(AccountService);
@@ -328,17 +84,13 @@ export class ProfilePage implements OnInit {
   readonly profileSaving = signal(false);
   readonly passwordSaving = signal(false);
   readonly deletionSaving = signal(false);
-  readonly showDeleteConfirm = signal(false);
   readonly account = signal<AccountDto | null>(null);
   readonly passwordError = signal<string | null>(null);
 
   readonly profileForm = this.fb.group({
     firstName: ['', [Validators.required, Validators.maxLength(100)]],
     lastName: ['', [Validators.required, Validators.maxLength(100)]],
-    phone: [
-      '',
-      [Validators.pattern(/^07[0-9]{8}$/)],
-    ],
+    phone: ['', [Validators.pattern(/^07[0-9]{8}$/)]],
   });
 
   readonly passwordForm = this.fb.group(
@@ -355,7 +107,7 @@ export class ProfilePage implements OnInit {
           return pw !== cpw ? { mismatch: true } : null;
         },
       ],
-    }
+    },
   );
 
   ngOnInit(): void {
@@ -379,13 +131,6 @@ export class ProfilePage implements OnInit {
           this.cdr.markForCheck();
         },
       });
-  }
-
-  isInvalid(form: 'profileForm' | 'passwordForm', field: string): boolean {
-    const ctrl = form === 'profileForm'
-      ? this.profileForm.get(field)
-      : this.passwordForm.get(field);
-    return !!(ctrl?.invalid && ctrl.touched);
   }
 
   saveProfile(): void {
@@ -457,7 +202,6 @@ export class ProfilePage implements OnInit {
       .subscribe({
         next: () => {
           this.deletionSaving.set(false);
-          this.showDeleteConfirm.set(false);
           const current = this.account();
           if (current) this.account.set({ ...current, deletionRequested: true });
           this.toast.show('Cererea de ștergere a contului a fost înregistrată.', 'info');

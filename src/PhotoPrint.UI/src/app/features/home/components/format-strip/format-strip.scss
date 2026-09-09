@@ -1,0 +1,46 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+:host {
+  display: block;
+}
+
+.format-strip {
+  width: 100%;
+  overflow: hidden;
+  border-top: 1px solid $color-neutral-300;
+  border-bottom: 1px solid $color-neutral-300;
+  background: $color-bg-soft;
+  padding: $space-3 0;
+}
+
+.format-strip__track {
+  display: flex;
+  align-items: center;
+  gap: $space-4;
+  animation: marquee 24s linear infinite;
+  width: max-content;
+}
+
+.format-strip__item {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semi;
+  color: $color-neutral-500;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.format-strip__sep {
+  color: $color-accent;
+  font-weight: $font-weight-bold;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

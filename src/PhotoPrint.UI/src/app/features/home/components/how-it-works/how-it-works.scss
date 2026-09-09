@@ -1,0 +1,96 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+:host {
+  display: block;
+}
+
+.steps__header {
+  text-align: center;
+  margin-bottom: $space-12;
+}
+
+.steps__title {
+  @include section-title;
+}
+
+.steps__sub {
+  font-size: $font-size-base;
+  color: $color-neutral-500;
+  margin: $space-2 auto 0;
+  max-width: 400px;
+  line-height: $line-height-relaxed;
+}
+
+.steps__grid {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  max-width: 900px;
+  margin: 0 auto;
+
+  @media (max-width: #{$breakpoint-md}) {
+    flex-direction: column;
+    align-items: center;
+    gap: $space-8;
+  }
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  max-width: 260px;
+  padding: $space-6;
+}
+
+.step__connector {
+  flex-shrink: 0;
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, $color-primary-light, $color-accent-light);
+  margin-top: 40px;
+  border-radius: $radius-full;
+
+  @media (max-width: #{$breakpoint-md}) {
+    width: 2px;
+    height: 40px;
+    margin: 0;
+    background: linear-gradient(180deg, $color-primary-light, $color-accent-light);
+  }
+}
+
+.step__num {
+  font-family: $font-family-display;
+  font-size: $font-size-4xl;
+  font-weight: 700;
+  color: $color-neutral-300;
+  line-height: 1;
+  margin-bottom: $space-3;
+}
+
+.step__icon-wrap {
+  margin-bottom: $space-4;
+}
+
+.step__icon {
+  width: 56px;
+  height: 56px;
+}
+
+.step__name {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: $color-neutral-900;
+  margin: 0 0 $space-2;
+}
+
+.step__desc {
+  font-size: $font-size-sm;
+  color: $color-neutral-500;
+  line-height: $line-height-relaxed;
+  margin: 0;
+}

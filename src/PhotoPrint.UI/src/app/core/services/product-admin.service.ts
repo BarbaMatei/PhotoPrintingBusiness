@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { BaseApiService } from './api/base-api.service';
 import { Product, ProductSize } from '../models/product.model';
 
 export interface CreateProductRequest {
@@ -37,46 +36,46 @@ export interface CreatePricingTierRequest {
 
 @Injectable({ providedIn: 'root' })
 export class ProductAdminService {
-  private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/admin/products`;
+  private readonly api = inject(BaseApiService);
+  private readonly base = '/admin/products';
 
   getAdminProducts(): Observable<Product[]> {
-    return this.http.get<Product[]>(this.base);
+    return this.api.get<Product[]>(this.base);
   }
 
   createProduct(request: CreateProductRequest): Observable<Product> {
-    return this.http.post<Product>(this.base, request);
+    return this.api.post<Product>(this.base, request);
   }
 
   updateProduct(id: string, request: UpdateProductRequest): Observable<Product> {
-    return this.http.put<Product>(`${this.base}/${id}`, request);
+    return this.api.put<Product>(`${this.base}/${id}`, request);
   }
 
   setProductStatus(id: string, isActive: boolean): Observable<{ id: string; isActive: boolean }> {
-    return this.http.patch<{ id: string; isActive: boolean }>(`${this.base}/${id}/status`, { isActive });
+    return this.api.patch<{ id: string; isActive: boolean }>(`${this.base}/${id}/status`, { isActive });
   }
 
   deleteProduct(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
+    return this.api.delete<void>(`${this.base}/${id}`);
   }
 
   addSize(productId: string, request: CreateProductSizeRequest): Observable<ProductSize> {
-    return this.http.post<ProductSize>(`${this.base}/${productId}/sizes`, request);
+    return this.api.post<ProductSize>(`${this.base}/${productId}/sizes`, request);
   }
 
   setSizeStatus(productId: string, sizeId: string, isActive: boolean): Observable<{ id: string; isActive: boolean }> {
-    return this.http.patch<{ id: string; isActive: boolean }>(
+    return this.api.patch<{ id: string; isActive: boolean }>(
       `${this.base}/${productId}/sizes/${sizeId}/status`, { isActive },
     );
   }
 
   replacePricingTiers(productId: string, sizeId: string, request: ReplacePricingTiersRequest): Observable<ProductSize> {
-    return this.http.put<ProductSize>(
+    return this.api.put<ProductSize>(
       `${this.base}/${productId}/sizes/${sizeId}/pricing`, request,
     );
   }
 
   replaceFinishes(productId: string, names: string[]): Observable<void> {
-    return this.http.put<void>(`${this.base}/${productId}/finishes`, { names });
+    return this.api.put<void>(`${this.base}/${productId}/finishes`, { names });
   }
 }

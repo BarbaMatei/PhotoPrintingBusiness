@@ -103,9 +103,7 @@ describe('SavedAddressesPage', () => {
   });
 
   it('saveNew shows 409 warning when limit reached', () => {
-    accountSvc.addAddress.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 409 }))
-    );
+    accountSvc.addAddress.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409 })));
     component.openAddForm();
     component.addressForm.patchValue(MOCK_REQUEST);
     component.saveNew();
@@ -116,7 +114,10 @@ describe('SavedAddressesPage', () => {
     component.openEditForm(MOCK_ADDRESS);
     component.addressForm.patchValue({ label: 'Birou' });
     component.saveEdit('addr-1');
-    expect(accountSvc.updateAddress).toHaveBeenCalledWith('addr-1', expect.objectContaining({ label: 'Birou' }));
+    expect(accountSvc.updateAddress).toHaveBeenCalledWith(
+      'addr-1',
+      expect.objectContaining({ label: 'Birou' }),
+    );
     expect(component.addresses()[0].label).toBe('Birou');
   });
 
@@ -128,7 +129,7 @@ describe('SavedAddressesPage', () => {
 
   it('deleteAddress shows error toast on failure', () => {
     accountSvc.deleteAddress.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 }))
+      throwError(() => new HttpErrorResponse({ status: 500 })),
     );
     component.deleteAddress('addr-1');
     expect(toast.show).toHaveBeenCalledWith('Eroare la ștergerea adresei.', 'error');
@@ -138,9 +139,87 @@ describe('SavedAddressesPage', () => {
     // Simulate an error being shown after init loads (toast already called in beforeEach
     // because the first fixture's getAddresses returned ok; test the error path via deleteAddress)
     accountSvc.deleteAddress.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 }))
+      throwError(() => new HttpErrorResponse({ status: 500 })),
     );
     component.deleteAddress('addr-1');
     expect(toast.show).toHaveBeenCalledWith('Eroare la ștergerea adresei.', 'error');
+  });
+  describe('rendering', () => {
+    const el = () => fixture.nativeElement as HTMLElement;
+
+    it('renders one card per saved address, with its details', () => {
+      expect(el().querySelectorAll('app-address-list-item')).toHaveLength(1);
+      expect(el().querySelector('.address-label')?.textContent).toContain('Acasă');
+      expect(el().querySelector('.address-card__body')?.textContent).toContain('Cluj-Napoca');
+      expect(el().querySelector('.badge-default')).toBeTruthy();
+    });
+
+    it('swaps the card for the edit form, with the address already in the fields', () => {
+      (el().querySelector('.address-card__actions button') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(el().querySelector('app-address-list-item')).toBeNull();
+      const label = el().querySelector('input[formControlName="label"]') as HTMLInputElement;
+      expect(label, 'câmpurile din componenta copil nu s-au randat').toBeTruthy();
+      expect(label.value).toBe('Acasă');
+      expect(component.editingId()).toBe('addr-1');
+    });
+
+    it('renders the new-address form when the page asks for one', () => {
+      component.openAddForm();
+      fixture.detectChanges();
+
+      expect(el().querySelectorAll('app-address-form')).toHaveLength(1);
+      expect(el().querySelectorAll('.form-group').length).toBeGreaterThan(5);
+      expect((el().querySelector('input[formControlName="label"]') as HTMLInputElement).value).toBe(
+        '',
+      );
+    });
+
+    it('shows a field error once the user leaves a required field empty', () => {
+      component.openAddForm();
+      fixture.detectChanges();
+
+      const label = el().querySelector('input[formControlName="label"]') as HTMLInputElement;
+      label.dispatchEvent(new Event('blur'));
+      component.addressForm.get('label')!.markAsTouched();
+      fixture.detectChanges();
+
+      expect(el().textContent).toContain('Eticheta este obligatorie.');
+    });
+
+    it('repaints the child form when the container alone marks a field touched', () => {
+      component.openAddForm();
+      fixture.detectChanges();
+      expect(el().textContent).not.toContain('Eticheta este obligatorie.');
+
+      component.addressForm.get('label')!.markAsTouched();
+      fixture.detectChanges();
+
+      expect(el().textContent).toContain('Eticheta este obligatorie.');
+    });
+
+    it('clears the field errors when the form is cancelled and reopened', () => {
+      component.openAddForm();
+      component.addressForm.get('label')!.markAsTouched();
+      fixture.detectChanges();
+      expect(el().textContent).toContain('Eticheta este obligatorie.');
+
+      component.cancelForm();
+      component.openAddForm();
+      fixture.detectChanges();
+
+      expect(el().textContent).not.toContain('Eticheta este obligatorie.');
+    });
+
+    it('marks the delete button as busy while the delete is in flight', () => {
+      component.deletingId.set('addr-1');
+      fixture.detectChanges();
+
+      const buttons = Array.from(el().querySelectorAll('.address-card__actions button'));
+      const remove = buttons[1] as HTMLButtonElement;
+      expect(remove.disabled).toBe(true);
+      expect(remove.textContent).toContain('Se șterge...');
+    });
   });
 });

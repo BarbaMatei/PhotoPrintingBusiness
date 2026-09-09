@@ -151,6 +151,46 @@ describe('DeliveryStep', () => {
     expect(fixture.componentInstance.lockers().length).toBe(1);
   });
 
+  it('clicking a rendered locker selects it in the page', () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture, [locker('l1', 'Box Cluj')]);
+    fixture.detectChanges();
+    const comp = fixture.componentInstance;
+    expect(comp.selectedLockerId()).toBeNull();
+
+    const item = fixture.debugElement.query(By.css('.locker-item'));
+    expect(item).not.toBeNull();
+    item.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(comp.selectedLockerId()).toBe('l1');
+    expect(TestBed.inject(CheckoutStateService).snapshot.lockerName).toBe('Box Cluj');
+  });
+
+  it('clicking the retry link after a failed search asks for the same city again', async () => {
+    const fixture = createFixture();
+    flushCosts();
+    selectEasybox(fixture);
+    const comp = fixture.componentInstance;
+
+    comp.citySearch.setValue('Clu');
+    await new Promise(r => setTimeout(r, 350));
+    http
+      .expectOne(`${BASE}/lockers?city=Clu`)
+      .flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    const retry = fixture.debugElement.query(By.css('.retry-link'));
+    expect(retry).not.toBeNull();
+    retry.nativeElement.click();
+    fixture.detectChanges();
+
+    http.expectOne(`${BASE}/lockers?city=Clu`).flush([locker('l1')]);
+    expect(comp.lockerSearchError()).toBe(false);
+    expect(comp.lockers().length).toBe(1);
+  });
+
   it('Selecting Easybox leaves Continue disabled until locker chosen', () => {
     const fixture = createFixture();
     flushCosts();
@@ -453,5 +493,30 @@ describe('DeliveryStep', () => {
     expect(comp.addressForm.valid).toBe(false);
     const btn = fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
+  });
+
+  it('keeps Continue disabled for a restored delivery method until both server prices arrive', () => {
+    TestBed.inject(CheckoutStateService).setMethod('Courier', 25);
+
+    const fixture = createFixture();
+    const comp = fixture.componentInstance;
+    const button = () =>
+      fixture.debugElement.query(By.css('.btn--primary')).nativeElement as HTMLButtonElement;
+
+    comp.addressForm.setValue(FISCAL_ADDRESS);
+    fixture.detectChanges();
+
+    expect(comp.deliveryMethod()).toBe('Courier');
+    expect(comp.shippingCostsReady()).toBe(false);
+    expect(button().disabled).toBe(true);
+
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    comp.continue();
+    expect(navigate).not.toHaveBeenCalled();
+
+    flushCosts();
+    fixture.detectChanges();
+
+    expect(button().disabled).toBe(false);
   });
 });

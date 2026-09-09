@@ -101,3 +101,9 @@ Thumbs.db
 
 # Review-gate override log (local evidence for the unattended policy, never shared)
 reviews/state/overrides.jsonl
+
+# -------------------------------------------------------------
+#  Playwright e2e (bolt 066) — run artifacts, never committed
+# -------------------------------------------------------------
+src/PhotoPrint.UI/test-results/
+src/PhotoPrint.UI/playwright-report/
